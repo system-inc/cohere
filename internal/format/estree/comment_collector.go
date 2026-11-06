@@ -148,7 +148,7 @@ func (collector *commentCollector) add(commentType string, start int, end int, v
 		return
 	}
 	collector.seen[start] = true
-	collector.comments = append(collector.comments, New(commentType, start, end, "value", value))
+	collector.comments = append(collector.comments, New(commentType, start, end, []Property{{"value", String(value)}}))
 }
 
 // lineTerminatorSize is the byte length of the line terminator at pos, or 0: \n, \r, U+2028, U+2029.

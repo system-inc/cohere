@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // postcssScssParseScript is the scss oracle: postcss-scss 4.0.9's lib/scss-parse from the fork's
@@ -333,7 +334,10 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 	}
 	javaScriptFiles := []string{}
 	for _, pattern := range []string{"tests/format/js/multiparser-css/*.js", "tests/format/js/template-literals/*.js"} {
-		matches, _ := filepath.Glob(filepath.Join(root, pattern))
+		matches, globError := filepath.Glob(filepath.Join(root, pattern))
+		if globError != nil {
+			test.Fatal(globError)
+		}
 		for _, match := range matches {
 			if filepath.Base(match) != "format.test.js" {
 				javaScriptFiles = append(javaScriptFiles, match)
@@ -359,27 +363,27 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", postcssScssParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	var records []map[string]any
+	var records []oracleRecord
 	seen := map[string]bool{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
+		var record oracleRecord
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		name, isString := record["name"].(string)
-		if !isString {
+		if record.Name == nil {
 			test.Fatalf("the oracle printed a record without a name: %s", line)
 		}
 		records = append(records, record)
-		seen[name] = true
+		seen[*record.Name] = true
 	}
 	for _, each := range inputs {
 		if each.Js == "" && !seen[each.Name] {
@@ -395,22 +399,26 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 		}
 	}
 	for _, want := range records {
-		name, nameIsString := want["name"].(string)
-		text, textIsString := want["text"].(string)
-		if !nameIsString || !textIsString {
-			test.Fatalf("the oracle printed a record without a name and text: %v", want)
+		if want.Name == nil || want.Text == nil {
+			test.Fatalf("the oracle printed a record without a name and text: %s", want.describe())
 		}
+		name := *want.Name
 		if !corpusFiles[name] && !strings.HasPrefix(name, "fixture: ") {
 			templates++
 		}
-		wantError, oracleRefused := want["error"]
+		oracleRefused := want.refused()
 		if expectMalformed, isFixture := malformed[name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and postcss-scss says %v", name, expectMalformed, want)
+			fail("%s: the fixture says malformed=%v and postcss-scss says %s", name, expectMalformed, want.describe())
 			continue
 		}
-		got, gotError := dumpParseWith(ParseScss, text)
+		got, gotError := dumpParseWith(ParseScss, *want.Text)
 		switch {
 		case oracleRefused && gotError != nil:
+			wantError, readError := json_value.Parse(want.Error)
+			if readError != nil {
+				fail("%s: postcss-scss's error does not read as JSON: %v", name, readError)
+				continue
+			}
 			if difference := firstParseDifference(wantError, gotError, "error"); difference != "" {
 				fail("%s: both refuse, differently: %s", name, difference)
 				continue
@@ -420,11 +428,16 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: postcss-scss refuses it (%v) and Go parsed it", name, wantError)
+			fail("%s: postcss-scss refuses it (%s) and Go parsed it", name, want.Error)
 		case gotError != nil:
 			fail("%s: postcss-scss parses it and Go refused: %v", name, gotError)
 		default:
-			if difference := firstParseDifference(want["root"], got, "root"); difference != "" {
+			wantRoot, readError := json_value.Parse(want.Root)
+			if readError != nil {
+				fail("%s: postcss-scss's tree does not read as JSON: %v", name, readError)
+				continue
+			}
+			if difference := firstParseDifference(wantRoot, got, "root"); difference != "" {
 				fail("%s: %s", name, difference)
 				continue
 			}
@@ -457,10 +470,23 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 	// What postcss-scss adds must be in the trees compared, or agreement says nothing about it.
 	features := map[string]int{}
 	for _, want := range records {
-		if root, parsed := want["root"]; parsed {
+		if want.Root != nil {
+			root, readError := json_value.Parse(want.Root)
+			if readError != nil {
+				test.Fatalf("%s: postcss-scss's tree does not read as JSON: %v", *want.Name, readError)
+			}
 			countScssFeatures(root, features)
-		} else if wantError, isMap := want["error"].(map[string]any); isMap && wantError["notCssSyntaxError"] != nil {
-			features["TypeError refusal"]++
+		} else if want.refused() {
+			wantError, readError := json_value.Parse(want.Error)
+			if readError != nil {
+				test.Fatalf("%s: postcss-scss's error does not read as JSON: %v", *want.Name, readError)
+			}
+			// A refusal that is not a CssSyntaxError dumps its message as a string under notCssSyntaxError.
+			if object, isObject := wantError.(json_value.Object); isObject {
+				if message, present := object["notCssSyntaxError"]; present && message != (json_value.Null{}) {
+					features["TypeError refusal"]++
+				}
+			}
 		}
 	}
 	test.Logf("postcss-scss features compared: %v", features)
@@ -480,25 +506,27 @@ func TestParseScssAgreesWithPostcssScss(test *testing.T) {
 }
 
 // countScssFeatures counts, in an oracle dump, the nodes and raws only postcss-scss makes.
-func countScssFeatures(value any, features map[string]int) {
+//
+// Mutates: features the walk adds every feature it finds to the count, so one map gathers a whole corpus.
+func countScssFeatures(value json_value.Value, features map[string]int) {
 	switch typed := value.(type) {
-	case []any:
+	case json_value.Array:
 		for _, each := range typed {
 			countScssFeatures(each, features)
 		}
-	case map[string]any:
-		raws, _ := typed["raws"].(map[string]any)
-		if typed["type"] == "comment" && raws["inline"] == true {
+	case json_value.Object:
+		raws, _ := typed["raws"].(json_value.Object)
+		if typed["type"] == json_value.String("comment") && raws["inline"] == json_value.Boolean(true) {
 			features["inline comment"]++
 			if _, hasText := raws["text"]; hasText {
 				features["inline comment raws.text"]++
 			}
 		}
-		if typed["type"] == "decl" && typed["isNested"] == true {
+		if typed["type"] == json_value.String("decl") && typed["isNested"] == json_value.Boolean(true) {
 			features["nested declaration"]++
 		}
 		for _, field := range []string{"selector", "value", "params"} {
-			if raw, isMap := raws[field].(map[string]any); isMap {
+			if raw, isMap := raws[field].(json_value.Object); isMap {
 				if _, hasScss := raw["scss"]; hasScss {
 					features["raws."+field+".scss"]++
 				}

@@ -32,7 +32,9 @@ func (reader *jsonReader) skipTrivia() {
 			for end < len(text) && lineTerminatorSize(text, end) == 0 {
 				end++
 			}
-			reader.comments = append(reader.comments, New("Line", start, end, "value", text[start+2:end]))
+			reader.comments = append(reader.comments, New("Line", start, end, []Property{
+				{"value", String(text[start+2 : end])},
+			}))
 			reader.position = end
 		case strings.HasPrefix(text[start:], "/*"):
 			closing := strings.Index(text[start+2:], "*/")
@@ -42,7 +44,9 @@ func (reader *jsonReader) skipTrivia() {
 				return
 			}
 			end := start + 2 + closing + 2
-			reader.comments = append(reader.comments, New("Block", start, end, "value", text[start+2:end-2]))
+			reader.comments = append(reader.comments, New("Block", start, end, []Property{
+				{"value", String(text[start+2 : end-2])},
+			}))
 			reader.position = end
 		default:
 			size := whitespaceSize(text, start)
@@ -104,8 +108,11 @@ func (reader *jsonReader) parseValue() (*Node, error) {
 				(argument.String("name") == "Infinity" || argument.String("name") == "NaN")) {
 			return nil, reader.errorf("Operator '%c' before '%s' is not allowed in JSON", character, argument.Type())
 		}
-		return New("UnaryExpression", start, argument.End(), "operator", string(character), "prefix", true,
-			"argument", argument), nil
+		return New("UnaryExpression", start, argument.End(), []Property{
+			{"operator", String(string(character))},
+			{"prefix", Boolean(true)},
+			{"argument", argument},
+		}), nil
 	case character == '.' || character >= '0' && character <= '9':
 		return reader.parseNumber()
 	}
@@ -115,11 +122,11 @@ func (reader *jsonReader) parseValue() (*Node, error) {
 	case "":
 		return nil, reader.errorf("unexpected %q", reader.text[start:min(start+10, len(reader.text))])
 	case "true", "false":
-		return New("BooleanLiteral", start, reader.position, "value", name == "true"), nil
+		return New("BooleanLiteral", start, reader.position, []Property{{"value", Boolean(name == "true")}}), nil
 	case "null":
-		return New("NullLiteral", start, reader.position), nil
+		return New("NullLiteral", start, reader.position, nil), nil
 	case "Infinity", "NaN", "undefined":
-		return New("Identifier", start, reader.position, "name", name), nil
+		return New("Identifier", start, reader.position, []Property{{"name", String(name)}}), nil
 	}
 	return nil, reader.errorf("Identifier '%s' is not allowed in JSON", name)
 }
@@ -127,7 +134,7 @@ func (reader *jsonReader) parseValue() (*Node, error) {
 func (reader *jsonReader) parseObject() (*Node, error) {
 	start := reader.position
 	reader.position++
-	properties := []*Node{}
+	properties := Nodes{}
 	for {
 		character := reader.peek()
 		if reader.triviaError != nil {
@@ -151,7 +158,7 @@ func (reader *jsonReader) parseObject() (*Node, error) {
 		}
 		break
 	}
-	return New("ObjectExpression", start, reader.position, "properties", properties), nil
+	return New("ObjectExpression", start, reader.position, []Property{{"properties", properties}}), nil
 }
 
 // parseProperty reads `key: value`. A computed, shorthand or method property is refused, as
@@ -173,7 +180,7 @@ func (reader *jsonReader) parseProperty() (*Node, error) {
 		if name == "" {
 			return nil, reader.errorf("unexpected %q", reader.text[start:min(start+10, len(reader.text))])
 		}
-		key = New("Identifier", start, reader.position, "name", name)
+		key = New("Identifier", start, reader.position, []Property{{"name", String(name)}})
 	}
 	if keyError != nil {
 		return nil, keyError
@@ -186,14 +193,19 @@ func (reader *jsonReader) parseProperty() (*Node, error) {
 	if parseValueError != nil {
 		return nil, parseValueError
 	}
-	return New("ObjectProperty", start, value.End(), "method", false, "key", key, "computed", false,
-		"shorthand", false, "value", value), nil
+	return New("ObjectProperty", start, value.End(), []Property{
+		{"method", Boolean(false)},
+		{"key", key},
+		{"computed", Boolean(false)},
+		{"shorthand", Boolean(false)},
+		{"value", value},
+	}), nil
 }
 
 func (reader *jsonReader) parseArray() (*Node, error) {
 	start := reader.position
 	reader.position++
-	elements := []*Node{}
+	elements := Nodes{}
 	for {
 		character := reader.peek()
 		if reader.triviaError != nil {
@@ -223,7 +235,7 @@ func (reader *jsonReader) parseArray() (*Node, error) {
 		}
 		break
 	}
-	return New("ArrayExpression", start, reader.position, "elements", elements), nil
+	return New("ArrayExpression", start, reader.position, []Property{{"elements", elements}}), nil
 }
 
 // parseString reads a single or double quoted string, keeping its raw text and decoding its value.
@@ -249,7 +261,7 @@ func (reader *jsonReader) parseString() (*Node, error) {
 	if decodeJavaScriptStringError != nil {
 		return nil, reader.errorf("%v", decodeJavaScriptStringError)
 	}
-	return New("StringLiteral", start, reader.position, "value", value, "raw", raw), nil
+	return New("StringLiteral", start, reader.position, []Property{{"value", String(value)}, {"raw", String(raw)}}), nil
 }
 
 // parseTemplate reads a template literal with no expressions, the only kind assertJsonNode accepts.
@@ -278,12 +290,15 @@ func (reader *jsonReader) parseTemplate() (*Node, error) {
 		"TemplateElement",
 		start+1,
 		position,
-		"value",
-		&TemplateValue{Cooked: &cooked, Raw: raw},
-		"tail",
-		true,
+		[]Property{
+			{"value", &TemplateValue{Cooked: &cooked, Raw: raw}},
+			{"tail", Boolean(true)},
+		},
 	)
-	return New("TemplateLiteral", start, reader.position, "expressions", []*Node{}, "quasis", []*Node{element}), nil
+	return New("TemplateLiteral", start, reader.position, []Property{
+		{"expressions", Nodes{}},
+		{"quasis", Nodes{element}},
+	}), nil
 }
 
 // parseNumber reads a numeric literal: decimal with fraction and exponent, or hexadecimal, octal and
@@ -347,7 +362,10 @@ func (reader *jsonReader) parseNumber() (*Node, error) {
 		return nil, reader.errorf("invalid number %q", text[start:position+1])
 	}
 	reader.position = position
-	return New("NumericLiteral", start, position, "value", value, "raw", text[start:position]), nil
+	return New("NumericLiteral", start, position, []Property{
+		{"value", Number(value)},
+		{"raw", String(text[start:position])},
+	}), nil
 }
 
 // readIdentifierName reads an IdentifierName at the position, or returns "" without moving.

@@ -70,22 +70,17 @@ func characterCodeAt(css []uint16, index int) int {
 
 // slice is css.slice(start, end), as WTF-8 (see wtf8.go): it can cut a surrogate pair after a backslash.
 func slice(css []uint16, start int, end int) string {
-	if end > len(css) {
-		end = len(css)
-	}
-	if start >= end {
+	clampedEnd := min(end, len(css))
+	if start >= clampedEnd {
 		return ""
 	}
-	return unitsToWtf8(css[start:end])
+	return unitsToWtf8(css[start:clampedEnd])
 }
 
 // indexOf is css.indexOf(search, from).
 func indexOf(css []uint16, search string, from int) int {
 	units := utf16.Encode([]rune(search))
-	if from < 0 {
-		from = 0
-	}
-	for index := from; index+len(units) <= len(css); index++ {
+	for index := max(from, 0); index+len(units) <= len(css); index++ {
 		matched := true
 		for offset, unit := range units {
 			if css[index+offset] != unit {
@@ -103,9 +98,15 @@ func indexOf(css []uint16, search string, from int) int {
 func tokenize(css []uint16) []*token {
 	tokens := []*token{}
 
-	var code, next, nextLine, nextOffset, escapePosition int
-	var quote, content string
-	var escape, escaped bool
+	var code int
+	var next int
+	var nextLine int
+	var nextOffset int
+	var escapePosition int
+	var quote string
+	var content string
+	var escape bool
+	var escaped bool
 
 	length := len(css)
 	offset := -1

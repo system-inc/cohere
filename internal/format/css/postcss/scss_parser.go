@@ -47,7 +47,7 @@ func (parser *scssParser) comment(commentToken token) {
 	if commentToken.inline {
 		node := newComment()
 		parser.init(node, commentToken.start)
-		node.raws["inline"] = true
+		node.raws["inline"] = rawFlag(true)
 		lineAndColumn := parser.input.fromOffset(commentToken.end)
 		node.source.end = &position{
 			column: lineAndColumn.column,
@@ -58,17 +58,17 @@ func (parser *scssParser) comment(commentToken token) {
 		text := commentToken.value[2:]
 		if strings.TrimFunc(text, ecmascripttext.IsWhitespace) == "" {
 			node.text = ""
-			node.raws["left"] = text
-			node.raws["right"] = ""
+			node.raws["left"] = rawText(text)
+			node.raws["right"] = rawText("")
 		} else {
 			// text.match(/^(\s*)([^]*\S)(\s*)$/), as Parser.comment reads it.
 			trimmedStart := strings.TrimLeftFunc(text, ecmascripttext.IsWhitespace)
 			trimmed := strings.TrimRightFunc(trimmedStart, ecmascripttext.IsWhitespace)
 			fixed := replaceCommentDelimiters(trimmed)
 			node.text = fixed
-			node.raws["left"] = text[:len(text)-len(trimmedStart)]
-			node.raws["right"] = trimmedStart[len(trimmed):]
-			node.raws["text"] = trimmed
+			node.raws["left"] = rawText(text[:len(text)-len(trimmedStart)])
+			node.raws["right"] = rawText(trimmedStart[len(trimmed):])
+			node.raws["text"] = rawText(trimmed)
 		}
 		node.mark("text")
 	} else {
@@ -124,15 +124,16 @@ func (parser *scssParser) rule(tokens []token) {
 	if !withColon || strings.TrimFunc(value, ecmascripttext.IsWhitespace) == "" || startsLikeAProperty(value) {
 		parser.parser.rule(tokens)
 	} else {
-		tokens = tokens[:len(tokens)-1]
+		// remaining is the tokens not yet read, starting without the "{" that opens the block.
+		remaining := tokens[:len(tokens)-1]
 		node := newNestedDeclaration()
-		parser.init(node, tokens[0].start)
+		parser.init(node, remaining[0].start)
 
 		// The last token that is not a space; there is one, the colon.
 		var last token
-		for index := len(tokens) - 1; index >= 0; index-- {
-			if tokens[index].kind != "space" {
-				last = tokens[index]
+		for index := len(remaining) - 1; index >= 0; index-- {
+			if remaining[index].kind != "space" {
+				last = remaining[index]
 				break
 			}
 		}
@@ -154,73 +155,76 @@ func (parser *scssParser) rule(tokens []token) {
 		}
 
 		for {
-			if len(tokens) == 0 {
+			if len(remaining) == 0 {
 				// tokens[0][0] on an empty array.
+				// Invariant: this is upstream's TypeError, which a nested property with no word reaches; Parse
+				// recovers every *TypeError and returns it as a syntax error, so the panic never leaves the
+				// package.
 				panic(&TypeError{Message: "Cannot read properties of undefined (reading '0')"})
 			}
-			if tokens[0].kind == "word" {
+			if remaining[0].kind == "word" {
 				break
 			}
-			node.raws["before"] = node.rawString("before") + tokens[0].value
-			tokens = tokens[1:]
+			node.raws["before"] = rawText(node.rawString("before") + remaining[0].value)
+			remaining = remaining[1:]
 		}
 
 		// `if (tokens[0][2])`: a start of 0 keeps the one init set, which is the same offset.
-		if tokens[0].start > 0 {
-			lineAndColumn := parser.input.fromOffset(tokens[0].start)
+		if remaining[0].start > 0 {
+			lineAndColumn := parser.input.fromOffset(remaining[0].start)
 			node.source.start = &position{
 				column: lineAndColumn.column,
 				line:   lineAndColumn.line,
-				offset: tokens[0].start,
+				offset: remaining[0].start,
 			}
 		}
 
 		node.property = ""
 		node.mark("prop")
-		for len(tokens) > 0 {
-			kind := tokens[0].kind
+		for len(remaining) > 0 {
+			kind := remaining[0].kind
 			if kind == ":" || kind == "space" || kind == "comment" {
 				break
 			}
-			node.property += tokens[0].value
-			tokens = tokens[1:]
+			node.property += remaining[0].value
+			remaining = remaining[1:]
 		}
 
-		node.raws["between"] = ""
+		node.raws["between"] = rawText("")
 
 		var each token
-		for len(tokens) > 0 {
-			each = tokens[0]
-			tokens = tokens[1:]
+		for len(remaining) > 0 {
+			each = remaining[0]
+			remaining = remaining[1:]
 
 			if each.kind == ":" {
-				node.raws["between"] = node.rawString("between") + each.value
+				node.raws["between"] = rawText(node.rawString("between") + each.value)
 				break
 			} else {
-				node.raws["between"] = node.rawString("between") + each.value
+				node.raws["between"] = rawText(node.rawString("between") + each.value)
 			}
 		}
 
 		if node.property != "" && (node.property[0] == '_' || node.property[0] == '*') {
-			node.raws["before"] = node.rawString("before") + node.property[:1]
+			node.raws["before"] = rawText(node.rawString("before") + node.property[:1])
 			node.property = node.property[1:]
 		}
-		node.raws["between"] = node.rawString("between") + parser.spacesAndCommentsFromStart(&tokens)
+		node.raws["between"] = rawText(node.rawString("between") + parser.spacesAndCommentsFromStart(&remaining))
 		// precheckMissedSemicolon is a hook for postcss-safe-parser; the base parser's does nothing.
 
-		for index := len(tokens) - 1; index > 0; index-- {
-			each = tokens[index]
+		for index := len(remaining) - 1; index > 0; index-- {
+			each = remaining[index]
 			if each.value == "!important" {
 				node.important = true
 				node.mark("important")
-				text := parser.stringFrom(&tokens, index)
-				text = parser.spacesFromEnd(&tokens) + text
+				text := parser.stringFrom(&remaining, index)
+				text = parser.spacesFromEnd(&remaining) + text
 				if text != " !important" {
-					node.raws["important"] = text
+					node.raws["important"] = rawText(text)
 				}
 				break
 			} else if each.value == "important" {
-				cache := copyTokens(tokens, 0, len(tokens))
+				cache := copyTokens(remaining, 0, len(remaining))
 				text := ""
 				for cursor := index; cursor > 0; cursor-- {
 					kind := cache[cursor].kind
@@ -233,8 +237,8 @@ func (parser *scssParser) rule(tokens []token) {
 				if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") {
 					node.important = true
 					node.mark("important")
-					node.raws["important"] = text
-					tokens = cache
+					node.raws["important"] = rawText(text)
+					remaining = cache
 				}
 			}
 
@@ -243,10 +247,10 @@ func (parser *scssParser) rule(tokens []token) {
 			}
 		}
 
-		parser.raw(node, "value", tokens, false)
+		parser.raw(node, "value", remaining, false)
 
 		if strings.Contains(node.value, ":") {
-			parser.checkMissedSemicolon(tokens)
+			parser.checkMissedSemicolon(remaining)
 		}
 
 		parser.current = node

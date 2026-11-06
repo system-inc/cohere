@@ -63,22 +63,16 @@ func (nodes *Arena) Length() int {
 }
 
 // node is New, from the arena.
-func (nodes *Arena) node(nodeType string, start int, end int, keysAndValues []any) *Node {
+func (nodes *Arena) node(nodeType string, start int, end int, properties []Property) *Node {
 	if nodes == nil {
-		return New(nodeType, start, end, keysAndValues...)
+		return New(nodeType, start, end, properties)
 	}
 	nodes.count++
 	created := nodes.nodes.New(
-		Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)},
+		Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(properties))},
 	)
-	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		key, ok := keysAndValues[index].(string)
-		if !ok {
-			// Invariant: node's only caller is the converter's node helpers, and every conversion passes its keys
-			// as string literals, key then value.
-			panic("estree: a node property key that is not a string")
-		}
-		created.Set(key, keysAndValues[index+1])
+	for _, given := range properties {
+		created.Set(given.Key, given.Value)
 	}
 	return created
 }

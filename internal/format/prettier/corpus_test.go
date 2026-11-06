@@ -34,7 +34,9 @@ func TestCorpus(test *testing.T) {
 		test.Fatalf("reading the list: %v", readError)
 	}
 
-	var formatted, failed, refused int
+	var formatted int
+	var failed int
+	var refused int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
 		if path == "" {

@@ -21,17 +21,28 @@ func parseNodes(test *testing.T, text string) []*estree.Node {
 	return root.List("nodes")[0].List("nodes")
 }
 
-func sourceColumn(test *testing.T, node *estree.Node, edge string) any {
+// sourceColumn is node.source[edge].column, which the library holds as an Integer or a NaN Number: the
+// column, or isNaN for NaN. Any other value fails the test.
+func sourceColumn(test *testing.T, node *estree.Node, edge string) (int, bool) {
 	test.Helper()
-	nodeSource, isMap := node.Get("source").(map[string]any)
+	nodeSource, isMap := node.Get("source").(estree.Record)
 	if !isMap {
 		test.Fatalf("%s source %v, want a {start, end} object", node.Type(), node.Get("source"))
 	}
-	edgePosition, isMap := nodeSource[edge].(map[string]any)
+	edgePosition, isMap := nodeSource[edge].(estree.Record)
 	if !isMap {
 		test.Fatalf("%s source %s %v, want a {line, column} object", node.Type(), edge, nodeSource[edge])
 	}
-	return edgePosition["column"]
+	switch column := edgePosition["column"].(type) {
+	case estree.Integer:
+		return int(column), false
+	case estree.Number:
+		if math.IsNaN(float64(column)) {
+			return 0, true
+		}
+	}
+	test.Fatalf("%s source %s column %#v, want an Integer or NaN", node.Type(), edge, edgePosition["column"])
+	return 0, false
 }
 
 // TestParseShapes checks, without node, the fields the oracle found that are easiest to get wrong:
@@ -50,7 +61,8 @@ func TestParseShapes(test *testing.T) {
 	}
 
 	// A signed number splits into value and unit, and its sourceIndex is the merged word's last token.
-	if nodes[0].String("value") != "-5" || nodes[0].String("unit") != "px" || nodes[0].Get("sourceIndex") != 1 {
+	if nodes[0].String("value") != "-5" || nodes[0].String("unit") != "px" ||
+		nodes[0].Get("sourceIndex") != estree.Integer(1) {
 		test.Errorf(
 			"-5px: got value %q unit %q sourceIndex %v",
 			nodes[0].String("value"),
@@ -59,12 +71,13 @@ func TestParseShapes(test *testing.T) {
 		)
 	}
 	// --foo is "--" and "foo" merged, indexed at "foo"; loc.js's fixValueWordLoc undoes that.
-	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != 7 || raws(nodes[1])["before"] != " " {
+	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != estree.Integer(7) ||
+		rawString(nodes[1], "before") != " " {
 		test.Errorf(
 			"--foo: got value %q sourceIndex %v raws %v",
 			nodes[1].String("value"),
 			nodes[1].Get("sourceIndex"),
-			raws(nodes[1]),
+			nodes[1].Get("raws"),
 		)
 	}
 	// A function holds its parens and arguments, and is balanced again at the end.
@@ -73,22 +86,22 @@ func TestParseShapes(test *testing.T) {
 		!function[0].Is("paren") ||
 		!function[2].Is("operator") ||
 		!function[4].Is("paren") ||
-		nodes[2].Get("unbalanced") != float64(0) {
+		nodes[2].Get("unbalanced") != estree.Number(0) {
 		test.Errorf("calc: got %d children, unbalanced %v", len(function), nodes[2].Get("unbalanced"))
 	}
 	// The operator's sourceIndex is its token's end line, 1, not its index.
-	if function[2].Get("sourceIndex") != 1 {
+	if function[2].Get("sourceIndex") != estree.Integer(1) {
 		test.Errorf("operator sourceIndex: want 1 (the line), got %v", function[2].Get("sourceIndex"))
 	}
 	if !nodes[3].Bool("isHex") || !nodes[3].Bool("isColor") {
 		test.Errorf("#fff: want isHex and isColor")
 	}
-	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || raws(nodes[4])["quote"] != "\"" {
+	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || rawString(nodes[4], "quote") != "\"" {
 		test.Errorf(
 			"string: got %q quoted %v raws %v",
 			nodes[4].String("value"),
 			nodes[4].Get("quoted"),
-			raws(nodes[4]),
+			nodes[4].Get("raws"),
 		)
 	}
 	if nodes[5].String("value") != " c " || nodes[5].Bool("inline") {
@@ -97,23 +110,26 @@ func TestParseShapes(test *testing.T) {
 
 	// A value opening with a paren ends that paren at column NaN; the next paren reuses a stale end.
 	parens := parseNodes(test, "(a)")
-	if column, isFloat := sourceColumn(test, parens[0], "end").(float64); !isFloat || !math.IsNaN(column) {
-		test.Errorf("first paren end column: want NaN, got %v", sourceColumn(test, parens[0], "end"))
+	if column, isNaN := sourceColumn(test, parens[0], "end"); !isNaN {
+		test.Errorf("first paren end column: want NaN, got %v", column)
 	}
-	if sourceColumn(test, parens[2], "end") != 2 {
-		test.Errorf("closing paren end column: want 2, got %v", sourceColumn(test, parens[2], "end"))
+	if column, isNaN := sourceColumn(test, parens[2], "end"); isNaN || column != 2 {
+		test.Errorf("closing paren end column: want 2, got %v (NaN %v)", column, isNaN)
 	}
 
 	// sourceIndex is bytes; columns stay UTF-16 units.
 	multibyte := parseNodes(test, "\xc3\xa9 \xf0\x9f\x98\x80x b")
-	if multibyte[1].Get("sourceIndex") != 3 ||
-		multibyte[2].Get("sourceIndex") != 9 ||
-		sourceColumn(test, multibyte[2], "start") != 7 {
+	column, isNaN := sourceColumn(test, multibyte[2], "start")
+	if multibyte[1].Get("sourceIndex") != estree.Integer(3) ||
+		multibyte[2].Get("sourceIndex") != estree.Integer(9) ||
+		isNaN ||
+		column != 7 {
 		test.Errorf(
-			"non-ASCII: got sourceIndex %v and %v, column %v",
+			"non-ASCII: got sourceIndex %v and %v, column %v (NaN %v)",
 			multibyte[1].Get("sourceIndex"),
 			multibyte[2].Get("sourceIndex"),
-			sourceColumn(test, multibyte[2], "start"),
+			column,
+			isNaN,
 		)
 	}
 

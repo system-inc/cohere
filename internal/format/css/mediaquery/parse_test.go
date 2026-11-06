@@ -18,8 +18,8 @@ func renderTree(node *estree.Node, depth int, builder *strings.Builder) {
 	}
 	builder.WriteString(nodeType)
 	builder.WriteString(" " + quote(node.String("value")))
-	sourceIndex, _ := node.Get("sourceIndex").(int)
-	builder.WriteString(" @" + itoa(sourceIndex))
+	sourceIndex, _ := node.Get("sourceIndex").(estree.Integer)
+	builder.WriteString(" @" + itoa(int(sourceIndex)))
 	builder.WriteString(" before=" + quote(node.String("before")) + " after=" + quote(node.String("after")))
 	builder.WriteString("\n")
 	for _, child := range node.List("nodes") {
@@ -34,9 +34,8 @@ func itoa(number int) string {
 		return "0"
 	}
 	digits := ""
-	for number > 0 {
-		digits = string(rune('0'+number%10)) + digits
-		number /= 10
+	for remaining := number; remaining > 0; remaining /= 10 {
+		digits = string(rune('0'+remaining%10)) + digits
 	}
 	return digits
 }

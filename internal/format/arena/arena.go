@@ -72,6 +72,8 @@ func (arena *Arena[T]) Reset() {
 // Release hands back values a caller keeps for its next use, as Reset does an arena's: cleared, so the
 // strings and slices they held are not kept alive, or under cohere_poison filled with poison, so a value
 // read after its release reads something no parse produces (#v6ksqg3).
+//
+// Mutates: values clearing or poisoning the caller's own memory is what releasing it means
 func Release[T any](values []T, poison T) {
 	if poisonReleased {
 		for index := range values {

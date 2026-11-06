@@ -18,8 +18,13 @@ func TestFormatIsIdempotent(test *testing.T) {
 		test.Skip("set COHERE_IDEM_LIST")
 	}
 	engine := newTestEngine(test)
-	listBytes, _ := os.ReadFile(listPath)
-	var checked, unstable, changedFromSource int
+	listBytes, listReadError := os.ReadFile(listPath)
+	if listReadError != nil {
+		test.Fatalf("reading the list: %v", listReadError)
+	}
+	var checked int
+	var unstable int
+	var changedFromSource int
 	for _, path := range strings.Split(strings.TrimSpace(string(listBytes)), "\n") {
 		path = strings.TrimSpace(path)
 		if path == "" || !engine.Handles(path) {

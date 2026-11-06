@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/optionschema"
+	"github.com/system-inc/cohere/internal/json_value"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -62,7 +62,7 @@ type RuleOptions struct {
 // that read their element with json.Unmarshal rather than rule.UnmarshalOptions.
 func refuseNulls(elements []json.RawMessage) error {
 	for index, element := range elements {
-		value, parseError := optionschema.ParseJsonValue(element)
+		value, parseError := json_value.Parse(element)
 		if parseError != nil {
 			// Malformed JSON is the decoder's to report, in its own words.
 			continue
@@ -81,17 +81,17 @@ func refuseNulls(elements []json.RawMessage) error {
 
 // nullPath finds the first null in a decoded JSON value, walking object keys in sorted order so the
 // same config always names the same path, and returns its dotted path.
-func nullPath(value optionschema.JsonValue, path string) (string, bool) {
+func nullPath(value json_value.Value, path string) (string, bool) {
 	switch typed := value.(type) {
-	case optionschema.JsonNull:
+	case json_value.Null:
 		return path, true
-	case optionschema.JsonArray:
+	case json_value.Array:
 		for index, member := range typed {
 			if found, isNull := nullPath(member, joinPath(path, strconv.Itoa(index))); isNull {
 				return found, true
 			}
 		}
-	case optionschema.JsonObject:
+	case json_value.Object:
 		keys := make([]string, 0, len(typed))
 		for key := range typed {
 			keys = append(keys, key)

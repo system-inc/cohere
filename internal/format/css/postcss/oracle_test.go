@@ -10,12 +10,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // postcssParseScript is the oracle: postcss 8.5.16 from the fork's node_modules, called the way
@@ -306,7 +308,10 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("reading the home directory for %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
 		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
@@ -356,25 +361,25 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", postcssParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	oracle := map[string]map[string]any{}
+	oracle := map[string]oracleRecord{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
+		var record oracleRecord
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		name, isString := record["name"].(string)
-		if !isString {
+		if record.Name == nil {
 			test.Fatalf("the oracle printed a record without a name: %s", line)
 		}
-		oracle[name] = record
+		oracle[*record.Name] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different := 0, 0, 0, 0
@@ -389,14 +394,19 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 		if !present {
 			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
-		wantError, oracleRefused := want["error"]
+		oracleRefused := want.refused()
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and postcss says %v", each.Name, expectMalformed, want)
+			fail("%s: the fixture says malformed=%v and postcss says %s", each.Name, expectMalformed, want.describe())
 			continue
 		}
 		got, gotError := dumpParse(each.Text)
 		switch {
 		case oracleRefused && gotError != nil:
+			wantError, readError := json_value.Parse(want.Error)
+			if readError != nil {
+				fail("%s: postcss's error does not read as JSON: %v", each.Name, readError)
+				continue
+			}
 			if difference := firstParseDifference(wantError, gotError, "error"); difference != "" {
 				fail("%s: both refuse, differently: %s", each.Name, difference)
 				continue
@@ -406,11 +416,16 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: postcss refuses it (%v) and Go parsed it", each.Name, wantError)
+			fail("%s: postcss refuses it (%s) and Go parsed it", each.Name, want.Error)
 		case gotError != nil:
 			fail("%s: postcss parses it and Go refused: %v", each.Name, gotError)
 		default:
-			if difference := firstParseDifference(want["root"], got, "root"); difference != "" {
+			wantRoot, readError := json_value.Parse(want.Root)
+			if readError != nil {
+				fail("%s: postcss's tree does not read as JSON: %v", each.Name, readError)
+				continue
+			}
+			if difference := firstParseDifference(wantRoot, got, "root"); difference != "" {
 				fail("%s: %s", each.Name, difference)
 				continue
 			}
@@ -436,109 +451,138 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 	}
 }
 
-// dumpParse parses one text and renders it the way the oracle script does, through JSON, so both sides
-// compare as the same Go values: the tree, or a non-nil error dump.
-func dumpParse(text string) (any, any) {
+// oracleRecord is one line an oracle script prints: the input's name, the text it parsed where the script
+// says (the scss script does), and either the root it dumped or the error it refused with. Root and Error
+// stay raw JSON until they are compared, and Error is set exactly when the script refused the input.
+type oracleRecord struct {
+	Name  *string         `json:"name"`
+	Text  *string         `json:"text"`
+	Root  json.RawMessage `json:"root"`
+	Error json.RawMessage `json:"error"`
+}
+
+// refused is whether the script refused the input: its record carries an error.
+func (record oracleRecord) refused() bool {
+	return record.Error != nil
+}
+
+// describe is the script's answer as a failure message shows it.
+func (record oracleRecord) describe() string {
+	if record.refused() {
+		return "it refuses it with " + string(record.Error)
+	}
+	return "it parses it to " + string(record.Root)
+}
+
+// dumpParse parses one text and renders it the way the oracle script does, as the JSON values the
+// script prints: the tree, or a non-nil error dump.
+func dumpParse(text string) (json_value.Value, json_value.Value) {
 	return dumpParseWith(Parse, text)
 }
 
 // dumpParseWith is dumpParse with the parser named, Parse or ParseSCSS.
-func dumpParseWith(parse func(string) (*estree.Node, error), text string) (any, any) {
+func dumpParseWith(parse func(string) (*estree.Node, error), text string) (json_value.Value, json_value.Value) {
 	offsets := utf16OffsetsOf(stripByteOrderMark(text))
 	root, parseError := parse(text)
 	if parseError != nil {
 		var syntaxError *CssSyntaxError
 		if !errors.As(parseError, &syntaxError) {
-			return nil, map[string]any{"notCssSyntaxError": parseError.Error()}
+			return nil, json_value.Object{"notCssSyntaxError": json_value.String(parseError.Error())}
 		}
-		dumped := map[string]any{
-			"name":   syntaxError.Name(),
-			"reason": syntaxError.Reason,
-			"line":   syntaxError.Line,
-			"column": syntaxError.Column,
-			"offset": offsets(syntaxError.Offset),
+		dumped := json_value.Object{
+			"name":   jsonString(syntaxError.Name()),
+			"reason": jsonString(syntaxError.Reason),
+			"line":   jsonInteger(syntaxError.Line),
+			"column": jsonInteger(syntaxError.Column),
+			"offset": jsonInteger(offsets(syntaxError.Offset)),
 		}
 		if syntaxError.HasEnd {
-			dumped["endLine"] = syntaxError.EndLine
-			dumped["endColumn"] = syntaxError.EndColumn
-			dumped["endOffset"] = offsets(syntaxError.EndOffset)
+			dumped["endLine"] = jsonInteger(syntaxError.EndLine)
+			dumped["endColumn"] = jsonInteger(syntaxError.EndColumn)
+			dumped["endOffset"] = jsonInteger(offsets(syntaxError.EndOffset))
 		}
-		return nil, throughJson(dumped)
+		return nil, dumped
 	}
-	return throughJson(dumpParseValue(root, offsets)), nil
+	return dumpParseValue(root, offsets), nil
 }
 
-func throughJson(value any) any {
-	encoded, encodeError := json.Marshal(value)
-	if encodeError != nil {
-		return fmt.Sprintf("not JSON: %v", encodeError)
-	}
-	var result any
-	if decodeError := json.Unmarshal(encoded, &result); decodeError != nil {
-		return fmt.Sprintf("not JSON: %v", decodeError)
-	}
-	return result
+// jsonString is text as it reads back from JSON: encoding/json writes each byte that is not UTF-8 as
+// U+FFFD, and converting to runes and back does the same, so a string compares as the trip through JSON
+// the oracle's tree takes would leave it.
+func jsonString(text string) json_value.String {
+	return json_value.String(string([]rune(text)))
 }
 
-func dumpParseValue(value any, offsets func(int) int) any {
+// jsonInteger is an int as a JSON number.
+func jsonInteger(number int) json_value.Number {
+	return json_value.Number(strconv.Itoa(number))
+}
+
+// dumpParseValue is one of a node's properties as the JSON value the oracle script prints for it, with
+// every offset converted to UTF-16.
+func dumpParseValue(value estree.Value, offsets func(int) int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
-		result := map[string]any{"type": typed.Type()}
-		keys := []string{}
+		result := json_value.Object{"type": jsonString(typed.Type())}
+		keys := json_value.Array{}
 		for _, key := range typed.Keys() {
-			keys = append(keys, key)
+			keys = append(keys, jsonString(key))
 			result[key] = dumpParseValue(typed.Get(key), offsets)
 		}
 		result["keys"] = keys
-		if source, isMap := typed.Get("source").(map[string]any); isMap {
-			start, _ := source["start"].(map[string]any)
-			end, hasEnd := source["end"].(map[string]any)
+		if source, isMap := typed.Get("source").(estree.Record); isMap {
+			start, _ := source["start"].(estree.Record)
+			end, hasEnd := source["end"].(estree.Record)
 			wantRange := [2]int{0, 0}
 			if start != nil && hasEnd {
-				startOffset, startIsInt := start["offset"].(int)
-				endOffset, endIsInt := end["offset"].(int)
+				startOffset, startIsInt := start["offset"].(estree.Integer)
+				endOffset, endIsInt := end["offset"].(estree.Integer)
 				if !startIsInt || !endIsInt {
-					result["range"] = fmt.Sprintf(
+					result["range"] = jsonString(fmt.Sprintf(
 						"source offsets %#v and %#v are not both ints",
 						start["offset"],
 						end["offset"],
-					)
+					))
 					return result
 				}
-				wantRange = [2]int{startOffset, endOffset}
+				wantRange = [2]int{int(startOffset), int(endOffset)}
 			}
 			if typed.Range != wantRange {
-				result["range"] = fmt.Sprintf("Range %v is not source's %v", typed.Range, wantRange)
+				result["range"] = jsonString(fmt.Sprintf("Range %v is not source's %v", typed.Range, wantRange))
 			}
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
-			return "a nil list, which no postcss field holds"
+			return json_value.String("a nil list, which no postcss field holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpParseValue(child, offsets)
 		}
 		return result
-	case map[string]any:
-		result := map[string]any{}
+	case estree.Record:
+		result := json_value.Object{}
 		for key, each := range typed {
 			if key == "offset" {
-				if offset, isInt := each.(int); isInt {
-					result[key] = offsets(offset)
+				if offset, isInt := each.(estree.Integer); isInt {
+					result[key] = jsonInteger(offsets(int(offset)))
 					continue
 				}
 			}
 			result[key] = dumpParseValue(each, offsets)
 		}
 		return result
-	case string, bool, int:
-		return typed
+	case estree.String:
+		return jsonString(string(typed))
+	case estree.Boolean:
+		return json_value.Boolean(typed)
+	case estree.Integer:
+		return jsonInteger(int(typed))
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
@@ -581,11 +625,11 @@ func utf16OffsetsOf(text string) func(int) int {
 	}
 }
 
-// firstParseDifference names the first path where two decoded JSON values differ, or "".
-func firstParseDifference(want any, got any, path string) string {
+// firstParseDifference names the first path where two JSON values differ, or "".
+func firstParseDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -620,8 +664,8 @@ func firstParseDifference(want any, got any, path string) string {
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements %v, got %v", path, len(typed), typed, got)
 		}
@@ -636,8 +680,29 @@ func firstParseDifference(want any, got any, path string) string {
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

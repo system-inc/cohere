@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // graphqlParseScript is the oracle: graphql-js 17.0.2 from the fork's node_modules, called the way
@@ -253,7 +255,10 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("expanding %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
 		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
@@ -302,21 +307,22 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", graphqlParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	oracle := map[string]map[string]any{}
+	oracle := map[string]oracleRecord{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
+		var record oracleRecord
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		oracle[record["name"].(string)] = record
+		oracle[record.Name] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different := 0, 0, 0, 0
@@ -331,19 +337,24 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 		if !present {
 			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
-		wantError, oracleRefused := want["error"].(string)
+		oracleRefused := want.Error != nil
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture && expectMalformed != oracleRefused {
-			fail("%s: the fixture says malformed=%v and graphql-js says %v", each.Name, expectMalformed, want)
+			fail(
+				"%s: the fixture says malformed=%v and graphql-js says %s",
+				each.Name,
+				expectMalformed,
+				want.describe(),
+			)
 			continue
 		}
-		got, dumpParseError := dumpParse(each.Text)
+		gotAst, gotComments, dumpParseError := dumpParse(each.Text)
 		switch {
 		case oracleRefused && dumpParseError != nil:
-			if dumpParseError.Error() != wantError {
+			if dumpParseError.Error() != *want.Error {
 				fail(
 					"%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s",
 					each.Name,
-					wantError,
+					*want.Error,
 					dumpParseError.Error(),
 				)
 				continue
@@ -353,12 +364,18 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 				corpusRefused++
 			}
 		case oracleRefused:
-			fail("%s: graphql-js refuses it (%s) and Go parsed it", each.Name, wantError)
+			fail("%s: graphql-js refuses it (%s) and Go parsed it", each.Name, *want.Error)
 		case dumpParseError != nil:
 			fail("%s: graphql-js parses it and Go refused: %v", each.Name, dumpParseError)
 		default:
-			difference := firstParseDifference(want["ast"], got["ast"], "ast") +
-				firstParseDifference(want["comments"], got["comments"], "comments")
+			wantAst, wantAstError := json_value.Parse(want.Ast)
+			wantComments, wantCommentsError := json_value.Parse(want.Comments)
+			if wantAstError != nil || wantCommentsError != nil {
+				fail("%s: graphql-js's dump does not read as JSON: %v, %v", each.Name, wantAstError, wantCommentsError)
+				continue
+			}
+			difference := firstParseDifference(wantAst, gotAst, "ast") +
+				firstParseDifference(wantComments, gotComments, "comments")
 			if difference != "" {
 				fail("%s: %s", each.Name, difference)
 				continue
@@ -385,57 +402,86 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 	}
 }
 
-// dumpParse parses one text and renders it the way the oracle script does, through JSON, so both sides
-// compare as the same Go values.
-func dumpParse(text string) (map[string]any, error) {
-	document, comments, parseError := Parse(text)
-	if parseError != nil {
-		return nil, parseError
-	}
-	offsets := utf16OffsetsOf(text)
-	dumped := make([]any, len(comments))
-	for index, comment := range comments {
-		if comment.Type() != "Comment" {
-			return nil, fmt.Errorf("a comment of type %q", comment.Type())
-		}
-		dumped[index] = map[string]any{
-			"loc":   []int{offsets[comment.Range[0]], offsets[comment.Range[1]]},
-			"value": comment.String("value"),
-		}
-	}
-	encoded, encodeError := json.Marshal(map[string]any{"ast": dumpParseValue(document, offsets), "comments": dumped})
-	if encodeError != nil {
-		return nil, encodeError
-	}
-	var result map[string]any
-	decodeError := json.Unmarshal(encoded, &result)
-	return result, decodeError
+// oracleRecord is what the oracle script prints for one input: the dumped tree and comment list for a
+// parse, or the message for a refusal. The dumps stay raw JSON until they are compared.
+type oracleRecord struct {
+	Name     string          `json:"name"`
+	Ast      json.RawMessage `json:"ast"`
+	Comments json.RawMessage `json:"comments"`
+	Error    *string         `json:"error"`
 }
 
-func dumpParseValue(value any, offsets []int) any {
+// describe is the record as a failure message shows it.
+func (record oracleRecord) describe() string {
+	if record.Error != nil {
+		return "it refuses it: " + *record.Error
+	}
+	return "it parses it to " + string(record.Ast)
+}
+
+// dumpParse parses one text and renders its tree and its comment list the way the oracle script does,
+// as the JSON values the script prints, with offsets converted to UTF-16.
+func dumpParse(text string) (json_value.Value, json_value.Value, error) {
+	document, comments, parseError := Parse(text)
+	if parseError != nil {
+		return nil, nil, parseError
+	}
+	offsets := utf16OffsetsOf(text)
+	dumped := make(json_value.Array, len(comments))
+	for index, comment := range comments {
+		if comment.Type() != "Comment" {
+			return nil, nil, fmt.Errorf("a comment of type %q", comment.Type())
+		}
+		dumped[index] = json_value.Object{
+			"loc":   jsonRange(offsets, comment.Range),
+			"value": jsonString(comment.String("value")),
+		}
+	}
+	return dumpParseValue(document, offsets), dumped, nil
+}
+
+// dumpParseValue is one of a node's properties as the JSON value the oracle script prints for it.
+func dumpParseValue(value estree.Value, offsets []int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
-		result := map[string]any{"kind": typed.Type(), "loc": []int{offsets[typed.Range[0]], offsets[typed.Range[1]]}}
+		result := json_value.Object{"kind": jsonString(typed.Type()), "loc": jsonRange(offsets, typed.Range)}
 		for _, key := range typed.Keys() {
 			result[key] = dumpParseValue(typed.Get(key), offsets)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
-			return "a nil list, which no graphql-js field holds"
+			return json_value.String("a nil list, which no graphql-js field holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpParseValue(child, offsets)
 		}
 		return result
-	case string, bool:
-		return typed
+	case estree.String:
+		return jsonString(string(typed))
+	case estree.Boolean:
+		return json_value.Boolean(typed)
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
+}
+
+// jsonRange is a byte range as the script's loc, its two ends in UTF-16 units.
+func jsonRange(offsets []int, byteRange [2]int) json_value.Array {
+	return json_value.Array{
+		json_value.Number(strconv.Itoa(offsets[byteRange[0]])),
+		json_value.Number(strconv.Itoa(offsets[byteRange[1]])),
+	}
+}
+
+// jsonString is text as it reads back from JSON. json.Marshal writes each byte that starts no UTF-8
+// character as U+FFFD, and converting to runes and back does the same, byte for byte, so the Go side
+// compares as it did when it reached the comparison through json.Marshal.
+func jsonString(text string) json_value.String {
+	return json_value.String(string([]rune(text)))
 }
 
 // utf16OffsetsOf maps every byte offset that starts a character (and the end) to its UTF-16 index.
@@ -456,11 +502,11 @@ func utf16OffsetsOf(text string) []int {
 	return offsets
 }
 
-// firstParseDifference names the first path where two decoded JSON values differ, or "".
-func firstParseDifference(want any, got any, path string) string {
+// firstParseDifference names the first path where two JSON values differ, or "".
+func firstParseDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -494,8 +540,8 @@ func firstParseDifference(want any, got any, path string) string {
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
@@ -510,8 +556,29 @@ func firstParseDifference(want any, got any, path string) string {
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

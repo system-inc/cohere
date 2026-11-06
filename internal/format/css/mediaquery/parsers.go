@@ -26,6 +26,8 @@ import (
 // and is undefined forever); that cannot be ported, so it is an error here too, named for what it is.
 
 // errorReadingMode is the TypeError V8 throws on modesEntered[lastModeIndex].mode with lastModeIndex -1.
+//
+//cohere:ignore consistency-require-error-clause V8's TypeError text, which the oracle compares byte for byte
 var errorReadingMode = errors.New("Cannot read properties of undefined (reading 'mode')")
 
 // errorUnclosedUrl stands for the infinite loop on an unclosed `url(`, where the library never returns.
@@ -112,16 +114,20 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 			mediaFeatureValueString := stringNormalized[index+1:]
 			mediaFeatureValueBefore := leadingWhitespace(mediaFeatureValueString)
 			mediaFeatureValue = estree.New("value", 0, 0,
-				"before", mediaFeatureValueBefore,
-				"after", trailingWhitespace(mediaFeatureValueString),
-				"value", trim(mediaFeatureValueString),
+				[]estree.Property{
+					{Key: "before", Value: estree.String(mediaFeatureValueBefore)},
+					{Key: "after", Value: estree.String(trailingWhitespace(mediaFeatureValueString))},
+					{Key: "value", Value: estree.String(trim(mediaFeatureValueString))},
+				},
 			)
 			// +1 for the colon
-			mediaFeatureValue.Set("sourceIndex", len(mediaFeatureValueBefore)+index+1+indexLocal)
+			mediaFeatureValue.Set("sourceIndex", estree.Integer(len(mediaFeatureValueBefore)+index+1+indexLocal))
 			colon = estree.New("colon", 0, 0,
-				"sourceIndex", index+indexLocal,
-				"after", mediaFeatureValueBefore,
-				"value", ":",
+				[]estree.Property{
+					{Key: "sourceIndex", Value: estree.Integer(index + indexLocal)},
+					{Key: "after", Value: estree.String(mediaFeatureValueBefore)},
+					{Key: "value", Value: estree.String(":")},
+				},
 			)
 			break
 		}
@@ -136,15 +142,17 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 	mediaFeatureBefore := leadingWhitespace(mediaFeature)
 	mediaFeatureAfter := trailingWhitespace(mediaFeature)
 	mediaFeatureNode := estree.New("media-feature", 0, 0,
-		"before", mediaFeatureBefore,
-		"after", mediaFeatureAfter,
-		"value", trim(mediaFeature),
+		[]estree.Property{
+			{Key: "before", Value: estree.String(mediaFeatureBefore)},
+			{Key: "after", Value: estree.String(mediaFeatureAfter)},
+			{Key: "value", Value: estree.String(trim(mediaFeature))},
+		},
 	)
-	mediaFeatureNode.Set("sourceIndex", len(mediaFeatureBefore)+indexLocal)
+	mediaFeatureNode.Set("sourceIndex", estree.Integer(len(mediaFeatureBefore)+indexLocal))
 	result = append(result, mediaFeatureNode)
 
 	if colon != nil {
-		colon.Set("before", mediaFeatureAfter)
+		colon.Set("before", estree.String(mediaFeatureAfter))
 		result = append(result, colon)
 	}
 

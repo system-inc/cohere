@@ -25,6 +25,13 @@ func mustParse(test *testing.T, text string) *estree.Node {
 	return root
 }
 
+// spaceOf is node.spaces[side] as a string, "" where it is missing or holds something else.
+func spaceOf(node *estree.Node, side string) string {
+	spaces, _ := node.Get("spaces").(estree.Record)
+	text, _ := spaces[side].(estree.String)
+	return string(text)
+}
+
 func TestParseTailwindEscapedClass(test *testing.T) {
 	test.Parallel()
 	root := mustParse(test, ".hover\\:bg-red:hover")
@@ -40,10 +47,10 @@ func TestParseTailwindEscapedClass(test *testing.T) {
 		test.Errorf("values %q and %q", nodes[0].String("value"), nodes[1].String("value"))
 	}
 	// splitWord positions the merged word from its last token, "bg-red" at 8: upstream's quirk, kept.
-	if nodes[0].Get("sourceIndex") != 8 {
+	if nodes[0].Get("sourceIndex") != estree.Integer(8) {
 		test.Errorf("class sourceIndex %v, want upstream's 8", nodes[0].Get("sourceIndex"))
 	}
-	if nodes[1].Get("sourceIndex") != 14 {
+	if nodes[1].Get("sourceIndex") != estree.Integer(14) {
 		test.Errorf("pseudo sourceIndex %v, want 14", nodes[1].Get("sourceIndex"))
 	}
 }
@@ -55,17 +62,18 @@ func TestParseAttribute(test *testing.T) {
 	if !attribute.Is("attribute") {
 		test.Fatalf("got a %q", attribute.Type())
 	}
-	checks := map[string]any{
-		"attribute": "data-x", "namespace": "ns", "operator": "=", "value": "'b'",
-		"insensitive": true, "quoted": true, "sourceIndex": 0,
+	checks := map[string]estree.Value{
+		"attribute": estree.String("data-x"), "namespace": estree.String("ns"), "operator": estree.String("="),
+		"value": estree.String("'b'"), "insensitive": estree.Boolean(true), "quoted": estree.Boolean(true),
+		"sourceIndex": estree.Integer(0),
 	}
 	for key, want := range checks {
 		if attribute.Get(key) != want {
 			test.Errorf("%s = %#v, want %#v", key, attribute.Get(key), want)
 		}
 	}
-	raws := rawsOf(attribute)
-	if raws["insensitive"] != " i" || raws["unquoted"] != "b" {
+	raws, _ := attribute.Get("raws").(estree.Record)
+	if raws["insensitive"] != estree.String(" i") || raws["unquoted"] != estree.String("b") {
 		test.Errorf("raws %v", raws)
 	}
 
@@ -89,22 +97,27 @@ func TestParseCombinatorAndSpaces(test *testing.T) {
 	if len(nodes) != 3 || !nodes[1].Is("combinator") {
 		test.Fatalf("want tag, combinator, tag")
 	}
-	if spacesOf(nodes[0])["before"] != " " {
-		test.Errorf("leading space %q", spacesOf(nodes[0])["before"])
+	if spaceOf(nodes[0], "before") != " " {
+		test.Errorf("leading space %q", spaceOf(nodes[0], "before"))
 	}
 	combinator := nodes[1]
 	if combinator.String("value") != ">" ||
-		spacesOf(combinator)["before"] != "  " ||
-		spacesOf(combinator)["after"] != "\t" {
-		test.Errorf("combinator %q spaces %v", combinator.String("value"), spacesOf(combinator))
+		spaceOf(combinator, "before") != "  " ||
+		spaceOf(combinator, "after") != "\t" {
+		test.Errorf(
+			"combinator %q spaces %q and %q",
+			combinator.String("value"),
+			spaceOf(combinator, "before"),
+			spaceOf(combinator, "after"),
+		)
 	}
-	if spacesOf(nodes[2])["after"] != " " {
-		test.Errorf("space before the comma %q", spacesOf(nodes[2])["after"])
+	if spaceOf(nodes[2], "after") != " " {
+		test.Errorf("space before the comma %q", spaceOf(nodes[2], "after"))
 	}
-	if spacesOf(selectors[1].List("nodes")[0])["before"] != " " {
+	if spaceOf(selectors[1].List("nodes")[0], "before") != " " {
 		test.Errorf("space after the comma not on c")
 	}
-	if mustParse(test, "a,").Get("trailingComma") != true {
+	if mustParse(test, "a,").Get("trailingComma") != estree.Boolean(true) {
 		test.Errorf("trailingComma not set")
 	}
 }
@@ -128,11 +141,12 @@ func TestParsePseudoWithSelectors(test *testing.T) {
 	if strings.Join(types, " ") != want {
 		test.Errorf("inner nodes\n got %s\nwant %s", strings.Join(types, " "), want)
 	}
-	end, isMap := sourceOf(pseudo)["end"].(map[string]any)
+	pseudoSource, _ := pseudo.Get("source").(estree.Record)
+	end, isMap := pseudoSource["end"].(estree.Record)
 	if !isMap {
-		test.Fatalf("pseudo source end %v, want a {line, column} object", sourceOf(pseudo)["end"])
+		test.Fatalf("pseudo source end %v, want a {line, column} object", pseudoSource["end"])
 	}
-	if end["line"] != 1 || end["column"] != 24 {
+	if end["line"] != estree.Integer(1) || end["column"] != estree.Integer(24) {
 		test.Errorf("pseudo end %v, want the closing parenthesis at 1:24 (columns are 1-based)", end)
 	}
 }
@@ -143,19 +157,20 @@ func TestParseOffsetsAreBytes(test *testing.T) {
 	root := mustParse(test, ".\xc3\xa9 > .\xc3\xbc")
 	nodes := root.List("nodes")[0].List("nodes")
 	second := nodes[2]
-	if second.Get("sourceIndex") != 6 {
+	if second.Get("sourceIndex") != estree.Integer(6) {
 		test.Errorf("sourceIndex %v, want byte 6", second.Get("sourceIndex"))
 	}
-	start, isMap := sourceOf(second)["start"].(map[string]any)
+	secondSource, _ := second.Get("source").(estree.Record)
+	start, isMap := secondSource["start"].(estree.Record)
 	if !isMap {
-		test.Fatalf("class source start %v, want a {line, column} object", sourceOf(second)["start"])
+		test.Fatalf("class source start %v, want a {line, column} object", secondSource["start"])
 	}
-	if column := start["column"]; column != 6 {
+	if column := start["column"]; column != estree.Integer(6) {
 		test.Errorf("column %v, want UTF-16 column 6", column)
 	}
 	// An emoji is two UTF-16 units and four bytes; splitWord's sourceIndex past the end stays past it.
 	merged := mustParse(test, ".\xf0\x9f\x98\x80\\:x.y").List("nodes")[0].List("nodes")
-	if merged[1].Get("sourceIndex") != len(".\xf0\x9f\x98\x80\\:x.y")+3 {
+	if merged[1].Get("sourceIndex") != estree.Integer(len(".\xf0\x9f\x98\x80\\:x.y")+3) {
 		test.Errorf("past-the-end sourceIndex %v", merged[1].Get("sourceIndex"))
 	}
 }

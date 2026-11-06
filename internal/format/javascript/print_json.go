@@ -103,12 +103,12 @@ func printJson(path *Path, options *Options, print PrintFunc, _ *printArguments)
 		// the two differ only where raw has a numeric separator, and then neither string equals raw.
 		raw := getRaw(current)
 		if isJsonObjectKey(path) {
-			value, isNumber := current.Get("value").(float64)
+			value, isNumber := current.Get("value").(estree.Number)
 			if !isNumber {
-				// Invariant: estree.ParseJSON builds every NumericLiteral with a float64 value.
-				panic(fmt.Sprintf("javascript: a NumericLiteral's value is a %T, not a float64", current.Get("value")))
+				// Invariant: estree.ParseJSON builds every NumericLiteral with a Number value.
+				panic(fmt.Sprintf("javascript: a NumericLiteral's value is a %T, not a Number", current.Get("value")))
 			}
-			if javaScriptNumberString(value) == raw {
+			if javaScriptNumberString(float64(value)) == raw {
 				return doc.Text(`"` + raw + `"`)
 			}
 		}

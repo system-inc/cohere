@@ -20,7 +20,9 @@ func parseSelector(selectorText string) *estree.Node {
 	// garbage. Better to print the whole selector as-is and not try to parse
 	// and reformat it.
 	if selectorCommentPattern.MatchString(selectorQuotedStringPattern.ReplaceAllString(selectorText, "")) {
-		return estree.New("selector-unknown", 0, 0, "value", trim(selectorText))
+		return estree.New("selector-unknown", 0, 0, []estree.Property{
+			{Key: "value", Value: estree.String(trim(selectorText))},
+		})
 	}
 
 	result, parseError := selector.Parse(selectorText)
@@ -35,7 +37,9 @@ func parseSelector(selectorText string) *estree.Node {
 		// Upstream's catch takes every throw, so every error lands here, the port's own included. A
 		// selector the library never returns from (selector.ErrLoopsForever) hangs Prettier; here it is
 		// printed as is.
-		return estree.New("selector-unknown", 0, 0, "value", selectorText)
+		return estree.New("selector-unknown", 0, 0, []estree.Property{
+			{Key: "value", Value: estree.String(selectorText)},
+		})
 	}
 
 	addTypePrefix(result, "selector-", nil)

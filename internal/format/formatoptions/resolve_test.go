@@ -207,7 +207,9 @@ func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(test *testing.T) {
 		{
 			"an empty block",
 			map[string]string{SettingsFileName: `{"extends": "cohere:typescript", "format": {}}`},
-			func(*Options) {},
+			func(*Options) {
+				// An empty block changes nothing, so the want is Prettier's defaults as they are.
+			},
 			strings.Join(house.HouseIgnore, ","),
 		},
 		{

@@ -1,7 +1,5 @@
 package values
 
-import "math"
-
 // token is upstream's token array: [type, value, startLine, startColumn, endLine, endColumn, index].
 type token struct {
 	kind        string
@@ -13,12 +11,4 @@ type token struct {
 	// endColumnIsNaN is an end column computed from an undefined `next`.
 	endColumnIsNaN bool
 	index          int
-}
-
-// endColumnValue is token[5] as JavaScript holds it: a number, or NaN.
-func (token *token) endColumnValue() any {
-	if token.endColumnIsNaN {
-		return math.NaN()
-	}
-	return token.endColumn
 }

@@ -86,8 +86,8 @@ func byteOffset(offsets []int, index int) int {
 }
 
 func convertSourceIndexes(node *estree.Node, offsets []int) {
-	if index, isInt := node.Get("sourceIndex").(int); isInt {
-		node.Set("sourceIndex", byteOffset(offsets, index))
+	if index, isInt := node.Get("sourceIndex").(estree.Integer); isInt {
+		node.Set("sourceIndex", estree.Integer(byteOffset(offsets, int(index))))
 	}
 	for _, child := range node.List("nodes") {
 		convertSourceIndexes(child, offsets)

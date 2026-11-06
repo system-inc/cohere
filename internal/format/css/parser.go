@@ -106,6 +106,8 @@ func customSelectorName(parameters string) string {
 	for from := 0; ; {
 		index := indexFrom(parameters, ":--", from)
 		if index == -1 {
+			// Invariant: this is upstream's TypeError, not a crash: parseCatching recovers every
+			// javaScriptError into the parse's error, as upstream's caller catches it.
 			panic(javaScriptError{message: "Cannot read properties of null (reading '0')"})
 		}
 		rest := parameters[index+3:]
@@ -116,6 +118,9 @@ func customSelectorName(parameters string) string {
 		from = index + 1
 	}
 }
+
+// javaScriptNonWhitespaceClass is JavaScript's \S.
+var javaScriptNonWhitespaceClass = "[^" + javaScriptWhitespaceClass[1:]
 
 var (
 	atRootWithPattern = regexp.MustCompile(
@@ -132,9 +137,6 @@ var (
 		javaScriptWhitespaceClass +
 		`+)\(`)
 )
-
-// javaScriptNonWhitespaceClass is JavaScript's \S.
-var javaScriptNonWhitespaceClass = "[^" + javaScriptWhitespaceClass[1:]
 
 var valueParamsAtRuleNames = map[string]bool{
 	"namespace":    true,
@@ -164,7 +166,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 		switch child := node.Get(key).(type) {
 		case *estree.Node:
 			parseNestedCss(child, options)
-		case []*estree.Node:
+		case estree.Nodes:
 			for _, element := range child {
 				parseNestedCss(element, options)
 			}
@@ -176,17 +178,17 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	}
 
 	/* c8 ignore next */
-	raws := rawsIn(node)
+	raws, _ := node.Get("raws").(estree.Record)
 	if raws == nil {
-		raws = map[string]any{}
+		raws = estree.Record{}
 		node.Set("raws", raws)
 	}
 
 	// Custom properties looks like declarations
-	if property, isString := node.Get(
-		"prop",
-	).(string); node.Type() == "css-decl" && isString && strings.HasPrefix(property, "--") {
-		if value, isString := node.Get("value").(string); isString && strings.HasPrefix(value, "{") {
+	if property, isString := asString(
+		node.Get("prop"),
+	); node.Type() == "css-decl" && isString && strings.HasPrefix(property, "--") {
+		if value, isString := asString(node.Get("value")); isString && strings.HasPrefix(value, "{") {
 			var rules []*estree.Node
 			hasRules := false
 			if strings.HasSuffix(trimEnd(value), "}") {
@@ -214,13 +216,19 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 				}
 			}
 			if hasRules {
-				node.Set("value", estree.New("css-rule", 0, 0, "nodes", rules))
+				node.Set("value", estree.New("css-rule", 0, 0, []estree.Property{
+					{Key: "nodes", Value: estree.Nodes(rules)},
+				}))
 			} else {
-				rawValue, isObject := raws["value"].(map[string]any)
+				rawValue, isObject := raws["value"].(estree.Record)
 				if !isObject {
+					// Invariant: this is upstream's TypeError, not a crash: parseCatching recovers every
+					// javaScriptError into the parse's error, as upstream's caller catches it.
 					panic(javaScriptError{message: "Cannot read properties of undefined (reading 'raw')"})
 				}
-				node.Set("value", estree.New("value-unknown", 0, 0, "value", rawValue["raw"]))
+				node.Set("value", estree.New("value-unknown", 0, 0, []estree.Property{
+					{Key: "value", Value: rawValue["raw"]},
+				}))
 			}
 			return node
 		}
@@ -228,57 +236,57 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 
 	selector := ""
 
-	if nodeSelector, isString := node.Get("selector").(string); isString {
-		if rawSelector, isObject := raws["selector"].(map[string]any); isObject {
-			selector = scssOrRaw(rawSelector)
+	if nodeSelector, isString := asString(node.Get("selector")); isString {
+		if rawSelector, isObject := scssOrRaw(node, "selector"); isObject {
+			selector = rawSelector
 		} else {
 			selector = nodeSelector
 		}
 
-		if between, isString := raws["between"].(string); isString && trim(between) != "" {
+		if between, isString := asString(raws["between"]); isString && trim(between) != "" {
 			selector += between
 		}
 
-		raws["selector"] = selector
+		raws["selector"] = estree.String(selector)
 	}
 
 	value := ""
 
-	if nodeValue, isString := node.Get("value").(string); isString {
-		if rawValue, isObject := raws["value"].(map[string]any); isObject {
-			value = scssOrRaw(rawValue)
+	if nodeValue, isString := asString(node.Get("value")); isString {
+		if rawValue, isObject := scssOrRaw(node, "value"); isObject {
+			value = rawValue
 		} else {
 			value = nodeValue
 		}
 
-		raws["value"] = trim(value)
+		raws["value"] = estree.String(trim(value))
 	}
 
 	parameters := ""
 
-	if nodeParameters, isString := node.Get("params").(string); isString {
-		if rawParameters, isObject := raws["params"].(map[string]any); isObject {
-			parameters = scssOrRaw(rawParameters)
+	if nodeParameters, isString := asString(node.Get("params")); isString {
+		if rawParameters, isObject := scssOrRaw(node, "params"); isObject {
+			parameters = rawParameters
 		} else {
 			parameters = nodeParameters
 		}
 
-		if afterName, isString := raws["afterName"].(string); isString && trim(afterName) != "" {
+		if afterName, isString := asString(raws["afterName"]); isString && trim(afterName) != "" {
 			parameters = afterName + parameters
 		}
 
-		if between, isString := raws["between"].(string); isString && trim(between) != "" {
+		if between, isString := asString(raws["between"]); isString && trim(between) != "" {
 			parameters += between
 		}
 
 		parameters = trim(parameters)
 
-		raws["params"] = parameters
+		raws["params"] = estree.String(parameters)
 	}
 
 	// Ignore less mixin declaration
 	if trim(selector) != "" {
-		// TODO: confirm this code is dead
+		// Upstream: `TODO: confirm this code is dead`
 		/* c8 ignore next 3 */
 		if strings.HasPrefix(selector, "@") && strings.HasSuffix(selector, ":") {
 			return node
@@ -288,7 +296,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 
 		// Check on SCSS nested property
 		if isScssNestedPropertyNode(node, options) {
-			node.Set("isScssNestedProperty", true)
+			node.Set("isScssNestedProperty", estree.Boolean(true))
 		}
 
 		node.Set("selector", parseSelector(selector))
@@ -299,24 +307,24 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	if trim(value) != "" {
 		if index, matched, found := matchScssDirective(value, defaultScssDirective); found {
 			value = value[:index]
-			node.Set("scssDefault", true)
+			node.Set("scssDefault", estree.Boolean(true))
 
 			if trim(matched) != "!default" {
-				raws["scssDefault"] = matched
+				raws["scssDefault"] = estree.String(matched)
 			}
 		}
 
 		if index, matched, found := matchScssDirective(value, globalScssDirective); found {
 			value = value[:index]
-			node.Set("scssGlobal", true)
+			node.Set("scssGlobal", estree.Boolean(true))
 
 			if trim(matched) != "!global" {
-				raws["scssGlobal"] = matched
+				raws["scssGlobal"] = estree.String(matched)
 			}
 		}
 
 		if strings.HasPrefix(value, "progid:") {
-			return estree.New("value-unknown", 0, 0, "value", value)
+			return estree.New("value-unknown", 0, 0, []estree.Property{{Key: "value", Value: estree.String(value)}})
 		}
 
 		node.Set("value", parseValue(value, options))
@@ -329,9 +337,9 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 
 		// only CSS support custom-selector
 		if options.parser == "css" && node.String("name") == "custom-selector" {
-			nodeParameters, _ := node.Get("params").(string)
+			nodeParameters, _ := asString(node.Get("params"))
 			customSelector := trim(customSelectorName(nodeParameters))
-			node.Set("customSelector", customSelector)
+			node.Set("customSelector", estree.String(customSelector))
 			node.Set(
 				"selector",
 				parseSelector(trim(sliceJavaScript(nodeParameters, len(customSelector), len(nodeParameters)))),
@@ -347,7 +355,9 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 		name := node.String("name")
 
 		if name == "warn" || name == "error" {
-			node.Set("params", estree.New("media-unknown", 0, 0, "value", parameters))
+			node.Set("params", estree.New("media-unknown", 0, 0, []estree.Property{
+				{Key: "value", Value: estree.String(parameters)},
+			}))
 
 			return node
 		}
@@ -372,7 +382,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 
 		lowercasedName := toLowerCase(name)
 		if isModuleRuleName(lowercasedName) {
-			node.Set("import", true)
+			node.Set("import", estree.Boolean(true))
 			node.Delete("filename")
 			node.Set("params", parseValue(parameters, options))
 			return node
@@ -408,7 +418,9 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 		if lowercasedName == "media" || lowercasedName == "custom-media" {
 			if strings.Contains(parameters, "#{") {
 				// Workaround for media at rule with scss interpolation
-				return estree.New("media-unknown", 0, 0, "value", parameters)
+				return estree.New("media-unknown", 0, 0, []estree.Property{
+					{Key: "value", Value: estree.String(parameters)},
+				})
 			}
 
 			node.Set("params", parseMediaQuery(parameters))
@@ -416,7 +428,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 			return node
 		}
 
-		node.Set("params", parameters)
+		node.Set("params", estree.String(parameters))
 
 		return node
 	}
@@ -424,16 +436,27 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	return node
 }
 
-// scssOrRaw is `raws.x.scss ?? raws.x.raw`.
-func scssOrRaw(raw map[string]any) string {
-	if scss, isPresent := raw["scss"]; isPresent && scss != nil {
-		text, _ := scss.(string)
-		return text
+// scssOrRaw is `raws[key].scss ?? raws[key].raw`, read from node.raws, and whether raws[key] is an
+// object at all.
+func scssOrRaw(node *estree.Node, key string) (string, bool) {
+	raws, _ := node.Get("raws").(estree.Record)
+	raw, isObject := raws[key].(estree.Record)
+	if !isObject {
+		return "", false
 	}
-	text, _ := raw["raw"].(string)
-	return text
+	if scss, isPresent := raw["scss"]; isPresent && scss != nil {
+		text, _ := asString(scss)
+		return text, true
+	}
+	text, _ := asString(raw["raw"])
+	return text, true
 }
 
+// parseWithParser is upstream's parseWithParser: the text parsed, its front matter set aside, then the
+// glue's walks over the tree.
+//
+// Mutates: options gets the text as its originalText, as upstream sets options.originalText, so
+// parseNestedCSS can slice a custom property block out of it.
 func parseWithParser(
 	parse func(string) (*estree.Node, error),
 	text string,
@@ -441,7 +464,8 @@ func parseWithParser(
 ) (*estree.Node, error) {
 	frontMatter, textToParse := parseFrontMatter(text)
 
-	// Prevent file access https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
+	// Prevent file access
+	// https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
 	result, parseError := parse(textToParse)
 	if parseError != nil {
 		// Upstream rethrows a CssSyntaxError as createError(`${name}: ${reason}`, {loc}); postcss.Parse
@@ -513,25 +537,35 @@ func parseFrontMatter(text string) (*estree.Node, string) {
 
 	raw := frontMatter.Raw
 	lines := strings.Split(raw, "\n")
-	var explicitLanguage any
-	if frontMatter.ExplicitLanguage != nil {
-		explicitLanguage = *frontMatter.ExplicitLanguage
-	}
+	// explicitLanguage is null until the front matter names one: written first, so the key keeps its
+	// place, and Set below replaces the value in place.
 	node := estree.New("front-matter", 0, len(raw),
-		"language", frontMatter.Language,
-		"explicitLanguage", explicitLanguage,
-		"value", frontMatter.Value,
-		"startDelimiter", frontMatter.StartDelimiter,
-		"endDelimiter", frontMatter.EndDelimiter,
-		"raw", raw,
-		"start", map[string]any{"line": 1, "column": 0, "index": 0},
-		// line and column are getters upstream; column counts UTF-16 units.
-		"end", map[string]any{
-			"index":  len(raw),
-			"line":   len(lines),
-			"column": len(utf16.Encode([]rune(lines[len(lines)-1]))),
+		[]estree.Property{
+			{Key: "language", Value: estree.String(frontMatter.Language)},
+			{Key: "explicitLanguage"},
+			{Key: "value", Value: estree.String(frontMatter.Value)},
+			{Key: "startDelimiter", Value: estree.String(frontMatter.StartDelimiter)},
+			{Key: "endDelimiter", Value: estree.String(frontMatter.EndDelimiter)},
+			{Key: "raw", Value: estree.String(raw)},
+			{Key: "start", Value: estree.Record{
+				"line":   estree.Integer(1),
+				"column": estree.Integer(0),
+				"index":  estree.Integer(0),
+			}},
+			// line and column are getters upstream; column counts UTF-16 units.
+			{Key: "end", Value: estree.Record{
+				"index":  estree.Integer(len(raw)),
+				"line":   estree.Integer(len(lines)),
+				"column": estree.Integer(len(utf16.Encode([]rune(lines[len(lines)-1])))),
+			}},
+			{Key: "source", Value: estree.Record{
+				"startOffset": estree.Integer(0),
+				"endOffset":   estree.Integer(len(raw)),
+			}},
 		},
-		"source", map[string]any{"startOffset": 0, "endOffset": len(raw)},
 	)
+	if frontMatter.ExplicitLanguage != nil {
+		node.Set("explicitLanguage", estree.String(*frontMatter.ExplicitLanguage))
+	}
 	return node, replaceNonLineBreaksWithSpace(raw) + text[len(raw):]
 }

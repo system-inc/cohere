@@ -68,12 +68,17 @@ var formatCases = []formatCase{
 	{
 		name: "schema: schema, scalar, type, input, interface, enum, union, directive, and every extension",
 		source: "\"schema description\" schema @a{query:Query mutation:Mutation subscription:Subscription}\n" +
-			"extend schema @b\nextend schema{query:Q}\nscalar   Date @specifiedBy(url:\"https://example.com\")\nextend scalar Date @c\n" +
-			"type Query implements A&B @key(fields:\"id\"){\"field description\" field(\"argument description\" a:Int=1 @d,b:[String!]!):String! @deprecated(reason:\"no\") other:Int}\n" +
+			"extend schema @b\nextend schema{query:Q}\nscalar   Date @specifiedBy(url:\"https://example.com\")\n" +
+			"extend scalar Date @c\n" +
+			"type Query implements A&B @key(fields:\"id\"){\"field description\" field(\"argument description\" " +
+			"a:Int=1 @d,b:[String!]!):String! @deprecated(reason:\"no\") other:Int}\n" +
 			"extend type Query implements C{added:Int}\nextend type Query @e\ntype Empty\n" +
-			"input In{a:Int=1 b:In2! @f}\nextend input In{c:String}\ninterface I implements J{a:Int}\nextend interface I @g{b:Int}\n" +
-			"enum E{\"value description\" A @h B}\nextend enum E{C}\nenum Bare\nunion U=|A|B\nextend union U=C\nunion Lone\n" +
-			"\"\"\"directive description\"\"\" directive @dir(a:Int=1,b:String) repeatable on FIELD|FRAGMENT_SPREAD|INLINE_FRAGMENT\n" +
+			"input In{a:Int=1 b:In2! @f}\nextend input In{c:String}\ninterface I implements J{a:Int}\n" +
+			"extend interface I @g{b:Int}\n" +
+			"enum E{\"value description\" A @h B}\nextend enum E{C}\nenum Bare\nunion U=|A|B\nextend union U=C\n" +
+			"union Lone\n" +
+			"\"\"\"directive description\"\"\" directive @dir(a:Int=1,b:String) repeatable on " +
+			"FIELD|FRAGMENT_SPREAD|INLINE_FRAGMENT\n" +
 			"directive @plain on QUERY\nextend directive @dir @i\n",
 		contains: []string{
 			"schema @a {",
@@ -106,7 +111,8 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "comments: own line, end of line, between arguments, trailing spaces, end of file",
-		source: "# leading the file   \n# ends in JavaScript-only whitespace\u00a0\f\ufeff\n\n# before a definition\ntype T { # after the brace\n  # own line before a field\n  a: Int # end of line\n" +
+		source: "# leading the file   \n# ends in JavaScript-only whitespace\u00a0\f\ufeff\n\n# before a definition\n" +
+			"type T { # after the brace\n  # own line before a field\n  a: Int # end of line\n" +
 			"  b(\n  # before an argument\n  x: Int # after an argument\n  ): Int\n}\nquery { a # after a selection\n  # between selections\n  b }\n# end of file\n",
 		contains: []string{
 			"# leading the file\n",
@@ -117,7 +123,8 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "comments: in variable definitions, object fields, list values, before a closing brace",
-		source: "query Q(\n# before a variable\n$a:Int # after a variable\n$b:Int) @dir # after a directive\n{a(o:{\n# before a field\nx:1 # after a field\ny:[1, # in a list\n2]})\n" +
+		source: "query Q(\n# before a variable\n$a:Int # after a variable\n$b:Int) @dir # after a directive\n{a(o:{\n" +
+			"# before a field\nx:1 # after a field\ny:[1, # in a list\n2]})\n" +
 			"# before the closing brace\n}\nenum E { A # after a value\n# own line before the end\n}\nunion U = # after the equals\nA | B\n",
 		contains: []string{
 			"# before a variable",
@@ -133,19 +140,28 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "long argument and variable lists break at the print width",
-		source: "query LongQuery($firstVariable:String,$secondVariable:Int,$thirdVariable:Boolean,$fourthVariable:[String!]!,$fifthVariable:ID){" +
-			"someField(firstArgument:$firstVariable,secondArgument:$secondVariable,thirdArgument:$thirdVariable,fourth:$fourthVariable){id}" +
-			"short(a:1)}\ntype T{field(firstArgument:String,secondArgument:Int,thirdArgument:Boolean,fourthArgument:Float,fifth:ID):String}\n" +
-			"directive @long(firstArgument:String,secondArgument:Int,thirdArgument:Boolean,fourthArgument:Float,fifth:ID) on FIELD\n" +
-			"query{f(o:{firstKey:\"a long value here\",secondKey:\"another long value\",thirdKey:\"and a third long value to break\"},l:[\"one long string value\",\"two long string value\",\"three long string value\"])}\n" +
-			"query{f @firstDirective(argument:\"value\") @secondDirective(argument:\"value\") @thirdDirective(argument:\"value\") @fourth}\n" +
+		source: "query LongQuery($firstVariable:String,$secondVariable:Int,$thirdVariable:Boolean," +
+			"$fourthVariable:[String!]!,$fifthVariable:ID){" +
+			"someField(firstArgument:$firstVariable,secondArgument:$secondVariable,thirdArgument:$thirdVariable," +
+			"fourth:$fourthVariable){id}" +
+			"short(a:1)}\ntype T{field(firstArgument:String,secondArgument:Int,thirdArgument:Boolean," +
+			"fourthArgument:Float,fifth:ID):String}\n" +
+			"directive @long(firstArgument:String,secondArgument:Int,thirdArgument:Boolean,fourthArgument:Float," +
+			"fifth:ID) on FIELD\n" +
+			"query{f(o:{firstKey:\"a long value here\",secondKey:\"another long value\",thirdKey:\"and a third long " +
+			"value to break\"},l:[\"one long string value\",\"two long string value\",\"three long string " +
+			"value\"])}\n" +
+			"query{f @firstDirective(argument:\"value\") @secondDirective(argument:\"value\") " +
+			"@thirdDirective(argument:\"value\") @fourth}\n" +
 			"query Q @firstDirective(argument:\"value\") @secondDirective(argument:\"value\") @thirdDirective(argument:\"value\") @fourth{a}\n",
 		contains: []string{"query LongQuery(\n"},
 	},
 	{
 		name: "interfaces with ampersands and unions with pipes that break",
-		source: "type Implementing implements FirstInterface&SecondInterface&ThirdInterface&FourthInterface&FifthInterface&SixthInterface{a:Int}\n" +
-			"union LongUnion=FirstMemberType|SecondMemberType|ThirdMemberType|FourthMemberType|FifthMemberType|SixthMemberType|Seventh\n" +
+		source: "type Implementing implements FirstInterface&SecondInterface&ThirdInterface&FourthInterface&" +
+			"FifthInterface&SixthInterface{a:Int}\n" +
+			"union LongUnion=FirstMemberType|SecondMemberType|ThirdMemberType|FourthMemberType|FifthMemberType|" +
+			"SixthMemberType|Seventh\n" +
 			"\"described\" union DescribedUnion @dir=FirstMemberType|SecondMemberType|ThirdMemberType|FourthMemberType|FifthMemberType|Sixth\n",
 		contains: []string{"FirstInterface &", "| FirstMemberType"},
 	},

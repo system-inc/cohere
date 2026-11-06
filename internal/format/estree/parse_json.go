@@ -55,7 +55,7 @@ func parseJson(text string, allowComments bool) (*Node, []*Node, error) {
 	if !allowComments && len(reader.comments) > 0 {
 		return nil, nil, fmt.Errorf("json: Comment is not allowed in JSON")
 	}
-	root := New("JsonRoot", 0, len(text), "node", expression)
+	root := New("JsonRoot", 0, len(text), []Property{{"node", expression}})
 	return root, reader.comments, nil
 }
 

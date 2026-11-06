@@ -17,7 +17,7 @@ func (processor *postprocessor) visit(node *Node) *Node {
 		switch value := node.Get(key).(type) {
 		case *Node:
 			node.Set(key, processor.visit(value))
-		case []*Node:
+		case Nodes:
 			for index := range value {
 				value[index] = processor.visit(value[index])
 			}

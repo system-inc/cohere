@@ -18,6 +18,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
+var javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+
 var (
 	declarationBeforePattern = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
 	importantPattern         = regexp.MustCompile(
@@ -28,12 +30,11 @@ var (
 	afterNameTwoNewlinesPattern = regexp.MustCompile(
 		`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`,
 	)
-	afterNameNewlinePattern        = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
-	mediaFeatureSpacesPattern      = regexp.MustCompile(` +`)
-	mediaUrlOpeningPattern         = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
-	mediaUrlClosingPattern         = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
-	valueAllSpacePattern           = regexp.MustCompile(`^ *$`)
-	javaScriptWhitespaceCharacters = javaScriptWhitespaceClass[1 : len(javaScriptWhitespaceClass)-1]
+	afterNameNewlinePattern   = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
+	mediaFeatureSpacesPattern = regexp.MustCompile(` +`)
+	mediaUrlOpeningPattern    = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
+	mediaUrlClosingPattern    = regexp.MustCompile(javaScriptWhitespaceClass + `+\)$`)
+	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
 func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
@@ -69,7 +70,7 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 		}
 
 	case "css-comment":
-		isInlineComment := node.Truthy("inline") || estree.IsTruthy(rawsOf(node)["inline"])
+		isInlineComment := node.Truthy("inline") || isRawTruthy(node, "inline")
 
 		text := sliceText(options.OriginalText, locStart(node), locEnd(node))
 
@@ -319,7 +320,7 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 
 	case "value-colon":
 		previous, _ := path.Previous()
-		previousValue, previousValueIsString := previous.Get("value").(string)
+		previousValue, previousValueIsString := asString(previous.Get("value"))
 		var after doc.Doc = doc.LineDoc
 		// Don't add spaces on escaped colon `:`, e.g: grid-template-rows: [row-1-00\:00] auto;
 		if (previousValueIsString && strings.HasSuffix(previousValue, `\`)) ||
@@ -344,6 +345,8 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 	}
 
 	// "front-matter" is handled in core, "value-comma" in `value-comma_group`.
+	// Invariant: every type the glue's parsers make has an arm above; one they missed is upstream's throw,
+	// which Format and PrintToDoc recover into their error, as upstream's caller catches it.
 	panic(fmt.Sprintf("Unexpected PostCSS node type: %q.", node.Type()))
 }
 
@@ -355,7 +358,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printFunc) d
 	trimmedBetween := trim(rawBetween)
 	isColon := trimmedBetween == ":"
 	hasSpaceAfterColon := strings.HasSuffix(rawBetween, " ") && isColon
-	stringValue, valueIsString := node.Get("value").(string)
+	stringValue, valueIsString := asString(node.Get("value"))
 	isValueAllSpace := valueIsString && valueAllSpacePattern.MatchString(stringValue)
 	var value doc.Doc
 	if valueIsString {
@@ -426,7 +429,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printFunc) d
 			doc.Text("}"),
 		}
 	case isTemplatePropNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";":
 		ending = doc.Text("")
 	default:
@@ -452,14 +455,14 @@ func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Do
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	isTemplatePlaceholderNodeWithoutSemiColon := isTemplatePlaceholderNode(node) &&
-		!estree.IsTruthy(rawsOf(parentNode)["semicolon"]) &&
+		!isRawTruthy(parentNode, "semicolon") &&
 		characterBefore(options.OriginalText, locEnd(node)) != ";"
 
 	// Less mixins, functions and variables are gated on options.parser === "less".
 
 	name := node.String("name")
 	parameters := node.Get("params")
-	stringParameters, parametersIsString := parameters.(string)
+	stringParameters, parametersIsString := asString(parameters)
 	isImportUnknownValueEndsWithSemiColon := name == "import" &&
 		node.Child("params").Type() == "value-unknown" &&
 		strings.HasSuffix(node.Child("params").String("value"), ";")
@@ -523,7 +526,7 @@ func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Do
 	var ending doc.Doc
 	if isPresent(node.Get("nodes")) {
 		var opening doc.Doc = doc.Text(" ")
-		_, selectorValueIsString := selector.Get("value").(string)
+		_, selectorValueIsString := asString(selector.Get("value"))
 		if isScssControlDirectiveNode(node, options) {
 			opening = doc.Text("")
 		} else if (selector != nil &&
@@ -602,9 +605,9 @@ func printNamespace(node *estree.Node) doc.Doc {
 	if !estree.IsTruthy(namespace) {
 		return doc.Text("")
 	}
-	if namespace == true {
+	if namespace == estree.Boolean(true) {
 		return doc.Text("|")
 	}
-	text, _ := namespace.(string)
+	text, _ := asString(namespace)
 	return doc.Concat{doc.Text(trim(text)), doc.Text("|")}
 }

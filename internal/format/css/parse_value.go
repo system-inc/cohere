@@ -16,17 +16,21 @@ func isClosingParenthesis(node *estree.Node) bool {
 
 // newParenGroup is upstream's { open, close, groups, type: "paren_group" } literal, keys in that order.
 func newParenGroup(open *estree.Node) *estree.Node {
-	return estree.New("paren_group", 0, 0, "open", open, "close", nil, "groups", []*estree.Node{})
+	return estree.New("paren_group", 0, 0, []estree.Property{
+		{Key: "open", Value: open},
+		{Key: "close", Value: nil},
+		{Key: "groups", Value: estree.Nodes{}},
+	})
 }
 
 // newCommaGroup is upstream's { groups: [], type: "comma_group" } literal.
 func newCommaGroup() *estree.Node {
-	return estree.New("comma_group", 0, 0, "groups", []*estree.Node{})
+	return estree.New("comma_group", 0, 0, []estree.Property{{Key: "groups", Value: estree.Nodes{}}})
 }
 
 // pushGroup is group.groups.push(child).
 func pushGroup(group *estree.Node, child *estree.Node) {
-	group.Set("groups", append(group.List("groups"), child))
+	group.Set("groups", estree.Nodes(append(group.List("groups"), child)))
 }
 
 func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOptions) *estree.Node {
@@ -49,8 +53,8 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 			// the node already had a unit work. For example, 50px... is parsed as `50` with unit `px...` already by
 			// postcss-values-parser.
 			value := node.String("value")
-			node.Set("value", value[:len(value)-1])
-			node.Set("unit", "...")
+			node.Set("value", estree.String(value[:len(value)-1]))
+			node.Set("unit", estree.String("..."))
 		}
 
 		if node.Is("func") && node.String("value") == "selector" {
@@ -61,14 +65,14 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 				intProperty(group.Child("close"), "sourceIndex"),
 			)
 			parsedSelector := parseSelector(selector)
-			parsedSelector.Set("sourceIndex", intProperty(group.Child("open"), "sourceIndex")+1)
-			raws := rawsIn(parsedSelector)
+			parsedSelector.Set("sourceIndex", estree.Integer(intProperty(group.Child("open"), "sourceIndex")+1))
+			raws, _ := parsedSelector.Get("raws").(estree.Record)
 			if raws == nil {
-				raws = map[string]any{}
+				raws = estree.Record{}
 				parsedSelector.Set("raws", raws)
 			}
-			raws["selector"] = selector
-			group.Set("groups", []*estree.Node{parsedSelector})
+			raws["selector"] = estree.String(selector)
+			group.Set("groups", estree.Nodes{parsedSelector})
 		}
 
 		if node.Is("func") && node.String("value") == "url" {
@@ -93,9 +97,9 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 			if hasScssInterpolation(groupList) ||
 				(!hasStringOrFunction(groupList) &&
 					!isScssVariable(firstGroup, options)) {
-				// The one place a groups list holds a string, so it is a []any here and not a
-				// []*estree.Node.
-				node.Child("group").Set("groups", []any{getFunctionArgumentsText(node, walk)})
+				// The one place a groups list holds a string, so it is an estree.Values here and not an
+				// estree.Nodes.
+				node.Child("group").Set("groups", estree.Values{estree.String(getFunctionArgumentsText(node, walk))})
 			}
 		}
 		if node.Is("paren") && node.String("value") == "(" {
@@ -112,6 +116,8 @@ func parseValueNode(valueNode *estree.Node, walk valueRootWalk, options *parseOp
 
 			/* c8 ignore next 3 */
 			if len(commaGroupStack) == 1 {
+				// Invariant: this is upstream's throw, not a crash: parseCatching recovers every
+				// javaScriptError into the parse's error, as upstream's caller catches it.
 				panic(javaScriptError{message: "Unbalanced parenthesis"})
 			}
 
@@ -159,11 +165,11 @@ func flattenGroups(node *estree.Node) *estree.Node {
 
 	if node.Is("paren_group", "comma_group") {
 		// { ...node, groups: node.groups.map(flattenGroups) }: a copy, keys in the same order.
-		flattened := make([]*estree.Node, len(groups))
+		flattened := make(estree.Nodes, len(groups))
 		for index, group := range groups {
 			flattened[index] = flattenGroups(group)
 		}
-		copied := estree.New(node.Type(), node.Range[0], node.Range[1])
+		copied := estree.New(node.Type(), node.Range[0], node.Range[1], nil)
 		for _, key := range node.Keys() {
 			if key == "groups" {
 				copied.Set(key, flattened)
@@ -189,7 +195,7 @@ func parseNestedValue(node *estree.Node, walk valueRootWalk, options *parseOptio
 		switch child := node.Get(key).(type) {
 		case *estree.Node:
 			parseNestedValue(child, walk, options)
-		case []*estree.Node:
+		case estree.Nodes:
 			for _, element := range child {
 				parseNestedValue(element, walk, options)
 			}
@@ -212,10 +218,10 @@ func parseValue(value string, options *parseOptions) *estree.Node {
 	result, parseError := values.Parse(value, values.Options{Loose: true})
 	if parseError != nil {
 		// Upstream's catch takes every throw, so every error lands here, the port's own included.
-		return estree.New("value-unknown", 0, 0, "value", value)
+		return estree.New("value-unknown", 0, 0, []estree.Property{{Key: "value", Value: estree.String(value)}})
 	}
 
-	result.Set("text", value)
+	result.Set("text", estree.String(value))
 
 	parsedResult := parseNestedValue(result, valueRootWalk{root: result}, options)
 

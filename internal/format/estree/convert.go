@@ -110,11 +110,11 @@ type token struct {
 	end   int
 }
 
-// noNodes is an empty node list made a property value once. A []*Node{} given to createNode is boxed
-// into its value on every node that has one, which was 1.5M of the conversion's allocations on ahra for
-// identifiers' decorators alone (#fyw36kf). Sharing one is safe: nothing can be stored in an empty list,
-// and appending to it moves the result to new memory.
-var noNodes any = []*Node{}
+// noNodes is an empty node list made a property value once. A Nodes{} given to createNode is boxed into its
+// value on every node that has one, which was 1.5M of the conversion's allocations on ahra for identifiers'
+// decorators alone (#fyw36kf). Sharing one is safe: nothing can be stored in an empty list, and appending to
+// it moves the result to new memory.
+var noNodes Value = Nodes{}
 
 // fixParentLocation is upstream's fixParentLocation.
 func fixParentLocation(result *Node, childRange [2]int) {
@@ -175,15 +175,15 @@ func hasModifier(kind ast.Kind, node *ast.Node) bool {
 
 // getTsNodeAccessibility is upstream's getTsNodeAccessibility. Upstream returns undefined when there
 // is none, so nil here, which a Node stores as a present property with no value.
-func getTsNodeAccessibility(node *ast.Node) any {
+func getTsNodeAccessibility(node *ast.Node) Value {
 	for _, modifier := range modifiers(node) {
 		switch modifier.Kind {
 		case ast.KindPublicKeyword:
-			return "public"
+			return String("public")
 		case ast.KindProtectedKeyword:
-			return "protected"
+			return String("protected")
 		case ast.KindPrivateKeyword:
-			return "private"
+			return String("private")
 		}
 	}
 	return nil

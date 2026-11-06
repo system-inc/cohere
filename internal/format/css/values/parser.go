@@ -68,8 +68,14 @@ func (parser *parser) sourceIndex(index int) int {
 }
 
 // tokenSource is the { start, end } most node kinds take straight from their token.
-func tokenSource(token *token) map[string]any {
-	return source(position(token.startLine, token.startColumn), position(token.endLine, token.endColumnValue()))
+func tokenSource(token *token) sourceSpan {
+	return sourceSpan{
+		startLine:      token.startLine,
+		startColumn:    token.startColumn,
+		endLine:        token.endLine,
+		endColumn:      token.endColumn,
+		endColumnIsNaN: token.endColumnIsNaN,
+	}
 }
 
 func (parser *parser) colon() {
@@ -119,6 +125,8 @@ func commentDelimiters(value string) string {
 }
 
 func (parser *parser) error(message string, token *token) {
+	// Invariant: this is upstream's throw of a ParserError, which malformed input reaches; Parse
+	// recovers every *Error and returns it as a syntax error, so the panic never leaves the package.
 	panic(&Error{
 		Name:    "ParserError",
 		Message: message + " at line: " + itoa(token.startLine) + ", column " + itoa(token.startColumn),
@@ -199,7 +207,12 @@ func (parser *parser) operator() {
 	node := leaf(
 		"operator",
 		decode(token.value),
-		source(position(token.startLine, token.startColumn), position(token.startLine, token.startColumn)),
+		sourceSpan{
+			startLine:   token.startLine,
+			startColumn: token.startColumn,
+			endLine:     token.startLine,
+			endColumn:   token.startColumn,
+		},
 		parser.sourceIndex(token.endLine),
 	)
 
@@ -279,7 +292,7 @@ func (parser *parser) parenOpen() {
 		kind(parser.currToken()) != ")" && !parser.options.Loose {
 		nextToken := parser.nextToken()
 		value := decode(parser.currToken().value)
-		start := position(parser.currToken().startLine, parser.currToken().startColumn)
+		startToken := parser.currToken()
 
 		for nextToken != nil && nextToken.kind != ")" && unbalanced(parser.current) != 0 {
 			parser.position++
@@ -295,7 +308,13 @@ func (parser *parser) parenOpen() {
 			parser.newNode(leaf(
 				"word",
 				value,
-				source(start, position(parser.currToken().endLine, parser.currToken().endColumnValue())),
+				sourceSpan{
+					startLine:      startToken.startLine,
+					startColumn:    startToken.startColumn,
+					endLine:        parser.currToken().endLine,
+					endColumn:      parser.currToken().endColumn,
+					endColumnIsNaN: parser.currToken().endColumnIsNaN,
+				},
 				parser.sourceIndex(parser.currToken().index),
 			))
 		}
@@ -333,6 +352,9 @@ func (parser *parser) space() {
 	if parser.position == len(parser.tokens)-1 || kind(parser.nextToken()) == "," || kind(parser.nextToken()) == ")" {
 		currentLast := last(parser.current)
 		if currentLast == nil {
+			// Invariant: this is upstream's TypeError reading the raws of a missing last node, which a
+			// value of only whitespace reaches; Parse recovers every *Error and returns it as a syntax
+			// error, so the panic never leaves the package.
 			panic(typeError("raws"))
 		}
 		appendRaw(currentLast, "after", decode(token.value))
@@ -466,10 +488,12 @@ func (parser *parser) splitWord() {
 		value := word[ind:index]
 		var node *estree.Node
 
-		nodeSource := source(
-			position(currToken.startLine, currToken.startColumn+ind),
-			position(currToken.endLine, currToken.startColumn+(index-1)),
-		)
+		nodeSource := sourceSpan{
+			startLine:   currToken.startLine,
+			startColumn: currToken.startColumn + ind,
+			endLine:     currToken.endLine,
+			endColumn:   currToken.startColumn + (index - 1),
+		}
 		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[indexIndex])
 
 		if containsIndex(hasAt, ind) {
@@ -483,15 +507,13 @@ func (parser *parser) splitWord() {
 
 			// value.replace(unit, ''): the first occurrence, which is not always the suffix.
 			node = newNumber(strings.Replace(text, unit, "", 1), nodeSource, nodeSourceIndex, unit)
+		} else if nextToken != nil && nextToken.kind == "(" {
+			node = newFunc(decode(value), nodeSource, nodeSourceIndex)
+			parser.cache = append(parser.cache, parser.current)
 		} else {
-			if nextToken != nil && nextToken.kind == "(" {
-				node = newFunc(decode(value), nodeSource, nodeSourceIndex)
-				parser.cache = append(parser.cache, parser.current)
-			} else {
-				node = leaf("word", decode(value), nodeSource, nodeSourceIndex)
-				node.Set("isHex", isHex(value))
-				node.Set("isColor", isColor(value))
-			}
+			node = leaf("word", decode(value), nodeSource, nodeSourceIndex)
+			node.Set("isHex", estree.Boolean(isHex(value)))
+			node.Set("isColor", estree.Boolean(isColor(value)))
 		}
 
 		parser.newNode(node)
@@ -525,7 +547,7 @@ func (parser *parser) string() {
 
 	node := newString(decode(value), tokenSource(token), parser.sourceIndex(token.index), quoted)
 
-	raws(node)["quote"] = quote
+	setRaw(node, "quote", quote)
 
 	parser.newNode(node)
 	parser.position++
@@ -560,6 +582,9 @@ func (parser *parser) tokenAt(index int) *token {
 // kind is token[0], which throws when the token is undefined.
 func kind(token *token) string {
 	if token == nil {
+		// Invariant: this is upstream's TypeError reading a token past either end, which an operator
+		// with nothing after it reaches; Parse recovers every *Error and returns it as a syntax error, so
+		// the panic never leaves the package.
 		panic(typeError("0"))
 	}
 	return token.kind
@@ -568,6 +593,9 @@ func kind(token *token) string {
 // property is node.type or node.value, which throws when the node is undefined.
 func property(node *estree.Node, key string) string {
 	if node == nil {
+		// Invariant: this is upstream's TypeError reading a property of a missing node, which malformed
+		// input can reach; Parse recovers every *Error and returns it as a syntax error, so the panic
+		// never leaves the package.
 		panic(typeError(key))
 	}
 	if key == "type" {

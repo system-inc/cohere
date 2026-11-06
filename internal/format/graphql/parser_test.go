@@ -15,50 +15,52 @@ import (
 // string: a nil field prints as key=undefined, an absent one does not print.
 func outline(node *estree.Node) string {
 	var builder strings.Builder
-	var write func(value any)
-	write = func(value any) {
-		switch typed := value.(type) {
-		case nil:
-			builder.WriteString("undefined")
-		case *estree.Node:
-			builder.WriteString(typed.Type())
-			builder.WriteString("[")
-			builder.WriteString(strconv.Itoa(typed.Range[0]) + "," + strconv.Itoa(typed.Range[1]))
-			builder.WriteString("]")
-			if keys := typed.Keys(); len(keys) > 0 {
-				builder.WriteString("{")
-				for index, key := range keys {
-					if index > 0 {
-						builder.WriteString(" ")
-					}
-					builder.WriteString(key + "=")
-					write(typed.Get(key))
-				}
-				builder.WriteString("}")
-			}
-		case []*estree.Node:
-			builder.WriteString("(")
-			for index, child := range typed {
+	writeOutline(&builder, node)
+	return builder.String()
+}
+
+// writeOutline writes one value of the outline: a node, a list of nodes, or one of a node's scalar fields,
+// which estree hands over as it holds them.
+func writeOutline(builder *strings.Builder, value estree.Value) {
+	switch typed := value.(type) {
+	case nil:
+		builder.WriteString("undefined")
+	case *estree.Node:
+		builder.WriteString(typed.Type())
+		builder.WriteString("[")
+		builder.WriteString(strconv.Itoa(typed.Range[0]) + "," + strconv.Itoa(typed.Range[1]))
+		builder.WriteString("]")
+		if keys := typed.Keys(); len(keys) > 0 {
+			builder.WriteString("{")
+			for index, key := range keys {
 				if index > 0 {
 					builder.WriteString(" ")
 				}
-				write(child)
+				builder.WriteString(key + "=")
+				writeOutline(builder, typed.Get(key))
 			}
-			builder.WriteString(")")
-		case string:
-			builder.WriteString(`"` + typed + `"`)
-		case bool:
-			if typed {
-				builder.WriteString("true")
-			} else {
-				builder.WriteString("false")
-			}
-		default:
-			builder.WriteString("?")
+			builder.WriteString("}")
 		}
+	case estree.Nodes:
+		builder.WriteString("(")
+		for index, child := range typed {
+			if index > 0 {
+				builder.WriteString(" ")
+			}
+			writeOutline(builder, child)
+		}
+		builder.WriteString(")")
+	case estree.String:
+		builder.WriteString(`"` + string(typed) + `"`)
+	case estree.Boolean:
+		if typed {
+			builder.WriteString("true")
+		} else {
+			builder.WriteString("false")
+		}
+	default:
+		builder.WriteString("?")
 	}
-	write(node)
-	return builder.String()
 }
 
 func TestParseShapes(test *testing.T) {
@@ -71,36 +73,47 @@ func TestParseShapes(test *testing.T) {
 		{
 			name: "shorthand query writes its undefined fields",
 			text: "{ a }",
-			want: `Document[0,5]{definitions=(OperationDefinition[0,5]{operation="query" description=undefined name=undefined ` +
+			want: `Document[0,5]{definitions=(OperationDefinition[0,5]{operation="query" description=undefined ` +
+				`name=undefined ` +
 				`variableDefinitions=undefined directives=undefined selectionSet=SelectionSet[0,5]{selections=(` +
 				`Field[2,3]{alias=undefined name=Name[2,3]{value="a"} arguments=undefined directives=undefined selectionSet=undefined})}})}`,
 		},
 		{
 			name: "variables, alias, arguments, directive, list and non-null types",
 			text: "query Q($a: [Int!] = [1]) { b: f(x: $a) @d }",
-			want: `Document[0,44]{definitions=(OperationDefinition[0,44]{operation="query" description=undefined name=Name[6,7]{value="Q"} ` +
-				`variableDefinitions=(VariableDefinition[8,24]{description=undefined variable=Variable[8,10]{name=Name[9,10]{value="a"}} ` +
+			want: `Document[0,44]{definitions=(OperationDefinition[0,44]{operation="query" description=undefined ` +
+				`name=Name[6,7]{value="Q"} ` +
+				`variableDefinitions=(VariableDefinition[8,24]{description=undefined ` +
+				`variable=Variable[8,10]{name=Name[9,10]{value="a"}} ` +
 				`type=ListType[12,18]{type=NonNullType[13,17]{type=NamedType[13,16]{name=Name[13,16]{value="Int"}}}} ` +
-				`defaultValue=ListValue[21,24]{values=(IntValue[22,23]{value="1"})} directives=undefined}) directives=undefined ` +
-				`selectionSet=SelectionSet[26,44]{selections=(Field[28,42]{alias=Name[28,29]{value="b"} name=Name[31,32]{value="f"} ` +
-				`arguments=(Argument[33,38]{name=Name[33,34]{value="x"} value=Variable[36,38]{name=Name[37,38]{value="a"}}}) ` +
+				`defaultValue=ListValue[21,24]{values=(IntValue[22,23]{value="1"})} directives=undefined}) ` +
+				`directives=undefined ` +
+				`selectionSet=SelectionSet[26,44]{selections=(Field[28,42]{alias=Name[28,29]{value="b"} ` +
+				`name=Name[31,32]{value="f"} ` +
+				`arguments=(Argument[33,38]{name=Name[33,34]{value="x"} ` +
+				`value=Variable[36,38]{name=Name[37,38]{value="a"}}}) ` +
 				`directives=(Directive[40,42]{name=Name[41,42]{value="d"} arguments=undefined}) selectionSet=undefined})}})}`,
 		},
 		{
 			name: "a fragment spread has arguments only when they are written",
 			text: "{ ...F(x: 1) ...G }",
-			want: `Document[0,19]{definitions=(OperationDefinition[0,19]{operation="query" description=undefined name=undefined ` +
+			want: `Document[0,19]{definitions=(OperationDefinition[0,19]{operation="query" description=undefined ` +
+				`name=undefined ` +
 				`variableDefinitions=undefined directives=undefined selectionSet=SelectionSet[0,19]{selections=(` +
-				`FragmentSpread[2,12]{name=Name[5,6]{value="F"} arguments=(FragmentArgument[7,11]{name=Name[7,8]{value="x"} value=IntValue[10,11]{value="1"}}) directives=undefined} ` +
+				`FragmentSpread[2,12]{name=Name[5,6]{value="F"} arguments=(FragmentArgument[7,11]{name=Name[7,8]{` +
+				`value="x"} value=IntValue[10,11]{value="1"}}) directives=undefined} ` +
 				`FragmentSpread[13,17]{name=Name[16,17]{value="G"} directives=undefined})}})}`,
 		},
 		{
 			name: "directive definition with repeatable, empty list and object",
 			text: "directive @d(a: [Int] = [], b: I = {}) repeatable on | FIELD",
-			want: `Document[0,60]{definitions=(DirectiveDefinition[0,60]{description=undefined name=Name[11,12]{value="d"} arguments=(` +
-				`InputValueDefinition[13,26]{description=undefined name=Name[13,14]{value="a"} type=ListType[16,21]{type=NamedType[17,20]{name=Name[17,20]{value="Int"}}} ` +
+			want: `Document[0,60]{definitions=(DirectiveDefinition[0,60]{description=undefined ` +
+				`name=Name[11,12]{value="d"} arguments=(` +
+				`InputValueDefinition[13,26]{description=undefined name=Name[13,14]{value="a"} ` +
+				`type=ListType[16,21]{type=NamedType[17,20]{name=Name[17,20]{value="Int"}}} ` +
 				`defaultValue=ListValue[24,26]{values=()} directives=undefined} ` +
-				`InputValueDefinition[28,37]{description=undefined name=Name[28,29]{value="b"} type=NamedType[31,32]{name=Name[31,32]{value="I"}} ` +
+				`InputValueDefinition[28,37]{description=undefined name=Name[28,29]{value="b"} ` +
+				`type=NamedType[31,32]{name=Name[31,32]{value="I"}} ` +
 				`defaultValue=ObjectValue[35,37]{fields=()} directives=undefined}) directives=undefined repeatable=true locations=(Name[55,60]{value="FIELD"})})}`,
 		},
 		{

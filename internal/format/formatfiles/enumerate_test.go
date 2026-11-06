@@ -2,6 +2,7 @@ package formatfiles
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -225,11 +226,13 @@ func settingsTree(test *testing.T, house string, ignorePatterns string, files ma
 	if house != "" {
 		block = `{"tabWidth": 4, "ignore": ` + house + `}`
 	}
-	files["nexus/NexusCohereSettings.json"] = `{"rules": {}, "format": ` + block + `}`
-	files["CohereSettings.json"] = `{"extends": "./nexus/NexusCohereSettings.json", "rules": {}, "ignorePatterns": ` +
+	// The settings files join a copy, so the caller's map still holds only the files it named.
+	tree := maps.Clone(files)
+	tree["nexus/NexusCohereSettings.json"] = `{"rules": {}, "format": ` + block + `}`
+	tree["CohereSettings.json"] = `{"extends": "./nexus/NexusCohereSettings.json", "rules": {}, "ignorePatterns": ` +
 		ignorePatterns +
 		`}`
-	return writeTree(test, files)
+	return writeTree(test, tree)
 }
 
 // TestEnumerateAppliesEveryIgnoreLayer is the walk's three layers: `.gitignore`, then the format block's
@@ -266,7 +269,10 @@ func TestEnumerateAppliesEveryIgnoreLayer(test *testing.T) {
 	}
 	survivors := map[string]bool{}
 	for _, file := range enumeration.Files {
-		relative, _ := filepath.Rel(root, file)
+		relative, relativeError := filepath.Rel(root, file)
+		if relativeError != nil {
+			test.Fatalf("naming %s under %s: %v", file, root, relativeError)
+		}
 		survivors[filepath.ToSlash(relative)] = true
 	}
 	if !survivors["a.ts"] || survivors["archived/old.md"] || survivors["pnpm-lock.yaml"] || survivors["built.ts"] {
@@ -381,7 +387,10 @@ func TestIgnorePatternsReadAsLintReadsThem(test *testing.T) {
 	}
 	var offered []string
 	for _, file := range enumeration.Files {
-		relative, _ := filepath.Rel(root, file)
+		relative, relativeError := filepath.Rel(root, file)
+		if relativeError != nil {
+			test.Fatalf("naming %s under %s: %v", file, root, relativeError)
+		}
 		offered = append(offered, filepath.ToSlash(relative))
 	}
 	sort.Strings(offered)
@@ -481,7 +490,10 @@ func TestIgnorePatternsCoverNestedPaths(test *testing.T) {
 	}
 	survivors := []string{}
 	for _, file := range enumeration.Files {
-		relative, _ := filepath.Rel(root, file)
+		relative, relativeError := filepath.Rel(root, file)
+		if relativeError != nil {
+			test.Fatalf("naming %s under %s: %v", file, root, relativeError)
+		}
 		survivors = append(survivors, filepath.ToSlash(relative))
 	}
 	sort.Strings(survivors)
@@ -563,6 +575,7 @@ func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(test *testing.T) 
 func survivorsOf(root string, enumeration Enumeration) map[string]bool {
 	survivors := map[string]bool{}
 	for _, file := range enumeration.Files {
+		// Ignored: Enumerate names each file by its absolute path under root, so Rel always finds one.
 		relative, _ := filepath.Rel(root, file)
 		survivors[filepath.ToSlash(relative)] = true
 	}
@@ -637,7 +650,10 @@ func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(test *testing.T) {
 	}
 	var got []string
 	for _, file := range enumeration.IgnoreFiles {
-		relative, _ := filepath.Rel(root, file)
+		relative, relativeError := filepath.Rel(root, file)
+		if relativeError != nil {
+			test.Fatalf("naming %s under %s: %v", file, root, relativeError)
+		}
 		got = append(got, filepath.ToSlash(relative))
 	}
 	sort.Strings(got)
@@ -713,7 +729,10 @@ func TestEnumerateHoldsAdamicFilesBack(test *testing.T) {
 	}
 	held := []string{}
 	for _, file := range enumeration.Adamic {
-		relative, _ := filepath.Rel(root, file)
+		relative, relativeError := filepath.Rel(root, file)
+		if relativeError != nil {
+			test.Fatalf("naming %s under %s: %v", file, root, relativeError)
+		}
 		held = append(held, filepath.ToSlash(relative))
 	}
 	sort.Strings(held)

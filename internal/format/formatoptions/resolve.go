@@ -21,8 +21,8 @@ import (
  * applied over Prettier's defaults, so `{}` means Prettier's defaults.
  *
  * Our own tiers stay unified (Kirk's ruling, 2026-10-03): a chain that extends a cohere:system-inc set
- * (configuration.InOurTiers, the predicate the lint loader shares) takes its block from the Nexus tier alone, and a `format` key anywhere else in
- * it is refused, naming the file, as is a Nexus tier without the block.
+ * (configuration.InOurTiers, the predicate the lint loader shares) takes its block from the Nexus tier alone, and a
+ * `format` key anywhere else in it is refused, naming the file, as is a Nexus tier without the block.
  *
  * So this resolves from the nearest CohereSettings.json walking up from the directory and follows its
  * `extends` chain as the lint loader does. Prettier config left behind in its old place is refused
@@ -367,36 +367,84 @@ type BlockKey struct {
 	// others are Prettier's, which the printers implement and nothing else.
 	Enum []string
 
-	// Option points at the field the value decodes into, nil for a key resolveChain reads itself.
-	Option func(options *Options) any
+	// Decode decodes the key's value into the field it sets, nil for a key resolveChain reads itself.
+	Decode func(options *Options, value json.RawMessage) error
 }
 
 // BlockKeys is every key of the format block, in the order the reference documents them.
 var BlockKeys = []BlockKey{
-	{Name: "printWidth", Type: "integer", Option: func(options *Options) any { return &options.PrintWidth }},
-	{Name: "tabWidth", Type: "integer", Option: func(options *Options) any { return &options.TabWidth }},
-	{Name: "useTabs", Type: "boolean", Option: func(options *Options) any { return &options.UseTabs }},
-	{Name: "semi", Type: "boolean", Option: func(options *Options) any { return &options.Semi }},
-	{Name: "singleQuote", Type: "boolean", Option: func(options *Options) any { return &options.SingleQuote }},
 	{
-		Name:   "trailingComma",
-		Type:   "string",
-		Enum:   []string{"all", "es5", "none"},
-		Option: func(options *Options) any { return &options.TrailingComma },
-	},
-	{Name: "bracketSpacing", Type: "boolean", Option: func(options *Options) any { return &options.BracketSpacing }},
-	{Name: "bracketSameLine", Type: "boolean", Option: func(options *Options) any { return &options.BracketSameLine }},
-	{
-		Name:   "arrowParens",
-		Type:   "string",
-		Enum:   []string{"always", "avoid"},
-		Option: func(options *Options) any { return &options.ArrowParens },
+		Name: "printWidth",
+		Type: "integer",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.PrintWidth)
+		},
 	},
 	{
-		Name:   "endOfLine",
-		Type:   "string",
-		Enum:   []string{"lf"},
-		Option: func(options *Options) any { return &options.EndOfLine },
+		Name: "tabWidth",
+		Type: "integer",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.TabWidth)
+		},
+	},
+	{
+		Name: "useTabs",
+		Type: "boolean",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.UseTabs)
+		},
+	},
+	{
+		Name: "semi",
+		Type: "boolean",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.Semi)
+		},
+	},
+	{
+		Name: "singleQuote",
+		Type: "boolean",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.SingleQuote)
+		},
+	},
+	{
+		Name: "trailingComma",
+		Type: "string",
+		Enum: []string{"all", "es5", "none"},
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.TrailingComma)
+		},
+	},
+	{
+		Name: "bracketSpacing",
+		Type: "boolean",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.BracketSpacing)
+		},
+	},
+	{
+		Name: "bracketSameLine",
+		Type: "boolean",
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.BracketSameLine)
+		},
+	},
+	{
+		Name: "arrowParens",
+		Type: "string",
+		Enum: []string{"always", "avoid"},
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.ArrowParens)
+		},
+	},
+	{
+		Name: "endOfLine",
+		Type: "string",
+		Enum: []string{"lf"},
+		Decode: func(options *Options, value json.RawMessage) error {
+			return json.Unmarshal(value, &options.EndOfLine)
+		},
 	},
 	{Name: "ignore", Type: "array"},
 }
@@ -430,7 +478,7 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, 
 	for _, key := range keys {
 		value := block[key]
 		blockKey, known := blockKeyNamed(key)
-		if known && blockKey.Option == nil {
+		if known && blockKey.Decode == nil {
 			// The house ignore list rides in the format block but is no printing option: resolveChain
 			// reads it.
 			continue
@@ -442,7 +490,7 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, 
 				key,
 			)
 		}
-		if decodeError := json.Unmarshal(value, blockKey.Option(options)); decodeError != nil {
+		if decodeError := blockKey.Decode(options, value); decodeError != nil {
 			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, decodeError)
 		}
 	}

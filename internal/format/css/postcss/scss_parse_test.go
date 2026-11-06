@@ -2,9 +2,11 @@ package postcss
 
 import (
 	"errors"
+	"maps"
 	"reflect"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -23,13 +25,16 @@ func TestParseScssTree(test *testing.T) {
 	}
 
 	comment := nodes[0]
-	commentRaws := objectOf(test, comment.Get("raws"), "comment raws")
+	commentRaws, commentRawsIsObject := comment.Get("raws").(estree.Record)
+	if !commentRawsIsObject {
+		test.Fatalf("comment raws is %#v, want an object", comment.Get("raws"))
+	}
 	if comment.Type() != "comment" ||
 		comment.String("text") != "a *//* b" ||
-		commentRaws["inline"] != true ||
-		commentRaws["text"] != "a /* b" ||
-		commentRaws["left"] != " " ||
-		commentRaws["right"] != "" {
+		commentRaws["inline"] != estree.Boolean(true) ||
+		commentRaws["text"] != estree.String("a /* b") ||
+		commentRaws["left"] != estree.String(" ") ||
+		commentRaws["right"] != estree.String("") {
 		test.Errorf("comment %q %v", comment.String("text"), commentRaws)
 	}
 	if comment.Range != [2]int{0, 9} {
@@ -49,12 +54,16 @@ func TestParseScssTree(test *testing.T) {
 	) {
 		test.Errorf("nested declaration keys %v", keys)
 	}
-	value := objectOf(test, nested.Get("raws"), "nested declaration raws")["value"]
-	if want := map[string]any{
-		"value": "0 ",
-		"raw":   "0 /* c*/\n ",
-		"scss":  "0 // c\n ",
-	}; !reflect.DeepEqual(value, want) {
+	nestedRaws, nestedRawsIsObject := nested.Get("raws").(estree.Record)
+	if !nestedRawsIsObject {
+		test.Fatalf("nested declaration raws is %#v, want an object", nested.Get("raws"))
+	}
+	value := nestedRaws["value"]
+	if record, isRecord := value.(estree.Record); !isRecord || !maps.Equal(record, estree.Record{
+		"value": estree.String("0 "),
+		"raw":   estree.String("0 /* c*/\n "),
+		"scss":  estree.String("0 // c\n "),
+	}) {
 		test.Errorf("raws.value %#v", value)
 	}
 

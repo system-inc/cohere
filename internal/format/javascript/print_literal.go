@@ -20,14 +20,14 @@ func printLiteral(path *Path, options *Options) Doc {
 		return concatIn(path, textDoc(printBigInt(current.String("raw"))))
 	}
 	switch value := current.Get("value").(type) {
-	case float64:
+	case estree.Number:
 		return concatIn(path, textDoc(printNumber(current.String("raw"))))
-	case string:
+	case estree.String:
 		if isDirective(path) {
 			return concatIn(path, textDoc(printDirective(current.String("raw"), options)))
 		}
 		return replaceEndOfLine(printString(current.String("raw"), options))
-	case bool:
+	case estree.Boolean:
 		if value {
 			return concatIn(path, doc.Text("true"))
 		}
@@ -46,7 +46,7 @@ func isDirective(path *Path) bool {
 		return false
 	}
 	parent := parentOf(path)
-	_, isString := parent.Get("directive").(string)
+	_, isString := parent.Get("directive").(estree.String)
 	return parent.Is("ExpressionStatement") && isString
 }
 
