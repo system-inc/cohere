@@ -10,11 +10,11 @@ import (
 
 // Engine is a prettier.Engine's Format, answered from a golden.
 type Engine struct {
-	golden  *Golden
-	options formatoptions.Options
-	once    sync.Once
-	engine  *prettier.Engine
-	err     error
+	golden      *Golden
+	options     formatoptions.Options
+	once        sync.Once
+	engine      *prettier.Engine
+	engineError error
 }
 
 // Format is the answer prettier.Engine.Format gives for fileName and text under the engine's options.
@@ -25,9 +25,9 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 		fileName,
 		text,
 	), func() (string, error) {
-		engine.once.Do(func() { engine.engine, engine.err = prettier.New(engine.options) })
-		if engine.err != nil {
-			return "", engine.err
+		engine.once.Do(func() { engine.engine, engine.engineError = prettier.New(engine.options) })
+		if engine.engineError != nil {
+			return "", engine.engineError
 		}
 		return engine.engine.Format(fileName, text)
 	})

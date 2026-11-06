@@ -10,10 +10,10 @@ import (
 )
 
 type jsonReader struct {
-	text     string
-	position int
-	comments []*Node
-	err      error
+	text        string
+	position    int
+	comments    []*Node
+	triviaError error
 }
 
 func (reader *jsonReader) errorf(format string, arguments ...any) error {
@@ -37,7 +37,7 @@ func (reader *jsonReader) skipTrivia() {
 		case strings.HasPrefix(text[start:], "/*"):
 			closing := strings.Index(text[start+2:], "*/")
 			if closing < 0 {
-				reader.err = reader.errorf("unterminated comment")
+				reader.triviaError = reader.errorf("unterminated comment")
 				reader.position = len(text)
 				return
 			}
@@ -57,8 +57,8 @@ func (reader *jsonReader) skipTrivia() {
 // expect skips trivia and consumes one punctuator.
 func (reader *jsonReader) expect(punctuator byte) error {
 	reader.skipTrivia()
-	if reader.err != nil {
-		return reader.err
+	if reader.triviaError != nil {
+		return reader.triviaError
 	}
 	if reader.position >= len(reader.text) || reader.text[reader.position] != punctuator {
 		return reader.errorf("expected %q", punctuator)
@@ -79,8 +79,8 @@ func (reader *jsonReader) peek() byte {
 // parseValue reads one value after trivia: assertJsonNode's accepted node types.
 func (reader *jsonReader) parseValue() (*Node, error) {
 	character := reader.peek()
-	if reader.err != nil {
-		return nil, reader.err
+	if reader.triviaError != nil {
+		return nil, reader.triviaError
 	}
 	switch {
 	case character == '{':
@@ -130,8 +130,8 @@ func (reader *jsonReader) parseObject() (*Node, error) {
 	properties := []*Node{}
 	for {
 		character := reader.peek()
-		if reader.err != nil {
-			return nil, reader.err
+		if reader.triviaError != nil {
+			return nil, reader.triviaError
 		}
 		if character == '}' {
 			reader.position++
@@ -196,8 +196,8 @@ func (reader *jsonReader) parseArray() (*Node, error) {
 	elements := []*Node{}
 	for {
 		character := reader.peek()
-		if reader.err != nil {
-			return nil, reader.err
+		if reader.triviaError != nil {
+			return nil, reader.triviaError
 		}
 		if character == ']' {
 			reader.position++

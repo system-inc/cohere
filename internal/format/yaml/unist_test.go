@@ -84,8 +84,8 @@ type parseResult struct {
 
 // parsed is one input's tree, or the parser's error.
 type parsed struct {
-	root *unist.Node
-	err  string
+	root         *unist.Node
+	parseFailure string
 }
 
 // parseTrees parses every text with the real parser, a few Node processes for all of them.
@@ -141,7 +141,7 @@ func parseBatch(test testing.TB, script string, texts []string) []parsed {
 	results := make([]parsed, len(texts))
 	for index, result := range raw {
 		if result.Root == nil {
-			results[index] = parsed{err: result.Error}
+			results[index] = parsed{parseFailure: result.Error}
 			continue
 		}
 		decoder := json.NewDecoder(bytes.NewReader(result.Root))
@@ -242,8 +242,8 @@ func TestLoaderConvertsOffsets(test *testing.T) {
 	test.Parallel()
 	text := "é: 🍐\n'中': \"x\"\n"
 	trees := parseTrees(test, []string{text})
-	if trees[0].err != "" {
-		test.Fatal(trees[0].err)
+	if trees[0].parseFailure != "" {
+		test.Fatal(trees[0].parseFailure)
 	}
 	var values []string
 	var walk func(node *unist.Node)

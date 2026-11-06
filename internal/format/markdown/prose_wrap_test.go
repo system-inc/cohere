@@ -21,10 +21,10 @@ import (
 // proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
 // recorded (see oracletest), so the runtime is built only when they are recorded again.
 type proseWrapOracle struct {
-	golden  *oracletest.Golden
-	once    sync.Once
-	runtime *goja.Runtime
-	err     error
+	golden    *oracletest.Golden
+	once      sync.Once
+	runtime   *goja.Runtime
+	loadError error
 }
 
 func newProseWrapOracle(test *testing.T) *proseWrapOracle {
@@ -35,13 +35,13 @@ func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 func (oracle *proseWrapOracle) load() {
 	bundles, bundlesError := prettier.Bundles()
 	if bundlesError != nil {
-		oracle.err = bundlesError
+		oracle.loadError = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range prettier.BundleFiles {
 		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, runStringError)
+			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -54,8 +54,8 @@ func (oracle *proseWrapOracle) format(text string, options formatoptions.Options
 	key := oracletest.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
-		if oracle.err != nil {
-			return "", oracle.err
+		if oracle.loadError != nil {
+			return "", oracle.loadError
 		}
 		return oracle.formatLive(text, options, proseWrap)
 	})

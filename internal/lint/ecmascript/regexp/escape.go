@@ -47,12 +47,12 @@ const (
 // no escape at all under Annex B, and comes back as a backslash of width none,
 // leaving the `c` to be read as the character it is.
 type decodedEscape struct {
-	kind     escapeKind
-	set      setKind
-	r        rune
-	width    int
-	negated  bool
-	property string
+	kind      escapeKind
+	set       setKind
+	character rune
+	width     int
+	negated   bool
+	property  string
 }
 
 // escapeContext is what an escape's meaning depends on besides its own text.
@@ -86,15 +86,15 @@ func decodeEscape(source string, index int, escaping escapeContext) (decodedEsca
 	case 'x':
 		return decodeFixedHex(source, index, size, 2, escaping)
 	case 'n':
-		return decodedEscape{r: '\n', width: size}, nil
+		return decodedEscape{character: '\n', width: size}, nil
 	case 'r':
-		return decodedEscape{r: '\r', width: size}, nil
+		return decodedEscape{character: '\r', width: size}, nil
 	case 't':
-		return decodedEscape{r: '\t', width: size}, nil
+		return decodedEscape{character: '\t', width: size}, nil
 	case 'f':
-		return decodedEscape{r: '\f', width: size}, nil
+		return decodedEscape{character: '\f', width: size}, nil
 	case 'v':
-		return decodedEscape{r: '\v', width: size}, nil
+		return decodedEscape{character: '\v', width: size}, nil
 	case 'c':
 		return decodeControlEscape(source, index, size, escaping)
 	case 'd', 'D', 's', 'S':
@@ -109,7 +109,7 @@ func decodeEscape(source string, index int, escaping escapeContext) (decodedEsca
 		if escaping.inClass {
 			// Inside a class a `\b` is a backspace, which is the one place the
 			// two readings of the escape part ways.
-			return decodedEscape{r: '\b', width: size}, nil
+			return decodedEscape{character: '\b', width: size}, nil
 		}
 		return decodedEscape{kind: escapeAssertion, width: size}, nil
 	case 'B':
@@ -145,7 +145,7 @@ func decodeUnicodeEscape(source string, index int, size int, escaping escapeCont
 		if parseError != nil || value > unicode.MaxRune {
 			return decodedEscape{}, fmt.Errorf(`%w: \u{…} naming no character`, ErrUnsupportedSyntax)
 		}
-		return decodedEscape{r: rune(value), width: size + end + 1}, nil
+		return decodedEscape{character: rune(value), width: size + end + 1}, nil
 	}
 	return decodeFixedHex(source, index, size, 4, escaping)
 }
@@ -157,14 +157,14 @@ func decodeFixedHex(source string, index int, size int, digits int, escaping esc
 	start := index + size
 	if start+digits <= len(source) {
 		if value, parseError := strconv.ParseUint(source[start:start+digits], 16, 32); parseError == nil {
-			return decodedEscape{r: rune(value), width: size + digits}, nil
+			return decodedEscape{character: rune(value), width: size + digits}, nil
 		}
 	}
 	if escaping.unicode {
 		return decodedEscape{}, fmt.Errorf(`%w: \%.1s naming no character`, ErrUnsupportedSyntax, source[index:])
 	}
 	character, _ := utf8.DecodeRuneInString(source[index:])
-	return decodedEscape{r: character, width: size}, nil
+	return decodedEscape{character: character, width: size}, nil
 }
 
 // decodeControlEscape reads `\cX`, the control character an ASCII letter names.
@@ -175,7 +175,7 @@ func decodeControlEscape(source string, index int, size int, escaping escapeCont
 		// underscore, which is the one place the two productions differ.
 		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
 			!escaping.unicode && escaping.inClass && (character >= '0' && character <= '9' || character == '_') {
-			return decodedEscape{r: rune(character % 32), width: size + 1}, nil
+			return decodedEscape{character: rune(character % 32), width: size + 1}, nil
 		}
 	}
 	if escaping.unicode {
@@ -183,7 +183,7 @@ func decodeControlEscape(source string, index int, size int, escaping escapeCont
 	}
 	// Annex B: with no control letter after it the backslash is not an escape
 	// at all and stands for itself, leaving the `c` to be read on its own.
-	return decodedEscape{r: '\\', width: 0}, nil
+	return decodedEscape{character: '\\', width: 0}, nil
 }
 
 // decodePropertyEscape reads `\p{…}` and `\P{…}`, which name a set out of
@@ -220,7 +220,7 @@ func decodePropertyEscape(source string, index int, size int, escaping escapeCon
 // where it sits, and on how many groups the pattern opens.
 func decodeNumericEscape(source string, index int, escaping escapeContext) (decodedEscape, error) {
 	if source[index] == '0' && !isDecimalDigit(source, index+1) {
-		return decodedEscape{r: 0, width: 1}, nil
+		return decodedEscape{character: 0, width: 1}, nil
 	}
 	// A number no group answers to is not a backreference at all, and Annex B
 	// reads the same text as an escaped character instead. Inside a class there
@@ -234,10 +234,10 @@ func decodeNumericEscape(source string, index int, escaping escapeContext) (deco
 		return decodedEscape{}, fmt.Errorf(`%w: \%.1s`, ErrUnsupportedSyntax, source[index:])
 	}
 	if character, width := decodeLegacyOctal(source, index); width > 0 {
-		return decodedEscape{r: character, width: width}, nil
+		return decodedEscape{character: character, width: width}, nil
 	}
 	// `\8` and `\9`, which no octal escape spells.
-	return decodedEscape{r: rune(source[index]), width: 1}, nil
+	return decodedEscape{character: rune(source[index]), width: 1}, nil
 }
 
 // decimalEscape reads the whole run of digits a backreference is numbered with,
@@ -282,7 +282,7 @@ func identityEscape(character rune, size int, escaping escapeContext) (decodedEs
 		(!escaping.inClass || character != '-') {
 		return decodedEscape{}, fmt.Errorf(`%w: \%c`, ErrUnsupportedSyntax, character)
 	}
-	return decodedEscape{r: character, width: size}, nil
+	return decodedEscape{character: character, width: size}, nil
 }
 
 func isDecimalDigit(source string, index int) bool {
