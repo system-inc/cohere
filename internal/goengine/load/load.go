@@ -56,9 +56,10 @@ type Loaded struct {
 	// tool would translate and reach its cgo files (see Withheld), one per file, sorted by file, and never nil.
 	WithheldInDependencyCgo []Withheld
 
-	// WithheldDependencyCgoBodies counts the functions of dependencies whose bodies reach their cgo files, which
-	// the analyzers were given without their bodies (see withholdCgoBodies).
-	WithheldDependencyCgoBodies int
+	// WithheldDependencyCgoDeclarations counts the declarations of dependencies with cgo files the analyzers were
+	// given without what reaches cgo: functions without their bodies, package-level variables without their initial
+	// values (see withholdCgoDeclarations).
+	WithheldDependencyCgoDeclarations int
 
 	// CgoTranslated is set when a package of the project has cgo files, so the load went through go/packages and
 	// the cgo tool translated every cgo file, rather than from source (see translated).
@@ -145,8 +146,8 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 }
 
 // fromSource parses and type-checks the listing's graph from source, and returns its roots and what the load
-// knows of them before the diagnostics and the counts. The functions of dependencies that reach their cgo files
-// lose their bodies only once every package is type-checked.
+// knows of them before the diagnostics and the counts. The declarations of dependencies that reach their cgo files
+// lose what reaches it only once every package is type-checked.
 func fromSource(
 	workspace string,
 	listed *listing,
@@ -168,9 +169,9 @@ func fromSource(
 		roots = append(roots, root.loaded)
 	}
 	return roots, &Loaded{
-		Packages:                    analyzedOfGraph(built),
-		WithheldInDependencyCgo:     withheld.sorted(),
-		WithheldDependencyCgoBodies: withholdCgoBodies(typeChecker.fileSet, reachable),
+		Packages:                          analyzedOfGraph(built),
+		WithheldInDependencyCgo:           withheld.sorted(),
+		WithheldDependencyCgoDeclarations: withholdCgoDeclarations(typeChecker.fileSet, reachable),
 	}, nil
 }
 

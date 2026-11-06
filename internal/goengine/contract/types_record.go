@@ -17,11 +17,12 @@ type TypesRecord struct {
 	// always written as a list, `[]` when empty (see MarshalJSON).
 	WithheldInDependencyCgo []WithheldFile `json:"withheldInDependencyCgo"`
 
-	// WithheldDependencyCgoBodies is additive within contract 3 too. It counts the functions of dependencies whose
-	// bodies use the faked package "C" or what their cgo files declare, which every rule was given as an assembly
-	// function is given, without its body, since the analyzers that read a body's every expression stop on one.
-	// Without it a run whose rules saw less of a dependency reads like one that saw it whole.
-	WithheldDependencyCgoBodies int `json:"withheldDependencyCgoBodies"`
+	// WithheldDependencyCgoDeclarations is additive within contract 3 too. It counts the declarations of dependencies
+	// with cgo files that use the faked package "C", what their cgo files declare, or what either left without a
+	// valid type: functions, which every rule was given as an assembly function is given, without a body, and
+	// package-level variables, given without their initial values, since the analyzers that read every expression
+	// stop on one. Without it a run whose rules saw less of a dependency reads like one that saw it whole.
+	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations"`
 }
 
 // WithheldFile is one file whose type errors a run withheld, with the package it is in and how many there were.

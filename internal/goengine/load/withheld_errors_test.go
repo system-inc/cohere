@@ -1,6 +1,7 @@
 package load
 
 import (
+	"fmt"
 	"go/ast"
 	"maps"
 	"os"
@@ -11,7 +12,11 @@ import (
 	"sync"
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/printf"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/goengine/check/checker"
 )
 
 // wrapperFiles are a cgo package that wraps its C names in `_C_` functions, as the standard library's net and
@@ -28,13 +33,16 @@ func wrapperFiles(packageName string) map[string]string {
 }
 
 // otherFiles are a second package of the dependency with a cgo file, whose plain file reaches nothing of it: one
-// function, and a type error of its own. It is a package of its own because the type checker stays silent on an
+// function, and a type error of its own; and a third, cgofree, with no cgo file, whose function's type error leaves
+// an expression without a type. It is a package of its own because the type checker stays silent on an
 // invalid type once a package has reported any error, which would hide the dependency's `_C_` call.
 var otherFiles = map[string]string{
 	"dependency/other/other_cgo.go": "package other\n\n// static int one(void) { return 1; }\nimport \"C\"\n\n" +
 		"func _C_one() int { return int(C.one()) }\n",
 	"dependency/other/other.go": "package other\n\n// Plain is one.\nfunc Plain() int { return 1 }\n\n" +
 		"// Broken is of the wrong type.\nvar Broken int = \"text\"\n",
+	"dependency/cgofree/cgofree.go": "package cgofree\n\n// Broken adds one to what is not declared.\n" +
+		"func Broken() int { return missing + 1 }\n",
 }
 
 // cgoFixtures are the cgo loads, written and loaded once per test binary. project is a module whose own package
@@ -68,9 +76,9 @@ func loadedCgoFixtures(test *testing.T) string {
 			"project/go.mod": "module example.com/project\n\ngo 1.21\n\nrequire example.com/dependency v0.0.0\n\n" +
 				"replace example.com/dependency => ../dependency\n",
 			"project/user/user.go": "package user\n\nimport (\n\t\"example.com/dependency\"\n" +
-				"\t\"example.com/dependency/other\"\n)\n\n" +
+				"\t\"example.com/dependency/cgofree\"\n\t\"example.com/dependency/other\"\n)\n\n" +
 				"// Total is the dependency's count.\n" +
-				"func Total() uint64 { return dependency.Count() + uint64(other.Plain()) }\n",
+				"func Total() uint64 { return dependency.Count() + uint64(other.Plain()+cgofree.Broken()) }\n",
 			"dependency/go.mod": "module example.com/dependency\n\ngo 1.21\n",
 			"linux/go.mod":      "module example.com/linux\n\ngo 1.21\n",
 			"linux/linux.go":    "package linux\n\nimport (\n\t_ \"net\"\n\t_ \"os/user\"\n)\n",
@@ -147,6 +155,30 @@ func TestADependencysTypeErrorThatReachesNoCgoIsADiagnostic(test *testing.T) {
 	}
 }
 
+// A dependency with no cgo file has no package "C" faked, so a type error in it is its own, whatever expression it
+// leaves without a type: a diagnostic, never withheld.
+func TestACgoFreeDependencysTypeErrorIsADiagnostic(test *testing.T) {
+	test.Parallel()
+
+	root := loadedCgoFixtures(test)
+	cgoFreeFile := filepath.Join(root, "dependency", "cgofree", "cgofree.go")
+	var found []Diagnostic
+	for _, diagnostic := range cgoFixtures.project.Diagnostics {
+		if diagnostic.File == cgoFreeFile {
+			found = append(found, diagnostic)
+		}
+	}
+	if len(found) != 1 || found[0].Kind != KindType || found[0].Line != 4 {
+		test.Fatalf("want one type diagnostic at %s:4, got %+v (all: %+v)", cgoFreeFile, found,
+			cgoFixtures.project.Diagnostics)
+	}
+	for _, withheld := range cgoFixtures.project.WithheldInDependencyCgo {
+		if withheld.File == cgoFreeFile {
+			test.Errorf("a cgo-free dependency's error was withheld: %+v", withheld)
+		}
+	}
+}
+
 // The same call in the project's own cgo package, were it loaded from source, is the project's to fix, so it is a
 // type diagnostic, reported where it is, and nothing of it is withheld.
 func TestTheSameCgoTypeErrorInTheProjectIsADiagnostic(test *testing.T) {
@@ -198,8 +230,8 @@ func TestNetAndOsUserForLinuxWithholdExactlyTheirWrapperCallers(test *testing.T)
 	if cgoFixtures.linux.CgoTranslated {
 		test.Error("a project that only reaches net went through go/packages; only its own cgo sends it there")
 	}
-	if cgoFixtures.linux.WithheldDependencyCgoBodies == 0 {
-		test.Error("no function of net or os/user was withheld without its body, though their wrappers call C")
+	if cgoFixtures.linux.WithheldDependencyCgoDeclarations == 0 {
+		test.Error("no declaration of net or os/user was withheld, though their wrappers call C")
 	}
 }
 
@@ -223,18 +255,19 @@ func functionsOf(loaded *Loaded, path string) map[string]*ast.FuncDecl {
 }
 
 // A dependency's function whose body reaches its cgo files, a `_C_` wrapper and its caller, comes to the rules
-// without its body, counted, and every other function keeps it: the dependency's plain one, and every function of
-// the project's own cgo package, which is the project's to check.
+// without its body, counted, and every other function keeps it: the dependency's plain one, the cgo-free
+// dependency's one though its body holds an expression without a type, and every function of the project's own cgo
+// package, which is the project's to check.
 func TestADependencysFunctionsThatReachCgoComeWithoutTheirBodies(test *testing.T) {
 	test.Parallel()
 
 	loadedCgoFixtures(test)
-	if cgoFixtures.project.WithheldDependencyCgoBodies != 3 {
-		test.Errorf("want 3 functions withheld without their bodies, got %d",
-			cgoFixtures.project.WithheldDependencyCgoBodies)
+	if cgoFixtures.project.WithheldDependencyCgoDeclarations != 3 {
+		test.Errorf("want 3 declarations withheld, got %d", cgoFixtures.project.WithheldDependencyCgoDeclarations)
 	}
 	dependency := functionsOf(cgoFixtures.project, "example.com/dependency")
 	other := functionsOf(cgoFixtures.project, "example.com/dependency/other")
+	cgoFree := functionsOf(cgoFixtures.project, "example.com/dependency/cgofree")
 	own := functionsOf(cgoFixtures.project, "example.com/project/own")
 	for _, expected := range []struct {
 		function *ast.FuncDecl
@@ -245,6 +278,7 @@ func TestADependencysFunctionsThatReachCgoComeWithoutTheirBodies(test *testing.T
 		{dependency["_C_count"], "the dependency's _C_count", false},
 		{other["_C_one"], "the dependency's _C_one", false},
 		{other["Plain"], "the dependency's Plain", true},
+		{cgoFree["Broken"], "the cgo-free dependency's Broken", true},
 		{own["Count"], "the project's Count", true},
 		{own["_C_count"], "the project's _C_count", true},
 	} {
@@ -253,5 +287,97 @@ func TestADependencysFunctionsThatReachCgoComeWithoutTheirBodies(test *testing.T
 		} else if bodied := expected.function.Body != nil; bodied != expected.bodied {
 			test.Errorf("%s has a body %t, want %t", expected.name, bodied, expected.bodied)
 		}
+	}
+}
+
+// Every declaration of net and os/user that reaches C comes without it, functions without their bodies and
+// package-level variables without their initial values, so an analyzer that walks every expression of the
+// dependencies for its facts, as printf does, finishes on each, where the faked package "C" would stop it.
+func TestPrintfFinishesOverNetAndOsUserForLinux(test *testing.T) {
+	test.Parallel()
+
+	loadedCgoFixtures(test)
+	// A copy whose panic is its error, so a body the load left in fails this test and not the whole binary.
+	recovering := *printf.Analyzer
+	recovering.Run = func(pass *analysis.Pass) (result any, runError error) {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				runError = fmt.Errorf("it panicked with %v", recovered)
+			}
+		}()
+		return printf.Analyzer.Run(pass)
+	}
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{&recovering}, cgoFixtures.linux.Packages, nil)
+	if analyzeError != nil {
+		test.Fatal(analyzeError)
+	}
+	ran := 0
+	for action := range graph.All() {
+		ran++
+		if action.Err != nil {
+			test.Errorf("%s did not finish on %s: %v", action.Analyzer.Name, action.Package.ID, action.Err)
+		}
+	}
+	if ran < 2 {
+		test.Fatalf("printf ran on %d packages, want it on the dependencies too", ran)
+	}
+}
+
+// A load that withholds nothing says so with an empty list, never nil, which would read as not counted.
+func TestALoadWithNothingWithheldSaysSo(test *testing.T) {
+	test.Parallel()
+
+	loadedFixtures(test)
+	if withheld := fixtures.clean.WithheldInDependencyCgo; withheld == nil || len(withheld) > 0 {
+		test.Fatalf("want an empty list, got %#v", withheld)
+	}
+}
+
+// os/user's userBuffer and groupBuffer are initialized from cgo constants, so they reach the analyzers without
+// their values, in the syntax and in TypesInfo.InitOrder both, since buildssa and buildir build the package's
+// initialization from InitOrder; os/user's other variables keep theirs.
+func TestOsUsersCgoInitializersLeaveTheSyntaxAndTheInitOrder(test *testing.T) {
+	test.Parallel()
+
+	loadedCgoFixtures(test)
+	var osUser *packages.Package
+	packages.Visit(cgoFixtures.linux.Packages, nil, func(visited *packages.Package) {
+		if visited.PkgPath == "os/user" {
+			osUser = visited
+		}
+	})
+	if osUser == nil {
+		test.Fatal("os/user is not in the linux load")
+	}
+	initialized := map[string]bool{}
+	for _, initializer := range osUser.TypesInfo.InitOrder {
+		for _, variable := range initializer.Lhs {
+			initialized[variable.Name()] = true
+		}
+	}
+	valued := map[string]bool{}
+	for _, file := range osUser.Syntax {
+		for _, declaration := range file.Decls {
+			general, isGeneral := declaration.(*ast.GenDecl)
+			if !isGeneral {
+				continue
+			}
+			for _, specification := range general.Specs {
+				if value, isValue := specification.(*ast.ValueSpec); isValue && len(value.Values) > 0 {
+					for _, name := range value.Names {
+						valued[name.Name] = true
+					}
+				}
+			}
+		}
+	}
+	for _, name := range []string{"userBuffer", "groupBuffer"} {
+		if initialized[name] || valued[name] {
+			test.Errorf("%s keeps its initial value: in InitOrder %t, in the syntax %t", name, initialized[name],
+				valued[name])
+		}
+	}
+	if len(initialized) == 0 {
+		test.Error("os/user's InitOrder lost every initializer, those that reach no cgo too")
 	}
 }

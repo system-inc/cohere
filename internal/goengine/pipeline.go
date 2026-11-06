@@ -225,8 +225,8 @@ func (engine *pipeline) reread(file string) {
 
 // runTypes is the types phase: every list, parse and type error the load met is a compiler finding, but those it
 // withheld in a dependency the cgo tool would translate, which the record names instead, as it counts the
-// dependency's functions the rules were given without their bodies, and every file in scope that no analyzed
-// package holds is a file nothing saw.
+// dependency's declarations the rules were given without what reaches cgo, and every file in scope that no
+// analyzed package holds is a file nothing saw.
 func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	if !engine.request.requests(contract.PhaseTypes) {
 		engine.phase(contract.PhaseTypes, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -259,8 +259,8 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s, type-checked from source: %d packages, %d in the workspace", build,
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
-		WithheldInDependencyCgo:     withheld,
-		WithheldDependencyCgoBodies: loaded.WithheldDependencyCgoBodies,
+		WithheldInDependencyCgo:           withheld,
+		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

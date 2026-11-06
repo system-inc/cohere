@@ -337,9 +337,10 @@ type error was withheld because the expression it is about uses package `"C"` or
 files declare: not the project's to fix. Each entry gives the file's package and how many errors it held, as
 `{"package":"net","file":"<goroot>/src/net/cgo_unix.go","errors":1}`, sorted by file, and the list is `[]` when
 nothing was withheld. A parse or list error is never withheld, nor a type error that uses nothing of the cgo
-files, nor anything in the project's own packages. `withheldDependencyCgoBodies` counts the functions of such
-dependencies whose bodies use the same, which every rule was given without their bodies, as an assembly
-function is given, and is `0` when there were none. A project with cgo files of its own is loaded through
+files, nor anything in the project's own packages. `withheldDependencyCgoDeclarations` counts the declarations
+of such dependencies that use the same, or what it left without a valid type: functions, which every rule was
+given without their bodies, as an assembly function is given, and package-level variables, given without their
+initial values. It is `0` when there were none. A project with cgo files of its own is loaded through
 go/packages instead, which has the cgo tool translate every cgo file, so both are empty then, and the record's
 `build` says which load ran.
 

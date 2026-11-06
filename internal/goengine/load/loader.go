@@ -287,7 +287,7 @@ func (loader *loader) appendError(current *node, found error) {
 // every fact is carried along. On this load such a package is never the project's own, whose cgo sends the whole
 // load through go/packages, so what this keeps the same is a dependency, and a package outside the workspace a
 // pattern names; cgocall over one finds nothing, since its functions that reach C are withheld without their
-// bodies (see withholdCgoBodies).
+// bodies (see withholdCgoDeclarations).
 //
 // Mutates: loaded its types' imports
 func addCgoImports(loaded *packages.Package) {
