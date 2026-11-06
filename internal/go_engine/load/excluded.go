@@ -38,7 +38,7 @@ func ExcludedByConstraints(directory string, environment []string, files []strin
 	if environmentError != nil {
 		return nil, environmentError
 	}
-	buildContext, contextError := constraintContext(workspace, fullEnvironment)
+	buildContext, _, contextError := constraintContext(workspace, fullEnvironment)
 	if contextError != nil {
 		return nil, contextError
 	}
@@ -162,16 +162,19 @@ func reasonFor(buildContext *build.Context) string {
 
 // constraintContext is the build context go uses in workspace under environment, the whole environment, as go
 // env reports it: the target, whether cgo is on, and the `-tags` of `GOFLAGS`, each of which a value given to
-// the load or a go.env setting can change from the host's.
-func constraintContext(workspace string, environment []string) (*build.Context, error) {
-	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS")
+// the load or a go.env setting can change from the host's. The same go env call reports where the toolchain and
+// its settings live, which go.mod and go.work go found, and where go writes its build cache, which the inputs record
+// needs (see inputs.go), so learning them costs no second command.
+func constraintContext(workspace string, environment []string) (*build.Context, reportedEnvironment, error) {
+	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOROOT", "GOENV",
+		"GOMOD", "GOWORK", "GOCACHE")
 	command.Dir = workspace
 	command.Env = environment
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, runError := command.Output()
 	if runError != nil {
-		return nil, fmt.Errorf("reading the build target with go env in %s: %w: %s",
+		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: %w: %s",
 			workspace, runError, strings.TrimSpace(standardError.String()))
 	}
 	var values struct {
@@ -179,19 +182,34 @@ func constraintContext(workspace string, environment []string) (*build.Context, 
 		Goarch     string `json:"GOARCH"`
 		CgoEnabled string `json:"CGO_ENABLED"`
 		Goflags    string `json:"GOFLAGS"`
+		Goroot     string `json:"GOROOT"`
+		Goenv      string `json:"GOENV"`
+		Gomod      string `json:"GOMOD"`
+		Gowork     string `json:"GOWORK"`
+		Gocache    string `json:"GOCACHE"`
 	}
 	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
-		return nil, fmt.Errorf("reading the build target with go env in %s: %w", workspace, decodeError)
+		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: %w", workspace,
+			decodeError)
 	}
 	if values.Goos == "" || values.Goarch == "" {
-		return nil, fmt.Errorf("reading the build target with go env in %s: no GOOS or GOARCH in %q", workspace, output)
+		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: no GOOS or GOARCH "+
+			"in %q", workspace, output)
 	}
 	buildContext := build.Default
 	buildContext.GOOS = values.Goos
 	buildContext.GOARCH = values.Goarch
 	buildContext.CgoEnabled = values.CgoEnabled == "1"
 	buildContext.BuildTags = tagsOf(values.Goflags)
-	return &buildContext, nil
+	reported := reportedEnvironment{
+		goRoot:          values.Goroot,
+		environmentFile: values.Goenv,
+		moduleFile:      values.Gomod,
+		workspaceFile:   values.Gowork,
+		buildCache:      values.Gocache,
+		goFlags:         strings.Fields(values.Goflags),
+	}
+	return &buildContext, reported, nil
 }
 
 // tagsOf is the build tags a `GOFLAGS` value sets: the last `-tags=` among its flags wins, as on a command line,

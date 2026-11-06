@@ -41,7 +41,9 @@ func newLandFixture(test *testing.T) *landFixture {
 	bin := test.TempDir()
 	fixture.log = filepath.Join(bin, "gates")
 	stand := "#!/bin/sh\n[ \"$1\" = vet ] && exit 0\n" +
-		"echo \"start $(basename \"$PWD\") $(ls | tr '\\n' ' ')flags=$GOFLAGS\" >> '" + fixture.log + "'\nsleep 1\n" +
+		"echo \"start $(basename \"$PWD\") $(ls | tr '\\n' ' ')tree=$(git rev-parse HEAD^{tree}) " +
+		"flags=$GOFLAGS\" >> '" +
+		fixture.log + "'\nsleep 1\n" +
 		"echo \"end $(basename \"$PWD\")\" >> '" + fixture.log + "'\n"
 	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
 		test.Fatal(writeError)
@@ -90,7 +92,16 @@ func (fixture *landFixture) commit(directory string, file string) {
 		fixture.test.Fatal(writeError)
 	}
 	fixture.git(directory, "add", file)
-	fixture.git(directory, "commit", "-q", "-m", "add "+file)
+	fixture.git(directory, "commit", "-q", "-m", fixtureSubject("add "+file))
+}
+
+// fixtureTask is the task every fixture commit names, so a landing finds one.
+const fixtureTask = "tskfix1"
+
+// fixtureSubject is a subject the house writes, `area: what changed (#task)`, its area base.txt, the fixture's
+// one top-level file.
+func fixtureSubject(what string) string {
+	return "base: " + what + " (#" + fixtureTask + ")"
 }
 
 func (fixture *landFixture) land(name string) *exec.Cmd {
@@ -171,6 +182,11 @@ func TestALandingAfterMainMovedOutsideLandGatesAgain(test *testing.T) {
 	if len(gates) != 4 || !strings.Contains(gates[2], "outside.txt") {
 		test.Fatalf("the gates ran %q, want a second gate that holds the commit made outside land", gates)
 	}
+	// The landing joins the moved main: its first parent is the commit made outside land.
+	if parent, outside := fixture.git(fixture.repository, "rev-parse", "main^1"),
+		fixture.git(fixture.repository, "log", "-1", "--format=%H", "--", "outside.txt"); parent != outside {
+		test.Errorf("the landing's first parent is %s, want the commit made outside land, %s", parent, outside)
+	}
 	if files := fixture.git(
 		fixture.repository,
 		"ls-files",
@@ -193,7 +209,7 @@ func TestLandRefusesUncommittedWorkAndUndoesAConflict(test *testing.T) {
 		!strings.Contains(string(output), "not committed") {
 		test.Errorf("land of uncommitted work was not refused (%v):\n%s", outputError, output)
 	}
-	fixture.git(worktreeA, "commit", "-q", "-am", "change a.txt")
+	fixture.git(worktreeA, "commit", "-q", "-am", fixtureSubject("change a.txt"))
 
 	// Main changes the same file, so the merge conflicts.
 	if writeError := os.WriteFile(
@@ -206,7 +222,7 @@ func TestLandRefusesUncommittedWorkAndUndoesAConflict(test *testing.T) {
 	fixture.git(fixture.repository, "add", "a.txt")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "main's a.txt")
 	before := fixture.git(worktreeA, "rev-parse", "HEAD")
-	conflicting := exec.Command(fixture.wrapper, "land")
+	conflicting := exec.Command(fixture.wrapper, "land", "--message", "a.txt changed")
 	conflicting.Dir, conflicting.Env = worktreeA, fixture.environment
 	output, outputError := conflicting.CombinedOutput()
 	if outputError == nil ||
@@ -531,7 +547,7 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	}
 
 	land := func() (string, error) {
-		landing := exec.Command(fixture.wrapper, "land")
+		landing := exec.Command(fixture.wrapper, "land", "--message", "a nested module tested")
 		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
@@ -540,7 +556,7 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	// Staged by name: the worktree's submodule is a symlink, and `commit -a` would commit it as one.
 	write(worktreeA, map[string]string{"inner/inner_test.go": failing})
 	fixture.git(worktreeA, "add", "inner/inner_test.go")
-	fixture.git(worktreeA, "commit", "-q", "-m", "plant a failing test in the nested module")
+	fixture.git(worktreeA, "commit", "-q", "-m", "inner: plant a failing test (#"+fixtureTask+")")
 	output, landError := land()
 	if landError == nil || !strings.Contains(output, "planted in the nested module") {
 		test.Fatalf("a failing test in a nested module did not refuse the landing (%v):\n%s", landError, output)
@@ -555,9 +571,16 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 
 	write(worktreeA, map[string]string{"inner/inner_test.go": passing})
 	fixture.git(worktreeA, "add", "inner/inner_test.go")
-	fixture.git(worktreeA, "commit", "-q", "-m", "the nested module's test passes")
+	fixture.git(worktreeA, "commit", "-q", "-m", "inner: the nested test passes (#"+fixtureTask+")")
 	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
 		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", landError, output)
+	}
+	// The landing commit names what the gate tested by module, as the gate's report does.
+	if body := fixture.git(fixture.repository, "log", "-1", "--format=%b", "main"); !strings.Contains(
+		body,
+		"go test of 2 modules from go.work (., inner)",
+	) {
+		test.Errorf("the landing's body does not name the modules gated:\n%s", body)
 	}
 }
 
@@ -591,9 +614,9 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 		"docs/data/example.txt": "stale\n",
 	})
 	fixture.git(worktreeA, "add", "go.mod", "internal", "docs")
-	fixture.git(worktreeA, "commit", "-q", "-m", "a rule change whose example went stale")
+	fixture.git(worktreeA, "commit", "-q", "-m", "docs: a rule change whose example went stale (#"+fixtureTask+")")
 	land := func() (string, error) {
-		landing := exec.Command(fixture.wrapper, "land")
+		landing := exec.Command(fixture.wrapper, "land", "--message", "a rule change and its example")
 		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
@@ -606,7 +629,7 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	}
 	write(map[string]string{"docs/data/example.txt": "fresh\n"})
 	fixture.git(worktreeA, "add", "docs/data/example.txt")
-	fixture.git(worktreeA, "commit", "-q", "-m", "the example recaptured")
+	fixture.git(worktreeA, "commit", "-q", "-m", "docs: the example recaptured (#"+fixtureTask+")")
 	if output, landError := land(); landError != nil ||
 		!strings.Contains(output, "the docs data is current") ||
 		!strings.Contains(output, "landed") {
@@ -620,5 +643,258 @@ func TestCohereHasTheDocsDataGeneratorTheGateRuns(test *testing.T) {
 	test.Parallel()
 	if _, statError := os.Stat(filepath.Join("..", "..", docsDataGenerator, "main.go")); statError != nil {
 		test.Fatalf("the landing gate runs %s, and it is not in this module: %v", docsDataGenerator, statError)
+	}
+}
+
+// treeGated is the tree the stand-in gate logged for a worktree's run, the one it tested.
+func (fixture *landFixture) treeGated(name string) string {
+	fixture.test.Helper()
+	for _, line := range fixture.gates() {
+		if !strings.HasPrefix(line, "start "+filepath.Base(fixture.worktree(name))+" ") {
+			continue
+		}
+		_, after, found := strings.Cut(line, " tree=")
+		if found {
+			return strings.Fields(after)[0]
+		}
+	}
+	fixture.test.Fatalf("no gate of %s logged its tree:\n%q", name, fixture.gates())
+	return ""
+}
+
+// A landing is one merge commit onto main (#4v9pmef): main's first-parent line gains exactly one commit, whose
+// first parent is main as it was, whose second is the branch's head, and whose tree is the tree the gate tested.
+// The branch merged main twice on the way, and neither merge reaches main's line, which reads `Land #<task>:`
+// and the branch's one commit. Before, main fast-forwarded onto the branch, its merges of main and all.
+func TestALandingIsOneMergeCommitOntoMain(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	worktreeA := fixture.worktree("a")
+	for _, file := range []string{"first.txt", "second.txt"} {
+		fixture.commit(fixture.repository, file)
+		fixture.git(worktreeA, "merge", "-q", "--no-edit", "main")
+	}
+	before := fixture.git(fixture.repository, "rev-parse", "main")
+	head := fixture.git(worktreeA, "rev-parse", "HEAD")
+	if waitError := fixture.land("a").Wait(); waitError != nil {
+		test.Fatalf("the landing failed: %v", waitError)
+	}
+
+	added := strings.Fields(fixture.git(fixture.repository, "rev-list", "--first-parent", before+"..main"))
+	if len(added) != 1 {
+		test.Fatalf("main's first-parent line gained %d commits, want the one landing: %v", len(added), added)
+	}
+	landing := added[0]
+	if parents := strings.Fields(fixture.git(fixture.repository, "rev-parse", landing+"^@")); len(parents) != 2 ||
+		parents[0] != before || parents[1] != head {
+		test.Errorf("the landing's parents are %v, want main as it was, %s, then the branch's head, %s",
+			parents, before, head)
+	}
+	tree, gated := fixture.git(fixture.repository, "rev-parse", landing+"^{tree}"), fixture.treeGated("a")
+	if tree != gated {
+		test.Errorf("the landing's tree is %s, and the gate tested %s", tree, gated)
+	}
+	if subject := fixture.git(fixture.repository, "log", "-1", "--format=%s", landing); subject !=
+		"Land #"+fixtureTask+": base: add a.txt" {
+		test.Errorf("the landing's subject is %q", subject)
+	}
+	body := fixture.git(fixture.repository, "log", "-1", "--format=%b", landing)
+	for _, want := range []string{"a at " + head[:8] + ", onto main at " + before[:8], fixtureSubject("add a.txt"),
+		"and 2 merges of the branch's own", "Gated by cohere-dev land in", ": go vet, go test of the module."} {
+		if !strings.Contains(body, want) {
+			test.Errorf("the landing's body lacks %q:\n%s", want, body)
+		}
+	}
+	if branch := fixture.git(fixture.repository, "rev-parse", "a"); branch != head {
+		test.Errorf("the branch moved from %s to %s, and a landing leaves it where it was", head, branch)
+	}
+}
+
+// Two landings read as two lines on main's first-parent log, each `Land #<task>: <what landed>`.
+func TestTwoLandingsReadAsTwoLandLines(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	before := fixture.git(fixture.repository, "rev-parse", "main")
+	for _, name := range []string{"a", "b"} {
+		if waitError := fixture.land(name).Wait(); waitError != nil {
+			test.Fatalf("landing %s failed: %v", name, waitError)
+		}
+	}
+	log := fixture.git(fixture.repository, "log", "--first-parent", "--format=%s", before+"..main")
+	if want := "Land #" + fixtureTask + ": base: add b.txt\nLand #" + fixtureTask + ": base: add a.txt"; log != want {
+		test.Errorf("main's first-parent log reads\n%s\nwant\n%s", log, want)
+	}
+}
+
+// A landing whose commits break the house's subject is refused before it waits for the lock or gates anything,
+// naming each commit, its subject and why: over 72 characters, no area, or an area that names no folder or
+// top-level file in the tree, with the folder it likely meant. A merge needs no area but is held to the length.
+// A branch that names no task, or two, is refused unless one is given, and several commits need a message.
+func TestLandRefusesSubjectsTheHouseDoesNotWrite(test *testing.T) {
+	test.Parallel()
+	for _, refusal := range []struct {
+		name      string
+		subject   string
+		arguments []string
+		want      []string
+	}{
+		{name: "over 72", subject: "base: " + strings.Repeat("word ", 14) + "(#" + fixtureTask + ")",
+			want: []string{"86 characters, over 72"}},
+		{name: "no area", subject: "add the thing (#" + fixtureTask + ")",
+			want: []string{"no `area: ` before what changed"}},
+		{name: "an unknown area", subject: "goengine: a thing (#" + fixtureTask + ")",
+			want: []string{`"goengine" names no folder or top-level file in the tree`, `("go_engine" is one)`}},
+		{name: "a second task", subject: "base: another thing (#tskfix2)", arguments: []string{"--message", "things"},
+			want: []string{"name 2 tasks, #" + fixtureTask + ", #tskfix2", "--task"}},
+		{name: "a second commit", subject: fixtureSubject("another thing"),
+			want: []string{"the branch brings 2 commits", "--message"}},
+	} {
+		test.Run(refusal.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newLandFixture(test)
+			worktreeA := fixture.worktree("a")
+			engine := filepath.Join(worktreeA, "go_engine")
+			if createDirectoryError := os.MkdirAll(engine, 0o755); createDirectoryError != nil {
+				test.Fatal(createDirectoryError)
+			}
+			if writeError := os.WriteFile(filepath.Join(engine, "x.txt"), []byte("x\n"), 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
+			fixture.git(worktreeA, "add", "go_engine")
+			fixture.git(worktreeA, "commit", "-q", "-m", refusal.subject)
+			before := fixture.git(fixture.repository, "rev-parse", "main")
+			landing := exec.Command(fixture.wrapper, append([]string{"land"}, refusal.arguments...)...)
+			landing.Dir, landing.Env = worktreeA, fixture.environment
+			output, outputError := landing.CombinedOutput()
+			if outputError == nil {
+				test.Fatalf("the landing was not refused:\n%s", output)
+			}
+			for _, want := range refusal.want {
+				if !strings.Contains(string(output), want) {
+					test.Errorf("the refusal lacks %q:\n%s", want, output)
+				}
+			}
+			if after := fixture.git(fixture.repository, "rev-parse", "main"); after != before {
+				test.Errorf("main moved, %s to %s, on a refused landing", before, after)
+			}
+			if contents := readMaybeMissing(test, fixture.log); len(contents) > 0 {
+				test.Errorf("the gate ran before the refusal:\n%s", contents)
+			}
+		})
+	}
+
+	// The control: the same branch, its subject the house's and its message given, lands.
+	fixture := newLandFixture(test)
+	worktreeA := fixture.worktree("a")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "-m", "Merge main", "main")
+	landing := exec.Command(fixture.wrapper, "land", "--task", "other1", "--message", "a.txt added")
+	landing.Dir, landing.Env = worktreeA, fixture.environment
+	if output, outputError := landing.CombinedOutput(); outputError != nil {
+		test.Errorf("a landing in the house's shape was refused (%v):\n%s", outputError, output)
+	}
+	subject := fixture.git(fixture.repository, "log", "-1", "--format=%s", "main")
+	if subject != "Land #other1: a.txt added" {
+		test.Errorf("the landing's subject is %q, want the task and message given", subject)
+	}
+}
+
+// A worktree whose cohere-dev differs from main's lands through main's land, run from the main checkout against
+// the worktree, once, and main gains exactly one `Land #` commit (#8wpk5tp). Before, the worktree's own land
+// ran, and one on old code landed the old way: 50f70d03 fast-forwarded main onto its branch. The stand-in for
+// `go run ./command/cohere-dev` in the main checkout logs where it ran and what it was handed, then runs this
+// land, which must not hand the landing on again.
+func TestALandingWhoseLandDiffersFromMainsRunsMains(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	source := filepath.Join(fixture.repository, "command", "cohere-dev")
+	if createDirectoryError := os.MkdirAll(source, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	// land_main.go says main's land takes a landing handed to it; without it the worktree's own land runs.
+	for _, file := range []string{"land.txt", landMainFile} {
+		if writeError := os.WriteFile(filepath.Join(source, file), []byte("main's land\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	fixture.git(fixture.repository, "add", "command")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "cohere-dev: main's land (#"+fixtureTask+")")
+	worktreeA := fixture.worktree("a")
+	fixture.git(worktreeA, "merge", "-q", "--no-edit", "main")
+	if writeError := os.WriteFile(
+		filepath.Join(worktreeA, "command", "cohere-dev", "land.txt"),
+		[]byte("an older land\n"),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
+	fixture.git(worktreeA, "commit", "-q", "-am", "cohere-dev: an older land (#"+fixtureTask+")")
+
+	log := filepath.Join(test.TempDir(), "main-land")
+	standIn := filepath.Join(test.TempDir(), "main-land")
+	script := "#!/bin/sh\necho \"$PWD $" + landWorktreeVariable + "\" >> '" + log + "'\n" +
+		"exec '" + fixture.wrapper + "' \"$@\"\n"
+	if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	before := fixture.git(fixture.repository, "rev-parse", "main")
+	landing := exec.Command(fixture.wrapper, "land", "--message", "an older land")
+	landing.Dir, landing.Env = worktreeA, append(fixture.environment, mainLandVariable+"="+standIn)
+	output, outputError := landing.CombinedOutput()
+	if outputError != nil {
+		test.Fatalf("the landing failed (%v):\n%s", outputError, output)
+	}
+	ran := strings.Split(strings.TrimSpace(string(readMaybeMissing(test, log))), "\n")
+	resolved := func(directory string) string {
+		test.Helper()
+		real, evalSymlinksError := filepath.EvalSymlinks(directory)
+		if evalSymlinksError != nil {
+			test.Fatal(evalSymlinksError)
+		}
+		return real
+	}
+	fields := strings.Fields(strings.Join(ran, " "))
+	if len(ran) != 1 || len(fields) != 2 || resolved(fields[0]) != resolved(fixture.repository) ||
+		resolved(fields[1]) != resolved(worktreeA) {
+		test.Errorf("main's land ran %q, want once, in the main checkout, handed %s", ran, worktreeA)
+	}
+	if count := strings.Count(string(output), "differs from main's, so main's land runs"); count != 1 {
+		test.Errorf("the landing said %d times that main's land runs, want once:\n%s", count, output)
+	}
+	added := strings.Fields(fixture.git(fixture.repository, "rev-list", "--first-parent", before+"..main"))
+	subject := fixture.git(fixture.repository, "log", "-1", "--format=%s", "main")
+	if len(added) != 1 || !strings.HasPrefix(subject, "Land #") {
+		test.Errorf("main's first-parent line gained %v, want one `Land #` commit", added)
+	}
+}
+
+// A main whose land predates handing a landing on reads the worktree from where it runs, so it can't take one,
+// and the worktree's own land lands, as the first landing of the handoff had to. The stand-in never runs.
+func TestALandingOntoAMainThatCannotTakeItRunsItsOwnLand(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	source := filepath.Join(fixture.repository, "command", "cohere-dev")
+	if createDirectoryError := os.MkdirAll(source, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	oldLand := filepath.Join(source, "land.txt")
+	if writeError := os.WriteFile(oldLand, []byte("an old land\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	fixture.git(fixture.repository, "add", "command")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "cohere-dev: an old land (#"+fixtureTask+")")
+	log := filepath.Join(test.TempDir(), "main-land")
+	standIn := filepath.Join(test.TempDir(), "main-land")
+	script := []byte("#!/bin/sh\necho ran >> '" + log + "'\nexit 1\n")
+	if writeError := os.WriteFile(standIn, script, 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	landing := exec.Command(fixture.wrapper, "land")
+	landing.Dir, landing.Env = fixture.worktree("a"), append(fixture.environment, mainLandVariable+"="+standIn)
+	output, outputError := landing.CombinedOutput()
+	if outputError != nil || strings.Contains(string(output), "main's land runs") {
+		test.Errorf("a landing onto a main that can't take one did not run its own land (%v):\n%s", outputError, output)
+	}
+	if ran := readMaybeMissing(test, log); len(ran) > 0 {
+		test.Errorf("the stand-in for main's land ran:\n%s", ran)
 	}
 }

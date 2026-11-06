@@ -179,16 +179,52 @@ struct BuildInputSnapshotTests {
         )
     }
 
+    /* Bytes, not time, decide a restored file: the same bytes rewritten are restored, different bytes are edited. */
+    @Test func aFileRewrittenWithTheSameBytesIsRestored() throws {
+        let package = try Package()
+        let control = package.sources.appendingPathComponent("Control.swift").resolvingSymlinksInPath()
+        let take = {
+            BuildInputSnapshot.take(
+                roots: [package.root],
+                resolved: package.root.appendingPathComponent("Package.resolved"),
+                toolchain: "t",
+                arguments: ["a"],
+            )
+        }
+        var built = take()
+        built.contents = [control.path: PackageDescriptionCache.fingerprint(of: control)]
+        let builtModified = try #require(
+            try control.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSinceNow: 60)],
+            ofItemAtPath: control.path,
+        )
+        let rewritten = try #require(take().changes(since: built))
+        #expect(rewritten.edited.isEmpty, "\(rewritten.edited)")
+        #expect(rewritten.restored.keys.sorted() == [control.path])
+        #expect(
+            abs((rewritten.restored[control.path] ?? .distantPast).timeIntervalSince(builtModified)) < 0.001,
+            "a restored file is not judged by the time the build saw",
+        )
+        try package.write(PipelineControlTests.cleanSource.replacingOccurrences(of: "* 2", with: "* 3"))
+        let edited = try #require(take().changes(since: built))
+        #expect(edited.edited.count == 1)
+        #expect(edited.restored.isEmpty)
+    }
+
     static let plantedError = PipelineControlTests.cleanSource.replacingOccurrences(
         of: "        value * 2",
         with: "        let text: Int = \"two\"\n        return value * text",
     )
 
+    static let replayedWords = "answered by an earlier run's check of the same text"
+
     /*
      An edit inside a function body is checked by sourcekitd in this process, never built, and its error is
-     found. It stays found on the run after (the stored snapshot is still the last build's, so the edit is
-     checked again rather than read from a record that predates it), and fixing it inside the body comes
-     back clean the same way.
+     found. It stays found on the run after, answered by that check since the text did not change (the stored
+     snapshot is still the last build's, so the edit is never read from a record that predates it), and fixing
+     it inside the body is asked about again and comes back clean.
      */
     @Test func aBodyOnlyEditIsCheckedInProcessAndFound() async throws {
         let package = try Package()
@@ -199,16 +235,62 @@ struct BuildInputSnapshotTests {
             planted.build.contains(TypesPhase.checkedInProcessWords),
             "a body-only edit was built: \(planted.build)",
         )
+        #expect(!planted.build.contains(Self.replayedWords), "a first check replayed an answer: \(planted.build)")
         #expect(
             planted.compilerFindings.contains { $0.hasPrefix("5: cannot convert") },
             "the planted error was not found: \(planted.compilerFindings)",
         )
         let again = try await package.run()
+        #expect(again.build.contains(Self.replayedWords), "an unchanged edit was asked about again: \(again.build)")
         #expect(again.compilerFindings == planted.compilerFindings)
         try package.write(PipelineControlTests.cleanSource + "\n")
         let fixed = try await package.run()
         #expect(fixed.build.contains(TypesPhase.checkedInProcessWords))
+        #expect(!fixed.build.contains(Self.replayedWords), "a changed text replayed its old answer: \(fixed.build)")
         #expect(fixed.compilerFindings.isEmpty, "the fix was not seen: \(fixed.compilerFindings)")
+    }
+
+    /* A body that keeps a `var` it never mutates, so the build records a warning against this file. */
+    static let warnedSource = PipelineControlTests.cleanSource.replacingOccurrences(
+        of: "        value * 2",
+        with: "        var twice = value * 2\n        return twice",
+    )
+
+    /*
+     An edit undone, the file's bytes again the ones the last build compiled though its time moved, is
+     unchanged: the build's records are read again, its warning about this very file among them, judged
+     against the time the build saw the file at. Before, the time alone decided, so every run after the revert
+     checked the file in sourcekitd until the next build.
+     */
+    @Test func anEditUndoneReadsTheBuildsRecordsAgain() async throws {
+        let package = try Package()
+        try package.write(Self.warnedSource)
+        let built = try await package.run()
+        #expect(
+            built.compilerFindings.contains { $0.contains("never mutated") },
+            "the build recorded no warning, so this test would prove nothing: \(built.compilerFindings)",
+        )
+        try package.write(Self.plantedError)
+        let planted = try await package.run()
+        #expect(planted.build.contains(TypesPhase.checkedInProcessWords))
+        #expect(planted.compilerFindings.contains { $0.hasPrefix("5: cannot convert") })
+        try package.write(Self.warnedSource)
+        let undone = try await package.run()
+        #expect(undone.build.contains(Self.reusedWords), "an undone edit was not read from the build: \(undone.build)")
+        #expect(undone.build.contains("again the bytes it compiled"), "\(undone.build)")
+        #expect(undone.compilerFindings == built.compilerFindings)
+    }
+
+    /* The builds these tests run plan their modules explicitly, so the in-process checks above use the build's own modules. */
+    @Test func theBuildsCommandsCarryTheModulesItCompiled() async throws {
+        let package = try Package()
+        _ = try await package.run()
+        let commands = try CompileCommands.read(
+            layout: .swiftPackage(scratchPath: Pipeline.scratchPath(for: package.root))
+        )
+        let command = try #require(commands.command(for: package.sources.appendingPathComponent("Control.swift")))
+        #expect(command.arguments.contains("-explicit-swift-module-map-file"), "\(command.arguments)")
+        #expect(command.arguments.contains("-disable-implicit-swift-modules"))
     }
 
     /* An edit another file could see, a signature here, is never checked alone: it builds. */

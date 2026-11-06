@@ -82,14 +82,20 @@ type Settings struct {
 // settingsFileName is the file the engine reads beside go.work or go.mod when no path is named.
 const settingsFileName = "CohereSettings.json"
 
-// Load reads the settings for the engine rooted at root: from explicitPath when the front door named one
-// with `--lint-config`, or else from the CohereSettings.json beside go.work or go.mod. knownRules is every
-// rule name the engine runs, and a key outside it is refused.
-func Load(root string, explicitPath string, knownRules []string) (Settings, error) {
-	path := explicitPath
-	if path == "" {
-		path = filepath.Join(root, settingsFileName)
+// Path is the settings file Load reads for the engine rooted at root: explicitPath when the front door named one
+// with `--lint-config`, or else the CohereSettings.json beside go.work or go.mod, there or not. The engine's
+// inputs record names it, so a replay sees the file appear, change or go.
+func Path(root string, explicitPath string) string {
+	if explicitPath != "" {
+		return explicitPath
 	}
+	return filepath.Join(root, settingsFileName)
+}
+
+// Load reads the settings for the engine rooted at root, from the file Path names. knownRules is every rule name
+// the engine runs, and a key outside it is refused.
+func Load(root string, explicitPath string, knownRules []string) (Settings, error) {
+	path := Path(root, explicitPath)
 	contents, readError := os.ReadFile(path)
 	if errors.Is(readError, fs.ErrNotExist) {
 		if explicitPath != "" {

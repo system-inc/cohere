@@ -10,6 +10,9 @@ import (
 )
 
 // switchNames are the switches the front door forwards, each `--name` or `--name=true|false`.
+//
+// `no-cache` turns off the per-package findings cache (see lintCache), as the front door's run cache is off for the
+// same run, so a run under it computes every package from source.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
 	"rules", "rules-enabled", "version", "no-cache",

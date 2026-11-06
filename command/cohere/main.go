@@ -335,8 +335,10 @@ func run() error {
 		if goEngineError != nil {
 			return goEngineError
 		}
+		// Through the run cache, which records a Go verdict (see beginGoRunCache): a failing tree's exit is one, and
+		// exiting around it would leave the run unrecorded and the last of its output in the tee's pipe.
 		if exitCode != 0 {
-			exitProcess(exitCode)
+			finishRunCache(exitCode)
 		}
 		return nil
 	}

@@ -27,10 +27,15 @@ struct CompilerRecords {
      were seen on Presence (2026-11-04, PoseSearchTests.dia holding RigBodyTests' and FaceMeshReaderTests' old
      errors, #zggj9xy). A dropped diagnostic's own file is then covered only by a newer record of its own, which
      coverage below checks.
+
+     A restored file, one whose bytes are again the ones the build compiled though its time moved
+     (`BuildInputSnapshot.changes(since:)`), is judged by the time the build saw it at, so the build's records
+     still describe it, and a record older than that build is still stale.
      */
     func read(
         targetDirectories: [(String, URL)],
         answeredInProcess: [String: [FindingRecord]] = [:],
+        restored: [String: Date] = [:],
     ) throws -> Reading {
         let reader = try SerializedDiagnosticsReader(
             libraryPath: SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner)
@@ -46,7 +51,7 @@ struct CompilerRecords {
         /* Each named file's text as it stands, read once however many records name it. */
         var sourceModified: [String: Date] = [:]
         func modifiedNow(_ file: String) -> Date {
-            if let known = sourceModified[file] {
+            if let known = sourceModified[file] ?? restored[file] {
                 return known
             }
             let modified =
@@ -115,7 +120,8 @@ struct CompilerRecords {
         for file in files where answeredInProcess[file.url.resolvingSymlinksInPath().path] == nil {
             let key = "\(file.targetName)/\(file.url.deletingPathExtension().lastPathComponent)"
             let sourceModified =
-                try file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                try restored[file.url.resolvingSymlinksInPath().path]
+                ?? file.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                 ?? .distantFuture
             guard let recorded = recordFor[key], recorded >= sourceModified else {
                 withoutRecord.append(file.url.path)

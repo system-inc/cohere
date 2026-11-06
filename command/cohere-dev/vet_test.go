@@ -47,9 +47,10 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 	worktreeA := fixture.worktree("a")
 	writeFiles(test, worktreeA, unkeyedLiteral)
 	fixture.git(worktreeA, "add", "go.mod", "other", "user")
-	fixture.git(worktreeA, "commit", "-q", "-m", "an unkeyed literal of another package's struct")
+	fixture.git(worktreeA, "commit", "-q", "-m", "user: an unkeyed literal of another package's struct (#"+
+		fixtureTask+")")
 	land := func() (string, error) {
-		landing := exec.Command(fixture.wrapper, "land")
+		landing := exec.Command(fixture.wrapper, "land", "--message", "a struct literal")
 		landing.Dir, landing.Env = worktreeA, fixture.environment
 		output, outputError := landing.CombinedOutput()
 		return string(output), outputError
@@ -64,7 +65,7 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 	}
 	writeFiles(test, worktreeA, map[string]string{"user/user.go": keyed})
 	fixture.git(worktreeA, "add", "user/user.go")
-	fixture.git(worktreeA, "commit", "-q", "-m", "its fields keyed")
+	fixture.git(worktreeA, "commit", "-q", "-m", "user: its fields keyed (#"+fixtureTask+")")
 	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
 		test.Errorf("the landing did not land once the fields were keyed (%v):\n%s", landError, output)
 	}

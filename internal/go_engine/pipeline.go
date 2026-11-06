@@ -97,6 +97,12 @@ func (engine *pipeline) run() int {
 	engine.runTypes(loaded, loadError)
 	engine.runLint(loaded, loadError)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
+	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
+	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
+	// read is not known.
+	if loaded != nil {
+		engine.write(engine.inputsRecord(loaded))
+	}
 
 	exitCode := exitClean
 	if engine.findingsWritten > 0 || engine.incomplete {

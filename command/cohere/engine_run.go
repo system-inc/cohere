@@ -146,6 +146,12 @@ type engineTypesRecord struct {
 	// which decodes as none.
 	WithheldInDependencyCgo           []withheldCgoFile `json:"withheldInDependencyCgo"`
 	WithheldDependencyCgoDeclarations int               `json:"withheldDependencyCgoDeclarations"`
+	// CgoTranslation is the Go engine's too: how many packages the cgo tool translated, and how long that load took,
+	// 0 and 0 on the load from source, which runs no cgo tool. A Swift engine sends none, which decodes as 0 and 0.
+	CgoTranslation struct {
+		Packages     int `json:"packages"`
+		Milliseconds int `json:"milliseconds"`
+	} `json:"cgoTranslation"`
 }
 
 type engineLintRecord struct {
@@ -164,6 +170,9 @@ type engineLintRecord struct {
 		File  string `json:"file"`
 		Error string `json:"error"`
 	} `json:"crashes"`
+	// Cache is what the Go engine's per-package findings cache did, additive within contract 3. A Swift engine
+	// sends none, which decodes as nil and prints nothing.
+	Cache *packageCacheUse `json:"cache"`
 }
 
 type enginePhaseRecord struct {
@@ -176,6 +185,17 @@ type enginePhaseRecord struct {
 type engineRuleRecord struct {
 	Name     string `json:"name"`
 	Severity string `json:"severity"`
+}
+
+// engineInputsRecord is every path a Go check run's verdict depends on, absolute and sorted, which the Go engine
+// writes once before its summary: each file whose bytes it read, each directory whose listing decided which
+// packages or files exist, and each path whose absence the load depended on, such as a go.work in an ancestor.
+// Additive within contract 3, and the run cache's proof for a Go run: the front door cannot watch what `go list`
+// reads in a process of its own, so the engine says, and a run that ends without saying is never recorded.
+type engineInputsRecord struct {
+	Files       []string `json:"files"`
+	Directories []string `json:"directories"`
+	Absent      []string `json:"absent"`
 }
 
 type engineSummaryRecord struct {
@@ -244,6 +264,17 @@ type engineRun struct {
 	summary    *engineSummaryRecord
 	report     *pipelineReport
 	rules      []engineRuleRecord
+
+	// inputs is what the engine said the run read, nil until its inputs record arrives. See goRunCacheProof.
+	inputs *engineInputsRecord
+
+	// filesRewritten is how many files the fix phase wrote, so a run that rewrote the tree it checked is never
+	// recorded as a verdict about that tree.
+	filesRewritten int
+
+	// cgoTranslated is whether the load ran the cgo tool, which reads C headers and a compiler no inputs record can
+	// name, so such a run is never recorded. See goInputsUnnameable.
+	cgoTranslated bool
 
 	// findings is every finding record received; findingsInPhase only those since the last phase
 	// record, which is how the types and lint records' own counts are checked.
@@ -343,6 +374,8 @@ func (run *engineRun) accept(line []byte) error {
 		return decodeRecord(line, &engineUnusedRecord{}, run.acceptUnused)
 	case "unusedCoverage":
 		return decodeRecord(line, &engineUnusedCoverageRecord{}, run.acceptUnusedCoverage)
+	case "inputs":
+		return decodeRecord(line, &engineInputsRecord{}, run.acceptInputs)
 	case "summary":
 		return decodeRecord(line, &engineSummaryRecord{}, run.acceptSummary)
 	default:
@@ -398,7 +431,9 @@ func (run *engineRun) acceptProject(record *engineProjectRecord) error {
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
-	fmt.Fprintln(accountOutput(run.out), line)
+	// The invocation's, as a TypeScript run's graph line is: it says what this run took to describe the project,
+	// which a replay did not spend (see invocationTag).
+	printInvocation(accountOutput(run.out), "%s\n", line)
 	streams.Show(run.out)
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
@@ -655,8 +690,11 @@ func (run *engineRun) acceptFix(record *engineFixRecord) error {
 		FilesTransformSkipped: record.FilesNotFormatted,
 		TransformSkipReasons:  record.NotFormattedReasons,
 	}
-	fmt.Fprintln(accountOutput(run.out), summary.String())
-	fmt.Fprintf(accountOutput(run.out), "format scope: %s\n", record.FormatScope)
+	// True of the tree and produced by a phase, as a TypeScript run's fix line is, so a replay says which run they
+	// came from (see provenanceTag).
+	printProvenance(accountOutput(run.out), "%s\n", summary.String())
+	printProvenance(accountOutput(run.out), "format scope: %s\n", record.FormatScope)
+	run.filesRewritten += record.FilesRewritten
 
 	// An engine from before the list sends none, and the run then states the counts alone: the footer
 	// leaves out a cohered count it was not given, rather than print a zero it does not know.
@@ -724,7 +762,8 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	fmt.Fprintf(
+	// The invocation's, as a TypeScript run's types line is, since it carries what this run spent.
+	printInvocation(
 		accountOutput(run.out),
 		"types: %d diagnostics over %d files in %s\n",
 		record.Diagnostics,
@@ -760,6 +799,8 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 			counted(file.Errors, "type error", "type errors"), file.File, file.Package)
 	}
 	run.withheldInDependencyCgo = append(run.withheldInDependencyCgo, record.WithheldInDependencyCgo...)
+	translated := record.CgoTranslation.Packages > 0 || record.CgoTranslation.Milliseconds > 0
+	run.cgoTranslated = run.cgoTranslated || translated
 	run.withheldDependencyCgoDeclarations += record.WithheldDependencyCgoDeclarations
 	streams.Show(run.out)
 	return nil
@@ -813,9 +854,15 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 		)
 	}
 	// The dash is escaped, not changed: it is the TypeScript run's lint line, which internal/differential finds
-	// by it. See writeLintReport.
-	fmt.Fprintf(accountOutput(run.out), "lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
+	// by it. See writeLintReport. The invocation's, as that line is, since it carries what this run spent.
+	printInvocation(accountOutput(run.out),
+		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
+	// The invocation's, as the lint line above is: what this run's cache did, which a replay of it did not do.
+	if record.Cache != nil {
+		printInvocation(accountOutput(run.out), "  lint: %s\n", record.Cache.line())
+		activeSummary.PackageCache = record.Cache
+	}
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
 	activeSummary.Nodes = record.NodesVisited
@@ -1055,6 +1102,30 @@ func (run *engineRun) acceptRule(record *engineRuleRecord) error {
 		return fmt.Errorf("a rule record in a %s run", run.mode)
 	}
 	run.rules = append(run.rules, *record)
+	return nil
+}
+
+// acceptInputs keeps what a check run read, once. Every path must be absolute: the front door stats them from a
+// working directory that need not be the engine's, so a relative one would prove a different file unchanged. And a
+// record naming no file is refused, since a check run reads at least its go.mod, and an empty proof matches any tree.
+func (run *engineRun) acceptInputs(record *engineInputsRecord) error {
+	if run.mode != engineModeCheck {
+		return fmt.Errorf("an inputs record in a %s run", run.mode)
+	}
+	if run.inputs != nil {
+		return fmt.Errorf("a second inputs record")
+	}
+	if len(record.Files) == 0 {
+		return fmt.Errorf("an inputs record naming no file, and a check run reads at least its go.mod")
+	}
+	for _, paths := range [][]string{record.Files, record.Directories, record.Absent} {
+		for _, path := range paths {
+			if !filepath.IsAbs(path) {
+				return fmt.Errorf("an inputs record naming %q, which is not an absolute path", path)
+			}
+		}
+	}
+	run.inputs = record
 	return nil
 }
 

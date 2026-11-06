@@ -179,6 +179,33 @@ func RecordRunCache(
 	exitCode int,
 	readSince time.Time,
 ) (*RunCache, error) {
+	return RecordRunCacheWithin(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince)
+}
+
+// RecordRunCacheWithin is RecordRunCache recording the directory holding a file only when that directory is one of
+// roots or lies inside one, for a run whose inputs name every path outside them whose presence decides its verdict,
+// as the Go engine's record does: a staticcheck.conf or a .gitignore above the module, the toolchain's files, the
+// module cache's, the git index in a worktree's git directory, each there or absent. Such a file is decided by its
+// own signature; a file added beside it changes nothing, and its directory would only move with whatever else lives
+// there: a home directory, a repository's top, a git directory that every git command in the worktree writes a lock
+// file into. Recorded, it would refuse or miss nearly every run and nothing would say why (the same trap as
+// #r9jevk9's parent of the project's own directory). Nil roots record every holding directory, as RecordRunCache
+// does.
+//
+// Such a run's extraDirectories are listings it read, each deciding which files exist, so each is held to readSince
+// as a file is, whether or not it holds a file the run read: a package directory created under one mid-run moved its
+// listing after the run read it, and recorded with its new signature it would replay a verdict that never saw it.
+func RecordRunCacheWithin(
+	roots []string,
+	key string,
+	files []string,
+	extraDirectories []string,
+	absent []string,
+	probed []string,
+	output []byte,
+	exitCode int,
+	readSince time.Time,
+) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -204,8 +231,12 @@ func RecordRunCache(
 	// every replay depend on whatever else lives beside the project, ~/Projects on a developer's machine and
 	// the benchmark's work directory, where something is created all day (#r9jevk9).
 	directorySet := map[string]struct{}{}
+	rootSet := map[string]bool{}
+	for _, root := range roots {
+		rootSet[filepath.Clean(root)] = true
+	}
 	for _, input := range inputs {
-		if !input.Directory {
+		if !input.Directory && (roots == nil || withinAny(filepath.Dir(input.Path), rootSet)) {
 			directorySet[filepath.Dir(input.Path)] = struct{}{}
 		}
 	}
@@ -249,8 +280,14 @@ func RecordRunCache(
 				holdsARead[filepath.Dir(input.Path)] = true
 			}
 		}
+		listingsRead := map[string]bool{}
+		if roots != nil {
+			for _, directory := range extraDirectories {
+				listingsRead[directory] = true
+			}
+		}
 		for _, input := range cache.Inputs {
-			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] {
+			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] && !listingsRead[input.Path] {
 				continue
 			}
 			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
@@ -273,6 +310,19 @@ func RecordRunCache(
 	}
 
 	return cache, nil
+}
+
+// withinAny reports whether directory is one of roots or lies inside one. It walks up from directory, so a set of
+// thousands of roots, every directory a Go run listed, costs each file a few lookups rather than one per root.
+func withinAny(directory string, roots map[string]bool) bool {
+	for current := filepath.Clean(directory); ; current = filepath.Dir(current) {
+		if roots[current] {
+			return true
+		}
+		if filepath.Dir(current) == current {
+			return false
+		}
+	}
 }
 
 // signaturesOf stats every path in parallel, as Check does, each into its own slot, so the order and the

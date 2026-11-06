@@ -391,6 +391,38 @@ regardless. Narrowing what is reported to the scope would hide findings the edit
 front door prints `  types: covered the whole package, not only the N files in scope` when the two
 differ.
 
+### `inputs`, the Go engine's, just before `summary`
+
+```json
+{"kind":"inputs","files":["/…/go.mod","/…/go.sum","/…/p/p.go","<goroot>/VERSION","<goroot>/bin/go","<goroot>/src/fmt/print.go"],
+ "directories":["/…","/…/p"],"absent":["/…/CohereSettings.json","/…/staticcheck.conf","/go.work"]}
+```
+
+Additive within contract 3, and written only by the Go engine, once, in a check run whose load ran, just before
+the summary. Swift's engine does not write it. It declares what the run's verdict was decided from, so the front
+door can replay that verdict without starting the engine when nothing it names has moved: `go list` and the load
+read in a subprocess and in the engine's own process, where the front door cannot observe them.
+
+- `files` are the files whose bytes the verdict can depend on: every file of every package in the loaded graph, the
+  standard library's and the module cache's too, the project's census, every module's go.mod, each module root's
+  go.sum and `vendor/modules.txt`, the go.work in use and its go.work.sum, PATH's `go`, the `bin/go`, `VERSION` and
+  `go.env` of the toolchain that ran (one in the module cache when `GOTOOLCHAIN` switched), the go env file, the
+  settings file, a staticcheck.conf at or above an analyzed package, the ignore files the census reads, and at a
+  go.work root the git index its gitlinks come from. A file in the build cache is never one: go writes it during
+  the run, and its bytes follow from what is named.
+- `directories` are the directories whose listing decides which packages or files exist: every directory under a
+  module root, or a local replacement's, that `./...` could reach, and the package and embedded directories among
+  them. None is above a module root, in the build cache, or below a directory whose name starts with `.`, such as
+  `.cache`, since a listing the run writes into would never let one replay. The standard library's and the module
+  cache's directories are the toolchain's and pinned versions', which the files above stand for.
+- `absent` are paths whose absence the run depends on: a go.work in each directory above a module root while none
+  is in use, and each of the files above that is not there. An ancestor is only ever named this way, as a path.
+
+Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
+an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes
+stale, so whatever the load, or a later cache of the engine's, reads to decide a verdict must be named here. A
+check run whose load failed, or that asked for no load, writes none, and the front door records nothing for it.
+
 ### `lint`
 
 ```json
