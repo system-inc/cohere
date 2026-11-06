@@ -24,10 +24,12 @@ var textRulesHouseSets = []string{configuration.TypeScriptSetName, configuration
 // textRulesProbeRules are the rules the probe turned on in its own settings, beside the sets, because the
 // sets leave them off: `nexus/consistency-no-abbreviated-identifier` and
 // `nexus/consistency-require-identifier-casing` live in `cohere:system-inc/base` and
-// `cohere:system-inc/structure`. The adapter turns them on the same way, with a bare severity.
+// `cohere:system-inc/structure`, and `base/consistency-no-console` in `cohere:system-inc/base` alone. The
+// adapter turns them on the same way, with a bare severity.
 var textRulesProbeRules = map[string]string{
 	"nexus/consistency-no-abbreviated-identifier": "error",
 	"nexus/consistency-require-identifier-casing": "error",
+	"base/consistency-no-console":                 "error",
 }
 
 // textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.

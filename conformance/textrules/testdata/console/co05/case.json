@@ -1,0 +1,10 @@
+{
+    "why": "co05: call 6, console calls are exempt in tests: the call in a test file is clean, a `*.test.ts` file by the house's TypeScript notion and a file of a SwiftPM test target. Go's form is co05b, since its test file is named `_test.go` and a case has one path",
+    "expect": [],
+    "options": {},
+    "path": "Tests/AnnounceTests/announce.test",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

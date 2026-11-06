@@ -1,0 +1,37 @@
+{
+    "why": "co00: the control, a direct console call in library code is reported at the call's callee, each language's own (`console.log`, `fmt.Println`, `print`)",
+    "control": true,
+    "expect": [
+        {
+            "covers": "console.log",
+            "occurrence": {
+                "typescript": 1,
+                "go": 0,
+                "swift": 0
+            }
+        },
+        {
+            "covers": "fmt.Println",
+            "occurrence": {
+                "typescript": 0,
+                "go": 1,
+                "swift": 0
+            }
+        },
+        {
+            "covers": "print",
+            "occurrence": {
+                "typescript": 0,
+                "go": 0,
+                "swift": 1
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

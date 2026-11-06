@@ -1,0 +1,9 @@
+{
+    "why": "co05b: call 6, co05's verdict in Go: a console call in a `_test.go` file is clean",
+    "expect": [],
+    "options": {},
+    "path": "announce_test",
+    "languages": [
+        "go"
+    ]
+}
