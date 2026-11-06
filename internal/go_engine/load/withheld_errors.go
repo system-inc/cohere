@@ -6,6 +6,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // Withheld is the type errors withheld in one file of a dependency the cgo tool would translate.
@@ -31,12 +33,13 @@ type Withheld struct {
 }
 
 // withheldErrors gathers the withheld type errors of every package, each once though a package and its test
-// variants report it alike.
+// variants report it alike, and each package's own, which the findings cache keeps with the package.
 type withheldErrors struct {
 	lock     sync.Mutex
 	seen     map[withheldKey]bool
 	counts   map[string]int
 	packages map[string]string
+	owned    map[*packages.Package][]WithheldError
 }
 
 // withheldKey is what makes two withheld errors the same error.
@@ -47,13 +50,22 @@ type withheldKey struct {
 }
 
 func newWithheldErrors() *withheldErrors {
-	return &withheldErrors{seen: map[withheldKey]bool{}, counts: map[string]int{}, packages: map[string]string{}}
+	return &withheldErrors{
+		seen:     map[withheldKey]bool{},
+		counts:   map[string]int{},
+		packages: map[string]string{},
+		owned:    map[*packages.Package][]WithheldError{},
+	}
 }
 
-// add withholds one type error of the dependency packagePath at position.
-func (withheld *withheldErrors) add(packagePath string, position token.Position, message string) {
+// add withholds one type error of the dependency owner at position.
+func (withheld *withheldErrors) add(owner *packages.Package, position token.Position, message string) {
 	withheld.lock.Lock()
 	defer withheld.lock.Unlock()
+	withheld.owned[owner] = append(withheld.owned[owner], WithheldError{
+		File: position.Filename, Line: position.Line, Column: position.Column, Message: message,
+	})
+	packagePath := owner.PkgPath
 	key := withheldKey{position.Filename, position.Line, position.Column, message}
 	if withheld.seen[key] {
 		return
@@ -61,6 +73,21 @@ func (withheld *withheldErrors) add(packagePath string, position token.Position,
 	withheld.seen[key] = true
 	withheld.counts[position.Filename]++
 	withheld.packages[position.Filename] = packagePath
+}
+
+// restore withholds again what a package the findings cache restores withheld when it was checked.
+func (withheld *withheldErrors) restore(owner *packages.Package, restoredErrors []WithheldError) {
+	for _, restored := range restoredErrors {
+		withheld.add(owner, token.Position{Filename: restored.File, Line: restored.Line, Column: restored.Column},
+			restored.Message)
+	}
+}
+
+// ownedBy is the errors withheld in one package, in the order they were withheld.
+func (withheld *withheldErrors) ownedBy(owner *packages.Package) []WithheldError {
+	withheld.lock.Lock()
+	defer withheld.lock.Unlock()
+	return withheld.owned[owner]
 }
 
 // sorted is every file with a withheld error, sorted by file, and never nil.

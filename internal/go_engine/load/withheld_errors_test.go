@@ -100,7 +100,7 @@ func loadedCgoFixtures(test *testing.T) string {
 			}
 		}
 		cgoFixtures.project, cgoFixtures.failure = loadWorkspace(filepath.Join(cgoFixtures.root, "project"),
-			[]string{"./..."}, cgoEnvironment, nil, false)
+			[]string{"./..."}, cgoEnvironment, nil, false, nil)
 		if cgoFixtures.failure != nil {
 			return
 		}
