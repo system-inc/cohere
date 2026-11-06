@@ -1,0 +1,16 @@
+{
+    "why": "us10: `database_url` read from the key `DATABASE_URL` doesn't spell the key, since a mirror keeps the external system's own case, so it is reported",
+    "expect": [
+        {
+            "covers": "database_url",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

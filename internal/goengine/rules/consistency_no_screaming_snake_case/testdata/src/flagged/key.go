@@ -15,3 +15,10 @@ func environment() (string, string, string, string) {
 	SERVICE_URL := read // want "`SERVICE_URL` is in screaming snake case; spell it `serviceUrl`"
 	return DATABASE_URL, DATABASE_HOST, API_TOKEN, SERVICE_URL
 }
+
+func lowercaseKey() string {
+	// A mirror is the key's own spelling, case and all, so a name that only matches the key ignoring case mirrors
+	// nothing.
+	database_url := os.Getenv("DATABASE_URL") // want "`database_url` .*`databaseUrl`"
+	return database_url
+}
