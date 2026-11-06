@@ -1,0 +1,15 @@
+{
+    "why": "sh15: a shouted word on the second line of a run of line comments, so a finding must map against the line it sits on, not the run's first",
+    "expect": [
+        {
+            "covers": "REALLY",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}
