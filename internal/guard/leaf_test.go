@@ -60,6 +60,12 @@ var allowedRuleImports = map[string]bool{
 	// 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
 	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
 	"github.com/system-inc/cohere/internal/warning_comment": true,
+	// The separated-folder-words judgment nexus/consistency-require-separated-folder-words and its Go engine twin
+	// share: the parts, the pieces a split may use and the tie rule (#narw7aq). It imports only the standard library
+	// and policy, on this list, so it is a leaf by its imports, and it changes only when the shared judgment does.
+	// Measured on 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a
+	// load average of about 24 to 34: 0.24 to 0.26s, and `go build -v` shows it is the only package rebuilt.
+	"github.com/system-inc/cohere/internal/folder_words": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

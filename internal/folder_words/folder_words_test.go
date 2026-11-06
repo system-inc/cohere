@@ -1,10 +1,13 @@
-package consistency_require_separated_folder_words
+package folder_words
 
 import "testing"
 
-// The split itself, on every folder the census of cohere and loom reports, each with the spelling it asks for, and
-// on the names it must leave alone: words a split would break, names already separated, and names that split no way
-// because no word list holds them. An empty want is a name that passes.
+// goSpelling is Go's, as cohere-go/consistency-require-separated-folder-words hands it in.
+var goSpelling = Spelling{Separators: "_", Joiner: "_"}
+
+// The split itself, in Go's spelling, on every folder the census of cohere and loom reports, each with the spelling
+// it asks for, and on the names it must leave alone: words a split would break, names already separated, and names
+// that split no way because no word list holds them. An empty want is a name that passes.
 func TestSeparated(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -98,7 +101,7 @@ func TestSeparated(test *testing.T) {
 		{"", ""},
 	}
 	for _, testCase := range cases {
-		got, runTogether := separated(testCase.name)
+		got, runTogether := Separated(testCase.name, goSpelling)
 		if testCase.want == "" {
 			if runTogether {
 				test.Errorf("%q is reported as %q, and it passes", testCase.name, got)
@@ -107,6 +110,53 @@ func TestSeparated(test *testing.T) {
 		}
 		if !runTogether || got != testCase.want {
 			test.Errorf("%q is %q (reported %t), want %q", testCase.name, got, runTogether, testCase.want)
+		}
+	}
+}
+
+// typeScriptSpelling is TypeScript's, as nexus/consistency-require-separated-folder-words hands it in.
+var typeScriptSpelling = Spelling{Separators: "_-", Joiner: "-"}
+
+// With a hyphen among the separators, each hyphenated part is judged on its own, as each underscored one is, and a
+// split takes the name's own separator, or the spelling's joiner where the name separates no two parts. A leading
+// underscore separates no two parts, so it never chooses the joiner. Go's spelling separates on the underscore
+// alone, so a hyphenated name there is one part, which splits no way, and passes.
+func TestSeparatedBySpelling(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name     string
+		spelling Spelling
+		want     string
+	}{
+		{"formatoptions", typeScriptSpelling, "format-options"},
+		{"net-worth", typeScriptSpelling, ""},
+		{"profileimages-leaf", typeScriptSpelling, "profile-images-leaf"},
+		{"by-formatoptions", typeScriptSpelling, "by-format-options"},
+		{"text_formatoptions", typeScriptSpelling, "text_format_options"},
+		{"_formatoptions", typeScriptSpelling, "_format-options"},
+		{"_components", typeScriptSpelling, ""},
+		{"serviceTypes", typeScriptSpelling, "service-types"},
+		{"social-media-v2", typeScriptSpelling, ""},
+		{"--", typeScriptSpelling, ""},
+		{"profileimages-leaf", goSpelling, ""},
+	}
+	for _, testCase := range cases {
+		got, runTogether := Separated(testCase.name, testCase.spelling)
+		if testCase.want == "" {
+			if runTogether {
+				test.Errorf("%q in %+v is reported as %q, and it passes", testCase.name, testCase.spelling, got)
+			}
+			continue
+		}
+		if !runTogether || got != testCase.want {
+			test.Errorf(
+				"%q in %+v is %q (reported %t), want %q",
+				testCase.name,
+				testCase.spelling,
+				got,
+				runTogether,
+				testCase.want,
+			)
 		}
 	}
 }
