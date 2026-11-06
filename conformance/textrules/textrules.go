@@ -347,9 +347,22 @@ func readCase(files fs.FS, family Family, name string) (Case, error) {
 		}
 	}
 
-	// Each expectation has to be in each source, so a case can't expect a finding over text it does not hold.
+	// Each expectation has to be in each source it applies to, so a case can't expect a finding over text it
+	// does not hold, and each has to apply somewhere.
+	for index, span := range testCase.Expect {
+		applies := false
+		for _, language := range testCase.Languages {
+			applies = applies || span.AppliesTo(language)
+		}
+		if !applies {
+			return Case{}, fmt.Errorf("expect %d applies to none of the case's languages", index)
+		}
+	}
 	for _, language := range testCase.Languages {
 		for index, span := range testCase.Expect {
+			if !span.AppliesTo(language) {
+				continue
+			}
 			if _, resolveError := Resolve(span, testCase.Sources[language], language); resolveError != nil {
 				return Case{}, fmt.Errorf("expect %d in %s: %w", index, language.SourceName(), resolveError)
 			}
@@ -446,8 +459,8 @@ func checkFamilyRow(label string, row LedgerRow, entry EngineRule) error {
 	}
 	switch {
 	case entry.Runs():
-		return fmt.Errorf("%s is a family-level row, and %s names the rule %s there now, so the row is stale: "+
-			"delete it and let the cases run", label, familiesFileName, entry.Rule)
+		return fmt.Errorf("%s is a family-level row, and %s names %s there now, so the row is stale: "+
+			"delete it and let the cases run", label, familiesFileName, entry)
 	case entry.None != "":
 		return fmt.Errorf("%s is a family-level row where the language has no such idea (%s), so there is no "+
 			"rule to add", label, entry.None)
@@ -557,6 +570,9 @@ func Compare(testCase Case, engine Engine, found []Range) Result {
 	expected := make([]Range, 0, len(testCase.Expect))
 	coversText := make([]bool, 0, len(testCase.Expect))
 	for index, span := range testCase.Expect {
+		if !span.AppliesTo(engine) {
+			continue
+		}
 		resolved, resolveError := Resolve(span, source, engine)
 		if resolveError != nil {
 			return Result{

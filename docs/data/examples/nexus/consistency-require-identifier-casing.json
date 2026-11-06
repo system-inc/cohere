@@ -1,0 +1,29 @@
+{
+    "rule": "nexus/consistency-require-identifier-casing",
+    "firing": {
+        "file": "subject.ts",
+        "source": "export function row() { let unit_price = 1; return { unit_price }; }\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 29,
+                "endLine": 1,
+                "endColumn": 39,
+                "messageId": "requireLowerCamelCaseValue",
+                "message": "The variable \"unit_price\" is a value, so spell it in lowerCamelCase: \"unitPrice\". Values are spelled in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name marks a word boundary the camel case already marks.",
+                "fix": true
+            }
+        ],
+        "fixedSource": "export function row() { let unitPrice = 1; return { unit_price: unitPrice }; }\n"
+    },
+    "clean": {
+        "file": "subject.tsx",
+        "source": "export function OrderList() { return <ul />; }\n"
+    },
+    "assertedMessageIds": [
+        "requireLowerCamelCaseValue",
+        "requireUpperCamelCaseCapital",
+        "requireUpperCamelCaseType"
+    ],
+    "assertsFix": true
+}

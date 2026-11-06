@@ -10,9 +10,10 @@
         "swift": "cohere-swift/consistency-no-ambiguous-identifier"
     },
     "casing": {
-        "typescript": {
-            "missing": true
-        },
+        "typescript": [
+            "nexus/consistency-no-screaming-snake-case",
+            "nexus/consistency-require-identifier-casing"
+        ],
         "go": "cohere-go/consistency-no-screaming-snake-case",
         "swift": "cohere-swift/always-use-lower-camel-case"
     },

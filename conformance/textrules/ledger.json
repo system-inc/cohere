@@ -1,11 +1,5 @@
 [
     {
-        "engine": "typescript",
-        "family": "casing",
-        "task": "h97gacx",
-        "reason": "no TypeScript rule judges the casing of declared names beyond a `const`'s screaming snake case"
-    },
-    {
         "engine": "swift",
         "family": "shouting",
         "task": "y8whqbe",

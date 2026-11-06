@@ -4285,7 +4285,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 292,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5215,6 +5215,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-require-identifier-casing",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -6098,7 +6102,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 301,
+        "rulesOn": 302,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6900,6 +6904,10 @@
                         ]
                     }
                 ]
+            },
+            {
+                "name": "nexus/consistency-require-identifier-casing",
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",

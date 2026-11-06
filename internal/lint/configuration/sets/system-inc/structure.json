@@ -159,6 +159,7 @@
                 ]
             }
         ],
+        "nexus/consistency-require-identifier-casing": "error",
         "nexus/import-require-path-alias": [
             "error",
             {

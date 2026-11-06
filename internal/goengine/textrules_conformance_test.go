@@ -70,9 +70,9 @@ func textRulesGoVersion(test *testing.T) string {
 	return parsed.Go.Version
 }
 
-// textRulesRule is the registered rule a family names for Go, found by its name in the registry, with an analyzer
-// of its own where its package can build one.
-func textRulesRule(test *testing.T, corpus *textrules.Corpus, testCase textrules.Case) rule.Rule {
+// textRulesRules are the registered rules a family names for Go, found by their names in the registry, each with
+// an analyzer of its own where its package can build one.
+func textRulesRules(test *testing.T, corpus *textrules.Corpus, testCase textrules.Case) []rule.Rule {
 	test.Helper()
 	entry, found := corpus.RuleFor(testCase.Family, textrules.EngineGo)
 	if !found {
@@ -81,8 +81,18 @@ func textRulesRule(test *testing.T, corpus *textrules.Corpus, testCase textrules
 	if !entry.Runs() {
 		test.Fatalf("family %s has no Go rule, and has a Go case", testCase.Family)
 	}
+	subjects := make([]rule.Rule, 0, len(entry.Rules))
+	for _, name := range entry.Rules {
+		subjects = append(subjects, textRulesRule(test, name, testCase))
+	}
+	return subjects
+}
+
+// textRulesRule is one registered rule by its name, with an analyzer of its own where its package can build one.
+func textRulesRule(test *testing.T, name string, testCase textrules.Case) rule.Rule {
+	test.Helper()
 	for _, registered := range rules.All() {
-		if registered.Name != entry.Rule {
+		if registered.Name != name {
 			continue
 		}
 		if newAnalyzer, hasConstructor := textRulesOwnAnalyzers[registered.Name]; hasConstructor {
@@ -99,7 +109,7 @@ func textRulesRule(test *testing.T, corpus *textrules.Corpus, testCase textrules
 		}
 		return registered
 	}
-	test.Fatalf("families.json names %s for Go in %s, and no rule is registered by that name", entry.Rule,
+	test.Fatalf("families.json names %s for Go in %s, and no rule is registered by that name", name,
 		testCase.Family)
 	return rule.Rule{}
 }
@@ -117,9 +127,9 @@ func writeTextRulesFile(test *testing.T, directory string, name string, contents
 	return path
 }
 
-// textRulesSettings is a CohereSettings.json whose go block runs the rule at error, with the case's options when
-// it has any.
-func textRulesSettings(test *testing.T, ruleName string, testCase textrules.Case) []byte {
+// textRulesSettings is a CohereSettings.json whose go block runs each of the rules at error, with the case's
+// options when it has any.
+func textRulesSettings(test *testing.T, ruleNames []string, testCase textrules.Case) []byte {
 	test.Helper()
 	// A rule's entry is its severity alone, or `[severity, options]`, as settings.Load reads it.
 	setting, severityError := json.Marshal(settings.SeverityError)
@@ -138,7 +148,10 @@ func textRulesSettings(test *testing.T, ruleName string, testCase textrules.Case
 		}
 	}
 	file := textRulesSettingsFile{}
-	file.Go.Rules = map[string]json.RawMessage{ruleName: setting}
+	file.Go.Rules = map[string]json.RawMessage{}
+	for _, ruleName := range ruleNames {
+		file.Go.Rules[ruleName] = setting
+	}
 	contents, encodeError := json.Marshal(file)
 	if encodeError != nil {
 		test.Fatal(encodeError)
@@ -154,10 +167,10 @@ type textRulesSettingsFile struct {
 	} `json:"go"`
 }
 
-// runTextRulesCase runs a case's rule over its Go source as the engine runs a project, and returns each finding of
-// that rule in the case's file as a byte range of its source, with how many of the rule's findings the engine
-// withheld as generated. A refusal is the engine refusing the case's options before anything ran, which is the
-// case's failure rather than the adapter's. Anything that keeps the case from
+// runTextRulesCase runs a case's rules over its Go source as the engine runs a project, and returns each finding of
+// those rules in the case's file as a byte range of its source, the family's findings being the union of its
+// rules', with how many of their findings the engine withheld as generated. A refusal is the engine refusing the case's
+// options before anything ran, which is the case's failure rather than the adapter's. Anything that keeps the case from
 // being measured at all, a load or type error or a crash, fails the test loudly, since it measures nothing.
 func runTextRulesCase(
 	test *testing.T,
@@ -166,8 +179,13 @@ func runTextRulesCase(
 	testCase textrules.Case,
 ) (found []textrules.Range, withheldAsGenerated int, refusal error) {
 	test.Helper()
-	subject := textRulesRule(test, corpus, testCase)
-	rulesForCase := []rule.Rule{subject}
+	rulesForCase := textRulesRules(test, corpus, testCase)
+	subjectNames := map[string]bool{}
+	ruleNames := make([]string, 0, len(rulesForCase))
+	for _, subject := range rulesForCase {
+		subjectNames[subject.Name] = true
+		ruleNames = append(ruleNames, subject.Name)
+	}
 
 	// Resolved, so the file names the load reports are the ones written here.
 	directory, resolveError := filepath.EvalSymlinks(test.TempDir())
@@ -176,7 +194,7 @@ func runTextRulesCase(
 	}
 	writeTextRulesFile(test, directory, "go.mod", fmt.Appendf(nil, "module %s\n\ngo %s\n", textRulesModuleName,
 		goVersion))
-	writeTextRulesFile(test, directory, textRulesSettingsFileName, textRulesSettings(test, subject.Name, testCase))
+	writeTextRulesFile(test, directory, textRulesSettingsFileName, textRulesSettings(test, ruleNames, testCase))
 	source := testCase.Sources[textrules.EngineGo]
 	casePath := writeTextRulesFile(test, directory, testCase.FileName(textrules.EngineGo), []byte(source))
 
@@ -210,10 +228,10 @@ func runTextRulesCase(
 
 	checked, runError := check.Run(loaded.Packages, rulesForCase, check.Options{})
 	if runError != nil {
-		test.Fatalf("running %s on %s: %v", subject.Name, testCase.Id(), runError)
+		test.Fatalf("running %s's rules on %s: %v", testCase.Family, testCase.Id(), runError)
 	}
 	for _, crash := range checked.Crashes {
-		test.Errorf("%s crashed on %s: %s", subject.Name, testCase.Id(), crash.Error)
+		test.Errorf("a rule crashed on %s: %s", testCase.Id(), crash.Error)
 	}
 	if len(checked.Crashes) > 0 {
 		test.FailNow()
@@ -222,13 +240,13 @@ func runTextRulesCase(
 	lineStarts := textrules.LineStarts(source, textrules.EngineGo)
 	offsetOf := func(line int, column int) int {
 		if line < 1 || line > len(lineStarts) || column < 1 {
-			test.Fatalf("%s reported %d:%d on %s, which is not in its %d lines", subject.Name, line, column,
+			test.Fatalf("a rule reported %d:%d on %s, which is not in its %d lines", line, column,
 				testCase.Id(), len(lineStarts))
 		}
 		return lineStarts[line-1] + column - 1
 	}
 	for _, finding := range checked.Findings {
-		if finding.Rule != subject.Name || finding.File != casePath {
+		if !subjectNames[finding.Rule] || finding.File != casePath {
 			continue
 		}
 		start := offsetOf(finding.Line, finding.Column)
@@ -238,7 +256,10 @@ func runTextRulesCase(
 		}
 		found = append(found, textrules.Range{Start: start, End: offsetOf(finding.EndLine, finding.EndColumn)})
 	}
-	return found, checked.WithheldAsGenerated[subject.Name], nil
+	for name := range subjectNames {
+		withheldAsGenerated += checked.WithheldAsGenerated[name]
+	}
+	return found, withheldAsGenerated, nil
 }
 
 // judgeTextRulesCase is a case's comparison: its findings against its expectation, or, where the engine refused

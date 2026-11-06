@@ -16,7 +16,10 @@ type Span struct {
 
 	// OccurrenceIn is the occurrence in each language, written as an object in place of Occurrence's number,
 	// where one number can't name the same text in every language: a one-letter name's declaration is the
-	// fifth `n` in TypeScript's form and the third in Go's, because `function` holds two.
+	// fifth `n` in TypeScript's form and the third in Go's, because `function` holds two. An occurrence of 0
+	// says the language's form has no such text, because its grammar can't express the construct (the text
+	// rules' second principle): a TypeScript property's name is its wire key, so us03's TypeScript form has no
+	// field whose name could differ from its wire spelling, and the finding over it is Go's and Swift's.
 	OccurrenceIn map[Engine]int
 
 	// FileStart is a point at the start of the file, for a rule about the file's path.
@@ -60,6 +63,16 @@ func (span Span) occurrenceFor(engine Engine) int {
 	return span.Occurrence
 }
 
+// AppliesTo reports whether the span is expected in an engine's form at all: everywhere, unless its
+// occurrence there is written as 0.
+func (span Span) AppliesTo(engine Engine) bool {
+	if span.OccurrenceIn == nil {
+		return true
+	}
+	occurrence, written := span.OccurrenceIn[engine]
+	return !written || occurrence != 0
+}
+
 // String names the span as a case writes it.
 func (span Span) String() string {
 	switch {
@@ -87,9 +100,9 @@ func (span Span) check() error {
 			return fmt.Errorf("covers %q gives its occurrence as a number and per language", *span.Covers)
 		case span.OccurrenceIn != nil:
 			for engine, occurrence := range span.OccurrenceIn {
-				if _, known := extensionOf[engine]; !known || occurrence < 1 {
-					return fmt.Errorf("covers %q gives %s occurrence %d, and each is a language's, from 1",
-						*span.Covers, engine, occurrence)
+				if _, known := extensionOf[engine]; !known || occurrence < 0 {
+					return fmt.Errorf("covers %q gives %s occurrence %d, and each is a language's, from 1, or 0 "+
+						"where its form has no such text", *span.Covers, engine, occurrence)
 				}
 			}
 		case span.Occurrence < 1:

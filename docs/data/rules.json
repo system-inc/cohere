@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/goengine/rules)"
     },
-    "count": 782,
+    "count": 783,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -7443,7 +7443,8 @@
             "upstreamName": "AlwaysUseLowerCamelCase",
             "typeAware": false,
             "typeScriptRules": [
-                "nexus/consistency-no-screaming-snake-case"
+                "nexus/consistency-no-screaming-snake-case",
+                "nexus/consistency-require-identifier-casing"
             ]
         },
         {
@@ -9565,6 +9566,34 @@
             ],
             "swift": {
                 "verdict": "NotApplicable"
+            }
+        },
+        {
+            "name": "nexus/consistency-require-identifier-casing",
+            "language": "TypeScript",
+            "namespace": "nexus",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": true,
+            "messageIds": [
+                "requireLowerCamelCaseValue",
+                "requireUpperCamelCaseCapital",
+                "requireUpperCamelCaseType"
+            ],
+            "fixKind": "fix",
+            "sets": [
+                {
+                    "set": "cohere:system-inc/base",
+                    "severity": "error"
+                },
+                {
+                    "set": "cohere:system-inc/structure",
+                    "severity": "error"
+                }
+            ],
+            "swift": {
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/always-use-lower-camel-case"
             }
         },
         {
