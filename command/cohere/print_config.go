@@ -30,10 +30,10 @@ type printedDeparture struct {
 	Reason string `json:"reason"`
 }
 
-// writeResolvedConfig answers language questions from the same program the lint run builds.
+// writeResolvedConfiguration answers language questions from the same program the lint run builds.
 // Globals come from TypeScript declarations, including the selected standard libraries; naming the
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
-func writeResolvedConfig(
+func writeResolvedConfiguration(
 	out *bufio.Writer,
 	lintConfiguration *configuration.Config,
 	resolved configuration.Resolved,

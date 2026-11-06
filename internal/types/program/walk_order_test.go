@@ -35,7 +35,7 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 	const fileCount = 12
 	const declarationCount = 3
 
-	files := map[string]string{"tsconfig.json": minimalConfig}
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 	for fileIndex := range fileCount {
 		var text strings.Builder
 		for declarationIndex := range declarationCount {

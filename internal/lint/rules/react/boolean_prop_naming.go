@@ -365,7 +365,7 @@ func runBooleanPropCheck(
 		if !isBooleanPropTypeValue(assignment.Initializer, settings.PropTypeNames) {
 			continue
 		}
-		name, hasName := propTypesKeyName(assignment.Name())
+		name, hasName := propertyTypesKeyName(assignment.Name())
 		// A match that overruns the time bound passes too: no answer here is a report.
 		if pattern.TestOrTimeout(name) && hasName {
 			continue
@@ -440,7 +440,7 @@ func isBooleanPropTypeValue(value *ast.Node, propertyTypeNames []string) bool {
 	return false
 }
 
-// propTypesKeyName reads the name upstream would read from a propTypes property key.
+// propertyTypesKeyName reads the name upstream would read from a propTypes property key.
 //
 // # An upstream defect, reproduced deliberately
 //
@@ -457,7 +457,7 @@ func isBooleanPropTypeValue(value *ast.Node, propertyTypeNames []string) bool {
 //
 // A computed key is different and is not a defect: upstream reads `node.key.name` and a computed
 // `[k]` has an identifier `k` underneath, so it renders `k` and is judged against it. Measured.
-func propTypesKeyName(key *ast.Node) (string, bool) {
+func propertyTypesKeyName(key *ast.Node) (string, bool) {
 	if key == nil {
 		return "undefined", false
 	}
@@ -625,7 +625,7 @@ func checkTypeMember(member *ast.Node, pattern *esregexp.RegExp, report func(*as
 		return
 	}
 
-	name, hasName := propTypesKeyName(signature.Name())
+	name, hasName := propertyTypesKeyName(signature.Name())
 	// A match that overruns the time bound passes too: no answer here is a report.
 	if pattern.TestOrTimeout(name) && hasName {
 		return

@@ -148,9 +148,9 @@ func isPunctuatorTokenKind(kind tokenKind) bool {
 		kind == tokenKindBraceR
 }
 
-// charCodeAt is body.charCodeAt(position) for the lexer's ASCII tests: the byte there, or -1 (NaN in
+// characterCodeAt is body.charCodeAt(position) for the lexer's ASCII tests: the byte there, or -1 (NaN in
 // graphql-js) past the end.
-func charCodeAt(body string, position int) int {
+func characterCodeAt(body string, position int) int {
 	if position < 0 || position >= len(body) {
 		return -1
 	}
@@ -202,8 +202,8 @@ func isUnicodeScalarValue(code int) bool {
 // UTF-8 text holds no surrogates, so this is false for every position in Go; it stays so the branches
 // that call it read as upstream's.
 func isSupplementaryCodePoint(body string, location int) bool {
-	return isLeadingSurrogate(charCodeAt(body, location)) &&
-		isTrailingSurrogate(charCodeAt(body, location+1))
+	return isLeadingSurrogate(characterCodeAt(body, location)) &&
+		isTrailingSurrogate(characterCodeAt(body, location+1))
 }
 
 func isLeadingSurrogate(code int) bool {
@@ -254,7 +254,7 @@ func readNextToken(lexer *lexer, start int) *token {
 	position := start
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// SourceCharacter
 		switch code {
@@ -292,7 +292,7 @@ func readNextToken(lexer *lexer, start int) *token {
 			lexer.lineStart = position
 			continue
 		case 0x000d: // \r
-			if charCodeAt(body, position+1) == 0x000a {
+			if characterCodeAt(body, position+1) == 0x000a {
 				position += 2
 			} else {
 				position++
@@ -322,8 +322,8 @@ func readNextToken(lexer *lexer, start int) *token {
 		case 0x0029: // )
 			return createToken(lexer, tokenKindParenR, position, position+1)
 		case 0x002e: // .
-			nextCode := charCodeAt(body, position+1)
-			if nextCode == 0x002e && charCodeAt(body, position+2) == 0x002e {
+			nextCode := characterCodeAt(body, position+1)
+			if nextCode == 0x002e && characterCodeAt(body, position+2) == 0x002e {
 				return createToken(lexer, tokenKindSpread, position, position+3)
 			}
 			if nextCode == 0x002e {
@@ -354,8 +354,8 @@ func readNextToken(lexer *lexer, start int) *token {
 			return createToken(lexer, tokenKindBraceR, position, position+1)
 		// StringValue
 		case 0x0022: // "
-			if charCodeAt(body, position+1) == 0x0022 &&
-				charCodeAt(body, position+2) == 0x0022 {
+			if characterCodeAt(body, position+1) == 0x0022 &&
+				characterCodeAt(body, position+2) == 0x0022 {
 				return readBlockString(lexer, position)
 			}
 			return readString(lexer, position)
@@ -400,7 +400,7 @@ func readComment(lexer *lexer, start int) *token {
 	position := start + 1
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// LineTerminator (\n | \r)
 		if code == 0x000a || code == 0x000d {
@@ -454,13 +454,13 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 	// NegativeSign (-)
 	if code == 0x002d {
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Zero (0)
 	if code == 0x0030 {
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		if isDigit(code) {
 			panic(syntaxError(
 				body,
@@ -470,7 +470,7 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		}
 	} else {
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Full stop (.)
@@ -478,9 +478,9 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		isFloat = true
 
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// E e
@@ -488,14 +488,14 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		isFloat = true
 
 		position++
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 		// + -
 		if code == 0x002b || code == 0x002d {
 			position++
-			code = charCodeAt(body, position)
+			code = characterCodeAt(body, position)
 		}
 		position = readDigits(lexer, position, code)
-		code = charCodeAt(body, position)
+		code = characterCodeAt(body, position)
 	}
 
 	// Numbers cannot be followed by . or NameStart
@@ -527,7 +527,7 @@ func readDigits(lexer *lexer, start int, firstCode int) int {
 	body := lexer.body
 	position := start + 1 // +1 to skip first firstCode
 
-	for isDigit(charCodeAt(body, position)) {
+	for isDigit(characterCodeAt(body, position)) {
 		position++
 	}
 
@@ -558,7 +558,7 @@ func readString(lexer *lexer, start int) *token {
 	value := ""
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// Closing Quote (")
 		if code == 0x0022 {
@@ -570,8 +570,8 @@ func readString(lexer *lexer, start int) *token {
 		if code == 0x005c {
 			value += body[chunkStart:position]
 			var escape escapeSequence
-			if charCodeAt(body, position+1) == 0x0075 { // u
-				if charCodeAt(body, position+2) == 0x007b { // {
+			if characterCodeAt(body, position+1) == 0x0075 { // u
+				if characterCodeAt(body, position+2) == 0x007b { // {
 					escape = readEscapedUnicodeVariableWidth(lexer, position)
 				} else {
 					escape = readEscapedUnicodeFixedWidth(lexer, position)
@@ -620,7 +620,7 @@ func readEscapedUnicodeVariableWidth(lexer *lexer, position int) escapeSequence 
 	size := 3
 	// Cannot be larger than 12 chars (\u{00000000}).
 	for size < 12 {
-		code := charCodeAt(body, position+size)
+		code := characterCodeAt(body, position+size)
 		size++
 		// Closing Brace (})
 		if code == 0x007d {
@@ -651,8 +651,8 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 	// GraphQL allows JSON-style surrogate pair escape sequences, but only when a valid pair is formed.
 	if isLeadingSurrogate(code) {
 		// \u
-		if charCodeAt(body, position+6) == 0x005c &&
-			charCodeAt(body, position+7) == 0x0075 {
+		if characterCodeAt(body, position+6) == 0x005c &&
+			characterCodeAt(body, position+7) == 0x0075 {
 			trailingCode := read16BitHexCode(body, position+8)
 			if isTrailingSurrogate(trailingCode) {
 				// JavaScript defines strings as a sequence of UTF-16 code units and encodes Unicode code
@@ -677,10 +677,10 @@ func readEscapedUnicodeFixedWidth(lexer *lexer, position int) escapeSequence {
 func read16BitHexCode(body string, position int) int {
 	// readHexDigit() returns -1 on error. ORing a negative value with any other value always produces a
 	// negative value.
-	return (readHexDigit(charCodeAt(body, position)) << 12) |
-		(readHexDigit(charCodeAt(body, position+1)) << 8) |
-		(readHexDigit(charCodeAt(body, position+2)) << 4) |
-		readHexDigit(charCodeAt(body, position+3))
+	return (readHexDigit(characterCodeAt(body, position)) << 12) |
+		(readHexDigit(characterCodeAt(body, position+1)) << 8) |
+		(readHexDigit(characterCodeAt(body, position+2)) << 4) |
+		readHexDigit(characterCodeAt(body, position+3))
 }
 
 // readHexDigit reads a hexadecimal character and returns its positive integer value (0-15).
@@ -721,7 +721,7 @@ func readHexDigit(code int) int {
 // | `t`               | U+0009     | horizontal tab               |
 func readEscapedCharacter(lexer *lexer, position int) escapeSequence {
 	body := lexer.body
-	code := charCodeAt(body, position+1)
+	code := characterCodeAt(body, position+1)
 	switch code {
 	case 0x0022: // "
 		return escapeSequence{value: "\x22", size: 2}
@@ -762,12 +762,12 @@ func readBlockString(lexer *lexer, start int) *token {
 
 	var blockLines []string
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 
 		// Closing Triple-Quote (""")
 		if code == 0x0022 &&
-			charCodeAt(body, position+1) == 0x0022 &&
-			charCodeAt(body, position+2) == 0x0022 {
+			characterCodeAt(body, position+1) == 0x0022 &&
+			characterCodeAt(body, position+2) == 0x0022 {
 			currentLine += body[chunkStart:position]
 			blockLines = append(blockLines, currentLine)
 
@@ -787,9 +787,9 @@ func readBlockString(lexer *lexer, start int) *token {
 
 		// Escaped Triple-Quote (\""")
 		if code == 0x005c &&
-			charCodeAt(body, position+1) == 0x0022 &&
-			charCodeAt(body, position+2) == 0x0022 &&
-			charCodeAt(body, position+3) == 0x0022 {
+			characterCodeAt(body, position+1) == 0x0022 &&
+			characterCodeAt(body, position+2) == 0x0022 &&
+			characterCodeAt(body, position+3) == 0x0022 {
 			currentLine += body[chunkStart:position]
 			chunkStart = position + 1 // skip only slash
 			position += 4
@@ -801,7 +801,7 @@ func readBlockString(lexer *lexer, start int) *token {
 			currentLine += body[chunkStart:position]
 			blockLines = append(blockLines, currentLine)
 
-			if code == 0x000d && charCodeAt(body, position+1) == 0x000a {
+			if code == 0x000d && characterCodeAt(body, position+1) == 0x000a {
 				position += 2
 			} else {
 				position++
@@ -838,7 +838,7 @@ func readName(lexer *lexer, start int) *token {
 	position := start + 1
 
 	for position < bodyLength {
-		code := charCodeAt(body, position)
+		code := characterCodeAt(body, position)
 		if isNameContinue(code) {
 			position++
 		} else {

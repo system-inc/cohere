@@ -7,23 +7,23 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// oneVarChecker holds what one file's walk needs.
-type oneVarChecker struct {
+// oneVariableChecker holds what one file's walk needs.
+type oneVariableChecker struct {
 	context  rule.Context
-	settings OneVarSettings
-	scopes   oneVarScopes
+	settings OneVariableSettings
+	scopes   oneVariableScopes
 }
 
 // groupFor returns the settings governing a declaration kind.
-func (checker *oneVarChecker) groupFor(kind oneVarKind) oneVarGroup {
+func (checker *oneVariableChecker) groupFor(kind oneVariableKind) oneVariableGroup {
 	switch kind {
-	case oneVarKindLet:
+	case oneVariableKindLet:
 		return checker.settings.Let
-	case oneVarKindConst:
+	case oneVariableKindConst:
 		return checker.settings.Const
-	case oneVarKindUsing:
+	case oneVariableKindUsing:
 		return checker.settings.Using
-	case oneVarKindAwaitUsing:
+	case oneVariableKindAwaitUsing:
 		return checker.settings.AwaitUsing
 	}
 	return checker.settings.Variable
@@ -36,20 +36,20 @@ func (checker *oneVarChecker) groupFor(kind oneVarKind) oneVarGroup {
 // than on anything the scope accumulated.
 //
 // Mutates: scope the flags are the scope's running record, which later statements in it read back
-func (checker *oneVarChecker) recordTypes(kind oneVarKind, declarators []*ast.Node,
-	scope *oneVarStateFlags) {
+func (checker *oneVariableChecker) recordTypes(kind oneVariableKind, declarators []*ast.Node,
+	scope *oneVariableStateFlags) {
 	group := checker.groupFor(kind)
 	for _, declarator := range declarators {
 		if declarator.AsVariableDeclaration().Initializer == nil {
-			if modeIs(group.Uninitialized, OneVarAlways) {
+			if modeIs(group.Uninitialized, OneVariableAlways) {
 				scope.Uninitialized = true
 			}
 			continue
 		}
-		if !modeIs(group.Initialized, OneVarAlways) {
+		if !modeIs(group.Initialized, OneVariableAlways) {
 			continue
 		}
-		if checker.settings.SeparateRequires && oneVarIsRequire(declarator) {
+		if checker.settings.SeparateRequires && oneVariableIsRequire(declarator) {
 			scope.Required = true
 		} else {
 			scope.Initialized = true
@@ -62,16 +62,16 @@ func (checker *oneVarChecker) recordTypes(kind oneVarKind, declarators []*ast.No
 // It answers "may this statement declare, given what the scope has already seen", and it records on
 // the way out when the answer is yes. The recording is the reason this cannot be split into a pure
 // predicate: the third `var` in a scope is judged against a flag the second one set.
-func (checker *oneVarChecker) hasOnlyOneStatement(kind oneVarKind, declarators []*ast.Node) bool {
-	counts := oneVarCountDeclarations(declarators)
+func (checker *oneVariableChecker) hasOnlyOneStatement(kind oneVariableKind, declarators []*ast.Node) bool {
+	counts := oneVariableCountDeclarations(declarators)
 	group := checker.groupFor(kind)
 	scope := checker.scopes.current(kind)
 	if scope == nil {
 		return true
 	}
-	hasRequires := oneVarAnyRequire(declarators)
+	hasRequires := oneVariableAnyRequire(declarators)
 
-	if modeIs(group.Uninitialized, OneVarAlways) && modeIs(group.Initialized, OneVarAlways) {
+	if modeIs(group.Uninitialized, OneVariableAlways) && modeIs(group.Initialized, OneVariableAlways) {
 		if scope.Uninitialized || scope.Initialized {
 			if !hasRequires {
 				return false
@@ -79,12 +79,12 @@ func (checker *oneVarChecker) hasOnlyOneStatement(kind oneVarKind, declarators [
 		}
 	}
 	if counts.Uninitialized > 0 {
-		if modeIs(group.Uninitialized, OneVarAlways) && scope.Uninitialized {
+		if modeIs(group.Uninitialized, OneVariableAlways) && scope.Uninitialized {
 			return false
 		}
 	}
 	if counts.Initialized > 0 {
-		if modeIs(group.Initialized, OneVarAlways) && scope.Initialized {
+		if modeIs(group.Initialized, OneVariableAlways) && scope.Initialized {
 			if !hasRequires {
 				return false
 			}
@@ -102,8 +102,8 @@ func (checker *oneVarChecker) hasOnlyOneStatement(kind oneVarKind, declarators [
 // The three blocks run in upstream's order and are not exclusive: one statement can report a
 // `splitRequires` and a `combine` and a `split`, which is why 23 corpus cases expect more than one
 // finding on a single input.
-func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
-	kind := oneVarKindOf(list)
+func (checker *oneVariableChecker) checkDeclarationList(list *ast.Node) {
+	kind := oneVariableKindOf(list)
 	group := checker.groupFor(kind)
 
 	// Upstream's `if (!options[key]) return;`, which skips a declaration kind the config never
@@ -114,22 +114,22 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	//
 	// Kept because that redundancy is a property of `modeIs` rather than of this rule, and a
 	// future change there would make this guard load bearing without anything saying so.
-	// `TestOneVarSkipsDeclarationKindsTheConfigDidNotName` pins the behaviour directly, so the
+	// `TestOneVariableSkipsDeclarationKindsTheConfigDidNotName` pins the behaviour directly, so the
 	// contract survives even though no corpus row can discriminate the guard itself.
 	if !group.configured() {
 		return
 	}
 
-	statement := oneVarStatementOf(list)
+	statement := oneVariableStatementOf(list)
 	container := statement.Parent
-	declarators := oneVarDeclarators(list)
-	counts := oneVarCountDeclarations(declarators)
-	mixedRequires := oneVarAnyRequire(declarators) && !oneVarAllRequire(declarators)
+	declarators := oneVariableDeclarators(list)
+	counts := oneVariableCountDeclarations(declarators)
+	mixedRequires := oneVariableAnyRequire(declarators) && !oneVariableAllRequire(declarators)
 
-	if modeIs(group.Initialized, OneVarAlways) &&
+	if modeIs(group.Initialized, OneVariableAlways) &&
 		checker.settings.SeparateRequires && mixedRequires {
 		checker.context.ReportNode(statement,
-			oneVarRender(messageOneVarSplitRequires, kind))
+			oneVariableRender(messageOneVariableSplitRequires, kind))
 	}
 
 	// consecutive
@@ -138,23 +138,23 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	// parent.body.indexOf(node)) || 0`, whose `|| 0` makes a node that is first in its list (index
 	// 0) and a node with no list at all indistinguishable. Both mean "no previous sibling to merge
 	// with", so the guard below is `> 0` and reproduces it exactly.
-	siblings := oneVarStatementList(container)
-	nodeIndex := oneVarIndexOf(siblings, statement)
-	if oneVarIsExported(statement) {
+	siblings := oneVariableStatementList(container)
+	nodeIndex := oneVariableIndexOf(siblings, statement)
+	if oneVariableIsExported(statement) {
 		// Upstream's `parent` here is the ExportNamedDeclaration wrapping the declaration, and
 		// that node carries no `body` array at all, so `parent.body && ...` is falsy and the whole
 		// index expression collapses to 0. Both the consecutive check and the join repair are
-		// therefore dead for an exported declaration upstream. See `oneVarIsExported`.
+		// therefore dead for an exported declaration upstream. See `oneVariableIsExported`.
 		siblings, nodeIndex = nil, 0
 	}
 	if nodeIndex > 0 {
 		previous := siblings[nodeIndex-1]
-		previousList := oneVarDeclarationListOfStatement(previous)
-		if previousList != nil && oneVarKindOf(previousList) == kind {
-			previousDeclarators := oneVarDeclarators(previousList)
+		previousList := oneVariableDeclarationListOfStatement(previous)
+		if previousList != nil && oneVariableKindOf(previousList) == kind {
+			previousDeclarators := oneVariableDeclarators(previousList)
 			combined := append(append([]*ast.Node{}, declarators...), previousDeclarators...)
-			if !(oneVarAnyRequire(combined) && !oneVarAllRequire(combined)) {
-				previousCounts := oneVarCountDeclarations(previousDeclarators)
+			if !(oneVariableAnyRequire(combined) && !oneVariableAllRequire(combined)) {
+				previousCounts := oneVariableCountDeclarations(previousDeclarators)
 				checker.reportConsecutive(statement, list, kind, group, counts, previousCounts,
 					siblings, nodeIndex)
 			}
@@ -171,7 +171,7 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 	// Upstream skips a `for` statement's own initializer, because splitting `for (var i = 0, j = 0;;)`
 	// would move `j` outside the head and change what the loop means. `parent.init !== node` is the
 	// test, and here the list is the init when its parent is the for statement.
-	if !oneVarIsForStatementInitializer(list) {
+	if !oneVariableIsForStatementInitializer(list) {
 		if counts.Uninitialized+counts.Initialized > 1 {
 			checker.reportNever(statement, list, kind, group, counts)
 		}
@@ -179,52 +179,52 @@ func (checker *oneVarChecker) checkDeclarationList(list *ast.Node) {
 }
 
 // reportConsecutive emits the combine family for the `consecutive` modes.
-func (checker *oneVarChecker) reportConsecutive(statement *ast.Node, list *ast.Node,
-	kind oneVarKind, group oneVarGroup, counts oneVarCounts, previousCounts oneVarCounts,
+func (checker *oneVariableChecker) reportConsecutive(statement *ast.Node, list *ast.Node,
+	kind oneVariableKind, group oneVariableGroup, counts oneVariableCounts, previousCounts oneVariableCounts,
 	siblings []*ast.Node, nodeIndex int) {
 	switch {
-	case modeIs(group.Initialized, OneVarConsecutive) &&
-		modeIs(group.Uninitialized, OneVarConsecutive):
-		checker.reportJoin(statement, list, messageOneVarCombine, kind, siblings, nodeIndex)
-	case modeIs(group.Initialized, OneVarConsecutive) &&
+	case modeIs(group.Initialized, OneVariableConsecutive) &&
+		modeIs(group.Uninitialized, OneVariableConsecutive):
+		checker.reportJoin(statement, list, messageOneVariableCombine, kind, siblings, nodeIndex)
+	case modeIs(group.Initialized, OneVariableConsecutive) &&
 		counts.Initialized > 0 && previousCounts.Initialized > 0:
-		checker.reportJoin(statement, list, messageOneVarCombineInitialized, kind, siblings, nodeIndex)
-	case modeIs(group.Uninitialized, OneVarConsecutive) &&
+		checker.reportJoin(statement, list, messageOneVariableCombineInitialized, kind, siblings, nodeIndex)
+	case modeIs(group.Uninitialized, OneVariableConsecutive) &&
 		counts.Uninitialized > 0 && previousCounts.Uninitialized > 0:
-		checker.reportJoin(statement, list, messageOneVarCombineUninitialized, kind, siblings, nodeIndex)
+		checker.reportJoin(statement, list, messageOneVariableCombineUninitialized, kind, siblings, nodeIndex)
 	}
 }
 
 // reportAlways emits the combine family for the `always` modes.
-func (checker *oneVarChecker) reportAlways(statement *ast.Node, list *ast.Node,
-	kind oneVarKind, group oneVarGroup, counts oneVarCounts,
+func (checker *oneVariableChecker) reportAlways(statement *ast.Node, list *ast.Node,
+	kind oneVariableKind, group oneVariableGroup, counts oneVariableCounts,
 	siblings []*ast.Node, nodeIndex int) {
-	if modeIs(group.Initialized, OneVarAlways) && modeIs(group.Uninitialized, OneVarAlways) {
-		checker.reportJoin(statement, list, messageOneVarCombine, kind, siblings, nodeIndex)
+	if modeIs(group.Initialized, OneVariableAlways) && modeIs(group.Uninitialized, OneVariableAlways) {
+		checker.reportJoin(statement, list, messageOneVariableCombine, kind, siblings, nodeIndex)
 		return
 	}
-	if modeIs(group.Initialized, OneVarAlways) && counts.Initialized > 0 {
-		checker.reportJoin(statement, list, messageOneVarCombineInitialized, kind, siblings, nodeIndex)
+	if modeIs(group.Initialized, OneVariableAlways) && counts.Initialized > 0 {
+		checker.reportJoin(statement, list, messageOneVariableCombineInitialized, kind, siblings, nodeIndex)
 	}
-	if modeIs(group.Uninitialized, OneVarAlways) && counts.Uninitialized > 0 {
+	if modeIs(group.Uninitialized, OneVariableAlways) && counts.Uninitialized > 0 {
 		// A for-in/for-of head is skipped entirely, report and all. See the helper's comment.
-		if oneVarIsForInOrOfLeft(list) {
+		if oneVariableIsForInOrOfLeft(list) {
 			return
 		}
-		checker.reportJoin(statement, list, messageOneVarCombineUninitialized, kind, siblings, nodeIndex)
+		checker.reportJoin(statement, list, messageOneVariableCombineUninitialized, kind, siblings, nodeIndex)
 	}
 }
 
 // reportNever emits the split family.
-func (checker *oneVarChecker) reportNever(statement *ast.Node, list *ast.Node,
-	kind oneVarKind, group oneVarGroup, counts oneVarCounts) {
+func (checker *oneVariableChecker) reportNever(statement *ast.Node, list *ast.Node,
+	kind oneVariableKind, group oneVariableGroup, counts oneVariableCounts) {
 	switch {
-	case modeIs(group.Initialized, OneVarNever) && modeIs(group.Uninitialized, OneVarNever):
-		checker.reportSplit(statement, list, messageOneVarSplit, kind)
-	case modeIs(group.Initialized, OneVarNever) && counts.Initialized > 0:
-		checker.reportSplit(statement, list, messageOneVarSplitInitialized, kind)
-	case modeIs(group.Uninitialized, OneVarNever) && counts.Uninitialized > 0:
-		checker.reportSplit(statement, list, messageOneVarSplitUninitialized, kind)
+	case modeIs(group.Initialized, OneVariableNever) && modeIs(group.Uninitialized, OneVariableNever):
+		checker.reportSplit(statement, list, messageOneVariableSplit, kind)
+	case modeIs(group.Initialized, OneVariableNever) && counts.Initialized > 0:
+		checker.reportSplit(statement, list, messageOneVariableSplitInitialized, kind)
+	case modeIs(group.Uninitialized, OneVariableNever) && counts.Uninitialized > 0:
+		checker.reportSplit(statement, list, messageOneVariableSplitUninitialized, kind)
 	}
 }
 
@@ -249,9 +249,9 @@ func (checker *oneVarChecker) reportNever(statement *ast.Node, list *ast.Node,
 // than one fix on one diagnostic, and `ProposalsFrom`'s own comment says grouping should be built
 // when a rule genuinely needs it rather than warned about. That is a finding for the shelf and it
 // is in the report, not something this rule can fix from here.
-func (checker *oneVarChecker) reportJoin(statement *ast.Node, list *ast.Node,
-	message rule.Message, kind oneVarKind, siblings []*ast.Node, nodeIndex int) {
-	rendered := oneVarRender(message, kind)
+func (checker *oneVariableChecker) reportJoin(statement *ast.Node, list *ast.Node,
+	message rule.Message, kind oneVariableKind, siblings []*ast.Node, nodeIndex int) {
+	rendered := oneVariableRender(message, kind)
 
 	fixes := checker.joinFixes(statement, list, kind, siblings, nodeIndex)
 	if len(fixes) == 0 {
@@ -273,15 +273,15 @@ func (checker *oneVarChecker) reportJoin(statement *ast.Node, list *ast.Node,
 // `function f() { var a = 1; let b = 2; var c = 3; }`, where the third statement reports because
 // the function scope already holds a `var` while its immediate predecessor is a `let`. Measured:
 // upstream returns `output: null`. No corpus case writes it, so a mutant dropping this check
-// survives all 296; see `TestOneVarJoinDeclinesAgainstADifferentKindPredecessor`.
-func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
-	kind oneVarKind, siblings []*ast.Node, nodeIndex int) []rule.Fix {
+// survives all 296; see `TestOneVariableJoinDeclinesAgainstADifferentKindPredecessor`.
+func (checker *oneVariableChecker) joinFixes(statement *ast.Node, list *ast.Node,
+	kind oneVariableKind, siblings []*ast.Node, nodeIndex int) []rule.Fix {
 	if nodeIndex <= 0 || nodeIndex-1 >= len(siblings) {
 		return nil
 	}
 	previous := siblings[nodeIndex-1]
-	previousList := oneVarDeclarationListOfStatement(previous)
-	if previousList == nil || oneVarKindOf(previousList) != kind {
+	previousList := oneVariableDeclarationListOfStatement(previous)
+	if previousList == nil || oneVariableKindOf(previousList) != kind {
 		return nil
 	}
 
@@ -295,7 +295,7 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 	// preserving when both statements are ambient: joining an ambient binding into a real one, or the
 	// reverse, changes whether a variable exists at runtime. Reporting without a repair is the subset
 	// that can be shown correct.
-	if oneVarIsAmbient(statement) || oneVarIsAmbient(previous) {
+	if oneVariableIsAmbient(statement) || oneVariableIsAmbient(previous) {
 		return nil
 	}
 
@@ -320,7 +320,7 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 	// is one. Found by scanning back over trivia from the keyword rather than by taking the previous
 	// statement's End(), because a statement's End() sits past its own terminator and a list's does
 	// not, so the two disagree by exactly the byte this fix has to replace.
-	beforeEnd := oneVarPreviousTokenEnd(text, keyword.Pos(), previous.Pos())
+	beforeEnd := oneVariablePreviousTokenEnd(text, keyword.Pos(), previous.Pos())
 	if beforeEnd < 0 {
 		return nil
 	}
@@ -335,7 +335,7 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 
 	// `await using` is two tokens, and upstream removes the second one separately before blanking
 	// the first. Without this the repair leaves a stray `using` behind.
-	if kind == oneVarKindAwaitUsing {
+	if kind == oneVariableKindAwaitUsing {
 		usingToken := scanner.GetRangeOfTokenAtPosition(sourceFile, keyword.End())
 		fixes = append(fixes, rule.RemoveRange(core.NewTextRange(usingToken.Pos(), usingToken.End())))
 	}
@@ -345,9 +345,9 @@ func (checker *oneVarChecker) joinFixes(statement *ast.Node, list *ast.Node,
 }
 
 // reportSplit reports a split finding, with upstream's `splitDeclarations` repair when it applies.
-func (checker *oneVarChecker) reportSplit(statement *ast.Node, list *ast.Node,
-	message rule.Message, kind oneVarKind) {
-	rendered := oneVarRender(message, kind)
+func (checker *oneVariableChecker) reportSplit(statement *ast.Node, list *ast.Node,
+	message rule.Message, kind oneVariableKind) {
+	rendered := oneVariableRender(message, kind)
 
 	fixes := checker.splitFixes(statement, list, kind)
 	if len(fixes) == 0 {
@@ -373,9 +373,9 @@ func (checker *oneVarChecker) reportSplit(statement *ast.Node, list *ast.Node,
 // because a non-ambient `const` needs an initializer. Upstream's estree hangs `declare` on the
 // declaration as a flag it never consults here; ours is a modifier on the statement, beside
 // `export`, and both have to be repeated on every statement the split creates.
-func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
-	kind oneVarKind) []rule.Fix {
-	if !oneVarIsInStatementList(statement) {
+func (checker *oneVariableChecker) splitFixes(statement *ast.Node, list *ast.Node,
+	kind oneVariableKind) []rule.Fix {
+	if !oneVariableIsInStatementList(statement) {
 		return nil
 	}
 	sourceFile := checker.context.SourceFile
@@ -385,15 +385,15 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 	text := sourceFile.Text()
 
 	modifierPrefix := ""
-	if oneVarIsExported(statement) {
+	if oneVariableIsExported(statement) {
 		modifierPrefix = "export "
 	}
-	if oneVarIsAmbient(statement) {
+	if oneVariableIsAmbient(statement) {
 		modifierPrefix += "declare "
 	}
 
 	fixes := []rule.Fix{}
-	for _, declarator := range oneVarDeclarators(list) {
+	for _, declarator := range oneVariableDeclarators(list) {
 		comma := scanner.GetRangeOfTokenAtPosition(sourceFile, declarator.End())
 		if comma.Pos() >= len(text) || text[comma.Pos()] != ',' {
 			// Upstream returns null for a declarator with no token after it, and skips one whose
@@ -404,7 +404,7 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 
 		// `afterComma` is the next token including comments, which is what decides between the
 		// three shapes below.
-		afterCommaPosition := oneVarNextTokenOrCommentStart(text, comma.End())
+		afterCommaPosition := oneVariableNextTokenOrCommentStart(text, comma.End())
 		if afterCommaPosition < 0 {
 			continue
 		}
@@ -420,9 +420,9 @@ func (checker *oneVarChecker) splitFixes(statement *ast.Node, list *ast.Node,
 		// A newline, or a comment, between the comma and what follows. Upstream keeps everything
 		// from the comma's end up to the last comment's start verbatim and puts the new statement
 		// head after it, so `var f, /* c */ l` becomes `var f; /* c */ var l`.
-		if oneVarCrossesLine(text, comma.End(), afterCommaPosition) ||
-			oneVarStartsComment(text, afterCommaPosition) {
-			lastCommentStart := oneVarLastCommentRunStart(text, comma.End())
+		if oneVariableCrossesLine(text, comma.End(), afterCommaPosition) ||
+			oneVariableStartsComment(text, afterCommaPosition) {
+			lastCommentStart := oneVariableLastCommentRunStart(text, comma.End())
 			fixes = append(fixes, rule.ReplaceRange(
 				core.NewTextRange(comma.Pos(), lastCommentStart),
 				";"+text[comma.End():lastCommentStart]+modifierPrefix+kind.text()+" "))

@@ -7,8 +7,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// labelVarFile is where the fixtures pretend to live.
-const labelVarFile = "/repository/source/LabelVar.ts"
+// labelVariableFile is where the fixtures pretend to live.
+const labelVariableFile = "/repository/source/LabelVar.ts"
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-label-var.js`, copied rather than rewritten:
 // 2 clean cases and 3 reporting ones, which is the whole upstream file.
@@ -16,7 +16,7 @@ const labelVarFile = "/repository/source/LabelVar.ts"
 // Every reporting case carries line and column assertions, so the span is stated data and is
 // asserted below rather than left to a message id. Every case string was verified byte against byte
 // against the upstream file, and every verdict reproduced by driving the installed eslint at 10.8.1.
-func TestNoLabelVarFires(test *testing.T) {
+func TestNoLabelVariableFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -32,7 +32,7 @@ func TestNoLabelVarFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText),
+				rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText),
 				"identifierClashWithLabel")
 		})
 	}
@@ -44,7 +44,7 @@ func TestNoLabelVarFires(test *testing.T) {
 // searching the whole file for the name reports it. The second has a variable in the same scope
 // whose name is not the label's, which is the ordinary case a rule that ignored the name would
 // report.
-func TestNoLabelVarStaysSilent(test *testing.T) {
+func TestNoLabelVariableStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -61,7 +61,10 @@ func TestNoLabelVarStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -76,7 +79,7 @@ func TestNoLabelVarStaysSilent(test *testing.T) {
 //
 // The function and class rows are the same point from the other side: a binding that is not a `var`
 // at all still clashes, because the clash is about the name being taken.
-func TestNoLabelVarFiresOnCasesBeyondTheCorpus(test *testing.T) {
+func TestNoLabelVariableFiresOnCasesBeyondTheCorpus(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -98,7 +101,7 @@ func TestNoLabelVarFiresOnCasesBeyondTheCorpus(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText),
+				rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText),
 				"identifierClashWithLabel")
 		})
 	}
@@ -111,7 +114,7 @@ func TestNoLabelVarFiresOnCasesBeyondTheCorpus(test *testing.T) {
 // label's own body is not in scope at the labeled statement either, because the label sits outside
 // the block it labels. Both measured clean upstream, and a rule searching the file for the name
 // reports both.
-func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
+func TestNoLabelVariableStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -127,7 +130,10 @@ func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -139,7 +145,7 @@ func TestNoLabelVarStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 // and end-exclusive, which is the zero-based half-open range [30,53) and the text
 // `x: for(;;) { break x; }`. Reporting the label instead would be a defensible reading of the same
 // rule with an identical message id, and no id fixture could tell the two apart.
-func TestNoLabelVarSpansTheWholeLabeledStatement(test *testing.T) {
+func TestNoLabelVariableSpansTheWholeLabeledStatement(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -155,7 +161,7 @@ func TestNoLabelVarSpansTheWholeLabeledStatement(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -171,23 +177,28 @@ func TestNoLabelVarSpansTheWholeLabeledStatement(test *testing.T) {
 // The rule declares NeedsTypeChecker, so the plain harness hands it a nil checker and the guard at
 // the top of the listener makes it go completely silent. That is the more dangerous of the two
 // failure modes, because every clean case would then pass vacuously.
-func TestNoLabelVarRequiresTheTypedHarness(test *testing.T) {
+func TestNoLabelVariableRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunTyped(test, NoLabelVar, labelVarFile, "function bar(x) { x: for(;;) { break x; } }"),
+		rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, "function bar(x) { x: for(;;) { break x; } }"),
 		"identifierClashWithLabel")
 	rule_testing.ExpectClean(test,
-		rule_testing.Run(test, NoLabelVar, labelVarFile, "function bar(x) { x: for(;;) { break x; } }"))
+		rule_testing.Run(test, NoLabelVariable, labelVariableFile, "function bar(x) { x: for(;;) { break x; } }"))
 }
 
 // The message text is asserted against a literal typed here rather than against the rule's own
 // constant, because comparing a diagnostic to the constant it was built from moves both sides
 // together under mutation and asserts nothing.
-func TestNoLabelVarMessage(test *testing.T) {
+func TestNoLabelVariableMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTyped(test, NoLabelVar, labelVarFile, "function bar(x) { x: for(;;) { break x; } }")
+	result := rule_testing.RunTyped(
+		test,
+		NoLabelVariable,
+		labelVariableFile,
+		"function bar(x) { x: for(;;) { break x; } }",
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -215,7 +226,7 @@ func TestNoLabelVarMessage(test *testing.T) {
 // and belongs with them: it reports, because a function-scoped declaration is hoisted out of the
 // block and is in scope at the label, so a rule that simply never looked inside would get the other
 // four right for the wrong reason.
-func TestNoLabelVarAsksAtTheLabelRatherThanInsideItsBody(test *testing.T) {
+func TestNoLabelVariableAsksAtTheLabelRatherThanInsideItsBody(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -234,7 +245,7 @@ func TestNoLabelVarAsksAtTheLabelRatherThanInsideItsBody(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoLabelVar, labelVarFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, NoLabelVariable, labelVariableFile, testCase.sourceText)
 			if testCase.wantFinding {
 				rule_testing.ExpectFindings(test, result, "identifierClashWithLabel")
 				return

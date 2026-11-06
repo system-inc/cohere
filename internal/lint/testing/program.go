@@ -13,13 +13,13 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// defaultTsConfig is a minimal, self-contained project.
+// defaultTsConfiguration is a minimal, self-contained project.
 //
 // `types: []` is load-bearing: without it the program tries to resolve @types packages from disk
 // and a fixture picks up whatever happens to be installed near the test's temp directory, which
 // makes the same fixture pass or fail depending on the machine. lib ES2022 gives Promise and the
 // other built-ins a type-aware rule needs to reason about, without pulling in the DOM.
-const defaultTsConfig = `{
+const defaultTsConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"target": "ES2022",
@@ -364,7 +364,7 @@ func runTypedFiles(
 		// a program built under that option.
 		configurationPath := filepath.Join(directory, "tsconfig.json")
 		if _, statError := os.Stat(configurationPath); os.IsNotExist(statError) {
-			if writeError := os.WriteFile(configurationPath, []byte(defaultTsConfig), 0o644); writeError != nil {
+			if writeError := os.WriteFile(configurationPath, []byte(defaultTsConfiguration), 0o644); writeError != nil {
 				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		}

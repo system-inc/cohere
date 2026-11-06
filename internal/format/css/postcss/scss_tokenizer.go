@@ -60,8 +60,8 @@ func newScssTokenizer(in *input) *scssTokenizer {
 	}
 }
 
-// charCodeAt is css.charCodeAt(index), -1 standing for NaN past either end.
-func (tokens *scssTokenizer) charCodeAt(index int) int {
+// characterCodeAt is css.charCodeAt(index), -1 standing for NaN past either end.
+func (tokens *scssTokenizer) characterCodeAt(index int) int {
 	if index < 0 || index >= tokens.length {
 		return -1
 	}
@@ -110,8 +110,8 @@ func (tokens *scssTokenizer) interpolation() {
 			tokens.unclosed("interpolation")
 		}
 
-		tokens.code = tokens.charCodeAt(tokens.next)
-		tokens.n = tokens.charCodeAt(tokens.next + 1)
+		tokens.code = tokens.characterCodeAt(tokens.next)
+		tokens.n = tokens.characterCodeAt(tokens.next + 1)
 
 		if stringQuote != 0 {
 			if !stringEscaped && tokens.code == stringQuote {
@@ -145,14 +145,14 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		return token{}, false
 	}
 
-	tokens.code = tokens.charCodeAt(tokens.pos)
+	tokens.code = tokens.characterCodeAt(tokens.pos)
 
 	switch tokens.code {
 	case newline, space, tab, carriageReturn, feed:
 		tokens.next = tokens.pos
 		for {
 			tokens.next += 1
-			tokens.code = tokens.charCodeAt(tokens.next)
+			tokens.code = tokens.characterCodeAt(tokens.next)
 			if !(tokens.code == space ||
 				tokens.code == newline ||
 				tokens.code == tab ||
@@ -185,7 +185,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		tokens.n = tokens.charCodeAt(tokens.pos + 1)
+		tokens.n = tokens.characterCodeAt(tokens.pos + 1)
 
 		// `SCSS PATCH` {
 		if tokens.previous == "url" && tokens.n != singleQuote && tokens.n != doubleQuote {
@@ -193,7 +193,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.escaped = false
 			tokens.next = tokens.pos + 1
 			for tokens.next <= tokens.length-1 {
-				tokens.n = tokens.charCodeAt(tokens.next)
+				tokens.n = tokens.characterCodeAt(tokens.next)
 				if tokens.n == backslash {
 					tokens.escaped = !tokens.escaped
 				} else if tokens.n == openParentheses {
@@ -240,8 +240,8 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.unclosed("string")
 			}
 
-			tokens.code = tokens.charCodeAt(tokens.next)
-			tokens.n = tokens.charCodeAt(tokens.next + 1)
+			tokens.code = tokens.characterCodeAt(tokens.next)
+			tokens.n = tokens.characterCodeAt(tokens.next + 1)
 
 			if !tokens.escaped && tokens.code == tokens.quote {
 				break
@@ -291,11 +291,11 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 	case backslash:
 		tokens.next = tokens.pos
 		tokens.escape = true
-		for tokens.charCodeAt(tokens.next+1) == backslash {
+		for tokens.characterCodeAt(tokens.next+1) == backslash {
 			tokens.next += 1
 			tokens.escape = !tokens.escape
 		}
-		tokens.code = tokens.charCodeAt(tokens.next + 1)
+		tokens.code = tokens.characterCodeAt(tokens.next + 1)
 		if tokens.escape &&
 			tokens.code != slash &&
 			tokens.code != space &&
@@ -304,11 +304,11 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.code != carriageReturn &&
 			tokens.code != feed {
 			tokens.next += 1
-			if isHexEscape(tokens.charCodeAt(tokens.next)) {
-				for isHexEscape(tokens.charCodeAt(tokens.next + 1)) {
+			if isHexEscape(tokens.characterCodeAt(tokens.next)) {
+				for isHexEscape(tokens.characterCodeAt(tokens.next + 1)) {
 					tokens.next += 1
 				}
-				if tokens.charCodeAt(tokens.next+1) == space {
+				if tokens.characterCodeAt(tokens.next+1) == space {
 					tokens.next += 1
 				}
 			}
@@ -325,7 +325,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 
 	default:
 		// `SCSS PATCH` {
-		tokens.n = tokens.charCodeAt(tokens.pos + 1)
+		tokens.n = tokens.characterCodeAt(tokens.pos + 1)
 
 		if tokens.code == hash && tokens.n == openCurly {
 			tokens.next = tokens.pos
@@ -381,7 +381,7 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			match := -1
 			for index := tokens.pos + 1; index < tokens.length; index++ {
 				unit := tokens.css[index]
-				if isScssWordEnd(unit) || (unit == slash && tokens.charCodeAt(index+1) == asterisk) {
+				if isScssWordEnd(unit) || (unit == slash && tokens.characterCodeAt(index+1) == asterisk) {
 					match = index
 					break
 				}

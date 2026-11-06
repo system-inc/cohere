@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoLabelVar = rule.Message{
+var messageNoLabelVariable = rule.Message{
 	Id: "identifierClashWithLabel",
 	Description: "This label has the same name as a variable in scope, so the same word means two " +
 		"different things a few lines apart and neither reading is wrong on sight. A reader who " +
@@ -13,7 +13,7 @@ var messageNoLabelVar = rule.Message{
 		"what the statement does. Rename the label.",
 }
 
-// NoLabelVar flags a label whose name is already a variable in scope.
+// NoLabelVariable flags a label whose name is already a variable in scope.
 //
 //	valid:   x: for(;;) { break x; }
 //	valid:   function bar() { var x = foo; q: for(;;) { break q; } }
@@ -49,7 +49,7 @@ var messageNoLabelVar = rule.Message{
 // Nor does one inside the label's own body: `x: for(;;) { let x = 1; }` is clean, because the label
 // sits outside the block it labels. Both measured, and both would report for any rule that searched
 // the file for the name instead of asking what is in scope at this point.
-var NoLabelVar = rule.Rule[rule.NoOptions]{
+var NoLabelVariable = rule.Rule[rule.NoOptions]{
 	Name:             "no-label-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
@@ -58,7 +58,7 @@ var NoLabelVar = rule.Rule[rule.NoOptions]{
 			ast.KindLabeledStatement: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than
 				// crashing, which is the more dangerous failure: every clean fixture would pass
-				// vacuously. `TestNoLabelVarRequiresTheTypedHarness` pins it.
+				// vacuously. `TestNoLabelVariableRequiresTheTypedHarness` pins it.
 				if ruleContext.TypeChecker == nil {
 					return
 				}
@@ -76,7 +76,7 @@ var NoLabelVar = rule.Rule[rule.NoOptions]{
 				// anchor and is what makes a binding declared in the label's body not clash.
 				for _, symbol := range ruleContext.TypeChecker.GetSymbolsInScope(node, ast.SymbolFlagsValue) {
 					if symbol.Name == labelName {
-						ruleContext.ReportNode(node, messageNoLabelVar)
+						ruleContext.ReportNode(node, messageNoLabelVariable)
 						return
 					}
 				}

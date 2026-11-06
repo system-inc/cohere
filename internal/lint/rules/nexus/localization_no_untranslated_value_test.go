@@ -13,7 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-const translationsConfig = `{
+const translationsConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -70,7 +70,7 @@ func runOnTranslations(test *testing.T, files map[string]string, subjectRelative
 	return rule_testing.Result{Diagnostics: diagnostics, SourceFile: subject}
 }
 
-// buildTranslations writes files to a directory of their own, beside translationsConfig, and builds a real
+// buildTranslations writes files to a directory of their own, beside translationsConfiguration, and builds a real
 // program over them, returning it and the directory.
 func buildTranslations(test *testing.T, files map[string]string) (*program.Graph, string) {
 	test.Helper()
@@ -78,7 +78,7 @@ func buildTranslations(test *testing.T, files map[string]string) (*program.Graph
 	directory := test.TempDir()
 	// A copy, so the caller's fixture map stays as it was handed in.
 	withConfiguration := maps.Clone(files)
-	withConfiguration["tsconfig.json"] = translationsConfig
+	withConfiguration["tsconfig.json"] = translationsConfiguration
 	for name, contents := range withConfiguration {
 		full := filepath.Join(directory, name)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(full), 0o755); createDirectoryError != nil {

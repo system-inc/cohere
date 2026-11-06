@@ -24,7 +24,7 @@ func testEnvironment(base []string) ([]string, []corpus.Corpus, error) {
 	if configurationPathError != nil {
 		return nil, nil, configurationPathError
 	}
-	configuration, readConfigurationError := corpus.ReadConfig(path)
+	configuration, readConfigurationError := corpus.ReadConfiguration(path)
 	if readConfigurationError != nil {
 		return nil, nil, readConfigurationError
 	}

@@ -17,12 +17,12 @@ func writeFile(test *testing.T, path string, contents string) {
 	}
 }
 
-// TestResolvingFormatsEachFileWithItsOwnConfig is the defect the format phase had, run through the
+// TestResolvingFormatsEachFileWithItsOwnConfiguration is the defect the format phase had, run through the
 // replacement: one formatter, two repositories, two configs, and each file gets its own.
 //
 // The JSX is long enough to break, so bracketSameLine decides where `>` lands. If Resolving applied one
 // config to both, the two outputs would put it in the same place.
-func TestResolvingFormatsEachFileWithItsOwnConfig(test *testing.T) {
+func TestResolvingFormatsEachFileWithItsOwnConfiguration(test *testing.T) {
 	test.Parallel()
 
 	root := test.TempDir()

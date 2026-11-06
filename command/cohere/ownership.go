@@ -78,7 +78,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		// tsconfig that points at one discovery's walk did not find. Reading a tsconfig is milliseconds, and
 		// a byte search keeps ahra's run from paying even that.
 		for _, project := range found.Projects {
-			if project.Engine == engineTypeScript && !mentionsReferences(found.configPath(project)) {
+			if project.Engine == engineTypeScript && !mentionsReferences(found.configurationPath(project)) {
 				return decided, nil
 			}
 		}
@@ -88,7 +88,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	known := map[string]bool{}
 	for _, project := range found.Projects {
 		if project.Engine == engineTypeScript {
-			known[found.configPath(project)] = true
+			known[found.configurationPath(project)] = true
 		}
 	}
 	// The references, followed to the end: each one discovery did not find is a project of its own, in the
@@ -96,7 +96,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for queue := found.Projects; len(queue) > 0; {
 		var added []discoveredProject
 		for _, project := range queue {
-			read, isRead := reads[found.configPath(project)]
+			read, isRead := reads[found.configurationPath(project)]
 			if project.Engine != engineTypeScript || !isRead || read.err != nil {
 				continue
 			}
@@ -123,7 +123,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// Solution roots: nothing to check, and their references are projects now.
 	running := found.Projects[:0:0]
 	for _, project := range found.Projects {
-		if read, isRead := reads[found.configPath(
+		if read, isRead := reads[found.configurationPath(
 			project,
 		)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
 			len(read.config.FileNames) == 0 && len(read.config.References) > 0 {
@@ -137,7 +137,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// Each file to the nearest tsconfig that includes it.
 	includers := map[string][]int{}
 	for index, project := range found.Projects {
-		read, isRead := reads[found.configPath(project)]
+		read, isRead := reads[found.configurationPath(project)]
 		if project.Engine != engineTypeScript || !isRead || read.err != nil {
 			continue
 		}
@@ -161,7 +161,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	running = found.Projects[:0:0]
 	var runningYields [][]string
 	for index, project := range found.Projects {
-		read, isRead := reads[found.configPath(project)]
+		read, isRead := reads[found.configurationPath(project)]
 		if isRead &&
 			read.err == nil &&
 			len(read.config.FileNames) > 0 &&
@@ -208,7 +208,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 // projectConfigRead is one tsconfig read, or why it could not be: a project whose tsconfig cannot be read
 // still runs, and its own run reports what is wrong with it.
 type projectConfigRead struct {
-	config program.ProjectConfig
+	config program.ProjectConfiguration
 	err    error
 }
 
@@ -222,12 +222,12 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 		if project.Engine != engineTypeScript {
 			continue
 		}
-		configurationFile := found.configPath(project)
+		configurationFile := found.configurationPath(project)
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			reading <- struct{}{}
-			configuration, readProjectConfigurationError := program.ReadProjectConfig(configurationFile)
+			configuration, readProjectConfigurationError := program.ReadProjectConfiguration(configurationFile)
 			<-reading
 			lock.Lock()
 			reads[configurationFile] = projectConfigRead{config: configuration, err: readProjectConfigurationError}

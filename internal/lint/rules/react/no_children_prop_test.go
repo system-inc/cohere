@@ -48,7 +48,7 @@ func TestNoChildrenPropFires(test *testing.T) {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+				rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 }
@@ -109,7 +109,7 @@ func TestNoChildrenPropStaysSilent(test *testing.T) {
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -144,7 +144,7 @@ func TestNoChildrenPropPointsAtTheName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText)
+			result := rule_testing.Run(test, NoChildrenProperty, childrenPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
@@ -168,16 +168,16 @@ func TestNoChildrenPropPointsAtTheName(test *testing.T) {
 func TestNoChildrenPropRendersItsMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, NoChildrenProp, childrenPropFile, `<div children />;`)
+	result := rule_testing.Run(test, NoChildrenProperty, childrenPropFile, `<div children />;`)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 	}
-	if got := result.Diagnostics[0].Message.Description; got != messageNoChildrenProp.Description {
-		test.Errorf("rendered %q, want %q", got, messageNoChildrenProp.Description)
+	if got := result.Diagnostics[0].Message.Description; got != messageNoChildrenProperty.Description {
+		test.Errorf("rendered %q, want %q", got, messageNoChildrenProperty.Description)
 	}
-	if strings.Contains(messageNoChildrenProp.Description, "%") {
+	if strings.Contains(messageNoChildrenProperty.Description, "%") {
 		test.Errorf("message carries a format verb but is reported without arguments: %q",
-			messageNoChildrenProp.Description)
+			messageNoChildrenProperty.Description)
 	}
 }
 
@@ -214,7 +214,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(test *testing.T) {
 		test.Run("reports "+sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+				rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -236,7 +236,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(test *testing.T) {
 	for _, sourceText := range silent {
 		test.Run("silent on "+sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -251,7 +251,7 @@ func TestNoChildrenPropCoversEveryPropertyKind(test *testing.T) {
 func TestNoChildrenPropSurvivesAComputedKey(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile,
 		"declare const key: string;\nReact.createElement(\"div\", {[key]: 1});\n"))
 }
 
@@ -264,7 +264,7 @@ func TestNoChildrenPropSurvivesAComputedKey(test *testing.T) {
 func TestNoChildrenPropDeclinesASubstitutingTemplateKey(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile,
 		"declare const part: string;\nReact.createElement(\"div\", {[`children${part}`]: 1});\n"))
 }
 
@@ -288,7 +288,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(test *testing.T) {
 		test.Run("reports "+sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+				rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText), "noChildrenProp")
 		})
 	}
 
@@ -299,7 +299,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(test *testing.T) {
 	for _, sourceText := range silent {
 		test.Run("silent on "+sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -313,7 +313,7 @@ func TestNoChildrenPropReadsTheCalleeTheWayTheShelfDoes(test *testing.T) {
 func TestNoChildrenPropDeclinesANamespacedAttributeName(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile,
 		`<svg xlink:children="x" />;`))
 }
 
@@ -325,7 +325,7 @@ func TestNoChildrenPropDeclinesANamespacedAttributeName(test *testing.T) {
 func TestNoChildrenPropReportsOncePerCall(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile,
 		`React.createElement("div", {children: 1, "children": 2});`), "noChildrenProp")
 }
 
@@ -338,7 +338,7 @@ func TestNoChildrenPropReportsOncePerCall(test *testing.T) {
 func TestNoChildrenPropReportsPerJsxAttribute(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile,
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile,
 		`<div children="a" children="b" />;`), "noChildrenProp", "noChildrenProp")
 }
 
@@ -370,7 +370,7 @@ func TestNoChildrenPropSurvivesDegenerateInput(test *testing.T) {
 					test.Fatalf("panicked rather than reporting: %v", recovered)
 				}
 			}()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText))
 		})
 	}
 }
@@ -401,13 +401,13 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 				test.Parallel()
 				rule_testing.ExpectClean(
 					test,
-					rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+					rule_testing.RunWithOptions(test, NoChildrenProperty, childrenPropFile, sourceText, allowed),
 				)
 				// The control: without the option the same source reports, so the option is what
 				// made it clean.
 				rule_testing.ExpectFindings(
 					test,
-					rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText),
+					rule_testing.Run(test, NoChildrenProperty, childrenPropFile, sourceText),
 					"noChildrenProp",
 				)
 			})
@@ -434,7 +434,7 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 				test.Parallel()
 				result := rule_testing.RunWithOptions(
 					test,
-					NoChildrenProp,
+					NoChildrenProperty,
 					childrenPropFile,
 					testCase.sourceText,
 					allowed,
@@ -448,7 +448,7 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 				// Without the option, a function passed this way is ordinary children.
 				rule_testing.ExpectClean(
 					test,
-					rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText),
+					rule_testing.Run(test, NoChildrenProperty, childrenPropFile, testCase.sourceText),
 				)
 			})
 		}
@@ -465,7 +465,7 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(
 				test,
-				rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+				rule_testing.RunWithOptions(test, NoChildrenProperty, childrenPropFile, sourceText, allowed),
 				"noChildrenProp",
 			)
 		})
@@ -474,7 +474,7 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 	// which ESTree does not materialize, and a method or getter, whose ESTree value is a function.
 	test.Run("a parenthesized function nested as the only child under allowFunctions", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoChildrenProperty, childrenPropFile,
 			"<MyComponent>{(() => {})}</MyComponent>;", allowed), "nestFunction")
 	})
 	for _, sourceText := range []string{
@@ -489,7 +489,7 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+				rule_testing.RunWithOptions(test, NoChildrenProperty, childrenPropFile, sourceText, allowed),
 			)
 		})
 	}

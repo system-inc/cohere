@@ -153,7 +153,7 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 	}
 	prefix := directives.Tags[unitsToString(handle)]
 	if prefix != "" {
-		decoded, ok := decodeURIComponent(suffix)
+		decoded, ok := decodeUriComponent(suffix)
 		if !ok {
 			onError("URIError: URI malformed")
 			return ""
@@ -167,9 +167,11 @@ func (directives *Directives) tagName(source []uint16, onError func(message stri
 	return ""
 }
 
-// decodeURIComponent is upstream's global, ECMAScript's Decode with an empty reserved set: each %XX
+// decodeUriComponent is upstream's global, ECMAScript's Decode with an empty reserved set: each %XX
 // escape is a UTF-8 byte, and a malformed escape or byte sequence is a URIError (ok false).
-func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
+//
+// It ports JavaScript's decodeURIComponent.
+func decodeUriComponent(text []uint16) (decoded []uint16, ok bool) {
 	decoded = make([]uint16, 0, len(text))
 	hexByte := func(index int) (byte, bool) {
 		if index+2 >= len(text) || text[index] != '%' {

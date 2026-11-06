@@ -83,7 +83,7 @@ var NoObjCalls = rule.Rule[rule.NoOptions]{
 				tracker := reference.NewTracker(ruleContext.SourceFile, ruleContext.TypeChecker, nil)
 				for _, tracked := range tracker.GlobalReferences(nonCallableTraceMap) {
 					callee := tracked.Node.Expression()
-					ruleContext.ReportNode(tracked.Node, objCallsMessage(calleeName(callee), tracked.Path[0]))
+					ruleContext.ReportNode(tracked.Node, objectCallsMessage(calleeName(callee), tracked.Path[0]))
 				}
 			},
 		}
@@ -124,9 +124,9 @@ func calleeName(callee *ast.Node) string {
 	return ""
 }
 
-// objCallsMessage builds the finding for one call: unexpectedCall when the callee spells the global,
+// objectCallsMessage builds the finding for one call: unexpectedCall when the callee spells the global,
 // unexpectedRefCall when it reaches the global through another name or none.
-func objCallsMessage(name string, global string) rule.Message {
+func objectCallsMessage(name string, global string) rule.Message {
 	if name == global {
 		return rule.Message{
 			Id: "unexpectedCall",

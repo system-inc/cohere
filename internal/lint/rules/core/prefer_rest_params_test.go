@@ -36,7 +36,7 @@ func TestPreferRestParamsFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, testCase.sourceText),
+				rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")
 		})
 	}
@@ -70,7 +70,7 @@ func TestPreferRestParamsStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, testCase.sourceText))
+				rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, testCase.sourceText))
 		})
 	}
 }
@@ -103,7 +103,7 @@ func TestPreferRestParamsPointsAtTheIdentifier(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted exactly one finding to check the span of, got %d", len(result.Diagnostics))
 			}
@@ -123,7 +123,7 @@ func TestPreferRestParamsReportsTheArrowsOwnReference(test *testing.T) {
 
 	const sourceText = "function outer() { arguments; var bar = () => arguments; }"
 
-	result := rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, sourceText)
+	result := rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "preferRestParams", "preferRestParams")
 
 	// Both references are to the same inherited binding, and each is reported where it is written.
@@ -142,7 +142,7 @@ func TestPreferRestParamsReportsTheArrowsOwnReference(test *testing.T) {
 func TestPreferRestParamsProposesNoRepair(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, "function foo() { arguments; }")
+	result := rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, "function foo() { arguments; }")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
 	}
@@ -160,12 +160,12 @@ func TestPreferRestParamsRequiresTheTypedHarness(test *testing.T) {
 
 	const sourceText = "function foo() { arguments; }"
 
-	if !PreferRestParams.NeedsTypeChecker {
+	if !PreferRestParameters.NeedsTypeChecker {
 		test.Fatal("the rule no longer declares NeedsTypeChecker, so this guard is measuring nothing")
 	}
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, sourceText), "preferRestParams")
-	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferRestParams, preferRestParamsFile, sourceText))
+		rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, sourceText), "preferRestParams")
+	rule_testing.ExpectClean(test, rule_testing.Run(test, PreferRestParameters, preferRestParamsFile, sourceText))
 }
 
 // Cases upstream does not cover, from reading our own code and from probing the checker.
@@ -195,7 +195,7 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(test *testing.T) 
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, testCase.sourceText))
+				rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, testCase.sourceText))
 		})
 	}
 
@@ -216,7 +216,7 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(test *testing.T) 
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, PreferRestParams, preferRestParamsFile, testCase.sourceText),
+				rule_testing.RunTyped(test, PreferRestParameters, preferRestParamsFile, testCase.sourceText),
 				"preferRestParams")
 		})
 	}

@@ -13,10 +13,10 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// incrementalConfig turns on the two options the incremental machinery needs. Everything else
-// matches minimalConfig, so a difference in findings is a difference the machinery caused
+// incrementalConfiguration turns on the two options the incremental machinery needs. Everything else
+// matches minimalConfiguration, so a difference in findings is a difference the machinery caused
 // rather than a difference in how the program was configured.
-const incrementalConfig = `{
+const incrementalConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -62,7 +62,7 @@ func messagesOf(diagnostics []*ast.Diagnostic) []string {
 func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": incrementalConfig,
+		"tsconfig.json": incrementalConfiguration,
 		"clean.ts":      "export const value: number = 1;\n",
 	})
 
@@ -149,7 +149,7 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 func TestBuildInfoReaderReturnsNilBeforeAnyBuild(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": incrementalConfig,
+		"tsconfig.json": incrementalConfiguration,
 		"main.ts":       "export const value: number = 1;\n",
 	})
 
@@ -186,7 +186,7 @@ func TestBuildInfoReaderReturnsNilBeforeAnyBuild(test *testing.T) {
 func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": incrementalConfig,
+		"tsconfig.json": incrementalConfiguration,
 		"clean.ts":      "export const value: number = 1;\n",
 	})
 
@@ -280,7 +280,7 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 func TestIncrementalMatchesFullPass(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": incrementalConfig,
+		"tsconfig.json": incrementalConfiguration,
 		"clean.ts":      "export const value: number = 1;\n",
 		"broken.ts":     "export const wrong: number = \"text\";\nexport const alsoWrong: string = 5;\n",
 	})

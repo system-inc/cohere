@@ -214,7 +214,7 @@ func locate(spelling string, lookup func(string) string, configurationPath func(
 		if configurationPathError != nil {
 			return "", configurationPathError
 		}
-		configuration, readConfigurationError := ReadConfig(path)
+		configuration, readConfigurationError := ReadConfiguration(path)
 		if readConfigurationError != nil {
 			return "", readConfigurationError
 		}
@@ -259,13 +259,13 @@ func ConfigPath() (string, error) {
 	return filepath.Join(home, ".config", "cohere", "corpora.json"), nil
 }
 
-// ReadConfig reads a corpora file, a JSON object from corpus name to absolute path:
+// ReadConfiguration reads a corpora file, a JSON object from corpus name to absolute path:
 //
 //	{ "ahra": "/path/to/ahra", "structure": "/path/to/ahra/libraries/structure" }
 //
 // A file that does not exist is no corpora. A name no corpus has, or a relative path, is refused, so a
 // typo cannot quietly leave a corpus uncovered.
-func ReadConfig(path string) (map[string]string, error) {
+func ReadConfiguration(path string) (map[string]string, error) {
 	contents, readError := os.ReadFile(path)
 	if os.IsNotExist(readError) {
 		return map[string]string{}, nil

@@ -570,7 +570,7 @@ func TestNoHtmlLinkForPagesTakesPagesDirectories(test *testing.T) {
 // file's directory, where upstream resolves it against the process's working directory. Pinned with
 // the config one level below the root, the only place the two readings part: `custom` there is
 // `sub/custom`, where ESLint started at the root would read the root's `custom`.
-func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(test *testing.T) {
+func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfiguration(test *testing.T) {
 	test.Parallel()
 
 	rows := []htmlLinkRow{

@@ -200,7 +200,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		}
 
 		// Ignore `$$` (i.e. `background-color: $$(style)Color;`)
-		if isPostcssSimpleVarNode(iNode, iNextNode) {
+		if isPostcssSimpleVariableNode(iNode, iNextNode) {
 			continue
 		}
 

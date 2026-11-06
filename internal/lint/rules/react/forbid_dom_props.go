@@ -171,7 +171,7 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 	return false
 }
 
-// ForbidDomProps flags a prop the project's configuration has forbidden on DOM nodes.
+// ForbidDomProperties flags a prop the project's configuration has forbidden on DOM nodes.
 //
 //	valid:   <div className="x" />                  with no forbid list
 //	valid:   <Foo id="x" />                         a component, not a DOM node
@@ -219,7 +219,7 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 //
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue rather than
 // upstream behaviour. This rule is ported from the authority, which has no such gate.
-var ForbidDomProps = rule.Rule[ForbidDomPropsOptions]{
+var ForbidDomProperties = rule.Rule[ForbidDomPropsOptions]{
 	Name: "react/forbid-dom-props",
 
 	Run: func(ruleContext rule.Context, options rule.Given[ForbidDomPropsOptions]) rule.Listeners {

@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageForwardRefUsesRef = rule.Message{
+var messageForwardRefUsesReference = rule.Message{
 	Id: "forwardRefUsesRef",
 	Description: "A function wrapped in `forwardRef` takes only one parameter, so the ref React " +
 		"passes as the second one is dropped on the floor. Every consumer writing " +
@@ -28,7 +28,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 	Description: "Remove the `forwardRef` wrapper.",
 }
 
-// ForwardRefUsesRef flags a `forwardRef` call whose function takes exactly one parameter.
+// ForwardRefUsesReference flags a `forwardRef` call whose function takes exactly one parameter.
 //
 //	valid:   forwardRef((props, ref) => null)
 //	valid:   forwardRef(() => {})
@@ -135,7 +135,7 @@ var messageForwardRefRemoveWrapper = rule.Message{
 // parent node is. Nothing asks what an identifier binds to, so nothing declares `NeedsTypeChecker`,
 // and declaring it would not let the rule answer the aliased-import case anyway, because upstream
 // does not ask that question either.
-var ForwardRefUsesRef = rule.Rule[rule.NoOptions]{
+var ForwardRefUsesReference = rule.Rule[rule.NoOptions]{
 	Name: "react/forward-ref-uses-ref",
 	Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
@@ -170,7 +170,7 @@ var ForwardRefUsesRef = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				ruleContext.ReportNodeWithSuggestions(first, messageForwardRefUsesRef,
+				ruleContext.ReportNodeWithSuggestions(first, messageForwardRefUsesReference,
 					suggestionsFor(ruleContext, node, first, parameters)...)
 			},
 		}
@@ -268,7 +268,7 @@ func suggestionsFor(
 		Message: messageForwardRefAddRefParameter,
 		Fixes:   []rule.Fix{addRefParameterFix(ruleContext, function, parameters)},
 	}
-	if !canRemoveForwardRef(function, call) {
+	if !canRemoveForwardReference(function, call) {
 		return []rule.Suggestion{addReference}
 	}
 	return []rule.Suggestion{
@@ -289,14 +289,14 @@ func suggestionsFor(
 	}
 }
 
-// canRemoveForwardRef answers whether unwrapping would still parse.
+// canRemoveForwardReference answers whether unwrapping would still parse.
 //
 // Only one shape fails: an anonymous function expression directly inside an expression statement,
 // where the unwrapped `function (a) {}` would be read as a declaration missing its name. A named
 // function expression is *not* guarded upstream even though unwrapping turns it into a declaration,
 // which is reproduced deliberately. The walk to the parent skips parentheses, matching
 // `outermost_paren_parent`, so `(forwardRef(function (a) {}));` is still statement context.
-func canRemoveForwardRef(function *ast.Node, call *ast.Node) bool {
+func canRemoveForwardReference(function *ast.Node, call *ast.Node) bool {
 	if function.Kind != ast.KindFunctionExpression {
 		return true
 	}

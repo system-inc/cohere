@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageVarsOnTop = rule.Message{
+var messageVariablesOnTop = rule.Message{
 	Id: "top",
 	Description: "All 'var' declarations must be at the top of the function scope. " +
 		"A `var` is hoisted to the top of its function whatever line it is written on, so a " +
@@ -13,7 +13,7 @@ var messageVarsOnTop = rule.Message{
 		"Writing them together at the top makes the text say what the engine already does.",
 }
 
-// VarsOnTop requires every `var` declaration to sit at the top of its containing scope.
+// VariablesOnTop requires every `var` declaration to sit at the top of its containing scope.
 //
 //	valid:   function foo() { var first; var second = 1; first = second; }
 //	valid:   'use strict'; var x; f();
@@ -62,7 +62,7 @@ var messageVarsOnTop = rule.Message{
 // its corpus pins: `class C { static { 'use strict'; var x; } }` reports. A static block has no
 // directive prologue and no import, so a string there is just an expression. This is the one place
 // the two container kinds behave differently and it is easy to unify them by accident.
-var VarsOnTop = rule.Rule[rule.NoOptions]{
+var VariablesOnTop = rule.Rule[rule.NoOptions]{
 	Name: "vars-on-top",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Anchored on the declaration list rather than on the variable statement, because a `var`
@@ -98,7 +98,7 @@ var VarsOnTop = rule.Rule[rule.NoOptions]{
 				switch container.Kind {
 				case ast.KindSourceFile:
 					if !varsOnTopIsOnTop(subject, container.AsSourceFile().Statements, false) {
-						ruleContext.ReportNode(subject, messageVarsOnTop)
+						ruleContext.ReportNode(subject, messageVariablesOnTop)
 					}
 				case ast.KindBlock:
 					grandparent := container.Parent
@@ -110,9 +110,9 @@ var VarsOnTop = rule.Rule[rule.NoOptions]{
 						varsOnTopIsOnTop(subject, container.AsBlock().Statements, true) {
 						return
 					}
-					ruleContext.ReportNode(subject, messageVarsOnTop)
+					ruleContext.ReportNode(subject, messageVariablesOnTop)
 				default:
-					ruleContext.ReportNode(subject, messageVarsOnTop)
+					ruleContext.ReportNode(subject, messageVariablesOnTop)
 				}
 			},
 		}

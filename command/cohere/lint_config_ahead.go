@@ -36,7 +36,7 @@ func startLintConfigAhead(location projectLocation) *lintConfigAhead {
 	ahead := &lintConfigAhead{done: make(chan struct{})}
 	go func() {
 		defer close(ahead.done)
-		// What loadLintConfig does for a project that names its sets.
+		// What loadLintConfiguration does for a project that names its sets.
 		ahead.config, ahead.loadError = configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 		if ahead.loadError != nil {
 			return

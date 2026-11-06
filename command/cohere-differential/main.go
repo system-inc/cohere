@@ -129,7 +129,7 @@ func run() error {
 //
 // **The rules block is not the whole configuration.** Forty rules are enforced by the `plugins` declarations
 // and named in no rules block, proven with planted violations rather than read from a file. Reading
-// only `lintConfig.Rules` therefore reported a denominator of 159 when the real one is 214, and it
+// only `lintConfiguration.Rules` therefore reported a denominator of 159 when the real one is 214, and it
 // did so in the summary line a reader uses to decide whether cohere is safe to trust yet.
 //
 // An understated denominator here makes a clean result mean less than it claims, in the one harness

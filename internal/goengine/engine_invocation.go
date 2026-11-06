@@ -93,7 +93,7 @@ func parseInvocation(arguments []string) (invocation, error) {
 			case "root":
 				request.root = value
 			case "lint-config":
-				request.lintConfig = value
+				request.lintConfiguration = value
 			}
 		case slices.Contains(switchNames, name):
 			switch {

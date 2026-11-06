@@ -12,10 +12,10 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs"
 )
 
-// ProjectConfig is what a tsconfig says belongs to it, read without building its program: the files it
+// ProjectConfiguration is what a tsconfig says belongs to it, read without building its program: the files it
 // includes and the tsconfigs it references. Discovery reads one per project, to find solution roots and to
 // give each file to the nearest tsconfig that includes it.
-type ProjectConfig struct {
+type ProjectConfiguration struct {
 	// FileNames are the files the tsconfig includes, absolute and cleaned to the platform's separator.
 	FileNames []string
 
@@ -24,13 +24,13 @@ type ProjectConfig struct {
 	References []string
 }
 
-// ReadProjectConfig reads a tsconfig the way Build does, and fails where Build would refuse it, so a
+// ReadProjectConfiguration reads a tsconfig the way Build does, and fails where Build would refuse it, so a
 // config discovery cannot read is one the project's own run reports.
-func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
+func ReadProjectConfiguration(configurationFileName string) (ProjectConfiguration, error) {
 	normalizedFileName := tspath.NormalizePath(configurationFileName)
 	fileSystem := cachedvfs.From(bundled.WrapFS(osvfs.FS()))
 	if !fileSystem.FileExists(tspath.RootedFilePath(normalizedFileName)) {
-		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", normalizedFileName)
+		return ProjectConfiguration{}, fmt.Errorf("no tsconfig at %s", normalizedFileName)
 	}
 	configuration, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
 		tspath.RootedFilePath(normalizedFileName),
@@ -40,20 +40,20 @@ func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
 		nil,
 	)
 	if len(configurationErrors) > 0 {
-		return ProjectConfig{}, fmt.Errorf(
+		return ProjectConfiguration{}, fmt.Errorf(
 			"reading %s: %w",
 			normalizedFileName,
 			joinDiagnostics(configurationErrors),
 		)
 	}
 	if configuration == nil {
-		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", normalizedFileName)
+		return ProjectConfiguration{}, fmt.Errorf("reading %s: the config parsed to nothing", normalizedFileName)
 	}
 	if diagnostics := configuration.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 &&
 		!onlyOptionValueDiagnostics(diagnostics) {
-		return ProjectConfig{}, fmt.Errorf("reading %s: %w", normalizedFileName, joinDiagnostics(diagnostics))
+		return ProjectConfiguration{}, fmt.Errorf("reading %s: %w", normalizedFileName, joinDiagnostics(diagnostics))
 	}
-	read := ProjectConfig{}
+	read := ProjectConfiguration{}
 	for _, fileName := range configuration.FileNames() {
 		read.FileNames = append(read.FileNames, filepath.Clean(filepath.FromSlash(fileName.AsString())))
 	}

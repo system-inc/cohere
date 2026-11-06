@@ -186,7 +186,7 @@ func TestForbidDomPropsFires(test *testing.T) {
 			options := forbidDomPropsOptions(test, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(
 				test,
-				ForbidDomProps,
+				ForbidDomProperties,
 				forbidDomPropsFile,
 				testCase.sourceText,
 				options,
@@ -303,7 +303,7 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
 			options := forbidDomPropsOptions(test, testCase.rawOptions)
 			result := rule_testing.RunWithOptions(
 				test,
-				ForbidDomProps,
+				ForbidDomProperties,
 				forbidDomPropsFile,
 				testCase.sourceText,
 				options,
@@ -325,7 +325,7 @@ func TestForbidDomPropsReportsOnTheWholeAttribute(test *testing.T) {
 
 	result := rule_testing.RunWithOptions(
 		test,
-		ForbidDomProps,
+		ForbidDomProperties,
 		forbidDomPropsFile,
 		source,
 		forbidDomPropsOptions(test, `{"forbid":["className"]}`),
@@ -375,7 +375,7 @@ func TestForbidDomPropsMessageText(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				ForbidDomProps,
+				ForbidDomProperties,
 				forbidDomPropsFile,
 				`<div className="foo" />`,
 				forbidDomPropsOptions(test, testCase.rawOptions),
@@ -410,7 +410,7 @@ func TestForbidDomPropsHasNoFileSuffixGate(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				ForbidDomProps,
+				ForbidDomProperties,
 				fileName,
 				source,
 				forbidDomPropsOptions(test, `{"forbid":["className"]}`),

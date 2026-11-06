@@ -120,8 +120,10 @@ var DefaultPropsMatchPropTypes = rule.Rule[DefaultPropsMatchPropTypesOptions]{
 	},
 }
 
-// propTypeEntry is one declared prop: where it was written and whether it is required.
-type propTypeEntry struct {
+// propertyTypeEntry is one declared prop: where it was written and whether it is required.
+//
+// Upstream reads it from a component's propTypes.
+type propertyTypeEntry struct {
 	isRequired bool
 }
 
@@ -137,7 +139,7 @@ type defaultPropEntry struct {
 // exit because both objects can be declared in separate statements and either one can be the
 // spread that disqualifies the component.
 type componentPropDeclarations struct {
-	propTypes               map[string]propTypeEntry
+	propTypes               map[string]propertyTypeEntry
 	propertyTypeOrder       []string
 	sawPropTypes            bool
 	propertyTypesUnresolved bool
@@ -172,7 +174,7 @@ func checkDefaultPropsAgainstPropTypes(
 		if found {
 			return existing
 		}
-		created := &componentPropDeclarations{propTypes: map[string]propTypeEntry{}}
+		created := &componentPropDeclarations{propTypes: map[string]propertyTypeEntry{}}
 		byOwner[owner] = created
 		order = append(order, owner)
 		return created
@@ -355,19 +357,19 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 		if _, already := declarations.propTypes[text]; !already {
 			declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, text)
 		}
-		declarations.propTypes[text] = propTypeEntry{
-			isRequired: propTypeIsRequired(property),
+		declarations.propTypes[text] = propertyTypeEntry{
+			isRequired: propertyTypeIsRequired(property),
 		}
 	}
 }
 
-// propTypeIsRequired reports whether a declared prop type ends in `.isRequired`.
+// propertyTypeIsRequired reports whether a declared prop type ends in `.isRequired`.
 //
 // Upstream's propTypes reader sets the flag from the annotation rather than from the value, but for
 // the shapes this rule meets the two coincide: a required prop is written `PropTypes.string.isRequired`
 // and the flag is the trailing member name. A shorthand property carries no value at all and is
 // therefore never required.
-func propTypeIsRequired(property *ast.Node) bool {
+func propertyTypeIsRequired(property *ast.Node) bool {
 	if property.Kind != ast.KindPropertyAssignment {
 		return false
 	}
@@ -516,7 +518,7 @@ func addSinglePropType(declarations *componentPropDeclarations, name string, val
 	if _, already := declarations.propTypes[name]; !already {
 		declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, name)
 	}
-	declarations.propTypes[name] = propTypeEntry{isRequired: expressionIsRequired(value)}
+	declarations.propTypes[name] = propertyTypeEntry{isRequired: expressionIsRequired(value)}
 }
 
 // addSingleDefaultProperty folds a `C.defaultProps.foo = ...` assignment into a component's record.
@@ -533,7 +535,7 @@ func addSingleDefaultProperty(declarations *componentPropDeclarations, name stri
 
 // expressionIsRequired reports whether a prop-type expression ends in `.isRequired`.
 //
-// The same test `propTypeIsRequired` applies to a property's value, lifted so the single-assignment
+// The same test `propertyTypeIsRequired` applies to a property's value, lifted so the single-assignment
 // arm can reuse it rather than reconstruct a property node to ask about.
 func expressionIsRequired(value *ast.Node) bool {
 	unwrapped := skipParenthesesOptional(value)

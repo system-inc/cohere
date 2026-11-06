@@ -62,11 +62,11 @@ type houseVariant struct {
 	next  bool
 }
 
-// IsZeroConfig reports whether the configuration at path takes the house stack: there is no file
+// IsZeroConfiguration reports whether the configuration at path takes the house stack: there is no file
 // there, or its chain names no set cohere carries.
 //
 // A chain that names any `cohere:` set chose its sets, and is loaded as written.
-func IsZeroConfig(path string) (bool, error) {
+func IsZeroConfiguration(path string) (bool, error) {
 	if _, statError := os.Stat(path); errors.Is(statError, fs.ErrNotExist) {
 		return true, nil
 	}
@@ -121,7 +121,7 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	if absolutePathError != nil {
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
-	var ownLayers []configLayer
+	var ownLayers []configurationLayer
 	if _, statError := os.Stat(path); statError == nil {
 		var readConfigurationLayersError error
 		ownLayers, readConfigurationLayersError = readConfigLayers(path, nil)
@@ -237,7 +237,7 @@ func relativeTo(root string, path string) string {
 // tailwind is true, and the project's own layers on top, each of which extends every set so a rule it
 // writes replaces the set's ruling rather than colliding with it.
 func loadHouseVariant(
-	ownLayers []configLayer,
+	ownLayers []configurationLayer,
 	root string,
 	registeredNames []string,
 	variant houseVariant,
@@ -253,7 +253,7 @@ func loadHouseVariant(
 	if tailwind {
 		sets = append(sets, TailwindSetName)
 	}
-	var layers []configLayer
+	var layers []configurationLayer
 	read := map[string]bool{}
 	for _, set := range sets {
 		setLayers, readConfigurationLayersError := readConfigLayers(set, nil)

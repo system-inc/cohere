@@ -103,8 +103,8 @@ func newTokenizer(in *input) *tokenizer {
 	}
 }
 
-// charCodeAt is css.charCodeAt(index), -1 standing for NaN past either end.
-func (tokens *tokenizer) charCodeAt(index int) int {
+// characterCodeAt is css.charCodeAt(index), -1 standing for NaN past either end.
+func (tokens *tokenizer) characterCodeAt(index int) int {
 	if index < 0 || index >= tokens.length {
 		return -1
 	}
@@ -155,14 +155,14 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 	var currentToken token
 	var next int
 	position := tokens.pos
-	code := tokens.charCodeAt(position)
+	code := tokens.characterCodeAt(position)
 
 	switch code {
 	case newline, space, tab, carriageReturn, feed:
 		next = position
 		for {
 			next += 1
-			code = tokens.charCodeAt(next)
+			code = tokens.characterCodeAt(next)
 			if !(code == space || code == newline || code == tab || code == carriageReturn || code == feed) {
 				break
 			}
@@ -181,7 +181,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		nextCode := tokens.charCodeAt(position + 1)
+		nextCode := tokens.characterCodeAt(position + 1)
 		if previous == "url" &&
 			nextCode != singleQuote &&
 			nextCode != doubleQuote &&
@@ -200,7 +200,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 					tokens.unclosed("bracket")
 				}
 				escapePosition := next
-				for tokens.charCodeAt(escapePosition-1) == backslash {
+				for tokens.characterCodeAt(escapePosition-1) == backslash {
 					escapePosition -= 1
 					escaped = !escaped
 				}
@@ -259,7 +259,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				tokens.unclosed("string")
 			}
 			escapePosition := next
-			for tokens.charCodeAt(escapePosition-1) == backslash {
+			for tokens.characterCodeAt(escapePosition-1) == backslash {
 				escapePosition -= 1
 				escaped = !escaped
 			}
@@ -294,11 +294,11 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 	case backslash:
 		next = position
 		escape := true
-		for tokens.charCodeAt(next+1) == backslash {
+		for tokens.characterCodeAt(next+1) == backslash {
 			next += 1
 			escape = !escape
 		}
-		code = tokens.charCodeAt(next + 1)
+		code = tokens.characterCodeAt(next + 1)
 		if escape &&
 			code != slash &&
 			code != space &&
@@ -307,11 +307,11 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			code != carriageReturn &&
 			code != feed {
 			next += 1
-			if isHexEscape(tokens.charCodeAt(next)) {
-				for isHexEscape(tokens.charCodeAt(next + 1)) {
+			if isHexEscape(tokens.characterCodeAt(next)) {
+				for isHexEscape(tokens.characterCodeAt(next + 1)) {
 					next += 1
 				}
-				if tokens.charCodeAt(next+1) == space {
+				if tokens.characterCodeAt(next+1) == space {
 					next += 1
 				}
 			}
@@ -322,7 +322,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 		position = next
 
 	default:
-		if code == slash && tokens.charCodeAt(position+1) == asterisk {
+		if code == slash && tokens.characterCodeAt(position+1) == asterisk {
 			next = tokens.indexOf("*/", position+2) + 1
 			if next == 0 {
 				// ignore and ignoreUnclosed are always false here.
@@ -342,7 +342,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			match := -1
 			for index := position + 1; index < tokens.length; index++ {
 				unit := tokens.css[index]
-				if isWordEnd(unit) || (unit == slash && tokens.charCodeAt(index+1) == asterisk) {
+				if isWordEnd(unit) || (unit == slash && tokens.characterCodeAt(index+1) == asterisk) {
 					match = index
 					break
 				}

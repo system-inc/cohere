@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // array, which is the one shape that is checkable in a line and is worth checking rather than
 // inheriting from the inventory column.
 func init() {
-	rule.Register(rule.Registration[rule.NoOptions]{Rule: BlockScopedVar})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: BlockScopedVariable})
 }

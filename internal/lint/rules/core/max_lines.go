@@ -12,10 +12,10 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// maxLinesMessage renders the finding. Upstream's template is
+// maximumLinesMessage renders the finding. Upstream's template is
 // `File has too many lines ({{actual}}). Maximum allowed is {{max}}.`, kept first so the two engines
 // say the same thing, with why it matters after it.
-func maxLinesMessage(actual int, maximum int) rule.Message {
+func maximumLinesMessage(actual int, maximum int) rule.Message {
 	return rule.Message{
 		Id: "exceed",
 		Description: fmt.Sprintf("File has too many lines (%d). Maximum allowed is %d. A file this long "+
@@ -117,15 +117,15 @@ var MaxLines = rule.Rule[MaxLinesOptions]{
 		text := ruleContext.SourceFile.Text()
 		var commentOnly func(start int, end int) bool
 		if settings.SkipComments {
-			commentOnly = maxLinesCommentOnly(text, comments.ForFile(ruleContext))
+			commentOnly = maximumLinesCommentOnly(text, comments.ForFile(ruleContext))
 		}
 
 		// Counted as the lines go by, keeping only where the first line past the maximum starts, so a
 		// file is never held as a slice of its lines.
 		counted := 0
 		excessStart := 0
-		for start, end := range maxLinesEach(text) {
-			if settings.SkipBlankLines && maxLinesIsBlank(text[start:end]) {
+		for start, end := range maximumLinesEach(text) {
+			if settings.SkipBlankLines && maximumLinesIsBlank(text[start:end]) {
 				continue
 			}
 			if commentOnly != nil && commentOnly(start, end) {
@@ -139,18 +139,21 @@ var MaxLines = rule.Rule[MaxLinesOptions]{
 		if counted <= settings.Maximum {
 			return nil
 		}
-		ruleContext.ReportRange(core.NewTextRange(excessStart, len(text)), maxLinesMessage(counted, settings.Maximum))
+		ruleContext.ReportRange(
+			core.NewTextRange(excessStart, len(text)),
+			maximumLinesMessage(counted, settings.Maximum),
+		)
 		return nil
 	},
 }
 
-// maxLinesEach yields each line's start and end, without its line break, as byte offsets into the
+// maximumLinesEach yields each line's start and end, without its line break, as byte offsets into the
 // file, split at upstream's line breaks. It drops the empty line a final break leaves, as upstream
 // does.
 //
 // Yielded rather than returned as a slice: a slice of every line of every file was 29 MB on a cold
 // ahra run, for a rule that only needs a count and one offset.
-func maxLinesEach(text string) iter.Seq2[int, int] {
+func maximumLinesEach(text string) iter.Seq2[int, int] {
 	return func(yield func(int, int) bool) {
 		start := 0
 		for index := 0; index < len(text); {
@@ -182,9 +185,9 @@ func maxLinesEach(text string) iter.Seq2[int, int] {
 	}
 }
 
-// maxLinesCommentOnly returns a test for whether a line is touched by a comment and holds no
+// maximumLinesCommentOnly returns a test for whether a line is touched by a comment and holds no
 // character outside comments, other than whitespace.
-func maxLinesCommentOnly(text string, fileComments []comments.Comment) func(start int, end int) bool {
+func maximumLinesCommentOnly(text string, fileComments []comments.Comment) func(start int, end int) bool {
 	inComment := make([]bool, len(text))
 	for _, comment := range fileComments {
 		for offset := comment.Range.Pos(); offset < comment.Range.End() && offset < len(text); offset++ {
@@ -204,11 +207,11 @@ func maxLinesCommentOnly(text string, fileComments []comments.Comment) func(star
 			}
 			outside.WriteByte(text[offset])
 		}
-		return touched && maxLinesIsBlank(outside.String())
+		return touched && maximumLinesIsBlank(outside.String())
 	}
 }
 
-// maxLinesIsBlank is upstream's `text.trim() === ""`.
-func maxLinesIsBlank(lineText string) bool {
+// maximumLinesIsBlank is upstream's `text.trim() === ""`.
+func maximumLinesIsBlank(lineText string) bool {
 	return text.TrimWhitespace(lineText) == ""
 }

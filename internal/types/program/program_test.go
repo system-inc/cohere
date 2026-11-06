@@ -38,7 +38,7 @@ func writeProject(test testing.TB, files map[string]string) string {
 	return directory
 }
 
-const minimalConfig = `{
+const minimalConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -54,7 +54,7 @@ const minimalConfig = `{
 func TestBuildProducesAProgramAndAChecker(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "export const greeting: string = 'hello';\n",
 	})
 
@@ -93,7 +93,7 @@ func TestBuildProducesAProgramAndAChecker(test *testing.T) {
 func TestProjectFilesExcludesDeclarations(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
 	})
@@ -121,7 +121,7 @@ func TestProjectFilesExcludesDeclarations(test *testing.T) {
 func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "const counted: number = 41 + 1;\nconst named = 'ahra';\n",
 	})
 
@@ -193,7 +193,7 @@ func TestWalkDispatchesRulesWithALiveChecker(test *testing.T) {
 func TestWalkReportsCoverage(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "export const value = 1;\n",
 	})
 
@@ -327,7 +327,7 @@ func TestBuildFailsLoudly(test *testing.T) {
 func TestWalkRefusesAnEmptyRun(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "export const value = 1;\n",
 	})
 
@@ -355,7 +355,7 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 	test.Run("reports a real error", func(test *testing.T) {
 		test.Parallel()
 		directory := writeProject(test, map[string]string{
-			"tsconfig.json": minimalConfig,
+			"tsconfig.json": minimalConfiguration,
 			"main.ts":       "const value: number = 'not a number';\n",
 		})
 
@@ -387,7 +387,7 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 	test.Run("stays silent on correct code", func(test *testing.T) {
 		test.Parallel()
 		directory := writeProject(test, map[string]string{
-			"tsconfig.json": minimalConfig,
+			"tsconfig.json": minimalConfiguration,
 			"main.ts":       "const value: number = 42;\nexport default value;\n",
 		})
 
@@ -410,7 +410,7 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 func TestCheckerResolvesAcrossFiles(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"Shape.ts":      "export interface Shape { sides: number; }\n",
 		"main.ts":       "import type { Shape } from './Shape.ts';\nconst square: Shape = { sides: 'four' };\nexport default square;\n",
 	})
@@ -456,7 +456,7 @@ func codesOf(diagnostics []*ast.Diagnostic) []int32 {
 func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 		"other.ts":      "const named = 'ahra';\n",
 	})
@@ -548,7 +548,7 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 		"other.ts":      "const other: number = 2;\n",
 	})
@@ -612,7 +612,7 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "const counted: number = 41 + 1;\n",
 	})
 
@@ -659,7 +659,7 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 func TestACompilerDiagnosticRendersThroughLocalize(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "export const counted: string = 41 + 1;\n",
 	})
 

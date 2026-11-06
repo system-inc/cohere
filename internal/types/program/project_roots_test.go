@@ -42,7 +42,7 @@ func TestClassifyMissingRootsTellsTheFourCasesApart(test *testing.T) {
 func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 	test.Parallel()
 	directory := writeMismatchFixture(test, map[string]string{
-		"tsconfig.json": mismatchFixtureConfig,
+		"tsconfig.json": mismatchFixtureConfiguration,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Locked.ts":     "export const locked = 2;\n",
 	})
@@ -82,7 +82,7 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 func TestBuildReturnsEveryNamedFileWhenNothingMoved(test *testing.T) {
 	test.Parallel()
 	directory := writeMismatchFixture(test, map[string]string{
-		"tsconfig.json": mismatchFixtureConfig,
+		"tsconfig.json": mismatchFixtureConfiguration,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
 	})
@@ -100,7 +100,7 @@ func TestBuildReturnsEveryNamedFileWhenNothingMoved(test *testing.T) {
 func TestBuildNeverPanicsWhileTheTreeChangesUnderIt(test *testing.T) {
 	test.Parallel()
 	directory := writeMismatchFixture(test, map[string]string{
-		"tsconfig.json": mismatchFixtureConfig,
+		"tsconfig.json": mismatchFixtureConfiguration,
 		"Alpha.ts":      "export const alpha = 1;\n",
 	})
 	stop := make(chan struct{})

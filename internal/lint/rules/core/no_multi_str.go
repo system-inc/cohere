@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageMultiStr = rule.Message{
+var messageMultiString = rule.Message{
 	Id: "multilineString",
 	Description: "This string is continued onto the next line with a trailing backslash, which " +
 		"the language accepts and almost no reader expects. Whatever indentation the next line " +
@@ -14,7 +14,7 @@ var messageMultiStr = rule.Message{
 		"parsing. Concatenation or a template literal says the same thing without either hazard.",
 }
 
-// NoMultiStr flags a string literal continued across a line break with a trailing backslash.
+// NoMultiString flags a string literal continued across a line break with a trailing backslash.
 //
 //	valid:   'Line 1 Line 2'
 //	valid:   'Line 1 \n Line 2'      // an escape, so no real line break is in the source
@@ -88,7 +88,7 @@ var messageMultiStr = rule.Message{
 // `frozen`. Any repair would have to choose between concatenation and a template and would have to
 // decide what happens to the leading whitespace on the continued line, which is exactly the value
 // the author may or may not have meant to include.
-var NoMultiStr = rule.Rule[rule.NoOptions]{
+var NoMultiString = rule.Rule[rule.NoOptions]{
 	Name: "no-multi-str",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
@@ -102,7 +102,7 @@ var NoMultiStr = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				ruleContext.ReportNode(node, messageMultiStr)
+				ruleContext.ReportNode(node, messageMultiString)
 			},
 		}
 	},

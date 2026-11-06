@@ -123,7 +123,7 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 	}
 	if writeError := os.WriteFile(
 		filepath.Join(directory, "tsconfig.json"),
-		[]byte(typedCorpusConfig),
+		[]byte(typedCorpusConfiguration),
 		0o644,
 	); writeError != nil {
 		test.Fatal(writeError)

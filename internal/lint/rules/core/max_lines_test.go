@@ -9,11 +9,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-const maxLinesFile = "/repository/source/Long.ts"
+const maximumLinesFile = "/repository/source/Long.ts"
 
-// maxLinesSource is count statements, one per line, joined by lineBreak and ended by it when
+// maximumLinesSource is count statements, one per line, joined by lineBreak and ended by it when
 // trailing is set.
-func maxLinesSource(count int, lineBreak string, trailing bool) string {
+func maximumLinesSource(count int, lineBreak string, trailing bool) string {
 	lines := make([]string, count)
 	for index := range lines {
 		lines[index] = "export const value" + strconv.Itoa(index) + " = 1;"
@@ -36,18 +36,18 @@ func TestMaxLinesCountsLinesAsAnEditorShowsThem(test *testing.T) {
 		source   string
 		findings int
 	}{
-		{"2,000 lines ending in a newline are 2,000", maxLinesSource(2000, "\n", true), 0},
-		{"2,000 lines with no final newline", maxLinesSource(2000, "\n", false), 0},
-		{"2,001 lines report", maxLinesSource(2001, "\n", true), 1},
-		{"\\r\\n is one line ending", maxLinesSource(2000, "\r\n", true), 0},
-		{"\\r\\n, one line over", maxLinesSource(2001, "\r\n", true), 1},
-		{"a lone \\r breaks a line", maxLinesSource(2001, "\r", false), 1},
-		{"U+2028 breaks a line", maxLinesSource(2001, "\u2028", false), 1},
+		{"2,000 lines ending in a newline are 2,000", maximumLinesSource(2000, "\n", true), 0},
+		{"2,000 lines with no final newline", maximumLinesSource(2000, "\n", false), 0},
+		{"2,001 lines report", maximumLinesSource(2001, "\n", true), 1},
+		{"\\r\\n is one line ending", maximumLinesSource(2000, "\r\n", true), 0},
+		{"\\r\\n, one line over", maximumLinesSource(2001, "\r\n", true), 1},
+		{"a lone \\r breaks a line", maximumLinesSource(2001, "\r", false), 1},
+		{"U+2028 breaks a line", maximumLinesSource(2001, "\u2028", false), 1},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, testCase.source, atLimit)
+			result := rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, testCase.source, atLimit)
 			if testCase.findings == 0 {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -63,7 +63,7 @@ func TestMaxLinesReportsFromTheFirstLinePastTheMaximum(test *testing.T) {
 	test.Parallel()
 
 	source := "first;\nsecond;\nthird;\nfourth;\n"
-	result := rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, source, MaxLinesOptions{Maximum: 2})
+	result := rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, source, MaxLinesOptions{Maximum: 2})
 	rule_testing.ExpectFindings(test, result, "exceed")
 	finding := result.Diagnostics[0]
 	if reported := source[finding.Range.Pos():finding.Range.End()]; reported != "third;\nfourth;\n" {
@@ -80,10 +80,13 @@ func TestMaxLinesOptions(test *testing.T) {
 
 	test.Run("the default is 300", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectClean(test, rule_testing.Run(test, MaxLines, maxLinesFile, maxLinesSource(300, "\n", true)))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.Run(test, MaxLines, maximumLinesFile, maximumLinesSource(300, "\n", true)),
+		)
 		rule_testing.ExpectFindings(
 			test,
-			rule_testing.Run(test, MaxLines, maxLinesFile, maxLinesSource(301, "\n", true)),
+			rule_testing.Run(test, MaxLines, maximumLinesFile, maximumLinesSource(301, "\n", true)),
 			"exceed",
 		)
 	})
@@ -91,9 +94,9 @@ func TestMaxLinesOptions(test *testing.T) {
 	blankLines := "first;\n\n   \nsecond;\n"
 	test.Run("blank lines count unless skipped", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, blankLines,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, blankLines,
 			MaxLinesOptions{Maximum: 2}), "exceed")
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, blankLines,
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, blankLines,
 			MaxLinesOptions{Maximum: 2, SkipBlankLines: true}))
 	})
 
@@ -102,11 +105,11 @@ func TestMaxLinesOptions(test *testing.T) {
 	commentLines := "// only a comment\n/*\n inside\n*/\nconst kept = 1; // trailing\n/* leading */ const also = 2;\n"
 	test.Run("comment-only lines count unless skipped", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, commentLines,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, commentLines,
 			MaxLinesOptions{Maximum: 2}), "exceed")
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, commentLines,
+		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, commentLines,
 			MaxLinesOptions{Maximum: 2, SkipComments: true}))
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maxLinesFile, commentLines,
+		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, MaxLines, maximumLinesFile, commentLines,
 			MaxLinesOptions{Maximum: 1, SkipComments: true}), "exceed")
 	})
 }
@@ -139,7 +142,7 @@ func TestMaxLinesDecodesUpstreamsShapes(test *testing.T) {
 	}
 }
 
-// TestMaxLinesEachSplitsAsTheSliceSplitterDid pins maxLinesEach to the answers of the slice splitter
+// TestMaxLinesEachSplitsAsTheSliceSplitterDid pins maximumLinesEach to the answers of the slice splitter
 // it replaced (#smshtp5): every line's start and end, without its break, for each line break and for
 // the edges a counter gets wrong, the empty text, a missing final break, a final break, and blank
 // lines in a row. The old splitter's offsets were checked against these rows before it was removed,
@@ -170,7 +173,7 @@ func TestMaxLinesEachSplitsAsTheSliceSplitterDid(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			var lines [][2]int
-			for start, end := range maxLinesEach(testCase.text) {
+			for start, end := range maximumLinesEach(testCase.text) {
 				lines = append(lines, [2]int{start, end})
 			}
 			if !slices.Equal(lines, testCase.lines) {

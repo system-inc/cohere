@@ -87,7 +87,7 @@ type Options struct {
 
 	// Yielded is files this tsconfig includes that a nearer one owns, by absolute path: they stay in the
 	// program, so every type question about them is answered, and leave ProjectFiles, so no phase lints
-	// them or reports their diagnostics here. Nil yields nothing. See ReadProjectConfig, and discovery's
+	// them or reports their diagnostics here. Nil yields nothing. See ReadProjectConfiguration, and discovery's
 	// ownership in the command.
 	Yielded map[string]struct{}
 
@@ -318,7 +318,7 @@ func buildOnce(options Options) (*Graph, error) {
 	//
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
 	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
-	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
+	// the config's), so the options are never silently wrong. See configurationParsingOptionCodes.
 	if configurationFileDiagnostics := parsedCommandLine.GetConfigFileParsingDiagnostics(); len(
 		configurationFileDiagnostics,
 	) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {

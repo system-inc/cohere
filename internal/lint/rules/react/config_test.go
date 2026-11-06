@@ -7,13 +7,13 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// configFile is where the fixtures pretend to live.
+// configurationFile is where the fixtures pretend to live.
 //
 // A `.tsx` extension because two of the four upstream fixtures contain JSX. Under `.ts` the parser
 // reads `<div>` as a type assertion rather than an element, and those two cases would then parse
 // into a tree with no JSX in it, still import the same module, and still report, passing for a
 // reason that has nothing to do with what they test.
-const configFile = "/repository/source/Config.tsx"
+const configurationFile = "/repository/source/Config.tsx"
 
 // withSeededProvider swaps the module type table for the duration of one test.
 //
@@ -106,7 +106,7 @@ func TestConfigFiresOnUpstreamFixtures(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, Config, configFile, testCase.source)
+			result := rule_testing.Run(test, Config, configurationFile, testCase.source)
 			rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 		})
 	}
@@ -125,7 +125,7 @@ func TestConfigFiresOnUpstreamFixtures(test *testing.T) {
 func TestConfigFiresOnNonHookNameTypedAsHook(test *testing.T) {
 	withSeededProvider(test, upstreamTestProvider())
 	source := "import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n"
-	result := rule_testing.Run(test, Config, configFile, source)
+	result := rule_testing.Run(test, Config, configurationFile, source)
 	rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 }
 
@@ -151,7 +151,7 @@ func TestConfigReadsThroughAnAlias(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, Config, configFile, testCase.source)
+			result := rule_testing.Run(test, Config, configurationFile, testCase.source)
 			rule_testing.ExpectFindings(test, result, "invalidTypeConfiguration")
 		})
 	}
@@ -211,7 +211,7 @@ func TestConfigStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, Config, configFile, testCase.source)
+			result := rule_testing.Run(test, Config, configurationFile, testCase.source)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -256,7 +256,7 @@ func TestConfigDeclinesTheUseSiteFixtures(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, Config, configFile, testCase.source)
+			result := rule_testing.Run(test, Config, configurationFile, testCase.source)
 			// The dotted-member fixture reports nothing because its module declares no `default`.
 			// The JSX fixture does report here, on its named import, which is a superset of what
 			// upstream reports rather than a miss: upstream points at the use site, this points at
@@ -292,7 +292,7 @@ func TestConfigIsSilentOnTheRealDefaultTable(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, Config, configFile, testCase.source)
+			result := rule_testing.Run(test, Config, configurationFile, testCase.source)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -310,7 +310,7 @@ func TestConfigIsSilentOnTheRealDefaultTable(test *testing.T) {
 func TestConfigReportsOnTheImportSpecifier(test *testing.T) {
 	withSeededProvider(test, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
-	result := rule_testing.Run(test, Config, configFile, source)
+	result := rule_testing.Run(test, Config, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -332,7 +332,7 @@ func TestConfigReportsOnTheImportSpecifier(test *testing.T) {
 func TestConfigReportsOnTheDefaultBinding(test *testing.T) {
 	withSeededProvider(test, upstreamTestProvider())
 	source := "import foo from 'useDefaultExportNotTypedAsHook';\n"
-	result := rule_testing.Run(test, Config, configFile, source)
+	result := rule_testing.Run(test, Config, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}
@@ -355,7 +355,7 @@ func TestConfigReportsOnTheDefaultBinding(test *testing.T) {
 func TestConfigMessageText(test *testing.T) {
 	withSeededProvider(test, upstreamTestProvider())
 	source := "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n"
-	result := rule_testing.Run(test, Config, configFile, source)
+	result := rule_testing.Run(test, Config, configurationFile, source)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want 1 diagnostic, got %d", len(result.Diagnostics))
 	}

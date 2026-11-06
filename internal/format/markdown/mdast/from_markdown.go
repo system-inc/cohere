@@ -65,7 +65,7 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 		)
 	}
 	events := micromark.Parse(units, micromark.MarkdownConstructs(), memory.parse)
-	return compile(events, compileConfig(), memory.offsets, nodes), nil
+	return compile(events, compileConfiguration(), memory.offsets, nodes), nil
 }
 
 // parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): micromark's tokens
@@ -97,14 +97,14 @@ func byteOffsets(text string, offsets []int) []int {
 	return append(offsets, len(text))
 }
 
-// newConfig is upstream's compiler config with the fork's mdastExtensions configured in, in order:
+// newConfiguration is upstream's compiler config with the fork's mdastExtensions configured in, in order:
 // gfmFromMarkdown() (autolink literal without its transform, footnote, strikethrough, table, task list
 // item), mathFromMarkdown(), the wiki-link fromMarkdown() and liquidFromMarkdown().
-// compileConfig is newConfig, made once: every compile reads the same handlers and never changes them, and
-// making them was a measurable share of a format's allocation (#93dpede).
-var compileConfig = sync.OnceValue(newConfig)
+// compileConfiguration is newConfiguration, made once: every compile reads the same handlers and never changes them,
+// and making them was a measurable share of a format's allocation (#93dpede).
+var compileConfiguration = sync.OnceValue(newConfiguration)
 
-func newConfig() *config {
+func newConfiguration() *config {
 	configuration := &config{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
 		enter: map[string]handle{

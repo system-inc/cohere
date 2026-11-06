@@ -760,8 +760,8 @@ func (found discovery) swiftYield(project discoveredProject) projectYield {
 	return yield
 }
 
-// configPath is the absolute path of a TypeScript project's tsconfig.
-func (found discovery) configPath(project discoveredProject) string {
+// configurationPath is the absolute path of a TypeScript project's tsconfig.
+func (found discovery) configurationPath(project discoveredProject) string {
 	name := project.ConfigFile
 	if name == "" {
 		name = projectMarker

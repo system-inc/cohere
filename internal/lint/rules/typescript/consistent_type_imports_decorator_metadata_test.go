@@ -28,9 +28,9 @@ import (
  * the class.
  */
 
-// decoratorMetadataConfig is the harness's default plus the three options api-phi-health's Base
+// decoratorMetadataConfiguration is the harness's default plus the three options api-phi-health's Base
 // configuration sets for decorators.
-const decoratorMetadataConfig = `{
+const decoratorMetadataConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"target": "ES2022",
@@ -68,7 +68,7 @@ func runDecoratorMetadata(test *testing.T, subject string, emitDecoratorMetadata
 		"decorators.ts":       decoratorMetadataDecorators,
 		"FormComponent.ts":    subject,
 	}, "FormComponent.ts", DefaultConsistentTypeImportsOptions(), func(directory string) {
-		configuration := []byte(fmt.Sprintf(decoratorMetadataConfig, enabled))
+		configuration := []byte(fmt.Sprintf(decoratorMetadataConfiguration, enabled))
 		if writeError := os.WriteFile(
 			filepath.Join(directory, "tsconfig.json"),
 			configuration,

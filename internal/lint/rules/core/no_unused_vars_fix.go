@@ -34,9 +34,9 @@ import (
 //   - Upstream removes a namespace import's whole declaration unconditionally, which deletes a used
 //     default beside it. Here that declaration goes only when every binding in it is reported unused.
 
-// noUnusedVarsRemovalMessage renders the two suggestion messages upstream's removal carries:
+// noUnusedVariablesRemovalMessage renders the two suggestion messages upstream's removal carries:
 // removeUnusedImportDeclaration when the edit takes the whole declaration, removeUnusedVar otherwise.
-func noUnusedVarsRemovalMessage(id string, name string) rule.Message {
+func noUnusedVariablesRemovalMessage(id string, name string) rule.Message {
 	if id == "removeUnusedImportDeclaration" {
 		return rule.Message{Id: id, Description: "Remove the import declaration: nothing it binds is used."}
 	}

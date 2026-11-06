@@ -51,7 +51,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			true,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -61,7 +61,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			true,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -71,7 +71,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			false,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -81,7 +81,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			false,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -103,7 +103,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			false,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -113,7 +113,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			false,
 			[]string{
 				messageUnsafeComponentWillMount.Id,
-				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillReceiveProperties.Id,
 				messageUnsafeComponentWillUpdate.Id,
 			},
 		},
@@ -179,7 +179,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			"a string-literal lifecycle key",
 			"class Foo extends React.Component {\n  \"UNSAFE_componentWillReceiveProps\"() {}\n}\n",
 			false,
-			[]string{messageUnsafeComponentWillReceiveProps.Id},
+			[]string{messageUnsafeComponentWillReceiveProperties.Id},
 		},
 		// Nothing asks what kind of member carries the name. A static method is not a lifecycle method
 		// at all and reports, and both accessors report, because oxc reaches all three through one
@@ -218,7 +218,7 @@ func TestNoUnsafeFires(test *testing.T) {
 			"an unprefixed lifecycle method under checkAliases",
 			"class Foo extends React.Component {\n  componentWillReceiveProps() {}\n}\n",
 			true,
-			[]string{messageUnsafeComponentWillReceiveProps.Id},
+			[]string{messageUnsafeComponentWillReceiveProperties.Id},
 		},
 		{
 			"a prefixed lifecycle method under checkAliases",
@@ -471,7 +471,7 @@ func TestNoUnsafeReportsAtTheKey(test *testing.T) {
 		{
 			"an object property underlines the key and not the value",
 			"const Foo = createReactClass({\n  UNSAFE_componentWillReceiveProps: function() {},\n});\n",
-			"UNSAFE_componentWillReceiveProps", messageUnsafeComponentWillReceiveProps,
+			"UNSAFE_componentWillReceiveProps", messageUnsafeComponentWillReceiveProperties,
 		},
 		{
 			"a string-literal key underlines the quotes as well",
@@ -539,15 +539,15 @@ func TestNoUnsafeNamesTheRightReplacement(test *testing.T) {
 	result := rule_testing.Run(test, NoUnsafe, unsafeFile, sourceText)
 	rule_testing.ExpectFindings(test, result,
 		messageUnsafeComponentWillMount.Id,
-		messageUnsafeComponentWillReceiveProps.Id,
+		messageUnsafeComponentWillReceiveProperties.Id,
 		messageUnsafeComponentWillUpdate.Id)
 
 	// The identifier and the span have to agree, which is the mapping this test exists for. Reading
 	// the reported text back out of the source is what makes a transposed pair visible.
 	wantByIdentifier := map[string]string{
-		messageUnsafeComponentWillMount.Id:        "UNSAFE_componentWillMount",
-		messageUnsafeComponentWillReceiveProps.Id: "UNSAFE_componentWillReceiveProps",
-		messageUnsafeComponentWillUpdate.Id:       "UNSAFE_componentWillUpdate",
+		messageUnsafeComponentWillMount.Id:             "UNSAFE_componentWillMount",
+		messageUnsafeComponentWillReceiveProperties.Id: "UNSAFE_componentWillReceiveProps",
+		messageUnsafeComponentWillUpdate.Id:            "UNSAFE_componentWillUpdate",
 	}
 	for _, finding := range result.Diagnostics {
 		reported := sourceText[finding.Range.Pos():finding.Range.End()]

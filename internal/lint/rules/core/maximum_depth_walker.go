@@ -8,8 +8,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// maxDepthWalker carries the per-function depth stack across the recursive walk.
-type maxDepthWalker struct {
+// maximumDepthWalker carries the per-function depth stack across the recursive walk.
+type maximumDepthWalker struct {
 	ctx      rule.Context
 	settings MaxDepthSettings
 
@@ -19,7 +19,7 @@ type maxDepthWalker struct {
 	depths []int
 }
 
-func (walker *maxDepthWalker) walk(node *ast.Node) {
+func (walker *maximumDepthWalker) walk(node *ast.Node) {
 	if node == nil {
 		return
 	}
@@ -37,7 +37,7 @@ func (walker *maxDepthWalker) walk(node *ast.Node) {
 
 	// Upstream's pushBlock set, with the else-if exemption folded into the IfStatement arm.
 	case ast.KindIfStatement:
-		if !maxDepthIsElseIf(node) {
+		if !maximumDepthIsElseIf(node) {
 			walker.pushBlock(node)
 			pushedBlock = true
 		}
@@ -95,7 +95,7 @@ func (walker *maxDepthWalker) walk(node *ast.Node) {
 //
 // Reporting on the way in rather than on the way out is upstream's order and it matters for a file
 // with several findings, since it decides the sequence they arrive in.
-func (walker *maxDepthWalker) pushBlock(node *ast.Node) {
+func (walker *maximumDepthWalker) pushBlock(node *ast.Node) {
 	if len(walker.depths) == 0 {
 		return
 	}

@@ -19,7 +19,7 @@ import (
 func TestARuleThatDeclinesOnACompilerOptionNotesASkipPerFile(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": strings.Replace(minimalConfig, `"strict": true`, `"strict": false`, 1),
+		"tsconfig.json": strings.Replace(minimalConfiguration, `"strict": true`, `"strict": false`, 1),
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",
 		"other.ts":      "export const other = 1;\n",
 	})
@@ -52,7 +52,7 @@ func TestARuleThatDeclinesOnACompilerOptionNotesASkipPerFile(test *testing.T) {
 func TestTheSameRuleInAStrictProjectNotesNoSkip(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",
 	})
 	result := plainWalk(test, root, []rule.Entry{rule_testing.EntryOf(test, typescript.NoUselessDefaultAssignment)})

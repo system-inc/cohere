@@ -131,14 +131,14 @@ func TestExportedPredicatesMatchEngine(test *testing.T) {
 	}
 }
 
-// TestVarShortCircuitBeatsEveryCheck states the first of the two load-bearing behaviors as its own
+// TestVariableShortCircuitBeatsEveryCheck states the first of the two load-bearing behaviors as its own
 // test rather than trusting it to fall out of the corpus.
 //
 // A `var()` value returns no type even when a check would plainly match it. `var(--a)` contains no
 // math function and is not a color, so most checks decline anyway; the ones that matter are the
 // permissive ones. `family-name` accepts nearly anything, and without the short-circuit every
 // `var()` value in the codebase would read as a font family.
-func TestVarShortCircuitBeatsEveryCheck(test *testing.T) {
+func TestVariableShortCircuitBeatsEveryCheck(test *testing.T) {
 	test.Parallel()
 	permissive := []DataType{DataTypeFamilyName, DataTypeLineWidth, DataTypePosition, DataTypeBackgroundSize}
 
@@ -279,7 +279,7 @@ func TestSegmentMatchesEngine(test *testing.T) {
 	test.Logf("compared %d segment splits across %d distinct value shapes", comparisons, len(corpus.Cases))
 }
 
-// TestImageVarSkipIsUnreachableThroughInferDataType records a measured limit of the differential
+// TestImageVariableSkipIsUnreachableThroughInferDataType records a measured limit of the differential
 // suite, and covers the branch the suite cannot reach.
 //
 // isImage skips `var(` parts without counting them, and a mutation that counts them instead survives
@@ -292,7 +292,7 @@ func TestSegmentMatchesEngine(test *testing.T) {
 // Which leaves the branch correct, unreachable from the public entry point, and untested unless the
 // predicate is called directly. It is called directly here, because "no caller can see it today" is
 // a fact about today's callers.
-func TestImageVarSkipIsUnreachableThroughInferDataType(test *testing.T) {
+func TestImageVariableSkipIsUnreachableThroughInferDataType(test *testing.T) {
 	test.Parallel()
 	// Directly: a value of nothing but var() parts is not an image, because the skips never count.
 	for _, value := range []string{"var(--a)", "var(--a),var(--b)", "var(--a),var(--b),var(--c)"} {

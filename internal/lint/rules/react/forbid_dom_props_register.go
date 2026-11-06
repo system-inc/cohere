@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // declines everything, which is what the installed build does.
 func init() {
 	rule.Register(rule.Registration[ForbidDomPropsOptions]{
-		Rule:   ForbidDomProps,
+		Rule:   ForbidDomProperties,
 		Decode: DecodeForbidDomPropsOptions,
 	})
 }

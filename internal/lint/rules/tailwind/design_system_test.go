@@ -24,7 +24,7 @@ import (
 // a while tonight, so a helper whose name does not say which component owns it is a collision
 // waiting to happen.
 
-const designSystemTestConfig = `{
+const designSystemTestConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -103,7 +103,7 @@ func designSystemProject(test *testing.T, sourceFileCount int) string {
 		}
 	}
 
-	write("tsconfig.json", designSystemTestConfig)
+	write("tsconfig.json", designSystemTestConfiguration)
 	write(filepath.Join("app", "_theme", "styles", "theme.css"), designSystemStylesheet)
 	write(filepath.Join("app", "_theme", "styles", "tokens.css"), designSystemTokensStylesheet)
 	write(filepath.Join("node_modules", "tailwindcss", "index.css"), designSystemFrameworkStylesheet)
@@ -339,7 +339,7 @@ func TestDesignSystemDeclinesRatherThanReportingClean(test *testing.T) {
 	root := test.TempDir()
 	if writeError := os.WriteFile(
 		filepath.Join(root, "tsconfig.json"),
-		[]byte(designSystemTestConfig),
+		[]byte(designSystemTestConfiguration),
 		0o644,
 	); writeError != nil {
 		test.Fatalf("writing tsconfig: %v", writeError)
@@ -387,7 +387,7 @@ func TestDesignSystemFailedBuildIsCachedToo(test *testing.T) {
 	root := test.TempDir()
 	if writeError := os.WriteFile(
 		filepath.Join(root, "tsconfig.json"),
-		[]byte(designSystemTestConfig),
+		[]byte(designSystemTestConfiguration),
 		0o644,
 	); writeError != nil {
 		test.Fatalf("writing tsconfig: %v", writeError)

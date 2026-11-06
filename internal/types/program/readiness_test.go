@@ -27,7 +27,7 @@ import (
 func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "test-set-skips": "error", "test-other": "error"}}`,
 		"a.ts":                "// cohere-disable-next-line test-set-enabled -- suppressed, still counted\nexport const first = 1;\nexport const second = 2;\n",
 		"b.ts":                "export const third = 3;\n",
@@ -39,7 +39,7 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -134,7 +134,7 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 func TestReadinessOffMeasuresNothing(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-off": "off", "test-other": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 	})
@@ -145,7 +145,7 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -179,7 +179,7 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 		"b.ts":                "export const second = 2;\n",
@@ -191,7 +191,7 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -242,7 +242,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 	test.Parallel()
 	typeAware := typeAwareRule(test)
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` +
 			typeAware.Name +
 			`": "off"}}`,
@@ -283,7 +283,7 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 			test.Fatalf("building: %v", buildError)
 		}
 		var loadError error
-		graph.LintConfig, loadError = configuration.Load(filepath.Join(root, "CohereSettings.json"))
+		graph.LintConfiguration, loadError = configuration.Load(filepath.Join(root, "CohereSettings.json"))
 		if loadError != nil {
 			test.Fatalf("loading the config: %v", loadError)
 		}

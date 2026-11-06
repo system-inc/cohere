@@ -42,7 +42,7 @@ func (set *Set) IsRoot(fileName string) (bool, Reason) {
 	}
 
 	if buildConfigFiles[stem] {
-		return true, ReasonBuildConfig
+		return true, ReasonBuildConfiguration
 	}
 
 	// The App Router's reserved names only mean anything inside an app directory. Checking the

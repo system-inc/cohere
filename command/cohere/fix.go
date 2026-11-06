@@ -175,7 +175,7 @@ func applyProposedFixes(
 		// A warning-only directive repair is available to --fix, but must not turn --no-fix red.
 		if !write && diagnostic.RuleName == configuration.UnusedDisable &&
 			unusedDisableSeverity(
-				graph.LintConfig,
+				graph.LintConfiguration,
 				diagnostic.SourceFile.FileName().AsString(),
 			) == configuration.SeverityWarn {
 			continue
@@ -296,7 +296,7 @@ func applyProposedFixes(
 				return nil, nil
 			}
 			proposals, relintError := relint(fileName, text)
-			if !write && unusedDisableSeverity(graph.LintConfig, fileName) == configuration.SeverityWarn {
+			if !write && unusedDisableSeverity(graph.LintConfiguration, fileName) == configuration.SeverityWarn {
 				kept := proposals[:0]
 				for _, proposal := range proposals {
 					if proposal.RuleName != configuration.UnusedDisable {
@@ -602,13 +602,13 @@ func proposalsForText(
 	 * fixes ever needs a second pass at all.
 	 */
 	applicable := make([]rule.Bound, 0, len(rules))
-	if graph.LintConfig == nil {
+	if graph.LintConfiguration == nil {
 		// No configuration decodes nothing, so every rule runs as a bare severity would.
 		for _, subject := range rules {
 			applicable = append(applicable, subject.Unconfigured)
 		}
 	} else {
-		resolution := graph.LintConfig.Resolve(fileName)
+		resolution := graph.LintConfiguration.Resolve(fileName)
 		if resolution.Ignored {
 			return nil, nil
 		}
@@ -706,7 +706,7 @@ func proposalsForText(
 	}
 
 	if len(directives.Directives()) > 0 &&
-		unusedDisableSeverity(graph.LintConfig, fileName) != configuration.SeverityOff {
+		unusedDisableSeverity(graph.LintConfiguration, fileName) != configuration.SeverityOff {
 		ran := make([]string, 0, len(applicable))
 		for _, subject := range applicable {
 			ran = append(ran, subject.Name)

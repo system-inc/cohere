@@ -778,7 +778,7 @@ func TestNoUselessAssignmentSwitchFlow(test *testing.T) {
 	}
 }
 
-// TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars pins upstream's `is_used` guard on
+// TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVariables pins upstream's `is_used` guard on
 // the shape that slipped past it.
 //
 // ESLint's rule says it "will not report variables that are never read", leaving them to
@@ -791,7 +791,7 @@ func TestNoUselessAssignmentSwitchFlow(test *testing.T) {
 //
 // Both directions: the uninitialized never-read binding is silent, and the same binding read once
 // after a dead write still reports that write, so the guard cannot be swallowing the rule.
-func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVars(test *testing.T) {
+func TestNoUselessAssignmentLeavesANeverReadBindingToNoUnusedVariables(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

@@ -1145,7 +1145,7 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 	},
 }
 
-// preferRegexLiteralsDecidedByGlobalsConfig holds the four upstream clean cases whose verdict is not
+// preferRegexLiteralsDecidedByGlobalsConfiguration holds the four upstream clean cases whose verdict is not
 // the rule's to make.
 //
 // Each is clean upstream only because the ESLint configuration removes a name from the global scope,
@@ -1163,7 +1163,7 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 // The pairing is what makes this legible. Two of the four are byte-identical to rows in the
 // reporting table and differ only in the globals setting, which is upstream stating outright that
 // the config is the whole difference.
-var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
+var preferRegexLiteralsDecidedByGlobalsConfiguration = []preferRegexLiteralsRow{
 	{source: "/* globals String:off */ new RegExp(String.raw`a`);", ids: []string{"unexpectedRegExp"}},
 	{
 		source:                  "RegExp('a', String.raw`g`);",
@@ -1187,7 +1187,7 @@ var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
 func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(test *testing.T) {
 	test.Parallel()
 
-	for _, row := range preferRegexLiteralsDecidedByGlobalsConfig {
+	for _, row := range preferRegexLiteralsDecidedByGlobalsConfiguration {
 		test.Run(row.source, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test, runPreferRegexLiterals(test, row), row.ids...)

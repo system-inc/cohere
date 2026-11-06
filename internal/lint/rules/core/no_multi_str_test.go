@@ -42,7 +42,7 @@ func TestNoMultiStrFires(test *testing.T) {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.Run(test, NoMultiStr, multiStrFile, sourceText), "multilineString")
+				rule_testing.Run(test, NoMultiString, multiStrFile, sourceText), "multilineString")
 		})
 	}
 }
@@ -60,13 +60,13 @@ func TestNoMultiStrStaysSilent(test *testing.T) {
 	test.Run("a string on one line", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test,
-			rule_testing.Run(test, NoMultiStr, multiStrFile, "var a = 'Line 1 Line 2';"))
+			rule_testing.Run(test, NoMultiString, multiStrFile, "var a = 'Line 1 Line 2';"))
 	})
 
 	test.Run("a JSX element whose text spans lines", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test,
-			rule_testing.Run(test, NoMultiStr, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
+			rule_testing.Run(test, NoMultiString, multiStrJsxFile, "var a = <div>\n<h1>Wat</h1>\n</div>;"))
 	})
 }
 
@@ -115,7 +115,7 @@ func TestNoMultiStrJsxExemption(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoMultiStr, multiStrJsxFile, testCase.sourceText)
+			result := rule_testing.Run(test, NoMultiString, multiStrJsxFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(test, result, "multilineString")
 			} else {
@@ -152,7 +152,7 @@ func TestNoMultiStrDistinguishesEscapesFromContinuations(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoMultiStr, multiStrFile, testCase.sourceText)
+			result := rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(test, result, "multilineString")
 			} else {
@@ -184,7 +184,7 @@ func TestNoMultiStrDeclinesOtherLiteralKinds(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiStr, multiStrFile, testCase.sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText))
 		})
 	}
 }
@@ -216,7 +216,7 @@ func TestNoMultiStrReportsTheWholeLiteral(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoMultiStr, multiStrFile, testCase.sourceText)
+			result := rule_testing.Run(test, NoMultiString, multiStrFile, testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -237,7 +237,7 @@ func TestNoMultiStrReportsTheWholeLiteral(test *testing.T) {
 func TestNoMultiStrMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, NoMultiStr, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
+	result := rule_testing.Run(test, NoMultiString, multiStrFile, "var x = 'Line 1 \\\n Line 2'")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

@@ -77,7 +77,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 		test.Run(shape.name, func(test *testing.T) {
 			test.Parallel()
 			directory := writeProject(test, map[string]string{
-				"tsconfig.json":       minimalConfig,
+				"tsconfig.json":       minimalConfiguration,
 				"CohereSettings.json": settings,
 				"main.ts": "// eslint-disable-next-line " +
 					shape.directive +
@@ -90,7 +90,7 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 				test.Fatalf("building: %v", buildError)
 			}
 			var loadError error
-			graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+			graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 			if loadError != nil {
 				test.Fatalf("loading the config: %v", loadError)
 			}
@@ -147,7 +147,7 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 		},
 	}
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-reporting": "error", "test-quiet": "error"}}`,
 		"main.ts": "// eslint-disable-next-line test-reporting -- live, it withholds the finding below\n" +
 			"const a = 1;\n" +
@@ -159,7 +159,7 @@ func TestADeadDirectiveIsNamedWhereItIs(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}

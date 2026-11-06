@@ -10,26 +10,26 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// SortVarsSettings is the decoded option surface.
-type SortVarsSettings struct {
+// SortVariablesSettings is the decoded option surface.
+type SortVariablesSettings struct {
 	// IgnoreCase compares names case-insensitively. Upstream's default is false.
 	IgnoreCase bool
 }
 
-// DefaultSortVarsSettings is upstream's `defaultOptions: [{ ignoreCase: false }]`, which is also
+// DefaultSortVariablesSettings is upstream's `defaultOptions: [{ ignoreCase: false }]`, which is also
 // the zero value, so this exists for symmetry with its siblings rather than to correct anything.
-func DefaultSortVarsSettings() SortVarsSettings {
-	return SortVarsSettings{}
+func DefaultSortVariablesSettings() SortVariablesSettings {
+	return SortVariablesSettings{}
 }
 
-// DecodeSortVarsOptions reads the one flag off the config.
+// DecodeSortVariablesOptions reads the one flag off the config.
 //
 // The wire shape is a single object and every default is false, so the generic decoder would work.
 // It is hand rolled anyway for one reason: `rule.DecodeOptionsInto` errors on empty input, and a
 // rule configured as a bare "error" is handed nil. Upstream's default is a working configuration
 // rather than a disabled one, so nil has to decode rather than fail.
-func DecodeSortVarsOptions(raw []byte) (SortVarsSettings, error) {
-	settings := DefaultSortVarsSettings()
+func DecodeSortVariablesOptions(raw []byte) (SortVariablesSettings, error) {
+	settings := DefaultSortVariablesSettings()
 	if len(raw) == 0 {
 		return settings, nil
 	}
@@ -43,21 +43,21 @@ func DecodeSortVarsOptions(raw []byte) (SortVarsSettings, error) {
 	return settings, nil
 }
 
-// sortVarsSettingsFrom recovers the settings from whatever the config layer handed over.
-func sortVarsSettingsFrom(options rule.Given[SortVarsSettings]) SortVarsSettings {
+// sortVariablesSettingsFrom recovers the settings from whatever the config layer handed over.
+func sortVariablesSettingsFrom(options rule.Given[SortVariablesSettings]) SortVariablesSettings {
 	if settings, ok := options.Read(); ok {
 		return settings
 	}
-	return DefaultSortVarsSettings()
+	return DefaultSortVariablesSettings()
 }
 
-var messageSortVarsSortVars = rule.Message{
+var messageSortVariablesSortVariables = rule.Message{
 	Id: "sortVars",
 	Description: "A declaration block in a fixed order is one a reader can scan instead of search. " +
 		"Sort the names, or split the block so each declaration stands where it is used.",
 }
 
-// SortVars reports a variable in a declaration block that is out of alphabetical order.
+// SortVariables reports a variable in a declaration block that is out of alphabetical order.
 //
 //	valid:   var a, b, c;
 //	valid:   var a, B, c;          (ignoreCase)
@@ -98,22 +98,22 @@ var messageSortVarsSortVars = rule.Message{
 // they can disagree only where a surrogate pair meets a character in U+E000..U+FFFF, which no
 // identifier in the corpus reaches. Recorded rather than papered over, since it is the one place
 // this port could differ on an input nobody has written.
-var SortVars = rule.Rule[SortVarsSettings]{
+var SortVariables = rule.Rule[SortVariablesSettings]{
 	Name: "sort-vars",
 
-	Run: func(ruleContext rule.Context, options rule.Given[SortVarsSettings]) rule.Listeners {
-		settings := sortVarsSettingsFrom(options)
+	Run: func(ruleContext rule.Context, options rule.Given[SortVariablesSettings]) rule.Listeners {
+		settings := sortVariablesSettingsFrom(options)
 
 		return rule.Listeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
-				checkSortVarsDeclarationList(ruleContext, node, settings)
+				checkSortVariablesDeclarationList(ruleContext, node, settings)
 			},
 		}
 	},
 }
 
-// sortVarsDeclarator is one identifier declarator and the span the fixer would move.
-type sortVarsDeclarator struct {
+// sortVariablesDeclarator is one identifier declarator and the span the fixer would move.
+type sortVariablesDeclarator struct {
 	node *ast.Node
 	name string
 	// start is upstream's `range[0]`: the declarator's first token, excluding the leading trivia
@@ -123,14 +123,14 @@ type sortVarsDeclarator struct {
 	end   int
 }
 
-// checkSortVarsDeclarationList judges one declaration block.
-func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, settings SortVarsSettings) {
+// checkSortVariablesDeclarationList judges one declaration block.
+func checkSortVariablesDeclarationList(ruleContext rule.Context, node *ast.Node, settings SortVariablesSettings) {
 	list := node.AsVariableDeclarationList()
 	if list == nil || list.Declarations == nil {
 		return
 	}
 
-	declarators := make([]sortVarsDeclarator, 0, len(list.Declarations.Nodes))
+	declarators := make([]sortVariablesDeclarator, 0, len(list.Declarations.Nodes))
 	unfixable := false
 	for _, declaration := range list.Declarations.Nodes {
 		typed := declaration.AsVariableDeclaration()
@@ -143,10 +143,10 @@ func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, sett
 		if name == nil || name.Kind != ast.KindIdentifier {
 			continue
 		}
-		if typed.Initializer != nil && !sortVarsIsLiteral(typed.Initializer) {
+		if typed.Initializer != nil && !sortVariablesIsLiteral(typed.Initializer) {
 			unfixable = true
 		}
-		declarators = append(declarators, sortVarsDeclarator{
+		declarators = append(declarators, sortVariablesDeclarator{
 			node:  declaration,
 			name:  name.Text(),
 			start: scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, declaration.Pos()).Pos(),
@@ -163,16 +163,16 @@ func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, sett
 	fixed := false
 	previous := declarators[0]
 	for _, current := range declarators[1:] {
-		if sortVarsNameFor(current.name, settings) >= sortVarsNameFor(previous.name, settings) {
+		if sortVariablesNameFor(current.name, settings) >= sortVariablesNameFor(previous.name, settings) {
 			previous = current
 			continue
 		}
 
 		if unfixable || fixed {
-			ruleContext.ReportNode(current.node, messageSortVarsSortVars)
+			ruleContext.ReportNode(current.node, messageSortVariablesSortVariables)
 		} else {
-			ruleContext.ReportNodeWithFixes(current.node, messageSortVarsSortVars,
-				sortVarsFix(ruleContext, declarators, settings))
+			ruleContext.ReportNodeWithFixes(current.node, messageSortVariablesSortVariables,
+				sortVariablesFix(ruleContext, declarators, settings))
 		}
 		fixed = true
 		// Deliberately not advancing `previous`. Upstream returns `memo` from this branch, so an
@@ -180,22 +180,22 @@ func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, sett
 	}
 }
 
-// sortVarsNameFor applies the ignoreCase option, which is upstream's `getSortableName`.
-func sortVarsNameFor(name string, settings SortVarsSettings) string {
+// sortVariablesNameFor applies the ignoreCase option, which is upstream's `getSortableName`.
+func sortVariablesNameFor(name string, settings SortVariablesSettings) string {
 	if settings.IgnoreCase {
 		return strings.ToLower(name)
 	}
 	return name
 }
 
-// sortVarsIsLiteral answers upstream's `decl.init.type !== "Literal"`.
+// sortVariablesIsLiteral answers upstream's `decl.init.type !== "Literal"`.
 //
 // ESTree's `Literal` covers a string, a number, a boolean, `null` and a regular expression, and it
 // is one node type there. Our parser gives each its own kind, and `true`/`false`/`null` are
 // keywords rather than literals, so the set has to be written out. A template literal is
 // deliberately absent: ESTree models it as `TemplateLiteral`, not `Literal`, so upstream treats it
 // as unfixable and so does this.
-func sortVarsIsLiteral(node *ast.Node) bool {
+func sortVariablesIsLiteral(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindRegularExpressionLiteral, ast.KindTrueKeyword, ast.KindFalseKeyword,
@@ -205,23 +205,23 @@ func sortVarsIsLiteral(node *ast.Node) bool {
 	return false
 }
 
-// sortVarsFix rebuilds the span from the first identifier declarator to the last, with the
+// sortVariablesFix rebuilds the span from the first identifier declarator to the last, with the
 // declarators sorted and the original separators kept in place.
 //
 // The separator for position `index` is the text between declarator `index`'s end and declarator
 // `index+1`'s start in the original order, which is upstream's `textAfterIdentifier`. That is what
 // keeps a comment or a newline attached to its position in the block rather than to the name that
 // happened to be there.
-func sortVarsFix(ruleContext rule.Context, declarators []sortVarsDeclarator,
-	settings SortVarsSettings) rule.Fix {
+func sortVariablesFix(ruleContext rule.Context, declarators []sortVariablesDeclarator,
+	settings SortVariablesSettings) rule.Fix {
 
 	text := ruleContext.SourceFile.Text()
 
-	sorted := make([]sortVarsDeclarator, len(declarators))
+	sorted := make([]sortVariablesDeclarator, len(declarators))
 	copy(sorted, declarators)
 	sort.SliceStable(sorted, func(first, second int) bool {
-		return sortVarsNameFor(sorted[first].name, settings) <
-			sortVarsNameFor(sorted[second].name, settings)
+		return sortVariablesNameFor(sorted[first].name, settings) <
+			sortVariablesNameFor(sorted[second].name, settings)
 	})
 
 	var rebuilt strings.Builder

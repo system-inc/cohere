@@ -54,9 +54,9 @@ type resolutionMemo struct {
 	byMatch map[string]Resolved
 }
 
-// configGlobs is a Config's patterns compiled once (#hsd2dfb): ignore is IgnorePatterns by index, and
+// configurationGlobs is a Config's patterns compiled once (#hsd2dfb): ignore is IgnorePatterns by index, and
 // overrides holds each override's Files by the same indices as Overrides.
-type configGlobs struct {
+type configurationGlobs struct {
 	ignore    []glob
 	overrides [][]glob
 }

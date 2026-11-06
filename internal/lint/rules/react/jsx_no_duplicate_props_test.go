@@ -42,7 +42,7 @@ func TestJsxNoDuplicatePropsFires(test *testing.T) {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, sourceText),
+				rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText),
 				"jsxNoDuplicateProps")
 		})
 	}
@@ -83,7 +83,7 @@ func TestJsxNoDuplicatePropsStaysSilent(test *testing.T) {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, sourceText))
+				rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText))
 		})
 	}
 }
@@ -120,7 +120,7 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+			result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantOffsets) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantOffsets))
 			}
@@ -146,7 +146,7 @@ func TestJsxNoDuplicatePropsReportsEarlierOccurrence(test *testing.T) {
 func TestJsxNoDuplicatePropsMessageText(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, "<App a a />;")
+	result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, "<App a a />;")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -238,7 +238,7 @@ func TestJsxNoDuplicatePropsBeyondUpstreamCorpus(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText)
+			result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, testCase.sourceText)
 			if len(result.Diagnostics) != testCase.wantCount {
 				for _, diagnostic := range result.Diagnostics {
 					test.Logf("  finding at %q",
@@ -261,7 +261,7 @@ func TestJsxNoDuplicatePropsThirdCopyComparesAgainstSecond(test *testing.T) {
 	test.Parallel()
 
 	const sourceText = "<App a a a />;"
-	result := rule_testing.Run(test, JsxNoDuplicateProps, duplicatePropsFile, sourceText)
+	result := rule_testing.Run(test, JsxNoDuplicateProperties, duplicatePropsFile, sourceText)
 	if len(result.Diagnostics) != 2 {
 		test.Fatalf("got %d findings, want 2", len(result.Diagnostics))
 	}
@@ -300,7 +300,7 @@ func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunWithOptions(
 				test,
-				JsxNoDuplicateProps,
+				JsxNoDuplicateProperties,
 				duplicatePropsFile,
 				testCase.sourceText,
 				decoded,

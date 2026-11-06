@@ -32,7 +32,7 @@ func pathAliasProject(test *testing.T, ruleOptions string) string {
 	return root
 }
 
-func TestPathAliasRootIsAnchoredToTheConfig(test *testing.T) {
+func TestPathAliasRootIsAnchoredToTheConfiguration(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	const aliases = `"aliases":[{"directory":".","alias":"@project"}]`

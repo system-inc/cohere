@@ -199,7 +199,7 @@ func buildProgramInto(
 		contents[directory+"/"+filepath.ToSlash(name)] = text
 	}
 	configurationPath := directory + "/tsconfig.json"
-	contents[configurationPath] = defaultTsConfig
+	contents[configurationPath] = defaultTsConfiguration
 
 	graph, buildError := program.Build(program.Options{
 		ConfigFileName:   configurationPath,

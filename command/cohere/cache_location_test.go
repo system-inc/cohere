@@ -28,7 +28,7 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	project := func(gitignore string) string {
 		root := test.TempDir()
 		files := map[string]string{
-			"tsconfig.json":            incrementalFixtureConfig,
+			"tsconfig.json":            incrementalFixtureConfiguration,
 			"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"error\" } }\n",
 			"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
 			"index.ts":                 "export function value(): number {\n  debugger;\n  return 1;\n}\n",

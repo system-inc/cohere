@@ -6,19 +6,21 @@ import (
 	"github.com/system-inc/cohere/policy"
 )
 
-// messageUsePropertiesNotPropsText is the rule's `usePropertiesNotProps` message, whose wording
+// messageUsePropertiesParameterText is the rule's `usePropertiesNotProps` message, whose wording
 // lives in `policy/messages/react-component-require-properties-parameter.json`.
-var messageUsePropertiesNotPropsText = policy.MessageOf(
+var messageUsePropertiesParameterText = policy.MessageOf(
 	"structure/react-component-require-properties-parameter",
 	"usePropertiesNotProps",
 )
 
-// messageUsePropertiesNotProps is the finding, rendered when it is reported so the text comes from
+// messageUsePropertiesParameter is the finding, rendered when it is reported so the text comes from
 // the current catalog.
-func messageUsePropertiesNotProps() rule.Message {
+//
+// It asks for `properties` where a component's parameter is named `props`.
+func messageUsePropertiesParameter() rule.Message {
 	return rule.Message{
-		Id:          messageUsePropertiesNotPropsText.Id,
-		Description: messageUsePropertiesNotPropsText.Render(nil),
+		Id:          messageUsePropertiesParameterText.Id,
+		Description: messageUsePropertiesParameterText.Render(nil),
 	}
 }
 
@@ -80,7 +82,7 @@ var ReactComponentRequirePropertiesParameter = rule.Rule[rule.NoOptions]{
 			if name == nil || name.Kind != ast.KindIdentifier || name.Text() != "props" {
 				return
 			}
-			ruleContext.ReportNodeWithSuggestions(name, messageUsePropertiesNotProps(), rule.Suggestion{
+			ruleContext.ReportNodeWithSuggestions(name, messageUsePropertiesParameter(), rule.Suggestion{
 				Message: messageRenameToProperties(),
 				Fixes:   []rule.Fix{ruleContext.ReplaceNode(name, "properties")},
 			})

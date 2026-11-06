@@ -50,18 +50,18 @@ func atEnd(code int) bool {
 
 // wordEnd is /[ \n\t\r\(\)\*:;@!&'"\+\|~>,\[\]\\]|\/(?=\*)/g, tested at index.
 func wordEnd(css []uint16, index int) bool {
-	switch charCodeAt(css, index) {
+	switch characterCodeAt(css, index) {
 	case space, newline, tab, cr, openBracket, closeBracket, asterisk, colon, semicolon, at, '!', ampersand,
 		singleQuote, doubleQuote, plus, pipe, tilde, gt, comma, openSq, closeSq, backslash:
 		return true
 	case slash:
-		return charCodeAt(css, index+1) == asterisk
+		return characterCodeAt(css, index+1) == asterisk
 	}
 	return false
 }
 
-// charCodeAt is css.charCodeAt(index), with -1 for the NaN past either end.
-func charCodeAt(css []uint16, index int) int {
+// characterCodeAt is css.charCodeAt(index), with -1 for the NaN past either end.
+func characterCodeAt(css []uint16, index int) int {
 	if index < 0 || index >= len(css) {
 		return -1
 	}
@@ -118,7 +118,7 @@ func tokenize(css []uint16) []*token {
 	}
 
 	for position < length {
-		code = charCodeAt(css, position)
+		code = characterCodeAt(css, position)
 
 		if code == newline {
 			offset = position
@@ -130,7 +130,7 @@ func tokenize(css []uint16) []*token {
 			next = position
 			for {
 				next += 1
-				code = charCodeAt(css, next)
+				code = characterCodeAt(css, next)
 				if code == newline {
 					offset = next
 					line += 1
@@ -150,7 +150,7 @@ func tokenize(css []uint16) []*token {
 			next = position
 			for {
 				next += 1
-				code = charCodeAt(css, next)
+				code = characterCodeAt(css, next)
 				if !(code == plus || code == gt || code == tilde || code == pipe) {
 					break
 				}
@@ -202,7 +202,7 @@ func tokenize(css []uint16) []*token {
 					unclosed("quote")
 				}
 				escapePosition = next
-				for charCodeAt(css, escapePosition-1) == backslash {
+				for characterCodeAt(css, escapePosition-1) == backslash {
 					escapePosition -= 1
 					escaped = !escaped
 				}
@@ -222,7 +222,7 @@ func tokenize(css []uint16) []*token {
 			// atEnd.lastIndex = pos + 1; atEnd.test(css): lastIndex is the match's end, or 0 on a miss.
 			lastIndex := 0
 			for index := position + 1; index < length; index++ {
-				if atEnd(charCodeAt(css, index)) {
+				if atEnd(characterCodeAt(css, index)) {
 					lastIndex = index + 1
 					break
 				}
@@ -242,11 +242,11 @@ func tokenize(css []uint16) []*token {
 		case backslash:
 			next = position
 			escape = true
-			for charCodeAt(css, next+1) == backslash {
+			for characterCodeAt(css, next+1) == backslash {
 				next += 1
 				escape = !escape
 			}
-			code = charCodeAt(css, next+1)
+			code = characterCodeAt(css, next+1)
 			if escape &&
 				code != slash &&
 				code != space &&
@@ -264,7 +264,7 @@ func tokenize(css []uint16) []*token {
 			position = next
 
 		default:
-			if code == slash && charCodeAt(css, position+1) == asterisk {
+			if code == slash && characterCodeAt(css, position+1) == asterisk {
 				next = indexOf(css, "*/", position+2) + 1
 				if next == 0 {
 					unclosed("comment")

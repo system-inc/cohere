@@ -34,15 +34,15 @@ import (
 type coverageCategory string
 
 const (
-	coverageFoundSomething     coverageCategory = "FoundSomething"
-	coverageRanOnPartOfTheTree coverageCategory = "RanOnPartOfTheTree"
-	coverageRanAndFoundNothing coverageCategory = "RanAndFoundNothing"
-	coverageNoListener         coverageCategory = "NoListener"
-	coverageListenedToNothing  coverageCategory = "ListenedToNothing"
-	coverageOffByTheConfig     coverageCategory = "OffByTheConfig"
-	coverageNotConfigured      coverageCategory = "NotConfigured"
-	coverageOfferedNoFiles     coverageCategory = "OfferedNoFiles"
-	coverageNotPorted          coverageCategory = "NotPorted"
+	coverageFoundSomething        coverageCategory = "FoundSomething"
+	coverageRanOnPartOfTheTree    coverageCategory = "RanOnPartOfTheTree"
+	coverageRanAndFoundNothing    coverageCategory = "RanAndFoundNothing"
+	coverageNoListener            coverageCategory = "NoListener"
+	coverageListenedToNothing     coverageCategory = "ListenedToNothing"
+	coverageOffByTheConfiguration coverageCategory = "OffByTheConfig"
+	coverageNotConfigured         coverageCategory = "NotConfigured"
+	coverageOfferedNoFiles        coverageCategory = "OfferedNoFiles"
+	coverageNotPorted             coverageCategory = "NotPorted"
 )
 
 // coverageCategoryOrder is the order the counts and the details print in: what ran first, then what
@@ -53,7 +53,7 @@ var coverageCategoryOrder = []coverageCategory{
 	coverageRanAndFoundNothing,
 	coverageNoListener,
 	coverageListenedToNothing,
-	coverageOffByTheConfig,
+	coverageOffByTheConfiguration,
 	coverageNotConfigured,
 	coverageOfferedNoFiles,
 	coverageNotPorted,
@@ -61,15 +61,15 @@ var coverageCategoryOrder = []coverageCategory{
 
 // coverageCategoryTerms is each category as a term in the counted line.
 var coverageCategoryTerms = map[coverageCategory]string{
-	coverageFoundSomething:     "found something",
-	coverageRanOnPartOfTheTree: "ran on part of the tree",
-	coverageRanAndFoundNothing: "ran and found nothing",
-	coverageNoListener:         "registered no listener",
-	coverageListenedToNothing:  "listened to no files",
-	coverageOffByTheConfig:     "off by the config",
-	coverageNotConfigured:      "nobody has configured",
-	coverageOfferedNoFiles:     "offered no files",
-	coverageNotPorted:          "not ported",
+	coverageFoundSomething:        "found something",
+	coverageRanOnPartOfTheTree:    "ran on part of the tree",
+	coverageRanAndFoundNothing:    "ran and found nothing",
+	coverageNoListener:            "registered no listener",
+	coverageListenedToNothing:     "listened to no files",
+	coverageOffByTheConfiguration: "off by the config",
+	coverageNotConfigured:         "nobody has configured",
+	coverageOfferedNoFiles:        "offered no files",
+	coverageNotPorted:             "not ported",
 }
 
 // coverageCategoryMeanings is what each category means, said once at its heading under `--coverage`
@@ -94,9 +94,9 @@ var coverageCategoryMeanings = map[coverageCategory]string{
 	// options leave inert (init-declarations with no mode) registers nothing anywhere. The first two
 	// are working and the third is dead, so each rule declares which it is (rule.NoListenerKind), and a
 	// rule declaring neither prints by default as having checked nothing.
-	coverageNoListener:        "offered files and registered no listener on any; each says whether it answers in Run, declines files it is not about, or declares neither and checked nothing",
-	coverageListenedToNothing: "nothing gave it a file, or it declined every one, so its silence says nothing about the tree",
-	coverageOffByTheConfig:    "the config turns it off for every file it would have run on",
+	coverageNoListener:            "offered files and registered no listener on any; each says whether it answers in Run, declines files it is not about, or declares neither and checked nothing",
+	coverageListenedToNothing:     "nothing gave it a file, or it declined every one, so its silence says nothing about the tree",
+	coverageOffByTheConfiguration: "the config turns it off for every file it would have run on",
 	// "Someone turned this rule off" and "nobody has said whether this rule should run" are different
 	// facts, and a rule newly added to the registry is a decision waiting to be made rather than one
 	// already made. Collapsing them would describe a brand-new rule as though it had been excluded.
@@ -208,7 +208,7 @@ func classifyTypeScriptCoverage(
 				entry.NeedsAction = true
 			}
 		case scopedOff > 0:
-			entry.Category = coverageOffByTheConfig
+			entry.Category = coverageOffByTheConfiguration
 			entry.Details = append(entry.Details, fmt.Sprintf("%d files", scopedOff))
 		case unconfigured > 0:
 			entry.Category = coverageNotConfigured
@@ -228,13 +228,13 @@ func classifyTypeScriptCoverage(
 			if unconfigured > 0 {
 				entry.Details = append(entry.Details, fmt.Sprintf("not in the config for %d files", unconfigured))
 			}
-		} else if entry.Category == coverageOffByTheConfig && unconfigured > 0 {
+		} else if entry.Category == coverageOffByTheConfiguration && unconfigured > 0 {
 			entry.Details = append(entry.Details, fmt.Sprintf("not in the config for %d more", unconfigured))
 		}
 
 		// Why it is off, from the file that said so, so a reader judging an off reads the decision
 		// beside it rather than in a file the run never names.
-		if entry.Category == coverageOffByTheConfig {
+		if entry.Category == coverageOffByTheConfiguration {
 			if offReason, reasoned := lintConfiguration.OffReasonFor(name); reasoned {
 				entry.Details = append(entry.Details, "off because "+offReason.Reason)
 			} else if lintConfiguration.TurnsOffAtTopLevel(name) {
@@ -582,9 +582,9 @@ func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguratio
 // lintReport is what the lint phase prints, gathered so the whole report can be written to any writer
 // and every category a reader must act on can be tested to print by default.
 type lintReport struct {
-	Result     program.Result
-	Rules      []rule.Entry
-	LintConfig *configuration.Config
+	Result            program.Result
+	Rules             []rule.Entry
+	LintConfiguration *configuration.Config
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string
 	// Details is `--coverage`: name every rule once rather than only counting them.
@@ -599,7 +599,7 @@ type lintReport struct {
 // decides whether the counts print.
 func writeLintReport(out *bufio.Writer, report lintReport) {
 	for _, diagnostic := range report.Result.Diagnostics {
-		printRuleDiagnostic(out, diagnostic, report.LintConfig)
+		printRuleDiagnostic(out, diagnostic, report.LintConfiguration)
 	}
 	coverage := report.Result.Coverage
 	crashes := crashesFrom(coverage)
@@ -623,15 +623,15 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 		replayedFromCache(report.Result),
 	)
 
-	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfig)
+	summary := classifyTypeScriptCoverage(report.Rules, coverage, report.LintConfiguration)
 	summary.Notes = sumRuleNotes(report.Result.Notes)
 	summary.excuseRulesThatSkippedEveryFile(coverage)
 	fmt.Fprintln(account, summary.coverageCountedLine())
 	fmt.Fprintln(account, summary.coverageFilesLine(report.Details))
-	writeParityCoverage(account, report.Rules, report.LintConfig)
-	writeOrphanedConfigKeys(account, report.Rules, report.LintConfig)
-	writeDepartures(account, report.LintConfig)
-	writeOverrideReasons(account, report.LintConfig)
+	writeParityCoverage(account, report.Rules, report.LintConfiguration)
+	writeOrphanedConfigKeys(account, report.Rules, report.LintConfiguration)
+	writeDepartures(account, report.LintConfiguration)
+	writeOverrideReasons(account, report.LintConfiguration)
 	writeCoverageNotes(account, summary, report.Details)
 	writeUnrunRuleReferences(account, coverage.UnrunRuleReferences)
 
@@ -646,7 +646,7 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	activeSummary.FilesInScope = coverage.FilesWalked
 	activeSummary.Nodes = coverage.NodesVisited
 	activeSummary.Findings += len(report.Result.Diagnostics)
-	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfig)
+	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfiguration)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
 	activeSummary.Gaps.Crashes = crashes

@@ -9,8 +9,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// maxClassesPerFileFile is where the fixtures pretend to live.
-const maxClassesPerFileFile = "/repository/source/MaxClassesPerFile.ts"
+// maximumClassesPerFileFile is where the fixtures pretend to live.
+const maximumClassesPerFileFile = "/repository/source/MaxClassesPerFile.ts"
 
 // decodedMaxClassesPerFileOptions routes a fixture's options through the rule's own exported
 // decoder rather than building the options struct directly.
@@ -80,13 +80,13 @@ func TestMaxClassesPerFileFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maximumClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, "maximumExceeded")
 
 			// The rendered text, not only the id. Both numbers move per finding, and passing them
 			// in the wrong order renders a grammatical sentence that no id assertion can see.
-			want := maxClassesPerFileMessage(testCase.wantCount, testCase.wantMaximum).Description
+			want := maximumClassesPerFileMessage(testCase.wantCount, testCase.wantMaximum).Description
 			if got := result.Diagnostics[0].Message.Description; got != want {
 				test.Fatalf("message text:\n got %q\nwant %q", got, want)
 			}
@@ -127,7 +127,7 @@ func TestMaxClassesPerFileStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maximumClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -170,7 +170,7 @@ func TestMaxClassesPerFileSpansTheProgramBody(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maximumClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, testCase.options))
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
@@ -204,7 +204,7 @@ func TestMaxClassesPerFileCountsEveryClassInTheFile(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maximumClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, ""))
 			rule_testing.ExpectFindings(test, result, "maximumExceeded")
 		})
@@ -278,11 +278,11 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 		// Past the decoder rather than through it: what a bare "error" produces after the config
 		// layer has turned the decoder's error into no options. A zero read here reports the single-class
 		// file below, so this case distinguishes the fallback from its absence.
-		reporting := rule_testing.Run(test, MaxClassesPerFile, maxClassesPerFileFile,
+		reporting := rule_testing.Run(test, MaxClassesPerFile, maximumClassesPerFileFile,
 			"class Foo {}\nclass Bar {}")
 		rule_testing.ExpectFindings(test, reporting, "maximumExceeded")
 
-		clean := rule_testing.Run(test, MaxClassesPerFile, maxClassesPerFileFile,
+		clean := rule_testing.Run(test, MaxClassesPerFile, maximumClassesPerFileFile,
 			"class Foo {}")
 		rule_testing.ExpectClean(test, clean)
 	})
@@ -333,7 +333,7 @@ func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(test *testin
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunGiven(test, MaxClassesPerFile, maxClassesPerFileFile,
+			result := rule_testing.RunGiven(test, MaxClassesPerFile, maximumClassesPerFileFile,
 				testCase.sourceText, decodedMaxClassesPerFileOptions(test, ""))
 			if testCase.reports {
 				rule_testing.ExpectFindings(test, result, "maximumExceeded")

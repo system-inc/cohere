@@ -112,7 +112,8 @@ func isUrlFunctionNode(node *estree.Node) bool {
 	return node.Type() == "value-func" && toLowerCase(node.String("value")) == "url"
 }
 
-func isVarFunctionNode(node *estree.Node) bool {
+// isVariableFunctionNode is upstream's isVarFunctionNode: whether a node calls CSS's var().
+func isVariableFunctionNode(node *estree.Node) bool {
 	return node.Type() == "value-func" && toLowerCase(node.String("value")) == "var"
 }
 
@@ -205,7 +206,9 @@ func isTemplatePropNode(node *estree.Node) bool {
 	return strings.HasPrefix(node.String("prop"), "@prettier-placeholder")
 }
 
-func isPostcssSimpleVarNode(currentNode *estree.Node, nextNode *estree.Node) bool {
+// isPostcssSimpleVariableNode is upstream's isPostcssSimpleVarNode: a `$$` function a word follows with no space
+// between, postcss-simple-vars' interpolation.
+func isPostcssSimpleVariableNode(currentNode *estree.Node, nextNode *estree.Node) bool {
 	return currentNode.String("value") == "$$" &&
 		currentNode.Type() == "value-func" &&
 		nextNode.Type() == "value-word" &&

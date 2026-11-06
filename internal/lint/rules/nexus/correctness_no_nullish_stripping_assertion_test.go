@@ -14,12 +14,12 @@ import (
 
 const correctnessNoNullishStrippingAssertionFile = "/repository/source/CorrectnessNoNullishStrippingAssertion.ts"
 
-// correctnessNoNullishStrippingAssertionTsConfig is the fixture program's compiler options, matching
+// correctnessNoNullishStrippingAssertionTsConfiguration is the fixture program's compiler options, matching
 // ahra's on the two that decide this rule's verdicts: `noUncheckedIndexedAccess`, which is what puts
 // `undefined` into `options.days` and `parts[1]`, and the DOM library, which types `event.target` as
 // `EventTarget | null`. The harness's default has neither, and without them every real site below
 // would be silent for a reason that is not the rule's.
-const correctnessNoNullishStrippingAssertionTsConfig = `{
+const correctnessNoNullishStrippingAssertionTsConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
@@ -69,7 +69,7 @@ func correctnessNoNullishStrippingAssertionRunRule(
 		configurationPath := filepath.Join(directory, "tsconfig.json")
 		if writeError := os.WriteFile(
 			configurationPath,
-			[]byte(correctnessNoNullishStrippingAssertionTsConfig),
+			[]byte(correctnessNoNullishStrippingAssertionTsConfiguration),
 			0o644,
 		); writeError != nil {
 			test.Fatalf("writing the fixture tsconfig: %v", writeError)

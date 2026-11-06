@@ -41,7 +41,7 @@ func TestUncoveredIsEveryUnsetCorpus(test *testing.T) {
 	}
 }
 
-func writeConfig(test *testing.T, contents string) string {
+func writeConfiguration(test *testing.T, contents string) string {
 	test.Helper()
 	path := filepath.Join(test.TempDir(), "corpora.json")
 	if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
@@ -53,8 +53,8 @@ func writeConfig(test *testing.T, contents string) string {
 // A config fills only what the environment leaves unset, so a run can still point one corpus elsewhere.
 func TestEnvironmentFillsOnlyUnsetVariables(test *testing.T) {
 	test.Parallel()
-	configuration, readConfigurationError := ReadConfig(
-		writeConfig(test, `{"ahra": "/checkouts/ahra", "structure": "/checkouts/structure"}`),
+	configuration, readConfigurationError := ReadConfiguration(
+		writeConfiguration(test, `{"ahra": "/checkouts/ahra", "structure": "/checkouts/structure"}`),
 	)
 	if readConfigurationError != nil {
 		test.Fatal(readConfigurationError)
@@ -69,7 +69,7 @@ func TestEnvironmentFillsOnlyUnsetVariables(test *testing.T) {
 // quietly uncovered.
 func TestReadConfigRefusesWhatWouldLoseACorpus(test *testing.T) {
 	test.Parallel()
-	if configuration, readConfigurationError := ReadConfig(
+	if configuration, readConfigurationError := ReadConfiguration(
 		filepath.Join(test.TempDir(), "absent.json"),
 	); readConfigurationError != nil || len(configuration) != 0 {
 		test.Errorf("a missing file read as %v, %v", configuration, readConfigurationError)
@@ -79,7 +79,9 @@ func TestReadConfigRefusesWhatWouldLoseACorpus(test *testing.T) {
 		"a relative path":      `{"ahra": "checkouts/ahra"}`,
 		"not an object":        `["/checkouts/ahra"]`,
 	} {
-		if _, readConfigurationError := ReadConfig(writeConfig(test, contents)); readConfigurationError == nil {
+		if _, readConfigurationError := ReadConfiguration(
+			writeConfiguration(test, contents),
+		); readConfigurationError == nil {
 			test.Errorf("%s was read", name)
 		}
 	}
@@ -236,7 +238,7 @@ func TestTheGeneratorsNameTheSameCorpora(test *testing.T) {
 // corpus, refuses a corpus that does not exist, and passes a path through as it was given.
 func TestLocateReadsTheVariableThenTheCorporaFile(test *testing.T) {
 	test.Parallel()
-	configurationPath := writeConfig(test, `{"ahra": "/checkouts/ahra"}`)
+	configurationPath := writeConfiguration(test, `{"ahra": "/checkouts/ahra"}`)
 	fromConfiguration := func() (string, error) { return configurationPath, nil }
 	for name, testCase := range map[string]struct {
 		spelling  string

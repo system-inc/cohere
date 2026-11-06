@@ -12,8 +12,8 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// libraryParsesConfig is a one-file project at a given target and lib, the shape a rule test builds.
-func libraryParsesConfig(target string, libs string) string {
+// libraryParsesConfiguration is a one-file project at a given target and lib, the shape a rule test builds.
+func libraryParsesConfiguration(target string, libs string) string {
 	lib := ""
 	if libs != "" {
 		lib = fmt.Sprintf(`, "lib": [%s]`, libs)
@@ -47,11 +47,11 @@ func TestLibraryParsesShareEachLibFileAcrossPrograms(test *testing.T) {
 	test.Parallel()
 	parses := program.NewLibraryParses()
 	first := buildWithLibraryParses(test, writeProject(test, map[string]string{
-		"tsconfig.json": libraryParsesConfig("ES2022", ""),
+		"tsconfig.json": libraryParsesConfiguration("ES2022", ""),
 		"main.ts":       "export const first: number = 1;\n",
 	}), parses)
 	second := buildWithLibraryParses(test, writeProject(test, map[string]string{
-		"tsconfig.json": libraryParsesConfig("ES2022", ""),
+		"tsconfig.json": libraryParsesConfiguration("ES2022", ""),
 		"main.ts":       "export const second: string = 'two';\n",
 	}), parses)
 
@@ -91,7 +91,7 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(test *testing.T) {
 	parses := program.NewLibraryParses()
 	// One program fills the cache first with a wide lib set.
 	buildWithLibraryParses(test, writeProject(test, map[string]string{
-		"tsconfig.json": libraryParsesConfig("ESNext", `"esnext", "dom", "dom.iterable"`),
+		"tsconfig.json": libraryParsesConfiguration("ESNext", `"esnext", "dom", "dom.iterable"`),
 		"main.ts":       "export const filler = 1;\n",
 	}), parses)
 
@@ -125,7 +125,7 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			directory := writeProject(test, map[string]string{
-				"tsconfig.json": libraryParsesConfig(testCase.target, testCase.libs),
+				"tsconfig.json": libraryParsesConfiguration(testCase.target, testCase.libs),
 				"main.ts":       testCase.source,
 			})
 			unshared := buildWithLibraryParses(test, directory, nil)
@@ -180,7 +180,7 @@ func TestLibraryParsesAreSafeAcrossConcurrentPrograms(test *testing.T) {
 	var group sync.WaitGroup
 	for index := range 8 {
 		directory := writeProject(test, map[string]string{
-			"tsconfig.json": libraryParsesConfig("ES2022", ""),
+			"tsconfig.json": libraryParsesConfiguration("ES2022", ""),
 			"main.ts":       fmt.Sprintf("export const value%d: number = '%d';\n", index, index),
 		})
 		group.Add(1)
@@ -204,7 +204,7 @@ func TestLibraryParsesAreSafeAcrossConcurrentPrograms(test *testing.T) {
 // BenchmarkOneFileProgram is the rule-test fixture's build, with and without shared lib parses.
 func BenchmarkOneFileProgram(benchmark *testing.B) {
 	directory := writeProject(benchmark, map[string]string{
-		"tsconfig.json": libraryParsesConfig("ES2022", ""),
+		"tsconfig.json": libraryParsesConfiguration("ES2022", ""),
 		"main.ts":       "export const value: number = 1;\n",
 	})
 	for _, mode := range []struct {

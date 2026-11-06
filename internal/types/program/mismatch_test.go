@@ -9,10 +9,10 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 )
 
-// mismatchFixtureConfig is deliberately its own rather than shared with the external test package:
+// mismatchFixtureConfiguration is deliberately its own rather than shared with the external test package:
 // these tests live inside the package so they can reach projectFilesMismatchMessage, and an internal
 // test cannot see an external one's helpers.
-const mismatchFixtureConfig = `{
+const mismatchFixtureConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -47,7 +47,7 @@ func writeMismatchFixture(test *testing.T, files map[string]string) string {
 func TestProjectFilesGuardFiresOnMismatch(test *testing.T) {
 	test.Parallel()
 	directory := writeMismatchFixture(test, map[string]string{
-		"tsconfig.json": mismatchFixtureConfig,
+		"tsconfig.json": mismatchFixtureConfiguration,
 		"Alpha.ts":      "export const alpha = 1;\n",
 		"Beta.ts":       "export const beta = 2;\n",
 	})

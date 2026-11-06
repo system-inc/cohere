@@ -76,7 +76,7 @@ func TestATimedWalkBillsCpuNotWaiting(test *testing.T) {
 	}
 	runtime.UnlockOSThread()
 
-	files := map[string]string{"tsconfig.json": minimalConfig}
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 	for index := range fileCount {
 		files[fmt.Sprintf("file%02d.ts", index)] = fmt.Sprintf("export const value%d = %d;\n", index, index)
 	}
