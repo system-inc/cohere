@@ -412,7 +412,7 @@ func newNoRestrictedImportsChecker(
 	ruleContext rule.Context,
 	settings NoRestrictedImportsOptions,
 ) (*noRestrictedImportsChecker, bool) {
-	checker := &noRestrictedImportsChecker{ctx: ruleContext, paths: map[string][]NoRestrictedImportsPath{}}
+	checker := &noRestrictedImportsChecker{ruleContext: ruleContext, paths: map[string][]NoRestrictedImportsPath{}}
 
 	for _, path := range settings.Paths {
 		checker.paths[path.Name] = append(checker.paths[path.Name], path)

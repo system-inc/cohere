@@ -307,8 +307,8 @@ var LogicalAssignmentOperators = rule.Rule[LogicalAssignmentOperatorsOptions]{
 		}
 
 		state := &logicalAssignmentState{
-			ctx:      ruleContext,
-			isStrict: logicalAssignmentIsStrict(ruleContext.SourceFile),
+			ruleContext: ruleContext,
+			isStrict:    logicalAssignmentIsStrict(ruleContext.SourceFile),
 			// Only under `always`: `never` reports the shorthand and expands it, which is the
 			// rewrite the compiler wants rather than the one it refuses.
 			skipCompiledFunctions: *settings.Require == LogicalAssignmentAlways && settings.ReactCompiler,

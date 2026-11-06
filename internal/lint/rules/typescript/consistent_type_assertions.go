@@ -168,7 +168,7 @@ var ConsistentTypeAssertions = rule.Rule[ConsistentTypeAssertionsOptions]{
 		if !isSettings {
 			settings = DefaultConsistentTypeAssertionsSettings()
 		}
-		state := &consistentTypeAssertionsState{ctx: ruleContext, settings: settings}
+		state := &consistentTypeAssertionsState{ruleContext: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			ast.KindAsExpression: func(node *ast.Node) {

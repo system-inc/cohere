@@ -7,9 +7,9 @@ import (
 
 // preferArrowCallbackWalker carries the frame stack across the recursive walk.
 type preferArrowCallbackWalker struct {
-	ctx      rule.Context
-	settings PreferArrowCallbackSettings
-	frames   []*preferArrowCallbackFrame
+	ruleContext rule.Context
+	settings    PreferArrowCallbackSettings
+	frames      []*preferArrowCallbackFrame
 }
 
 // walk visits a node and records on owner, the nearest enclosing function's frame, what the node uses.
@@ -39,7 +39,7 @@ func (walker *preferArrowCallbackWalker) walk(node *ast.Node, owner *preferArrow
 	case ast.KindIdentifier:
 		// `arguments` belongs to the nearest enclosing function, which is exactly what `owner` is.
 		if owner != nil && node.Text() == "arguments" && !preferArrowCallbackIsDeclarationName(node) &&
-			!preferArrowCallbackResolvesToADeclaration(walker.ctx, node) {
+			!preferArrowCallbackResolvesToADeclaration(walker.ruleContext, node) {
 			owner.usesArguments = true
 		}
 	}
@@ -85,7 +85,7 @@ func (walker *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArro
 		return
 	}
 	// A function that calls itself by name needs that binding, which an arrow does not provide.
-	if preferArrowCallbackReferencesOwnName(walker.ctx, node, expression) {
+	if preferArrowCallbackReferencesOwnName(walker.ruleContext, node, expression) {
 		return
 	}
 	// An arrow has no `arguments` binding either.
@@ -107,9 +107,9 @@ func (walker *preferArrowCallbackWalker) judge(node *ast.Node, frame *preferArro
 	// The repair is withheld in five cases; see the rule's doc comment. Reporting without a fix is
 	// the subset that can be shown correct, which is what upstream does through a `fix` returning
 	// null.
-	if fix, ok := preferArrowCallbackFix(walker.ctx, node, expression, frame, callback); ok {
-		walker.ctx.ReportNodeWithFixes(node, messagePreferArrowCallbackPreferArrowCallback, fix...)
+	if fix, ok := preferArrowCallbackFix(walker.ruleContext, node, expression, frame, callback); ok {
+		walker.ruleContext.ReportNodeWithFixes(node, messagePreferArrowCallbackPreferArrowCallback, fix...)
 		return
 	}
-	walker.ctx.ReportNode(node, messagePreferArrowCallbackPreferArrowCallback)
+	walker.ruleContext.ReportNode(node, messagePreferArrowCallbackPreferArrowCallback)
 }

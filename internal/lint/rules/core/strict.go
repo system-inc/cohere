@@ -261,7 +261,7 @@ func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 		resolvedMode = strictModeModule
 	}
 
-	walker := strictWalker{ctx: ruleContext, mode: resolvedMode}
+	walker := strictWalker{ruleContext: ruleContext, mode: resolvedMode}
 	statements := source.Statements.Nodes
 	directives := strictDirectivesIn(ruleContext, statements)
 

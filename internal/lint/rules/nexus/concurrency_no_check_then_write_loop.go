@@ -10,8 +10,8 @@ import (
 
 // concurrencyNoCheckThenWriteLoop is the analysis of one loop.
 type concurrencyNoCheckThenWriteLoop struct {
-	ctx  rule.Context
-	loop *ast.Node
+	ruleContext rule.Context
+	loop        *ast.Node
 	// function is the function-like node holding the loop, or nil at module scope.
 	function *ast.Node
 	// check is the existence check the loop exits on, and checkStatement the `try` holding it, or nil
@@ -111,11 +111,11 @@ func (analysis *concurrencyNoCheckThenWriteLoop) throwingCheckOf(statement *ast.
 
 // resolve returns the symbol an identifier names, aliases followed.
 func (analysis *concurrencyNoCheckThenWriteLoop) resolve(node *ast.Node) *ast.Symbol {
-	symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return nil
 	}
-	return checker.SkipAlias(symbol, analysis.ctx.TypeChecker)
+	return checker.SkipAlias(symbol, analysis.ruleContext.TypeChecker)
 }
 
 // calleeSymbol returns the symbol a call's callee resolves to, for a callee written as a name or a
@@ -168,7 +168,7 @@ func (analysis *concurrencyNoCheckThenWriteLoop) isSharpToFile(call *ast.Node) b
 	if symbol == nil || symbol.Name != "toFile" || len(symbol.Declarations) == 0 {
 		return false
 	}
-	sharpFiles := concurrencyNoCheckThenWriteSharpFiles(analysis.ctx)
+	sharpFiles := concurrencyNoCheckThenWriteSharpFiles(analysis.ruleContext)
 	for _, declaration := range symbol.Declarations {
 		if declaration.Kind != ast.KindMethodSignature ||
 			!sharpFiles[ast.GetSourceFileOfNode(declaration).FileName().AsString()] {
@@ -360,7 +360,7 @@ func (analysis *concurrencyNoCheckThenWriteLoop) readThrough(symbol *ast.Symbol)
 	}
 	variable := declaration.AsVariableDeclaration()
 	if variable.Name().Kind != ast.KindIdentifier || variable.Initializer == nil ||
-		ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile ||
+		ast.GetSourceFileOfNode(declaration) != analysis.ruleContext.SourceFile ||
 		scope.EnclosingFunctionLike(declaration) != analysis.function {
 		return nil, -1
 	}
@@ -505,7 +505,7 @@ func (analysis *concurrencyNoCheckThenWriteLoop) holdsStill(
 	write *ast.Node,
 ) bool {
 	declaration := symbol.ValueDeclaration
-	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile {
+	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ruleContext.SourceFile {
 		// Another module's `let` can change while this function waits, and its writes are not in
 		// this file to read.
 		return false
@@ -517,7 +517,7 @@ func (analysis *concurrencyNoCheckThenWriteLoop) holdsStill(
 	if !cached {
 		root := scope.EnclosingFunctionLike(declaration)
 		if root == nil {
-			root = analysis.ctx.SourceFile.AsNode()
+			root = analysis.ruleContext.SourceFile.AsNode()
 		}
 		var visit func(node *ast.Node) bool
 		visit = func(node *ast.Node) bool {

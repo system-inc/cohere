@@ -11,7 +11,7 @@ import (
 
 // noTyposState carries the two import bindings while the file is walked.
 type noTyposState struct {
-	ctx rule.Context
+	ruleContext rule.Context
 
 	// propertyTypesPackageName is the local name `prop-types` was imported under, or the name a
 	// `PropTypes` specifier from `react` was bound to.
@@ -71,7 +71,7 @@ func (state *noTyposState) recordImport(node *ast.Node) {
 	switch moduleSpecifier.Text() {
 	case "prop-types":
 		if len(specifiers) == 0 {
-			state.ctx.ReportNode(node, rule.Message{
+			state.ruleContext.ReportNode(node, rule.Message{
 				Id: "noPropTypesBinding",
 				Description: "This imports `prop-types` for its side effects and never names it, " +
 					"so nothing in the file can reference a prop type. The package has no side " +
@@ -83,7 +83,7 @@ func (state *noTyposState) recordImport(node *ast.Node) {
 
 	case "react":
 		if len(specifiers) == 0 {
-			state.ctx.ReportNode(node, rule.Message{
+			state.ruleContext.ReportNode(node, rule.Message{
 				Id: "noReactBinding",
 				Description: "This imports `react` for its side effects and never names it, so " +
 					"nothing in the file can reference React. Write " +
@@ -265,7 +265,7 @@ func (state *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isCl
 	for _, canonical := range noTyposStaticClassProperties {
 		if strings.EqualFold(canonical, name) && canonical != name {
 			if isClassProperty {
-				state.ctx.ReportNode(key, rule.Message{
+				state.ruleContext.ReportNode(key, rule.Message{
 					Id: "typoStaticClassProp",
 					Description: "This static property is spelled with the wrong casing, so React " +
 						"never reads it. React matches these names exactly, which means the " +
@@ -273,7 +273,7 @@ func (state *noTyposState) reportCasingTypo(value *ast.Node, key *ast.Node, isCl
 				})
 				return
 			}
-			state.ctx.ReportNode(key, rule.Message{
+			state.ruleContext.ReportNode(key, rule.Message{
 				Id: "typoPropDeclaration",
 				Description: "This property is spelled with the wrong casing, so React never " +
 					"reads it. React matches these names exactly, which means the declaration " +
@@ -298,7 +298,7 @@ func (state *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.No
 
 	for _, method := range noTyposStaticLifecycleMethods {
 		if !isStatic && strings.EqualFold(name, method) {
-			state.ctx.ReportNode(node, rule.Message{
+			state.ruleContext.ReportNode(node, rule.Message{
 				Id: "staticLifecycleMethod",
 				Description: fmt.Sprintf(
 					"`%s` is a static lifecycle method and this one is not declared `static`, so "+
@@ -310,7 +310,7 @@ func (state *noTyposState) reportLifecycleCasingTypo(node *ast.Node, key *ast.No
 	for _, method := range append(append([]string{}, noTyposInstanceLifecycleMethods...),
 		noTyposStaticLifecycleMethods...) {
 		if strings.EqualFold(method, name) && method != name {
-			state.ctx.ReportNode(node, rule.Message{
+			state.ruleContext.ReportNode(node, rule.Message{
 				Id: "typoLifecycleMethod",
 				Description: fmt.Sprintf(
 					"`%s` is spelled with the wrong casing and React calls `%s`, so this method "+
@@ -458,7 +458,7 @@ func (state *noTyposState) checkPropTypeName(node *ast.Node) {
 			return
 		}
 	}
-	state.ctx.ReportNode(node, rule.Message{
+	state.ruleContext.ReportNode(node, rule.Message{
 		Id: "typoPropType",
 		Description: fmt.Sprintf(
 			"`%s` is not a prop type the `prop-types` package exports, so this validator is "+
@@ -474,7 +474,7 @@ func (state *noTyposState) checkPropTypeQualifier(node *ast.Node) {
 	if node.Text() == "isRequired" {
 		return
 	}
-	state.ctx.ReportNode(node, rule.Message{
+	state.ruleContext.ReportNode(node, rule.Message{
 		Id: "typoPropTypeChain",
 		Description: fmt.Sprintf(
 			"`isRequired` is the only qualifier a prop type chain accepts, and `%s` is not it, so "+

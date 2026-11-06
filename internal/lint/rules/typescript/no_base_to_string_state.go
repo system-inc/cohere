@@ -12,8 +12,8 @@ import (
 // A struct rather than a closure chain because the recursion is deep and threading four values
 // through eight functions obscures which of them actually decide anything.
 type noBaseToStringState struct {
-	ctx      rule.Context
-	settings NoBaseToStringOptions
+	ruleContext rule.Context
+	settings    NoBaseToStringOptions
 }
 
 // checkExpression is upstream's `checkExpression`.
@@ -58,7 +58,7 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 
 	subjectType := knownType
 	if subjectType == nil {
-		subjectType = state.ctx.TypeChecker.GetTypeAtLocation(unwrapped)
+		subjectType = state.ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)
 	}
 	if subjectType == nil {
 		return
@@ -69,9 +69,9 @@ func (state *noBaseToStringState) checkExpression(node *ast.Node, knownType *che
 		return
 	}
 
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, unwrapped)
-	name := state.ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
-	state.ctx.ReportNode(unwrapped, rule.Message{
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, unwrapped)
+	name := state.ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+	state.ruleContext.ReportNode(unwrapped, rule.Message{
 		Id: "baseToString",
 		Description: "'" + name + "' " + string(certainty) +
 			" use Object's default stringification format ('[object Object]') when stringified.",
@@ -85,9 +85,9 @@ func (state *noBaseToStringState) checkExpressionForArrayJoin(node *ast.Node, su
 		return
 	}
 
-	nodeRange := rule.TokenRange(state.ctx.SourceFile, node)
-	name := state.ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
-	state.ctx.ReportNode(node, rule.Message{
+	nodeRange := rule.TokenRange(state.ruleContext.SourceFile, node)
+	name := state.ruleContext.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
+	state.ruleContext.ReportNode(node, rule.Message{
 		Id: "baseArrayJoin",
 		Description: "Using `join()` for " + name + " " + string(certainty) +
 			" use Object's default stringification format ('[object Object]') when stringified.",
@@ -117,7 +117,7 @@ func (state *noBaseToStringState) collectJoinCertainty(
 	if checker.IsTupleType(subjectType) {
 		return state.collectTupleCertainty(subjectType, visited)
 	}
-	if checker.Checker_isArrayType(state.ctx.TypeChecker, subjectType) {
+	if checker.Checker_isArrayType(state.ruleContext.TypeChecker, subjectType) {
 		return state.collectArrayCertainty(subjectType, visited)
 	}
 	return noBaseToStringAlways
@@ -132,7 +132,7 @@ func (state *noBaseToStringState) collectTupleCertainty(
 	visited []*checker.Type,
 ) noBaseToStringUsefulness {
 	sawSometimes := false
-	for _, argument := range checker.Checker_getTypeArguments(state.ctx.TypeChecker, subjectType) {
+	for _, argument := range checker.Checker_getTypeArguments(state.ruleContext.TypeChecker, subjectType) {
 		switch state.collectToStringCertainty(argument, visited) {
 		case noBaseToStringNever:
 			return noBaseToStringNever
@@ -155,7 +155,7 @@ func (state *noBaseToStringState) collectArrayCertainty(
 	subjectType *checker.Type,
 	visited []*checker.Type,
 ) noBaseToStringUsefulness {
-	elementType := type_checking.GetNumberIndexType(state.ctx.TypeChecker, subjectType)
+	elementType := type_checking.GetNumberIndexType(state.ruleContext.TypeChecker, subjectType)
 	if elementType == nil {
 		return noBaseToStringAlways
 	}
@@ -177,7 +177,7 @@ func (state *noBaseToStringState) collectToStringCertainty(
 	}
 
 	if type_checking.IsTypeParameter(subjectType) {
-		constraint := checker.Checker_getBaseConstraintOfType(state.ctx.TypeChecker, subjectType)
+		constraint := checker.Checker_getBaseConstraintOfType(state.ruleContext.TypeChecker, subjectType)
 		if constraint != nil {
 			return state.collectToStringCertainty(constraint, visited)
 		}
@@ -226,7 +226,7 @@ func (state *noBaseToStringState) collectToStringCertainty(
 	if checker.IsTupleType(subjectType) {
 		return state.collectTupleCertainty(subjectType, append(visited, subjectType))
 	}
-	if checker.Checker_isArrayType(state.ctx.TypeChecker, subjectType) {
+	if checker.Checker_isArrayType(state.ruleContext.TypeChecker, subjectType) {
 		return state.collectArrayCertainty(subjectType, append(visited, subjectType))
 	}
 
@@ -279,7 +279,7 @@ func (state *noBaseToStringState) matchesTypeOrBaseType(
 		}
 	}
 	if noBaseToStringNameIsIgnored(state.settings.IgnoredTypeNames,
-		type_checking.GetTypeName(state.ctx.TypeChecker, subjectType)) {
+		type_checking.GetTypeName(state.ruleContext.TypeChecker, subjectType)) {
 		return true
 	}
 	visitedWithSubject := append(visited, subjectType)
@@ -313,7 +313,7 @@ func (state *noBaseToStringState) baseTypesOf(subjectType *checker.Type) []*chec
 		(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) == 0 {
 		return nil
 	}
-	return checker.Checker_getBaseTypes(state.ctx.TypeChecker, target)
+	return checker.Checker_getBaseTypes(state.ruleContext.TypeChecker, target)
 }
 
 // isToStringLikeFromObject is upstream's `isToStringLikeFromObject`.
@@ -322,7 +322,7 @@ func (state *noBaseToStringState) baseTypesOf(subjectType *checker.Type) []*chec
 // `any` or `unknown`. The second return says whether the first is meaningful.
 func (state *noBaseToStringState) isToStringLikeFromObject(subjectType *checker.Type) (bool, bool) {
 	// An explicit [Symbol.toPrimitive] is by construction user-defined, so nothing else matters.
-	for _, property := range checker.Checker_getPropertiesOfType(state.ctx.TypeChecker, subjectType) {
+	for _, property := range checker.Checker_getPropertiesOfType(state.ruleContext.TypeChecker, subjectType) {
 		if property.ValueDeclaration != nil &&
 			state.isSymbolToPrimitiveMethod(property.ValueDeclaration) {
 			return false, true
@@ -331,7 +331,7 @@ func (state *noBaseToStringState) isToStringLikeFromObject(subjectType *checker.
 
 	foundFallbackOnObject := false
 	for _, propertyName := range []string{"toLocaleString", "toString", "valueOf"} {
-		candidate := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, subjectType, propertyName)
+		candidate := checker.Checker_getPropertyOfType(state.ruleContext.TypeChecker, subjectType, propertyName)
 		if candidate == nil || len(candidate.Declarations) == 0 {
 			continue
 		}
@@ -377,8 +377,8 @@ func (state *noBaseToStringState) isSymbolToPrimitiveMethod(declaration *ast.Nod
 		access.Name().AsIdentifier().Text != "toPrimitive" {
 		return false
 	}
-	symbol := state.ctx.TypeChecker.GetSymbolAtLocation(access.Expression)
-	return symbol != nil && noBaseToStringIsDefaultLibrarySymbol(state.ctx, symbol)
+	symbol := state.ruleContext.TypeChecker.GetSymbolAtLocation(access.Expression)
+	return symbol != nil && noBaseToStringIsDefaultLibrarySymbol(state.ruleContext, symbol)
 }
 
 // isBuiltinStringCall is upstream's `isBuiltInStringCall`.
@@ -398,13 +398,13 @@ func (state *noBaseToStringState) isBuiltinStringCall(call *ast.CallExpression) 
 		return false
 	}
 
-	symbol := state.ctx.TypeChecker.GetSymbolAtLocation(callee)
+	symbol := state.ruleContext.TypeChecker.GetSymbolAtLocation(callee)
 	if symbol == nil {
 		// Unresolvable, so nothing says it is a shadow.
 		return true
 	}
 	for _, declaration := range symbol.Declarations {
-		if !noBaseToStringIsDefaultLibraryFile(state.ctx, ast.GetSourceFileOfNode(declaration)) {
+		if !noBaseToStringIsDefaultLibraryFile(state.ruleContext, ast.GetSourceFileOfNode(declaration)) {
 			return false
 		}
 	}

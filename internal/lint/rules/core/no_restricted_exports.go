@@ -227,10 +227,10 @@ var NoRestrictedExports = rule.Rule[NoRestrictedExportsOptions]{
 		}
 
 		checker := &noRestrictedExportsChecker{
-			ctx:        ruleContext,
-			restricted: restricted,
-			pattern:    pattern,
-			defaults:   settings.RestrictDefaultExports,
+			ruleContext: ruleContext,
+			restricted:  restricted,
+			pattern:     pattern,
+			defaults:    settings.RestrictDefaultExports,
 		}
 
 		return rule.Listeners{

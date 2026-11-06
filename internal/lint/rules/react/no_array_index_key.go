@@ -138,7 +138,7 @@ var NoArrayIndexKey = rule.Rule[rule.NoOptions]{
 			// hook to pop it with. `KindSourceFile` fires before its children, so the walk below is
 			// the rule's own rather than the harness's.
 			ast.KindSourceFile: func(node *ast.Node) {
-				walker := &noArrayIndexKeyWalker{ctx: ruleContext}
+				walker := &noArrayIndexKeyWalker{ruleContext: ruleContext}
 				walker.walk(node)
 			},
 		}

@@ -14,9 +14,9 @@ import (
 
 // concurrencyNoLostUpdateRoot is the analysis of one suspending function.
 type concurrencyNoLostUpdateRoot struct {
-	ctx    rule.Context
-	root   *ast.Node
-	locals map[*ast.Symbol]*concurrencyNoLostUpdateLocal
+	ruleContext rule.Context
+	root        *ast.Node
+	locals      map[*ast.Symbol]*concurrencyNoLostUpdateLocal
 
 	graph            *control_flow_graph.Graph[concurrencyNoLostUpdateEvent]
 	between          map[concurrencyNoLostUpdateBetweenKey]bool
@@ -57,7 +57,7 @@ func (analysis *concurrencyNoLostUpdateRoot) collectLocal(declaration *ast.Node)
 		return
 	}
 	if name.Kind == ast.KindIdentifier {
-		if symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
+		if symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(name); symbol != nil {
 			analysis.locals[symbol] = &concurrencyNoLostUpdateLocal{name: name, initializer: variable.Initializer}
 		}
 		return
@@ -91,7 +91,7 @@ func (analysis *concurrencyNoLostUpdateRoot) collectLocal(declaration *ast.Node)
 			}
 			propertyName = text
 		}
-		symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(elementName)
+		symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(elementName)
 		if symbol == nil {
 			continue
 		}
@@ -107,11 +107,11 @@ func (analysis *concurrencyNoLostUpdateRoot) collectLocal(declaration *ast.Node)
 // resolve returns the symbol an identifier occurrence reads, seeing through a shorthand property.
 func (analysis *concurrencyNoLostUpdateRoot) resolve(identifier *ast.Node) *ast.Symbol {
 	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-		if symbol := analysis.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+		if symbol := analysis.ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
 			return symbol
 		}
 	}
-	return analysis.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	return analysis.ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 }
 
 // pathOf reads an expression as a variable or a static member path, through parentheses and type
@@ -463,7 +463,7 @@ func (analysis *concurrencyNoLostUpdateRoot) controlFlowGraph() (
 		default:
 			return nil
 		}
-		symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(node)
+		symbol := analysis.ruleContext.TypeChecker.GetSymbolAtLocation(node)
 		if local := analysis.locals[symbol]; local == nil || local.name != node {
 			return nil
 		}
@@ -567,7 +567,7 @@ func (analysis *concurrencyNoLostUpdateRoot) computeStoreAccess(call *ast.Node) 
 		if symbol == nil {
 			return nil
 		}
-		symbol = shimchecker.SkipAlias(symbol, analysis.ctx.TypeChecker)
+		symbol = shimchecker.SkipAlias(symbol, analysis.ruleContext.TypeChecker)
 		declaration := symbol.ValueDeclaration
 		if declaration == nil && len(symbol.Declarations) > 0 {
 			declaration = symbol.Declarations[0]
@@ -713,6 +713,6 @@ func (analysis *concurrencyNoLostUpdateRoot) storeReadText(target concurrencyNoL
 	if read == nil {
 		read = write.AsCallExpression().Expression
 	}
-	textRange := rule.TokenRange(analysis.ctx.SourceFile, read)
-	return analysis.ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+	textRange := rule.TokenRange(analysis.ruleContext.SourceFile, read)
+	return analysis.ruleContext.SourceFile.Text()[textRange.Pos():textRange.End()]
 }

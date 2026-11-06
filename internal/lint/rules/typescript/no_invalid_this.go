@@ -90,7 +90,7 @@ var NoInvalidThis = rule.Rule[noInvalidThisSettings]{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs to know what it is inside when it meets a `this`, and the listener walk is
 				// pre-order with no exit hook to pop a stack on.
-				walker := &noInvalidThisWalker{ctx: ruleContext, settings: settings}
+				walker := &noInvalidThisWalker{ruleContext: ruleContext, settings: settings}
 				walker.walk(node)
 			},
 		}

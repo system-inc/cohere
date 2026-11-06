@@ -10,8 +10,8 @@ import (
 
 // maxDepthWalker carries the per-function depth stack across the recursive walk.
 type maxDepthWalker struct {
-	ctx      rule.Context
-	settings MaxDepthSettings
+	ruleContext rule.Context
+	settings    MaxDepthSettings
 
 	// depths is upstream's `functionStack`. Its top is the nesting depth in force inside the
 	// innermost enclosing function, and entering a function pushes a fresh zero so a nested
@@ -107,10 +107,10 @@ func (walker *maxDepthWalker) pushBlock(node *ast.Node) {
 
 	// The keyword alone, which is upstream's `getFirstToken(node).loc`. See the span section on the
 	// rule for why `rule.TokenRange` is the wrong helper.
-	tokenRange := scanner.GetRangeOfTokenAtPosition(walker.ctx.SourceFile, node.Pos())
-	walker.ctx.Report(rule.Diagnostic{
+	tokenRange := scanner.GetRangeOfTokenAtPosition(walker.ruleContext.SourceFile, node.Pos())
+	walker.ruleContext.Report(rule.Diagnostic{
 		Range:      tokenRange,
-		SourceFile: walker.ctx.SourceFile,
+		SourceFile: walker.ruleContext.SourceFile,
 		Message: rule.Message{
 			Id: messageMaxDepthTooDeeply.Id,
 			Description: fmt.Sprintf("Blocks are nested too deeply (%d). Maximum allowed is %d. %s",

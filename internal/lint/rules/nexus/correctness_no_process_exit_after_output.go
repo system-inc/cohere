@@ -193,7 +193,7 @@ type correctnessNoProcessExitAfterOutputRoot struct {
 }
 
 func correctnessNoProcessExitAfterOutputScanFile(ruleContext rule.Context, sourceFile *ast.Node) {
-	writers := correctnessNoProcessExitAfterOutputWriters{ctx: ruleContext, byDeclaration: map[*ast.Node]bool{}}
+	writers := correctnessNoProcessExitAfterOutputWriters{ruleContext: ruleContext, byDeclaration: map[*ast.Node]bool{}}
 	rootsByNode := map[*ast.Node]*correctnessNoProcessExitAfterOutputRoot{}
 	var roots []*correctnessNoProcessExitAfterOutputRoot
 	rootFor := func(call *ast.Node) *correctnessNoProcessExitAfterOutputRoot {

@@ -12,7 +12,7 @@ import (
 
 // purityUnit is the analysis state for one compiled unit, shared by every function inside it.
 type purityUnit struct {
-	ctx rule.Context
+	ruleContext rule.Context
 	// values is the abstract state keyed by value. Single-assignment form makes one entry per
 	// value rather than per binding, which is what lets a forward walk be correct without a
 	// fixpoint.
@@ -52,7 +52,7 @@ func (unit *purityUnit) walk(function *high_level_intermediate_representation.Fu
 			return
 		}
 		unit.reported[finding.Node] = true
-		unit.ctx.ReportNode(finding.Node, rule.Message{
+		unit.ruleContext.ReportNode(finding.Node, rule.Message{
 			Id: messagePurityImpureCallId,
 			Description: fmt.Sprintf("`%s` is an impure function. %s",
 				finding.CanonicalName, messagePurityImpureCallReason),
@@ -241,7 +241,7 @@ func (unit *purityUnit) namesATrueGlobal(node *ast.Node) bool {
 	if !ast.IsIdentifier(identifier) {
 		return false
 	}
-	return !rule.IsDeclaredInASourceFile(unit.ctx.TypeChecker.GetSymbolAtLocation(identifier))
+	return !rule.IsDeclaredInASourceFile(unit.ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 }
 
 // loadByName recovers a captured binding's state through its source name.

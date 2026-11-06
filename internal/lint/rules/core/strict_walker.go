@@ -11,8 +11,8 @@ import (
 // enclosing function is strict, and one of whether we are inside a class body. There is no exit
 // listener here, so the walk is explicit and the two stacks are ordinary recursion parameters.
 type strictWalker struct {
-	ctx  rule.Context
-	mode StrictMode
+	ruleContext rule.Context
+	mode        StrictMode
 }
 
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
@@ -94,7 +94,7 @@ func (walker strictWalker) enterFunction(node *ast.Node, insideAnyFunction bool,
 	var bodyStatements []*ast.Node
 	if body != nil && body.Kind == ast.KindBlock {
 		bodyStatements = body.AsBlock().Statements.Nodes
-		directives = strictDirectivesIn(walker.ctx, bodyStatements)
+		directives = strictDirectivesIn(walker.ruleContext, bodyStatements)
 	}
 
 	isStrict := len(directives) > 0
@@ -107,7 +107,7 @@ func (walker strictWalker) enterFunction(node *ast.Node, insideAnyFunction bool,
 		if strictHasSimpleParameterList(node) {
 			walker.reportAll(directives, walker.fileLevelMessage(), strictShouldFix(walker.mode))
 		} else {
-			walker.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
+			walker.ruleContext.ReportNode(directives[0], messageStrictNonSimpleParameterList)
 			walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 		}
 	}
@@ -143,13 +143,13 @@ func (walker strictWalker) enterFunctionInFunctionMode(
 		switch {
 		case !strictHasSimpleParameterList(node):
 			// A syntax error since ES2016, and the most urgent thing to say about this function.
-			walker.ctx.ReportNode(directives[0], messageStrictNonSimpleParameterList)
+			walker.ruleContext.ReportNode(directives[0], messageStrictNonSimpleParameterList)
 		case parentIsStrict:
-			walker.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessary,
-				strictRemoveDirective(walker.ctx, directives[0]))
+			walker.ruleContext.ReportNodeWithFixes(directives[0], messageStrictUnnecessary,
+				strictRemoveDirective(walker.ruleContext, directives[0]))
 		case inClass:
-			walker.ctx.ReportNodeWithFixes(directives[0], messageStrictUnnecessaryInClasses,
-				strictRemoveDirective(walker.ctx, directives[0]))
+			walker.ruleContext.ReportNodeWithFixes(directives[0], messageStrictUnnecessaryInClasses,
+				strictRemoveDirective(walker.ruleContext, directives[0]))
 		}
 		walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 		return
@@ -166,12 +166,12 @@ func (walker strictWalker) enterFunctionInFunctionMode(
 		return
 	}
 	if strictHasSimpleParameterList(node) {
-		walker.ctx.ReportNode(node, messageStrictFunction)
+		walker.ruleContext.ReportNode(node, messageStrictFunction)
 		return
 	}
 	// The function cannot carry a directive at all, so upstream asks for a wrapper instead and
 	// names the function so the reader can find it.
-	walker.ctx.ReportNode(node, messageStrictWrapFor(strictDescribeFunction(walker.ctx, node)))
+	walker.ruleContext.ReportNode(node, messageStrictWrapFor(strictDescribeFunction(walker.ruleContext, node)))
 }
 
 // walkParameters descends into parameter default values, which can hold functions.
@@ -206,10 +206,10 @@ func (walker strictWalker) reportSlice(
 ) {
 	for index := from; index < len(directives); index++ {
 		if fix {
-			walker.ctx.ReportNodeWithFixes(directives[index], message,
-				strictRemoveDirective(walker.ctx, directives[index]))
+			walker.ruleContext.ReportNodeWithFixes(directives[index], message,
+				strictRemoveDirective(walker.ruleContext, directives[index]))
 			continue
 		}
-		walker.ctx.ReportNode(directives[index], message)
+		walker.ruleContext.ReportNode(directives[index], message)
 	}
 }

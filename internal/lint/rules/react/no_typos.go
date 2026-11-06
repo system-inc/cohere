@@ -110,7 +110,7 @@ var NoTypos = rule.Rule[rule.NoOptions]{
 		// order, rather than by registering per-kind listeners whose relative order is not stated.
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
-				state := &noTyposState{ctx: ruleContext}
+				state := &noTyposState{ruleContext: ruleContext}
 				state.walk(sourceFile)
 			},
 		}

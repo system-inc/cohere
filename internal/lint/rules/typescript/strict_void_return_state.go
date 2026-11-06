@@ -9,8 +9,8 @@ import (
 )
 
 type strictVoidReturnState struct {
-	ctx      rule.Context
-	settings StrictVoidReturnOptions
+	ruleContext rule.Context
+	settings    StrictVoidReturnOptions
 }
 
 // isVoidReturningFunctionType answers upstream's helper of the same name.
@@ -34,11 +34,11 @@ func (state *strictVoidReturnState) isVoidReturningFunctionType(subject *checker
 	found := 0
 	for part := range type_checking.UnionTypePartsSequence(subject) {
 		for _, signature := range checker.Checker_getSignaturesOfType(
-			state.ctx.TypeChecker,
+			state.ruleContext.TypeChecker,
 			part,
 			checker.SignatureKindCall,
 		) {
-			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
+			returnType := checker.Checker_getReturnTypeOfSignature(state.ruleContext.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSequence(returnType) {
 				found++
 				if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsVoid) {
@@ -63,14 +63,14 @@ func (state *strictVoidReturnState) isVoidReturningFunctionType(subject *checker
 // Returns whether a base was found expecting a void function, so the caller can skip the ordinary
 // contextual path rather than reporting the same member through two routes.
 func (state *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool {
-	if state.ctx.TypeChecker == nil {
+	if state.ruleContext.TypeChecker == nil {
 		return false
 	}
 	name := member.Name()
 	if name == nil {
 		return false
 	}
-	memberSymbol := state.ctx.TypeChecker.GetSymbolAtLocation(name)
+	memberSymbol := state.ruleContext.TypeChecker.GetSymbolAtLocation(name)
 	if memberSymbol == nil {
 		return false
 	}
@@ -90,15 +90,19 @@ func (state *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool
 			continue
 		}
 		for _, baseTypeNode := range types.Nodes {
-			baseType := state.ctx.TypeChecker.GetTypeAtLocation(baseTypeNode)
+			baseType := state.ruleContext.TypeChecker.GetTypeAtLocation(baseTypeNode)
 			if baseType == nil {
 				continue
 			}
-			baseMemberSymbol := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, baseType, memberSymbol.Name)
+			baseMemberSymbol := checker.Checker_getPropertyOfType(
+				state.ruleContext.TypeChecker,
+				baseType,
+				memberSymbol.Name,
+			)
 			if baseMemberSymbol == nil {
 				continue
 			}
-			baseMemberType := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(baseMemberSymbol, member)
+			baseMemberType := state.ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(baseMemberSymbol, member)
 			if baseMemberType == nil || !state.isVoidReturningFunctionType(baseMemberType) {
 				continue
 			}
@@ -127,7 +131,7 @@ func (state *strictVoidReturnState) checkAgainstBaseTypes(member *ast.Node) bool
 // contextual object type, and the method itself is then judged exactly as a function literal would
 // be. Upstream reaches the same place through its own object-property path.
 func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *ast.Node) {
-	if state.ctx.TypeChecker == nil {
+	if state.ruleContext.TypeChecker == nil {
 		return
 	}
 	name := property.Name()
@@ -141,7 +145,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *
 	if object == nil || object.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
-	objectExpected := checker.Checker_getContextualType(state.ctx.TypeChecker, object, 0)
+	objectExpected := checker.Checker_getContextualType(state.ruleContext.TypeChecker, object, 0)
 	if objectExpected == nil {
 		return
 	}
@@ -151,11 +155,11 @@ func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *
 	}
 	var expected *checker.Type
 	for part := range type_checking.UnionTypePartsSequence(objectExpected) {
-		symbol := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, part, propertyName)
+		symbol := checker.Checker_getPropertyOfType(state.ruleContext.TypeChecker, part, propertyName)
 		if symbol == nil {
 			continue
 		}
-		if candidate := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(symbol, property); candidate != nil {
+		if candidate := state.ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(symbol, property); candidate != nil {
 			expected = candidate
 			break
 		}
@@ -169,10 +173,10 @@ func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *
 // checkExpression is upstream's `checkExpressionNode`, and reports whether the position expected a
 // void function.
 func (state *strictVoidReturnState) checkExpression(node *ast.Node) bool {
-	if node == nil || state.ctx.TypeChecker == nil {
+	if node == nil || state.ruleContext.TypeChecker == nil {
 		return false
 	}
-	expected := checker.Checker_getContextualType(state.ctx.TypeChecker, node, 0)
+	expected := checker.Checker_getContextualType(state.ruleContext.TypeChecker, node, 0)
 	if expected == nil || !state.isVoidReturningFunctionType(expected) {
 		return false
 	}
@@ -196,7 +200,10 @@ func (state *strictVoidReturnState) allowedReturnFlags() checker.TypeFlags {
 func (state *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool {
 	allowed := state.allowedReturnFlags()
 
-	actual := checker.Checker_getApparentType(state.ctx.TypeChecker, state.ctx.TypeChecker.GetTypeAtLocation(node))
+	actual := checker.Checker_getApparentType(
+		state.ruleContext.TypeChecker,
+		state.ruleContext.TypeChecker.GetTypeAtLocation(node),
+	)
 	if actual == nil {
 		return false
 	}
@@ -206,11 +213,11 @@ func (state *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool 
 	sawOne := false
 	for part := range type_checking.UnionTypePartsSequence(actual) {
 		for _, signature := range checker.Checker_getSignaturesOfType(
-			state.ctx.TypeChecker,
+			state.ruleContext.TypeChecker,
 			part,
 			checker.SignatureKindCall,
 		) {
-			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
+			returnType := checker.Checker_getReturnTypeOfSignature(state.ruleContext.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSequence(returnType) {
 				sawOne = true
 				if !type_checking.IsTypeFlagSet(constituent, allowed) {
@@ -239,17 +246,23 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	isMethod := node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor
 	if !isArrow && !isFunctionExpression && !isMethod {
 		// Not a function literal, so there is nothing to point inside. Upstream reports the node.
-		state.ctx.ReportNode(node, strictVoidReturnNonVoidFuncMessage())
+		state.ruleContext.ReportNode(node, strictVoidReturnNonVoidFuncMessage())
 		return
 	}
 
 	if strictVoidReturnIsGenerator(node) {
-		state.ctx.ReportRange(strictVoidReturnHeadRange(state.ctx, node), strictVoidReturnNonVoidFuncMessage())
+		state.ruleContext.ReportRange(
+			strictVoidReturnHeadRange(state.ruleContext, node),
+			strictVoidReturnNonVoidFuncMessage(),
+		)
 		return
 	}
 
 	if strictVoidReturnIsAsync(node) {
-		state.ctx.ReportRange(strictVoidReturnHeadRange(state.ctx, node), strictVoidReturnAsyncFuncMessage())
+		state.ruleContext.ReportRange(
+			strictVoidReturnHeadRange(state.ruleContext, node),
+			strictVoidReturnAsyncFuncMessage(),
+		)
 		return
 	}
 
@@ -265,7 +278,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// in `(chunk) => (total += chunk)` is the assignment and its finding starts at `total`; reporting
 	// our `ParenthesizedExpression` pointed one column early on eight ahra sites.
 	if body := strictVoidReturnBody(node); body != nil && body.Kind != ast.KindBlock {
-		state.ctx.ReportNode(ast.SkipParentheses(body), strictVoidReturnNonVoidReturnMessage())
+		state.ruleContext.ReportNode(ast.SkipParentheses(body), strictVoidReturnNonVoidReturnMessage())
 		return
 	}
 
@@ -273,7 +286,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 	// function.
 	if annotation := strictVoidReturnTypeAnnotation(node); annotation != nil {
 		if annotation.Kind != ast.KindVoidKeyword {
-			state.ctx.ReportNode(annotation, strictVoidReturnNonVoidFuncMessage())
+			state.ruleContext.ReportNode(annotation, strictVoidReturnNonVoidFuncMessage())
 			return
 		}
 	}
@@ -288,11 +301,11 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 		if argument == nil {
 			continue
 		}
-		returnType := state.ctx.TypeChecker.GetTypeAtLocation(argument)
+		returnType := state.ruleContext.TypeChecker.GetTypeAtLocation(argument)
 		if type_checking.IsTypeFlagSet(returnType, allowed) {
 			continue
 		}
-		state.ctx.ReportRange(scanner.GetRangeOfTokenAtPosition(state.ctx.SourceFile, statement.Pos()),
+		state.ruleContext.ReportRange(scanner.GetRangeOfTokenAtPosition(state.ruleContext.SourceFile, statement.Pos()),
 			strictVoidReturnNonVoidReturnMessage())
 	}
 }
@@ -306,7 +319,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunction(node *ast.Node) {
 // from every signature and only trusts the contextual type when there is a single signature or when
 // all of them agree that the position is void.
 func (state *strictVoidReturnState) checkCall(node *ast.Node) {
-	if state.ctx.TypeChecker == nil {
+	if state.ruleContext.TypeChecker == nil {
 		return
 	}
 
@@ -325,14 +338,14 @@ func (state *strictVoidReturnState) checkCall(node *ast.Node) {
 		return
 	}
 
-	calleeType := state.ctx.TypeChecker.GetTypeAtLocation(callee)
+	calleeType := state.ruleContext.TypeChecker.GetTypeAtLocation(callee)
 	if calleeType == nil {
 		return
 	}
 	signatures := []*checker.Signature{}
 	for constituent := range type_checking.UnionTypePartsSequence(calleeType) {
 		signatures = append(signatures,
-			checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, constituent, signatureKind)...)
+			checker.Checker_getSignaturesOfType(state.ruleContext.TypeChecker, constituent, signatureKind)...)
 	}
 
 	for index, argument := range arguments.Nodes {
@@ -346,15 +359,15 @@ func (state *strictVoidReturnState) checkCall(node *ast.Node) {
 			if index >= len(parameters) {
 				continue
 			}
-			parameterType := state.ctx.TypeChecker.GetTypeOfSymbolAtLocation(parameters[index], callee)
+			parameterType := state.ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameters[index], callee)
 			if parameterType == nil {
 				continue
 			}
 			for constituent := range type_checking.UnionTypePartsSequence(parameterType) {
 				for _, parameterSignature := range checker.Checker_getSignaturesOfType(
-					state.ctx.TypeChecker, constituent, checker.SignatureKindCall) {
+					state.ruleContext.TypeChecker, constituent, checker.SignatureKindCall) {
 					expectedReturns = append(expectedReturns,
-						checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, parameterSignature))
+						checker.Checker_getReturnTypeOfSignature(state.ruleContext.TypeChecker, parameterSignature))
 				}
 			}
 		}
