@@ -22,13 +22,15 @@ public struct AbbreviationVocabulary: Sendable {
     /* One abbreviated word and the forms it is judged in. */
     struct Entry: Sendable {
         var abbreviation: String
-        var expansion: String
+        /* The words it stands in for, the most common meaning first. A word with more than one meaning lists every one, and every message names them all. */
+        var expansions: [String]
         var advice: String
         /* The whole form's style, when the word is judged as a whole name. */
         var whole: String?
         var prefix: (phase: String, style: String)?
         var suffix: (advice: String, matcher: String, replacement: String)?
-        var segment: Bool
+        /* The segment form's style, when the word is judged as a camelCase word anywhere in a name. */
+        var segment: String?
     }
 
     /* What the vocabulary says about one name: the form and word that matched, and the message. */
@@ -111,7 +113,7 @@ public struct AbbreviationVocabulary: Sendable {
             if entry.suffix != nil {
                 vocabulary.suffixes.append(entry)
             }
-            if entry.segment {
+            if entry.segment != nil {
                 vocabulary.segments.append(entry)
             }
         }
@@ -131,19 +133,25 @@ public struct AbbreviationVocabulary: Sendable {
         let context = "entry \(index) (\"\(abbreviation)\")"
         try refuseUnknownKeys(
             in: object,
-            allowed: ["abbreviation", "expansion", "advice", "reason", "whole", "prefix", "suffix", "segment"],
+            allowed: ["abbreviation", "expansions", "advice", "reason", "whole", "prefix", "suffix", "segment"],
             context: context,
         )
         guard !abbreviation.isEmpty, abbreviation.lowercased() == abbreviation else {
             throw LoadFailure(description: "\(context): the abbreviation must be lowercase and present")
         }
+        /* A list of words or nothing, as Go's decoder reads `[]string`: a lone string is refused rather than read as no expansion. */
+        let expansions: [String]
+        switch object["expansions"] {
+            case nil: expansions = []
+            case let words as [String]: expansions = words
+            default: throw LoadFailure(description: "\(context): expansions is not a list of words")
+        }
         var entry = Entry(
             abbreviation: abbreviation,
-            expansion: object["expansion"] as? String ?? "",
+            expansions: expansions,
             advice: object["advice"] as? String ?? "",
-            segment: object["segment"] != nil,
         )
-        var needsExpansion = entry.segment
+        var needsExpansion = false
         if let whole = object["whole"] as? [String: Any] {
             try refuseUnknownKeys(in: whole, allowed: ["style"], context: "\(context) whole")
             let style = whole["style"] as? String ?? ""
@@ -189,16 +197,30 @@ public struct AbbreviationVocabulary: Sendable {
             }
             entry.suffix = (advice, matcher, replacement)
         }
-        guard entry.whole != nil || entry.prefix != nil || entry.suffix != nil || entry.segment else {
+        if let segment = object["segment"] {
+            guard let fields = segment as? [String: Any] else {
+                throw LoadFailure(description: "\(context): the segment form is not an object")
+            }
+            try refuseUnknownKeys(in: fields, allowed: ["style"], context: "\(context) segment")
+            let style = fields["style"] as? String ?? ""
+            switch style {
+                case "": needsExpansion = true
+                case "advice" where !entry.advice.isEmpty: break
+                case "advice":
+                    throw LoadFailure(description: "\(context): segment style is advice and the entry has none")
+                default: throw LoadFailure(description: "\(context): unknown segment style \"\(style)\"")
+            }
+            entry.segment = style
+        }
+        guard entry.whole != nil || entry.prefix != nil || entry.suffix != nil || entry.segment != nil else {
             throw LoadFailure(description: "\(context): no form, so the entry judges nothing")
         }
-        if let segment = object["segment"] {
-            guard let fields = segment as? [String: Any], fields.isEmpty else {
-                throw LoadFailure(description: "\(context): the segment form takes no fields")
-            }
-        }
-        if needsExpansion && entry.expansion.isEmpty {
+        if needsExpansion && entry.expansions.isEmpty {
             throw LoadFailure(description: "\(context): a form suggests the expansion and the entry has none")
+        }
+        /* An empty expansion would print `Use ""`, or fold a name's own tail into the suggestion as if it were the word. */
+        if entry.expansions.contains("") {
+            throw LoadFailure(description: "\(context): an expansion is empty")
         }
         return entry
     }
@@ -214,6 +236,23 @@ public struct AbbreviationVocabulary: Sendable {
         word.prefix(1).uppercased() + word.dropFirst()
     }
 
+    /* A list of names as a message reads it: `"a"`, `"a" or "b"`, or `"a", "b" or "c"`, as Go's `quoted` writes it. */
+    static func quoted(_ names: [String]) -> String {
+        let quotedNames = names.map { "\"\($0)\"" }
+        guard let last = quotedNames.last, quotedNames.count > 1 else {
+            return quotedNames.joined()
+        }
+        return quotedNames.dropLast().joined(separator: ", ") + " or " + last
+    }
+
+    /* `Use "a".` for one candidate, byte for byte what every message said before a word could mean two things; more than one names them all. */
+    static func useAdvice(_ candidates: [String]) -> String {
+        if candidates.count == 1 {
+            return "Use \"\(candidates[0])\"."
+        }
+        return "Use \(quoted(candidates)), whichever it means."
+    }
+
     /* What the vocabulary reports for a name, if anything, in the order the Go rule has always used. */
     public func find(_ name: String) -> Finding? {
         if allowedNames.contains(name) {
@@ -223,8 +262,10 @@ public struct AbbreviationVocabulary: Sendable {
             let advice: String
             switch whole {
                 case "advice": advice = entry.advice
-                case "plain": advice = "Use \"\(entry.expansion)\"."
-                default: advice = "Use \"\(entry.expansion)\" or a more descriptive name."
+                case "plain": advice = Self.useAdvice(entry.expansions)
+                case _ where entry.expansions.count > 1:
+                    advice = "Use \(Self.quoted(entry.expansions)), whichever it means, or a more descriptive name."
+                default: advice = "Use \(Self.quoted(entry.expansions)) or a more descriptive name."
             }
             return Finding(
                 form: "whole",
@@ -265,8 +306,11 @@ public struct AbbreviationVocabulary: Sendable {
             guard name.hasSuffix(word) else { continue }
             var advice = suffix.advice
             if advice.isEmpty {
-                let replacement = suffix.replacement.isEmpty ? Self.capitalized(entry.expansion) : suffix.replacement
-                advice = "Use \"\(name.dropLast(word.count))\(replacement)\"."
+                let head = String(name.dropLast(word.count))
+                /* A replacement is the one spelling the file chose for every meaning, so it stands alone. */
+                let replacements =
+                    suffix.replacement.isEmpty ? entry.expansions.map(Self.capitalized) : [suffix.replacement]
+                advice = Self.useAdvice(replacements.map { head + $0 })
             }
             return Finding(
                 form: "suffix",
@@ -291,12 +335,19 @@ public struct AbbreviationVocabulary: Sendable {
             guard Self.segmentMatches(word, in: bytes), let at = Self.firstSegmentStart(word, in: bytes) else {
                 continue
             }
-            let suggestion = String(
-                decoding: bytes[..<at] + Array(Self.capitalized(entry.expansion).utf8) + bytes[(at + word.count)...],
-                as: UTF8.self,
-            )
-            if suggestion == name {
-                continue
+            var advice = entry.advice
+            if entry.segment != "advice" {
+                let suggestions = entry.expansions.map { expansion in
+                    String(
+                        decoding: bytes[..<at] + Array(Self.capitalized(expansion).utf8) + bytes[(at + word.count)...],
+                        as: UTF8.self,
+                    )
+                }
+                /* Every expansion rewrites the same occurrence, so a rewrite that leaves the name as it was leaves it so for all of them. */
+                if suggestions.contains(name) {
+                    continue
+                }
+                advice = Self.useAdvice(suggestions)
             }
             let shown = Self.capitalized(entry.abbreviation)
             return Finding(
@@ -305,7 +356,7 @@ public struct AbbreviationVocabulary: Sendable {
                 message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedWordSegment(
                     name: name,
                     word: shown,
-                    suggestion: suggestion,
+                    advice: advice,
                 ),
             )
         }
@@ -329,13 +380,13 @@ public struct AbbreviationVocabulary: Sendable {
                 ),
             )
         }
-        let suggestion = entry.expansion + name.dropFirst(entry.abbreviation.count)
+        let rest = name.dropFirst(entry.abbreviation.count)
         return Finding(
             form: "prefix",
             abbreviation: entry.abbreviation,
             message: RuleMessages.ConsistencyNoAbbreviatedIdentifier.abbreviatedIdentifier(
                 name: name,
-                advice: "Use \"\(suggestion)\".",
+                advice: Self.useAdvice(entry.expansions.map { $0 + rest }),
             ),
         )
     }

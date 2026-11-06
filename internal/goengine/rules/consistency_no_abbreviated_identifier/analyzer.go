@@ -214,13 +214,14 @@ func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
 	// The house expands to a descriptive name, never to one Go already gives something else: `ctx` becomes
 	// `requestContext`, not the package name `context`, and `err` becomes `readError`, not the predeclared `error`.
 	// Only a whole-word finding suggests the bare expansion, so only its advice changes, and an advice-style entry
-	// already gives its own.
+	// already gives its own. A word with more than one expansion keeps the vocabulary's advice: it names every
+	// meaning and asks for whichever one the name has, and an ending that named one meaning would be a guess.
 	if finding.Form == abbreviation.FormWhole && finding.Entry.Whole.Style != "advice" &&
-		isTakenInGo(reachable, finding.Entry.Expansion) {
+		len(finding.Entry.Expansions) == 1 && isTakenInGo(reachable, finding.Entry.Expansions[0]) {
 		values = map[string]string{
 			"name": finding.Values["name"],
-			"advice": `Use a descriptive name ending in "` + abbreviation.Capitalize(finding.Entry.Expansion) +
-				`", since "` + finding.Entry.Expansion + `" is already Go's name for something else.`,
+			"advice": `Use a descriptive name ending in "` + abbreviation.Capitalize(finding.Entry.Expansions[0]) +
+				`", since "` + finding.Entry.Expansions[0] + `" is already Go's name for something else.`,
 		}
 	}
 	pass.Report(analysis.Diagnostic{

@@ -111,6 +111,8 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		{"Tx segment", "const pendingTxHash = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Vars segment", "const themeVars = 1;\n", []string{"abbreviatedWordSegment"}},
 		{"Var segment", "const themeVarName = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Pos segment", "const resultPos = 1;\n", []string{"abbreviatedWordSegment"}},
+		{"Sb segment", "const scrollSbOffset = 1;\n", []string{"abbreviatedWordSegment"}},
 
 		// A bare `queryFn` variable fires. It lands on
 		// the `Fn` suffix branch rather than the `fn` prefix one, which is the order the original
@@ -405,6 +407,29 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 		// `arguments` is a reserved binding, so a bare `args` names no replacement and says why.
 		{"args offers alternatives instead of one name", "const args = 1;\n", `"commandLineArguments"`},
 		{"Fn asks for a role rather than an expansion", "const compareFn = () => 1;\n", `like "Handler"`},
+		// A word with two common meanings names both and lets the author say which: a census found `resultPos`
+		// beside `resultNeg`, where it means positive, told to become `resultPosition`.
+		{
+			"a word with two meanings names both",
+			"const resultPos = 1;\nconst resultNeg = -1;\n",
+			`Use "resultPosition" or "resultPositive", whichever it means.`,
+		},
+		{
+			"a whole word with two meanings names both",
+			"const pos = 1;\n",
+			`Use "position" or "positive", whichever it means, or a more descriptive name.`,
+		},
+		// `sb` fits more words than a list could hold, a scroll region's bottom among them, so it suggests none.
+		{
+			"sb asks what it holds",
+			"const sb = 1;\n",
+			`Identifier "sb" should not be abbreviated. Spell out what it holds.`,
+		},
+		{
+			"an sb segment asks what it holds",
+			"const scrollSbOffset = 1;\n",
+			`Identifier "scrollSbOffset" abbreviates "Sb". Spell out what it holds.`,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
