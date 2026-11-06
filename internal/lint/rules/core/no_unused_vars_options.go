@@ -81,7 +81,7 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 		return unmarshalOptionsError
 	}
 	decoded := NoUnusedVarsOptions(fields)
-	for _, mode := range noUnusedVarsModes {
+	for _, mode := range noUnusedVariablesModes {
 		value := mode.value(&decoded)
 		if value != "" && !slices.Contains(mode.allowed, value) {
 			return fmt.Errorf("%s is one of %q, and the config gives %q", mode.key, mode.allowed, value)

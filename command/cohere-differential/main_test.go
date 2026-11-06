@@ -20,7 +20,7 @@ import (
 // guarantee to a run that has none.
 func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 	test.Parallel()
-	lintConfiguration := configFrom(test, lintConfigFile{
+	lintConfiguration := configurationFrom(test, lintConfigFile{
 		Rules:          map[string]string{"nexus/consistency-no-enum": "error"},
 		IgnorePatterns: []string{"ignored-here/**"},
 	})
@@ -78,12 +78,12 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 
 // An override that scopes a rule off for one directory is invisible from the base rule list.
 //
-// This is the case a check written against `lintConfig.Rules` alone would sail past: the rule is
+// This is the case a check written against `lintConfiguration.Rules` alone would sail past: the rule is
 // enabled at the base level, the path is not ignored, and the control would still be silent because
 // an override turned that rule off for exactly that directory.
 func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 	test.Parallel()
-	lintConfiguration := configFrom(test, lintConfigFile{
+	lintConfiguration := configurationFrom(test, lintConfigFile{
 		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
 		Overrides: []lintConfigOverride{{
 			Files: []string{"generated/**/*.ts"},
@@ -125,7 +125,7 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 // because the opposite fix, dropping the check, is the tempting one.
 func TestABareRuleNameFindsItsPluginPrefixedConfigKey(test *testing.T) {
 	test.Parallel()
-	lintConfiguration := configFrom(test, lintConfigFile{
+	lintConfiguration := configurationFrom(test, lintConfigFile{
 		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
 	})
 
@@ -153,12 +153,12 @@ type lintConfigOverride struct {
 	Rules map[string]string `json:"rules"`
 }
 
-// configFrom writes a lint config to disk and loads it through the real loader.
+// configurationFrom writes a lint config to disk and loads it through the real loader.
 //
 // Built through configuration.Load rather than by hand so the test exercises the same parsing, override
 // ordering, and root resolution the command does. A hand-built Config would test this guard against
 // a shape the loader never produces.
-func configFrom(test *testing.T, raw lintConfigFile) *configuration.Config {
+func configurationFrom(test *testing.T, raw lintConfigFile) *configuration.Config {
 	test.Helper()
 
 	directory := test.TempDir()

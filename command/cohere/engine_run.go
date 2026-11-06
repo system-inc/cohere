@@ -823,7 +823,7 @@ func classifyEngineCoverage(record *engineLintRecord, language engineLanguage) (
 		case notConfigured[name]:
 			entry.Category = coverageNotConfigured
 		case record.RulesScopedOff[name] > 0:
-			entry.Category = coverageOffByTheConfig
+			entry.Category = coverageOffByTheConfiguration
 			entry.Details = []string{fmt.Sprintf("%d files", record.RulesScopedOff[name])}
 		default:
 			entry.Category = coverageListenedToNothing

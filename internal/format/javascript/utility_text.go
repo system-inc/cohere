@@ -78,11 +78,11 @@ func getNextNonSpaceNonCommentCharacter(text string, startIndex int) string {
 	if index < 0 || index >= len(text) {
 		return ""
 	}
-	return charAt(text, index)
+	return characterAt(text, index)
 }
 
-// charAt is JavaScript's text.charAt(index) on a byte offset: the whole character starting there.
-func charAt(text string, index int) string {
+// characterAt is JavaScript's text.charAt(index) on a byte offset: the whole character starting there.
+func characterAt(text string, index int) string {
 	if index < 0 || index >= len(text) {
 		return ""
 	}

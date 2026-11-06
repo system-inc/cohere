@@ -234,10 +234,10 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 		return value
 	}
 	location := TailwindLocationOptions{
-		EntryPoint:       read("entryPoint"),
-		TailwindConfig:   read("tailwindConfig"),
-		WorkingDirectory: read("cwd"),
-		Tsconfig:         read("tsconfig"),
+		EntryPoint:            read("entryPoint"),
+		TailwindConfiguration: read("tailwindConfig"),
+		WorkingDirectory:      read("cwd"),
+		Tsconfig:              read("tsconfig"),
 	}
 	location.anchorAt(anchor)
 	named := location.Location()

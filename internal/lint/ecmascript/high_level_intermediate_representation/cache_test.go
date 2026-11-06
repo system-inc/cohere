@@ -24,7 +24,7 @@ export function Widget({items}: {items: number[]}) {
 
 // totalPhis counts phis across a function and every nested function.
 //
-// `CollectSSAStats` reports the top-level function only, which is why the first version of the test
+// `CollectSsaStats` reports the top-level function only, which is why the first version of the test
 // below could not see the defect it exists to catch: repeated construction adds phis wherever the
 // merges are, and in a real component that is often a nested arrow. A whole-tree count is the only
 // one that stays true as the probe source changes.
@@ -108,7 +108,7 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 // inside the cached computation.
 //
 // `Construct` mutates in place and is not idempotent: a second run over one graph adds phis that
-// correspond to no branch. The doubly-constructed graph still passes `VerifySSA`, so nothing would
+// correspond to no branch. The doubly-constructed graph still passes `VerifySsa`, so nothing would
 // have caught this at runtime. Asserting the phi count is stable across repeated asks is what
 // pins the design.
 func TestForFunctionConstructsExactlyOnce(test *testing.T) {

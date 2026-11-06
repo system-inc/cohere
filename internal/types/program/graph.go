@@ -58,12 +58,12 @@ type Graph struct {
 	contentPack    *ContentPack
 	readIdentities *readIdentities
 
-	// LintConfig decides which rules apply to which files, and which files are not linted at all.
+	// LintConfiguration decides which rules apply to which files, and which files are not linted at all.
 	//
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
 	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
 	// permissive default is reachable only from a caller that chose it deliberately.
-	LintConfig *configuration.Config
+	LintConfiguration *configuration.Config
 
 	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
@@ -381,7 +381,7 @@ func (graph *Graph) Workers() int {
 // source: a code from either list, located in no file or in one outside this program.
 func (graph *Graph) IsOptionsDiagnostic(diagnostic *ast.Diagnostic) bool {
 	_, raisedByProgram := optionsDiagnosticCodes[diagnostic.Code()]
-	_, raisedByConfiguration := configParsingOptionCodes[diagnostic.Code()]
+	_, raisedByConfiguration := configurationParsingOptionCodes[diagnostic.Code()]
 	if !raisedByProgram && !raisedByConfiguration {
 		return false
 	}
@@ -542,7 +542,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 	workers := min(graph.Workers(), len(files))
 
 	// Built once per walk, read by every worker. Nil when no registry was supplied.
-	catalog := newRuleNameCatalog(graph.RegisteredRuleNames, graph.LintConfig.RuleKeys())
+	catalog := newRuleNameCatalog(graph.RegisteredRuleNames, graph.LintConfiguration.RuleKeys())
 
 	var mutex sync.Mutex
 	diagnostics := []rule.Diagnostic{}
@@ -1135,7 +1135,7 @@ func (graph *Graph) rulesFor(
 	scopedOff map[string]int,
 	unconfigured map[string]int,
 ) (*ruleSelection, configuration.Resolved) {
-	if graph.LintConfig == nil {
+	if graph.LintConfiguration == nil {
 		selection, made := selections[noConfiguration]
 		if !made {
 			selection = &ruleSelection{applicable: rules}
@@ -1144,7 +1144,7 @@ func (graph *Graph) rulesFor(
 		return selection, configuration.Resolved{}
 	}
 
-	resolution := graph.LintConfig.Resolve(fileName)
+	resolution := graph.LintConfiguration.Resolve(fileName)
 	if resolution.Ignored {
 		return nil, resolution
 	}

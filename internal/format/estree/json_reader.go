@@ -167,12 +167,12 @@ func (reader *jsonReader) parseProperty() (*Node, error) {
 	character := reader.peek()
 	start := reader.position
 	var key *Node
-	var err error
+	var keyError error
 	switch {
 	case character == '"' || character == '\'':
-		key, err = reader.parseString()
+		key, keyError = reader.parseString()
 	case character == '.' || character >= '0' && character <= '9':
-		key, err = reader.parseNumber()
+		key, keyError = reader.parseNumber()
 	case character == '[':
 		return nil, reader.errorf("Computed key is not allowed in JSON")
 	default:
@@ -182,8 +182,8 @@ func (reader *jsonReader) parseProperty() (*Node, error) {
 		}
 		key = New("Identifier", start, reader.position, []Property{{"name", String(name)}})
 	}
-	if err != nil {
-		return nil, err
+	if keyError != nil {
+		return nil, keyError
 	}
 	if reader.peek() != ':' {
 		return nil, reader.errorf("Shorthand property is not allowed in JSON")

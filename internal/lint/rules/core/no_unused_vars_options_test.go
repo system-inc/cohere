@@ -22,10 +22,10 @@ import (
  * three, extracted by transpiling the files and stubbing RuleTester. Those files run under
  * `sourceType: "script"`, as cohere reads a file with no import or export. Three of them also set
  * `reportUsedIgnorePattern`. Here the key is dropped from both columns, and upstream's answer without
- * it is what they assert; with it, they are replayed by TestNoUnusedVarsOptionsUpstreamCorpus. The rest are edge
+ * it is what they assert; with it, they are replayed by TestNoUnusedVariablesOptionsUpstreamCorpus. The rest are edge
  * rows written for this port, each replayed under the source type cohere gives it: a script unless
  * it imports or exports. Findings in their prelude are left out, as in
- * TestNoUnusedVarsIgnoreRestSiblings. Upstream's id `unusedVar` is this rule's `noUnusedVars`.
+ * TestNoUnusedVariablesIgnoreRestSiblings. Upstream's id `unusedVar` is this rule's `noUnusedVars`.
  *
  * The programs are built under TypeScript's default module detection rather than the typed harness's
  * `moduleDetection: "force"`, which makes every file a module and so leaves `vars: "local"` nothing
@@ -33,14 +33,14 @@ import (
  * is a script, which is the reading the rows were replayed under.
  */
 
-// noUnusedVarsScriptTsConfig is the harness's tsconfig without `moduleDetection: "force"`.
-const noUnusedVarsScriptTsConfig = `{
+// noUnusedVariablesScriptTsConfiguration is the harness's tsconfig without `moduleDetection: "force"`.
+const noUnusedVariablesScriptTsConfiguration = `{
 	"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []},
 	"include": ["**/*.ts"]
 }`
-const noUnusedVarsOptionPrelude = "declare const o: Record<string, number>;\ndeclare const n2: { x: number[] };\ndeclare const list: number[];\ndeclare const list2: [number, { e: number }];\ndeclare const nested: number[][];\ndeclare const entries: [string, number][];\ndeclare function use(...values: unknown[]): void;\n"
+const noUnusedVariablesOptionPrelude = "declare const o: Record<string, number>;\ndeclare const n2: { x: number[] };\ndeclare const list: number[];\ndeclare const list2: [number, { e: number }];\ndeclare const nested: number[][];\ndeclare const entries: [string, number][];\ndeclare function use(...values: unknown[]): void;\n"
 
-func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *testing.T) {
+func TestNoUnusedVariablesVariablesCaughtErrorsAndDestructuredArrayIgnorePattern(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -660,7 +660,7 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *tes
 			test.Run(column.label+" "+column.options+": "+testCase.body, func(test *testing.T) {
 				test.Parallel()
 
-				options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+				options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
 					json.RawMessage(column.options),
 				)
 				if decodeNoUnusedVariablesOptionsError != nil {
@@ -668,17 +668,17 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *tes
 				}
 				prelude := ""
 				if testCase.withPrelude {
-					prelude = noUnusedVarsOptionPrelude
+					prelude = noUnusedVariablesOptionPrelude
 				}
 				// The harness writes the file trimmed, so positions are in the trimmed text.
 				source := strings.TrimSpace(prelude+testCase.body) + "\n"
-				result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+				result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVariables, map[string]string{
 					"a.ts": source,
 				}, "a.ts", options,
 					func(directory string) {
 						if writeError := os.WriteFile(
 							filepath.Join(directory, "tsconfig.json"),
-							[]byte(noUnusedVarsScriptTsConfig),
+							[]byte(noUnusedVariablesScriptTsConfiguration),
 							0o644,
 						); writeError != nil {
 							test.Fatalf("writing the tsconfig: %v", writeError)
@@ -705,7 +705,7 @@ func TestNoUnusedVarsVarsCaughtErrorsAndDestructuredArrayIgnorePattern(test *tes
 
 // The decoder reads upstream's two forms and refuses a mode spelling upstream's schema refuses, so a
 // typo fails at load rather than running the default (#6esg2nx, the class of #p9s1131).
-func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
+func TestDecodeNoUnusedVariablesOptionsModesAndShorthand(test *testing.T) {
 	test.Parallel()
 
 	accepted := map[string]NoUnusedVarsOptions{
@@ -723,7 +723,7 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 		},
 	}
 	for raw, want := range accepted {
-		decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
+		decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(json.RawMessage(raw))
 		if decodeNoUnusedVariablesOptionsError != nil {
 			test.Errorf("%s was refused: %v", raw, decodeNoUnusedVariablesOptionsError)
 			continue
@@ -743,7 +743,7 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 		`{"Vars": "local"}`:                  `"Vars"`,
 	}
 	for raw, naming := range refused {
-		_, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(raw))
+		_, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(json.RawMessage(raw))
 		if decodeNoUnusedVariablesOptionsError == nil {
 			test.Errorf("%s decoded, and upstream's schema refuses it", raw)
 			continue
@@ -767,7 +767,7 @@ func TestDecodeNoUnusedVarsOptionsModesAndShorthand(test *testing.T) {
 // `after-used` rows pin the two halves of upstream's isAfterLastUsedArg: a destructured name is never
 // skipped by it, and a later destructured name that is read, or given a default anywhere in its
 // pattern, keeps the parameters before it.
-func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(test *testing.T) {
+func TestNoUnusedVariablesJudgesADestructuredParameterAsAParameter(test *testing.T) {
 	test.Parallel()
 
 	const prelude = "declare function use(...values: unknown[]): void;\n"
@@ -855,12 +855,14 @@ func TestNoUnusedVarsJudgesADestructuredParameterAsAParameter(test *testing.T) {
 		test.Run(testCase.options+" "+testCase.body, func(test *testing.T) {
 			test.Parallel()
 
-			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
+				json.RawMessage(testCase.options),
+			)
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.options, decodeNoUnusedVariablesOptionsError)
 			}
 			source := prelude + testCase.body + "\nexport {};\n"
-			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", source, options)
+			result := rule_testing.RunTypedWithOptions(test, NoUnusedVariables, "a.ts", source, options)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				if diagnostic.Range.Pos() < len(prelude) {

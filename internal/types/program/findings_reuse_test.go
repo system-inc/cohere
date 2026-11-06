@@ -68,7 +68,7 @@ func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"a.ts":          "export function f(x: number): number {\n  if (x === x) {\n    return 1;\n  }\n  switch (x) {\n    case 1:\n      break;\n    case 1:\n      break;\n  }\n  return 0;\n}\n",
 		"b.ts":          "export const b = 1;\n",
 		"c.ts":          "export function g(y: number): boolean {\n  // cohere-disable-next-line no-self-compare\n  return y === y;\n}\n",
@@ -146,7 +146,7 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"a.ts":          "export function f(x: number): boolean {\n  return x === x;\n}\n",
 		"b.ts":          "export const b = 1;\n",
 	})
@@ -199,7 +199,10 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 // every entry at once.
 func TestAFindingsCacheUnderAnotherKeyServesNothing(test *testing.T) {
 	test.Parallel()
-	root := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "b.ts": "export const b = 1;\n"})
+	root := writeProject(
+		test,
+		map[string]string{"tsconfig.json": minimalConfiguration, "b.ts": "export const b = 1;\n"},
+	)
 	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
 	if buildError != nil {
 		test.Fatal(buildError)
@@ -242,7 +245,7 @@ func foldedCoverage(coverage program.Coverage) program.Coverage {
 func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"a.ts":          "export function f(x: number): boolean {\n  return x === x;\n}\n",
 		"b.ts":          "export const b = 1;\n",
 	})
@@ -314,7 +317,7 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"a.ts":          "export const a = 1;\n",
 	})
 	panicking := rule.Rule[rule.NoOptions]{
@@ -407,7 +410,7 @@ func plainWalk(test *testing.T, root string, rules []rule.Entry) program.Result 
 func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"lib.ts":        "export const value: string = \"1\";\n",
 		"consumer.ts":   "import { value } from \"./lib\";\nexport const negated = -value;\n",
 	})
@@ -479,7 +482,7 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(test *testing.T
 func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"globals.d.ts":  "declare const ambient: string;\n",
 		"consumer.ts":   "export const negated = -ambient;\n",
 	})
@@ -636,7 +639,7 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 		)
 	}
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"lib.ts":        "export const value: string = \"1\";\n",
 		"consumer.ts":   "import { value } from \"./lib\";\nexport const copy = value;\nexport const other = copy;\n",
 	})

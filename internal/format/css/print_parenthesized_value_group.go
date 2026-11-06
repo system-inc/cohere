@@ -22,7 +22,7 @@ func hasComma(path *astPath, options *printerOptions) bool {
 
 func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
 	grandparent, _ := path.Grandparent()
-	if isVarFunctionNode(grandparent) && hasComma(path, options) {
+	if isVariableFunctionNode(grandparent) && hasComma(path, options) {
 		return doc.Text(",")
 	}
 

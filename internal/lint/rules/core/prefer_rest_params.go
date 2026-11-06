@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// PreferRestParams flags reads of the implicit `arguments` object inside a function.
+// PreferRestParameters flags reads of the implicit `arguments` object inside a function.
 //
 //	valid:   function foo(...args) { args; }
 //	valid:   function foo(arguments) { arguments; }
@@ -65,7 +65,7 @@ import (
 // parameter to the enclosing function and rewrite every use, which changes the signature, is not a
 // single-span edit, and has to pick a parameter name. Under this tree's rule that is not even a
 // suggestion: it is a change of meaning at a site the rule does not own.
-var PreferRestParams = rule.Rule[rule.NoOptions]{
+var PreferRestParameters = rule.Rule[rule.NoOptions]{
 	Name: "prefer-rest-params",
 
 	// See the doc above: telling the implicit binding from a declared one is name resolution, and

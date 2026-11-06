@@ -83,10 +83,10 @@ func singleQuotedValue(source []uint16, onError func(rel int, code string, messa
 
 func isSpaceOrTab(character int) bool { return character == ' ' || character == '\t' }
 
-// foldLinesEnd is where a line's content ends before the newline at n: before an \r right at the
+// foldLinesEnd is where a line's content ends, given the offset of its newline: before an \r right at the
 // newline, and before the spaces and tabs before that, but not before from.
-func foldLinesEnd(source []uint16, from int, n int) int {
-	end := n
+func foldLinesEnd(source []uint16, from int, newline int) int {
+	end := newline
 	if end-1 >= from && source[end-1] == '\r' {
 		end--
 	}
@@ -108,13 +108,13 @@ func foldLinesEnd(source []uint16, from int, n int) int {
 // capture is the text up to that newline less an \r right before it and the spaces and tabs before
 // that (foldLinesEnd), and line first skips the line's leading spaces and tabs.
 func foldLines(source []uint16) []uint16 {
-	n := indexOfUnit(source, '\n')
-	if n == -1 {
+	firstNewline := indexOfUnit(source, '\n')
+	if firstNewline == -1 {
 		return source
 	}
-	result := append([]uint16{}, source[:foldLinesEnd(source, 0, n)]...)
+	result := append([]uint16{}, source[:foldLinesEnd(source, 0, firstNewline)]...)
 	sep := []uint16{' '}
-	position := n + 1
+	position := firstNewline + 1
 	for {
 		start := position
 		for start < len(source) && isSpaceOrTab(int(source[start])) {

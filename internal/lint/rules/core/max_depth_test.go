@@ -8,15 +8,15 @@ import (
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// maxDepthFile is where the fixtures pretend to live.
-const maxDepthFile = "/repository/source/MaxDepth.ts"
+// maximumDepthFile is where the fixtures pretend to live.
+const maximumDepthFile = "/repository/source/MaxDepth.ts"
 
-// maxDepthOf builds the settings a config carrying this option would decode to.
+// maximumDepthOf builds the settings a config carrying this option would decode to.
 //
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder,
 // so a fixture cannot bypass the decoder or accidentally test a shape a config could not deliver.
 // That is section 7c of the standard applied at the fixture rather than only in a contract test.
-func maxDepthOf(optionJson string) MaxDepthSettings {
+func maximumDepthOf(optionJson string) MaxDepthSettings {
 	settings, decodeMaximumDepthOptionsError := DecodeMaxDepthOptions([]byte(optionJson))
 	if decodeMaximumDepthOptionsError != nil {
 		panic(decodeMaximumDepthOptionsError)
@@ -46,43 +46,43 @@ func TestMaxDepthFires(test *testing.T) {
 	}{
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "var foo = () => { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (true) {} else { for(;;) {} } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (a) {} else if (b) {} if (c) { if (d) {} } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 1,
 		},
-		{source: "if (a) if (b) {}", settings: rule.Configured(maxDepthOf("1")), findings: 1},
+		{source: "if (a) if (b) {}", settings: rule.Configured(maximumDepthOf("1")), findings: 1},
 		{
 			source:   "function foo() { while (true) { if (true) {} } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (a) { switch (b) { case 1: foo(); } } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { for (let x of foo) { if (true) {} } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { while (true) { if (true) { if (false) { } } } }",
-			settings: rule.Configured(maxDepthOf("1")),
+			settings: rule.Configured(maximumDepthOf("1")),
 			findings: 2,
 		},
 		{
@@ -91,39 +91,43 @@ func TestMaxDepthFires(test *testing.T) {
 		},
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("{\"max\": 2}")),
+			settings: rule.Configured(maximumDepthOf("{\"max\": 2}")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }",
-			settings: rule.Configured(maxDepthOf("{}")),
+			settings: rule.Configured(maximumDepthOf("{}")),
 			findings: 1,
 		},
-		{source: "function foo() { if (true) {} }", settings: rule.Configured(maxDepthOf("{\"max\": 0}")), findings: 1},
+		{
+			source:   "function foo() { if (true) {} }",
+			settings: rule.Configured(maximumDepthOf("{\"max\": 0}")),
+			findings: 1,
+		},
 		{
 			source:   "class C { static { if (1) { if (2) { if (3) {} } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } if (2) { if (3) {} } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 			findings: 1,
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunGiven(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, MaxDepth, maximumDepthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
@@ -149,43 +153,46 @@ func TestMaxDepthStaysSilent(test *testing.T) {
 	}{
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("3")),
+			settings: rule.Configured(maximumDepthOf("3")),
 		},
 		{
 			source:   "function foo() { if (true) { } else if (false) { } else if (true) { } else if (false) {} }",
-			settings: rule.Configured(maxDepthOf("3")),
+			settings: rule.Configured(maximumDepthOf("3")),
 		},
 		{
 			source:   "var foo = () => { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("3")),
+			settings: rule.Configured(maximumDepthOf("3")),
 		},
 		{source: "function foo() { if (true) { if (false) { if (true) { } } } }"},
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: rule.Configured(maxDepthOf("{\"max\": 3}")),
+			settings: rule.Configured(maximumDepthOf("{\"max\": 3}")),
 		},
-		{source: "class C { static { if (1) { if (2) {} } } }", settings: rule.Configured(maxDepthOf("2"))},
+		{source: "class C { static { if (1) { if (2) {} } } }", settings: rule.Configured(maximumDepthOf("2"))},
 		{
 			source:   "class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 		},
 		{
 			source:   "class C { static { if (1) { if (2) {} } } static { if (1) { if (2) {} } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 		},
-		{source: "if (1) { class C { static { if (1) { if (2) {} } } } }", settings: rule.Configured(maxDepthOf("2"))},
+		{
+			source:   "if (1) { class C { static { if (1) { if (2) {} } } } }",
+			settings: rule.Configured(maximumDepthOf("2")),
+		},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 		},
 		{
 			source:   "function foo() { if (1) { if (2) { class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } } } } if (1) { if (2) {} } }",
-			settings: rule.Configured(maxDepthOf("2")),
+			settings: rule.Configured(maximumDepthOf("2")),
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunGiven(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, MaxDepth, maximumDepthFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
 		// matches the call name.
 		rule_testing.ExpectClean(test, result)
@@ -215,7 +222,7 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 	}{
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: maxDepthOf("2"),
+			settings: maximumDepthOf("2"),
 			spans:    []string{"if"},
 			messages: []string{"Blocks are nested too deeply (3). Maximum allowed is 2."},
 		},
@@ -223,13 +230,13 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 			// A switch keyword is six characters, so a span covering the statement rather than the
 			// token is visible here in a way the two-character `if` cases could hide.
 			source:   "function foo() { if (a) { switch (b) { case 1: foo(); } } }",
-			settings: maxDepthOf("1"),
+			settings: maximumDepthOf("1"),
 			spans:    []string{"switch"},
 			messages: []string{"Blocks are nested too deeply (2). Maximum allowed is 1."},
 		},
 		{
 			source:   "function foo() { for (let x of foo) { if (true) {} } }",
-			settings: maxDepthOf("1"),
+			settings: maximumDepthOf("1"),
 			spans:    []string{"if"},
 			messages: []string{"Blocks are nested too deeply (2). Maximum allowed is 1."},
 		},
@@ -237,7 +244,7 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 			// Two findings from one function, so the reported depth has to rise between them. A
 			// rule reporting a constant depth passes every count-based fixture.
 			source:   "function foo() { while (true) { if (true) { if (false) { } } } }",
-			settings: maxDepthOf("1"),
+			settings: maximumDepthOf("1"),
 			spans:    []string{"if", "if"},
 			messages: []string{
 				"Blocks are nested too deeply (2). Maximum allowed is 1.",
@@ -247,7 +254,7 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunWithOptions(test, MaxDepth, maximumDepthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.spans) {
 			test.Errorf("%q: expected %d findings, got %d %v",
 				testCase.source, len(testCase.spans), len(result.Diagnostics), result.MessageIds())
@@ -333,19 +340,19 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 	// And end to end, because a decoder row is not a verdict. The disabled shape must report
 	// nothing on source that a limit of 0 would report five times.
 	nested := "function f() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }"
-	result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"maximum": 0}`))
+	result := rule_testing.RunWithOptions(test, MaxDepth, maximumDepthFile, nested, maximumDepthOf(`{"maximum": 0}`))
 	rule_testing.ExpectClean(test, result)
 
 	// The control: the same source under the sibling zero spelling reports every block, so the
 	// silence above is the option rather than a rule that cannot fire on this input.
-	result = rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, maxDepthOf(`{"max": 0}`))
+	result = rule_testing.RunWithOptions(test, MaxDepth, maximumDepthFile, nested, maximumDepthOf(`{"max": 0}`))
 	if len(result.Diagnostics) != 5 {
 		test.Errorf("expected the control to report all 5 blocks, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 
 	// A rule handed nil options enforces upstream's default of 4 rather than doing nothing.
-	result = rule_testing.Run(test, MaxDepth, maxDepthFile, nested)
+	result = rule_testing.Run(test, MaxDepth, maximumDepthFile, nested)
 	if len(result.Diagnostics) != 1 {
 		test.Errorf("expected the default limit of 4 to report once, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
@@ -401,8 +408,8 @@ func TestMaxDepthClassMembersAreEachTheirOwnFrame(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source,
-			maxDepthOf(testCase.limit))
+		result := rule_testing.RunWithOptions(test, MaxDepth, maximumDepthFile, testCase.source,
+			maximumDepthOf(testCase.limit))
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q at limit %s: expected %d findings, got %d %v",
 				testCase.source, testCase.limit, testCase.findings,

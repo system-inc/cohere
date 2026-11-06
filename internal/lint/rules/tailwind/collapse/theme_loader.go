@@ -49,7 +49,7 @@ import (
 // load; a resolver that wants to ignore an unresolvable import must return a path to an empty file
 // rather than an error, so that "ignored" is a decision the caller made rather than a failure the
 // loader swallowed.
-type StylesheetResolver func(specifier, base string) (path string, err error)
+type StylesheetResolver func(specifier, base string) (path string, resolveError error)
 
 // NodeStylesheetResolver resolves `@import` the way a bundler does, given the root of an installed
 // tailwindcss package.

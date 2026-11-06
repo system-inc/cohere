@@ -18,12 +18,12 @@ import (
 // or one whose chain names no `cohere:` set, gets every set we pick, each where the program shows it
 // fits, and the run's first line names each set and its evidence so nothing is applied silently.
 
-// loadLintConfig loads the configuration a run lints with: the project's own chain when it names its
+// loadLintConfiguration loads the configuration a run lints with: the project's own chain when it names its
 // sets, or the house stack detected from graph when it does not.
 //
 // A `--lint-config` that names a missing file is still an error, as it always was: the person asked for
 // that file. Only the default file's absence means zero config.
-func loadLintConfig(graph *program.Graph, location projectLocation) (*configuration.Config, error) {
+func loadLintConfiguration(graph *program.Graph, location projectLocation) (*configuration.Config, error) {
 	if !usesHouseSets(location) {
 		return configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	}
@@ -59,7 +59,7 @@ func usesHouseSets(location projectLocation) bool {
 	if _, statError := os.Stat(location.LintConfigFileName); statError != nil && location.LintConfigFileNameGiven {
 		return false
 	}
-	zero, isZeroConfigurationError := configuration.IsZeroConfig(location.LintConfigFileName)
+	zero, isZeroConfigurationError := configuration.IsZeroConfiguration(location.LintConfigFileName)
 	// A chain that cannot be read is not zero config: LoadFor reads it again and fails the run naming why.
 	return isZeroConfigurationError == nil && zero
 }

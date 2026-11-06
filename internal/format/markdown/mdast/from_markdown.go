@@ -56,9 +56,9 @@ var parseMemories = sync.Pool{New: func() any {
 	return &parseMemory{parse: micromark.NewMemory()}
 }}
 
-// compileConfig is newConfig, made once: every compile reads the same handlers and never changes them, and
-// making them was a measurable share of a format's allocation (#93dpede).
-var compileConfig = sync.OnceValue(newConfig)
+// compileConfiguration is newConfiguration, made once: every compile reads the same handlers and never changes
+// them, and making them was a measurable share of a format's allocation (#93dpede).
+var compileConfiguration = sync.OnceValue(newConfiguration)
 
 // FromMarkdown parses markdown the way the fork's parseMarkdown does with the given source, and returns
 // the tree. source is the text micromark reads (front matter already blanked by the caller); original is
@@ -90,7 +90,7 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 		)
 	}
 	events := micromark.Parse(units, micromark.MarkdownConstructs(), memory.parse)
-	return compile(events, compileConfig(), memory.offsets, nodes), nil
+	return compile(events, compileConfiguration(), memory.offsets, nodes), nil
 }
 
 // byteOffsets maps every UTF-16 index of text, and its end, to a byte offset, appended to offsets. An index
@@ -106,10 +106,10 @@ func byteOffsets(text string, offsets []int) []int {
 	return append(appended, len(text))
 }
 
-// newConfig is upstream's compiler config with the fork's mdastExtensions configured in, in order:
+// newConfiguration is upstream's compiler config with the fork's mdastExtensions configured in, in order:
 // gfmFromMarkdown() (autolink literal without its transform, footnote, strikethrough, table, task list
 // item), mathFromMarkdown(), the wiki-link fromMarkdown() and liquidFromMarkdown().
-func newConfig() *config {
+func newConfiguration() *config {
 	configuration := &config{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
 		enter: map[string]handle{

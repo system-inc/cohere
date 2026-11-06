@@ -72,7 +72,7 @@ func writeRules(request invocation, registered []rule.Rule, standardOutput io.Wr
 // loadSettings reads which rules run, and how strictly, from the file `--lint-config` names or the one beside
 // the root.
 func loadSettings(request invocation, registered []rule.Rule) (settings.Settings, error) {
-	return settings.Load(request.root, request.lintConfig, knownRuleNames(registered))
+	return settings.Load(request.root, request.lintConfiguration, knownRuleNames(registered))
 }
 
 // broken says the stream could not be written, and returns the exit the front door reads as a crash.

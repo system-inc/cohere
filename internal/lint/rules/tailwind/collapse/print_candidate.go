@@ -58,7 +58,7 @@ func PrintCandidate(candidate ParsedCandidate, prefix string) string {
 func printArbitraryCandidateValue(parsedValue *ParsedValue) string {
 	text := parsedValue.Value
 	open, close := "[", "]"
-	if isLoneVar(text) {
+	if isLoneVariable(text) {
 		text = text[len("var(") : len(text)-1]
 		open, close = "(", ")"
 	}

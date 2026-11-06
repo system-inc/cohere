@@ -139,15 +139,15 @@ func TestCustomPropertiesAreStrippedFromDeclaredProperties(test *testing.T) {
 	// Roots whose emitters write a `--tw-*` variable alongside a real property. Each must report only
 	// the real one, or a class sharing the variable becomes a false conflict.
 	for _, probe := range []struct {
-		root      string
-		wantReal  string
-		wantNoVar string
+		root           string
+		wantReal       string
+		wantNoVariable string
 	}{
-		{root: "blur", wantReal: "filter", wantNoVar: "--tw-blur"},
-		{root: "grayscale", wantReal: "filter", wantNoVar: "--tw-grayscale"},
-		{root: "leading", wantReal: "line-height", wantNoVar: "--tw-leading"},
-		{root: "tracking", wantReal: "letter-spacing", wantNoVar: "--tw-tracking"},
-		{root: "scale-x", wantReal: "scale", wantNoVar: "--tw-scale-x"},
+		{root: "blur", wantReal: "filter", wantNoVariable: "--tw-blur"},
+		{root: "grayscale", wantReal: "filter", wantNoVariable: "--tw-grayscale"},
+		{root: "leading", wantReal: "line-height", wantNoVariable: "--tw-leading"},
+		{root: "tracking", wantReal: "letter-spacing", wantNoVariable: "--tw-tracking"},
+		{root: "scale-x", wantReal: "scale", wantNoVariable: "--tw-scale-x"},
 	} {
 		properties, resolved := declaredPropertiesOfRoot(probe.root)
 		if !resolved {

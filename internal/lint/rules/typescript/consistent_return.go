@@ -164,7 +164,7 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // the whole `typescript` package, because every instrument in both is a fixture that names the rule
 // variable rather than its string. `internal/lint/registry` is what catches it, and it catches it
 // twice: `TestEveryRuleShipsAFixturePair` loses the rule's test file, and
-// `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` reports the renamed name as unreachable.
+// `TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration` reports the renamed name as unreachable.
 //
 // Measured, because "unscoped" reads as "sees everything" and does not: the sweep tool builds and
 // tests one package, so widening its scope from one test pattern to the whole package widens nothing

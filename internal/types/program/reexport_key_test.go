@@ -44,7 +44,7 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 	test.Run("into another project file", func(test *testing.T) {
 		test.Parallel()
 		root := writeProject(test, map[string]string{
-			"tsconfig.json": minimalConfig,
+			"tsconfig.json": minimalConfiguration,
 			"a.ts":          "import { v } from \"./b\";\nconst negated = -v;\nexport const used = typeof negated === \"number\";\n",
 			"b.ts":          "export * from \"./c\";\n",
 			"c.ts":          "export const v = 1;\n",
@@ -77,7 +77,7 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 	test.Run("between two installed files", func(test *testing.T) {
 		test.Parallel()
 		root := writeProject(test, map[string]string{
-			"tsconfig.json": minimalConfig,
+			"tsconfig.json": minimalConfiguration,
 			"a.ts":          "import { v } from \"./b\";\nconst negated = -v;\nexport const used = typeof negated === \"number\";\n",
 			"b.ts":          "export * from \"pkg\";\n",
 			// Both declarations stay in the program whichever one "types" names, so neither entering nor

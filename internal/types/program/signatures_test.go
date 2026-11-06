@@ -11,13 +11,13 @@ import (
 // signatureTree is a fixture built twice in one directory, before and after an edit, so its paths, which
 // every fingerprint hashes, are the same in both graphs.
 type signatureTree struct {
-	t         *testing.T
+	test      *testing.T
 	directory string
 }
 
 func newSignatureTree(test *testing.T, files map[string]string) *signatureTree {
 	test.Helper()
-	tree := &signatureTree{t: test, directory: test.TempDir()}
+	tree := &signatureTree{test: test, directory: test.TempDir()}
 	tree.write(files)
 	tree.write(map[string]string{
 		"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`,
@@ -26,29 +26,29 @@ func newSignatureTree(test *testing.T, files map[string]string) *signatureTree {
 }
 
 func (tree *signatureTree) write(files map[string]string) {
-	tree.t.Helper()
+	tree.test.Helper()
 	for name, contents := range files {
 		path := filepath.Join(tree.directory, name)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
-			tree.t.Fatal(createDirectoryError)
+			tree.test.Fatal(createDirectoryError)
 		}
 		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
-			tree.t.Fatal(writeError)
+			tree.test.Fatal(writeError)
 		}
 	}
 }
 
 func (tree *signatureTree) graph() *Graph {
-	tree.t.Helper()
+	tree.test.Helper()
 	graph, buildError := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: tree.directory})
 	if buildError != nil {
-		tree.t.Fatal(buildError)
+		tree.test.Fatal(buildError)
 	}
 	return graph
 }
 
 func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureState {
-	tree.t.Helper()
+	tree.test.Helper()
 	graph := tree.graph()
 	// A first state has its signatures computed, as a project with build info does: these tests are about
 	// what a computed signature holds. A first run with nothing recorded is its own test below.

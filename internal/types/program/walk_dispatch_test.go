@@ -27,7 +27,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 	// The same layout in each file, so a finding in b.ts or c.ts sits where a.ts's directive covers.
 	declarations := "export const first = 1;\nexport function second(): void {}\n"
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-run-crashes-on-a": "error", "test-listener-crashes-on-a": "error", "test-functions-only-in-a": "error", "test-notes": "error"}}`,
 		"a.ts": "// cohere-disable-next-line test-run-crashes-on-a -- covers a.ts alone\n" +
 			declarations,
@@ -46,7 +46,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 		test.Fatalf("the walk has %d workers, so files need not meet each other's leftovers", graph.Workers())
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -149,7 +149,7 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 func TestAReportKeptPastItsFilePanicsNamingTheRule(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "export const kept = 1;\n",
 	})
 	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})

@@ -91,8 +91,8 @@ func (graph *Graph) Explain(
 	explanation := &Explanation{FileName: sourceFile.FileName().AsString()}
 
 	var resolution configuration.Resolved
-	if graph.LintConfig != nil {
-		resolution = graph.LintConfig.Resolve(sourceFile.FileName().AsString())
+	if graph.LintConfiguration != nil {
+		resolution = graph.LintConfiguration.Resolve(sourceFile.FileName().AsString())
 		if resolution.Ignored {
 			explanation.FileIgnored = true
 			explanation.IgnoredBy = resolution.IgnoredBy
@@ -110,7 +110,7 @@ func (graph *Graph) Explain(
 	for _, subject := range rules {
 		account := RuleAccount{Name: subject.Name}
 
-		if graph.LintConfig != nil {
+		if graph.LintConfiguration != nil {
 			status, _ := resolution.StatusOf(subject.Name)
 			if reason := declineReason(status); reason != "" {
 				account.DeclinedBecause = reason

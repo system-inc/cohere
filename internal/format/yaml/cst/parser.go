@@ -336,8 +336,8 @@ func (parser *Parser) step() {
 }
 
 // peek returns nil for upstream's undefined.
-func (parser *Parser) peek(n int) *Token {
-	index := len(parser.stack) - n
+func (parser *Parser) peek(depth int) *Token {
+	index := len(parser.stack) - depth
 	if index < 0 || index >= len(parser.stack) {
 		return nil
 	}

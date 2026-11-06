@@ -33,7 +33,7 @@ func init() {
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoConstAssignment},
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoDestructuring},
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoDisplayName},
-		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoForwardRef},
+		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoForwardReference},
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentNoSeparateNamedExport},
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentRequireNamedExport},
 		rule.Registration[rule.NoOptions]{Rule: ReactComponentRequirePropertiesParameter},

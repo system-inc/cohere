@@ -82,7 +82,7 @@ func TestTailwindLocationOptions(test *testing.T) {
 	}
 	location := func(entryPoint, tailwindConfiguration, cwd string) NoUnknownClassesOptions {
 		return NoUnknownClassesOptions{TailwindLocationOptions: TailwindLocationOptions{
-			EntryPoint: entryPoint, TailwindConfig: tailwindConfiguration, WorkingDirectory: cwd,
+			EntryPoint: entryPoint, TailwindConfiguration: tailwindConfiguration, WorkingDirectory: cwd,
 		}}
 	}
 

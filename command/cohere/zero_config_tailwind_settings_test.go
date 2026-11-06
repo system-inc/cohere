@@ -10,8 +10,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind/vendored"
 )
 
-// tailwindProjectConfig is a tsconfig for a project with TSX in it.
-const tailwindProjectConfig = `{
+// tailwindProjectConfiguration is a tsconfig for a project with TSX in it.
+const tailwindProjectConfiguration = `{
     "compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true,
         "noEmit": true, "jsx": "preserve"},
     "include": ["**/*.ts", "**/*.tsx"]
@@ -26,7 +26,7 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 	packageRoot := vendored.TailwindPackageRootForTest(test)
 	root := test.TempDir()
 	tree := maps.Clone(files)
-	tree["tsconfig.json"] = tailwindProjectConfig
+	tree["tsconfig.json"] = tailwindProjectConfiguration
 	writeTree(test, root, tree)
 	if createDirectoryError := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)

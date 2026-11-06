@@ -6,9 +6,9 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-const deleteVarFile = "/repository/source/Thing.ts"
+const deleteVariableFile = "/repository/source/Thing.ts"
 
-func TestNoDeleteVarFires(test *testing.T) {
+func TestNoDeleteVariableFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -24,13 +24,16 @@ func TestNoDeleteVarFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDeleteVar, deleteVarFile, testCase.sourceText),
-				"unexpectedDeleteVar")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoDeleteVariable, deleteVariableFile, testCase.sourceText),
+				"unexpectedDeleteVar",
+			)
 		})
 	}
 }
 
-func TestNoDeleteVarStaysSilent(test *testing.T) {
+func TestNoDeleteVariableStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -66,7 +69,10 @@ func TestNoDeleteVarStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDeleteVar, deleteVarFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoDeleteVariable, deleteVariableFile, testCase.sourceText),
+			)
 		})
 	}
 }

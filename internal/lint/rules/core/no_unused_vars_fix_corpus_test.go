@@ -19,9 +19,9 @@ import (
  * says how it was built.
  */
 
-// noUnusedVarsFixCorpusDivergences are the rows cohere answers differently, by row index, with the reason
+// noUnusedVariablesFixCorpusDivergences are the rows cohere answers differently, by row index, with the reason
 // and cohere's answer, so each difference is asserted rather than skipped.
-var noUnusedVarsFixCorpusDivergences = map[int]struct {
+var noUnusedVariablesFixCorpusDivergences = map[int]struct {
 	reason string
 	cohere []noUnusedVarsFixCorpusFinding
 	output string
@@ -45,9 +45,9 @@ var noUnusedVarsFixCorpusDivergences = map[int]struct {
 	},
 }
 
-// noUnusedVarsFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
+// noUnusedVariablesFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
 // parser options gave and the .tsx file in its include.
-func noUnusedVarsFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) string {
+func noUnusedVariablesFixTsconfig(test *testing.T, row noUnusedVarsFixCorpusCase) string {
 	test.Helper()
 	if !row.jsx {
 		return noUnusedVarsOptionsCorpusTsconfig
@@ -106,7 +106,7 @@ func applyFixesOnce(source string, fixes []rule.Fix) string {
 	return output + source[cursor:]
 }
 
-func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
+func TestNoUnusedVariablesFixUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	upstream := 0
@@ -130,7 +130,7 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(json.RawMessage(row.options))
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
@@ -138,8 +138,8 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 			if row.jsx {
 				fileName = "file.tsx"
 			}
-			configuration := noUnusedVarsFixTsconfig(test, row)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+			configuration := noUnusedVariablesFixTsconfig(test, row)
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVariables, map[string]string{
 				fileName: row.source,
 			}, fileName, options,
 				func(directory string) {
@@ -160,7 +160,7 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 			var fixes []rule.Fix
 			for _, diagnostic := range diagnostics {
 				id := diagnostic.Message.Id
-				if upstreamId, renamed := noUnusedVarsUpstreamIds[id]; renamed {
+				if upstreamId, renamed := noUnusedVariablesUpstreamIds[id]; renamed {
 					id = upstreamId
 				}
 				finding := noUnusedVarsFixCorpusFinding{
@@ -182,7 +182,7 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 			}
 
 			want, wantOutput := row.findings, row.output
-			if divergence, diverges := noUnusedVarsFixCorpusDivergences[row.index]; diverges {
+			if divergence, diverges := noUnusedVariablesFixCorpusDivergences[row.index]; diverges {
 				want, wantOutput = divergence.cohere, divergence.output
 			}
 			if fmt.Sprint(reported) != fmt.Sprint(want) {

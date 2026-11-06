@@ -140,11 +140,11 @@ func ParseCss(input string) ([]*Node, error) {
 		return stylesheet[index]
 	}
 
-	for i := 0; i < len(stylesheet); i++ {
-		currentCharacter := stylesheet[i]
+	for index := 0; index < len(stylesheet); index++ {
+		currentCharacter := stylesheet[index]
 
 		// Skip the CR of a CRLF so that every branch below only has to recognize a bare line break.
-		if currentCharacter == byteCarriageReturn && peekAt(i+1) == byteLineBreak {
+		if currentCharacter == byteCarriageReturn && peekAt(index+1) == byteLineBreak {
 			continue
 		}
 
@@ -153,30 +153,30 @@ func ParseCss(input string) ([]*Node, error) {
 		// `;` inside a selector such as `.hover\:foo:hover` cannot be mistaken for structure.
 		case currentCharacter == byteBackslash:
 			if buffer.Len() == 0 {
-				bufferStart = i
+				bufferStart = index
 			}
-			end := i + 2
+			end := index + 2
 			if end > len(stylesheet) {
 				end = len(stylesheet)
 			}
-			appendToBuffer(stylesheet[i:end])
-			i++
+			appendToBuffer(stylesheet[index:end])
+			index++
 
 		// Start of a comment. The comment is consumed and dropped, except for a license comment
 		// (`/*!`), which is hoisted to the top of the output.
-		case currentCharacter == byteSlash && peekAt(i+1) == byteAsterisk:
-			start := i
-			for j := i + 2; j < len(stylesheet); j++ {
-				peekCharacter := stylesheet[j]
+		case currentCharacter == byteSlash && peekAt(index+1) == byteAsterisk:
+			start := index
+			for peekIndex := index + 2; peekIndex < len(stylesheet); peekIndex++ {
+				peekCharacter := stylesheet[peekIndex]
 				if peekCharacter == byteBackslash {
-					j++
-				} else if peekCharacter == byteAsterisk && peekAt(j+1) == byteSlash {
-					i = j + 1
+					peekIndex++
+				} else if peekCharacter == byteAsterisk && peekAt(peekIndex+1) == byteSlash {
+					index = peekIndex + 1
 					break
 				}
 			}
 
-			commentString := stylesheet[start:min(i+1, len(stylesheet))]
+			commentString := stylesheet[start:min(index+1, len(stylesheet))]
 
 			if len(commentString) > 2 && commentString[2] == byteExclamationMark {
 				// The `/*` and `*/` are stripped, leaving `! ...`, matching upstream's slice.
@@ -186,17 +186,17 @@ func ParseCss(input string) ([]*Node, error) {
 		// Start of a string. The whole string, quotes included, joins the buffer verbatim; a `;`,
 		// `}` or `:` inside it is text rather than structure.
 		case currentCharacter == byteSingleQuote || currentCharacter == byteDoubleQuote:
-			end, parseCssStringError := parseCssString(stylesheet, i, currentCharacter)
+			end, parseCssStringError := parseCssString(stylesheet, index, currentCharacter)
 			if parseCssStringError != nil {
 				return nil, parseCssStringError
 			}
-			appendToBuffer(stylesheet[i : end+1])
-			i = end
+			appendToBuffer(stylesheet[index : end+1])
+			index = end
 
 		// Collapse a run of whitespace: skip this one if the next is also whitespace. This is what
 		// keeps the AST from carrying the stylesheet's indentation.
 		case (currentCharacter == byteSpace || currentCharacter == byteLineBreak || currentCharacter == byteTab) &&
-			isFollowedByWhitespace(stylesheet, i, peekAt):
+			isFollowedByWhitespace(stylesheet, index, peekAt):
 			continue
 
 		// A line break that survived the collapse above becomes a single space, and only when the
@@ -225,40 +225,40 @@ func ParseCss(input string) ([]*Node, error) {
 		// recorded during this scan rather than searched for afterwards, because a `:` may appear
 		// inside the value (in a `url()`, or a nested `var()` fallback) and `indexOf` would find
 		// the wrong one.
-		case currentCharacter == byteDash && peekAt(i+1) == byteDash && buffer.Len() == 0:
+		case currentCharacter == byteDash && peekAt(index+1) == byteDash && buffer.Len() == 0:
 			// Shadows the outer stack deliberately, exactly as upstream does: brackets opened
 			// inside a custom property are balanced within it and must not disturb the block
 			// structure the outer loop is tracking.
 			var closingBracketStack []byte
 
-			start := i
+			start := index
 			colonIndex := -1
 			// terminated records whether the scan found an end. When the input runs out without
-			// one, upstream leaves `i` where it was and the buffer unfilled; the declaration
+			// one, upstream leaves `i` (index here) where it was and the buffer unfilled; the declaration
 			// splitter then fails, which is the correct outcome for a truncated stylesheet.
 			terminated := false
 
-			for j := i + 2; j < len(stylesheet); j++ {
-				peekCharacter := stylesheet[j]
+			for peekIndex := index + 2; peekIndex < len(stylesheet); peekIndex++ {
+				peekCharacter := stylesheet[peekIndex]
 
 				switch {
 				case peekCharacter == byteBackslash:
-					j++
+					peekIndex++
 
 				case peekCharacter == byteSingleQuote || peekCharacter == byteDoubleQuote:
-					end, parseCssStringError := parseCssString(stylesheet, j, peekCharacter)
+					end, parseCssStringError := parseCssString(stylesheet, peekIndex, peekCharacter)
 					if parseCssStringError != nil {
 						return nil, parseCssStringError
 					}
-					j = end
+					peekIndex = end
 
-				case peekCharacter == byteSlash && peekAt(j+1) == byteAsterisk:
-					for k := j + 2; k < len(stylesheet); k++ {
-						innerPeek := stylesheet[k]
+				case peekCharacter == byteSlash && peekAt(peekIndex+1) == byteAsterisk:
+					for innerPeekIndex := peekIndex + 2; innerPeekIndex < len(stylesheet); innerPeekIndex++ {
+						innerPeek := stylesheet[innerPeekIndex]
 						if innerPeek == byteBackslash {
-							k++
-						} else if innerPeek == byteAsterisk && peekAt(k+1) == byteSlash {
-							j = k + 1
+							innerPeekIndex++
+						} else if innerPeek == byteAsterisk && peekAt(innerPeekIndex+1) == byteSlash {
+							peekIndex = innerPeekIndex + 1
 							break
 						}
 					}
@@ -267,11 +267,11 @@ func ParseCss(input string) ([]*Node, error) {
 				// into the buffer-relative string that parseCSSDeclaration will be handed, which is
 				// why the current buffer length is part of the arithmetic.
 				case colonIndex == -1 && peekCharacter == byteColon:
-					colonIndex = buffer.Len() + j - start
+					colonIndex = buffer.Len() + peekIndex - start
 
 				case peekCharacter == byteSemicolon && len(closingBracketStack) == 0:
-					appendToBuffer(stylesheet[start:j])
-					i = j
+					appendToBuffer(stylesheet[start:peekIndex])
+					index = peekIndex
 					terminated = true
 
 				case peekCharacter == byteOpenParen:
@@ -284,11 +284,12 @@ func ParseCss(input string) ([]*Node, error) {
 					closingBracketStack = append(closingBracketStack, byteCloseCurly)
 
 				// A custom property that ends at the enclosing block's `}` rather than at a `;`,
-				// or that ends at the end of the input. `i` is set to `j - 1` so the outer loop's
+				// or that ends at the end of the input. `index` is set to `peekIndex - 1` so the outer loop's
 				// increment lands on the `}` itself and the close-block branch runs for it.
-				case (peekCharacter == byteCloseCurly || j == len(stylesheet)-1) && len(closingBracketStack) == 0:
-					i = j - 1
-					appendToBuffer(stylesheet[start:j])
+				case (peekCharacter == byteCloseCurly || peekIndex == len(stylesheet)-1) &&
+					len(closingBracketStack) == 0:
+					index = peekIndex - 1
+					appendToBuffer(stylesheet[start:peekIndex])
 					terminated = true
 
 				case peekCharacter == byteCloseParen ||
@@ -383,7 +384,7 @@ func ParseCss(input string) ([]*Node, error) {
 		// End of a block.
 		case currentCharacter == byteCloseCurly && topOfStack(closingBracketStack) != byteCloseParen:
 			if len(closingBracketStack) == 0 {
-				return nil, &CssSyntaxError{Message: "Missing opening {", Offset: i}
+				return nil, &CssSyntaxError{Message: "Missing opening {", Offset: index}
 			}
 			closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 
@@ -442,13 +443,13 @@ func ParseCss(input string) ([]*Node, error) {
 		case currentCharacter == byteOpenParen:
 			closingBracketStack = append(closingBracketStack, byteCloseParen)
 			if buffer.Len() == 0 {
-				bufferStart = i
+				bufferStart = index
 			}
 			appendToBuffer("(")
 
 		case currentCharacter == byteCloseParen:
 			if topOfStack(closingBracketStack) != byteCloseParen {
-				return nil, &CssSyntaxError{Message: "Missing opening (", Offset: i}
+				return nil, &CssSyntaxError{Message: "Missing opening (", Offset: index}
 			}
 			closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 			appendToBuffer(")")
@@ -462,9 +463,9 @@ func ParseCss(input string) ([]*Node, error) {
 				continue
 			}
 			if buffer.Len() == 0 {
-				bufferStart = i
+				bufferStart = index
 			}
-			appendToBuffer(stylesheet[i : i+1])
+			appendToBuffer(stylesheet[index : index+1])
 		}
 	}
 

@@ -143,10 +143,10 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 		mergeItems := scopeNestingItems(mergedRangeMap(mergeOnly))
 		fullMergeOnly += blockNestingViolations(mergeItems, blocks)
 		scopeMergeOnly += blockNestingViolations(mergeItems, nil)
-		s, b, bb := violationsByKind(mergeItems, blocks)
-		mergeOnlyScopeInBlock += s
-		mergeOnlyBlockInScope += b
-		mergeOnlyBlockInBlock += bb
+		mergedScopeInBlock, mergedBlockInScope, mergedBlockInBlock := violationsByKind(mergeItems, blocks)
+		mergeOnlyScopeInBlock += mergedScopeInBlock
+		mergeOnlyBlockInScope += mergedBlockInScope
+		mergeOnlyBlockInBlock += mergedBlockInBlock
 
 		// The control for the residue: the same assertion with the scope items removed entirely.
 		blockOnly += blockNestingViolations(nil, blocks)
@@ -157,15 +157,15 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 		finalItems := scopeNestingItems(mergedRangeMap(merged))
 		fullAligned += blockNestingViolations(finalItems, blocks)
 		scopeAligned += blockNestingViolations(finalItems, nil)
-		fs, fb, fbb := violationsByKind(finalItems, blocks)
+		alignedScopeInBlock, alignedBlockInScope, alignedBlockInBlock := violationsByKind(finalItems, blocks)
 		if function.Kind == FunctionKindComponent || function.Kind == FunctionKindHook {
 			componentFunctions++
-			componentScopeInBlock += fs
-			componentBlockInScope += fb
+			componentScopeInBlock += alignedScopeInBlock
+			componentBlockInScope += alignedBlockInScope
 		}
-		finalScopeInBlock += fs
-		finalBlockInScope += fb
-		finalBlockInBlock += fbb
+		finalScopeInBlock += alignedScopeInBlock
+		finalBlockInScope += alignedBlockInScope
+		finalBlockInBlock += alignedBlockInBlock
 	})
 
 	test.Logf("functions=%d scopes %d -> %d, scopes widened by alignment=%d",
@@ -727,7 +727,7 @@ func TestAlignPreservesScopeWidthAndMembership(test *testing.T) {
 	})
 
 	sort.Ints(widths)
-	at := func(p float64) int { return widths[int(float64(len(widths)-1)*p)] }
+	at := func(quantile float64) int { return widths[int(float64(len(widths)-1)*quantile)] }
 	test.Logf("scopes=%d  width p50=%d p90=%d p99=%d max=%d",
 		len(widths), at(0.50), at(0.90), at(0.99), widths[len(widths)-1])
 	test.Logf("                width<=1   width>1")

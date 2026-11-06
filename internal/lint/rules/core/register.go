@@ -56,7 +56,7 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoUnusedExpressionsOptions](),
 		},
 		rule.Registration[NoUnusedVarsOptions]{
-			Rule:   NoUnusedVars,
+			Rule:   NoUnusedVariables,
 			Decode: rule.DecodeOptionsInto[NoUnusedVarsOptions](),
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoUnusedPrivateClassMembers},
@@ -64,7 +64,7 @@ func init() {
 			Rule:   PreferConst,
 			Decode: rule.DecodeOptionsInto[PreferConstOptions](),
 		},
-		rule.Registration[rule.NoOptions]{Rule: PreferRestParams},
+		rule.Registration[rule.NoOptions]{Rule: PreferRestParameters},
 		rule.Registration[NoConstantBinaryExpressionOptions]{
 			Rule:   NoConstantBinaryExpression,
 			Decode: rule.DecodeOptionsInto[NoConstantBinaryExpressionOptions](),
@@ -78,7 +78,7 @@ func init() {
 			Decode: rule.DecodeOptionsInto[NoExtraBooleanCastOptions](),
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoDebugger},
-		rule.Registration[rule.NoOptions]{Rule: NoDeleteVar},
+		rule.Registration[rule.NoOptions]{Rule: NoDeleteVariable},
 		rule.Registration[rule.NoOptions]{Rule: NoDupeElseIf},
 		rule.Registration[rule.NoOptions]{Rule: NoDuplicateCase},
 		rule.Registration[NoEmptyOptions]{
@@ -118,7 +118,7 @@ func init() {
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoSparseArrays},
 		rule.Registration[rule.NoOptions]{Rule: NoThisBeforeSuper},
-		rule.Registration[rule.NoOptions]{Rule: NoUnassignedVars},
+		rule.Registration[rule.NoOptions]{Rule: NoUnassignedVariables},
 		rule.Registration[rule.NoOptions]{Rule: NoUselessAssignment},
 		rule.Registration[rule.NoOptions]{Rule: NoUnsafeFinally},
 		rule.Registration[NoUnsafeNegationOptions]{
@@ -136,7 +136,7 @@ func init() {
 			Rule:   NoUselessEscape,
 			Decode: rule.DecodeOptionsInto[NoUselessEscapeOptions](),
 		},
-		rule.Registration[rule.NoOptions]{Rule: NoVar},
+		rule.Registration[rule.NoOptions]{Rule: NoVariable},
 		rule.Registration[rule.NoOptions]{Rule: NoWith},
 		rule.Registration[rule.NoOptions]{Rule: PreferSpread},
 		rule.Registration[PreserveCaughtErrorOptions]{

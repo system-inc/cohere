@@ -7,15 +7,15 @@ import (
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// oneVarFile is where the fixtures pretend to live.
+// oneVariableFile is where the fixtures pretend to live.
 //
 // A `.ts` name, because that is what cohere lints and because the oracle replayed every case
 // under the TypeScript parser with `sourceType: module` before any of this was written. Nothing
 // in the corpus is JSX.
-const oneVarFile = "/repository/source/OneVar.ts"
+const oneVariableFile = "/repository/source/OneVar.ts"
 
-// oneVarCase is one row of upstream's corpus.
-type oneVarCase struct {
+// oneVariableCase is one row of upstream's corpus.
+type oneVariableCase struct {
 	// name is the corpus list and index the row came from, so a failure names a case findable
 	// in upstream's own file rather than a number local to this table.
 	name string
@@ -40,29 +40,29 @@ type oneVarCase struct {
 	messages []string
 }
 
-// oneVarFixCase is one of upstream's `output` fixtures.
-type oneVarFixCase struct {
+// oneVariableFixCase is one of upstream's `output` fixtures.
+type oneVariableFixCase struct {
 	name    string
 	source  string
 	options string
 	wanted  string
 }
 
-// decodedOneVar routes a row's raw option JSON through the rule's own decoder.
+// decodedOneVariable routes a row's raw option JSON through the rule's own decoder.
 //
 // An empty string means the config carried no options at all, which is what a bare `"error"`
 // delivers, and the decoder answers with upstream's `defaultOptions: ["always"]`.
-func decodedOneVar(test *testing.T, raw string) OneVarSettings {
+func decodedOneVariable(test *testing.T, raw string) OneVariableSettings {
 	test.Helper()
-	decoded, decodeOneVariableOptionsError := DecodeOneVarOptions([]byte(raw))
+	decoded, decodeOneVariableOptionsError := DecodeOneVariableOptions([]byte(raw))
 	if decodeOneVariableOptionsError != nil {
 		test.Fatalf("decoding one-var options %q: %v", raw, decodeOneVariableOptionsError)
 	}
 	return decoded
 }
 
-// oneVarFiresCases are the rows upstream reports on.
-var oneVarFiresCases = []oneVarCase{
+// oneVariableFiresCases are the rows upstream reports on.
+var oneVariableFiresCases = []oneVariableCase{
 	{name: "invalid-152", source: "var bar = true, baz = false;", options: "\"never\"",
 		ids:      []string{"split"},
 		messages: []string{"Split 'var' declarations into multiple statements."}},
@@ -796,11 +796,11 @@ var oneVarFiresCases = []oneVarCase{
 		messages: []string{"Split initialized 'await using' declarations into multiple statements."}},
 }
 
-// oneVarSilentCases are the rows upstream leaves alone.
+// oneVariableSilentCases are the rows upstream leaves alone.
 //
 // These are the false positives upstream already thought about, and every one skipped is a class
 // of false positive this rule would ship.
-var oneVarSilentCases = []oneVarCase{
+var oneVariableSilentCases = []oneVariableCase{
 	{name: "valid-0", source: "function foo() { var bar = true; }", options: ""},
 	{name: "valid-1", source: "function foo() { var bar = true, baz = 1; if (qux) { bar = false; } }", options: ""},
 	{name: "valid-2", source: "var foo = function() { var bar = true; baz(); }", options: ""},
@@ -1247,49 +1247,49 @@ var oneVarSilentCases = []oneVarCase{
 	},
 }
 
-func TestOneVarFires(test *testing.T) {
+func TestOneVariableFires(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarFiresCases {
+	for _, testCase := range oneVariableFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
 }
 
-func TestOneVarStaysSilent(test *testing.T) {
+func TestOneVariableStaysSilent(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarSilentCases {
+	for _, testCase := range oneVariableSilentCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-// TestOneVarRendersTheTypeUpstreamRenders asserts the message text, not only the id.
+// TestOneVariableRendersTheTypeUpstreamRenders asserts the message text, not only the id.
 //
 // Six of the seven messages interpolate `{{type}}`, whose value is the declaration spelling --
 // and `await using` is the one most likely to be computed wrongly, because the flag named for it
 // is a composite that is also true for every plain `const`. A rule that classified every `const`
-// as `await using` would report the right id with the wrong word and pass TestOneVarFires
+// as `await using` would report the right id with the wrong word and pass TestOneVariableFires
 // completely.
 //
 // The comparison is on the rendered prefix rather than the whole Description, because this tree's
 // messages carry an explanation upstream does not have. That is a weaker predicate than the whole
 // string, so the prefix asserted is the entire sentence upstream renders, up to and including its
 // terminating period.
-func TestOneVarRendersTheTypeUpstreamRenders(test *testing.T) {
+func TestOneVariableRendersTheTypeUpstreamRenders(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarFiresCases {
+	for _, testCase := range oneVariableFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.messages) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.messages))
 			}
@@ -1304,7 +1304,7 @@ func TestOneVarRendersTheTypeUpstreamRenders(test *testing.T) {
 	}
 }
 
-// TestOneVarAnchorsOnTheDeclarationStatement asserts the span of every finding.
+// TestOneVariableAnchorsOnTheDeclarationStatement asserts the span of every finding.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule pointing at the wrong node
 // passes a complete fixture pair. That matters twice over here because the findings carry fixes:
@@ -1313,13 +1313,13 @@ func TestOneVarRendersTheTypeUpstreamRenders(test *testing.T) {
 //
 // Upstream reports on the whole declaration statement, so the reported text must begin with the
 // declaration keyword -- or with `export`, for an exported one.
-func TestOneVarAnchorsOnTheDeclarationStatement(test *testing.T) {
+func TestOneVariableAnchorsOnTheDeclarationStatement(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarFiresCases {
+	for _, testCase := range oneVariableFiresCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			source := result.SourceFile.Text()
 			for index, diagnostic := range result.Diagnostics {
 				start, end := diagnostic.Range.Pos(), diagnostic.Range.End()
@@ -1327,7 +1327,7 @@ func TestOneVarAnchorsOnTheDeclarationStatement(test *testing.T) {
 					test.Fatalf("finding %d has range [%d,%d) outside %q", index, start, end, source)
 				}
 				reported := source[start:end]
-				if !oneVarBeginsADeclaration(reported) {
+				if !oneVariableBeginsADeclaration(reported) {
 					test.Errorf("finding %d points at %q, which does not begin a declaration statement",
 						index, reported)
 				}
@@ -1336,8 +1336,8 @@ func TestOneVarAnchorsOnTheDeclarationStatement(test *testing.T) {
 	}
 }
 
-// oneVarBeginsADeclaration answers whether a reported span starts where a declaration does.
-func oneVarBeginsADeclaration(reported string) bool {
+// oneVariableBeginsADeclaration answers whether a reported span starts where a declaration does.
+func oneVariableBeginsADeclaration(reported string) bool {
 	for _, opening := range []string{"var", "let", "const", "using", "await", "export", "declare"} {
 		if strings.HasPrefix(reported, opening) {
 			return true
@@ -1346,7 +1346,7 @@ func oneVarBeginsADeclaration(reported string) bool {
 	return false
 }
 
-// oneVarTypeScriptGapCases are shapes upstream's corpus cannot contain, measured against the
+// oneVariableTypeScriptGapCases are shapes upstream's corpus cannot contain, measured against the
 // installed rule rather than reasoned about.
 //
 // Upstream's corpus is JavaScript of an era before class methods were common, and it writes zero
@@ -1362,7 +1362,7 @@ func oneVarBeginsADeclaration(reported string) bool {
 //
 // Every verdict below was produced by driving ESLint 10.10.0's own one-var over the source with
 // the TypeScript parser, alongside controls that fire and controls that stay clean.
-var oneVarTypeScriptGapCases = []oneVarCase{
+var oneVariableTypeScriptGapCases = []oneVariableCase{
 	// Each member kind is its own `var` scope, so the second declaration is not a duplicate.
 	{name: "gap-method-pair", source: "class C { a() { var x; } b() { var y; } }", options: "\"always\""},
 	{name: "gap-ctor-pair", source: "class C { constructor() { var x; } m() { var y; } }", options: "\"always\""},
@@ -1376,11 +1376,11 @@ var oneVarTypeScriptGapCases = []oneVarCase{
 	{name: "gap-method-let-pair", source: "class C { a() { let x; } b() { let y; } }", options: "\"always\""},
 }
 
-// oneVarTypeScriptGapFiringCases are the same gap from the reporting side.
+// oneVariableTypeScriptGapFiringCases are the same gap from the reporting side.
 //
 // A clean row alone cannot tell a working scope from a rule that reports nothing at all, so each
 // shape above has a partner here that must fire.
-var oneVarTypeScriptGapFiringCases = []oneVarCase{
+var oneVariableTypeScriptGapFiringCases = []oneVariableCase{
 	{name: "gap-method-inner", source: "class C { a() { var x; var y; } }", options: "\"always\"",
 		ids:      []string{"combine"},
 		messages: []string{"Combine this with the previous 'var' statement."}},
@@ -1402,25 +1402,25 @@ var oneVarTypeScriptGapFiringCases = []oneVarCase{
 		messages: []string{"Combine this with the previous 'const' statement."}},
 }
 
-func TestOneVarStaysSilentOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
+func TestOneVariableStaysSilentOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarTypeScriptGapCases {
+	for _, testCase := range oneVariableTypeScriptGapCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 }
 
-func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
+func TestOneVariableFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range oneVarTypeScriptGapFiringCases {
+	for _, testCase := range oneVariableTypeScriptGapFiringCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 			if len(result.Diagnostics) == len(testCase.messages) {
 				for index, diagnostic := range result.Diagnostics {
@@ -1434,7 +1434,7 @@ func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
 	}
 }
 
-// TestOneVarSkipsDeclarationKindsTheConfigDidNotName pins the unconfigured-kind contract.
+// TestOneVariableSkipsDeclarationKindsTheConfigDidNotName pins the unconfigured-kind contract.
 //
 // Upstream's `if (!options[key]) return;` is what makes `{ "var": "never" }` govern `var` alone
 // and leave `let` and `const` untouched. That guard is redundant in this port today, because every
@@ -1444,9 +1444,9 @@ func TestOneVarFiresOnTypeScriptShapesUpstreamCannotWrite(test *testing.T) {
 // The behaviour is still a contract, and this test asserts it where the guard cannot be seen: a
 // change to `modeIs` that made nil compare equal would break these rows immediately, which is
 // exactly the failure the guard exists to prevent.
-func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(test *testing.T) {
+func TestOneVariableSkipsDeclarationKindsTheConfigDidNotName(test *testing.T) {
 	test.Parallel()
-	cases := []oneVarCase{
+	cases := []oneVariableCase{
 		// `never` on var alone: the let list has two declarators and must stay clean.
 		{name: "var-never-leaves-let", source: "let foo = true, bar = false;", options: "{\"var\":\"never\"}"},
 		// `never` on const alone: same shape, different unnamed kind.
@@ -1459,8 +1459,8 @@ func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -1468,14 +1468,14 @@ func TestOneVarSkipsDeclarationKindsTheConfigDidNotName(test *testing.T) {
 	// A control, so the four clean rows above cannot pass by the rule being silent everywhere.
 	test.Run("control-the-named-kind-does-report", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
-			"var foo = true, bar = false;", decodedOneVar(test, "{\"var\":\"never\"}"))
+		result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile,
+			"var foo = true, bar = false;", decodedOneVariable(test, "{\"var\":\"never\"}"))
 		rule_testing.ExpectFindings(test, result, "split")
 	})
 }
 
-// oneVarExportCase is one exported-declaration row.
-type oneVarExportCase struct {
+// oneVariableExportCase is one exported-declaration row.
+type oneVariableExportCase struct {
 	name     string
 	source   string
 	options  string
@@ -1485,7 +1485,7 @@ type oneVarExportCase struct {
 	fixes int
 }
 
-// TestOneVarDeclinesToRepairExportedDeclarations pins a divergence the corpus cannot reach.
+// TestOneVariableDeclinesToRepairExportedDeclarations pins a divergence the corpus cannot reach.
 //
 // Upstream reaches an exported declaration's siblings through `declaration.parent.parent.body`,
 // and for an export `declaration.parent` is the ExportNamedDeclaration, which carries no `body`
@@ -1510,9 +1510,9 @@ type oneVarExportCase struct {
 // fixes in a single pass exactly as RuleTester records `output`. The corpus is blind to all of it:
 // all seven of its exported cases are under "never", which reaches the split fixer and never the
 // join.
-func TestOneVarDeclinesToRepairExportedDeclarations(test *testing.T) {
+func TestOneVariableDeclinesToRepairExportedDeclarations(test *testing.T) {
 	test.Parallel()
-	cases := []oneVarExportCase{
+	cases := []oneVariableExportCase{
 		{name: "export-join", source: "export const a = 1; export const b = 2;",
 			options: "\"always\"", findings: 1, fixes: 0},
 		{name: "export-join-consecutive", source: "export const a = 1; export const b = 2;",
@@ -1534,8 +1534,8 @@ func TestOneVarDeclinesToRepairExportedDeclarations(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
 			}
@@ -1550,22 +1550,22 @@ func TestOneVarDeclinesToRepairExportedDeclarations(test *testing.T) {
 	}
 }
 
-// TestOneVarSplitStillRepairsExports is the other half, and it is why the collapse above is scoped
+// TestOneVariableSplitStillRepairsExports is the other half, and it is why the collapse above is scoped
 // to the join rather than applied to exports generally.
 //
 // Upstream's split fixer reads `declaration.parent.type === "ExportNamedDeclaration"` to decide
 // whether to write an `export ` prefix, so it very much does repair an exported declaration under
 // "never". Seven corpus cases pin it. A collapse that turned off every repair for exports would
 // pass every join test above and break all seven.
-func TestOneVarSplitStillRepairsExports(test *testing.T) {
+func TestOneVariableSplitStillRepairsExports(test *testing.T) {
 	test.Parallel()
-	result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
-		"export const foo=1, bar=2;", decodedOneVar(test, "\"never\""))
+	result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile,
+		"export const foo=1, bar=2;", decodedOneVariable(test, "\"never\""))
 	rule_testing.ExpectFindings(test, result, "split")
 	rule_testing.ExpectFixedSource(test, result, "export const foo=1; export const bar=2;")
 }
 
-// TestOneVarCarriesDeclareThroughTheSplit pins the `declare` modifier on every statement a split
+// TestOneVariableCarriesDeclareThroughTheSplit pins the `declare` modifier on every statement a split
 // creates.
 //
 // Both rows were broken, and both the same way upstream's installed build is broken: the split
@@ -1573,9 +1573,9 @@ func TestOneVarSplitStillRepairsExports(test *testing.T) {
 // `declare let a: number; let b: number;`, a binding that now exists at runtime, and the exported
 // const form became `export const b: number;`, which does not compile. The third row is the
 // control that the plain split is untouched.
-func TestOneVarCarriesDeclareThroughTheSplit(test *testing.T) {
+func TestOneVariableCarriesDeclareThroughTheSplit(test *testing.T) {
 	test.Parallel()
-	for _, testCase := range []oneVarFixCase{
+	for _, testCase := range []oneVariableFixCase{
 		{name: "declare", source: "declare let a: number, b: number;",
 			options: "\"never\"", wanted: "declare let a: number; declare let b: number;"},
 		{name: "export-declare", source: "export declare const a: number, b: number;",
@@ -1585,24 +1585,24 @@ func TestOneVarCarriesDeclareThroughTheSplit(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, "split")
 			rule_testing.ExpectFixedSource(test, result, testCase.wanted)
 		})
 	}
 }
 
-// TestOneVarDeclinesToJoinAmbientDeclarations pins the join's decline on `declare`.
+// TestOneVariableDeclinesToJoinAmbientDeclarations pins the join's decline on `declare`.
 //
 // The join turned `declare let a: number; declare let b: number;` into `declare let a: number;
 // declare,  b: number;`, because the token before the second keyword is that statement's own
 // `declare`, not the first statement's semicolon. It is still reported; it is no longer repaired.
 // A mixed pair declines too, since joining an ambient binding into a real one changes whether it
 // exists at runtime. The control shows the join is otherwise alive.
-func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
+func TestOneVariableDeclinesToJoinAmbientDeclarations(test *testing.T) {
 	test.Parallel()
-	cases := []oneVarExportCase{
+	cases := []oneVariableExportCase{
 		{name: "both-ambient", source: "declare let a: number;\ndeclare let b: number;",
 			options: "\"always\"", findings: 1, fixes: 0},
 		{name: "ambient-then-plain", source: "declare let a: number;\nlet b: number;",
@@ -1615,8 +1615,8 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), testCase.findings)
 			}
@@ -1631,7 +1631,7 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
 	}
 }
 
-// TestOneVarJoinDeclinesAgainstADifferentKindPredecessor pins the fixer's own same-kind check.
+// TestOneVariableJoinDeclinesAgainstADifferentKindPredecessor pins the fixer's own same-kind check.
 //
 // The check appears twice in upstream: once in the consecutive arm, which tests
 // `previousNode.kind === type` before reporting, and once inside `joinDeclarationsFixer`, which
@@ -1649,13 +1649,13 @@ func TestOneVarDeclinesToJoinAmbientDeclarations(test *testing.T) {
 //
 // A mutation dropping the fixer's own check survives the entire 296-case corpus, because no corpus
 // case puts a different-kind statement between two same-kind ones under `always`.
-func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
+func TestOneVariableJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
 	test.Parallel()
 
 	test.Run("declines", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, OneVar, oneVarFile,
-			"function f() { var a = 1; let b = 2; var c = 3; }", decodedOneVar(test, "\"always\""))
+		result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile,
+			"function f() { var a = 1; let b = 2; var c = 3; }", decodedOneVariable(test, "\"always\""))
 		rule_testing.ExpectFindings(test, result, "combine")
 		for _, diagnostic := range result.Diagnostics {
 			if len(diagnostic.Fixes) != 0 {
@@ -1667,7 +1667,7 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
 
 	// Controls, so the decline above cannot pass by the join fixer being dead. Each has a
 	// same-kind predecessor and must repair.
-	for _, control := range []oneVarFixCase{
+	for _, control := range []oneVariableFixCase{
 		{name: "control-let-then-var", source: "function f() { let a = 1; var b = 2; var c = 3; }",
 			options: "\"always\"", wanted: "function f() { let a = 1; var b = 2,  c = 3; }"},
 		{name: "control-const-then-let", source: "function f() { const a = 1; let b; let c; }",
@@ -1677,14 +1677,14 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
 	} {
 		test.Run(control.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, control.source,
-				decodedOneVar(test, control.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, control.source,
+				decodedOneVariable(test, control.options))
 			rule_testing.ExpectFixedSource(test, result, control.wanted)
 		})
 	}
 }
 
-// TestOneVarRequireIsASpellingNotAResolution pins what `isRequire` actually asks.
+// TestOneVariableRequireIsASpellingNotAResolution pins what `isRequire` actually asks.
 //
 // Upstream reads `decl.init.callee.name === "require"`, which is a name test on the callee rather
 // than a resolution. Two consequences follow, and no corpus case can see either, because all ten
@@ -1700,10 +1700,10 @@ func TestOneVarJoinDeclinesAgainstADifferentKindPredecessor(test *testing.T) {
 //
 // A mutation making `isRequire` answer true for every call survives the whole corpus. These rows
 // are what kill it.
-func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
+func TestOneVariableRequireIsASpellingNotAResolution(test *testing.T) {
 	test.Parallel()
 	separateRequires := "{\"separateRequires\":true,\"var\":\"always\"}"
-	cases := []oneVarCase{
+	cases := []oneVariableCase{
 		{name: "require-mixed", source: "var foo = require('foo'), bar;",
 			options: separateRequires, ids: []string{"splitRequires"}},
 		{name: "other-call-mixed", source: "var foo = notRequire('foo'), bar;",
@@ -1719,8 +1719,8 @@ func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			if len(testCase.ids) == 0 {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -1730,7 +1730,7 @@ func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
 	}
 }
 
-// TestOneVarConsecutiveNeedsUpstreamsParentBody pins where the sibling index exists.
+// TestOneVariableConsecutiveNeedsUpstreamsParentBody pins where the sibling index exists.
 //
 // Upstream's consecutive arm reads `(parent.body && parent.body.length > 0 &&
 // parent.body.indexOf(node)) || 0`, so it fires only where the container has a `body` array. An
@@ -1747,9 +1747,9 @@ func TestOneVarRequireIsASpellingNotAResolution(test *testing.T) {
 // arm off for every unusual container would pass the switch rows and break the namespace ones.
 //
 // Every expectation measured against ESLint 10.10.0.
-func TestOneVarConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
+func TestOneVariableConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
 	test.Parallel()
-	silent := []oneVarCase{
+	silent := []oneVariableCase{
 		{name: "case-consecutive", source: "switch (x) { case 1: let a = 1; let b = 2; }",
 			options: "\"consecutive\""},
 		{name: "default-consecutive", source: "switch (x) { default: let a = 1; let b = 2; }",
@@ -1762,13 +1762,13 @@ func TestOneVarConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 
-	firing := []oneVarCase{
+	firing := []oneVariableCase{
 		// A namespace body does carry `body` upstream, so consecutive fires there.
 		{name: "namespace-consecutive", source: "namespace N { const a = 1; const b = 2; }",
 			options: "\"consecutive\"", ids: []string{"combine"}},
@@ -1785,8 +1785,8 @@ func TestOneVarConsecutiveNeedsUpstreamsParentBody(test *testing.T) {
 	for _, testCase := range firing {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OneVar, oneVarFile, testCase.source,
-				decodedOneVar(test, testCase.options))
+			result := rule_testing.RunWithOptions(test, OneVariable, oneVariableFile, testCase.source,
+				decodedOneVariable(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}

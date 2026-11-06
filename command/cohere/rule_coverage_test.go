@@ -117,10 +117,10 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 
 	output := renderLintReport(
 		lintReport{
-			Result:     program.Result{Coverage: coverage},
-			Rules:      rules,
-			LintConfig: lintConfiguration,
-			WalkCost:   "in 1s",
+			Result:            program.Result{Coverage: coverage},
+			Rules:             rules,
+			LintConfiguration: lintConfiguration,
+			WalkCost:          "in 1s",
 		},
 	)
 	total, terms := countedLineTerms(test, output)
@@ -259,11 +259,11 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 	}
 
 	output := renderLintReport(lintReport{
-		Result:     program.Result{Coverage: coverage},
-		Rules:      rules,
-		LintConfig: lintConfiguration,
-		WalkCost:   "in 1s",
-		Details:    true,
+		Result:            program.Result{Coverage: coverage},
+		Rules:             rules,
+		LintConfiguration: lintConfiguration,
+		WalkCost:          "in 1s",
+		Details:           true,
 	})
 	lines := strings.Split(output, "\n")
 	for _, name := range []string{
@@ -417,10 +417,10 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 			"no-dupe-keys": {Severity: configuration.SeverityOff},
 		}}
 		output := renderLintReport(lintReport{
-			Result:     program.Result{Coverage: cleanCoverage()},
-			Rules:      rules,
-			LintConfig: lintConfiguration,
-			WalkCost:   "in 1s",
+			Result:            program.Result{Coverage: cleanCoverage()},
+			Rules:             rules,
+			LintConfiguration: lintConfiguration,
+			WalkCost:          "in 1s",
 		})
 		requireLines(test, output, `  config: key "no-dupe-keys" matches no registered rule, so its off never applies`)
 	})
@@ -528,10 +528,10 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 			"turned-off-be": {Severity: configuration.SeverityOff},
 		}}
 		output := renderLintReport(lintReport{
-			Result:     program.Result{Coverage: cleanCoverage()},
-			Rules:      rules,
-			LintConfig: lintConfiguration,
-			WalkCost:   "in 1s",
+			Result:            program.Result{Coverage: cleanCoverage()},
+			Rules:             rules,
+			LintConfiguration: lintConfiguration,
+			WalkCost:          "in 1s",
 		})
 		requireLines(test, output,
 			"  parity: 1 of 2 rules the config asks for, so 1 were not checked by anything here\n",
@@ -618,7 +618,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 			"guard-for-in": {File: root + "/CohereSettings.json", Reason: "no for-in replacement here yet"},
 		},
 	}
-	output := renderLintReport(lintReport{LintConfig: withDeparture})
+	output := renderLintReport(lintReport{LintConfiguration: withDeparture})
 	want := "  departure: guard-for-in is set differently from the house ruling in CohereSettings.json: no for-in replacement here yet"
 	if !strings.Contains(output, want+"\n") {
 		test.Errorf("the departure did not print as\n%s\nin:\n%s", want, output)
@@ -628,7 +628,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
 		Root:  root,
 	}
-	if output := renderLintReport(lintReport{LintConfig: without}); strings.Contains(output, "departure:") {
+	if output := renderLintReport(lintReport{LintConfiguration: without}); strings.Contains(output, "departure:") {
 		test.Errorf("a config with no departures printed one:\n%s", output)
 	}
 }
@@ -659,7 +659,7 @@ func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 			},
 		},
 	}
-	output := renderLintReport(lintReport{LintConfig: lintConfiguration})
+	output := renderLintReport(lintReport{LintConfiguration: lintConfiguration})
 	want := "  override: **/api/graphql/*.generated.ts in structure/StructureCohereSettings.json sets " +
 		"@typescript-eslint/no-explicit-any off, nexus/consistency-no-abbreviated-identifier off: " +
 		"until the generator emits real scalar types"
@@ -702,10 +702,10 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 		},
 	}
 	report := lintReport{
-		Result:     program.Result{Coverage: coverage},
-		Rules:      rules,
-		LintConfig: lintConfiguration,
-		WalkCost:   "in 1s",
+		Result:            program.Result{Coverage: coverage},
+		Rules:             rules,
+		LintConfiguration: lintConfiguration,
+		WalkCost:          "in 1s",
 	}
 
 	output := renderLintReport(report)

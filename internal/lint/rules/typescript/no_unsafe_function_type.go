@@ -14,7 +14,7 @@
 // tests passes, because a fixture exercises the rule directly and never reads the configuration.
 //
 // The first rule in the `next` package shipped with that defect and was inert until a planted
-// violation failed to fire. `TestEveryRegisteredRuleIsReachableFromTheLiveConfig` catches it now,
+// violation failed to fire. `TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration` catches it now,
 // but reading the config costs ten seconds and does not depend on remembering that the guard exists.
 package typescript
 

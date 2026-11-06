@@ -60,9 +60,9 @@ var crashShapes = []string{
 	"export class Base {}\nexport class Derived extends Base { constructor() { super(); } }\n",
 }
 
-// typedCorpusConfig is the corpus's tsconfig. The harness's own, plus what the shapes ask of it: JSX
+// typedCorpusConfiguration is the corpus's tsconfig. The harness's own, plus what the shapes ask of it: JSX
 // for the .tsx paths, and imports written with their .ts extension.
-const typedCorpusConfig = `{
+const typedCorpusConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"target": "ES2022",
@@ -152,7 +152,7 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(test *testing.T) {
 	test.Parallel()
 	rules := All()
 	directory := test.TempDir()
-	files := map[string]string{"tsconfig.json": typedCorpusConfig}
+	files := map[string]string{"tsconfig.json": typedCorpusConfiguration}
 	for index, source := range crashShapes {
 		for _, folder := range []string{"source/api", "source/components", fmt.Sprintf("app/thing%d", index)} {
 			files[folder+"/NetworkService.ts"] = networkServiceStub

@@ -23,7 +23,7 @@ import (
 func mixedRepository(test *testing.T, swiftDirectory string) string {
 	test.Helper()
 	root := newRepository(test, map[string]string{
-		"tsconfig.json":       incrementalFixtureConfig + "\n",
+		"tsconfig.json":       incrementalFixtureConfiguration + "\n",
 		"CohereSettings.json": "{ \"rules\": {} }\n",
 		"index.ts":            "export const value = 1;\n",
 		".gitignore":          "tsconfig.tsbuildinfo\n",
@@ -104,7 +104,7 @@ func TestBothMarkersInOneDirectoryAndProjectsNestedDeepAreEachChecked(test *test
 
 	deep := newRepository(test, nil)
 	writeTree(test, filepath.Join(deep, "web", "app"), map[string]string{
-		"tsconfig.json":       incrementalFixtureConfig + "\n",
+		"tsconfig.json":       incrementalFixtureConfiguration + "\n",
 		"CohereSettings.json": "{ \"rules\": {} }\n",
 		"index.ts":            "export const value = 1;\n",
 	})
@@ -524,7 +524,7 @@ func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
 	binary := buildCohere(test)
 	// The cache is ignored, so the second run's inputs are the first's and it replays.
 	root := newRepository(test, map[string]string{
-		"tsconfig.json":         incrementalFixtureConfig + "\n",
+		"tsconfig.json":         incrementalFixtureConfiguration + "\n",
 		"CohereSettings.json":   "{ \"rules\": {} }\n",
 		"index.ts":              "export const value = 1;\n",
 		".gitignore":            ".cache/\ntsconfig.tsbuildinfo\n",
@@ -698,7 +698,7 @@ func xcodeRepository(test *testing.T) string {
 	test.Helper()
 	root := mixedRepository(test, ".")
 	writeTree(test, root, map[string]string{
-		"web/tsconfig.json":                   incrementalFixtureConfig + "\n",
+		"web/tsconfig.json":                   incrementalFixtureConfiguration + "\n",
 		"web/CohereSettings.json":             "{ \"rules\": {} }\n",
 		"web/index.ts":                        "export const web = 1;\n",
 		"CapturePhone/project.yml":            "name: CapturePhone\n",

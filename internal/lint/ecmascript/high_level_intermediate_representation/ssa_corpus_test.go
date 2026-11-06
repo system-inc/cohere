@@ -74,22 +74,22 @@ func TestSsaOverRealCodebase(test *testing.T) {
 							}
 							Construct(function)
 							var each func(*Function)
-							each = func(f *Function) {
+							each = func(lowered *Function) {
 								totalFns++
-								st := CollectSsaStats(f)
+								st := CollectSsaStats(lowered)
 								totalPhis += st.Phis
 								totalNamed += st.NamedValues
 								totalUses += st.Uses
 								if st.Phis > 0 {
 									withPhis++
 								}
-								for _, violation := range VerifySsa(f) {
+								for _, violation := range VerifySsa(lowered) {
 									violations++
 									if violations <= 8 {
 										test.Errorf("%s: %s", filepath.Base(path), violation.Detail)
 									}
 									switch violation.Kind {
-									case static_single_assignment.SSAViolationMultipleDefinitions:
+									case static_single_assignment.StaticSingleAssignmentViolationMultipleDefinitions:
 										kinds["multiple-definitions"]++
 									default:
 										kinds["use-not-dominated"]++
@@ -99,7 +99,7 @@ func TestSsaOverRealCodebase(test *testing.T) {
 								// A text grep for "while (" reports zero on this corpus because it
 								// is written "while(", which is the same wrong-by-a-pattern answer
 								// the `HIR` corpus test documents. Terminals cannot lie about this.
-								for _, blk := range f.Blocks {
+								for _, blk := range lowered.Blocks {
 									switch blk.Terminal.(type) {
 									case *While:
 										terminals["While"]++
@@ -127,8 +127,8 @@ func TestSsaOverRealCodebase(test *testing.T) {
 										terminals["Label"]++
 									}
 								}
-								for _, n := range f.Functions {
-									each(n)
+								for _, nested := range lowered.Functions {
+									each(nested)
 								}
 							}
 							each(function)

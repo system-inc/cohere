@@ -724,27 +724,27 @@ func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 		"the compiler at %s is not checked out. Run `git submodule update --init TypeScript`",
 		submoduleDirectory,
 	)
-	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
-	if err != nil {
+	output, readError := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
+	if readError != nil {
 		return "", notCheckedOut
 	}
-	topLevel, err := filepath.EvalSymlinks(strings.TrimSpace(string(output)))
-	if err != nil {
+	topLevel, readError := filepath.EvalSymlinks(strings.TrimSpace(string(output)))
+	if readError != nil {
 		return "", notCheckedOut
 	}
 	// Absolute before resolving, because git answers with an absolute path and EvalSymlinks keeps a
 	// relative one relative. Without it a module named as "." reads as never checked out.
-	expected, err := filepath.Abs(submoduleDirectory)
-	if err == nil {
-		expected, err = filepath.EvalSymlinks(expected)
+	expected, readError := filepath.Abs(submoduleDirectory)
+	if readError == nil {
+		expected, readError = filepath.EvalSymlinks(expected)
 	}
-	if err != nil || topLevel != expected {
+	if readError != nil || topLevel != expected {
 		return "", notCheckedOut
 	}
 
-	output, err = exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
-	if err != nil {
-		return "", fmt.Errorf("reading the checked-out compiler commit: %w", err)
+	output, readError = exec.Command("git", "-C", submoduleDirectory, "rev-parse", "HEAD").Output()
+	if readError != nil {
+		return "", fmt.Errorf("reading the checked-out compiler commit: %w", readError)
 	}
 	commit := strings.TrimSpace(string(output))
 	if commit == "" {

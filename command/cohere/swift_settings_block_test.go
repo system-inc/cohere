@@ -96,7 +96,7 @@ func TestASwiftBlockNoSwiftRunReadsIsRefusedByName(test *testing.T) {
 	engine, log := loggingSwiftEngine(test)
 
 	typeScriptOnly := newRepository(test, map[string]string{
-		"tsconfig.json":       incrementalFixtureConfig + "\n",
+		"tsconfig.json":       incrementalFixtureConfiguration + "\n",
 		"CohereSettings.json": "{ \"rules\": {}, \"swift\": { \"rules\": {} } }\n",
 		"index.ts":            "export const value = 1;\n",
 		".gitignore":          "tsconfig.tsbuildinfo\n",

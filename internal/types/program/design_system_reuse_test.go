@@ -48,7 +48,7 @@ func designSystemRule(root string) rule.Rule[rule.NoOptions] {
 func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"theme.css":     "flag\n",
 		"a.ts":          "export const a = 1;\n",
 		"b.ts":          "export const b = 2;\n",
@@ -135,12 +135,15 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"theme.css":     "flag\n",
 		"a.ts":          "export const a = 1;\n",
 		"b.ts":          "export const b = 2;\n",
 	})
-	elsewhere := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "c.ts": "export const c = 3;\n"})
+	elsewhere := writeProject(
+		test,
+		map[string]string{"tsconfig.json": minimalConfiguration, "c.ts": "export const c = 3;\n"},
+	)
 	other, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(elsewhere, "tsconfig.json")})
 	if buildError != nil {
 		test.Fatal(buildError)

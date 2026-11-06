@@ -250,7 +250,7 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 // (#bfxz13m): its own file may turn a rule off or change its options with no reason, and coverage
 // counts each unreasoned off by rule so the choice stays visible. The sets cohere carries are ours
 // wherever they are read, so an off or a departure written in one is held to a reason in every chain.
-func loadLayers(layers []configLayer, root string, registeredNames []string) (*Config, error) {
+func loadLayers(layers []configurationLayer, root string, registeredNames []string) (*Config, error) {
 	layerPaths := make([]string, 0, len(layers))
 	for _, layer := range layers {
 		layerPaths = append(layerPaths, layer.path)
@@ -526,9 +526,9 @@ func IgnorePatternsOf(path string) ([]string, error) {
 	return patterns, nil
 }
 
-// configLayer is one file in an `extends` chain: what it says, which top-level keys it wrote, and the
+// configurationLayer is one file in an `extends` chain: what it says, which top-level keys it wrote, and the
 // layers it names in `extends`, by path.
-type configLayer struct {
+type configurationLayer struct {
 	path     string
 	raw      rawConfig
 	present  map[string]bool
@@ -542,7 +542,7 @@ type configLayer struct {
 //
 // path is a file or an embedded set (`cohere:typescript`). A set is its own name, never a path, and it
 // may extend only other sets: it has no directory for a relative path to resolve against.
-func readConfigLayers(path string, chain []string) ([]configLayer, error) {
+func readConfigLayers(path string, chain []string) ([]configurationLayer, error) {
 	absolute := path
 	if !IsSet(path) {
 		resolved, absolutePathError := filepath.Abs(path)
@@ -589,11 +589,11 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 		return nil, checkSwiftBlockPlacementError
 	}
 
-	layer := configLayer{path: absolute, raw: raw, present: present}
+	layer := configurationLayer{path: absolute, raw: raw, present: present}
 
 	// Each entry's chain in order, a layer already read keeping its first place: two sets that sit on
 	// one base share it, and it applies once, outermost.
-	var layers []configLayer
+	var layers []configurationLayer
 	read := map[string]bool{}
 	for _, extended := range raw.Extends {
 		base := extended
@@ -625,7 +625,7 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 }
 
 // ancestorsByLayer is every layer each layer extends, directly or through others, keyed by path.
-func ancestorsByLayer(layers []configLayer) map[string]map[string]bool {
+func ancestorsByLayer(layers []configurationLayer) map[string]map[string]bool {
 	extendedByPath := make(map[string][]string, len(layers))
 	for _, layer := range layers {
 		extendedByPath[layer.path] = layer.extended
@@ -730,7 +730,7 @@ func compactJson(raw json.RawMessage) string {
 // The second is the guard that keeps the list from rotting. A reason left behind after its rule was
 // turned back on, or written for a rule another file turns off, reads as a decision while deciding
 // nothing, exactly as a departure that departs from nothing would.
-func checkReasons(layer configLayer) error {
+func checkReasons(layer configurationLayer) error {
 	names := make([]string, 0, len(layer.raw.Reasons))
 	for name := range layer.raw.Reasons {
 		names = append(names, name)

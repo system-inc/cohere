@@ -171,7 +171,7 @@ func init() { rule.Register(rule.Registration[rule.NoOptions]{Rule: NoCrossEnumN
 		"./internal/lint/registry",
 		"-count=1",
 		"-timeout=30s",
-		"-run=^TestRegisteredRuleCPUBudget$",
+		"-run=^TestRegisteredRuleCpuBudget$",
 		"-v",
 	)
 	command.Dir = root

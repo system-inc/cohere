@@ -15,7 +15,7 @@ import (
 // file of its own, and a cohere-dev whose go stands in for the gate: it logs when each worktree's test run
 // starts and ends, and which files the tree it tests holds.
 type landFixture struct {
-	t           *testing.T
+	test        *testing.T
 	wrapper     string
 	repository  string
 	log         string
@@ -24,7 +24,11 @@ type landFixture struct {
 
 func newLandFixture(test *testing.T) *landFixture {
 	test.Helper()
-	fixture := &landFixture{t: test, wrapper: filepath.Join(test.TempDir(), "cohere-dev"), repository: test.TempDir()}
+	fixture := &landFixture{
+		test:       test,
+		wrapper:    filepath.Join(test.TempDir(), "cohere-dev"),
+		repository: test.TempDir(),
+	}
 	if output, outputError := exec.Command(
 		"go",
 		"build",
@@ -70,50 +74,50 @@ func (fixture *landFixture) worktree(name string) string {
 }
 
 func (fixture *landFixture) git(directory string, arguments ...string) string {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command("git", arguments...)
 	command.Dir, command.Env = directory, fixture.environment
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {
-		fixture.t.Fatalf("git %v in %s: %v\n%s", arguments, directory, outputError, output)
+		fixture.test.Fatalf("git %v in %s: %v\n%s", arguments, directory, outputError, output)
 	}
 	return strings.TrimSpace(string(output))
 }
 
 func (fixture *landFixture) commit(directory string, file string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	if writeError := os.WriteFile(filepath.Join(directory, file), []byte(file+"\n"), 0o644); writeError != nil {
-		fixture.t.Fatal(writeError)
+		fixture.test.Fatal(writeError)
 	}
 	fixture.git(directory, "add", file)
 	fixture.git(directory, "commit", "-q", "-m", "add "+file)
 }
 
 func (fixture *landFixture) land(name string) *exec.Cmd {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command(fixture.wrapper, "land")
 	command.Dir, command.Env = fixture.worktree(name), fixture.environment
 	if startError := command.Start(); startError != nil {
-		fixture.t.Fatal(startError)
+		fixture.test.Fatal(startError)
 	}
 	return command
 }
 
 func (fixture *landFixture) waitForGate(line string) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	for deadline := time.Now().Add(time.Minute); ; time.Sleep(20 * time.Millisecond) {
-		contents := readMaybeMissing(fixture.t, fixture.log)
+		contents := readMaybeMissing(fixture.test, fixture.log)
 		if strings.Contains(string(contents), line) {
 			return
 		}
 		if time.Now().After(deadline) {
-			fixture.t.Fatalf("waited a minute for %q in the gate log:\n%s", line, contents)
+			fixture.test.Fatalf("waited a minute for %q in the gate log:\n%s", line, contents)
 		}
 	}
 }
 
 func (fixture *landFixture) gates() []string {
-	contents := readMaybeMissing(fixture.t, fixture.log)
+	contents := readMaybeMissing(fixture.test, fixture.log)
 	return strings.Split(strings.TrimSpace(string(contents)), "\n")
 }
 

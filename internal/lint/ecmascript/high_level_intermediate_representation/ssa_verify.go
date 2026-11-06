@@ -42,22 +42,22 @@ import "github.com/system-inc/cohere/static_single_assignment"
 //
 // An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to `LoadGlobal` has almost nothing to cohere and
-// passes trivially. `SSAStats` is how a caller tells a real pass from a vacuous one.
+// passes trivially. `CollectSsaStats` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySsa(function *Function) []static_single_assignment.SSAViolation {
+func VerifySsa(function *Function) []static_single_assignment.StaticSingleAssignmentViolation {
 	if function == nil {
 		return nil
 	}
-	return static_single_assignment.VerifySSA(ssaGraph{}, function)
+	return static_single_assignment.VerifyStaticSingleAssignment(ssaGraph{}, function)
 }
 
 // CollectSsaStats measures one function.
-func CollectSsaStats(function *Function) static_single_assignment.SSAStats {
+func CollectSsaStats(function *Function) static_single_assignment.StaticSingleAssignmentStatistics {
 	if function == nil {
-		return static_single_assignment.SSAStats{}
+		return static_single_assignment.StaticSingleAssignmentStatistics{}
 	}
-	return static_single_assignment.CollectSSAStats(ssaGraph{}, function)
+	return static_single_assignment.CollectStaticSingleAssignmentStatistics(ssaGraph{}, function)
 }
 
 // computeDominance runs Cooper-Harvey-Kennedy over the function's blocks, which are already in

@@ -14,13 +14,13 @@ import (
 // report and nothing a reader could compare a diagnostic against by identity.
 const messageMaxClassesPerFileId = "maximumExceeded"
 
-// maxClassesPerFileMessage renders the finding.
+// maximumClassesPerFileMessage renders the finding.
 //
 // Upstream's template is `File has too many classes ({{ classCount }}). Maximum allowed is {{ max
 // }}.` and both values move, which is why this is a function and why the tests assert the rendered
 // string rather than only the id. A message-id fixture cannot see the two arguments being passed in
 // the wrong order, and that swap renders as a grammatical sentence.
-func maxClassesPerFileMessage(classCount int, maximum int) rule.Message {
+func maximumClassesPerFileMessage(classCount int, maximum int) rule.Message {
 	return rule.Message{
 		Id: messageMaxClassesPerFileId,
 		Description: fmt.Sprintf("File has too many classes (%d). Maximum allowed is %d. "+
@@ -238,7 +238,7 @@ var MaxClassesPerFile = rule.Rule[MaxClassesPerFileOptions]{
 				last := statements[len(statements)-1]
 
 				ruleContext.ReportRange(core.NewTextRange(first.Pos(), last.End()),
-					maxClassesPerFileMessage(classCount, maximum))
+					maximumClassesPerFileMessage(classCount, maximum))
 			},
 		}
 	},

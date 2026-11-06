@@ -29,10 +29,10 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 // adamicIncluded is adamicHeld for a run that builds no graph, `--format-only` (#m0dktbn): the `.a` files the
 // tsconfig includes, read from the config alone. It is the program's own list less any `.a` file reached only
 // by an import from outside the include, which Adamic's layout does not have: its code is listed where its
-// tsconfig claims ".a". ReadProjectConfig cleans each name to the platform's separator, the form the walk's
+// tsconfig claims ".a". ReadProjectConfiguration cleans each name to the platform's separator, the form the walk's
 // names and adamicHeld's are in, so a tsconfig's `/` names match a walk's `\` ones on Windows.
 func adamicIncluded(configurationFileName string) (map[string]struct{}, error) {
-	configuration, readProjectConfigurationError := program.ReadProjectConfig(configurationFileName)
+	configuration, readProjectConfigurationError := program.ReadProjectConfiguration(configurationFileName)
 	if readProjectConfigurationError != nil {
 		return nil, readProjectConfigurationError
 	}

@@ -296,9 +296,9 @@ func TestBothRuleShapesLoad(test *testing.T) {
 	}
 }
 
-// TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig is the loudness guard. An empty config lints
+// TestAnUnreadableConfigIsAnErrorNotAnEmptyConfiguration is the loudness guard. An empty config lints
 // everything with nothing configured, which looks exactly like a clean run.
-func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfig(test *testing.T) {
+func TestAnUnreadableConfigIsAnErrorNotAnEmptyConfiguration(test *testing.T) {
 	test.Parallel()
 	if _, loadError := Load(filepath.Join(test.TempDir(), "absent.json")); loadError == nil {
 		test.Fatal("a missing config file loaded successfully")

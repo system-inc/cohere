@@ -26,7 +26,8 @@ var (
 			"interrupts the render. Move the work to `componentDidMount`, which runs after the " +
 			"tree is committed and cannot be thrown away.",
 	}
-	messageUnsafeComponentWillReceiveProps = rule.Message{
+	// messageUnsafeComponentWillReceiveProperties reports React's `componentWillReceiveProps`.
+	messageUnsafeComponentWillReceiveProperties = rule.Message{
 		Id: "unsafeComponentWillReceiveProps",
 		Description: "`componentWillReceiveProps` runs on every parent render rather than only when " +
 			"the props changed, so state derived inside it drifts out of step with the props it " +
@@ -243,13 +244,13 @@ var NoUnsafe = rule.Rule[NoUnsafeOptions]{
 			case unsafeWillMountName:
 				return messageUnsafeComponentWillMount, true
 			case unsafeWillReceivePropsName:
-				return messageUnsafeComponentWillReceiveProps, true
+				return messageUnsafeComponentWillReceiveProperties, true
 			case unsafeWillUpdateName:
 				return messageUnsafeComponentWillUpdate, true
 			case unsafeAliasWillMountName:
 				return messageUnsafeComponentWillMount, settings.CheckAliases
 			case unsafeAliasWillReceivePropsName:
-				return messageUnsafeComponentWillReceiveProps, settings.CheckAliases
+				return messageUnsafeComponentWillReceiveProperties, settings.CheckAliases
 			case unsafeAliasWillUpdateName:
 				return messageUnsafeComponentWillUpdate, settings.CheckAliases
 			}

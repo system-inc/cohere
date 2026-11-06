@@ -286,16 +286,16 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 // listing. A listed entry's FileInfo is its listing's, the type an lstat gives (so a symbolic link is never a
 // directory) and nothing else, where Walk lstats each entry; the walk's callback reads only the name and type.
 func walkListed(root string, listing gitignore.Listing, walkVisit filepath.WalkFunc) error {
-	information, err := os.Lstat(root)
-	if err != nil {
-		err = walkVisit(root, nil, err)
+	information, walkError := os.Lstat(root)
+	if walkError != nil {
+		walkError = walkVisit(root, nil, walkError)
 	} else {
-		err = walkListedFrom(root, information, listing, walkVisit)
+		walkError = walkListedFrom(root, information, listing, walkVisit)
 	}
-	if err == filepath.SkipDir || err == filepath.SkipAll {
+	if walkError == filepath.SkipDir || walkError == filepath.SkipAll {
 		return nil
 	}
-	return err
+	return walkError
 }
 
 func walkListedFrom(

@@ -45,7 +45,7 @@ func TestForwardRefUsesRefFiresOnUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	for _, source := range upstreamFails {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 	}
 }
@@ -61,7 +61,7 @@ func TestForwardRefUsesRefStaysSilentOnUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	for _, source := range upstreamPasses {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -81,7 +81,7 @@ func TestForwardRefUsesRefPointsAtTheFunction(test *testing.T) {
 			"function (props) { return null; }"},
 		{"forwardRef(props => null);", "props => null"},
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", testCase.source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", testCase.source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 		reported := testCase.source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != testCase.want {
@@ -95,9 +95,9 @@ func TestForwardRefUsesRefPointsAtTheFunction(test *testing.T) {
 func TestForwardRefUsesRefRendersItsMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "forwardRef((props) => null);")
+	result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "forwardRef((props) => null);")
 	rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
-	if result.Diagnostics[0].Message.Description != messageForwardRefUsesRef.Description {
+	if result.Diagnostics[0].Message.Description != messageForwardRefUsesReference.Description {
 		test.Errorf("description was %q", result.Diagnostics[0].Message.Description)
 	}
 }
@@ -151,7 +151,7 @@ func TestForwardRefUsesRefOffersUpstreamRepairs(test *testing.T) {
 		{"forwardRef(function(a, ) {})", "", "forwardRef(function(a, ref) {})"},
 		{"React.forwardRef(function(a) {})", "", "React.forwardRef(function(a, ref) {})"},
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", testCase.source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", testCase.source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 		suggestions := result.Diagnostics[0].Suggestions
 
@@ -207,7 +207,7 @@ func TestForwardRefUsesRefMatchesTheCalleeNameOnly(test *testing.T) {
 		"(React).forwardRef(function (c) {});",
 		"forwardRef(function (h) {}, extra);",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 	}
 
@@ -224,7 +224,7 @@ func TestForwardRefUsesRefMatchesTheCalleeNameOnly(test *testing.T) {
 		"React[forwardRef](function (a) {});",
 		"React[key](function (a) {});",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -244,7 +244,7 @@ func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(test *testin
 		"forwardRef((function (g) {}));",
 		"forwardRef(((a) => {}));",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -259,7 +259,7 @@ func TestForwardRefUsesRefDeclinesParenthesesAtTheCalleeAndArgument(test *testin
 func TestForwardRefUsesRefSkipsParenthesesWalkingToTheStatement(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "(forwardRef(function (a) {}));")
+	result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "(forwardRef(function (a) {}));")
 	rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 	if len(result.Diagnostics[0].Suggestions) != 1 {
 		test.Fatalf("offered %d suggestions, want only the add-ref one",
@@ -284,12 +284,12 @@ func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(test *testing.T) {
 		"forwardRef((a, ...b) => {});",
 		"forwardRef((...a) => {});",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectClean(test, result)
 	}
 
 	// A `this` parameter is not counted, so `a` is the only real one and this reports.
-	result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "forwardRef(function (this: any, a) {});")
+	result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "forwardRef(function (this: any, a) {});")
 	rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 
 	// One parameter is the whole reportable band. A destructured or defaulted parameter is still
@@ -302,7 +302,7 @@ func TestForwardRefUsesRefCountsParametersTheWayOxcDoes(test *testing.T) {
 		"forwardRef(async (a) => {});",
 		"forwardRef(function* (a) {});",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 	}
 }
@@ -318,7 +318,7 @@ func TestForwardRefUsesRefDeclinesNonFunctionArguments(test *testing.T) {
 		"forwardRef({a: 1});",
 		"forwardRef(forwardRef);",
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", source)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -335,14 +335,14 @@ func TestForwardRefUsesRefDeclinesNonFunctionArguments(test *testing.T) {
 func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(test *testing.T) {
 	test.Parallel()
 
-	anonymousStatement := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "forwardRef(function (a) {});")
+	anonymousStatement := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "forwardRef(function (a) {});")
 	rule_testing.ExpectFindings(test, anonymousStatement, "forwardRefUsesRef")
 	if len(anonymousStatement.Diagnostics[0].Suggestions) != 1 {
 		test.Errorf("anonymous statement offered %d suggestions, want 1",
 			len(anonymousStatement.Diagnostics[0].Suggestions))
 	}
 
-	namedStatement := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "forwardRef(function Named(a) {});")
+	namedStatement := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "forwardRef(function Named(a) {});")
 	rule_testing.ExpectFindings(test, namedStatement, "forwardRefUsesRef")
 	if len(namedStatement.Diagnostics[0].Suggestions) != 2 {
 		test.Fatalf("named statement offered %d suggestions, want 2",
@@ -356,7 +356,7 @@ func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(test *testi
 	}
 
 	// An arrow is never guarded: unwrapping leaves a valid expression statement.
-	arrowStatement := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", "forwardRef((a) => {});")
+	arrowStatement := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", "forwardRef((a) => {});")
 	rule_testing.ExpectFindings(test, arrowStatement, "forwardRefUsesRef")
 	if len(arrowStatement.Diagnostics[0].Suggestions) != 2 {
 		test.Errorf("arrow statement offered %d suggestions, want 2",
@@ -394,7 +394,7 @@ func TestForwardRefUsesRefRewritesAwkwardParameterLists(test *testing.T) {
 		{"const x = forwardRef( a => {})", "const x = forwardRef( (a, ref) => {})"},
 		{"const y = forwardRef(  b => {})", "const y = forwardRef(  (b, ref) => {})"},
 	} {
-		result := rule_testing.Run(test, ForwardRefUsesRef, "input.tsx", testCase.source)
+		result := rule_testing.Run(test, ForwardRefUsesReference, "input.tsx", testCase.source)
 		rule_testing.ExpectFindings(test, result, "forwardRefUsesRef")
 		suggestions := result.Diagnostics[0].Suggestions
 		addReference := suggestions[len(suggestions)-1]

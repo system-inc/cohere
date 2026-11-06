@@ -17,7 +17,7 @@ import (
 // namedWorktree runs cohere-dev worktree in directory, and returns what it printed on each stream and its
 // exit code.
 func (fixture *landFixture) namedWorktree(directory string, arguments ...string) (string, string, int) {
-	fixture.t.Helper()
+	fixture.test.Helper()
 	command := exec.Command(fixture.wrapper, append([]string{"worktree"}, arguments...)...)
 	command.Dir, command.Env = directory, fixture.environment
 	var standardOutput bytes.Buffer
@@ -26,7 +26,7 @@ func (fixture *landFixture) namedWorktree(directory string, arguments ...string)
 	runError := command.Run()
 	var exited *exec.ExitError
 	if runError != nil && !errors.As(runError, &exited) {
-		fixture.t.Fatalf("running cohere-dev worktree: %v", runError)
+		fixture.test.Fatalf("running cohere-dev worktree: %v", runError)
 	}
 	return standardOutput.String(), standardError.String(), command.ProcessState.ExitCode()
 }
@@ -39,8 +39,8 @@ func (fixture *landFixture) namedWorktreePath(name string) string {
 // pinLibrary pins a library of two files into main as a submodule, checked out in the checkout of main, the
 // way the land fixture's submodule tests do, and returns its path there.
 func (fixture *landFixture) pinLibrary() string {
-	fixture.t.Helper()
-	library := fixture.t.TempDir()
+	fixture.test.Helper()
+	library := fixture.test.TempDir()
 	fixture.git(library, "init", "-q", "-b", "main")
 	fixture.commit(library, "first.txt")
 	fixture.commit(library, "second.txt")

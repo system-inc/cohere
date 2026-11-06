@@ -7,14 +7,14 @@ import (
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// sortVarsFile is where the fixtures pretend to live.
-const sortVarsFile = "/repository/source/SortVars.ts"
+// sortVariablesFile is where the fixtures pretend to live.
+const sortVariablesFile = "/repository/source/SortVars.ts"
 
-// sortVarsOf builds the settings a config carrying this option would decode to.
+// sortVariablesOf builds the settings a config carrying this option would decode to.
 //
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder.
-func sortVarsOf(optionJson string) rule.Given[SortVarsSettings] {
-	settings, decodeSortVariablesOptionsError := DecodeSortVarsOptions([]byte(optionJson))
+func sortVariablesOf(optionJson string) rule.Given[SortVariablesSettings] {
+	settings, decodeSortVariablesOptionsError := DecodeSortVariablesOptions([]byte(optionJson))
 	if decodeSortVariablesOptionsError != nil {
 		panic(decodeSortVariablesOptionsError)
 	}
@@ -57,12 +57,12 @@ func pointerTo(value string) *string { return new(value) }
 // absence of fixes, not as an unchanged string.
 //
 //	25 reporting cases (9 of them declines), 36 clean cases.
-func TestSortVarsFires(test *testing.T) {
+func TestSortVariablesFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		source   string
-		settings rule.Given[SortVarsSettings]
+		settings rule.Given[SortVariablesSettings]
 		findings int
 		// fixed is the source after one fix pass, which is what upstream's `output` records.
 		fixed *string
@@ -112,35 +112,35 @@ func TestSortVarsFires(test *testing.T) {
 		{source: "var a, B, c;", findings: 1, fixed: pointerTo("var B, a, c;"), declinesRepair: false},
 		{
 			source:         "var B, a;",
-			settings:       sortVarsOf("{\"ignoreCase\": true}"),
+			settings:       sortVariablesOf("{\"ignoreCase\": true}"),
 			findings:       1,
 			fixed:          pointerTo("var a, B;"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var B, A, c;",
-			settings:       sortVarsOf("{\"ignoreCase\": true}"),
+			settings:       sortVariablesOf("{\"ignoreCase\": true}"),
 			findings:       1,
 			fixed:          pointerTo("var A, B, c;"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var d, a, [b, c] = {};",
-			settings:       sortVarsOf("{\"ignoreCase\": true}"),
+			settings:       sortVariablesOf("{\"ignoreCase\": true}"),
 			findings:       1,
 			fixed:          pointerTo("var a, d, [b, c] = {};"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var d, a, [b, {x: {c, e}}] = {};",
-			settings:       sortVarsOf("{\"ignoreCase\": true}"),
+			settings:       sortVariablesOf("{\"ignoreCase\": true}"),
 			findings:       1,
 			fixed:          pointerTo("var a, d, [b, {x: {c, e}}] = {};"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var {} = 1, b, a",
-			settings:       sortVarsOf("{\"ignoreCase\": true}"),
+			settings:       sortVariablesOf("{\"ignoreCase\": true}"),
 			findings:       1,
 			fixed:          pointerTo("var {} = 1, a, b"),
 			declinesRepair: false,
@@ -157,7 +157,7 @@ func TestSortVarsFires(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunGiven(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, SortVariables, sortVariablesFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
@@ -166,7 +166,7 @@ func TestSortVarsFires(test *testing.T) {
 		}
 		expected := make([]string, 0, testCase.findings)
 		for range testCase.findings {
-			expected = append(expected, messageSortVarsSortVars.Id)
+			expected = append(expected, messageSortVariablesSortVariables.Id)
 		}
 		rule_testing.ExpectFindings(test, result, expected...)
 
@@ -186,13 +186,13 @@ func TestSortVarsFires(test *testing.T) {
 	}
 }
 
-// TestSortVarsStaysSilent carries upstream's clean cases.
-func TestSortVarsStaysSilent(test *testing.T) {
+// TestSortVariablesStaysSilent carries upstream's clean cases.
+func TestSortVariablesStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
 		source   string
-		settings rule.Given[SortVarsSettings]
+		settings rule.Given[SortVariablesSettings]
 	}{
 		{source: "var a=10, b=4, c='abc'"},
 		{source: "var a, b, c, d"},
@@ -200,22 +200,22 @@ func TestSortVarsStaysSilent(test *testing.T) {
 		{source: "var _a, a"},
 		{source: "var A, a"},
 		{source: "var A, b"},
-		{source: "var a, A;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var A, a;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var a, B, c;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var A, b, C;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var {a, b, c} = x;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var {A, b, C} = x;", settings: sortVarsOf("{\"ignoreCase\": true}")},
+		{source: "var a, A;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var A, a;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var a, B, c;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var A, b, C;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var {a, b, c} = x;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var {A, b, C} = x;", settings: sortVariablesOf("{\"ignoreCase\": true}")},
 		{source: "var test = [1,2,3];"},
 		{source: "var {a,b} = [1,2];"},
-		{source: "var [a, B, c] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var [A, B, c] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var [A, b, C] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
+		{source: "var [a, B, c] = [1, 2, 3];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var [A, B, c] = [1, 2, 3];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "var [A, b, C] = [1, 2, 3];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
 		{source: "let {a, b, c} = x;"},
 		{source: "let [a, b, c] = [1, 2, 3];"},
-		{source: "const {a, b, c} = {a: 1, b: true, c: \"Moo\"};", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "const [a, b, c] = [1, true, \"Moo\"];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "const [c, a, b] = [1, true, \"Moo\"];", settings: sortVarsOf("{\"ignoreCase\": true}")},
+		{source: "const {a, b, c} = {a: 1, b: true, c: \"Moo\"};", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "const [a, b, c] = [1, true, \"Moo\"];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
+		{source: "const [c, a, b] = [1, true, \"Moo\"];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
 		{source: "var {a, x: {b, c}} = {};"},
 		{source: "var {c, x: {a, c}} = {};"},
 		{source: "var {a, x: [b, c]} = {};"},
@@ -226,21 +226,21 @@ func TestSortVarsStaysSilent(test *testing.T) {
 		{source: "var [b, {x: {a, c}}] = {};"},
 		{source: "var [b, d, a, c] = {};"},
 		{source: "var e, [a, c, d] = {};"},
-		{source: "var a, [E, c, D] = [];", settings: sortVarsOf("{\"ignoreCase\": true}")},
+		{source: "var a, [E, c, D] = [];", settings: sortVariablesOf("{\"ignoreCase\": true}")},
 		{source: "var a, f, [e, c, d] = [1,2,3];"},
 		{
 			source: "export default class {\n    render () {\n        let {\n            b\n        } = this,\n            a,\n            c;\n    }\n}",
 		},
-		{source: "var {} = 1, a", settings: sortVarsOf("{\"ignoreCase\": true}")},
+		{source: "var {} = 1, a", settings: sortVariablesOf("{\"ignoreCase\": true}")},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunGiven(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, SortVariables, sortVariablesFile, testCase.source, testCase.settings)
 		rule_testing.ExpectClean(test, result)
 	}
 }
 
-// TestSortVarsLiteralSetDecidesFixability covers what upstream's corpus cannot.
+// TestSortVariablesLiteralSetDecidesFixability covers what upstream's corpus cannot.
 //
 // The fixer declines the whole block when any identifier declarator has a non-literal initializer,
 // because reordering `var b = foo(), a = bar();` would change evaluation order. "Literal" is
@@ -261,7 +261,7 @@ func TestSortVarsStaysSilent(test *testing.T) {
 //
 // The last row is the one the mutation needed. The four above it are the control: without them a
 // rule that declined everything would pass the template row and prove nothing.
-func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
+func TestSortVariablesLiteralSetDecidesFixability(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -281,7 +281,7 @@ func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.Run(test, SortVars, sortVarsFile, testCase.source)
+		result := rule_testing.Run(test, SortVariables, sortVariablesFile, testCase.source)
 		if len(result.Diagnostics) != 1 {
 			test.Errorf("%q: expected exactly 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
@@ -302,7 +302,7 @@ func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
 	}
 }
 
-// TestSortVarsRepairKeepsTheTextBetweenDeclarators covers the other half of the fixer that the
+// TestSortVariablesRepairKeepsTheTextBetweenDeclarators covers the other half of the fixer that the
 // corpus under-tests: where the moved text starts and what sits between the moved pieces.
 //
 // Upstream rebuilds the span from the first identifier declarator to the last and, for each sorted
@@ -318,7 +318,7 @@ func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
 // `" a"` and its token span is `"a"`.
 //
 // Every expectation is what the installed rule produced.
-func TestSortVarsRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
+func TestSortVariablesRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -343,7 +343,7 @@ func TestSortVarsRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.Run(test, SortVars, sortVarsFile, testCase.source)
+		result := rule_testing.Run(test, SortVariables, sortVariablesFile, testCase.source)
 		if len(result.Diagnostics) == 0 {
 			test.Errorf("%q: expected a finding, got none", testCase.source)
 			continue

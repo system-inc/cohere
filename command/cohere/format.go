@@ -120,13 +120,13 @@ func formatTransform(engine formatEngine) edit.Transform {
 		withTree, takesTree := engine.(treeFormatter)
 		for pass := 1; pass <= formatPassLimit; pass++ {
 			var formatted string
-			var err error
+			var formatError error
 			if takesTree && pass == 1 && parsed != nil {
-				formatted, err = withTree.FormatParsed(fileName, current, parsed)
+				formatted, formatError = withTree.FormatParsed(fileName, current, parsed)
 			} else {
-				formatted, err = engine.Format(fileName, current)
+				formatted, formatError = engine.Format(fileName, current)
 			}
-			if err != nil {
+			if formatError != nil {
 				// A failure is reported as a failure rather than downgraded to a skip. The edit engine
 				// keeps the fixes that already converged, so a formatter falling over on one file does
 				// not cost the tree its correctness fixes, and the refusal is counted rather than
@@ -137,10 +137,10 @@ func formatTransform(engine formatEngine) edit.Transform {
 				// state, and the types phase reports it in a form a reader can act on. A second
 				// complaint from the formatter adds noise rather than information. Only on the first
 				// pass, though: the formatter's own output failing to parse is the formatter breaking.
-				if pass == 1 && isUnparseable(err) {
+				if pass == 1 && isUnparseable(formatError) {
 					return "", fmt.Errorf("%w: %s", edit.ErrSkipped, unparseableSkipReason)
 				}
-				return "", err
+				return "", formatError
 			}
 			if formatted == current {
 				return current, nil

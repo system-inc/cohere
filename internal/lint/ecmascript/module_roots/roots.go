@@ -33,8 +33,8 @@ const (
 	// ReasonNextInstrumentation is a framework hook Next.js calls by name at process start.
 	ReasonNextInstrumentation Reason = "Next.js framework hook"
 
-	// ReasonBuildConfig is a config file a build tool loads by name.
-	ReasonBuildConfig Reason = "build configuration, loaded by name"
+	// ReasonBuildConfiguration is a config file a build tool loads by name.
+	ReasonBuildConfiguration Reason = "build configuration, loaded by name"
 
 	// ReasonTest is a test file, which a runner loads by glob rather than by import.
 	ReasonTest Reason = "test file"

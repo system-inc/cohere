@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoUnassignedVars = rule.Message{
+var messageNoUnassignedVariables = rule.Message{
 	Id: "noUnassignedVars",
 	Description: "This declares a variable without a value and nothing ever assigns one, so every " +
 		"read of it is `undefined`. The code below it is written as though the value arrives from " +
@@ -17,7 +17,7 @@ var messageNoUnassignedVars = rule.Message{
 		"known, or delete the declaration.",
 }
 
-// NoUnassignedVars flags a `let` or `var` that is read but never assigned.
+// NoUnassignedVariables flags a `let` or `var` that is read but never assigned.
 //
 //	valid:   let x;
 //	valid:   let y = undefined; log(y);
@@ -63,8 +63,8 @@ var messageNoUnassignedVars = rule.Message{
 // anchors above are both `let` declarations, so a comparison on kind calls the inner declaration a
 // match for the outer one, concludes the outer is assigned, and reports the inner instead. That
 // produces exactly one finding, same as the correct behavior, so a fixture asserting the count
-// passes while the rule names the wrong variable. `TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten`
-// asserts the offset for that reason.
+// passes while the rule names the wrong variable.
+// `TestNoUnassignedVariablesNamesTheOuterBindingWhenOnlyTheInnerIsWritten` asserts the offset for that reason.
 //
 // # Why the checker is not sufficient on its own
 //
@@ -91,7 +91,7 @@ var messageNoUnassignedVars = rule.Message{
 //
 // No fix. The repair is either an initializer whose value the rule cannot know, or a deletion that
 // is only correct if every read was also a mistake.
-var NoUnassignedVars = rule.Rule[rule.NoOptions]{
+var NoUnassignedVariables = rule.Rule[rule.NoOptions]{
 	Name: "no-unassigned-vars",
 
 	// See the doc above: the discrimination is which binding a write names, and the shape that
@@ -215,7 +215,7 @@ var NoUnassignedVars = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				ruleContext.ReportNode(name, messageNoUnassignedVars)
+				ruleContext.ReportNode(name, messageNoUnassignedVariables)
 			},
 		}
 	},

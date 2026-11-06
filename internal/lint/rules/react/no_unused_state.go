@@ -331,7 +331,7 @@ func noUnusedStateVisitClassProperty(
 
 	// `static getDerivedStateFromProps = (props, state) => ...` written as a property. Upstream has
 	// a separate handler for it that reads the state parameter's references directly.
-	if noUnusedStateIsDerivedStateFromProps(node) && initializer != nil {
+	if noUnusedStateIsDerivedStateFromProperties(node) && initializer != nil {
 		noUnusedStateRecordParameterReads(ruleContext, classInfo, initializer, 1)
 	}
 }
@@ -350,9 +350,11 @@ func noUnusedStatePropertyOpensAnAliasScope(node *ast.Node) bool {
 	return initializer != nil && initializer.Kind == ast.KindArrowFunction
 }
 
-// noUnusedStateIsDerivedStateFromProps reports whether a member is the static lifecycle hook that
+// noUnusedStateIsDerivedStateFromProperties reports whether a member is the static lifecycle hook that
 // receives state as its second parameter.
-func noUnusedStateIsDerivedStateFromProps(node *ast.Node) bool {
+//
+// React names the hook getDerivedStateFromProps.
+func noUnusedStateIsDerivedStateFromProperties(node *ast.Node) bool {
 	if !noUnusedStateIsStatic(node) {
 		return false
 	}

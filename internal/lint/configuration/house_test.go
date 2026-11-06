@@ -155,7 +155,7 @@ func TestZeroConfigPutsTheProjectsOwnFileOnTop(test *testing.T) {
 		"CohereSettings.json": `{"rules": {"no-var": "off", "eqeqeq": ["error", "smart"], "react/no-danger": "warn"}}`,
 	})
 	path := filepath.Join(directory, "CohereSettings.json")
-	if zero, isZeroConfigurationError := IsZeroConfig(path); isZeroConfigurationError != nil || !zero {
+	if zero, isZeroConfigurationError := IsZeroConfiguration(path); isZeroConfigurationError != nil || !zero {
 		test.Fatalf("a file that names no set is zero config: %v %v", zero, isZeroConfigurationError)
 	}
 	component := filepath.Join(directory, "View.tsx")
@@ -182,18 +182,18 @@ func TestZeroConfigPutsTheProjectsOwnFileOnTop(test *testing.T) {
 
 // Not parallel: it swaps the package's setFiles for stand-in sets through withHouseSetsForTest
 // (withSetFiles), which every test that reads a set would see.
-func TestAChainThatNamesASetIsNotZeroConfig(test *testing.T) {
+func TestAChainThatNamesASetIsNotZeroConfiguration(test *testing.T) {
 	withHouseSetsForTest(test)
 	directory := writeConfigs(test, map[string]string{
 		"base.json":           `{"extends": "cohere:react"}`,
 		"CohereSettings.json": `{"extends": "./base.json"}`,
 	})
-	if zero, isZeroConfigurationError := IsZeroConfig(
+	if zero, isZeroConfigurationError := IsZeroConfiguration(
 		filepath.Join(directory, "CohereSettings.json"),
 	); isZeroConfigurationError != nil || zero {
 		test.Fatalf("a chain naming a set chose its sets: zero=%v err=%v", zero, isZeroConfigurationError)
 	}
-	if zero, isZeroConfigurationError := IsZeroConfig(
+	if zero, isZeroConfigurationError := IsZeroConfiguration(
 		filepath.Join(directory, "Missing.json"),
 	); isZeroConfigurationError != nil || !zero {
 		test.Fatalf("no settings file is zero config: zero=%v err=%v", zero, isZeroConfigurationError)

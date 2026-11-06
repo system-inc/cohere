@@ -28,7 +28,7 @@ func liveConfigPath(test testing.TB) string {
 //
 // This is the mechanical version: every registered rule must be a name the live config can resolve,
 // or be listed below as deliberately not enabled.
-func TestEveryRegisteredRuleIsReachableFromTheLiveConfig(test *testing.T) {
+func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T) {
 	test.Parallel()
 
 	loaded, loadError := configuration.Load(liveConfigPath(test))

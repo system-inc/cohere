@@ -106,7 +106,7 @@ func TestADerivedRuleReplaysWhileItsProgramFingerprintHolds(test *testing.T) {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": minimalConfig,
+				"tsconfig.json": minimalConfiguration,
 				"marker.ts":     "// red\n",
 				"a.ts":          "export const a = 1;\n",
 				"b.ts":          "export const b = 2;\n",
@@ -219,7 +219,7 @@ func TestARuleWithNoUsableProgramFingerprintIsWalkedEveryRun(test *testing.T) {
 		test.Run(scenario.name, func(test *testing.T) {
 			test.Parallel()
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": minimalConfig,
+				"tsconfig.json": minimalConfiguration,
 				"marker.ts":     "// red\n",
 				"a.ts":          "export const a = 1;\n",
 			})
@@ -381,7 +381,7 @@ func TestADerivedRuleIsFingerprintedUnderEachSelectionsOptions(test *testing.T) 
 				}
 				runs := &sync.Map{}
 				subject := optionMarkerRule(scenario.fingerprint, runs)
-				graph.LintConfig, graph.RuleOptions = lintConfiguration, registryFor(subject)
+				graph.LintConfiguration, graph.RuleOptions = lintConfiguration, registryFor(subject)
 				var reuse *program.FindingsReuse
 				if cached {
 					reuse = program.NewFindingsReuse(key, recorded, program.PathAnchor{})
@@ -514,7 +514,7 @@ func TestAWalkComputesEachProgramFingerprintOnce(test *testing.T) {
 	}
 	// Two overrides that change nothing but which resolution a file lands in, so the walk makes three
 	// selections on each worker that sees all three directories.
-	graph.LintConfig = &configuration.Config{Root: root, Rules: settings, Overrides: []configuration.Override{
+	graph.LintConfiguration = &configuration.Config{Root: root, Rules: settings, Overrides: []configuration.Override{
 		{
 			Files: []string{"b/**"},
 			Rules: map[string]configuration.RuleSetting{"test-derived-a": {Severity: configuration.SeverityError}},

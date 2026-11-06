@@ -7,7 +7,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoChildrenProp = rule.Message{
+var messageNoChildrenProperty = rule.Message{
 	Id: "noChildrenProp",
 	Description: "Children are being passed as a prop rather than as children. React reads " +
 		"`props.children` from what is nested between the tags, so writing the prop by hand " +
@@ -24,7 +24,7 @@ var messageNoChildrenPropNestFunction = rule.Message{
 		"name that call. Pass the function as the `children` prop instead.",
 }
 
-var messageNoChildrenPropPassFunctionAsArgs = rule.Message{
+var messageNoChildrenPropPassFunctionAsArguments = rule.Message{
 	Id: "passFunctionAsArgs",
 	Description: "A function is passed to `createElement` as a child argument while the " +
 		"configuration allows function children only as a prop. Pass it as `children` in the " +
@@ -38,7 +38,7 @@ type NoChildrenPropOptions struct {
 	AllowFunctions bool `json:"allowFunctions"`
 }
 
-// NoChildrenProp flags children passed as a prop instead of as children.
+// NoChildrenProperty flags children passed as a prop instead of as children.
 //
 //	valid:   <div>Children</div>
 //	valid:   React.createElement("div", {}, "Children")
@@ -94,7 +94,7 @@ type NoChildrenPropOptions struct {
 // reports and `{[children]: 1}` does not, and the difference is that the first names the property
 // and the second names a variable holding some other name. `staticKeyName` below draws exactly
 // that line.
-var NoChildrenProp = rule.Rule[NoChildrenPropOptions]{
+var NoChildrenProperty = rule.Rule[NoChildrenPropOptions]{
 	// No namespace prefix. The config writes `react/no-children-prop` and the parity guard strips
 	// the namespace on a `/` boundary, so a rule named `react-no-children-prop` would match no
 	// inventory entry, lint no files, and still pass every fixture in this file. The first rule in
@@ -126,7 +126,7 @@ var NoChildrenProp = rule.Rule[NoChildrenPropOptions]{
 					initializer.Kind == ast.KindJsxExpression && isFunction(initializer.AsJsxExpression().Expression) {
 					return
 				}
-				ruleContext.ReportNode(node.AsJsxAttribute().Name(), messageNoChildrenProp)
+				ruleContext.ReportNode(node.AsJsxAttribute().Name(), messageNoChildrenProperty)
 			},
 
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -148,7 +148,7 @@ var NoChildrenProp = rule.Rule[NoChildrenPropOptions]{
 					}
 					if name, static := staticKeyName(key); static && name == "children" {
 						if !isFunction(noChildrenPropPropertyValue(property)) {
-							ruleContext.ReportNode(key, messageNoChildrenProp)
+							ruleContext.ReportNode(key, messageNoChildrenProperty)
 						}
 						return
 					}
@@ -157,7 +157,7 @@ var NoChildrenProp = rule.Rule[NoChildrenPropOptions]{
 				// round, which upstream reports only under the option.
 				if arguments := node.AsCallExpression().Arguments.Nodes; len(arguments) == 3 &&
 					isFunction(arguments[2]) {
-					ruleContext.ReportNode(node, messageNoChildrenPropPassFunctionAsArgs)
+					ruleContext.ReportNode(node, messageNoChildrenPropPassFunctionAsArguments)
 				}
 			},
 		}

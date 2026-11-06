@@ -676,9 +676,9 @@ func TestAnEditAnywhereInTheChainIsSeen(test *testing.T) {
 	}
 }
 
-// TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig: a Resolver that already knows a
+// TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfiguration: a Resolver that already knows a
 // directory's options still walks a child that holds old Prettier config, and refuses it.
-func TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig(test *testing.T) {
+func TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfiguration(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	project(test, root, houseBlock)

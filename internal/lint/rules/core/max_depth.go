@@ -111,8 +111,8 @@ func DecodeMaxDepthOptions(raw []byte) (MaxDepthSettings, error) {
 	return settings, nil
 }
 
-// maxDepthSettingsFrom recovers the settings from whatever the config layer handed over.
-func maxDepthSettingsFrom(options rule.Given[MaxDepthSettings]) MaxDepthSettings {
+// maximumDepthSettingsFrom recovers the settings from whatever the config layer handed over.
+func maximumDepthSettingsFrom(options rule.Given[MaxDepthSettings]) MaxDepthSettings {
 	if settings, ok := options.Read(); ok {
 		return settings
 	}
@@ -174,7 +174,7 @@ var MaxDepth = rule.Rule[MaxDepthSettings]{
 	Name: "max-depth",
 
 	Run: func(ruleContext rule.Context, options rule.Given[MaxDepthSettings]) rule.Listeners {
-		settings := maxDepthSettingsFrom(options)
+		settings := maximumDepthSettingsFrom(options)
 		if settings.Disabled {
 			// `{"maximum": 0}` leaves upstream comparing against `undefined`, so it reports
 			// nothing at all. Declining the file is the same verdict paid once rather than once
@@ -187,7 +187,7 @@ var MaxDepth = rule.Rule[MaxDepthSettings]{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs a counter that rises entering a block and falls leaving it, and the
 				// listener walk is pre-order with no exit hook to decrement on.
-				walker := &maxDepthWalker{ctx: ruleContext, settings: settings}
+				walker := &maximumDepthWalker{ctx: ruleContext, settings: settings}
 				// Upstream's `Program: startFunction`: the file itself is a function frame, so
 				// top-level blocks are measured rather than ignored.
 				walker.depths = append(walker.depths, 0)
@@ -197,9 +197,9 @@ var MaxDepth = rule.Rule[MaxDepthSettings]{
 	},
 }
 
-// maxDepthIsElseIf is upstream's `isElseIf`: this IfStatement is the else-branch of another one, so
+// maximumDepthIsElseIf is upstream's `isElseIf`: this IfStatement is the else-branch of another one, so
 // it continues a chain rather than opening a new level.
-func maxDepthIsElseIf(node *ast.Node) bool {
+func maximumDepthIsElseIf(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil || parent.Kind != ast.KindIfStatement {
 		return false

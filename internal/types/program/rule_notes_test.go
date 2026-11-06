@@ -37,7 +37,7 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 	constant := notingEachDeclaration("test-constant", func(declaration *ast.Node) string { return "a" })
 
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-by-name": "error", "test-constant": "error"}}`,
 		"main.ts":             "export const a = 1;\nexport const b = 2;\nexport const a2 = a + b;\n",
 		"other.ts":            "export const a = 3;\n",
@@ -48,7 +48,7 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -82,7 +82,7 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
 		"hub.ts": "/** @processState the one hub every helper keeps current */\n" +
 			"export interface HubInterface { count: number; names: string[] }\n" +
@@ -95,7 +95,7 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}
@@ -131,7 +131,7 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
+		"tsconfig.json":       minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"nexus/correctness-no-caller-data-mutation": "error"}}`,
 		"base.ts": "export interface RecordInterface { status: string; log: string[] }\n" +
 			"export abstract class ScheduledExecutable {\n" +
@@ -149,7 +149,7 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}

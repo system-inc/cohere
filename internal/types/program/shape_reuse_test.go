@@ -84,7 +84,7 @@ func shapeWalk(
 // type-aware rule's finding on consumer depends on lib's declaration and not on lib's body.
 func shapeFixture(test *testing.T) string {
 	return writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"lib.ts":        "export function value(): string {\n  return \"1\";\n}\n",
 		"consumer.ts":   "import { value } from \"./lib\";\nexport const negated = -value();\n",
 	})
@@ -373,7 +373,7 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 			1,
 		},
 		{
-			rule_testing.EntryOf(test, react.NoObjectTypeAsDefaultProp),
+			rule_testing.EntryOf(test, react.NoObjectTypeAsDefaultProperty),
 			`import {createElement} from "react"; function A({items=[]}) {return createElement("div");}`,
 			1,
 		},
@@ -390,7 +390,7 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 				source = "// cohere-disable-next-line " + tc.subject.Name + "\n" + source
 			}
 			root := writeProject(test, map[string]string{
-				"tsconfig.json": strings.ReplaceAll(minimalConfig, "./*.ts", "./*.ts*"),
+				"tsconfig.json": strings.ReplaceAll(minimalConfiguration, "./*.ts", "./*.ts*"),
 				"lib.ts":        "export function value(): string { return \"before\"; }\n",
 				"consumer.tsx":  "import { value } from \"./lib\";\nvoid value;\n" + source + "\n",
 			})
@@ -531,7 +531,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 			lib := tc.lib + "\nfunction shapeProbe(): string { return \"before\"; }\n"
 			root := writeProject(
 				test,
-				map[string]string{"tsconfig.json": minimalConfig, "lib.ts": lib, "consumer.ts": tc.consumer},
+				map[string]string{"tsconfig.json": minimalConfiguration, "lib.ts": lib, "consumer.ts": tc.consumer},
 			)
 			counter := &countingRule{ran: map[string]int{}}
 			rules := []rule.Entry{counter.wrap(rule_testing.EntryOf(test, subject))}

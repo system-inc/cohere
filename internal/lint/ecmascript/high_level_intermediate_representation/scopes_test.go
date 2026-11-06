@@ -192,11 +192,12 @@ func TestScopeIsOnePerEquivalenceClass(test *testing.T) {
 	if scopes.Length() != 2 {
 		test.Fatalf("got %d scopes for 2 classes over 5 values; a scope must name a class", scopes.Length())
 	}
-	if a, b, c := scopes.ScopeOf(1), scopes.ScopeOf(2), scopes.ScopeOf(3); a != b || b != c {
-		test.Errorf("values 1,2,3 are one class but got scopes %d,%d,%d", a, b, c)
+	scopeOfOne, scopeOfTwo, scopeOfThree := scopes.ScopeOf(1), scopes.ScopeOf(2), scopes.ScopeOf(3)
+	if scopeOfOne != scopeOfTwo || scopeOfTwo != scopeOfThree {
+		test.Errorf("values 1,2,3 are one class but got scopes %d,%d,%d", scopeOfOne, scopeOfTwo, scopeOfThree)
 	}
-	if d, e := scopes.ScopeOf(4), scopes.ScopeOf(5); d != e {
-		test.Errorf("values 4,5 are one class but got scopes %d,%d", d, e)
+	if scopeOfFour, scopeOfFive := scopes.ScopeOf(4), scopes.ScopeOf(5); scopeOfFour != scopeOfFive {
+		test.Errorf("values 4,5 are one class but got scopes %d,%d", scopeOfFour, scopeOfFive)
 	}
 	if scopes.ScopeOf(1) == scopes.ScopeOf(4) {
 		test.Error("two separate classes were given one scope, which is a false merge")

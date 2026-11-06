@@ -5,7 +5,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageUnexpectedVar = rule.Message{
+// messageUnexpectedVariable is upstream's unexpectedVar message: a `var` declaration.
+var messageUnexpectedVariable = rule.Message{
 	Id: "unexpectedVar",
 	Description: "This is a `var` declaration, which is function-scoped and hoisted rather than " +
 		"block-scoped. The binding exists from the top of the enclosing function, so it is " +
@@ -16,7 +17,7 @@ var messageUnexpectedVar = rule.Message{
 		"reassigns it.",
 }
 
-// NoVar flags a var declaration, wherever one can appear.
+// NoVariable flags a var declaration, wherever one can appear.
 //
 //	valid:   const value = 1
 //	valid:   let value = 1
@@ -43,7 +44,7 @@ var messageUnexpectedVar = rule.Message{
 // declaration and never relied on outside its block, and both are questions about the whole enclosing
 // function rather than about this line. Changing scope silently is how a lint fix turns a working
 // program into a broken one.
-var NoVar = rule.Rule[rule.NoOptions]{
+var NoVariable = rule.Rule[rule.NoOptions]{
 	Name: "no-var",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportIfVar reports when a declaration list declares with `var`.
@@ -60,7 +61,7 @@ var NoVar = rule.Rule[rule.NoOptions]{
 			if declarationList.Flags&blockScoped != 0 {
 				return
 			}
-			ruleContext.ReportNode(declarationList, messageUnexpectedVar)
+			ruleContext.ReportNode(declarationList, messageUnexpectedVariable)
 		}
 
 		// loopInitializer returns a loop's initializer when it declares bindings rather than

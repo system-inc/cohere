@@ -18,12 +18,12 @@ import (
  * bytes under the same tsconfig; no_unused_vars_options_corpus_data_test.go says how it was built.
  */
 
-// noUnusedVarsUpstreamIds maps this rule's message ids to typescript-eslint's, the one place they differ.
-var noUnusedVarsUpstreamIds = map[string]string{"noUnusedVars": "unusedVar"}
+// noUnusedVariablesUpstreamIds maps this rule's message ids to typescript-eslint's, the one place they differ.
+var noUnusedVariablesUpstreamIds = map[string]string{"noUnusedVars": "unusedVar"}
 
-// noUnusedVarsOptionsCorpusDivergences are the upstream rows cohere answers differently, by row, with the
+// noUnusedVariablesOptionsCorpusDivergences are the upstream rows cohere answers differently, by row, with the
 // reason and cohere's answer, so the difference is asserted rather than skipped and cannot drift.
-var noUnusedVarsOptionsCorpusDivergences = map[int]struct {
+var noUnusedVariablesOptionsCorpusDivergences = map[int]struct {
 	reason string
 	cohere []noUnusedVarsOptionsCorpusFinding
 }{
@@ -37,7 +37,7 @@ var noUnusedVarsOptionsCorpusDivergences = map[int]struct {
 	},
 }
 
-func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
+func TestNoUnusedVariablesOptionsUpstreamCorpus(test *testing.T) {
 	test.Parallel()
 
 	upstream, pinned := 0, 0
@@ -62,11 +62,11 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 		}
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(row.options))
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(json.RawMessage(row.options))
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVariables, map[string]string{
 				"file.ts": row.source,
 			}, "file.ts", options,
 				func(directory string) {
@@ -86,7 +86,7 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 			reported := []noUnusedVarsOptionsCorpusFinding{}
 			for _, diagnostic := range diagnostics {
 				id := diagnostic.Message.Id
-				if upstreamId, renamed := noUnusedVarsUpstreamIds[id]; renamed {
+				if upstreamId, renamed := noUnusedVariablesUpstreamIds[id]; renamed {
 					id = upstreamId
 				}
 				reported = append(reported, noUnusedVarsOptionsCorpusFinding{
@@ -94,7 +94,8 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
 				})
 			}
-			if divergence, diverges := noUnusedVarsOptionsCorpusDivergences[row.index]; diverges && row.edge == "" {
+			if divergence, diverges := noUnusedVariablesOptionsCorpusDivergences[row.index]; diverges &&
+				row.edge == "" {
 				if fmt.Sprint(reported) != fmt.Sprint(divergence.cohere) {
 					test.Fatalf("row %d is a recorded divergence (%s) where cohere reports %q, and it now reports %q",
 						row.index, divergence.reason, divergence.cohere, reported)
@@ -112,7 +113,7 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 
 // usedIgnoredVar names the pattern that set the binding aside, by the option that holds it, so a reader
 // can tell which of four patterns to fix. Asserted on one row per kind rather than read off the constant.
-func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
+func TestNoUnusedVariablesUsedIgnoredMessageNamesItsPattern(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -149,13 +150,15 @@ func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+			options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVariablesOptions(
+				json.RawMessage(testCase.options),
+			)
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatal(decodeNoUnusedVariablesOptionsError)
 			}
 			result := rule_testing.RunTypedWithOptions(
 				test,
-				NoUnusedVars,
+				NoUnusedVariables,
 				"/repository/source/Case.ts",
 				testCase.source,
 				options,

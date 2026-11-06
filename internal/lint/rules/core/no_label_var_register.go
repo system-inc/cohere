@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No `Decode`: upstream's `meta.schema` is `[]`, so the rule has no option surface at all.
 func init() {
-	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoLabelVar})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoLabelVariable})
 }

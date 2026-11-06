@@ -980,7 +980,7 @@ func findingsCacheKey(graph *program.Graph, location projectLocation) (program.R
 	}
 	// Under zero config which sets a file gets is decided by the whole program, so a file can change sets
 	// without its own bytes changing, when another file starts importing next.
-	if fingerprint := graph.LintConfig.DetectionFingerprint(); fingerprint != "" {
+	if fingerprint := graph.LintConfiguration.DetectionFingerprint(); fingerprint != "" {
 		facts = append(facts, "house-sets="+fingerprint)
 	}
 	compilerFacts, compilerOptionsFactsError := compilerOptionsFacts(graph, location)

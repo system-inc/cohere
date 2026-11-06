@@ -36,7 +36,7 @@ import (
 // something tidier.
 func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 	test.Parallel()
-	files := map[string]string{"tsconfig.json": minimalConfig}
+	files := map[string]string{"tsconfig.json": minimalConfiguration}
 
 	// Enough files, cross-importing, that several workers run at once and reach across checkers.
 	// Sixty-four standalone files was not enough: the fix reverted, that version passed five of five,

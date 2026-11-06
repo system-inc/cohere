@@ -15,13 +15,13 @@ import (
 // could compare a diagnostic against by identity.
 const messageMaxNestedCallbacksId = "exceed"
 
-// maxNestedCallbacksMessage renders the finding.
+// maximumNestedCallbacksMessage renders the finding.
 //
 // Upstream's template is `Too many nested callbacks ({{num}}). Maximum allowed is {{max}}.` Both
 // values move and both are integers, so passing them in the wrong order renders a sentence that
 // reads perfectly and says the opposite thing. That is why the tests assert the rendered string
 // rather than only the id.
-func maxNestedCallbacksMessage(depth int, maximum int) rule.Message {
+func maximumNestedCallbacksMessage(depth int, maximum int) rule.Message {
 	return rule.Message{
 		Id: messageMaxNestedCallbacksId,
 		Description: fmt.Sprintf("Too many nested callbacks (%d). Maximum allowed is %d. "+
@@ -223,11 +223,11 @@ var MaxNestedCallbacks = rule.Rule[MaxNestedCallbacksOptions]{
 				var walk func(current *ast.Node, depth int)
 				walk = func(current *ast.Node, depth int) {
 					next := depth
-					if maxNestedCallbacksIsCountedCallback(current, checkConstructorCallCallbacks) {
+					if maximumNestedCallbacksIsCountedCallback(current, checkConstructorCallCallbacks) {
 						next = depth + 1
 						if next > maximum {
-							ruleContext.ReportRange(maxNestedCallbacksHeadRange(ruleContext, current),
-								maxNestedCallbacksMessage(next, maximum))
+							ruleContext.ReportRange(maximumNestedCallbacksHeadRange(ruleContext, current),
+								maximumNestedCallbacksMessage(next, maximum))
 						}
 					}
 					current.ForEachChild(func(child *ast.Node) bool {
@@ -241,14 +241,14 @@ var MaxNestedCallbacks = rule.Rule[MaxNestedCallbacksOptions]{
 	},
 }
 
-// maxNestedCallbacksIsCountedCallback answers whether this node is a function being passed as an
+// maximumNestedCallbacksIsCountedCallback answers whether this node is a function being passed as an
 // argument to a call, which is the only thing the depth counts.
 //
 // The callee test is upstream's `parent.callee === node` and it is not redundant with the argument
 // test. An immediately invoked function is the child of a call expression, so a check that only
 // asked about the parent's kind would count `(function() {})()` and report it at a limit of zero,
 // which upstream's corpus writes as a passing case twice.
-func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCallbacks bool) bool {
+func maximumNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCallbacks bool) bool {
 	if node.Kind != ast.KindFunctionExpression && node.Kind != ast.KindArrowFunction {
 		return false
 	}
@@ -268,7 +268,7 @@ func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCal
 	return false
 }
 
-// maxNestedCallbacksHeadRange is the reachable half of upstream's `getFunctionHeadLoc`.
+// maximumNestedCallbacksHeadRange is the reachable half of upstream's `getFunctionHeadLoc`.
 //
 // For an arrow the head is the `=>` token by itself. For anything else it runs from the function's
 // own first token through to the opening paren of its parameters, which places `async` and a
@@ -277,7 +277,7 @@ func maxNestedCallbacksIsCountedCallback(node *ast.Node, checkConstructorCallCal
 // position is inside the paren by construction. Verified across a named function, an async one, a
 // generator, an async generator, one carrying type parameters, one with a comment before its
 // parens, and one broken across three lines.
-func maxNestedCallbacksHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
+func maximumNestedCallbacksHeadRange(ruleContext rule.Context, node *ast.Node) core.TextRange {
 	start := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos()).Pos()
 
 	if node.Kind == ast.KindArrowFunction {

@@ -185,12 +185,12 @@ func printToDocWithParser(
 // printToDoc is parser-postcss.js's parseCss (or parseScss) followed by printAstToDoc
 // (src/main/ast-to-doc.js).
 func printToDoc(text string, prettierOptions formatoptions.Options, parser string) (doc.Doc, error) {
-	root, err := parseWithParserName(text, parser)
-	if err != nil {
-		if !printing.IsSyntax(err) {
-			err = printing.Syntax(err)
+	root, parseError := parseWithParserName(text, parser)
+	if parseError != nil {
+		if !printing.IsSyntax(parseError) {
+			parseError = printing.Syntax(parseError)
 		}
-		return nil, err
+		return nil, parseError
 	}
 
 	// Format has no textToDoc to reach the yaml printer with, and the core would drop a failing embed

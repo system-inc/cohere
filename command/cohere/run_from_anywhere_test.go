@@ -14,9 +14,9 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// incrementalFixtureConfig is a tsconfig that writes its build info inside the project, so a test can
+// incrementalFixtureConfiguration is a tsconfig that writes its build info inside the project, so a test can
 // watch the one file `--no-fix` used to rewrite.
-const incrementalFixtureConfig = `{
+const incrementalFixtureConfiguration = `{
     "compilerOptions": {
         "target": "ES2022",
         "module": "esnext",
@@ -35,7 +35,7 @@ func fixtureProject(test *testing.T) string {
 	test.Helper()
 	root := test.TempDir()
 	writeTree(test, root, map[string]string{
-		"tsconfig.json":       incrementalFixtureConfig,
+		"tsconfig.json":       incrementalFixtureConfiguration,
 		"CohereSettings.json": `{"rules":{}}`,
 		"index.ts":            "export const value = 1;\n",
 		"sub/deeper/Thing.ts": "export const thing = 2;\n",
@@ -273,7 +273,7 @@ func TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile(test *testing.T) {
 	binary := buildCohere(test)
 	root := test.TempDir()
 	writeTree(test, root, map[string]string{
-		"tsconfig.json":       incrementalFixtureConfig,
+		"tsconfig.json":       incrementalFixtureConfiguration,
 		"CohereSettings.json": `{"rules":{"no-debugger":"error"}}`,
 		"Scoped.ts":           "export function scoped(): number {\n    debugger;\n    return 1;\n}\n",
 		"Other.ts":            "export const other: number = 2;\n",

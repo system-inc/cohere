@@ -42,7 +42,7 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunTyped(
 				test,
-				NoObjectTypeAsDefaultProp,
+				NoObjectTypeAsDefaultProperty,
 				noObjectTypeAsDefaultPropFile,
 				testCase.sourceText,
 			)
@@ -114,7 +114,7 @@ func TestNoObjectTypeAsDefaultPropFires(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.RunTyped(
 				test,
-				NoObjectTypeAsDefaultProp,
+				NoObjectTypeAsDefaultProperty,
 				noObjectTypeAsDefaultPropFile,
 				testCase.sourceText,
 			)
@@ -253,7 +253,7 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp,
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProperty,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				test.Fatalf("installed build reports %d findings, this rule reports %d",
@@ -280,7 +280,7 @@ func TestNoObjectTypeAsDefaultPropAnchorsOnTheWholeAssignment(test *testing.T) {
 	sourceText := "function C({a = {}, b = []}) { return <div/>; }"
 	wantSpans := []string{"a = {}", "b = []"}
 
-	result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProperty, noObjectTypeAsDefaultPropFile,
 		sourceText)
 	if len(result.Diagnostics) != len(wantSpans) {
 		test.Fatalf("want %d findings, got %d", len(wantSpans), len(result.Diagnostics))
@@ -306,11 +306,11 @@ func TestNoObjectTypeAsDefaultPropRequiresTheTypedHarness(test *testing.T) {
 
 	// The control. On the typed harness this reports, so the zero below means the guard fired
 	// rather than that the input was uninteresting.
-	typed := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	typed := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProperty, noObjectTypeAsDefaultPropFile,
 		sourceText)
 	rule_testing.ExpectFindings(test, typed, "forbiddenTypeDefaultParam")
 
-	untyped := rule_testing.Run(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile,
+	untyped := rule_testing.Run(test, NoObjectTypeAsDefaultProperty, noObjectTypeAsDefaultPropFile,
 		sourceText)
 	rule_testing.ExpectClean(test, untyped)
 }
@@ -332,7 +332,7 @@ func TestNoObjectTypeAsDefaultPropHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, fileName, sourceText)
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProperty, fileName, sourceText)
 			rule_testing.ExpectFindings(test, result, "forbiddenTypeDefaultParam")
 		})
 	}
@@ -420,7 +420,7 @@ func TestNoObjectTypeAsDefaultPropRendersRealKeyNamesWhereUpstreamSaysUndefined(
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp,
+			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProperty,
 				noObjectTypeAsDefaultPropFile, testCase.sourceText)
 
 			// Every row reports, including the two that diverge. That is the half with no

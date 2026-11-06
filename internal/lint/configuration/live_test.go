@@ -16,11 +16,11 @@ func liveConfigPath(test testing.TB) string {
 	return corpus.Ahra.Path(test, "CohereSettings.json")
 }
 
-// TestAgainstTheLiveConfig loads the actual file rather than a hand-written model of it.
+// TestAgainstTheLiveConfiguration loads the actual file rather than a hand-written model of it.
 //
 // A test that models a config can drift from the configuration. This one reads the bytes that are actually
 // gating the codebase, so a change there shows up here rather than at the next full run.
-func TestAgainstTheLiveConfig(test *testing.T) {
+func TestAgainstTheLiveConfiguration(test *testing.T) {
 	test.Parallel()
 
 	loaded, loadError := Load(liveConfigPath(test))

@@ -18,7 +18,7 @@ import (
 func TestARetiredGraphRecordsNothing(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"main.ts":       "import { helper } from './helper';\nexport const value: number = helper();\n",
 		"helper.ts":     "export function helper(): number { return 1; }\n",
 	})

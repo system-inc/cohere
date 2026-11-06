@@ -385,7 +385,7 @@ func mergeMain(worktree string, mainCommit string) error {
 }
 
 // gate runs the landing gate on the worktree through a pool token: go vet, then the rule CPU budget
-// (checkRuleCPU), then the tests of every module go.work names outside a submodule, each in one go
+// (checkRuleCpu), then the tests of every module go.work names outside a submodule, each in one go
 // invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData).
 func gate(worktree string, commit string) int {
 	covered, readGatedWorkspaceError := readGatedWorkspace(worktree)
@@ -436,6 +436,10 @@ func gate(worktree string, commit string) int {
 // ruleCpuCheck is the repository-local, generated stress corpus and its budget test.
 const ruleCpuCheck = "./internal/lint/registry/rule_budget_test.go"
 
+// ruleCpuTest is the budget test in ruleCpuCheck that the gate runs by name. A -run pattern that names no test runs
+// none and passes, so TestCohereHasTheRuleCpuCheckTheGateRuns holds the file to this name.
+const ruleCpuTest = "TestRegisteredRuleCpuBudget"
+
 // docsDataGenerator is the repository's generator of the website's data, relative to its root.
 const docsDataGenerator = "./internal/docsdata/tools/generate"
 
@@ -458,7 +462,7 @@ func checkRuleCpu(worktree string, environment func() []string) int {
 		"test",
 		"-count=1",
 		"-timeout=30s",
-		"-run=^TestRegisteredRuleCPUBudget$",
+		"-run=^"+ruleCpuTest+"$",
 		"-v",
 		"./"+filepath.ToSlash(filepath.Dir(ruleCpuCheck)),
 	)

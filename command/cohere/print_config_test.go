@@ -18,8 +18,8 @@ import (
 // check can diff the two engines (#mnmx9s4). The cases are the ones a key listing gets wrong: an
 // override turning a rule off for one path, a rule nobody configured, and a core rule configured only
 // through its typescript-eslint twin's key.
-func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
-	t.Parallel()
+func TestPrintConfigResolvesEveryRegisteredRuleForAFile(test *testing.T) {
+	test.Parallel()
 	lintConfiguration := &configuration.Config{
 		Root: "/repository",
 		Rules: map[string]configuration.RuleSetting{
@@ -40,26 +40,26 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 		return resolvedConfigRules(lintConfiguration.Resolve(path))
 	}
 
-	source := printed("/repository/source/Thing.ts")
-	if got := source["max-classes-per-file"]; len(got) != 2 ||
+	sourceFile := printed("/repository/source/Thing.ts")
+	if got := sourceFile["max-classes-per-file"]; len(got) != 2 ||
 		string(got[0]) != "2" ||
-		compacted(t, got[1]) != `{"ignoreExpressions":true}` {
-		t.Errorf("max-classes-per-file printed as %s, want [2, {\"ignoreExpressions\":true}]", got)
+		compacted(test, got[1]) != `{"ignoreExpressions":true}` {
+		test.Errorf("max-classes-per-file printed as %s, want [2, {\"ignoreExpressions\":true}]", got)
 	}
-	if got := source["no-var"]; len(got) != 1 || string(got[0]) != "1" {
-		t.Errorf("no-var printed as %s, want [1]", got)
+	if got := sourceFile["no-var"]; len(got) != 1 || string(got[0]) != "1" {
+		test.Errorf("no-var printed as %s, want [1]", got)
 	}
 	// The core rule has no key of its own and runs through its twin's, as the resolver decides.
-	if got := source["no-invalid-this"]; len(got) != 1 || string(got[0]) != "2" {
-		t.Errorf("core no-invalid-this printed as %s, want [2] through its twin's key", got)
+	if got := sourceFile["no-invalid-this"]; len(got) != 1 || string(got[0]) != "2" {
+		test.Errorf("core no-invalid-this printed as %s, want [2] through its twin's key", got)
 	}
-	if _, printedAtAll := source["no-debugger"]; printedAtAll {
-		t.Error("a rule nobody configured was printed")
+	if _, printedAtAll := sourceFile["no-debugger"]; printedAtAll {
+		test.Error("a rule nobody configured was printed")
 	}
 
-	test := printed("/repository/source/Thing.test.ts")
-	if got := test["no-var"]; len(got) != 1 || string(got[0]) != "0" {
-		t.Errorf("no-var on a test file printed as %s, want [0] from the override", got)
+	testFile := printed("/repository/source/Thing.test.ts")
+	if got := testFile["no-var"]; len(got) != 1 || string(got[0]) != "0" {
+		test.Errorf("no-var on a test file printed as %s, want [0] from the override", got)
 	}
 }
 

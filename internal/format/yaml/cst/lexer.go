@@ -210,8 +210,9 @@ func (lexer *Lexer) atLineEnd() bool {
 	return false
 }
 
-func (lexer *Lexer) charAt(n int) int {
-	return characterAt(lexer.buffer, lexer.position+n)
+// characterAt is upstream's charAt(n): the code unit n past the lexer's position, or -1 past either end.
+func (lexer *Lexer) characterAt(offset int) int {
+	return characterAt(lexer.buffer, lexer.position+offset)
 }
 
 func (lexer *Lexer) continueScalar(offset int) int {
@@ -263,8 +264,8 @@ func (lexer *Lexer) getLine() ([]uint16, bool) {
 	return substring(lexer.buffer, lexer.position, end), true
 }
 
-func (lexer *Lexer) hasChars(n int) bool {
-	return lexer.position+n <= len(lexer.buffer)
+func (lexer *Lexer) hasChars(count int) bool {
+	return lexer.position+count <= len(lexer.buffer)
 }
 
 // setNext returns upstream's null, the state that ends the lex loop.
@@ -276,8 +277,8 @@ func (lexer *Lexer) setNext(state string) string {
 	return ""
 }
 
-func (lexer *Lexer) peek(n int) []uint16 {
-	return substr(lexer.buffer, lexer.position, n)
+func (lexer *Lexer) peek(count int) []uint16 {
+	return substr(lexer.buffer, lexer.position, count)
 }
 
 func (lexer *Lexer) parseNext(next string) string {
@@ -348,7 +349,7 @@ func (lexer *Lexer) parseStream() string {
 }
 
 func (lexer *Lexer) parseLineStart() string {
-	character := lexer.charAt(0)
+	character := lexer.characterAt(0)
 	if character == -1 && !lexer.atEnd {
 		return lexer.setNext("line-start")
 	}
@@ -356,19 +357,19 @@ func (lexer *Lexer) parseLineStart() string {
 		if !lexer.atEnd && !lexer.hasChars(4) {
 			return lexer.setNext("line-start")
 		}
-		s := lexer.peek(3)
-		if (equals(s, "---") || equals(s, "...")) && isEmpty(lexer.charAt(3)) {
+		marker := lexer.peek(3)
+		if (equals(marker, "---") || equals(marker, "...")) && isEmpty(lexer.characterAt(3)) {
 			lexer.pushCount(3)
 			lexer.indentValue = 0
 			lexer.indentNext = 0
-			if equals(s, "---") {
+			if equals(marker, "---") {
 				return "doc"
 			}
 			return "stream"
 		}
 	}
 	lexer.indentValue = lexer.pushSpaces(false)
-	if lexer.indentNext > lexer.indentValue && !isEmpty(lexer.charAt(1)) {
+	if lexer.indentNext > lexer.indentValue && !isEmpty(lexer.characterAt(1)) {
 		lexer.indentNext = lexer.indentValue
 	}
 	return lexer.parseBlockStart()
@@ -405,10 +406,10 @@ func (lexer *Lexer) parseDocument() string {
 	if !ok {
 		return lexer.setNext("doc")
 	}
-	n := lexer.pushIndicators()
-	switch characterAt(line, n) {
+	pushed := lexer.pushIndicators()
+	switch characterAt(line, pushed) {
 	case '#':
-		lexer.pushCount(len(line) - n)
+		lexer.pushCount(len(line) - pushed)
 		fallthrough
 	case -1:
 		lexer.pushNewline()
@@ -428,9 +429,9 @@ func (lexer *Lexer) parseDocument() string {
 	case '"', '\'':
 		return lexer.parseQuotedScalar()
 	case '|', '>':
-		n += lexer.parseBlockScalarHeader()
-		n += lexer.pushSpaces(true)
-		lexer.pushCount(len(line) - n)
+		pushed += lexer.parseBlockScalarHeader()
+		pushed += lexer.pushSpaces(true)
+		lexer.pushCount(len(line) - pushed)
 		lexer.pushNewline()
 		return lexer.parseBlockScalar()
 	default:
@@ -507,7 +508,7 @@ func (lexer *Lexer) parseFlowCollection() string {
 		lexer.flowKey = true
 		return lexer.parseQuotedScalar()
 	case ':':
-		next := lexer.charAt(1)
+		next := lexer.characterAt(1)
 		if lexer.flowKey || isEmpty(next) || next == ',' {
 			lexer.flowKey = false
 			lexer.pushCount(1)
@@ -524,7 +525,7 @@ func (lexer *Lexer) parseFlowCollection() string {
 }
 
 func (lexer *Lexer) parseQuotedScalar() string {
-	quote := lexer.charAt(0)
+	quote := lexer.characterAt(0)
 	end := -1
 	if quote != -1 {
 		end = indexOf(lexer.buffer, uint16(quote), lexer.position+1)
@@ -767,11 +768,11 @@ func (lexer *Lexer) pushCount(count int) int {
 }
 
 func (lexer *Lexer) pushToIndex(index int, allowEmpty bool) int {
-	s := slice(lexer.buffer, lexer.position, index)
-	if len(s) > 0 {
-		lexer.emit(s)
-		lexer.position += len(s)
-		return len(s)
+	text := slice(lexer.buffer, lexer.position, index)
+	if len(text) > 0 {
+		lexer.emit(text)
+		lexer.position += len(text)
+		return len(text)
 	} else if allowEmpty {
 		lexer.emit([]uint16{})
 	}
@@ -782,7 +783,7 @@ func (lexer *Lexer) pushIndicators() int {
 	count := 0
 	// A `continue` inside the switch reaches this for, as upstream's labeled continue does.
 	for {
-		switch lexer.charAt(0) {
+		switch lexer.characterAt(0) {
 		case '!':
 			count += lexer.pushTag()
 			count += lexer.pushSpaces(true)
@@ -795,7 +796,7 @@ func (lexer *Lexer) pushIndicators() int {
 			'?', // this is an error outside flow collections
 			':':
 			inFlow := lexer.flowLevel > 0
-			ch1 := lexer.charAt(1)
+			ch1 := lexer.characterAt(1)
 			if isEmpty(ch1) || (inFlow && inSet(flowIndicatorChars, ch1)) {
 				if !inFlow {
 					lexer.indentNext = lexer.indentValue + 1
@@ -813,7 +814,7 @@ func (lexer *Lexer) pushIndicators() int {
 }
 
 func (lexer *Lexer) pushTag() int {
-	if lexer.charAt(1) == '<' {
+	if lexer.characterAt(1) == '<' {
 		index := lexer.position + 2
 		character := characterAt(lexer.buffer, index)
 		for !isEmpty(character) && character != '>' {
@@ -847,7 +848,7 @@ func (lexer *Lexer) pushNewline() int {
 	character := characterAt(lexer.buffer, lexer.position)
 	if character == '\n' {
 		return lexer.pushCount(1)
-	} else if character == '\r' && lexer.charAt(1) == '\n' {
+	} else if character == '\r' && lexer.characterAt(1) == '\n' {
 		return lexer.pushCount(2)
 	}
 	return 0
@@ -863,12 +864,12 @@ func (lexer *Lexer) pushSpaces(allowTabs bool) int {
 			break
 		}
 	}
-	n := index - lexer.position
-	if n > 0 {
-		lexer.emit(substr(lexer.buffer, lexer.position, n))
+	spaces := index - lexer.position
+	if spaces > 0 {
+		lexer.emit(substr(lexer.buffer, lexer.position, spaces))
 		lexer.position = index
 	}
-	return n
+	return spaces
 }
 
 func (lexer *Lexer) pushUntil(test func(character int) bool) int {

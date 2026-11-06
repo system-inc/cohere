@@ -24,7 +24,7 @@ func messageForbiddenTypeDefaultParameter(propertyName string, forbiddenType str
 	}
 }
 
-// NoObjectTypeAsDefaultProp reports a referential value used as a destructured prop default.
+// NoObjectTypeAsDefaultProperty reports a referential value used as a destructured prop default.
 //
 //	valid:   function C({a = 1}) { return <div/>; }
 //	valid:   function C({a = someReference}) { return <div/>; }
@@ -59,7 +59,7 @@ func messageForbiddenTypeDefaultParameter(propertyName string, forbiddenType str
 //
 // The repair is to hoist the value to a module constant and name it, which means choosing that name
 // and a place to put it. Upstream ships no fixer either.
-var NoObjectTypeAsDefaultProp = rule.Rule[rule.NoOptions]{
+var NoObjectTypeAsDefaultProperty = rule.Rule[rule.NoOptions]{
 	Name:             "react/no-object-type-as-default-prop",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,

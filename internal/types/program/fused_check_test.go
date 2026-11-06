@@ -18,7 +18,7 @@ import (
 func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"shared.ts":     "export function take(value: string): string {\n    return value;\n}\nexport interface Shape { a: number }\n",
 		"global.d.ts":   "declare const declared: { broken: UnknownName };\n",
 	}
@@ -77,7 +77,7 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
 	test.Parallel()
 	files := map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"broken.ts":     "export const value = ;\n",
 		"typed.ts":      "export const wrong: number = 'text';\n",
 	}

@@ -70,13 +70,13 @@ func FindLastUsage(tree *ReactiveFunction, function *Function) *LastUsage {
 // Path comparison goes through `equalPaths`, which compares `Optional` as well as `Property`. That
 // matters here for the same reason it matters there: `a?.b` and `a.b` are different dependencies,
 // and collapsing them would merge two scopes that invalidate under different conditions.
-func AreEqualDependencies(a, b []ReactiveScopeDependency) bool {
-	if len(a) != len(b) {
+func AreEqualDependencies(leftDependencies, rightDependencies []ReactiveScopeDependency) bool {
+	if len(leftDependencies) != len(rightDependencies) {
 		return false
 	}
-	for _, left := range a {
+	for _, left := range leftDependencies {
 		found := false
-		for _, right := range b {
+		for _, right := range rightDependencies {
 			if left.Identifier == right.Identifier && equalPaths(left.Path, right.Path) {
 				found = true
 				break

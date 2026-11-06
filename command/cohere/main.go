@@ -401,7 +401,7 @@ func run() error {
 			return nil
 		}
 		if *printConfiguration {
-			return writeResolvedConfig(streams.Output, lintConfiguration, resolved, location, probePath)
+			return writeResolvedConfiguration(streams.Output, lintConfiguration, resolved, location, probePath)
 		}
 
 		// Only rules the binary actually implements. A config key naming a rule this build does not
@@ -1440,11 +1440,11 @@ func run() error {
 		// The findings, the lint line, and the coverage block, which prints unconditionally. See
 		// writeLintReport.
 		writeLintReport(streams.Output, lintReport{
-			Result:     result,
-			Rules:      rules,
-			LintConfig: lintConfiguration,
-			WalkCost:   lintWalkCost,
-			Details:    *showCoverage,
+			Result:            result,
+			Rules:             rules,
+			LintConfiguration: lintConfiguration,
+			WalkCost:          lintWalkCost,
+			Details:           *showCoverage,
 		})
 		// The lint phase's line and its coverage are out before whatever runs next, the unused report among it.
 		streams.Show(streams.Output)
@@ -1589,7 +1589,7 @@ func rebuildGraph(
 	if buildError != nil {
 		return nil, time.Since(start), buildError
 	}
-	rebuilt.LintConfig = lintConfiguration
+	rebuilt.LintConfiguration = lintConfiguration
 	rebuilt.RuleOptions = registry.OptionsAt(optionsBase(lintConfiguration, directory))
 	rebuilt.RegisteredRuleNames = registry.Names()
 	rebuilt.Readiness = requestedReadiness()
@@ -1620,15 +1620,15 @@ func configureLint(
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
 	var lintConfiguration *configuration.Config
-	var err error
+	var loadError error
 	if ahead != nil {
 		<-ahead.done
-		lintConfiguration, err = ahead.config, ahead.loadError
+		lintConfiguration, loadError = ahead.config, ahead.loadError
 	} else {
-		lintConfiguration, err = loadLintConfig(graph, location)
+		lintConfiguration, loadError = loadLintConfiguration(graph, location)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("loading the lint config: %w", err)
+	if loadError != nil {
+		return nil, fmt.Errorf("loading the lint config: %w", loadError)
 	}
 	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
 	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits
@@ -1667,7 +1667,7 @@ func configureLint(
 		}
 		graph.RuleOptions = registry.OptionsAt(base)
 	}
-	graph.LintConfig = lintConfiguration
+	graph.LintConfiguration = lintConfiguration
 	graph.RegisteredRuleNames = registry.Names()
 	graph.Readiness = requestedReadiness()
 	return lintConfiguration, nil

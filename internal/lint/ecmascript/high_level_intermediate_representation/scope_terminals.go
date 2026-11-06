@@ -81,7 +81,7 @@
 // wrong values, no crash, and nothing in a well-formedness check that would notice.
 //
 // `Construct` is not re-run. It is not idempotent: running it twice on the same function moved 1 phi
-// to 2 while `VerifySSA` reported zero violations. This pass therefore runs after single-assignment
+// to 2 while `VerifySsa` reported zero violations. This pass therefore runs after single-assignment
 // construction and repairs the phis in place rather than rebuilding them, which is also what
 // upstream does.
 package high_level_intermediate_representation

@@ -38,7 +38,7 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 		"export const f = 1;",
 		"",
 	}, "\n")
-	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfig, "main.ts": source})
+	directory := writeProject(test, map[string]string{"tsconfig.json": minimalConfiguration, "main.ts": source})
 	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 	if buildError != nil {
 		test.Fatalf("building: %v", buildError)

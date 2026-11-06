@@ -48,7 +48,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 		"adding a default in the same week from colliding in the same spot.",
 }
 
-// SortDefaultProps reports a defaultProps object whose keys are not in ascending order.
+// SortDefaultProperties reports a defaultProps object whose keys are not in ascending order.
 //
 //	valid:   static defaultProps = {a: 1, b: 2}
 //	valid:   static defaultProps = {b: 1, ...rest, a: 2}   a spread restarts the comparison
@@ -98,7 +98,7 @@ var messageDefaultPropsNotSorted = rule.Message{
 // `const o = {defaultProps: {b: 1, a: 2}}` is silent only because the member arm requires an
 // assignment, while any class field named `defaultProps` is judged regardless of what the class
 // extends. Reproduced.
-var SortDefaultProps = rule.Rule[SortDefaultPropsOptions]{
+var SortDefaultProperties = rule.Rule[SortDefaultPropsOptions]{
 	Name:             "react/sort-default-props",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,

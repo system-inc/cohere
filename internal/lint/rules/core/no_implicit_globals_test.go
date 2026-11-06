@@ -15,9 +15,9 @@ const implicitGlobalsFile = "/repository/source/ImplicitGlobals.ts"
 // implicitGlobalsScript is the sloppy JavaScript script the leak half can still fire in.
 const implicitGlobalsScript = "/repository/source/ImplicitGlobals.js"
 
-// implicitGlobalsScriptTsConfig is the typed harness's project with TypeScript's own module detection
+// implicitGlobalsScriptTsConfiguration is the typed harness's project with TypeScript's own module detection
 // rather than `force`, so a file with no import or export is a script, and with JavaScript allowed.
-const implicitGlobalsScriptTsConfig = `{
+const implicitGlobalsScriptTsConfiguration = `{
 	"compilerOptions": {
 		"strict": true,
 		"target": "ES2022",
@@ -41,7 +41,11 @@ func runImplicitGlobalsAsAScript(
 	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoImplicitGlobals,
 		map[string]string{fileName: sourceText}, fileName, options, func(directory string) {
 			path := filepath.Join(directory, "tsconfig.json")
-			if writeError := os.WriteFile(path, []byte(implicitGlobalsScriptTsConfig), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				path,
+				[]byte(implicitGlobalsScriptTsConfiguration),
+				0o644,
+			); writeError != nil {
 				test.Fatalf("writing the script tsconfig: %v", writeError)
 			}
 		})

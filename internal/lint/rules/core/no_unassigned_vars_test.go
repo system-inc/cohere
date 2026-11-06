@@ -7,11 +7,11 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// unassignedVarsFile is where the fixtures pretend to live.
+// unassignedVariablesFile is where the fixtures pretend to live.
 //
 // A real path matters here because this rule reads the checker, so the harness builds an actual
 // program and the file has to sit somewhere a tsconfig can reach.
-const unassignedVarsFile = "/repository/source/UnassignedVars.ts"
+const unassignedVariablesFile = "/repository/source/UnassignedVars.ts"
 
 // The corpus is oxc's, copied rather than rewritten.
 //
@@ -20,7 +20,7 @@ const unassignedVarsFile = "/repository/source/UnassignedVars.ts"
 // so one finding per input is wrong here, and the extractor said so before any code was written.
 // The extra diagnostic belongs to `let x; let a = x, b; log(x, a, b);`, which declares two
 // never-assigned readable bindings and reports twice.
-func TestNoUnassignedVarsFires(test *testing.T) {
+func TestNoUnassignedVariablesFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -66,7 +66,7 @@ func TestNoUnassignedVarsFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -80,7 +80,7 @@ func TestNoUnassignedVarsFires(test *testing.T) {
 // assigned-somewhere group, where a write exists and the rule has to find it: upstream's
 // `one = two` inside an `if` is the only shape its corpus covers, which is why the invented cases
 // below enumerate the rest.
-func TestNoUnassignedVarsStaysSilent(test *testing.T) {
+func TestNoUnassignedVariablesStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -119,7 +119,7 @@ func TestNoUnassignedVarsStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText))
 		})
 	}
 }
@@ -133,7 +133,7 @@ func TestNoUnassignedVarsStaysSilent(test *testing.T) {
 //
 // Sliced out of the source with the finding's own range rather than compared against an offset,
 // since an offset computed by the test is wrong in the same direction as the code that produced it.
-func TestNoUnassignedVarsPointsAtTheDeclaredName(test *testing.T) {
+func TestNoUnassignedVariablesPointsAtTheDeclaredName(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -151,7 +151,7 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.want) {
 				test.Fatalf("wanted %d findings, got %d", len(testCase.want), len(result.Diagnostics))
 			}
@@ -171,10 +171,10 @@ func TestNoUnassignedVarsPointsAtTheDeclaredName(test *testing.T) {
 //
 // `[]string{"x", "b"}` would also be satisfied by a rule that happened to order them that way while
 // reporting one of them at the other's offset. This pins that they are distinct.
-func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(test *testing.T) {
+func TestNoUnassignedVariablesReportsEachDeclarationAtItsOwnOffset(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile,
+	result := rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile,
 		"let x; let a = x, b; log(x, a, b);")
 	if len(result.Diagnostics) != 2 {
 		test.Fatalf("wanted 2 findings, got %d", len(result.Diagnostics))
@@ -192,15 +192,15 @@ func TestNoUnassignedVarsReportsEachDeclarationAtItsOwnOffset(test *testing.T) {
 // Fires cases would fail in a way that reads as a rule bug rather than as a harness mistake. This
 // asserts the silence directly, so the vacuous configuration is a named, tested state rather than
 // something a later edit can drift into unnoticed.
-func TestNoUnassignedVarsNeedsTheTypedHarness(test *testing.T) {
+func TestNoUnassignedVariablesNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
-	if !NoUnassignedVars.NeedsTypeChecker {
+	if !NoUnassignedVariables.NeedsTypeChecker {
 		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
 	rule_testing.ExpectClean(
 		test,
-		rule_testing.Run(test, NoUnassignedVars, unassignedVarsFile, "let user; greet(user);"),
+		rule_testing.Run(test, NoUnassignedVariables, unassignedVariablesFile, "let user; greet(user);"),
 	)
 }
 
@@ -216,7 +216,7 @@ func TestNoUnassignedVarsNeedsTheTypedHarness(test *testing.T) {
 //
 // The sibling rule `no-ex-assign` shipped for weeks missing `x++` entirely because neither corpus
 // tested it. Each arm below exists so that gap cannot recur silently here.
-func TestNoUnassignedVarsFindsEveryWriteShape(test *testing.T) {
+func TestNoUnassignedVariablesFindsEveryWriteShape(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -254,7 +254,7 @@ func TestNoUnassignedVarsFindsEveryWriteShape(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText))
 		})
 	}
 }
@@ -266,7 +266,7 @@ func TestNoUnassignedVarsFindsEveryWriteShape(test *testing.T) {
 // despite there being an identifier of the same name in a position that resembles a write. A
 // detector that is too eager goes silent on real findings, which is the quiet failure: nothing in
 // the corpus notices a rule that stopped firing.
-func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(test *testing.T) {
+func TestNoUnassignedVariablesDoesNotMistakeReadsForWrites(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -289,7 +289,7 @@ func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText),
 				"noUnassignedVars")
 		})
 	}
@@ -307,7 +307,7 @@ func TestNoUnassignedVarsDoesNotMistakeReadsForWrites(test *testing.T) {
 // The reverse case is the one that accuses. `{ let x; log(x); }` inside a file whose outer `x` is
 // assigned must report the inner binding, and a rule anchoring on the wrong declaration reports
 // nothing or reports the wrong one.
-func TestNoUnassignedVarsSeparatesShadowedBindings(test *testing.T) {
+func TestNoUnassignedVariablesSeparatesShadowedBindings(test *testing.T) {
 	test.Parallel()
 
 	fires := []struct {
@@ -336,7 +336,7 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText),
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText),
 				testCase.wantIds...)
 		})
 	}
@@ -348,11 +348,11 @@ func TestNoUnassignedVarsSeparatesShadowedBindings(test *testing.T) {
 // finding here. It just produces the wrong one: it reports the inner `x`, which is assigned, and
 // stays quiet about the outer `x`, which is not. Only the offset separates the two behaviors, so
 // the count assertion alone would ship the kind comparison.
-func TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten(test *testing.T) {
+func TestNoUnassignedVariablesNamesTheOuterBindingWhenOnlyTheInnerIsWritten(test *testing.T) {
 	test.Parallel()
 
 	const sourceText = "let x; log(x); { let x; x = 1; log(x); }"
-	result := rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, sourceText)
+	result := rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, sourceText)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("wanted 1 finding, got %d", len(result.Diagnostics))
 	}
@@ -371,7 +371,7 @@ func TestNoUnassignedVarsNamesTheOuterBindingWhenOnlyTheInnerIsWritten(test *tes
 // that is a crash rather than a wrong finding. The second is the ambient and namespace surface,
 // where oxc exempts any enclosing module declaration whether or not it carries `declare`, and our
 // checker's ambient flag alone would not.
-func TestNoUnassignedVarsExemptions(test *testing.T) {
+func TestNoUnassignedVariablesExemptions(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -413,7 +413,7 @@ func TestNoUnassignedVarsExemptions(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(test,
-				rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText))
+				rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText))
 		})
 	}
 }
@@ -424,7 +424,7 @@ func TestNoUnassignedVarsExemptions(test *testing.T) {
 // finding. Dropping the read requirement would report every declared-then-unused local in the tree,
 // which is a large and entirely duplicate finding set. The corpus covers it with `let x;` alone, at
 // the top level of a file, which is also the shape a rule could decline for unrelated reasons.
-func TestNoUnassignedVarsRequiresARead(test *testing.T) {
+func TestNoUnassignedVariablesRequiresARead(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -440,7 +440,7 @@ func TestNoUnassignedVarsRequiresARead(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnassignedVars, unassignedVarsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(test, NoUnassignedVariables, unassignedVariablesFile, testCase.sourceText)
 			// The third case has one genuine finding; the first two have none. Asserting the count
 			// against the number of readable declarations keeps this one table.
 			wanted := strings.Count(testCase.sourceText, "log(x)")

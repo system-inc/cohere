@@ -13,8 +13,8 @@ type invocation struct {
 	// root is the absolute directory of the go.work or the go.mod.
 	root string
 
-	// lintConfig is the settings file `--lint-config` named, absolute, or empty for the one beside the root.
-	lintConfig string
+	// lintConfiguration is the settings file `--lint-config` named, absolute, or empty for the one beside the root.
+	lintConfiguration string
 
 	// switches holds every switch named, by name, with the value it was given.
 	switches map[string]bool
@@ -31,8 +31,8 @@ func (request invocation) check() error {
 	if !filepath.IsAbs(request.root) {
 		return fmt.Errorf("--root %s is not an absolute path", request.root)
 	}
-	if request.lintConfig != "" && !filepath.IsAbs(request.lintConfig) {
-		return fmt.Errorf("--lint-config %s is not an absolute path", request.lintConfig)
+	if request.lintConfiguration != "" && !filepath.IsAbs(request.lintConfiguration) {
+		return fmt.Errorf("--lint-config %s is not an absolute path", request.lintConfiguration)
 	}
 	for _, path := range request.paths {
 		if !filepath.IsAbs(path) {

@@ -43,7 +43,7 @@ type NoHtmlLinkForPagesOptions struct {
 // resolves against the directory of the config file it was written in, the way a tsconfig's paths
 // do and the way every other cohere rule taking a path anchors it. When the config sits at the
 // project root and ESLint is started there, which is how every consumer runs it, the two readings are
-// the same directory. `TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig` pins the choice.
+// the same directory. `TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfiguration` pins the choice.
 //
 // An element written as "" is kept as "", not anchored. Anchored, it would name the config's own
 // directory and walk the whole project as a pages directory; upstream finds no directory named ""

@@ -70,7 +70,7 @@ type Config struct {
 	resolutionMemo atomic.Pointer[resolutionMemo]
 
 	// compiledGlobs is IgnorePatterns and each override's Files, compiled on first use. See Config.globs.
-	compiledGlobs atomic.Pointer[configGlobs]
+	compiledGlobs atomic.Pointer[configurationGlobs]
 }
 
 // OffReasonFor returns why the rule named ruleName is off, found by its own key or by a key that reaches
@@ -131,11 +131,11 @@ func (configuration *Config) RuleKeys() []string {
 
 // globs returns the Config's compiled patterns, compiling them on first use. Two goroutines racing to
 // compile build the same answer, and the first one stored wins.
-func (configuration *Config) globs() *configGlobs {
+func (configuration *Config) globs() *configurationGlobs {
 	if compiled := configuration.compiledGlobs.Load(); compiled != nil {
 		return compiled
 	}
-	compiled := &configGlobs{
+	compiled := &configurationGlobs{
 		ignore:    make([]glob, len(configuration.IgnorePatterns)),
 		overrides: make([][]glob, len(configuration.Overrides)),
 	}

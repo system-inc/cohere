@@ -165,63 +165,65 @@ func expectRange(test *testing.T, table *MutableRanges, id ssa.IdentifierId, wan
 // ways, since until Adamic switches to this module it is the only gate on that option.
 //
 // The shape is the one that took Adamic's rule (its 4748a636): a parameter mutated through another
-// value before its first read. Here p is mutated at order 1 by an instruction that reads only q (as
-// Adamic's escaped-values rule does for a write into an escaped container q reaches), read at 2, and
-// mutated again at 3.
+// value before its first read. Here `mutated` is mutated at order 1 by an instruction that reads only
+// `readOnly` (as Adamic's escaped-values rule does for a write into an escaped container `readOnly` reaches),
+// read at 2, and mutated again at 3.
 //
-//   - Without the option, the widening takes p's end to 4, and p first appears as an operand at order
-//     2, where the operand loop opens its start: [2,4). The mutation at 1 is outside it.
-//   - With it, p is defined on entry: [1,4), and the mutation at 1 is inside. r, a parameter nothing
-//     touches, is unset without the option and is the first instruction alone with it, [1,2).
+//   - Without the option, the widening takes the end of `mutated` to 4, and it first appears as an operand
+//     at order 2, where the operand loop opens its start: [2,4). The mutation at 1 is outside it.
+//   - With it, `mutated` is defined on entry: [1,4), and the mutation at 1 is inside. `untouched`, a
+//     parameter nothing touches, is unset without the option and is the first instruction alone with it, [1,2).
 func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	test.Parallel()
 	build := func() (*testFunction, ssa.IdentifierId, ssa.IdentifierId, ssa.IdentifierId) {
 		function := newTestFunction()
-		p, q, r := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
-		function.params = []testPlace{place(p), place(q), place(r)}
+		mutated, readOnly, untouched := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
+		function.params = []testPlace{place(mutated), place(readOnly), place(untouched)}
 		entry := function.block()
 		entry.add(&testInstruction{
-			uses:    []testPlace{place(q)},
-			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateTransitiveConditionally, place(p))},
+			uses: []testPlace{place(readOnly)},
+			effects: []AliasingEffect[testPlace]{
+				MutationEffect(AliasingEffectMutateTransitiveConditionally, place(mutated)),
+			},
 		})
-		entry.add(&testInstruction{uses: []testPlace{place(p)}})
-		entry.add(&testInstruction{uses: []testPlace{place(p)},
-			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(p))}})
-		return function, p, q, r
+		entry.add(&testInstruction{uses: []testPlace{place(mutated)}})
+		entry.add(&testInstruction{uses: []testPlace{place(mutated)},
+			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(mutated))}})
+		return function, mutated, readOnly, untouched
 	}
 
-	function, p, q, r := build()
+	function, mutated, readOnly, untouched := build()
 	without := ranges(function, Options{})
 	if order := function.blocks[0].instructions[0].order; order != 1 {
 		test.Fatalf("the first instruction is at order %d, so the ranges below would not mean what they say", order)
 	}
-	expectRange(test, without, p, MutableRange{Start: 2, End: 4},
+	expectRange(test, without, mutated, MutableRange{Start: 2, End: 4},
 		"React's rule opens a parameter's range at its first read, after the mutation at order 1")
-	if without.Contains(p, 1) {
+	if without.Contains(mutated, 1) {
 		test.Error(
-			"without the option, the mutation at order 1 must fall outside p's range: that is the hole the option closes",
+			"without the option, the mutation at order 1 falls outside mutated's range: the hole the option closes",
 		)
 	}
-	expectRange(test, without, q, MutableRange{}, "q is read and never mutated")
-	expectRange(test, without, r, MutableRange{}, "r is never touched")
+	expectRange(test, without, readOnly, MutableRange{}, "readOnly is read and never mutated")
+	expectRange(test, without, untouched, MutableRange{}, "untouched is never read or mutated")
 
-	function, p, q, r = build()
+	function, mutated, readOnly, untouched = build()
 	with := ranges(function, Options{ParametersDefinedOnEntry: true})
-	expectRange(test, with, p, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
-	if !with.Contains(p, 1) {
-		test.Error("with the option, the mutation at order 1 must be inside p's range")
+	expectRange(test, with, mutated, MutableRange{Start: 1, End: 4}, "a parameter is defined on entry")
+	if !with.Contains(mutated, 1) {
+		test.Error("with the option, the mutation at order 1 must be inside mutated's range")
 	}
 	expectRange(
 		test,
 		with,
-		q,
+		readOnly,
 		MutableRange{Start: 1, End: 2},
 		"a parameter nothing widened is the first instruction alone",
 	)
 	expectRange(
 		test,
 		with,
-		r,
+		untouched,
 		MutableRange{Start: 1, End: 2},
 		"a parameter nothing widened is the first instruction alone",
 	)

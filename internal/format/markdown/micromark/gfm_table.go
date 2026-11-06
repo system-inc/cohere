@@ -306,9 +306,9 @@ func flushGfmTableCell(
 
 			// Remove if needed.
 			if cellRange[3] > cellRange[2]+1 {
-				a := cellRange[2] + 1
-				b := cellRange[3] - cellRange[2] - 1
-				editMap.add(a, b, []Event{})
+				at := cellRange[2] + 1
+				remove := cellRange[3] - cellRange[2] - 1
+				editMap.add(at, remove, []Event{})
 			}
 		}
 

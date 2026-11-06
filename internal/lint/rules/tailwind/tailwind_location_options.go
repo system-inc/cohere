@@ -13,10 +13,10 @@ package tailwind
 // always has, and a rule given any of them follows upstream exactly. On a rule that never reads the
 // design system they change nothing, in upstream as here.
 type TailwindLocationOptions struct {
-	EntryPoint       string `json:"entryPoint"`
-	TailwindConfig   string `json:"tailwindConfig"`
-	WorkingDirectory string `json:"cwd"`
-	Tsconfig         string `json:"tsconfig"`
+	EntryPoint            string `json:"entryPoint"`
+	TailwindConfiguration string `json:"tailwindConfig"`
+	WorkingDirectory      string `json:"cwd"`
+	Tsconfig              string `json:"tsconfig"`
 
 	// anchor is the directory the config was written in, which stands for ESLint's working directory,
 	// set by the decoder from rule.OptionsBase.
@@ -27,7 +27,7 @@ type TailwindLocationOptions struct {
 func (options TailwindLocationOptions) Location() DesignSystemLocation {
 	configurationPath := options.EntryPoint
 	if configurationPath == "" {
-		configurationPath = options.TailwindConfig
+		configurationPath = options.TailwindConfiguration
 	}
 	return DesignSystemLocation{
 		Anchor:           options.anchor,

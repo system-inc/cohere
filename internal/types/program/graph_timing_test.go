@@ -21,7 +21,7 @@ import (
 func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json":                      minimalConfig,
+		"tsconfig.json":                      minimalConfiguration,
 		"main.ts":                            "import { helper } from './helper';\nimport { packaged } from 'packaged';\nexport const value = helper() + packaged;\n",
 		"helper.ts":                          "export function helper(): number { return 1; }\n",
 		"node_modules/packaged/package.json": `{"name": "packaged", "types": "index.d.ts"}`,

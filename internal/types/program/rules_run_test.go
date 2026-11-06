@@ -19,7 +19,7 @@ import (
 func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 	test.Parallel()
 	directory := writeProject(test, map[string]string{
-		"tsconfig.json": minimalConfig,
+		"tsconfig.json": minimalConfiguration,
 		"CohereSettings.json": `{"rules": {"test-listens": "error", "test-declines": "error", "test-off": "off",
 			"test-only-in-special": "off"},
 			"overrides": [{"files": ["special.ts"], "rules": {"test-only-in-special": "error"}}]}`,
@@ -31,7 +31,7 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 		test.Fatalf("building: %v", buildError)
 	}
 	var loadError error
-	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	graph.LintConfiguration, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
 	if loadError != nil {
 		test.Fatalf("loading the config: %v", loadError)
 	}

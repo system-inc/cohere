@@ -123,7 +123,7 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 	}
 	if writeError := os.WriteFile(
 		filepath.Join(directory, "tsconfig.json"),
-		[]byte(typedCorpusConfig),
+		[]byte(typedCorpusConfiguration),
 		0o644,
 	); writeError != nil {
 		test.Fatal(writeError)
@@ -246,7 +246,7 @@ func checkRuleBudget(
 
 // Invoked separately by cohere-dev land with -count=1: a cached test verdict must
 // never answer a performance question on a busy landing machine.
-func TestRegisteredRuleCPUBudget(test *testing.T) {
+func TestRegisteredRuleCpuBudget(test *testing.T) {
 	test.Parallel()
 	started := time.Now()
 	rules := All()

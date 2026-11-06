@@ -51,19 +51,19 @@ func span(text string) Range {
 	if !ok {
 		hi = lo
 	}
-	a, parseError := strconv.ParseInt(lo, 16, 32)
+	first, parseError := strconv.ParseInt(lo, 16, 32)
 	if parseError != nil {
 		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
 		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
-	b, parseError := strconv.ParseInt(hi, 16, 32)
+	last, parseError := strconv.ParseInt(hi, 16, 32)
 	if parseError != nil {
 		// Invariant: every row span reads comes from the Unicode Character Database zip embedded at build
 		// time, whose code points are all hex within 32 bits.
 		panic(parseError)
 	}
-	return Range{rune(a), rune(b)}
+	return Range{rune(first), rune(last)}
 }
 func merge(rs []Range) []Range {
 	slices.SortFunc(rs, func(left, right Range) int { return int(left.Lo - right.Lo) })
@@ -145,20 +145,20 @@ func Build() (Tables, error) {
 	scripts := map[string][]Range{}
 	var assignedScript []Range
 	for _, row := range fields(files["Scripts.txt"]) {
-		r := span(row[0])
-		scripts[row[1]] = append(scripts[row[1]], r)
-		assignedScript = append(assignedScript, r)
+		rowRange := span(row[0])
+		scripts[row[1]] = append(scripts[row[1]], rowRange)
+		assignedScript = append(assignedScript, rowRange)
 	}
 	scripts["Unknown"] = Complement(assignedScript)
 	// Script_Extensions defaults to Script, except for explicit overrides.
 	overrides := []Range{}
 	extensions := map[string][]Range{}
 	for _, row := range fields(files["ScriptExtensions.txt"]) {
-		r := span(row[0])
-		overrides = append(overrides, r)
+		rowRange := span(row[0])
+		overrides = append(overrides, rowRange)
 		for _, alias := range strings.Fields(row[1]) {
 			name := scriptAlias[alias]
-			extensions[name] = append(extensions[name], r)
+			extensions[name] = append(extensions[name], rowRange)
 		}
 	}
 	overrides = merge(overrides)
@@ -204,14 +204,14 @@ func Build() (Tables, error) {
 		}
 	}
 	binaries := map[string][]Range{}
-	for _, f := range []string{
+	for _, filename := range []string{
 		"PropList.txt",
 		"DerivedCoreProperties.txt",
 		"extracted/DerivedBinaryProperties.txt",
 		"emoji/emoji-data.txt",
 		"DerivedNormalizationProps.txt",
 	} {
-		for _, row := range fields(files[f]) {
+		for _, row := range fields(files[filename]) {
 			binaries[row[1]] = append(binaries[row[1]], span(row[0]))
 		}
 	}

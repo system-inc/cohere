@@ -162,18 +162,18 @@ func showDoc(document Doc) string {
 	case *Indent:
 		return "indent(" + showDoc(typed.Contents) + ")"
 	case *Align:
-		var n string
+		var argument string
 		switch typed.Kind {
 		case AlignWidth:
-			n = fmt.Sprint(typed.Width)
+			argument = fmt.Sprint(typed.Width)
 		case AlignString:
-			n = quote(typed.String)
+			argument = quote(typed.String)
 		case AlignRoot:
-			n = "markRoot"
+			argument = "markRoot"
 		case AlignDedentToRoot:
-			n = "root"
+			argument = "root"
 		}
-		return "align(" + n + "," + showDoc(typed.Contents) + ")"
+		return "align(" + argument + "," + showDoc(typed.Contents) + ")"
 	case *IndentIfBreak:
 		return "indentIfBreak(" +
 			idName(typed.GroupId) +

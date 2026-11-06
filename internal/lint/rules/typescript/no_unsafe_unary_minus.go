@@ -176,12 +176,12 @@ var NoUnsafeUnaryMinus = rule.Rule[rule.NoOptions]{
 
 // buildUnaryMinusMessage names the offending union part rather than the whole argument type, which
 // is tsgolint's behavior and differs observably from `@typescript-eslint`. See the note above.
-func buildUnaryMinusMessage(t string) rule.Message {
+func buildUnaryMinusMessage(typeText string) rule.Message {
 	return rule.Message{
 		Id: "unaryMinus",
 		Description: fmt.Sprintf(
 			"Argument of unary negation should be assignable to number | bigint but is %v instead.",
-			t,
+			typeText,
 		),
 	}
 }
