@@ -16,6 +16,7 @@ import (
 // test, restoring what it set, before any parallel test runs.
 func TestMain(suite *testing.M) {
 	if unsetenvError := os.Unsetenv(ForkPathVariable); unsetenvError != nil {
+		// Ignored: the run exits failing on the next line whether or not the reason reached stderr.
 		fmt.Fprintf(os.Stderr, "clearing %s: %v\n", ForkPathVariable, unsetenvError)
 		os.Exit(1)
 	}
