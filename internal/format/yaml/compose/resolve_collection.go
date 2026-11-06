@@ -339,9 +339,9 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 				if len(previousItemComment) > 0 {
 					if len(coll.Items) == 0 {
 						// `coll.items[coll.items.length - 1]` is undefined.
-						// Invariant: this is upstream's TypeError, which input can raise and which stops no
-						// process: resolveFlowCollection runs only under composeCollectionCatching, which
-						// recovers a typeError and reports it as upstream's catch does.
+						// Invariant: upstream throws here, and composeCollectionCatching recovers this panic
+						// into the document's RESOURCE_EXHAUSTION error, as upstream's catch does, so it never
+						// leaves the package.
 						panic(typeError("Cannot read properties of undefined (reading 'comment')"))
 					}
 					previous := coll.Items[len(coll.Items)-1]
