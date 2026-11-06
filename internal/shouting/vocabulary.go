@@ -53,9 +53,11 @@ var allowedUppercaseTokens, shoutedTwoLetterWords = mustLoadVocabulary(policy.Sh
 var vocabularyWord = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 
 func mustLoadVocabulary(data []byte) (map[string]bool, map[string]bool) {
-	allowed, twoLetterWords, err := loadVocabulary(data)
-	if err != nil {
-		panic(fmt.Sprintf("policy/Shouting.json: %v", err))
+	allowed, twoLetterWords, loadError := loadVocabulary(data)
+	if loadError != nil {
+		// Invariant: the file is embedded and its loader is tested, so a refusal here is a broken build of policy,
+		// and running with a vocabulary read wrongly would quietly judge shouting differently than the rules appear to.
+		panic(fmt.Sprintf("policy/Shouting.json: %v", loadError))
 	}
 	return allowed, twoLetterWords
 }
@@ -64,10 +66,10 @@ func loadVocabulary(data []byte) (map[string]bool, map[string]bool, error) {
 	var file vocabularyFile
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&file); err != nil {
-		return nil, nil, err
+	if decodeError := decoder.Decode(&file); decodeError != nil {
+		return nil, nil, decodeError
 	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+	if trailingError := decoder.Decode(&struct{}{}); !errors.Is(trailingError, io.EOF) {
 		return nil, nil, errors.New("there is more after the JSON value")
 	}
 	if len(file.Allowed) == 0 {
@@ -91,7 +93,10 @@ func loadVocabulary(data []byte) (map[string]bool, map[string]bool, error) {
 	twoLetterWords := map[string]bool{}
 	for _, word := range file.ShoutedTwoLetterWords.Words {
 		if len(word) != 2 || !vocabularyWord.MatchString(word) {
-			return nil, nil, fmt.Errorf("shoutedTwoLetterWords lists %q, which is not a two-letter uppercase word", word)
+			return nil, nil, fmt.Errorf(
+				"shoutedTwoLetterWords lists %q, which is not a two-letter uppercase word",
+				word,
+			)
 		}
 		twoLetterWords[word] = true
 	}

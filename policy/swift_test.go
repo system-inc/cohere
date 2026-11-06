@@ -51,15 +51,15 @@ func TestAbbreviationsFileHandsOutACopy(test *testing.T) {
 }
 
 // TestShoutingFileHandsOutACopy is TestAbbreviationsFileHandsOutACopy for the shouting vocabulary.
-func TestShoutingFileHandsOutACopy(t *testing.T) {
-	t.Parallel()
+func TestShoutingFileHandsOutACopy(test *testing.T) {
+	test.Parallel()
 	handedOut := ShoutingFile()
 	if len(handedOut) == 0 || !bytes.Equal(handedOut, shoutingFile) {
-		t.Fatalf("ShoutingFile is not the embedded file (%d bytes, embedded %d)", len(handedOut), len(shoutingFile))
+		test.Fatalf("ShoutingFile is not the embedded file (%d bytes, embedded %d)", len(handedOut), len(shoutingFile))
 	}
 	handedOut[0] ^= 0xff
 	if !bytes.Equal(ShoutingFile(), shoutingFile) || handedOut[0] == shoutingFile[0] {
-		t.Errorf("a write into one caller's bytes reached the embedded file")
+		test.Errorf("a write into one caller's bytes reached the embedded file")
 	}
 }
 
