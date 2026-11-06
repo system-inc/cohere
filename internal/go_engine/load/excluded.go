@@ -163,11 +163,11 @@ func reasonFor(buildContext *build.Context) string {
 // constraintContext is the build context go uses in workspace under environment, the whole environment, as go
 // env reports it: the target, whether cgo is on, and the `-tags` of `GOFLAGS`, each of which a value given to
 // the load or a go.env setting can change from the host's. The same go env call reports where the toolchain and
-// its settings live and which go.mod and go.work go found, which the inputs record names (see inputs.go), so
-// learning them costs no second command.
+// its settings live, which go.mod and go.work go found, and where go writes its build cache, which the inputs record
+// needs (see inputs.go), so learning them costs no second command.
 func constraintContext(workspace string, environment []string) (*build.Context, reportedEnvironment, error) {
 	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOROOT", "GOENV",
-		"GOMOD", "GOWORK")
+		"GOMOD", "GOWORK", "GOCACHE")
 	command.Dir = workspace
 	command.Env = environment
 	var standardError bytes.Buffer
@@ -186,6 +186,7 @@ func constraintContext(workspace string, environment []string) (*build.Context, 
 		Goenv      string `json:"GOENV"`
 		Gomod      string `json:"GOMOD"`
 		Gowork     string `json:"GOWORK"`
+		Gocache    string `json:"GOCACHE"`
 	}
 	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
 		return nil, reportedEnvironment{}, fmt.Errorf("reading the build target with go env in %s: %w", workspace,
@@ -205,6 +206,7 @@ func constraintContext(workspace string, environment []string) (*build.Context, 
 		environmentFile: values.Goenv,
 		moduleFile:      values.Gomod,
 		workspaceFile:   values.Gowork,
+		buildCache:      values.Gocache,
 		goFlags:         strings.Fields(values.Goflags),
 	}
 	return &buildContext, reported, nil

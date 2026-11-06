@@ -27,8 +27,12 @@ type Inputs struct {
 	// Files are the files whose bytes the load's result can depend on.
 	Files []string
 
-	// Directories are the directories whose listing decides which packages or files exist: every package directory
-	// of the graph, and every directory under a module root that `./...` could reach.
+	// Directories are the directories whose listing decides which packages or files exist: every directory under a
+	// module root, or a local replacement's, that `./...` could reach, and each package directory and embedded
+	// directory among them. A directory outside them, of the standard library or the module cache, is the
+	// toolchain's or a pinned version's, which VERSION, go.mod and go.sum stand for. None is above a module root, nor
+	// in the build cache, nor a directory whose name starts with `.` or below one, such as the root's `.cache`: the
+	// run, or the front door around it, writes there, and a listing that moves on every run would never replay.
 	Directories []string
 
 	// Absent are paths whose absence the load depends on: a go.work above a module root while none is in use, and a
@@ -36,13 +40,15 @@ type Inputs struct {
 	Absent []string
 }
 
-// reportedEnvironment is what go env reported in the workspace beyond the build target: the toolchain's root, the go
-// env file, the go.mod and go.work go found (`/dev/null`, empty or `off` when none), and the flags of `GOFLAGS`.
+// reportedEnvironment is what go env reported in the workspace beyond the build target: the root of the toolchain that
+// ran, which with `GOTOOLCHAIN` switching is one in the module cache rather than PATH's, the go env file, the go.mod
+// and go.work go found (`/dev/null`, empty or `off` when none), the build cache, and the flags of `GOFLAGS`.
 type reportedEnvironment struct {
 	goRoot          string
 	environmentFile string
 	moduleFile      string
 	workspaceFile   string
+	buildCache      string
 	goFlags         []string
 }
 
@@ -54,12 +60,14 @@ type inputSet struct {
 }
 
 // collectInputs is what a load read: every file of every package in the graph, the standard library's and the module
-// cache's included, and each package's directory; the census, which the load reads for build constraints; every
-// module's go.mod and each module root's go.sum and vendor/modules.txt; the go.work in use and its go.work.sum, or,
-// with none in use, a go.work above each module root as absent; the go executable, the toolchain's VERSION and
-// go.env, and the go env file; a go.mod or overlay `GOFLAGS` names; and every directory under a module root that
-// `./...` could reach. A path that could not be read about is still named, so the front door, which cannot read it
-// either, counts it as moved.
+// cache's included; the census, which the load reads for build constraints; every module's go.mod and each module
+// root's go.sum and vendor/modules.txt; the go.work in use and its go.work.sum, or, with none in use, a go.work above
+// each module root as absent; PATH's go executable, and the go, VERSION and go.env of the toolchain that ran; the go
+// env file; a go.mod or overlay `GOFLAGS` names; and the directories Inputs.Directories says. A path that could not be
+// read about is still named, so the front door, which cannot read it either, counts it as moved.
+//
+// A file in the build cache is never named: go writes it during the run (a translated cgo file), so its time is
+// always past the front door's clock, and its bytes follow from the source files and settings named already.
 func collectInputs(
 	workspace string,
 	reported reportedEnvironment,
@@ -68,24 +76,26 @@ func collectInputs(
 ) Inputs {
 	set := &inputSet{files: map[string]bool{}, directories: map[string]bool{}, absent: map[string]bool{}}
 	moduleRoots := map[string]bool{}
+	localReplacements := map[string]bool{}
+	packageDirectories := map[string]bool{}
 	packages.Visit(roots, nil, func(visited *packages.Package) {
 		for _, file := range slices.Concat(visited.GoFiles, visited.CompiledGoFiles, visited.OtherFiles,
 			visited.EmbedFiles, visited.IgnoredFiles) {
 			set.files[filepath.Clean(file)] = true
 		}
 		if visited.Dir != "" {
-			set.directories[filepath.Clean(visited.Dir)] = true
+			packageDirectories[filepath.Clean(visited.Dir)] = true
 			// An embed pattern can name a directory, whose files go list globs, so each directory between an
 			// embedded file and its package is listed too: a file added beside an embedded one changes the match.
 			for _, file := range visited.EmbedFiles {
 				directory := filepath.Dir(file)
 				for inside(visited.Dir, directory) {
-					set.directories[filepath.Clean(directory)] = true
+					packageDirectories[filepath.Clean(directory)] = true
 					directory = filepath.Dir(directory)
 				}
 			}
 		}
-		set.addModule(visited.Module, moduleRoots)
+		set.addModule(visited.Module, moduleRoots, localReplacements)
 	})
 	for _, file := range census {
 		set.files[filepath.Clean(file)] = true
@@ -98,6 +108,7 @@ func collectInputs(
 		}
 	}
 	if reported.goRoot != "" {
+		set.addFileOrAbsent(filepath.Join(reported.goRoot, "bin", "go"))
 		set.addFileOrAbsent(filepath.Join(reported.goRoot, "VERSION"))
 		set.addFileOrAbsent(filepath.Join(reported.goRoot, "go.env"))
 	}
@@ -116,6 +127,25 @@ func collectInputs(
 		set.addFileOrAbsent(filepath.Join(root, "vendor", "modules.txt"))
 		set.addReachableDirectories(root)
 	}
+	walked := slices.Concat(slices.Sorted(maps.Keys(moduleRoots)), slices.Sorted(maps.Keys(localReplacements)))
+	for _, root := range slices.Sorted(maps.Keys(localReplacements)) {
+		set.addReachableDirectories(root)
+	}
+	for directory := range packageDirectories {
+		set.directories[directory] = true
+	}
+	for directory := range set.directories {
+		if !listable(directory, moduleRoots, walked, reported.buildCache) {
+			delete(set.directories, directory)
+		}
+	}
+	if reported.buildCache != "" {
+		for file := range set.files {
+			if inside(filepath.Clean(reported.buildCache), file) {
+				delete(set.files, file)
+			}
+		}
+	}
 	return Inputs{
 		Files:       slices.Sorted(maps.Keys(set.files)),
 		Directories: slices.Sorted(maps.Keys(set.directories)),
@@ -124,10 +154,16 @@ func collectInputs(
 }
 
 // addModule names a package's module's go.mod, and its replacement's, and keeps a main module's directory as a module
-// root. The standard library's packages have no module.
+// root and a replacement by a local directory, which has no version to pin it, as one to walk too. The standard
+// library's packages have no module.
 //
-// Mutates: set gains the go.mod files; moduleRoots gains a main module's directory
-func (set *inputSet) addModule(module *packages.Module, moduleRoots map[string]bool) {
+// Mutates: set gains the go.mod files; moduleRoots gains a main module's directory; localReplacements gains a local
+// replacement's directory
+func (set *inputSet) addModule(
+	module *packages.Module,
+	moduleRoots map[string]bool,
+	localReplacements map[string]bool,
+) {
 	if module == nil {
 		return
 	}
@@ -136,6 +172,9 @@ func (set *inputSet) addModule(module *packages.Module, moduleRoots map[string]b
 	}
 	if module.Replace != nil && module.Replace.GoMod != "" {
 		set.files[filepath.Clean(module.Replace.GoMod)] = true
+	}
+	if module.Replace != nil && module.Replace.Version == "" && module.Replace.Dir != "" {
+		localReplacements[filepath.Clean(module.Replace.Dir)] = true
 	}
 	if module.Main && module.Dir != "" {
 		moduleRoots[filepath.Clean(module.Dir)] = true
@@ -231,6 +270,22 @@ func (set *inputSet) addReachableDirectories(root string) {
 		}
 		return nil
 	})
+}
+
+// listable reports whether a directory's listing may be an input: a walked root or inside one, above no module root,
+// which a replacement by a parent directory would be, and outside the build cache, which `GOCACHE` can put inside a
+// module and go writes during the run. The walk never enters a directory whose name starts with `.`, so the root's
+// `.cache`, where the front door and the engine write, is never one.
+func listable(directory string, moduleRoots map[string]bool, walked []string, buildCache string) bool {
+	for root := range moduleRoots {
+		if inside(directory, root) {
+			return false
+		}
+	}
+	if buildCache != "" && (directory == filepath.Clean(buildCache) || inside(filepath.Clean(buildCache), directory)) {
+		return false
+	}
+	return slices.ContainsFunc(walked, func(root string) bool { return directory == root || inside(root, directory) })
 }
 
 // addFileOrAbsent names path as a file when it exists and as absent when it does not.
