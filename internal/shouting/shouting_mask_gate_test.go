@@ -139,8 +139,16 @@ func TestShoutingUppercaseGatePreservesTokens(test *testing.T) {
 		return tokens
 	}
 
+	// The gate as every engine applies it: checked on the text before masking.
+	gatedTokens := func(body string) []string {
+		if !HasAdjacentUppercaseLetters(body) {
+			return nil
+		}
+		return TokensInMasked(MaskCodeAndCommands(body))
+	}
+
 	for _, comment := range comments {
-		gated := TokensIn(comment)
+		gated := gatedTokens(comment)
 		reference := ungated(comment)
 		if len(gated) != len(reference) {
 			test.Fatalf("gate changed the token count for %q: %v against %v", comment, gated, reference)

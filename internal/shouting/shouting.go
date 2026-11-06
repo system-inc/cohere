@@ -432,32 +432,10 @@ func maskCommandLines(text string) string {
 	return strings.Join(lines, "\n")
 }
 
-// TokensIn returns the distinct shouted tokens in a comment body, in first-seen order.
-//
-// The body is masked first, so code is invisible. Order is first-seen rather than sorted because a
-// reader looking for what to fix scans the comment top to bottom.
-func TokensIn(body string) []string {
-	// The cheapest question first, and it lets the whole rule skip 94% of comments.
-	//
-	// `uppercaseToken` is `\b[A-Z][A-Z0-9_]*\b`, and `isShoutedToken` declines anything under two
-	// characters, so nothing this function can report exists in a body without two uppercase letters
-	// somewhere. Masking only ever replaces characters with spaces, never adds an uppercase letter,
-	// so a body that fails this test cannot pass it after masking either. Checking before masking
-	// therefore skips both stages rather than one.
-	//
-	// Measured over 8,814 real comments: 5.7% hold two adjacent uppercase letters. The byte scan is
-	// 579µs against 5,413µs for the regex over the same corpus, and masking is another 6,019µs that
-	// this avoids entirely.
-	if !HasAdjacentUppercaseLetters(body) {
-		return nil
-	}
-	return TokensInMasked(MaskCodeAndCommands(body))
-}
-
 // TokensInMasked returns the distinct shouted tokens in text MaskCodeAndCommands has already masked, in first-seen
-// order. It is TokensIn's scan on its own, for a caller that masks a wider text than the one it reports on: the Go
-// engine masks a whole comment group, so a fence or a wrapped quote spanning its lines is seen, then reads each
-// comment's slice of the result.
+// order, which is the order a reader looking for what to fix scans a comment in. It is for a caller that masks a
+// wider text than the one it reports on: an engine masks a whole run of comments, so a fence or a wrapped quote
+// spanning its lines is seen, then reads each comment's slice of the result.
 func TokensInMasked(masked string) []string {
 	var tokens []string
 	seen := map[string]bool{}
@@ -530,8 +508,13 @@ func containsAnyCommandStarter(text string) bool {
 // That is the shortest thing `uppercaseToken` can match that `isShoutedToken` will not immediately
 // decline, so it is a superset of what the rule can report. Over-approximating costs one masking
 // pass on a comment that turns out to hold only acronyms; under-approximating would silence the rule
-// for a real shout, which is the failure that cannot be allowed. Exported so a caller masking a wider
-// text than TokensIn takes can skip it by the same gate.
+// for a real shout, which is the failure that cannot be allowed. Masking only ever replaces
+// characters with spaces, never adds an uppercase letter, so a text that fails this test cannot pass
+// it after masking either, and a caller checks it before masking to skip both stages.
+//
+// Measured over 8,814 real comments: 5.7% hold two adjacent uppercase letters. The byte scan is
+// 579µs against 5,413µs for the regex over the same corpus, and masking is another 6,019µs that
+// this avoids entirely.
 func HasAdjacentUppercaseLetters(text string) bool {
 	previousWasUppercase := false
 	for index := 0; index < len(text); index++ {
@@ -564,4 +547,14 @@ func QuotedTokenList(tokens []string) string {
 		quoted = append(quoted, `"`+token+`"`)
 	}
 	return strings.Join(quoted, ", ")
+}
+
+// generatedMarker is the line go.dev/s/generatedcode says marks a file as generated, spelled exactly so tools can find
+// it. Its capitals are the convention's, which no writer can lower, so it is notation in any language.
+var generatedMarker = regexp.MustCompile(`^// Code generated .* DO NOT EDIT\.$`)
+
+// IsGeneratedMarker reports whether a line comment's text, its slashes included, is the generated-code marker. Where in
+// a file the line counts is the engine's to say, since the convention places it before the first token.
+func IsGeneratedMarker(commentText string) bool {
+	return generatedMarker.MatchString(commentText)
 }
