@@ -1,5 +1,5 @@
 {
-    "why": "us03: types are UpperCamel and fields lowerCamel, so a type and a field with an underscore are each reported at their declaration",
+    "why": "us03: types are UpperCamel and fields lowerCamel, so a type and a field with an underscore are each reported at their declaration. TypeScript's form has the type and no field: a TypeScript property's name is its wire key, with no tag or CodingKeys to hold a different wire spelling, so a hand-written mirror can't be told from a defect, and property names are not judged there (P2)",
     "expect": [
         {
             "covers": "Order_Line",
@@ -7,7 +7,11 @@
         },
         {
             "covers": "unit_price",
-            "occurrence": 1
+            "occurrence": {
+                "typescript": 0,
+                "go": 1,
+                "swift": 1
+            }
         }
     ],
     "options": {},

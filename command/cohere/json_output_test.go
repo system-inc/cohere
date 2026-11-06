@@ -133,6 +133,10 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 			uncheckedSwiftFile{},
 		},
 		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
+		"summary.gaps.withheldInDependencyCgo": {
+			*summary.Properties["gaps"].Properties["withheldInDependencyCgo"].Items,
+			withheldCgoFile{},
+		},
 	} {
 		fields, required := jsonFields(reflect.TypeOf(check.value))
 		if got := schemaPropertyNames(check.object.Properties); strings.Join(got, ",") != strings.Join(fields, ",") {

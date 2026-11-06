@@ -1028,13 +1028,14 @@ func TestConsistencyRequireConstantCasingCountsALocalExportClause(test *testing.
 			[]string{"requireCamelCaseLocal"},
 		},
 		{
-			// Matched by binding, not spelling: the clause names the outer constant, so the inner
-			// same-spelled constant is still file-local.
+			// Matched by binding, not spelling: the clause names the outer constant, which is exported
+			// and clean, and the inner same-spelled one is a local inside a function, which
+			// consistency-require-identifier-casing judges (#h97gacx).
 			"a same-spelled inner binding is not the exported one",
 			"const OrderColumns = [1];\nexport function f(): number {\n" +
 				"    const OrderColumns = 2;\n    return OrderColumns;\n}\n" +
 				"export { OrderColumns };\n",
-			[]string{"requireCamelCaseLocal"},
+			nil,
 		},
 	}
 	for _, testCase := range cases {
@@ -1206,6 +1207,48 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(test *
 				"source/Documents.ts":  testCase.library,
 				"source/Operations.ts": "import { TypedDocumentString } from './Documents';\nexport const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\nexport function use(): unknown { return AccountDocument; }\n",
 			}, "source/Operations.ts")
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+		})
+	}
+}
+
+// A constant of the module or a namespace body is this rule's, where casing signals reach. One inside a
+// function, a block or a loop's head reaches no other file, so it is a local value, judged by
+// consistency-require-identifier-casing (#h97gacx), and this rule leaves it so no local is judged twice.
+func TestConsistencyRequireConstantCasingJudgesOnlyModuleScopeConstants(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name       string
+		sourceText string
+		wantIds    []string
+	}{
+		{
+			"a module constant",
+			"const OrderColumns = [1];\nexport const Total = OrderColumns.length;\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			"a namespace constant",
+			"export namespace Limits {\n    const OrderColumns = [1];\n    export const Total = OrderColumns.length;\n}\n",
+			[]string{"requireCamelCaseLocal"},
+		},
+		{
+			"a function's constant",
+			"export function total(): number {\n    const OrderColumns = [1];\n    return OrderColumns.length;\n}\n",
+			nil,
+		},
+		{
+			"a block's constant",
+			"if (Math.random() > 0.5) {\n    const OrderColumns = [1];\n    console.log(OrderColumns);\n}\n",
+			nil,
+		},
+		{"a loop head's constant", "for (const OrderColumn of [1]) {\n    console.log(OrderColumn);\n}\n", nil},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}

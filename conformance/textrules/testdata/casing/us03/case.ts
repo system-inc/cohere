@@ -1,3 +1,1 @@
-export interface Order_Line {
-  unit_price: number
-}
+export interface Order_Line {}

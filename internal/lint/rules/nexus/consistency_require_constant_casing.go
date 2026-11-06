@@ -111,6 +111,10 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 //	invalid: const OrderColumns = [...]
 //	invalid: export const FormatNumber = (value: number) => String(value)
 //
+// A constant of the module or of a namespace body, since only there does its casing have a reach to
+// signal. A constant inside a function or a block is a local value, judged by
+// consistency-require-identifier-casing.
+//
 // Three clauses. An exported constant holding a value is PascalCase; a file-local one is camelCase;
 // and a constant holding a class instance or a function is camelCase whatever its reach.
 //
@@ -176,6 +180,14 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 					return
 				}
 				statement := declarationList.Parent
+
+				// A constant inside a function or a block reaches no other file, so its casing has no
+				// scope to signal: it is a local value, which consistency-require-identifier-casing
+				// spells lowerCamelCase with the rest (#h97gacx). One owner per shape, so a local is
+				// never judged twice by rules that could disagree.
+				if !isModuleScopeConstant(declarationList) {
+					return
+				}
 
 				// A "declare const X" names something that already exists somewhere this file does
 				// not control: a runtime global, a script host's API, a value injected by a bundler.
@@ -356,6 +368,17 @@ func reportCamelCase(ruleContext rule.Context, exported bool, name *ast.Node, me
 		}
 	}
 	ruleContext.ReportNode(name, message)
+}
+
+// isModuleScopeConstant reports a declaration list that is a statement of the module itself, or of a
+// namespace's body, where a constant can be exported and its casing signals how far it reaches. A list
+// in a function, a block, or a loop's head is local.
+func isModuleScopeConstant(declarationList *ast.Node) bool {
+	statement := declarationList.Parent
+	if statement == nil || statement.Kind != ast.KindVariableStatement || statement.Parent == nil {
+		return false
+	}
+	return statement.Parent.Kind == ast.KindSourceFile || statement.Parent.Kind == ast.KindModuleBlock
 }
 
 // hasDeclareModifier reports whether a statement carries the declare keyword.

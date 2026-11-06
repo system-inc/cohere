@@ -336,6 +336,22 @@ var uncheckedConditions = []struct {
 		marker: "⚠ 1 file the compiler left no record for",
 	},
 	{
+		name: "a Go run withheld type errors and declarations for cgo",
+		plant: func(summary *runSummary) {
+			summary.Gaps.WithheldInDependencyCgo = []withheldCgoFile{
+				{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1},
+				{Package: "os/user", File: "/goroot/src/os/user/cgo_lookup_unix.go", Errors: 2},
+			}
+			summary.Gaps.WithheldDependencyCgoDeclarations = 1
+		},
+		marker: "⚠ cgo withheld: 3 type errors in 2 dependency files, 1 declaration",
+	},
+	{
+		name:   "a Go run withheld only declarations for cgo",
+		plant:  func(summary *runSummary) { summary.Gaps.WithheldDependencyCgoDeclarations = 14 },
+		marker: "⚠ cgo withheld: 14 declarations",
+	},
+	{
 		name:   "the binary was built from a modified tree",
 		plant:  func(summary *runSummary) { summary.Gaps.ModifiedBuild = true },
 		marker: "⚠ built from a modified tree",

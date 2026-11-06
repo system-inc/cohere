@@ -22,9 +22,13 @@ import (
 var textRulesHouseSets = []string{configuration.TypeScriptSetName, configuration.SetPrefix + "style"}
 
 // textRulesProbeRules are the rules the probe turned on in its own settings, beside the sets, because the
-// sets leave them off: `nexus/consistency-no-abbreviated-identifier` lives in `cohere:system-inc/base`. The
-// adapter turns them on the same way, with a bare severity.
-var textRulesProbeRules = map[string]string{"nexus/consistency-no-abbreviated-identifier": "error"}
+// sets leave them off: `nexus/consistency-no-abbreviated-identifier` and
+// `nexus/consistency-require-identifier-casing` live in `cohere:system-inc/base` and
+// `cohere:system-inc/structure`. The adapter turns them on the same way, with a bare severity.
+var textRulesProbeRules = map[string]string{
+	"nexus/consistency-no-abbreviated-identifier": "error",
+	"nexus/consistency-require-identifier-casing": "error",
+}
 
 // textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.
 type textRulesHouse struct {
@@ -103,8 +107,9 @@ func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCas
 	return decoded, true
 }
 
-// textRulesRule is the registered rule a family names for TypeScript.
-func textRulesRule(test *testing.T, corpus *textrules.Corpus, family string) rule.Entry {
+// textRulesRules are the registered rules a family names for TypeScript, in the order families.json lists
+// them.
+func textRulesRules(test *testing.T, corpus *textrules.Corpus, family string) []rule.Entry {
 	test.Helper()
 	entry, found := corpus.RuleFor(family, textrules.EngineTypeScript)
 	if !found {
@@ -113,21 +118,25 @@ func textRulesRule(test *testing.T, corpus *textrules.Corpus, family string) rul
 	if entry.None != "" {
 		test.Fatalf("family %s has no TypeScript rule (%s), and has a TypeScript case", family, entry.None)
 	}
+	registeredByName := map[string]rule.Entry{}
 	for _, registered := range registry.All() {
-		if registered.Name == entry.Rule {
-			return registered
-		}
+		registeredByName[registered.Name] = registered
 	}
-	test.Fatalf(
-		"families.json names %s for TypeScript in %s, and no rule is registered by that name",
-		entry.Rule,
-		family,
-	)
-	return rule.Entry{}
+	subjects := make([]rule.Entry, 0, len(entry.Rules))
+	for _, name := range entry.Rules {
+		registered, isRegistered := registeredByName[name]
+		if !isRegistered {
+			test.Fatalf("families.json names %s for TypeScript in %s, and no rule is registered by that name", name,
+				family)
+		}
+		subjects = append(subjects, registered)
+	}
+	return subjects
 }
 
-// runTextRulesCase runs a case's rule over its TypeScript source, and returns each finding as a byte range. A
-// rule the house turns off for the case's file does not run, and finds nothing, as in a lint run.
+// runTextRulesCase runs each of a case's rules over its TypeScript source, and returns every finding of
+// them all as a byte range: the family's findings are the union of its rules'. A rule the house turns off
+// for the case's file does not run, and finds nothing, as in a lint run.
 func runTextRulesCase(
 	test *testing.T,
 	corpus *textrules.Corpus,
@@ -135,16 +144,17 @@ func runTextRulesCase(
 	testCase textrules.Case,
 ) []textrules.Range {
 	test.Helper()
-	subject := textRulesRule(test, corpus, testCase.Family)
-	bound, runs := house.optionsFor(test, subject.Name, testCase)
-	if !runs {
-		return nil
-	}
 	fileName := testCase.AbsoluteFileName(textrules.EngineTypeScript)
-	result := rule_testing.RunBound(test, bound, fileName, testCase.Sources[textrules.EngineTypeScript])
-	found := make([]textrules.Range, 0, len(result.Diagnostics))
-	for _, diagnostic := range result.Diagnostics {
-		found = append(found, textrules.Range{Start: diagnostic.Range.Pos(), End: diagnostic.Range.End()})
+	found := []textrules.Range{}
+	for _, subject := range textRulesRules(test, corpus, testCase.Family) {
+		bound, runs := house.optionsFor(test, subject.Name, testCase)
+		if !runs {
+			continue
+		}
+		result := rule_testing.RunBound(test, bound, fileName, testCase.Sources[textrules.EngineTypeScript])
+		for _, diagnostic := range result.Diagnostics {
+			found = append(found, textrules.Range{Start: diagnostic.Range.Pos(), End: diagnostic.Range.End()})
+		}
 	}
 	return found
 }

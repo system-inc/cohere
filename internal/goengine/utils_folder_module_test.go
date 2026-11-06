@@ -71,7 +71,7 @@ func TestUtilsFolderJudgesBelowTheModuleRoot(test *testing.T) {
 	writeTextRulesFile(test, directory, "go.mod", fmt.Appendf(nil, "module example.com/utils\n\ngo %s\n",
 		textRulesGoVersion(test)))
 	writeTextRulesFile(test, directory, textRulesSettingsFileName,
-		textRulesSettings(test, consistency_no_utils_folder.Name, textrules.Case{}))
+		textRulesSettings(test, []string{consistency_no_utils_folder.Name}, textrules.Case{}))
 	writeTextRulesFile(test, directory, "root.go", []byte("package root\n\nconst Root = 1\n"))
 	writeTextRulesFile(test, directory, "helpers/helpers.go", []byte("package helpers\n\nconst Helper = 1\n"))
 

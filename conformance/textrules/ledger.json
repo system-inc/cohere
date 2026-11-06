@@ -1,70 +1,8 @@
 [
     {
-        "engine": "typescript",
-        "family": "casing",
-        "task": "h97gacx",
-        "reason": "no TypeScript rule judges the casing of declared names beyond a `const`'s screaming snake case"
-    },
-    {
         "engine": "swift",
         "family": "shouting",
         "task": "y8whqbe",
         "reason": "Swift has no shouting rule"
-    },
-    {
-        "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab01",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "reports `msg`'s two reads as well as its declaration"
-    },
-    {
-        "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab03",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "silent, since it exempts a rest parameter named `args`"
-    },
-    {
-        "engine": "typescript",
-        "family": "abbreviated-identifier",
-        "case": "ab04",
-        "kind": "verdict",
-        "task": "2wgkyfn",
-        "reason": "reports each name's reads as well as its declaration"
-    },
-    {
-        "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am01",
-        "kind": "verdict",
-        "task": "rb0ewgm",
-        "reason": "reports `n`'s two reads as well as its declaration"
-    },
-    {
-        "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am02",
-        "kind": "verdict",
-        "task": "rb0ewgm",
-        "reason": "reports the bare `_` discard"
-    },
-    {
-        "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am06",
-        "kind": "verdict",
-        "task": "rb0ewgm",
-        "reason": "reports the catch-bound `e`'s read as well as its declaration"
-    },
-    {
-        "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am07",
-        "kind": "verdict",
-        "task": "rb0ewgm",
-        "reason": "reports the handler parameter `e`'s read as well as its declaration"
     }
 ]

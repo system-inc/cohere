@@ -1077,6 +1077,151 @@ func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
 	}
 }
 
+// goStreamWithheld is the Go contract's clean stream with the two withheld fields added to its types record as
+// given, as a Linux load reaching `net` writes them.
+func goStreamWithheld(test *testing.T, withheldFields string) []string {
+	test.Helper()
+	lines := contractFixture(test, "GoClean.jsonl")
+	for index, line := range lines {
+		if strings.HasPrefix(line, `{"kind":"types"`) {
+			lines[index] = strings.TrimSuffix(line, "}") + "," + withheldFields + "}"
+			return lines
+		}
+	}
+	test.Fatal("GoClean.jsonl holds no types record")
+	return nil
+}
+
+// renderGoStreamAs renders a Go stream under one output mode from a fresh summary, and gives the output with the
+// summary the run left.
+func renderGoStreamAs(test *testing.T, mode outputMode, lines []string) (string, runSummary) {
+	test.Helper()
+	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
+	output, exitCode, renderRecordsInError := renderRecordsIn(
+		test,
+		goLanguage("module"),
+		engineModeCheck,
+		lines,
+		0,
+		nil,
+	)
+	if renderRecordsInError != nil || exitCode != 0 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
+	}
+	return output, activeSummary
+}
+
+// summaryJsonOf is the summary line a `--json` run printed, or a failure naming the output when there is none.
+func summaryJsonOf(test *testing.T, output string) string {
+	test.Helper()
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, `"kind":"summary"`) {
+			return line
+		}
+	}
+	test.Fatalf("no summary line in:\n%s", output)
+	return ""
+}
+
+// A Go run that withheld type errors in a dependency's cgo files, and gave some of its declarations without bodies,
+// says so: one count line under the types line and each file by name in the account `--verbose` prints, one
+// marker in the footer every view ends with, both fields in `--json`'s gaps, and neither fails the run, since
+// what was withheld is not the project's to fix.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestEngineRunSaysWhatAGoRunWithheldForCgo(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	withheld := goStreamWithheld(test,
+		`"withheldInDependencyCgo":[{"package":"net","file":"/goroot/src/net/cgo_unix.go","errors":1}],`+
+			`"withheldDependencyCgoDeclarations":14`)
+
+	verbose, summary := renderGoStreamAs(test, outputVerbose, withheld)
+	requireLines(test, verbose,
+		"types: 0 diagnostics over 3 files in 240ms\n"+
+			"  types: withheld 1 type error in 1 file of dependencies with cgo, and 14 of their declarations were "+
+			"given without bodies or initial values, since no cgo tool ran\n"+
+			"  types: withheld 1 type error in /goroot/src/net/cgo_unix.go (package net)\n",
+	)
+	wantFiles := []withheldCgoFile{{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1}}
+	if !reflect.DeepEqual(summary.Gaps.WithheldInDependencyCgo, wantFiles) {
+		test.Errorf("the gap's files are %v, want %v", summary.Gaps.WithheldInDependencyCgo, wantFiles)
+	}
+	if summary.Gaps.WithheldDependencyCgoDeclarations != 14 {
+		test.Errorf("the gap counts %d declarations, want 14", summary.Gaps.WithheldDependencyCgoDeclarations)
+	}
+	if summary.failed() {
+		test.Errorf("what a run withheld for cgo failed it: %+v", summary.Gaps)
+	}
+
+	const marker = " • ⚠ cgo withheld: 1 type error in 1 dependency file, 14 declarations"
+	requireLines(test, verbose, marker)
+	human, _ := renderGoStreamAs(test, outputHuman, withheld)
+	requireLines(test, human, marker)
+	forbidLines(test, human, "types: withheld", "cgo_unix.go")
+
+	jsonOutput, _ := renderGoStreamAs(test, outputJson, withheld)
+	var decoded struct {
+		Verdict string `json:"verdict"`
+		Gaps    struct {
+			WithheldInDependencyCgo           []withheldCgoFile `json:"withheldInDependencyCgo"`
+			WithheldDependencyCgoDeclarations int               `json:"withheldDependencyCgoDeclarations"`
+		} `json:"gaps"`
+	}
+	summaryLine := summaryJsonOf(test, jsonOutput)
+	if decodeError := json.Unmarshal([]byte(summaryLine), &decoded); decodeError != nil {
+		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, summaryLine)
+	}
+	if !reflect.DeepEqual(decoded.Gaps.WithheldInDependencyCgo, wantFiles) ||
+		decoded.Gaps.WithheldDependencyCgoDeclarations != 14 || decoded.Verdict != "pass" {
+		test.Errorf("under --json the summary is %+v, want both gaps and a pass:\n%s", decoded, summaryLine)
+	}
+}
+
+// A Go run that withheld nothing, as on macOS, says nothing of it: no line in the account, no marker in the
+// footer, and neither field in `--json`'s gaps.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	nothing := goStreamWithheld(test, `"withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0`)
+
+	verbose, _ := renderGoStreamAs(test, outputVerbose, nothing)
+	requireLines(test, verbose, "types: 0 diagnostics over 3 files in 240ms\n")
+	forbidLines(test, verbose, "withheld", "cgo")
+	human, _ := renderGoStreamAs(test, outputHuman, nothing)
+	forbidLines(test, human, "withheld", "cgo")
+
+	jsonOutput, _ := renderGoStreamAs(test, outputJson, nothing)
+	forbidLines(test, summaryJsonOf(test, jsonOutput), "withheldInDependencyCgo", "withheldDependencyCgoDeclarations")
+}
+
+// The count line says each part only when there is some, in the singular where there is one.
+func TestWithheldCgoSentenceCountsEachPartItHas(test *testing.T) {
+	test.Parallel()
+	net := withheldCgoFile{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 1}
+	user := withheldCgoFile{Package: "os/user", File: "/goroot/src/os/user/cgo_lookup_unix.go", Errors: 2}
+	for _, check := range []struct {
+		files        []withheldCgoFile
+		declarations int
+		want         string
+	}{
+		{nil, 0, ""},
+		{[]withheldCgoFile{}, 0, ""},
+		{[]withheldCgoFile{net}, 1, "withheld 1 type error in 1 file of dependencies with cgo, and 1 of their " +
+			"declarations was given without bodies or initial values, since no cgo tool ran"},
+		{[]withheldCgoFile{net, user}, 0, "withheld 3 type errors in 2 files of dependencies with cgo, since no cgo " +
+			"tool ran"},
+		{nil, 1, "1 declaration of dependencies with cgo was given without bodies or initial values, since no cgo " +
+			"tool ran"},
+		{nil, 14, "14 declarations of dependencies with cgo were given without bodies or initial values, since no " +
+			"cgo tool ran"},
+	} {
+		if got := withheldCgoSentence(check.files, check.declarations); got != check.want {
+			test.Errorf("%v and %d declarations:\n got  %q\n want %q", check.files, check.declarations, got, check.want)
+		}
+	}
+}
+
 // TestEngineRunLabelsAGoCompilerFindingGo holds that a compiler finding with no group of its own carries
 // the Go compiler's label where a rule goes, as a Swift one carries swiftc's.
 // Not parallel: it swaps the package-level activeOutput and activeSummary, and acceptFinding counts into

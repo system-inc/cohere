@@ -216,6 +216,36 @@ func TestTheLoaderRefusesAMalformedCorpus(test *testing.T) {
 			`gives rust occurrence 1`,
 		},
 		{
+			"an occurrence per language below zero",
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+				`"occurrence": {"typescript": 1, "go": -1}}], "languages": ["typescript", "go"]}`),
+			`gives go occurrence -1`,
+		},
+		{
+			"an expectation of no language's form",
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+				`"occurrence": {"typescript": 0, "go": 0}}], "languages": ["typescript", "go"]}`),
+			"applies to none of the case's languages",
+		},
+		{
+			"an empty list of rules",
+			with(valid, "families.json", `{"words": {"typescript": [], "go": "go/no-words", `+
+				`"swift": {"none": "a probe"}}}`),
+			"names none",
+		},
+		{
+			"a rule listed twice",
+			with(valid, "families.json", `{"words": {"typescript": ["no-words", "no-words"], "go": "go/no-words", `+
+				`"swift": {"none": "a probe"}}}`),
+			"listed twice",
+		},
+		{
+			"an empty name in a list",
+			with(valid, "families.json", `{"words": {"typescript": ["no-words", " "], "go": "go/no-words", `+
+				`"swift": {"none": "a probe"}}}`),
+			"a listed rule name is empty",
+		},
+		{
 			"a root that is not absolute",
 			with(
 				valid,
@@ -339,6 +369,52 @@ func TestAnOccurrencePerLanguageResolvesInEach(test *testing.T) {
 		if resolveError != nil || got != want {
 			test.Errorf("%s resolved to %+v (%v), want %+v", engine, got, resolveError, want)
 		}
+	}
+}
+
+// An occurrence of 0 for a language says its form has no such text: the expectation is neither resolved nor
+// expected there, and still binds in the other languages.
+func TestAnOccurrenceOfZeroLeavesALanguageOut(test *testing.T) {
+	test.Parallel()
+
+	files := with(validCorpus(), "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": `+
+		`[{"covers": "WORD", "occurrence": 1}, {"covers": "GOONLY", "occurrence": {"typescript": 0, "go": 1}}], `+
+		`"languages": ["typescript", "go"]}`)
+	files = with(files, "testdata/words/w01/case.go", "package w01\n\n// WORD and GOONLY here\n")
+	corpus, loadFromError := LoadFrom(files)
+	if loadFromError != nil {
+		test.Fatalf("an expectation left out of TypeScript's form was refused: %v", loadFromError)
+	}
+	control := corpus.Families[0].Cases[0]
+	if result := Compare(control, EngineTypeScript, []Range{{Start: 3, End: 7}}); !result.Passed() {
+		test.Errorf("TypeScript, with the one finding its form holds, failed: %s", result.Detail)
+	}
+	if result := Compare(control, EngineGo, []Range{{Start: 16, End: 20}}); result.Passed() {
+		test.Errorf("Go, missing the finding its form holds, passed: %s", result.Detail)
+	}
+	if result := Compare(control, EngineGo, []Range{{Start: 16, End: 20}, {Start: 25, End: 31}}); !result.Passed() {
+		test.Errorf("Go, with both findings, failed: %s", result.Detail)
+	}
+}
+
+// An engine's entry may list several rules, whose findings for the family are their union, and one name
+// written as a string is a list of one.
+func TestAnEngineEntryListsItsRules(test *testing.T) {
+	test.Parallel()
+
+	files := with(validCorpus(), "families.json", `{"words": {"typescript": ["no-words", "no-shouted-words"], `+
+		`"go": "go/no-words", "swift": {"none": "a probe"}}}`)
+	corpus, loadFromError := LoadFrom(files)
+	if loadFromError != nil {
+		test.Fatalf("a list of rules was refused: %v", loadFromError)
+	}
+	listed, _ := corpus.RuleFor("words", EngineTypeScript)
+	if !listed.Runs() || strings.Join(listed.Rules, " ") != "no-words no-shouted-words" {
+		test.Errorf("TypeScript's entry read as %v, want both rules in order", listed.Rules)
+	}
+	single, _ := corpus.RuleFor("words", EngineGo)
+	if strings.Join(single.Rules, " ") != "go/no-words" {
+		test.Errorf("Go's entry read as %v, want its one rule", single.Rules)
 	}
 }
 
