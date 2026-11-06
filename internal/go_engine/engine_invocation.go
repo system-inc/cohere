@@ -11,9 +11,8 @@ import (
 
 // switchNames are the switches the front door forwards, each `--name` or `--name=true|false`.
 //
-// `no-cache` is accepted and read by nothing yet: the engine keeps no cache of its own, and the front door's run
-// cache, which the flag already turns off, is the only one a Go run has. The per-package findings cache will read
-// it (#b1k48by), so the front door forwards it now rather than the engine refusing a flag it will honor.
+// `no-cache` turns off the per-package findings cache (see lintCache), as the front door's run cache is off for the
+// same run, so a run under it computes every package from source.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
 	"rules", "rules-enabled", "version", "no-cache",

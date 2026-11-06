@@ -218,6 +218,7 @@ func goVerdict(cold string) string {
 		"workspace described in ",
 		"types: ",
 		"lint: ",
+		"  lint: package cache ",
 		"phases: ",
 		"  total ",
 		"  memory: ",
@@ -261,7 +262,7 @@ func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage
 		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, output)
 	}
 	for _, invocation := range []string{
-		"seconds", "graphSeconds", "formattingSeconds", "phases", "cache", "checked", "cached", "nodes",
+		"seconds", "graphSeconds", "formattingSeconds", "phases", "cache", "packageCache", "checked", "cached", "nodes",
 	} {
 		delete(summary, invocation)
 	}
@@ -327,6 +328,10 @@ func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 				coldLines := goKeepLines(cold.stdout, `{"kind":"summary"`)
 				if replayLines != coldLines {
 					test.Fatalf("the replay's records differ:\n--- replay\n%s\n--- cold\n%s", replayLines, coldLines)
+				}
+				// A replay started no engine, so it says nothing of the engine's package cache.
+				if strings.Contains(summaryJsonOf(test, replayed.stdout), `"packageCache"`) {
+					test.Errorf("the replay's summary claims the engine's package cache:\n%s", replayed.stdout)
 				}
 				replaySummary := jsonText(test, goSummaryVerdict(test, replayed.stdout))
 				coldSummary := jsonText(test, goSummaryVerdict(test, cold.stdout))
@@ -537,12 +542,17 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 			if !strings.Contains(cold.stdout, "  cache: off, by --no-cache: no recorded run was replayed") {
 				test.Errorf("the account does not say the cache was off:\n%s", cold.stdout)
 			}
+			// The flag reached the engine, whose own per-package cache it turns off too.
+			if !strings.Contains(cold.stdout, "\n  lint: package cache off\n") {
+				test.Errorf("the engine's package cache was not off:\n%s", cold.stdout)
+			}
 		case "--json":
 			var summary struct {
 				Cache struct {
 					Off      bool `json:"off"`
 					Replayed bool `json:"replayed"`
 				} `json:"cache"`
+				PackageCache *packageCacheUse `json:"packageCache"`
 			}
 			if decodeError := json.Unmarshal([]byte(summaryJsonOf(test, cold.stdout)), &summary); decodeError != nil {
 				test.Fatal(decodeError)
@@ -550,6 +560,9 @@ func TestAGoRunUnderNoCacheNeitherReplaysNorRecords(test *testing.T) {
 			if !summary.Cache.Off || summary.Cache.Replayed {
 				test.Errorf("the summary's cache reads off %t, replayed %t:\n%s", summary.Cache.Off,
 					summary.Cache.Replayed, cold.stdout)
+			}
+			if summary.PackageCache == nil || summary.PackageCache.On {
+				test.Errorf("the summary does not say the engine's package cache was off:\n%s", cold.stdout)
 			}
 		}
 	}
@@ -597,13 +610,19 @@ func TestAnUnchangedGoModuleReplays(test *testing.T) {
 					test.Fatal(removeError)
 				}
 			case "a file added above the module":
-				conf := filepath.Join(fixture.parent, "staticcheck.conf")
-				if writeError := os.WriteFile(conf, []byte("checks = [\"inherit\"]\n"), 0o644); writeError != nil {
+				staticcheckConfiguration := filepath.Join(fixture.parent, "staticcheck.conf")
+				contents := []byte("checks = [\"inherit\"]\n")
+				if writeError := os.WriteFile(staticcheckConfiguration, contents, 0o644); writeError != nil {
 					test.Fatal(writeError)
 				}
 			}
 			arguments := []string{"--no-fix", "--verbose"}
 			fixture.establishHit(arguments...)
+			// With the engine's own per-package cache on: the recording run wrote its entries under the root's
+			// .cache/cohere/go, during the run and after the clock, and none of them kept the run from replaying.
+			if entries := goEngineCacheEntries(test, fixture.root); entries == 0 {
+				test.Errorf("the engine's package cache wrote no entry, so it was not on for these runs")
+			}
 			if shape == "a file added above the module" {
 				// Beside the staticcheck.conf the engine named, in a directory whose listing no load reads.
 				sibling := filepath.Join(fixture.parent, "sibling.txt")
@@ -616,6 +635,26 @@ func TestAnUnchangedGoModuleReplays(test *testing.T) {
 			}
 		})
 	}
+}
+
+// goEngineCacheEntries counts the files the Go engine's per-package findings cache holds under root.
+func goEngineCacheEntries(test *testing.T, root string) int {
+	test.Helper()
+	entries := 0
+	walkError := filepath.WalkDir(filepath.Join(cacheDirectory(root), "go"),
+		func(path string, entry os.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
+			}
+			if !entry.IsDir() {
+				entries++
+			}
+			return nil
+		})
+	if walkError != nil && !errors.Is(walkError, os.ErrNotExist) {
+		test.Fatal(walkError)
+	}
+	return entries
 }
 
 // TestAGoInputChangedDuringTheRunIsNeverReplayedOver: an input that changes after the run began reading it, here

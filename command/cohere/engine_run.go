@@ -164,6 +164,9 @@ type engineLintRecord struct {
 		File  string `json:"file"`
 		Error string `json:"error"`
 	} `json:"crashes"`
+	// Cache is what the Go engine's per-package findings cache did, additive within contract 3. A Swift engine
+	// sends none, which decodes as nil and prints nothing.
+	Cache *packageCacheUse `json:"cache"`
 }
 
 type enginePhaseRecord struct {
@@ -843,6 +846,11 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 	printInvocation(accountOutput(run.out),
 		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
+	// The invocation's, as the lint line above is: what this run's cache did, which a replay of it did not do.
+	if record.Cache != nil {
+		printInvocation(accountOutput(run.out), "  lint: %s\n", record.Cache.line())
+		activeSummary.PackageCache = record.Cache
+	}
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
 	activeSummary.Nodes = record.NodesVisited

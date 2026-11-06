@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // cacheUse is what the run took from the cache.
 type cacheUse struct {
@@ -32,4 +35,34 @@ func (cache cacheUse) missLine() string {
 		return ""
 	}
 	return "cache: " + strings.Join(parts, "; ")
+}
+
+// packageCacheUse is what the Go engine's per-package findings cache did in the lint phase, by package, as the lint
+// record's `cache` object says it (swift/Contract.md): hit, restored from an entry with nothing run on it; missed,
+// analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; and the facts
+// the written entries left out, since nothing outside their package can name their object. On is false under
+// `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as it was.
+type packageCacheUse struct {
+	On           bool `json:"on"`
+	Hit          int  `json:"hit"`
+	Missed       int  `json:"missed"`
+	Written      int  `json:"written"`
+	Unstorable   int  `json:"unstorable"`
+	FactsDropped int  `json:"factsDropped"`
+}
+
+// line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the two
+// that are usually zero only when they are not, so the line stays short where nothing went wrong.
+func (cache packageCacheUse) line() string {
+	if !cache.On {
+		return "package cache off"
+	}
+	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
+	if cache.Unstorable > 0 {
+		line += fmt.Sprintf(", %d unstorable", cache.Unstorable)
+	}
+	if cache.FactsDropped > 0 {
+		line += fmt.Sprintf(", %d facts dropped", cache.FactsDropped)
+	}
+	return line
 }

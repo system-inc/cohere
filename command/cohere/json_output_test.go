@@ -122,12 +122,13 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		object schemaObject
 		value  any
 	}{
-		"finding":       {schema.Defs["finding"], findingJson{}},
-		"changedFile":   {schema.Defs["changedFile"], changedFileJson{}},
-		"summary":       {summary, summaryJson{}},
-		"summary.phase": {*summary.Properties["phases"].Items, phaseJson{}},
-		"summary.cache": {summary.Properties["cache"], cacheUse{}},
-		"summary.gaps":  {summary.Properties["gaps"], runGaps{}},
+		"finding":              {schema.Defs["finding"], findingJson{}},
+		"changedFile":          {schema.Defs["changedFile"], changedFileJson{}},
+		"summary":              {summary, summaryJson{}},
+		"summary.phase":        {*summary.Properties["phases"].Items, phaseJson{}},
+		"summary.cache":        {summary.Properties["cache"], cacheUse{}},
+		"summary.packageCache": {summary.Properties["packageCache"], packageCacheUse{}},
+		"summary.gaps":         {summary.Properties["gaps"], runGaps{}},
 		"summary.gaps.uncheckedSwift": {
 			*summary.Properties["gaps"].Properties["uncheckedSwift"].Items,
 			uncheckedSwiftFile{},

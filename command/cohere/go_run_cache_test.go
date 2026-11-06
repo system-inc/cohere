@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -357,5 +358,75 @@ func TestGoInputsUnreplayableRefusesWhatWouldNeverReplay(test *testing.T) {
 		if wrong {
 			test.Errorf("%s: the reason is %q, want %q", testCase.name, reason, testCase.reason)
 		}
+	}
+}
+
+// goStreamWithLintCache is the Go contract's clean stream with a `cache` object on its lint record, as the engine's
+// per-package findings cache writes it.
+func goStreamWithLintCache(test *testing.T, cacheObject string) []string {
+	test.Helper()
+	lines := contractFixture(test, "GoClean.jsonl")
+	for index, line := range lines {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			lines[index] = strings.TrimSuffix(line, "}") + `,"cache":` + cacheObject + "}"
+			return lines
+		}
+	}
+	test.Fatal("GoClean.jsonl holds no lint record")
+	return nil
+}
+
+// TestAGoRunSaysWhatItsPackageCacheDid: a Go lint record's `cache` object is one line of the --verbose account, its
+// two rarer counts only when they are not zero and `off` under `--no-cache`, and a field of the `--json` summary of
+// its own; a record without it, as every Swift record is, prints neither, so a Swift run's output is as it was.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
+	savedOutput, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	cases := []struct {
+		name        string
+		lines       []string
+		line        string
+		summaryJson string
+	}{
+		{"a warm run", goStreamWithLintCache(test,
+			`{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0}`),
+			"  lint: package cache hit 412, missed 3, wrote 3\n",
+			`"packageCache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0}`},
+		{"a run with unstorable packages and dropped facts", goStreamWithLintCache(test,
+			`{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7}`),
+			"  lint: package cache hit 1, missed 4, wrote 2, 2 unstorable, 7 facts dropped\n",
+			`"packageCache":{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7}`},
+		{"a run under --no-cache", goStreamWithLintCache(test,
+			`{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0}`),
+			"  lint: package cache off\n",
+			`"packageCache":{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0}`},
+		{"a record with no cache object", contractFixture(test, "GoClean.jsonl"), "", ""},
+	}
+	for _, testCase := range cases {
+		verbose, _ := renderGoStreamAs(test, outputVerbose, testCase.lines)
+		said := regexp.MustCompile(`(?m)^  lint: package cache.*\n`).FindString(verbose)
+		if said != testCase.line {
+			test.Errorf("%s: the account says %q, want %q:\n%s", testCase.name, said, testCase.line, verbose)
+		}
+		asJson, _ := renderGoStreamAs(test, outputJson, testCase.lines)
+		summaryLine := summaryJsonOf(test, asJson)
+		wrong := strings.Contains(summaryLine, "packageCache")
+		if testCase.summaryJson != "" {
+			wrong = !strings.Contains(summaryLine, testCase.summaryJson)
+		}
+		if wrong {
+			test.Errorf("%s: the summary is %s, want %q in it", testCase.name, summaryLine, testCase.summaryJson)
+		}
+	}
+
+	// Swift's records never carry the object, so neither view of a Swift run gains anything.
+	activeOutput, activeSummary = outputSettings{Mode: outputVerbose}, runSummary{}
+	swift, _, renderError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	if strings.Contains(swift, "package cache") || activeSummary.PackageCache != nil {
+		test.Errorf("a Swift run said a package cache:\n%s", swift)
 	}
 }
