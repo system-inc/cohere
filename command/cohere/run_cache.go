@@ -431,7 +431,7 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}),
 			)
 		case outputJson:
-			writeJsonLine(streams.Output, summaryAsJson(summary))
+			writeSummaryLine(streams.Output, summaryAsJson(summary))
 		default:
 			fmt.Fprintln(
 				streams.Output,

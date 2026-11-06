@@ -1,0 +1,13 @@
+{
+    "why": "uf05: Go's package clause `package utils` is reported, a Go fact, though its folder is `helpers`. Go form only: no other language names a file's package in it",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "helpers/uf05",
+    "languages": [
+        "go"
+    ]
+}

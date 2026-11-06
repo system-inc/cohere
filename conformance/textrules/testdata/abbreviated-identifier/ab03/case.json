@@ -1,0 +1,16 @@
+{
+    "why": "ab03: a rest or variadic `args` is reported, since the advice names a descriptive name ending in `Arguments` rather than exempting it",
+    "expect": [
+        {
+            "covers": "args",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

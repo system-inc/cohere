@@ -1,0 +1,11 @@
+{
+    "why": "wc10: a `TODO` inside backticks is the marker named, not one written, and is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

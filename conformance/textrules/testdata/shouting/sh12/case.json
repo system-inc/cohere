@@ -1,0 +1,16 @@
+{
+    "why": "sh12: multibyte text inside a masked backtick span before the shouted word",
+    "expect": [
+        {
+            "covers": "NEVER",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

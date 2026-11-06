@@ -1,0 +1,12 @@
+{
+    "why": "uf06: only folders inside the project count, so a project checked out under a directory named `utils` is clean. Nothing is written there: the case only names its file by that root",
+    "expect": [],
+    "options": {},
+    "path": "src/nested",
+    "root": "/checkouts/utils/probe",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

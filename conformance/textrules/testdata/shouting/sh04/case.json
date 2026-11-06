@@ -1,0 +1,11 @@
+{
+    "why": "sh04: a run of `//` lines is one text, so a backtick span across two lines masks what it holds",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

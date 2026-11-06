@@ -1,0 +1,15 @@
+{
+    "why": "us09: an `override` is judged at its base only, so the base's name is reported and the override's is not. Go has no form: it has no inheritance and no `override`",
+    "expect": [
+        {
+            "covers": "do_work",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

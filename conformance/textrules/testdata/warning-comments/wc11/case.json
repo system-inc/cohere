@@ -1,0 +1,11 @@
+{
+    "why": "wc11: a `TODO` inside a fenced code block in a comment is quoted code, and is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

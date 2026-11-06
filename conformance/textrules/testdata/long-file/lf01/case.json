@@ -1,0 +1,16 @@
+{
+    "why": "lf01: the control, a file past 2,000 lines is reported from its first line past the limit to its end",
+    "control": true,
+    "expect": [
+        {
+            "linesFrom": 2001
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

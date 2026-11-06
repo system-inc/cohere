@@ -1,0 +1,20 @@
+{
+    "why": "am01: an ambiguous single letter is reported once, at its declaration, and its reads are not",
+    "expect": [
+        {
+            "covers": "n",
+            "occurrence": {
+                "typescript": 5,
+                "go": 3,
+                "swift": 3
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

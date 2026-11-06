@@ -1,0 +1,14 @@
+{
+    "why": "lf03: a lone carriage return ends a line in TypeScript and in Swift, so 2,100 lines split by it are past the limit. Go has no form: Go ends a line only at a line feed, so its form would be one line, another case",
+    "expect": [
+        {
+            "linesFrom": 2001
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

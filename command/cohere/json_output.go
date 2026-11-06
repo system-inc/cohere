@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
+	"time"
 
+	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -97,6 +100,9 @@ type summaryJson struct {
 	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
 	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
 	Adamic *readinessSummary `json:"adamic,omitempty"`
+	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
+	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
+	Error string `json:"error,omitempty"`
 }
 
 // phaseJson is one phase's outcome.
@@ -150,6 +156,42 @@ func summaryAsJson(summary runSummary) summaryJson {
 		Gaps:              summary.Gaps,
 		Adamic:            adamic,
 	}
+}
+
+// summaryWritten is whether this run printed its summary line under `--json`, so a run that then fails
+// prints no second one. See writeFailedRunSummary.
+var summaryWritten bool
+
+// summaryJsonLine is the summary as the last line, newline included, and notes that the run printed it.
+func summaryJsonLine(summary summaryJson) string {
+	summaryWritten = true
+	return jsonLine(summary)
+}
+
+// writeSummaryLine prints the summary as the last line and notes that it did.
+func writeSummaryLine(out *bufio.Writer, summary summaryJson) {
+	fmt.Fprint(out, summaryJsonLine(summary))
+}
+
+// writeFailedRunSummary ends a run that stopped on an error with a summary line of its own under `--json`:
+// verdict fail, the error as the sentence the human view prints, and the project's label in a repository with
+// several. Every run ends on a summary, so a reader that saw none would read the stream as cut off, and one that
+// counted the lines it did see would read a project that never loaded as one with nothing wrong (#9zqayzh). A
+// run that already printed its summary prints nothing more, and the human views print nothing here: the error
+// line on stderr is theirs.
+func writeFailedRunSummary(out *bufio.Writer, runError error) {
+	if activeOutput.Mode != outputJson || summaryWritten {
+		return
+	}
+	summary := activeSummary
+	summary.Total = time.Since(processStart)
+	if label := os.Getenv(projectLabelVariable); label != "" {
+		summary.Label = label
+	}
+	line := summaryAsJson(summary)
+	line.Verdict = "fail"
+	line.Error = sentence.FromError(runError)
+	writeSummaryLine(out, line)
 }
 
 // writeJsonLine writes one object as one line.

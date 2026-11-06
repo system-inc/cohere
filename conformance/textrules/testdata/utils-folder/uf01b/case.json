@@ -1,0 +1,15 @@
+{
+    "why": "uf01b: a second file in the same `utils` folder is reported too, since the finding is once per file",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "utils/uf01b",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
