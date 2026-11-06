@@ -898,10 +898,12 @@ func (state *reactivity) terminalTestIsReactive(terminal Terminal) bool {
 // That was about a quarter of preserve-manual-memoization's CPU on ahra, 736 to 536ms (#hekjpw3). The
 // answer is the same, order included, and TestPostDominatorFrontiersMatchTheChainWalk holds the old
 // walk beside it.
-func (state *reactivity) postDominatorFrontiers() map[static_single_assignment.BlockId][]static_single_assignment.BlockId {
+func (state *reactivity) postDominatorFrontiers() (
+	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+) {
 	tree := computePostDominance(state.function)
 	blocks := state.function.Blocks
-	frontiers := make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(blocks))
+	frontiers = make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(blocks))
 
 	position := make(map[static_single_assignment.BlockId]int, len(blocks))
 	for index, block := range blocks {
