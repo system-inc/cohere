@@ -45,6 +45,12 @@
         "Go"
       ]
     },
+    "capitalizedLocalValue": {
+      "text": "`{{name}}` is declared inside a function and opens with a capital; spell it `{{suggestion}}`. Go reads a capital first letter as exported, and a value local to a function never is, so the capital promises something the name cannot do. Values open lower-case and types upper-case, so a reader tells which is which at a glance.",
+      "languages": [
+        "Go"
+      ]
+    },
     "incumbentFailed": {
       "text": "swift-format's {{incumbentRule}} could not run on this file, so it was not checked: {{error}}",
       "languages": [

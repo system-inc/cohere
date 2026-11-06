@@ -23,10 +23,12 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a // want on every declared name with an underscore in it, of every kind a name is
-// declared as, with the suggestion each must offer. analysistest fails on a finding no want expects as much as on a
-// want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on MixedCaps names, the blank
-// identifier, uses of another package's snake-case names, test and example grammar, directive names, constants
-// mirroring syscall or golang.org/x/sys, and names with no MixedCaps form.
+// declared as, and on every local value that opens with a capital, with the suggestion each must offer. analysistest
+// fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike fixtures prove
+// the rule stays quiet on MixedCaps names, lowerCamel locals and local types, the blank identifier, uses of another
+// package's snake-case names, test and example grammar, directive names, constants named exactly as the syscall or
+// golang.org/x/sys constant they mirror, names read from an external key spelled exactly as they are, and names with
+// no MixedCaps form.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.Run(

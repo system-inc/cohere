@@ -245,30 +245,6 @@
     },
     {
         "engine": "go",
-        "family": "casing",
-        "case": "us06",
-        "kind": "verdict",
-        "task": "zjvr61d",
-        "reason": "silent on a local `MaxSize`: the rule judges screaming snake case only"
-    },
-    {
-        "engine": "go",
-        "family": "casing",
-        "case": "us07",
-        "kind": "verdict",
-        "task": "zjvr61d",
-        "reason": "reports `DATABASE_URL`, which mirrors its environment key exactly"
-    },
-    {
-        "engine": "go",
-        "family": "casing",
-        "case": "us08",
-        "kind": "verdict",
-        "task": "zjvr61d",
-        "reason": "silent on `O_RDONLY_MODE`, exempting it though it is not `O_RDONLY`'s spelling"
-    },
-    {
-        "engine": "go",
         "family": "long-file",
         "case": "lf01",
         "kind": "span",
