@@ -123,37 +123,68 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		// A destructure binds a name this file owns.
 		{"destructured binding", "const { props } = source;\n", []string{"abbreviatedIdentifier"}},
 
-		// Every reference reports, not just the declaration.
+		// One finding per name, at its declaration: its reads, writes and type references are uses
+		// of the name chosen there (#2wgkyfn).
 		{
-			"declaration and reference",
-			"const idx = 0;\nuse(idx);\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+			"a declaration and its reads",
+			"const idx = 0;\nuse(idx);\nuse(idx + 1);\n",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{"a declaration and a write", "let idx = 0;\nidx = 1;\n", []string{"abbreviatedIdentifier"}},
+		{
+			"a parameter and its read",
+			"function run(ctx: number) {\n    return ctx;\n}\n",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{"a type and its reference", "type ctxShape = {};\nlet value: ctxShape;\n", []string{"abbreviatedIdentifier"}},
+		{"a function and its call", "function fnCache() {}\nfnCache();\n", []string{"abbreviatedIdentifier"}},
+		{"a label and its break", "idx: for (;;) {\n    break idx;\n}\n", []string{"abbreviatedIdentifier"}},
+		{"a class, an enum and a namespace", "class ctxStore {}\nenum dbKind {}\nnamespace txSpace {}\n", []string{
+			"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier",
+		}},
+		{
+			"a type parameter",
+			"function first<ctxType>(value: ctxType) {\n    return value;\n}\n",
+			[]string{"abbreviatedIdentifier"},
 		},
 
 		// `Msg` continues in lowercase, so it is not the millisecond unit. It is still the `msg`
 		// prefix, which is a different branch with a different message.
 		{"msgText is the msg prefix, not the Ms unit", "const msgText = 1;\n", []string{"abbreviatedIdentifier"}},
 
-		// A plain parameter or catch binding named `args` reports where it is declared and at every
-		// use. Once the file binds one, the rest-only exemption is off for the whole file, since
-		// without scope analysis a use cannot be traced to its binding (#e000k8d): the rest's own
-		// declaration stays exempt and its use reports.
+		// Every `args` is judged where it is declared, a rest as well: strict code cannot bind
+		// `arguments`, so the advice names a descriptive name ending in it rather than the rule
+		// exempting the conventional spelling (#2wgkyfn).
+		{
+			"a rest parameter",
+			"function run(...args: string[]) {\n    use(args);\n}\n",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{"a rest binding element", "const { first, ...args } = source;\n", []string{"abbreviatedIdentifier"}},
+		{
+			"a destructured rest",
+			"const [first, ...args] = source;\nuse(first, args);\n",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{
+			"a spread of a rest parameter",
+			"function forward(...args: unknown[]) {\n    return target(...args);\n}\n",
+			[]string{"abbreviatedIdentifier"},
+		},
 		{
 			"a plain args parameter",
 			"function run(args: string[]) {\n    use(args);\n}\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"a catch binding named args",
 			"try {\n    run();\n} catch (args) {\n    use(args);\n}\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+			[]string{"abbreviatedIdentifier"},
 		},
-		// A file that binds no `args` at all has no rest to agree with, so a free reference reports.
-		{"an args the file never binds", "use(args);\n", []string{"abbreviatedIdentifier"}},
 		{
 			"a rest beside a plain args",
 			"function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier"},
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
 		},
 	}
 	for _, testCase := range cases {
@@ -238,19 +269,9 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
 		{"a jsx attribute name", "export const Thing = () => <div config=\"1\" idx=\"2\" />;\n"},
 		{"a hyphenated jsx attribute", "export const Thing = () => <div data-config=\"1\" />;\n"},
 
-		// The conventional shapes.
-		{"a rest parameter declaration", "function run(...args: string[]) {\n    return 1;\n}\n"},
-		{"a rest binding element", "const { first, ...args } = source;\n"},
-		// The uses agree with the rest that named them, when every `args` the file binds is a rest
-		// (#e000k8d): the finding would otherwise land on the spread, away from where the name was
-		// chosen.
-		{"a use of a rest parameter", "function run(...args: string[]) {\n    use(args);\n}\n"},
-		{"a spread of a rest parameter", "function forward(...args: unknown[]) {\n    return target(...args);\n}\n"},
-		{"a use of a destructured rest", "const [first, ...args] = source;\nuse(first, args);\n"},
-		{
-			"two rests in one file",
-			"function run(...args: string[]) {\n    use(args);\n}\nconst other = (...args: number[]) => args.length;\n",
-		},
+		// A use of a name this file never declares has no declaration to be judged at.
+		{"an args the file never binds", "use(args);\n"},
+		{"a global read", "const value = ctx.state;\n"},
 
 		// A destructured ref forwarded to React retains its binding exemption.
 		{"a destructured ref forwarded onward", "export const Thing = ({ ref }) => <Child ref={ref} />;\n"},
@@ -299,7 +320,7 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(test *testing.T) 
 			"the same name outside a framework file is judged on its merits",
 			"/repository/source/Thing.tsx",
 			"export function read({ params }) {\n    return params;\n}\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+			[]string{"abbreviatedIdentifier"},
 		},
 		{
 			"config in a middleware file is mandated",
@@ -357,7 +378,7 @@ func TestConsistencyNoAbbreviatedIdentifierFrameworkExemptions(test *testing.T) 
 			"a non-framework function in the same file is still judged",
 			"/repository/source/Thing.tsx",
 			"export function readThing({ params }) {\n    return params;\n}\n",
-			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+			[]string{"abbreviatedIdentifier"},
 		},
 	}
 	for _, testCase := range cases {
@@ -378,7 +399,7 @@ func TestConsistencyNoAbbreviatedIdentifierRunsWithoutOptions(test *testing.T) {
 
 	result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier,
 		"/repository/app/blog/page.tsx", "export default function Page({ params }) {\n    return params;\n}\n")
-	rule_testing.ExpectFindings(test, result, "abbreviatedIdentifier", "abbreviatedIdentifier")
+	rule_testing.ExpectFindings(test, result, "abbreviatedIdentifier")
 }
 
 // The suggested name travels in the message, since there is no fix to carry it. A message naming
@@ -404,8 +425,31 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 		// they did not ask for in a position the rule never reported.
 		{"a repeated segment expands once", "const rootDirCacheDir = 1;\n", `Use "rootDirectoryCacheDir"`},
 		{"a repeated millisecond unit expands once", "const ageMsHalfMs = 1;\n", `Use "ageInMillisecondsHalfMs"`},
-		// `arguments` is a reserved binding, so a bare `args` names no replacement and says why.
-		{"args offers alternatives instead of one name", "const args = 1;\n", `"commandLineArguments"`},
+		// Strict code cannot bind `arguments` or `package`, so a binding named for their abbreviation is
+		// told to end in the word rather than to be it. A rest is told the same.
+		{
+			"an args binding names a legal ending",
+			"const args = 1;\n",
+			`Use a descriptive name ending in "Arguments", since strict code cannot bind "arguments".`,
+		},
+		{
+			"a rest args names a legal ending",
+			"export function join(...args: string[]) {\n    return args.join(',');\n}\n",
+			`Use a descriptive name ending in "Arguments", since strict code cannot bind "arguments".`,
+		},
+		{
+			"a pkg binding names a legal ending",
+			"const pkg = 1;\n",
+			`Use a descriptive name ending in "Package", since strict code cannot bind "package".`,
+		},
+		// A key is no binding, and `{ arguments: [] }` is legal, so a key keeps the vocabulary's advice.
+		{
+			"an args key keeps the vocabulary's advice",
+			"export const run = { args: [] };\n",
+			`Use "arguments", "commandArguments", "commandLineArguments", or a more descriptive name.`,
+		},
+		// Only the whole word stands where the bare expansion would: `argsList` becomes a legal name.
+		{"an args prefix keeps the vocabulary's advice", "const argsList = 1;\n", `"commandLineArguments"`},
 		{"Fn asks for a role rather than an expansion", "const compareFn = () => 1;\n", `like "Handler"`},
 		// A word with two common meanings names both and lets the author say which: a census found `resultPos`
 		// beside `resultNeg`, where it means positive, told to become `resultPosition`.
@@ -759,10 +803,8 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(test *t
 			"export const maxDuration = 60;\nconsole.log(maxDuration);",
 			nil,
 		},
-		// A nested binding sharing the spelling is a different variable, judged on its merits. Its
-		// declaration reports and its reference does not: references are exempt by spelling, since
-		// telling a shadow from the export needs scope resolution this rule does not do. One finding,
-		// on the declaration, is enough for the author to rename both.
+		// A nested binding sharing the spelling is a different variable, judged on its merits, at its
+		// declaration, as every name is.
 		{
 			"a nested config shadows the contract",
 			pageFile,
@@ -810,7 +852,7 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 		{
 			"own ref property",
 			`interface Session { ref: unknown; params: unknown; config: unknown; args: unknown; maxDuration: number } function forward(...args: unknown[]) {}`,
-			5,
+			6,
 		},
 		{"own queryFn property", `const session = { queryFn: () => 500 };`, 1},
 		{"interface property", `interface Session { durationMs: number }`, 1},
