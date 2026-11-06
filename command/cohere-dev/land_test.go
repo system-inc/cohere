@@ -810,9 +810,11 @@ func TestALandingWhoseLandDiffersFromMainsRunsMains(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(source, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	landText := filepath.Join(source, "land.txt")
-	if writeError := os.WriteFile(landText, []byte("main's land\n"), 0o644); writeError != nil {
-		test.Fatal(writeError)
+	// land_main.go says main's land takes a landing handed to it; without it the worktree's own land runs.
+	for _, file := range []string{"land.txt", landMainFile} {
+		if writeError := os.WriteFile(filepath.Join(source, file), []byte("main's land\n"), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
 	}
 	fixture.git(fixture.repository, "add", "command")
 	fixture.git(fixture.repository, "commit", "-q", "-m", "cohere-dev: main's land (#"+fixtureTask+")")
@@ -862,5 +864,37 @@ func TestALandingWhoseLandDiffersFromMainsRunsMains(test *testing.T) {
 	subject := fixture.git(fixture.repository, "log", "-1", "--format=%s", "main")
 	if len(added) != 1 || !strings.HasPrefix(subject, "Land #") {
 		test.Errorf("main's first-parent line gained %v, want one `Land #` commit", added)
+	}
+}
+
+// A main whose land predates handing a landing on reads the worktree from where it runs, so it can't take one,
+// and the worktree's own land lands, as the first landing of the handoff had to. The stand-in never runs.
+func TestALandingOntoAMainThatCannotTakeItRunsItsOwnLand(test *testing.T) {
+	test.Parallel()
+	fixture := newLandFixture(test)
+	source := filepath.Join(fixture.repository, "command", "cohere-dev")
+	if createDirectoryError := os.MkdirAll(source, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	oldLand := filepath.Join(source, "land.txt")
+	if writeError := os.WriteFile(oldLand, []byte("an old land\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	fixture.git(fixture.repository, "add", "command")
+	fixture.git(fixture.repository, "commit", "-q", "-m", "cohere-dev: an old land (#"+fixtureTask+")")
+	log := filepath.Join(test.TempDir(), "main-land")
+	standIn := filepath.Join(test.TempDir(), "main-land")
+	script := []byte("#!/bin/sh\necho ran >> '" + log + "'\nexit 1\n")
+	if writeError := os.WriteFile(standIn, script, 0o755); writeError != nil {
+		test.Fatal(writeError)
+	}
+	landing := exec.Command(fixture.wrapper, "land")
+	landing.Dir, landing.Env = fixture.worktree("a"), append(fixture.environment, mainLandVariable+"="+standIn)
+	output, outputError := landing.CombinedOutput()
+	if outputError != nil || strings.Contains(string(output), "main's land runs") {
+		test.Errorf("a landing onto a main that can't take one did not run its own land (%v):\n%s", outputError, output)
+	}
+	if ran := readMaybeMissing(test, log); len(ran) > 0 {
+		test.Errorf("the stand-in for main's land ran:\n%s", ran)
 	}
 }

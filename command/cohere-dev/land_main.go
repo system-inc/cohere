@@ -21,6 +21,9 @@ import (
 // landSource is cohere-dev's source, relative to the repository, which decides how land behaves.
 const landSource = "command/cohere-dev"
 
+// landMainFile is this file, whose presence on main says main's land takes a landing handed to it.
+const landMainFile = "land_main.go"
+
 // landWorktreeVariable names the worktree being landed, for main's land run from the main checkout. Its
 // presence also says this land is already main's, so it never hands the landing on again.
 const landWorktreeVariable = "COHERE_DEV_LAND_WORKTREE"
@@ -46,6 +49,12 @@ func runsMainsLand(worktree string) bool {
 	}
 	mains, gitOutputError := gitOutput(worktree, "rev-parse", "--verify", "--quiet", "main:"+landSource)
 	if gitOutputError != nil {
+		return true
+	}
+	// A main whose land predates this file reads the worktree from where it runs, so it would refuse to land the
+	// main checkout itself, and its landing is this land's: the first landing of this file was one.
+	mainTakesOne := "main:" + landSource + "/" + landMainFile
+	if _, gitOutputError := gitOutput(worktree, "cat-file", "-e", mainTakesOne); gitOutputError != nil {
 		return true
 	}
 	// The source that is running: land refuses a worktree with changes, so its committed tree is its disk.
