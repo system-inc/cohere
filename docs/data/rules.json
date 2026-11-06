@@ -9445,6 +9445,10 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
+            "options": {
+                "elements": "one",
+                "anchorsPaths": true
+            },
             "messageIds": [
                 "noUnderscoreUtils",
                 "noUtils"

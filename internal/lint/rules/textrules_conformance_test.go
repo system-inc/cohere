@@ -93,7 +93,10 @@ func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCas
 		}
 		elements = []json.RawMessage{element}
 	}
-	decoded, decodeError := registry.Options().Decode(ruleName, elements)
+	// Decoded at the case's Root, as a lint run decodes at the root it discovered, so a rule that judges
+	// only what is inside the project learns where the project starts.
+	base := rule.OptionsBase{ConfigDirectory: house.directory, ProjectRoot: testCase.Root}
+	decoded, decodeError := registry.OptionsAt(base).Decode(ruleName, elements)
 	if decodeError != nil {
 		test.Fatalf("decoding %s's options: %v", ruleName, decodeError)
 	}
