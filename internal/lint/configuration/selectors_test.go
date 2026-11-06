@@ -11,7 +11,7 @@ import (
 // single or would see modules/** match and let the stale generated-code selector remain silent.
 func TestZeroMatchOverrideSelectorIsRefused(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Root: "/repo",
 		Overrides: []Override{{
 			Files: []string{"modules/**", "**/generated-miss/**/*.ts"},
@@ -39,7 +39,7 @@ func TestZeroMatchOverrideSelectorIsRefused(test *testing.T) {
 // override would satisfy the failure case above while making all real configurations unusable.
 func TestEveryMatchingSelectorPasses(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Root: "/repo",
 		Overrides: []Override{
 			{Files: []string{"**/generated/**/*.{ts,tsx}"}},
@@ -66,7 +66,7 @@ func TestEveryMatchingSelectorPasses(test *testing.T) {
 // must not make the selector look alive.
 func TestASelectorReachingOnlyIgnoredFilesIsRefused(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Root:           "/repo",
 		IgnorePatterns: []string{"generated/**"},
 		Overrides: []Override{{
@@ -90,7 +90,7 @@ func TestASelectorReachingOnlyIgnoredFilesIsRefused(test *testing.T) {
 // no pattern to misspell, but the block can never apply and previously disappeared just as quietly.
 func TestAnOverrideWithoutSelectorsIsRefused(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{Overrides: []Override{{}}}
+	configuration := &Configuration{Overrides: []Override{{}}}
 
 	validateSelectorsError := configuration.ValidateSelectors([]string{"index.ts"})
 	if validateSelectorsError == nil {

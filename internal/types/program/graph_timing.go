@@ -26,9 +26,9 @@ type GraphTiming struct {
 	// and Build built again. Every duration below covers all of them.
 	Builds int
 
-	// Config is parsing the tsconfig, which includes enumerating the directories its `include`
+	// Configuration is parsing the tsconfig, which includes enumerating the directories its `include`
 	// patterns reach. That enumeration is the directory walk a parallel readDirectory would speed up.
-	Config time.Duration
+	Configuration time.Duration
 
 	// Program is compiler.NewProgram: every file read, parsed and its imports resolved.
 	Program time.Duration

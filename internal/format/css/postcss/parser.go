@@ -183,7 +183,7 @@ func (parser *parser) atrule(atToken token) {
 		}
 	} else {
 		node.raws["afterName"] = ""
-		node.params = ""
+		node.parameters = ""
 		node.mark("params")
 	}
 
@@ -313,7 +313,7 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 		}
 		start++
 	}
-	node.prop = tokensToString(tokens, propertyStart, start)
+	node.property = tokensToString(tokens, propertyStart, start)
 	node.mark("prop")
 
 	betweenStart := start
@@ -330,9 +330,9 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 	}
 	node.raws["between"] = tokensToString(tokens, betweenStart, start)
 
-	if node.prop[0] == '_' || node.prop[0] == '*' {
-		node.raws["before"] = node.rawString("before") + node.prop[:1]
-		node.prop = node.prop[1:]
+	if node.property[0] == '_' || node.property[0] == '*' {
+		node.raws["before"] = node.rawString("before") + node.property[:1]
+		node.property = node.property[1:]
 	}
 
 	firstSpacesStart := start

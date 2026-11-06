@@ -15,7 +15,7 @@ import (
 // stays silent on. If this test ever passes in the wrong direction, those 336 come back.
 func TestTheThreeHundredThirtySixCase(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{
 			"consistency-require-type-suffix": {Severity: SeverityError},
 		},
@@ -149,7 +149,7 @@ func TestEveryLivePatternBehaves(test *testing.T) {
 // blocks an honest acceptance diff.
 func TestLaterOverridesWin(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		Overrides: []Override{
 			{Files: []string{"modules/**"}, Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityOff}}},
@@ -174,7 +174,7 @@ func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(test *testing.T) {
 	test.Parallel()
 	inherited := []json.RawMessage{json.RawMessage(`{"ignoreReadBeforeAssign":true}`)}
 	written := []json.RawMessage{json.RawMessage(`{"destructuring":"all"}`)}
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{"prefer-const": {Severity: SeverityError, Options: inherited}},
 		Overrides: []Override{
 			{Files: []string{"**/*.ts"}, Rules: map[string]RuleSetting{"prefer-const": {Severity: SeverityError}}},
@@ -206,7 +206,7 @@ func TestABareSeverityInAnOverrideKeepsTheOptionsInForce(test *testing.T) {
 // across files makes the first override permanent for every file resolved afterward.
 func TestOneFilesOverridesDoNotLeakIntoTheNext(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		Overrides: []Override{{
 			Files: []string{"**/generated/**"},
@@ -224,7 +224,7 @@ func TestOneFilesOverridesDoNotLeakIntoTheNext(test *testing.T) {
 // file skipped by ignorePatterns and a file with no findings are identical output otherwise.
 func TestIgnoredFileRunsNoRulesAndSaysWhy(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules:          map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
 		IgnorePatterns: []string{"node_modules/**"},
 	}
@@ -245,7 +245,7 @@ func TestIgnoredFileRunsNoRulesAndSaysWhy(test *testing.T) {
 // across the whole tree.
 func TestAnUnconfiguredRuleDoesNotRun(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{Rules: map[string]RuleSetting{"known": {Severity: SeverityError}}}
+	configuration := &Configuration{Rules: map[string]RuleSetting{"known": {Severity: SeverityError}}}
 
 	if configuration.Resolve("File.ts").Enabled("never-configured") {
 		test.Fatal("a rule the config never mentions was treated as enabled")

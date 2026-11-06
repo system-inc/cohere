@@ -28,7 +28,7 @@ func writeConfigs(test *testing.T, files map[string]string) string {
 }
 
 // loadOrFail loads a config that must load.
-func loadOrFail(test *testing.T, path string) *Config {
+func loadOrFail(test *testing.T, path string) *Configuration {
 	test.Helper()
 	loaded, loadError := Load(path)
 	if loadError != nil {

@@ -468,14 +468,14 @@ func (graph *Graph) SeedSignatures(previous map[string]SignatureEntry) map[strin
 	for name, entry := range previous {
 		seeded[name] = entry
 	}
-	if graph.CompilerHost == nil || graph.Config == nil {
+	if graph.CompilerHost == nil || graph.Configuration == nil {
 		return seeded
 	}
-	buildInfoFileName := graph.Config.GetBuildInfoFileName()
+	buildInfoFileName := graph.Configuration.GetBuildInfoFileName()
 	if buildInfoFileName == "" {
 		return seeded
 	}
-	buildInfo := incremental.NewBuildInfoReader(graph.CompilerHost).ReadBuildInfo(graph.Config)
+	buildInfo := incremental.NewBuildInfoReader(graph.CompilerHost).ReadBuildInfo(graph.Configuration)
 	if buildInfo == nil || len(buildInfo.FileNames) != len(buildInfo.FileInfos) {
 		return seeded
 	}

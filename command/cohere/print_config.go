@@ -35,7 +35,7 @@ type printedDeparture struct {
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
 func writeResolvedConfiguration(
 	out *bufio.Writer,
-	lintConfiguration *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 	resolved configuration.Resolved,
 	location projectLocation,
 	path string,

@@ -7,7 +7,7 @@ type testFunction struct {
 	blocks           []*testBlock
 	table            map[ssa.BlockId]*testBlock
 	next             ssa.BlockId
-	params           []testPlace
+	parameters       []testPlace
 	context          []testPlace
 	returns          *testPlace
 	parametersFrozen bool

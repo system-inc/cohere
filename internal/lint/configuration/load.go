@@ -222,13 +222,13 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //
 // Load matches inherited rulings by exact key. LoadFor, which the command uses, also knows which rules
 // are registered, and that is what lets it tell a respelling from a twin; see sameRuling.
-func Load(path string) (*Config, error) {
+func Load(path string) (*Configuration, error) {
 	return LoadFor(path, nil)
 }
 
 // LoadFor is Load knowing the registered rule names, so a key spelled differently from the one it
 // inherits is matched to it by the rules the two actually reach rather than by the shape of the names.
-func LoadFor(path string, registeredNames []string) (*Config, error) {
+func LoadFor(path string, registeredNames []string) (*Configuration, error) {
 	root, absolutePathError := filepath.Abs(filepath.Dir(path))
 	if absolutePathError != nil {
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
@@ -250,14 +250,14 @@ func LoadFor(path string, registeredNames []string) (*Config, error) {
 // (#bfxz13m): its own file may turn a rule off or change its options with no reason, and coverage
 // counts each unreasoned off by rule so the choice stays visible. The sets cohere carries are ours
 // wherever they are read, so an off or a departure written in one is held to a reason in every chain.
-func loadLayers(layers []configurationLayer, root string, registeredNames []string) (*Config, error) {
+func loadLayers(layers []configurationLayer, root string, registeredNames []string) (*Configuration, error) {
 	layerPaths := make([]string, 0, len(layers))
 	for _, layer := range layers {
 		layerPaths = append(layerPaths, layer.path)
 	}
 	inOurTiers := InOurTiers(layerPaths)
 
-	loaded := &Config{
+	loaded := &Configuration{
 		Rules:      map[string]RuleSetting{},
 		Root:       root,
 		Departures: map[string]Departure{},
@@ -772,7 +772,7 @@ func checkReasons(layer configurationLayer) error {
 //
 // Inside our tiers, and in the sets cohere carries. Outside them an off in the project's own files is
 // its choice to make (#bfxz13m), and coverage counts it rather than the load refusing it.
-func refuseUnreasonedOffs(loaded *Config, writtenBy map[string]string, inOurTiers bool) error {
+func refuseUnreasonedOffs(loaded *Configuration, writtenBy map[string]string, inOurTiers bool) error {
 	var unreasoned []string
 	for name, setting := range loaded.Rules {
 		if setting.Severity != SeverityOff {

@@ -13,8 +13,8 @@ import (
 	"github.com/system-inc/cohere/internal/testfunctions"
 )
 
-// Config says where and how to load.
-type Config struct {
+// Configuration says where and how to load.
+type Configuration struct {
 	// Directory is where go list runs and names the source module: the module of the go.mod at or above it.
 	Directory string
 
@@ -58,7 +58,7 @@ type Package struct {
 // packages from source, with their syntax kept for the named ones, and the rest from config.Exports. It
 // returns an error only when it cannot load at all; what the packages themselves get wrong is each
 // package's Errors.
-func Load(configuration Config, patterns ...string) (*Loaded, error) {
+func Load(configuration Configuration, patterns ...string) (*Loaded, error) {
 	root, sourceModule, moduleAtError := moduleAt(configuration.Directory)
 	if moduleAtError != nil {
 		return nil, moduleAtError
@@ -170,14 +170,14 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 
 	fileSet := token.NewFileSet()
 	loader := &loader{
-		config:      configuration,
-		fileSet:     fileSet,
-		sizes:       sizes,
-		listed:      listed,
-		roots:       roots,
-		fromExports: fromExports,
-		checked:     map[string]*Package{},
-		done:        map[string]chan struct{}{},
+		configuration: configuration,
+		fileSet:       fileSet,
+		sizes:         sizes,
+		listed:        listed,
+		roots:         roots,
+		fromExports:   fromExports,
+		checked:       map[string]*Package{},
+		done:          map[string]chan struct{}{},
 	}
 	if configuration.Exports != nil {
 		loader.exportImporter = configuration.Exports.importer(fileSet)
@@ -188,13 +188,13 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 // Parse lists the packages the patterns name and parses their files, with any overlay read in place of the
 // files it names, and type-checks nothing: for a test that reads syntax alone. Each package's Errors are what
 // go list and the parser reported for it.
-func Parse(configuration Config, patterns ...string) ([]*Package, error) {
+func Parse(configuration Configuration, patterns ...string) ([]*Package, error) {
 	listed, listError := list(configuration.Directory, configuration.Environment, patterns)
 	if listError != nil {
 		return nil, listError
 	}
 	fileSet := token.NewFileSet()
-	reader := &loader{config: configuration, fileSet: fileSet}
+	reader := &loader{configuration: configuration, fileSet: fileSet}
 	var parsed []*Package
 	sourceFiles := map[string]bool{}
 	for _, listedPackage := range listed.packages {

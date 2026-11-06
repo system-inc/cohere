@@ -118,14 +118,14 @@ type node struct {
 	tupleItems        []*node
 	additionalItems   *node
 	noAdditionalItems bool
-	minItems          *int
-	maxItems          *int
+	minimumItems      *int
+	maximumItems      *int
 	uniqueItems       bool
 
 	minimum       *float64
 	maximum       *float64
-	minLength     *int
-	maxLength     *int
+	minimumLength *int
+	maximumLength *int
 	pattern       *esregexp.RegExp
 	patternSource string
 
@@ -381,13 +381,13 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 		}
 		compiled.additionalItems, keywordError = child(key, value)
 	case "minItems":
-		compiled.minItems, keywordError = count(value)
+		compiled.minimumItems, keywordError = count(value)
 	case "maxItems":
-		compiled.maxItems, keywordError = count(value)
+		compiled.maximumItems, keywordError = count(value)
 	case "minLength":
-		compiled.minLength, keywordError = count(value)
+		compiled.minimumLength, keywordError = count(value)
 	case "maxLength":
-		compiled.maxLength, keywordError = count(value)
+		compiled.maximumLength, keywordError = count(value)
 	case "uniqueItems":
 		unique, isBool := value.(JsonBoolean)
 		if !isBool {

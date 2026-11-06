@@ -29,10 +29,10 @@ func gfmAutolinkLiteralFromMarkdown() extension {
 		exit: map[string]handle{
 			"literalAutolink": func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
 			"literalAutolinkEmail": func(context *compileContext, token *micromark.Token) {
-				context.config.exit["autolinkEmail"](context, token)
+				context.configuration.exit["autolinkEmail"](context, token)
 			},
 			"literalAutolinkHttp": func(context *compileContext, token *micromark.Token) {
-				context.config.exit["autolinkProtocol"](context, token)
+				context.configuration.exit["autolinkProtocol"](context, token)
 			},
 			"literalAutolinkWww": exitLiteralAutolinkWww,
 		},
@@ -40,11 +40,11 @@ func gfmAutolinkLiteralFromMarkdown() extension {
 }
 
 func enterLiteralAutolinkValue(context *compileContext, token *micromark.Token) {
-	context.config.enter["autolinkProtocol"](context, token)
+	context.configuration.enter["autolinkProtocol"](context, token)
 }
 
 func exitLiteralAutolinkWww(context *compileContext, token *micromark.Token) {
-	context.config.exit["data"](context, token)
+	context.configuration.exit["data"](context, token)
 	context.top().Url = "http://" + context.sliceSerialize(token)
 }
 
@@ -247,8 +247,8 @@ func sliceOneUnit(value string) string {
 // mathFromMarkdown is mdast-util-math's. The hast data it attaches is for HTML output and not kept.
 func mathFromMarkdown() extension {
 	exitMathData := func(context *compileContext, token *micromark.Token) {
-		context.config.enter["data"](context, token)
-		context.config.exit["data"](context, token)
+		context.configuration.enter["data"](context, token)
+		context.configuration.exit["data"](context, token)
 	}
 	return extension{
 		enter: map[string]handle{

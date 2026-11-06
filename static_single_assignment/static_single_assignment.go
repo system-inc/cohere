@@ -138,8 +138,8 @@ type Graph[F any, B comparable, P any] interface {
 	// SetTerminalOrder sets the evaluation order of a block's terminal.
 	SetTerminalOrder(block B, order EvaluationOrder)
 
-	// Params are the function's parameters, defined on entry, in a slice whose elements a pass renames.
-	Params(function F) []P
+	// Parameters are the function's parameters, defined on entry, in a slice whose elements a pass renames.
+	Parameters(function F) []P
 	// Returns is the place every return stores into, or nil for an IR with none.
 	Returns(function F) *P
 	// Declaration is the binding an identifier is a value of.

@@ -83,7 +83,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 			}
 		}
 	}
-	lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+	lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
 		"rule-00":         {Severity: configuration.SeverityError},
 		"unported-one":    {Severity: configuration.SeverityError},
 		"plugin/unported": {Severity: configuration.SeverityWarn},
@@ -254,7 +254,7 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 			"off-and-unconfigured": 785,
 		},
 	}
-	lintConfiguration := &configuration.Config{
+	lintConfiguration := &configuration.Configuration{
 		Rules: map[string]configuration.RuleSetting{"not-ported": {Severity: configuration.SeverityError}},
 	}
 
@@ -412,7 +412,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("config keys that match no rule", func(test *testing.T) {
-		lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+		lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":   {Severity: configuration.SeverityError},
 			"no-dupe-keys": {Severity: configuration.SeverityOff},
 		}}
@@ -522,7 +522,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("parity", func(test *testing.T) {
-		lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+		lintConfiguration := &configuration.Configuration{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":    {Severity: configuration.SeverityError},
 			"not-yet-here":  {Severity: configuration.SeverityError},
 			"turned-off-be": {Severity: configuration.SeverityOff},
@@ -611,7 +611,7 @@ func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 	root := "/repository"
-	withDeparture := &configuration.Config{
+	withDeparture := &configuration.Configuration{
 		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
 		Root:  root,
 		Departures: map[string]configuration.Departure{
@@ -624,7 +624,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 		test.Errorf("the departure did not print as\n%s\nin:\n%s", want, output)
 	}
 
-	without := &configuration.Config{
+	without := &configuration.Configuration{
 		Rules: map[string]configuration.RuleSetting{"guard-for-in": {Severity: configuration.SeverityError}},
 		Root:  root,
 	}
@@ -640,7 +640,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 	root := "/repository"
-	lintConfiguration := &configuration.Config{
+	lintConfiguration := &configuration.Configuration{
 		Root: root,
 		Overrides: []configuration.Override{
 			{
@@ -688,7 +688,7 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 		RulesScopedOff:    map[string]int{"prefer-arrow-callback": 40, "no-continue": 40},
 		RulesUnconfigured: map[string]int{},
 	}
-	lintConfiguration := &configuration.Config{
+	lintConfiguration := &configuration.Configuration{
 		Root: root,
 		Rules: map[string]configuration.RuleSetting{
 			"prefer-arrow-callback": {Severity: configuration.SeverityOff},

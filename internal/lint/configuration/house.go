@@ -116,7 +116,7 @@ func OwnSettingsOf(path string) (map[string]json.RawMessage, error) {
 // The returned configuration is the whole house stack: its rules are every rule any set asks for,
 // which is what parity, coverage and selector validation read. Resolve answers per file from the
 // variant that file gets.
-func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Config, error) {
+func LoadHouse(path string, registeredNames []string, detection HouseDetection) (*Configuration, error) {
 	root, absolutePathError := filepath.Abs(filepath.Dir(path))
 	if absolutePathError != nil {
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
@@ -143,7 +143,7 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 	house := &houseSets{
 		detection:    detection,
-		variants:     map[houseVariant]*Config{},
+		variants:     map[houseVariant]*Configuration{},
 		gatedReasons: map[string]OffReason{},
 	}
 	for _, variant := range []houseVariant{{}, {react: true}, {next: true}, {react: true, next: true}} {
@@ -242,7 +242,7 @@ func loadHouseVariant(
 	registeredNames []string,
 	variant houseVariant,
 	tailwind bool,
-) (*Config, error) {
+) (*Configuration, error) {
 	sets := []string{TypeScriptSetName}
 	if variant.react {
 		sets = append(sets, ReactSetName)

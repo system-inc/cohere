@@ -24,10 +24,10 @@ type node struct {
 	// Rule.
 	selector string
 	// AtRule.
-	name   string
-	params string
+	name       string
+	parameters string
 	// Declaration.
-	prop      string
+	property  string
 	value     string
 	important bool
 	// Comment.
@@ -117,7 +117,7 @@ func (each *node) setField(property string, value string) {
 	case "selector":
 		each.selector = value
 	case "params":
-		each.params = value
+		each.parameters = value
 	case "value":
 		each.value = value
 	default:

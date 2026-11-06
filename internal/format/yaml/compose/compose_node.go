@@ -53,7 +53,7 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	return doc
 }
 
-func composeNode(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) *Node {
+func composeNode(composition *composeContext, token *cst.Token, properties properties, onError onErrorFunc) *Node {
 	atKey := composition.atKey
 	spaceBefore, comment, anchor, tag := properties.spaceBefore, properties.comment, properties.anchor, properties.tag
 	var node *Node
@@ -119,7 +119,7 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 func composeCollectionCatching(
 	composition *composeContext,
 	token *cst.Token,
-	properties props,
+	properties properties,
 	onError onErrorFunc,
 ) (node *Node) {
 	defer func() {
@@ -150,7 +150,7 @@ func composeEmptyNode(
 	composition *composeContext,
 	offset int,
 	before []*cst.Token,
-	properties props,
+	properties properties,
 	onError onErrorFunc,
 ) *Node {
 	token := &cst.Token{

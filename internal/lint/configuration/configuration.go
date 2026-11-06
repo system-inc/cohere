@@ -11,9 +11,9 @@ import (
 	"sync/atomic"
 )
 
-// Config is a resolved lint configuration: what runs everywhere, what never runs, and what changes
+// Configuration is a resolved lint configuration: what runs everywhere, what never runs, and what changes
 // per path.
-type Config struct {
+type Configuration struct {
 	// Rules is the base configuration, applying to every file not excluded.
 	Rules map[string]RuleSetting
 
@@ -75,7 +75,7 @@ type Config struct {
 
 // OffReasonFor returns why the rule named ruleName is off, found by its own key or by a key that reaches
 // it, the way the resolver lets a key spelled differently configure a rule.
-func (configuration *Config) OffReasonFor(ruleName string) (OffReason, bool) {
+func (configuration *Configuration) OffReasonFor(ruleName string) (OffReason, bool) {
 	if configuration == nil {
 		return OffReason{}, false
 	}
@@ -92,7 +92,7 @@ func (configuration *Config) OffReasonFor(ruleName string) (OffReason, bool) {
 
 // TurnsOffAtTopLevel reports whether the chain's top-level rules turn the rule named ruleName off, by its
 // own key or, when no key names it exactly, by a key that reaches it.
-func (configuration *Config) TurnsOffAtTopLevel(ruleName string) bool {
+func (configuration *Configuration) TurnsOffAtTopLevel(ruleName string) bool {
 	if configuration == nil {
 		return false
 	}
@@ -113,7 +113,7 @@ func (configuration *Config) TurnsOffAtTopLevel(ruleName string) bool {
 // A key is evidence the rule exists somewhere even when cohere has not ported it: someone wrote a
 // decision about it. That is what lets a suppression naming an unported rule be told apart from one
 // naming a rule that exists nowhere.
-func (configuration *Config) RuleKeys() []string {
+func (configuration *Configuration) RuleKeys() []string {
 	if configuration == nil {
 		return nil
 	}
@@ -131,7 +131,7 @@ func (configuration *Config) RuleKeys() []string {
 
 // globs returns the Config's compiled patterns, compiling them on first use. Two goroutines racing to
 // compile build the same answer, and the first one stored wins.
-func (configuration *Config) globs() *configurationGlobs {
+func (configuration *Configuration) globs() *configurationGlobs {
 	if compiled := configuration.compiledGlobs.Load(); compiled != nil {
 		return compiled
 	}
@@ -153,7 +153,7 @@ func (configuration *Config) globs() *configurationGlobs {
 }
 
 // resolutions returns the Config's memo, creating it on first use.
-func (configuration *Config) resolutions() *resolutionMemo {
+func (configuration *Configuration) resolutions() *resolutionMemo {
 	if memo := configuration.resolutionMemo.Load(); memo != nil {
 		return memo
 	}
@@ -173,7 +173,7 @@ func (configuration *Config) resolutions() *resolutionMemo {
 //
 // Resolutions are memoized by which overrides a path matched (see resolutionMemo), so the result is
 // shared with every other path that matched the same ones.
-func (configuration *Config) Resolve(path string) Resolved {
+func (configuration *Configuration) Resolve(path string) Resolved {
 	if configuration.house != nil {
 		return configuration.house.variantFor(path).Resolve(path)
 	}
@@ -211,7 +211,7 @@ func (configuration *Config) Resolve(path string) Resolved {
 
 // resolveMatch builds the resolution for one match: the base rules, then each override the match names,
 // in order.
-func (configuration *Config) resolveMatch(match []byte) Resolved {
+func (configuration *Configuration) resolveMatch(match []byte) Resolved {
 	// The base map is copied rather than shared, because an override writes into the result and a
 	// shared map would leak one file's overrides into every later file.
 	effective := make(map[string]RuleSetting, len(configuration.Rules))
@@ -245,7 +245,7 @@ func (configuration *Config) resolveMatch(match []byte) Resolved {
 // Getting this wrong is silent in the dangerous direction. An absolute path never matches
 // `modules/**`, so every override quietly stops applying and the rules they scoped off come back,
 // which is exactly the 336 findings this package exists to remove.
-func (configuration *Config) relativePath(path string) string {
+func (configuration *Configuration) relativePath(path string) string {
 	normalized := filepath.ToSlash(path)
 
 	if configuration.Root != "" && filepath.IsAbs(path) {
@@ -258,13 +258,13 @@ func (configuration *Config) relativePath(path string) string {
 }
 
 // InOurTiers reports whether this configuration's chain reaches one of our tier sets. See InOurTiers.
-func (configuration *Config) InOurTiers() bool {
+func (configuration *Configuration) InOurTiers() bool {
 	return configuration != nil && InOurTiers(configuration.Sources)
 }
 
 // Applied is the house sets a zero-config run applied, and the ones it looked for and did not, with
 // the evidence for each. Nil for a configuration that names its sets.
-func (configuration *Config) Applied() []AppliedSet {
+func (configuration *Configuration) Applied() []AppliedSet {
 	if configuration == nil || configuration.house == nil {
 		return nil
 	}
@@ -273,7 +273,7 @@ func (configuration *Config) Applied() []AppliedSet {
 
 // SetsLine is the run's first line under zero config: each house set and why it applies or does not.
 // Empty for a configuration that names its own sets, since its file already says.
-func (configuration *Config) SetsLine() string {
+func (configuration *Configuration) SetsLine() string {
 	applied := configuration.Applied()
 	if len(applied) == 0 {
 		return ""
@@ -292,7 +292,7 @@ func (configuration *Config) SetsLine() string {
 // DetectionFingerprint is a digest of which files each per-file set applied to and the Tailwind entry,
 // for a cache keyed on what decides which rules run: a file can change sets without its own bytes
 // changing, when another file starts importing next. Empty for a configuration that names its sets.
-func (configuration *Config) DetectionFingerprint() string {
+func (configuration *Configuration) DetectionFingerprint() string {
 	if configuration == nil || configuration.house == nil {
 		return ""
 	}

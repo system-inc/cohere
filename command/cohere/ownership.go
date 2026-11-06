@@ -100,7 +100,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 			if project.Engine != engineTypeScript || !isRead || read.err != nil {
 				continue
 			}
-			for _, reference := range read.config.References {
+			for _, reference := range read.configuration.References {
 				if known[reference] {
 					continue
 				}
@@ -126,7 +126,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		if read, isRead := reads[found.configurationPath(
 			project,
 		)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
-			len(read.config.FileNames) == 0 && len(read.config.References) > 0 {
+			len(read.configuration.FileNames) == 0 && len(read.configuration.References) > 0 {
 			decided.Solutions = append(decided.Solutions, projectLabel(project))
 			continue
 		}
@@ -141,7 +141,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		if project.Engine != engineTypeScript || !isRead || read.err != nil {
 			continue
 		}
-		for _, fileName := range read.config.FileNames {
+		for _, fileName := range read.configuration.FileNames {
 			includers[fileName] = append(includers[fileName], index)
 		}
 	}
@@ -164,8 +164,8 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		read, isRead := reads[found.configurationPath(project)]
 		if isRead &&
 			read.err == nil &&
-			len(read.config.FileNames) > 0 &&
-			len(yielded[index]) == len(read.config.FileNames) {
+			len(read.configuration.FileNames) > 0 &&
+			len(yielded[index]) == len(read.configuration.FileNames) {
 			decided.Yielding = append(decided.Yielding, projectLabel(project))
 			continue
 		}
@@ -208,8 +208,8 @@ func resolveOwnership(found *discovery) (ownership, error) {
 // projectConfigRead is one tsconfig read, or why it could not be: a project whose tsconfig cannot be read
 // still runs, and its own run reports what is wrong with it.
 type projectConfigRead struct {
-	config program.ProjectConfiguration
-	err    error
+	configuration program.ProjectConfiguration
+	err           error
 }
 
 // readProjectConfigs reads the TypeScript projects' tsconfigs, several at once, by absolute path.
@@ -230,7 +230,10 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 			configuration, readProjectConfigurationError := program.ReadProjectConfiguration(configurationFile)
 			<-reading
 			lock.Lock()
-			reads[configurationFile] = projectConfigRead{config: configuration, err: readProjectConfigurationError}
+			reads[configurationFile] = projectConfigRead{
+				configuration: configuration,
+				err:           readProjectConfigurationError,
+			}
 			lock.Unlock()
 		}()
 	}

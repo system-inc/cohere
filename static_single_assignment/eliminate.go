@@ -123,7 +123,7 @@ func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](
 		}
 		graph.EachTerminalPlace(block, rewrite)
 	}
-	parameters := graph.Params(function)
+	parameters := graph.Parameters(function)
 	for index := range parameters {
 		rewrite(&parameters[index], Define)
 	}

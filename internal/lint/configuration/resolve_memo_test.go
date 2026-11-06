@@ -10,7 +10,7 @@ import (
 // settings each set implies: the memo may save the copy, never change the result.
 func TestPathsMatchingTheSameOverridesShareOneResolution(test *testing.T) {
 	test.Parallel()
-	configuration := &Config{
+	configuration := &Configuration{
 		Rules: map[string]RuleSetting{"no-var": {Severity: SeverityError}, "eqeqeq": {Severity: SeverityError}},
 		Overrides: []Override{
 			{Files: []string{"modules/**"}, Rules: map[string]RuleSetting{"no-var": {Severity: SeverityOff}}},

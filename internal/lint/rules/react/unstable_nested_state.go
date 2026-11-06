@@ -11,7 +11,7 @@ type unstableNestedState struct {
 	ruleContext rule.Context
 	isComponent map[*ast.Node]bool
 
-	allowAsProps        bool
+	allowAsProperties   bool
 	propertyNameMatches func(string) bool
 }
 
@@ -35,7 +35,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 
 	switch {
 	// The `allowAsProps` option, and the render-prop exemption that applies regardless of it.
-	case isDeclaredInsideProperties && (state.allowAsProps || state.isComponentInRenderProperty(node)):
+	case isDeclaredInsideProperties && (state.allowAsProperties || state.isComponentInRenderProperty(node)):
 		return
 
 	// A component created inside `items.map(...)` is a callback rather than a nested component.
@@ -90,7 +90,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 	// The enumerated callers are this file's own `KindSourceFile` walk and nothing else. If a
 	// second entry point is ever added, this verdict is void.
 	message := unstableNestedMessage(parentName)
-	if isDeclaredInsideProperties && !state.allowAsProps {
+	if isDeclaredInsideProperties && !state.allowAsProperties {
 		message += componentAsPropsInfo
 	}
 

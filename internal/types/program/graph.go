@@ -32,9 +32,9 @@ type Graph struct {
 	// some type questions are asked of the program rather than of a checker.
 	Program *compiler.Program
 
-	// Config is the resolved tsconfig this graph was built from, kept so a later snapshot can hash
+	// Configuration is the resolved tsconfig this graph was built from, kept so a later snapshot can hash
 	// what it was built against rather than guess.
-	Config *tsoptions.ParsedCommandLine
+	Configuration *tsoptions.ParsedCommandLine
 
 	// ConfigFileName is the absolute path of the tsconfig that produced this graph.
 	ConfigFileName string
@@ -63,7 +63,7 @@ type Graph struct {
 	// Nil means every rule applies to every file, which is what the tests and any caller predating
 	// this layer expect. The command always loads a real one and fails loudly if it cannot, so the
 	// permissive default is reachable only from a caller that chose it deliberately.
-	LintConfiguration *configuration.Config
+	LintConfiguration *configuration.Configuration
 
 	// RuleOptions says how to decode each rule's configuration, and which rules cannot run without
 	// it. Empty means no rule takes options, which is what a test that did not set one expects.
@@ -186,12 +186,12 @@ func (graph *Graph) timedVerify(options Options) (rootsVerdict, []string) {
 // verifyProjectFiles matches the config's files to the program's, keeps the matches for ProjectFiles,
 // and says what any missing ones mean.
 func (graph *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
-	rootPaths := make(map[tspath.PathKey]string, len(graph.Config.FileNames()))
-	for _, fileName := range graph.Config.FileNames() {
+	rootPaths := make(map[tspath.PathKey]string, len(graph.Configuration.FileNames()))
+	for _, fileName := range graph.Configuration.FileNames() {
 		rootPaths[toPath(
 			fileName.AsString(),
 			graph.Anchor.Root(),
-			graph.Config.CaseSensitivity(),
+			graph.Configuration.CaseSensitivity(),
 		)] = fileName.AsString()
 	}
 

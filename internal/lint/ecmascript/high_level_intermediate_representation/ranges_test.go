@@ -93,7 +93,7 @@ export function f() {
   return a;
 }
 `)
-	if ranges.Len() == 0 {
+	if ranges.Length() == 0 {
 		test.Fatal("no value got a range, so this pass is inert rather than correctly silent")
 	}
 	mutableRange := rangeOfName(test, function, "a")
@@ -201,7 +201,7 @@ export function f(c: boolean, items: number[]) {
   return total;
 }
 `)
-	if ranges.Len() == 0 {
+	if ranges.Length() == 0 {
 		test.Fatal("no value got a range over a function with a loop and a branch; this is inert")
 	}
 	if invalid := mutation_aliasing.ValidateMutableRanges(ranges); len(invalid) != 0 {
@@ -779,12 +779,12 @@ export function f(c: boolean) {
   return v;
 }
 `)
-	if first.Len() == 0 {
+	if first.Length() == 0 {
 		test.Fatal("the first run produced no ranges, so idempotence here is vacuous")
 	}
 	second := InferMutableRanges(function)
-	if second.Len() != first.Len() {
-		test.Fatalf("a second run produced %d ranges against %d", second.Len(), first.Len())
+	if second.Length() != first.Length() {
+		test.Fatalf("a second run produced %d ranges against %d", second.Length(), first.Length())
 	}
 	for _, identifier := range function.Identifiers {
 		id, want := identifier.Id, first.Get(identifier.Id)
@@ -810,7 +810,7 @@ export function f() {
   return a;
 }
 `)
-	if ranges.Len() == 0 {
+	if ranges.Length() == 0 {
 		test.Fatal("the numbered control produced nothing, so the comparison below is meaningless")
 	}
 
@@ -820,10 +820,10 @@ export function f() {
 		}
 	}
 	unnumbered := InferMutableRanges(function)
-	if unnumbered.Len() != 0 {
+	if unnumbered.Length() != 0 {
 		test.Errorf("an unnumbered graph produced %d ranges; opening at order zero writes the unset "+
 			"value and reads back as absent, which is a wrong answer that looks right",
-			unnumbered.Len())
+			unnumbered.Length())
 	}
 }
 
@@ -1072,7 +1072,7 @@ export function f(p: number) {
   return a;
 }
 `)
-	if ranges.Len() == 0 {
+	if ranges.Length() == 0 {
 		test.Fatal("no value got a range, so the negative assertion below is vacuous")
 	}
 
@@ -1431,7 +1431,7 @@ export function f() {
 	// untouched: without it the count rises by two from whatever the baseline is, which is still
 	// what the assertion below catches.
 	const wantWidened = 8
-	if got := widened.Len(); got != wantWidened {
+	if got := widened.Length(); got != wantWidened {
 		test.Errorf("the widening reached %d values, want %d. More than %d means the walk followed an "+
 			"edge created after the mutation it is propagating, which is the sequence-index guard "+
 			"failing; fewer means it stopped early", got, wantWidened, wantWidened)

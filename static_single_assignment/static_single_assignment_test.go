@@ -134,8 +134,8 @@ func (testGraph) EachTerminalPlace(block *testBlock, visit func(*testPlace, ssa.
 func (testGraph) SetTerminalOrder(block *testBlock, order ssa.EvaluationOrder) {
 	block.terminalOrder = order
 }
-func (testGraph) Params(function *testFunction) []testPlace { return function.params }
-func (testGraph) Returns(function *testFunction) *testPlace { return function.returns }
+func (testGraph) Parameters(function *testFunction) []testPlace { return function.parameters }
+func (testGraph) Returns(function *testFunction) *testPlace     { return function.returns }
 func (testGraph) Declaration(function *testFunction, id ssa.IdentifierId) ssa.DeclarationId {
 	return function.identifiers[id].declaration
 }

@@ -89,9 +89,9 @@ func toEstree(each *node, in *input) *estree.Node {
 		case "name":
 			result.Set("name", each.name)
 		case "params":
-			result.Set("params", each.params)
+			result.Set("params", each.parameters)
 		case "prop":
-			result.Set("prop", each.prop)
+			result.Set("prop", each.property)
 		case "important":
 			result.Set("important", each.important)
 		case "value":

@@ -101,7 +101,7 @@ func compilerFinding(diagnostic *ast.Diagnostic) runFinding {
 
 // ruleFinding is a rule's diagnostic as a runFinding, with the severity the settings give the rule for
 // its file. Unnamed rules report as errors, and so does the unused-disable engine diagnostic by default.
-func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Config) runFinding {
+func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Configuration) runFinding {
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
@@ -228,7 +228,7 @@ func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 }
 
 // unusedDisableSeverity is shared by rendering and check-only fixes, including nil-config harnesses.
-func unusedDisableSeverity(lintConfiguration *configuration.Config, path string) configuration.Severity {
+func unusedDisableSeverity(lintConfiguration *configuration.Configuration, path string) configuration.Severity {
 	resolved := configuration.Resolved{}
 	if lintConfiguration != nil {
 		resolved = lintConfiguration.Resolve(path)
@@ -236,7 +236,7 @@ func unusedDisableSeverity(lintConfiguration *configuration.Config, path string)
 	return resolved.UnusedDisableSeverity()
 }
 
-func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Config) int {
+func lintWarningCount(diagnostics []rule.Diagnostic, lintConfiguration *configuration.Configuration) int {
 	warnings := 0
 	for _, diagnostic := range diagnostics {
 		if ruleFinding(diagnostic, lintConfiguration).Severity == "warn" {

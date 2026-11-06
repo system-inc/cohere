@@ -137,16 +137,24 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 		}
 	case JsonString:
 		length := utf8.RuneCountInString(string(typed))
-		if schema.minLength != nil && length < *schema.minLength {
+		if schema.minimumLength != nil && length < *schema.minimumLength {
 			return &Violation{
-				Path:     pathOrRoot(path),
-				Expected: fmt.Sprintf("a string of at least %d characters, got %s", *schema.minLength, describe(value)),
+				Path: pathOrRoot(path),
+				Expected: fmt.Sprintf(
+					"a string of at least %d characters, got %s",
+					*schema.minimumLength,
+					describe(value),
+				),
 			}
 		}
-		if schema.maxLength != nil && length > *schema.maxLength {
+		if schema.maximumLength != nil && length > *schema.maximumLength {
 			return &Violation{
-				Path:     pathOrRoot(path),
-				Expected: fmt.Sprintf("a string of at most %d characters, got %s", *schema.maxLength, describe(value)),
+				Path: pathOrRoot(path),
+				Expected: fmt.Sprintf(
+					"a string of at most %d characters, got %s",
+					*schema.maximumLength,
+					describe(value),
+				),
 			}
 		}
 		// A match that runs past esregexp's time bound counts as a match: this check may only refuse
@@ -225,16 +233,16 @@ func validate(schema *node, value JsonValue, path string) *Violation {
 }
 
 func validateArray(schema *node, list JsonArray, path string) *Violation {
-	if schema.minItems != nil && len(list) < *schema.minItems {
+	if schema.minimumItems != nil && len(list) < *schema.minimumItems {
 		return &Violation{
 			Path:     pathOrRoot(path),
-			Expected: fmt.Sprintf("at least %d items, got %d", *schema.minItems, len(list)),
+			Expected: fmt.Sprintf("at least %d items, got %d", *schema.minimumItems, len(list)),
 		}
 	}
-	if schema.maxItems != nil && len(list) > *schema.maxItems {
+	if schema.maximumItems != nil && len(list) > *schema.maximumItems {
 		return &Violation{
 			Path:     pathOrRoot(path),
-			Expected: fmt.Sprintf("at most %d items, got %d", *schema.maxItems, len(list)),
+			Expected: fmt.Sprintf("at most %d items, got %d", *schema.maximumItems, len(list)),
 		}
 	}
 	if schema.uniqueItems {

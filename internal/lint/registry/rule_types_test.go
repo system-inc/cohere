@@ -45,7 +45,7 @@ func loadRules(test *testing.T, moduleRoot string, patterns ...string) []*gotype
 	if ruleExportsError != nil {
 		test.Fatal(ruleExportsError)
 	}
-	loaded, loadError := gotypes.Load(gotypes.Config{Directory: moduleRoot, Exports: exports}, patterns...)
+	loaded, loadError := gotypes.Load(gotypes.Configuration{Directory: moduleRoot, Exports: exports}, patterns...)
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}

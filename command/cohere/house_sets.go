@@ -23,7 +23,7 @@ import (
 //
 // A `--lint-config` that names a missing file is still an error, as it always was: the person asked for
 // that file. Only the default file's absence means zero config.
-func loadLintConfiguration(graph *program.Graph, location projectLocation) (*configuration.Config, error) {
+func loadLintConfiguration(graph *program.Graph, location projectLocation) (*configuration.Configuration, error) {
 	if !usesHouseSets(location) {
 		return configuration.LoadFor(location.LintConfigFileName, registeredRuleNames())
 	}
@@ -83,7 +83,7 @@ func houseSources(location projectLocation) []string {
 //
 // Written to out and not as an invocation line: which sets applied is part of the verdict, true of the
 // tree rather than of this run, so a replay prints it too and nothing is ever applied silently.
-func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Config) {
+func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
 	if line := lintConfiguration.SetsLine(); line != "" {
 		fmt.Fprintln(out, line)
 	}

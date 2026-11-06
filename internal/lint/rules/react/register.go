@@ -29,7 +29,7 @@ import (
 // rules that vanished rather than as a quieter run.
 func init() {
 	rule.Register(
-		rule.Registration[CompilerRuleOptions]{Rule: Config, Decode: DecodeCompilerRuleOptions},
+		rule.Registration[CompilerRuleOptions]{Rule: Configuration, Decode: DecodeCompilerRuleOptions},
 		rule.Registration[CompilerRuleOptions]{Rule: ErrorBoundaries, Decode: DecodeCompilerRuleOptions},
 		rule.Registration[ExhaustiveDepsOptions]{
 			Rule:   ExhaustiveDeps,

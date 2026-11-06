@@ -167,7 +167,7 @@ var noListenerReasons = map[rule.NoListenerKind]string{
 func classifyTypeScriptCoverage(
 	rules []rule.Entry,
 	coverage program.Coverage,
-	lintConfiguration *configuration.Config,
+	lintConfiguration *configuration.Configuration,
 ) coverageSummary {
 	summary := coverageSummary{
 		FilesIgnored: coverage.FilesIgnored,
@@ -523,7 +523,7 @@ const namedRuleGapsSentence = "the notes above name the rules that could not fin
 // and named in no rules block; they are held in `configuration.PluginDefaultRules` and resolved into
 // the config's rules on load, so a denominator taken from the block alone would understate by exactly
 // the rules nobody wrote down.
-func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuration.Config) []string {
+func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuration.Configuration) []string {
 	if lintConfiguration == nil {
 		return nil
 	}
@@ -545,7 +545,7 @@ func unportedConfiguredRules(rules []rule.Entry, lintConfiguration *configuratio
 }
 
 // wantedConfiguredRules counts the rules the config turns on, the parity line's denominator.
-func wantedConfiguredRules(lintConfiguration *configuration.Config) int {
+func wantedConfiguredRules(lintConfiguration *configuration.Configuration) int {
 	wanted := 0
 	for name, setting := range lintConfiguration.Rules {
 		if name != configuration.UnusedDisable && setting.Severity != configuration.SeverityOff {
@@ -566,7 +566,7 @@ func wantedConfiguredRules(lintConfiguration *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Config) {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguration *configuration.Configuration) {
 	if lintConfiguration == nil {
 		return
 	}
@@ -584,7 +584,7 @@ func writeParityCoverage(out *bufio.Writer, rules []rule.Entry, lintConfiguratio
 type lintReport struct {
 	Result            program.Result
 	Rules             []rule.Entry
-	LintConfiguration *configuration.Config
+	LintConfiguration *configuration.Configuration
 	// WalkCost says how the walk was paid for: `in 5.64s`, or which phase walked it.
 	WalkCost string
 	// Details is `--coverage`: name every rule once rather than only counting them.
@@ -688,7 +688,7 @@ func writeUnrunRuleReferences(out *bufio.Writer, references map[string]int) {
 // one with no reason; printing it is what stops a reasoned one becoming a quiet allowance, because a
 // reader of any run can see each place the project and the house disagree and judge whether the reason
 // still holds.
-func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Config) {
+func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
 	if lintConfiguration == nil || len(lintConfiguration.Departures) == 0 {
 		return
 	}
@@ -720,7 +720,7 @@ func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Config)
 // on every run and by default. A scoped override needs no reason, so one that gives a reason is usually
 // standing in for unfinished work, and printing it keeps that work in front of whoever reads a run until
 // the override can go.
-func writeOverrideReasons(out *bufio.Writer, lintConfiguration *configuration.Config) {
+func writeOverrideReasons(out *bufio.Writer, lintConfiguration *configuration.Configuration) {
 	if lintConfiguration == nil {
 		return
 	}

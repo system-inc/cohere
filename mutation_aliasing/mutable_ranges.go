@@ -32,8 +32,8 @@ func (ranges *MutableRanges) Get(id static_single_assignment.IdentifierId) Mutab
 	return ranges.ranges[id]
 }
 
-// Len reports how many values have a range, for measurement.
-func (ranges *MutableRanges) Len() int {
+// Length reports how many values have a range, for measurement.
+func (ranges *MutableRanges) Length() int {
 	if ranges == nil {
 		return 0
 	}
