@@ -210,13 +210,5 @@
         "kind": "span",
         "task": "mxe7xjy",
         "reason": "covers the package clause `package utils` rather than the file's start"
-    },
-    {
-        "engine": "typescript",
-        "family": "shouting",
-        "case": "sh15",
-        "kind": "span",
-        "task": "34fejeq",
-        "reason": "covers the whole comment line `// This is REALLY important.` rather than the shouted word"
     }
 ]
