@@ -74,7 +74,8 @@ var topLevelDescriptions = map[string]string{
 	SwiftKey: "The Swift engine's rules, read by cohere-swift itself: under rules, each Swift rule's severity, " +
 		"error, warning or off, or an array of one and, for a rule that reads options, an object of them, which may " +
 		"only make the rule stricter: cohere-swift/file-length reads max, at or below the house's 2,000 lines. An " +
-		"option a rule does not read is refused by name. A house rule the block does not name runs at error. The engine reads the block from the settings file beside a Swift project's root (its " +
+		"option a rule does not read is refused by name. A house rule the block does not name runs at error. " +
+		"The engine reads the block from the settings file beside a Swift project's root (its " +
 		"Package.swift, project.yml or .xcodeproj), or the file --lint-config names, and never follows extends, " +
 		"so a block in a file another extends, or beside no Swift project, is refused by name. Formatting is not " +
 		"configured here: Swift has one house format, and a format key in this block is refused.",

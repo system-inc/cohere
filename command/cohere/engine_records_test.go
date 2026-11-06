@@ -563,18 +563,28 @@ type excludedFile struct {
 // test can state which files the engine left out and why.
 func projectRecordAt(test *testing.T, record string, root string, excluded []excludedFile) string {
 	test.Helper()
-	var fields map[string]any
+	// Each field stays as the fixture wrote it, so the record passes through whole but for the two replaced.
+	var fields map[string]json.RawMessage
 	if decodeError := json.Unmarshal([]byte(record), &fields); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	if fields["kind"] != "project" {
+	var kind string
+	if kindError := json.Unmarshal(fields["kind"], &kind); kindError != nil || kind != "project" {
 		test.Fatalf("not a project record: %s", record)
 	}
 	entries := make([]map[string]string, 0, len(excluded))
 	for _, entry := range excluded {
 		entries = append(entries, map[string]string{"file": entry.file, "reason": entry.reason})
 	}
-	fields["root"], fields["excluded"] = root, entries
+	encodedRoot, rootError := json.Marshal(root)
+	if rootError != nil {
+		test.Fatal(rootError)
+	}
+	encodedEntries, entriesError := json.Marshal(entries)
+	if entriesError != nil {
+		test.Fatal(entriesError)
+	}
+	fields["root"], fields["excluded"] = encodedRoot, encodedEntries
 	encoded, encodeError := json.Marshal(fields)
 	if encodeError != nil {
 		test.Fatal(encodeError)
