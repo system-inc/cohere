@@ -36,6 +36,11 @@ type Loaded struct {
 	// Their Imports reach the whole graph as go/packages loaded it.
 	Packages []*packages.Package
 
+	// Roots are what go/packages returns with Tests set: each package the patterns matched, and each test variant
+	// go test builds of it, "p [p.test]" beside p and "p_test [p.test]", less go test's synthesized main. Packages
+	// are chosen from them; a driver that analyzes every variant, as the copy of analysistest does, takes them all.
+	Roots []*packages.Package
+
 	// Diagnostics are every list, parse and type error anywhere in the graph, and every test function go test
 	// would refuse, each once, sorted by file and position.
 	Diagnostics []Diagnostic
@@ -121,6 +126,7 @@ func loadWorkspace(
 		return nil, loadError
 	}
 
+	loaded.Roots = withoutTestMain(roots)
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })

@@ -31,6 +31,17 @@ func analyzed(roots []*packages.Package) []*packages.Package {
 	return chosen
 }
 
+// withoutTestMain is roots without go test's synthesized main, which only go/packages' roots hold.
+func withoutTestMain(roots []*packages.Package) []*packages.Package {
+	var kept []*packages.Package
+	for _, root := range roots {
+		if !isTestMain(root) {
+			kept = append(kept, root)
+		}
+	}
+	return kept
+}
+
 // isTestMain reports whether candidate is go test's synthesized main. It is the one package that is no test
 // variant itself and yet imports one: a package as written cannot import a package as built for a test.
 func isTestMain(candidate *packages.Package) bool {
