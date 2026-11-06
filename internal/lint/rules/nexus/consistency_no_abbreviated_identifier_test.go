@@ -1302,3 +1302,163 @@ func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(test *testing
 		})
 	}
 }
+
+// abbreviatedIntrinsicDependencyFiles lays out the slice of React's declarations an intrinsic element
+// reads its attributes through, `JSX.IntrinsicElements` to `DetailedHTMLProps` to
+// `ImgHTMLAttributes`, beside a DOM declaration file, since the fixture's lib is ES2022 alone, and a
+// dependency interface a class can implement.
+func abbreviatedIntrinsicDependencyFiles(source string) map[string]string {
+	return map[string]string{
+		"subject.tsx": "import * as React from 'react';\nimport { ImageLike } from 'image-like';\n" +
+			"declare const url: string;\ndeclare const condition: boolean;\n" +
+			source,
+		"node_modules/react/index.d.ts": `
+			export interface DOMAttributes<T> { children?: unknown }
+			export interface HTMLAttributes<T> extends DOMAttributes<T> { className?: string; id?: string }
+			export interface ImgHTMLAttributes<T> extends HTMLAttributes<T> { alt?: string; src?: string }
+			export interface SourceHTMLAttributes<T> extends HTMLAttributes<T> { src?: string; type?: string }
+			export interface ClassAttributes<T> { key?: string }
+			export type DetailedHTMLProps<E extends HTMLAttributes<T>, T> = ClassAttributes<T> & E;
+			declare global {
+				namespace JSX {
+					interface Element {}
+					interface IntrinsicElements {
+						img: DetailedHTMLProps<ImgHTMLAttributes<HTMLImageElement>, HTMLImageElement>;
+						source: DetailedHTMLProps<SourceHTMLAttributes<HTMLSourceElement>, HTMLSourceElement>;
+					}
+				}
+			}
+		`,
+		"node_modules/image-like/index.d.ts": `export interface ImageLike { src: string; loadSrc(): string }`,
+		"dom.d.ts": `
+			interface HTMLImageElement { alt: string; src: string }
+			interface HTMLSourceElement { src: string }
+		`,
+	}
+}
+
+// A type we do not own fixes `src` on an intrinsic attribute, on a literal React or the DOM types,
+// and on a member we implement from a dependency; each quiet case has a reporting twin where the
+// same spelling is ours, so the silence is shown to come from the types rather than from the word.
+// Controls: no contextual declaration owning the spelling fails 9/24; no inherited dependency
+// member, 4/24; no combined dependency constituent, 2/24; judging a JSX attribute name, 4/24.
+func TestConsistencyNoAbbreviatedIdentifierLeavesIntrinsicAndDependencyNamesAlone(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name, source string
+		want         int
+	}{
+		{"img attribute", `const element = <img src={url} alt="" />;`, 0},
+		{"source attribute", `const element = <source src={url} type="video/mp4" />;`, 0},
+		{"React attributes literal", `const attributes: React.ImgHTMLAttributes<HTMLImageElement> = { src: url };`, 0},
+		{
+			"React attributes argument",
+			`declare function render(attributes: React.SourceHTMLAttributes<HTMLSourceElement>): void; ` +
+				`render({ src: url });`,
+			0,
+		},
+		{"intrinsic element attributes literal", `const attributes: JSX.IntrinsicElements['img'] = { src: url };`, 0},
+		{"DOM partial literal", `const image: Partial<HTMLImageElement> = { src: url };`, 0},
+		{"literal spread into an intrinsic", `const element = <img {...{ src: url }} />;`, 0},
+		{"conditional spread into an intrinsic", `const element = <img {...(condition ? { src: url } : {})} />;`, 0},
+		{
+			"implemented dependency members",
+			`class Loader implements ImageLike { src = ''; loadSrc() { return '' } }`,
+			0,
+		},
+		{
+			"extends the intrinsic attributes",
+			`interface ImageProperties extends React.ImgHTMLAttributes<HTMLImageElement> { src: string }`,
+			0,
+		},
+		{
+			"intersects the intrinsic attributes",
+			`type ImageProperties = React.ImgHTMLAttributes<HTMLImageElement> & { src: string };`,
+			0,
+		},
+		{
+			"picks from the intrinsic attributes",
+			`type ImageProperties = Pick<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> & { src: string };`,
+			0,
+		},
+		{
+			"extends a pick of the intrinsic attributes",
+			`interface ImageProperties extends Pick<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> { src: string }`,
+			0,
+		},
+
+		{
+			"own property passed to an attribute",
+			`interface ImageProperties { src?: string } ` +
+				`function Image(properties: ImageProperties) { return <img src={properties.src} />; }`,
+			1,
+		},
+		{
+			"own property spread into an intrinsic",
+			`interface ImageProperties { src?: string } ` +
+				`function Image(properties: ImageProperties) { return <img {...properties} />; }`,
+			1,
+		},
+		{
+			"own literal typed by own properties",
+			`interface ImageProperties { src?: string } const image: ImageProperties = { src: url };`,
+			1,
+		},
+		{
+			"own member beside the intrinsic attributes",
+			`type ImageProperties = React.ImgHTMLAttributes<HTMLImageElement> & { thumbnailSrc: string };`,
+			1,
+		},
+		// These two would be as quiet as their twins if the DOM file or the intrinsic table failed to
+		// resolve, since an unresolved contract cannot prove a spelling ours, so they show it resolves.
+		{
+			"own member beside the DOM members",
+			`const image: Partial<HTMLImageElement> = { src: url, thumbnailSrc: url };`,
+			1,
+		},
+		{"own member spread into an intrinsic", `const element = <img {...{ src: url, thumbnailSrc: url }} />;`, 1},
+		{
+			"own member beside an implemented dependency",
+			`class Loader implements ImageLike { src = ''; loadSrc() { return '' } thumbnailSrc = '' }`,
+			1,
+		},
+		{
+			"untyped literal read into an attribute",
+			`const image = { src: url }; const element = <img src={image.src} />;`,
+			1,
+		},
+		{
+			"request body mirroring a wire format",
+			`declare function send(url: string, init: { body: unknown }): void; ` +
+				`send(url, { body: { cmd: 'forget-sta' } });`,
+			1,
+		},
+		{"serialized request body", `const body = JSON.stringify({ cmd: 'forget-sta' });`, 1},
+		{"request body type", `interface ForgetRequest { body: { cmd: string } }`, 1},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFiles(
+				test,
+				ConsistencyNoAbbreviatedIdentifier,
+				abbreviatedIntrinsicDependencyFiles(testCase.source),
+				"subject.tsx",
+			)
+			if len(result.Diagnostics) != testCase.want {
+				test.Fatalf(
+					"expected %d findings, got %d: %v",
+					testCase.want,
+					len(result.Diagnostics),
+					result.MessageIds(),
+				)
+			}
+			for _, diagnostic := range result.Diagnostics {
+				text := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if text != "src" && text != "thumbnailSrc" && text != "cmd" {
+					test.Errorf("finding at %q instead of the declared member", text)
+				}
+			}
+		})
+	}
+}
