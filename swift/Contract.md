@@ -385,6 +385,22 @@ Rendered by the existing lint line and coverage printers:
 coverage, crash, and config notes. `reusedFrom` names the phase whose walk was reused (`fix`), and
 the line then says so instead of printing a duration.
 
+The Go engine's lint record carries one more field, additive within contract 3 as the types record's
+are, so a front door that does not read it yet loses only what it counts:
+`"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1}`. It is what
+the engine's per-package findings cache did, by package. Every package an analyzer reached, each
+analyzed package and test variant and each dependency analyzed for its facts, was either `hit`,
+restored from an entry with nothing run on it, or `missed`, analyzed from source. Of the misses,
+`written` got an entry, and `unstorable` exported a fact gob cannot encode, so it got none and is
+analyzed again next run; a miss that is neither had a rule fail on it, or its write failed, which the
+engine says on stderr. `factsDropped` counts the facts the written entries left out because nothing
+outside their package can name their object, such as a wrapper closure printf marks: no importer
+can look such a fact up, so leaving it out changes no finding. The entries live in
+`<root>/.cache/cohere/go/`, beside the front door's own cache. The cache changes no finding and no
+other field of any record: a run with it and a run under `--no-cache` write the same stream but for
+this field and the elapsed times. Under `--no-cache` the engine reads and writes no
+entry, and the field is `{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0}`.
+
 ### `phase`
 
 ```json

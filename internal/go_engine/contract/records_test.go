@@ -35,7 +35,7 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied"},
+	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache"},
 	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations"},
 }
 

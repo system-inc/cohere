@@ -12,7 +12,7 @@ import (
 // switchNames are the switches the front door forwards, each `--name` or `--name=true|false`.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version",
+	"rules", "rules-enabled", "version", "no-cache",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

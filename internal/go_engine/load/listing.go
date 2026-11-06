@@ -39,6 +39,11 @@ type listedPackage struct {
 	SwigCxxFiles      []string `json:"SwigCXXFiles"`
 	SysoFiles         []string
 
+	// EmbedFiles are the files the package's own `//go:embed` patterns match, which go list resolves without
+	// compiling. Its tests' patterns it resolves only under -test, which a runner of prebuilt tests refuses, so a test
+	// variant lists the package's embedded files and not its tests' (see newNode).
+	EmbedFiles []string
+
 	Imports   []string
 	ImportMap map[string]string
 	Deps      []string
@@ -62,7 +67,7 @@ type listedError struct {
 // listedFields are the fields asked of go list, so it computes nothing else.
 var listedFields = "ImportPath,Name,Dir,DepOnly,GoFiles,CgoFiles,IgnoredGoFiles,IgnoredOtherFiles,CFiles,CXXFiles," +
 	"MFiles,HFiles,FFiles,SFiles,SwigFiles,SwigCXXFiles,SysoFiles,Imports,ImportMap,Deps,Module,Error,TestGoFiles," +
-	"XTestGoFiles,TestImports,XTestImports"
+	"XTestGoFiles,TestImports,XTestImports,EmbedFiles"
 
 // listing is every package the patterns name, everything they import, and everything their tests import, in an
 // order where each package comes after what it imports.
