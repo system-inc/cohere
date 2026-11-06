@@ -191,7 +191,8 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 		},
 		{
 			"a duplicate entry",
-			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {}}, {"abbreviation": "val", "expansions": ["value"], "segment": {}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "segment": {}}, ` +
+				`{"abbreviation": "val", "expansions": ["value"], "segment": {}}]}`,
 		},
 		{
 			"an unknown matcher",
@@ -201,7 +202,8 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 		{"a broken segment", `{"abbreviations":[{"abbreviation":"v(","expansions":["v"],"segment":{}}]}`},
 		{
 			"a retired per-word messageId",
-			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], "whole": {"messageId": "noVal", "style": "plain"}}]}`,
+			`{"abbreviations": [{"abbreviation": "val", "expansions": ["value"], ` +
+				`"whole": {"messageId": "noVal", "style": "plain"}}]}`,
 		},
 	}
 	for _, testCase := range cases {
