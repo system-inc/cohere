@@ -374,7 +374,8 @@ func TestASpanRowOnAControlLoads(test *testing.T) {
 
 // covers is a span's covers field, for a test that writes one.
 func covers(text string, occurrence int) Span {
-	return Span{Covers: &text, Occurrence: occurrence}
+	covered := text
+	return Span{Covers: &covered, Occurrence: occurrence}
 }
 
 // Each span form resolves to the bytes it names, and lines end as each language ends them.

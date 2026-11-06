@@ -53,7 +53,8 @@ func runForJson(test *testing.T, binary string, directory string, arguments ...s
 	command := exec.Command(binary, append([]string{"--json"}, arguments...)...)
 	command.Dir = directory
 	command.Env = append(os.Environ(), "COHERE_VERDICT_FD=")
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	runError := command.Run()
 	if runError == nil {
@@ -66,24 +67,32 @@ func runForJson(test *testing.T, binary string, directory string, arguments ...s
 	return stdout.String(), stderr.String(), childExitCode(test, exited)
 }
 
+// jsonRecord is a --json line under the names these tests read. Every kind of line spells the four as strings
+// when it has them, so any line decodes, and a summary's are what the tests judge.
+type jsonRecord struct {
+	Kind    string `json:"kind"`
+	Label   string `json:"label"`
+	Verdict string `json:"verdict"`
+	Error   string `json:"error"`
+}
+
 // summariesOf parses every line of a --json stdout, failing on any line that is not JSON, and returns the
 // summary lines by label, each label once.
-func summariesOf(test *testing.T, stdout string) map[string]map[string]any {
+func summariesOf(test *testing.T, stdout string) map[string]jsonRecord {
 	test.Helper()
-	summaries := map[string]map[string]any{}
+	summaries := map[string]jsonRecord{}
 	for _, line := range strings.Split(strings.TrimSuffix(stdout, "\n"), "\n") {
-		var record map[string]any
+		var record jsonRecord
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatalf("a line of --json stdout is not JSON (%v): %q\nstdout:\n%s", decodeError, line, stdout)
 		}
-		if record["kind"] != "summary" {
+		if record.Kind != "summary" {
 			continue
 		}
-		label, _ := record["label"].(string)
-		if _, seen := summaries[label]; seen {
-			test.Fatalf("two summary lines for %q:\n%s", label, stdout)
+		if _, seen := summaries[record.Label]; seen {
+			test.Fatalf("two summary lines for %q:\n%s", record.Label, stdout)
 		}
-		summaries[label] = record
+		summaries[record.Label] = record
 	}
 	return summaries
 }
@@ -107,8 +116,7 @@ func TestAjsonRunWhoseGraphDoesNotBuildEndsOnAFailedSummary(test *testing.T) {
 		if exitCode == 0 || len(summaries) != 1 || !found {
 			test.Fatalf("want one summary and a failing exit, got exit %d:\n%s", exitCode, stdout)
 		}
-		if message, _ := summary["error"].(string); summary["verdict"] != "fail" ||
-			!strings.Contains(message, missing) {
+		if summary.Verdict != "fail" || !strings.Contains(summary.Error, missing) {
 			test.Errorf("the summary does not fail naming the load error: %v", summary)
 		}
 		if !strings.HasSuffix(strings.TrimSpace(stdout), "}") || !strings.Contains(
@@ -139,11 +147,11 @@ func TestAjsonRunWhoseGraphDoesNotBuildEndsOnAFailedSummary(test *testing.T) {
 				stdout,
 			)
 		}
-		if summaries["."]["verdict"] != "pass" {
+		if summaries["."].Verdict != "pass" {
 			test.Errorf("the root, which loads, did not pass: %v", summaries["."])
 		}
 		wire := summaries["wire"]
-		if message, _ := wire["error"].(string); wire["verdict"] != "fail" || !strings.Contains(message, missing) {
+		if wire.Verdict != "fail" || !strings.Contains(wire.Error, missing) {
 			test.Errorf(
 				"the project that does not load has no failed summary naming why: %v\nstdout:\n%s",
 				wire,
