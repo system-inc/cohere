@@ -92,6 +92,18 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
 	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.
 	exitCode, runError := runEngineBinary(executable, append([]string{goEngineVerb}, arguments...), run, os.Stderr)
+	// A test instrument: a file written after the engine read the tree and before its run is recorded, holding
+	// COHERE_TEST_WRITE_AFTER_GO_ENGINE_TEXT, so a test can change an input the verdict was read from. See
+	// TestAGoInputChangedDuringTheRunIsNeverReplayedOver.
+	if written := os.Getenv("COHERE_TEST_WRITE_AFTER_GO_ENGINE"); written != "" {
+		if createDirectoryError := os.MkdirAll(filepath.Dir(written), 0o755); createDirectoryError != nil {
+			return 1, createDirectoryError
+		}
+		text := []byte(os.Getenv("COHERE_TEST_WRITE_AFTER_GO_ENGINE_TEXT"))
+		if writeError := os.WriteFile(written, text, 0o644); writeError != nil {
+			return 1, writeError
+		}
+	}
 	if runError == nil {
 		declareGoRunCacheInputs(run, exitCode, location.LintConfigFileName)
 	}

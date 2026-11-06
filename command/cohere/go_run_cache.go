@@ -32,7 +32,10 @@ func beginGoRunCache(location projectLocation) {
 		exec.LookPath)
 	// No section beyond the run's own: the findings, shapes and types sections serve a TypeScript graph's walk,
 	// and the Go engine walks none of them.
-	beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
+	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
+	if session != nil {
+		session.declaredAbove = []string{anchor.Root(), anchor.Resolved()}
+	}
 }
 
 // goRunCacheFacts is what a Go run's verdict depends on that is no file the engine reads, each a fact in the run's
@@ -44,9 +47,11 @@ func beginGoRunCache(location projectLocation) {
 // whose name starts with GO or CGO_, by name and value, sorted: `GOFLAGS` (its `-tags` among it), `GOOS`,
 // `GOARCH`, `CGO_ENABLED`, `GOWORK`, `GOENV`, `GOTOOLCHAIN` and the rest each change what `go list` loads, and
 // one the go command reads that nobody listed here is still covered. `HOME` and `XDG_CONFIG_HOME`, since the go
-// command finds its own settings file, its default `GOPATH` and with it the module cache under them. And the
-// `go` the loader will run, as PATH finds it and as its links resolve, so another toolchain on PATH misses even
-// where the engine's own record of the binary would not show it.
+// command finds its own settings file, its default `GOPATH` and with it the module cache under them. `CC`, `CXX`
+// and `PKG_CONFIG`, since a package with cgo of its own is loaded through the cgo tool, whose compiler and headers
+// no record can name. `BURNTSUSHI_TOML_110`, which the TOML reader of staticcheck's config consults. And the `go`
+// the loader will run, as PATH finds it and as its links resolve, so another toolchain on PATH misses even where
+// the engine's own record of the binary would not show it.
 func goRunCacheFacts(
 	anchor program.PathAnchor,
 	settingsFile string,
@@ -64,8 +69,7 @@ func goRunCacheFacts(
 	variables := []string{}
 	for _, variable := range environment {
 		name, _, _ := strings.Cut(variable, "=")
-		if strings.HasPrefix(name, "GO") || strings.HasPrefix(name, "CGO_") || name == "HOME" ||
-			name == "XDG_CONFIG_HOME" {
+		if strings.HasPrefix(name, "GO") || strings.HasPrefix(name, "CGO_") || slices.Contains(goKeyedVariables, name) {
 			variables = append(variables, variable)
 		}
 	}
@@ -76,6 +80,10 @@ func goRunCacheFacts(
 	}
 	return facts
 }
+
+// goKeyedVariables are the variables a Go run's key takes by name, beside every `GO*` and `CGO_*` one. See
+// goRunCacheFacts for why each is there.
+var goKeyedVariables = []string{"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110"}
 
 // goOnPath is the `go` PATH finds, absolute, and where its links lead, or a word saying there is none. A go the
 // loader cannot find fails the load, and a run that failed is never recorded, so the word only has to differ from
@@ -113,6 +121,13 @@ func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) 
 		declineRunCache(reason)
 		return
 	}
+	if reason := goInputsUnreplayable(run.inputs, session.declaredAbove); reason != "" {
+		// Said, and kept for the next run, since a record like this would never replay and nothing else would say
+		// why: it is the engine's record that is wrong, and only a cold run every time shows it.
+		declineRunCache(reason)
+		session.note("the run cache did not record this run: " + reason)
+		return
+	}
 	declareRunCacheInputs(run.inputs.Files...)
 	session.extraDirectories = append(session.extraDirectories, run.inputs.Directories...)
 	session.extraAbsent = append(session.extraAbsent, run.inputs.Absent...)
@@ -121,6 +136,39 @@ func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) 
 	} else {
 		session.extraAbsent = append(session.extraAbsent, settingsFile)
 	}
+}
+
+// goInputsUnreplayable is why an inputs record could never be replayed, empty when it can: a path inside a root's
+// cache directory, which this run writes after its record is taken (the table, and any cache of the engine's kept
+// beside it), or a listed directory above a root, whose listing moves with everything beside the project. Each
+// would make every later run a miss, so the record is refused rather than kept, and the engine's record is what
+// needs mending.
+func goInputsUnreplayable(inputs *engineInputsRecord, roots []string) string {
+	for _, paths := range [][]string{inputs.Files, inputs.Directories, inputs.Absent} {
+		for _, path := range paths {
+			for _, root := range roots {
+				if pathWithin(path, cacheDirectory(root)) {
+					return fmt.Sprintf("the Go engine named %s, inside the cache directory the run writes, so "+
+						"no later run could replay it", path)
+				}
+			}
+		}
+	}
+	for _, directory := range inputs.Directories {
+		for _, root := range roots {
+			if directory != root && pathWithin(root, directory) {
+				return fmt.Sprintf("the Go engine listed %s, a directory above the root %s whose listing moves "+
+					"with everything beside the project, so no later run could replay it", directory, root)
+			}
+		}
+	}
+	return ""
+}
+
+// pathWithin reports whether path is directory or below it.
+func pathWithin(path string, directory string) bool {
+	relative, relativeError := filepath.Rel(directory, path)
+	return relativeError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 // goRunUnrecordable is why a finished Go run's exit is no verdict to replay, empty when it is one.

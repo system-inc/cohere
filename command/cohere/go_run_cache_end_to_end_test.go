@@ -58,6 +58,10 @@ func newGoReplayFixture(test *testing.T) *goReplayFixture {
 	fixture.write("sub/b.go", "package sub\n\n// Answer answers.\nfunc Answer() int {\n\treturn 42\n}\n")
 	// A directory `./...` reaches that holds no Go file, so only its listing says when a package appears below it.
 	fixture.write("notes/README.md", "notes\n")
+	// A file the package embeds, which no Go file names but its directive.
+	fixture.write("embedded.go", "package replay\n\nimport _ \"embed\"\n\n// Message is embedded.\n//\n"+
+		"//go:embed data/message.txt\nvar Message string\n")
+	fixture.write("data/message.txt", "hello\n")
 	// Files no load reads until a scenario's environment builds them, each with a finding so the verdict says when
 	// one is loaded.
 	fixture.write("tagged.go", "//go:build replaytest\n\n"+goReplaySource("replay", "Tagged"))
@@ -159,10 +163,11 @@ func goKeepLines(output string, drop ...string) string {
 // goVerdict is a run's verdict: its output without the lines that describe the invocation rather than the tree,
 // which a replay deliberately does not print and a cold run does, and without the footer, which is the
 // invocation's too. A replay's own framing comes off in goReplayBody. These are the lines the TypeScript run
-// cache's end-to-end test drops, with the Go project line in place of the graph line.
+// cache's end-to-end test drops, with the Go project line, for a module or a workspace, in place of the graph line.
 func goVerdict(cold string) string {
 	return goKeepLines(cold,
 		"module described in ",
+		"workspace described in ",
 		"types: ",
 		"lint: ",
 		"phases: ",
@@ -252,6 +257,19 @@ func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 					test.Errorf("the replay printed the fix line as though the fix phase had just run:\n%s",
 						replayed.stdout)
 				}
+				// Every line that describes the invocation is the replay's own or left out, never the recorded run's.
+				if !strings.HasPrefix(replayed.stdout, "cached: ") || !goReplayFooter.MatchString(replayed.stdout) ||
+					!strings.Contains(replayed.stdout, "\nphases: replayed the run at ") {
+					test.Errorf("the replay is not framed as one, first line to footer:\n%s", replayed.stdout)
+				}
+				for _, claim := range []string{
+					"module described in ", "workspace described in ", "types: ", "lint: ", "  total ",
+				} {
+					if regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(claim)).MatchString(replayed.stdout) {
+						test.Errorf("the replay printed the recorded run's %q line as this run's:\n%s", claim,
+							replayed.stdout)
+					}
+				}
 				if goReplayBody(replayed.stdout) != goVerdict(cold.stdout) {
 					test.Fatalf("the replay is not the cold run's verdict:\n--- replay\n%s\n--- cold verdict\n%s",
 						goReplayBody(replayed.stdout), goVerdict(cold.stdout))
@@ -304,6 +322,28 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			// The new modification time must differ from the recorded one at the file system's resolution.
 			time.Sleep(10 * time.Millisecond)
 			fixture.write("a.go", strings.Replace(goReplaySource("replay", "Greet"), `"%d"`, `"%s"`, 1))
+		}},
+		// The same size and the old modification time, as cp -p, rsync -t and touch -r leave a file: only the change
+		// time and the bytes moved.
+		{"a same-size edit with its modification time restored", func(fixture *goReplayFixture) {
+			path := filepath.Join(fixture.root, "a.go")
+			information, statError := os.Stat(path)
+			if statError != nil {
+				fixture.test.Fatal(statError)
+			}
+			time.Sleep(10 * time.Millisecond)
+			fixture.write("a.go", strings.Replace(goReplaySource("replay", "Greet"), `"%d"`, `"%s"`, 1))
+			restored := information.ModTime()
+			if changeTimesError := os.Chtimes(path, restored, restored); changeTimesError != nil {
+				fixture.test.Fatal(changeTimesError)
+			}
+		}},
+		{"an embedded file edited", func(fixture *goReplayFixture) {
+			fixture.write("data/message.txt", "hello, again\n")
+		}},
+		// Its constraint taken off, so a file the load left out joins it.
+		{"a build-tagged file edited", func(fixture *goReplayFixture) {
+			fixture.write("tagged.go", goReplaySource("replay", "Tagged"))
 		}},
 		{"a .go file added to a package directory", func(fixture *goReplayFixture) {
 			fixture.write("sub/c.go", goReplaySource("sub", "Added"))
@@ -378,6 +418,14 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 				test.Fatalf("the run after the change differs from a cold run (exit %d against %d):\n"+
 					"--- after the change\n%s\n--- cold\n%s", afterChange.exitCode, cold.exitCode,
 					afterChange.stdout, cold.stdout)
+			}
+			// And the run after that replays the new truth, so the change was recorded and not only missed.
+			next := fixture.run(true, arguments...)
+			replayedTruth := goReplayBody(next.stdout) == goVerdict(cold.stdout) && next.exitCode == cold.exitCode
+			if !isGoReplay(next) || !replayedTruth {
+				test.Fatalf("the run after that did not replay the new truth (exit %d against %d):\n--- next\n%s\n"+
+					"--- cold verdict\n%s", next.exitCode, cold.exitCode, goReplayBody(next.stdout),
+					goVerdict(cold.stdout))
 			}
 		})
 	}
@@ -454,4 +502,116 @@ func cacheDirectoryState(test *testing.T, root string) string {
 			information.ModTime().UnixNano())
 	}
 	return state.String()
+}
+
+// TestAnUnchangedGoModuleReplays: two runs in a row with nothing touched, the second a replay, on the fixture, on a
+// module with no settings file at all, whose absence is recorded as absent and never as a file the run read
+// (#e0tybvv refused every such record), and on a module with a staticcheck.conf above it, after a file appears
+// beside that one. A key or a record so broad it never hits passes every staleness test, so this is the other half.
+func TestAnUnchangedGoModuleReplays(test *testing.T) {
+	test.Parallel()
+	for _, shape := range []string{"the fixture", "no settings file", "a file added above the module"} {
+		test.Run(shape, func(test *testing.T) {
+			test.Parallel()
+			fixture := newGoReplayFixture(test)
+			switch shape {
+			case "no settings file":
+				if removeError := os.Remove(filepath.Join(fixture.root, "CohereSettings.json")); removeError != nil {
+					test.Fatal(removeError)
+				}
+			case "a file added above the module":
+				conf := filepath.Join(fixture.parent, "staticcheck.conf")
+				if writeError := os.WriteFile(conf, []byte("checks = [\"inherit\"]\n"), 0o644); writeError != nil {
+					test.Fatal(writeError)
+				}
+			}
+			arguments := []string{"--no-fix", "--verbose"}
+			fixture.establishHit(arguments...)
+			if shape == "a file added above the module" {
+				// Beside the staticcheck.conf the engine named, in a directory whose listing no load reads.
+				sibling := filepath.Join(fixture.parent, "sibling.txt")
+				if writeError := os.WriteFile(sibling, []byte("beside\n"), 0o644); writeError != nil {
+					test.Fatal(writeError)
+				}
+				if again := fixture.run(true, arguments...); !isGoReplay(again) {
+					test.Fatalf("a file added beside the module kept the next run from replaying:\n%s", again.stdout)
+				}
+			}
+		})
+	}
+}
+
+// TestAGoInputChangedDuringTheRunIsNeverReplayedOver: an input that changes after the run began reading it, here
+// after the engine read the tree and before the run is recorded, keeps the run from being recorded, so the next
+// run checks it rather than replaying a verdict that never saw the change. The clock starts before the engine is
+// spawned, and every recorded file and listed directory is held to it: a file's bytes edited, and a package created
+// under a directory holding no Go file, whose listing is the only thing that moved.
+func TestAGoInputChangedDuringTheRunIsNeverReplayedOver(test *testing.T) {
+	test.Parallel()
+	for _, change := range []struct {
+		name string
+		path string
+		text string
+	}{
+		{"a file's bytes", "a.go", strings.Replace(goReplaySource("replay", "Greet"), `"%d"`, `"%s"`, 1)},
+		{"a package under a listed directory", "notes/late/late.go", goReplaySource("late", "Late")},
+	} {
+		test.Run(change.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newGoReplayFixture(test)
+			arguments := []string{"--no-fix", "--verbose"}
+			fixture.establishHit(arguments...)
+			// A change of its own first, so the run below is a miss, runs the engine, and is the record in question.
+			fixture.write("sub/b.go", "package sub\n\n// Answer answers.\nfunc Answer() int {\n\treturn 43\n}\n")
+			path := filepath.Join(fixture.root, change.path)
+			during := fixture.environment
+			fixture.environment = append(slices.Clone(during), "COHERE_TEST_WRITE_AFTER_GO_ENGINE="+path,
+				"COHERE_TEST_WRITE_AFTER_GO_ENGINE_TEXT="+change.text)
+			if changed := fixture.run(true, arguments...); isGoReplay(changed) {
+				test.Fatalf("the run with the change in it replayed, so it proves nothing:\n%s", changed.stdout)
+			}
+			fixture.environment = during
+			if contents, readError := os.ReadFile(path); readError != nil || string(contents) != change.text {
+				test.Fatalf("the instrument did not write %s, so nothing below is about it: %v", path, readError)
+			}
+
+			after := fixture.run(true, arguments...)
+			cold := fixture.run(false, arguments...)
+			if isGoReplay(after) {
+				test.Fatalf("a run recorded over a change made while it ran was replayed:\n%s", after.stdout)
+			}
+			if goNormalized(after.stdout) != goNormalized(cold.stdout) || after.exitCode != cold.exitCode {
+				test.Fatalf("the run after the change differs from a cold run:\n--- after\n%s\n--- cold\n%s",
+					after.stdout, cold.stdout)
+			}
+		})
+	}
+}
+
+// TestAGoRunThatWritesIsNeverRecorded: a bare run whose fix phase formats a file is never recorded, since its record
+// would be signed by the tree it wrote and replay "1 of N files rewritten" over a tree nothing touched. And a
+// `--no-fix` run's record never answers a bare run, which writes where `--no-fix` only reports.
+func TestAGoRunThatWritesIsNeverRecorded(test *testing.T) {
+	test.Parallel()
+	fixture := newGoReplayFixture(test)
+	fixture.write("spaced.go", "package replay\n\n// Spaced is spaced.\nfunc  Spaced() int { return 1 }\n")
+	fixture.establishHit("--no-fix", "--verbose")
+
+	writing := fixture.run(true, "--verbose")
+	if isGoReplay(writing) {
+		test.Fatalf("a bare run replayed the --no-fix run's record:\n%s", writing.stdout)
+	}
+	rewrote := regexp.MustCompile(`(?m)^fix: 1 of \d+ files rewritten`)
+	if !rewrote.MatchString(writing.stdout) {
+		test.Fatalf("the bare run rewrote nothing, so this case proves nothing:\n%s", writing.stdout)
+	}
+	next := fixture.run(true, "--verbose")
+	cold := fixture.run(false, "--verbose")
+	if isGoReplay(next) || rewrote.MatchString(next.stdout) {
+		test.Fatalf("the run that rewrote a file was replayed over a tree nothing touched:\n%s", next.stdout)
+	}
+	if goNormalized(next.stdout) != goNormalized(cold.stdout) || next.exitCode != cold.exitCode {
+		test.Fatalf("the run after the rewrite differs from a cold run:\n--- next\n%s\n--- cold\n%s",
+			next.stdout, cold.stdout)
+	}
 }

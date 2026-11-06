@@ -51,6 +51,12 @@ type runCacheSession struct {
 	// does not have, so one appearing moves an input. See declareFormatWalk.
 	extraAbsent []string
 
+	// declaredAbove is the root, as given and resolved, of a run whose declared inputs name every path above it
+	// that its verdict depends on, so no directory above it is recorded for holding one of them (see
+	// program.RecordRunCacheBelow). A Go run's, whose engine declares them; nil for a TypeScript run, whose
+	// recorder observes its reads and whose holding directories are all kept.
+	declaredAbove []string
+
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
 
@@ -86,8 +92,9 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	absent = append(absent, session.extraAbsent...)
-	cache, recordRunCacheError := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
-		recordedOutput(session.stdout.buffer.Bytes(), session.anchor), exitCode, session.readSince)
+	cache, recordRunCacheError := program.RecordRunCacheBelow(session.declaredAbove, session.key, files,
+		session.extraDirectories, absent, probed, recordedOutput(session.stdout.buffer.Bytes(), session.anchor),
+		exitCode, session.readSince)
 	if recordRunCacheError != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.

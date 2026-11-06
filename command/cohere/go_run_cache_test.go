@@ -161,6 +161,10 @@ func TestGoRunCacheFactsMoveWithWhatALoadReads(test *testing.T) {
 		{"CGO_ENABLED changed", replaced("CGO_ENABLED", "0"), found(link)},
 		{"GOWORK set", append(slices.Clone(base), "GOWORK=off"), found(link)},
 		{"HOME changed", replaced("HOME", "/home/another"), found(link)},
+		{"CC set", append(slices.Clone(base), "CC=clang"), found(link)},
+		{"CXX set", append(slices.Clone(base), "CXX=clang++"), found(link)},
+		{"PKG_CONFIG set", append(slices.Clone(base), "PKG_CONFIG=/opt/bin/pkg-config"), found(link)},
+		{"BURNTSUSHI_TOML_110 set", append(slices.Clone(base), "BURNTSUSHI_TOML_110=1"), found(link)},
 		{"another go found on PATH", base, found(secondGo)},
 		{"no go found on PATH", base, func(string) (string, error) { return "", os.ErrNotExist }},
 	}
@@ -298,5 +302,57 @@ func TestDeclareGoRunCacheInputsDeclaresTheEnginesAndTheFrontDoors(test *testing
 	declareGoRunCacheInputs(declaring(), 2, present)
 	if activeRunCache.declared || activeRunCache.declined == "" {
 		test.Error("a run that exited 2 was declared rather than declined")
+	}
+
+	// A record naming the cache the run writes is declined, and said beside the table for the next run.
+	activeRunCache = &runCacheSession{directory: test.TempDir(), declaredAbove: []string{root}}
+	cached := declaring()
+	cached.inputs.Files = append(cached.inputs.Files, filepath.Join(cacheDirectory(root), "go", "entry"))
+	declareGoRunCacheInputs(cached, 0, present)
+	if activeRunCache.declared || !strings.Contains(activeRunCache.declined, "inside the cache directory") {
+		test.Errorf("a record naming the cache directory was not declined (declined %q)", activeRunCache.declined)
+	}
+}
+
+// TestGoInputsUnreplayableRefusesWhatWouldNeverReplay: an inputs record naming a path inside a root's cache
+// directory, which the run writes after its record is taken, or listing a directory above the root, whose listing
+// moves with everything beside the project, is refused, since either would make every later run a miss that only a
+// cold run every time would show. A record of the module's own paths, and of files above it, is kept.
+func TestGoInputsUnreplayableRefusesWhatWouldNeverReplay(test *testing.T) {
+	test.Parallel()
+	root := "/work/module"
+	roots := []string{root, "/private/work/module"}
+	cases := []struct {
+		name   string
+		inputs engineInputsRecord
+		reason string
+	}{
+		{"the module's own paths, and a file above it", engineInputsRecord{
+			Files:       []string{"/work/module/a.go", "/work/staticcheck.conf"},
+			Directories: []string{root, "/work/module/sub"},
+			Absent:      []string{"/work/go.work"},
+		}, ""},
+		{"a file in the engine's cache", engineInputsRecord{
+			Files: []string{"/work/module/a.go", "/work/module/.cache/cohere/go/entry"},
+		}, "inside the cache directory"},
+		{"the cache directory listed, under the resolved root", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Directories: []string{"/private/work/module/.cache/cohere"},
+		}, "inside the cache directory"},
+		{"an absent path in the cache", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Absent: []string{"/work/module/.cache/cohere/run"},
+		}, "inside the cache directory"},
+		{"a directory above the root listed", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Directories: []string{"/work"},
+		}, "a directory above the root"},
+	}
+	for _, testCase := range cases {
+		reason := goInputsUnreplayable(&testCase.inputs, roots)
+		wrong := reason != ""
+		if testCase.reason != "" {
+			wrong = !strings.Contains(reason, testCase.reason)
+		}
+		if wrong {
+			test.Errorf("%s: the reason is %q, want %q", testCase.name, reason, testCase.reason)
+		}
 	}
 }

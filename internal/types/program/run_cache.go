@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -179,6 +180,31 @@ func RecordRunCache(
 	exitCode int,
 	readSince time.Time,
 ) (*RunCache, error) {
+	return RecordRunCacheBelow(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince)
+}
+
+// RecordRunCacheBelow is RecordRunCache recording no directory above any of roots as the directory holding a
+// file, for a run whose inputs name every path above its root whose presence decides its verdict, as the Go
+// engine's record does (a staticcheck.conf or a .gitignore in each directory above the module, there or absent).
+// For such a run a file added beside one of them changes nothing, and the directory would only move with whatever
+// else lives there: a home directory or a repository's top, which something changes all day, so the run would
+// never replay and nothing would say why (the same trap as #r9jevk9's parent of the project's own directory).
+// Nil roots record every holding directory, as RecordRunCache does.
+//
+// Such a run's extraDirectories are listings it read, each deciding which files exist, so each is held to readSince
+// as a file is, whether or not it holds a file the run read: a package directory created under one mid-run moved its
+// listing after the run read it, and recorded with its new signature it would replay a verdict that never saw it.
+func RecordRunCacheBelow(
+	roots []string,
+	key string,
+	files []string,
+	extraDirectories []string,
+	absent []string,
+	probed []string,
+	output []byte,
+	exitCode int,
+	readSince time.Time,
+) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -205,7 +231,7 @@ func RecordRunCache(
 	// the benchmark's work directory, where something is created all day (#r9jevk9).
 	directorySet := map[string]struct{}{}
 	for _, input := range inputs {
-		if !input.Directory {
+		if !input.Directory && !aboveAny(filepath.Dir(input.Path), roots) {
 			directorySet[filepath.Dir(input.Path)] = struct{}{}
 		}
 	}
@@ -249,8 +275,14 @@ func RecordRunCache(
 				holdsARead[filepath.Dir(input.Path)] = true
 			}
 		}
+		listingsRead := map[string]bool{}
+		if roots != nil {
+			for _, directory := range extraDirectories {
+				listingsRead[directory] = true
+			}
+		}
 		for _, input := range cache.Inputs {
-			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] {
+			if input.ExistenceOnly || input.Directory && !holdsARead[input.Path] && !listingsRead[input.Path] {
 				continue
 			}
 			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
@@ -273,6 +305,18 @@ func RecordRunCache(
 	}
 
 	return cache, nil
+}
+
+// aboveAny reports whether directory is an ancestor of one of roots, never one of them itself.
+func aboveAny(directory string, roots []string) bool {
+	for _, root := range roots {
+		relative, relativeError := filepath.Rel(directory, root)
+		if relativeError == nil && relative != "." && relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 // signaturesOf stats every path in parallel, as Check does, each into its own slot, so the order and the
