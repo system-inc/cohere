@@ -15,8 +15,8 @@ import (
 // string: a nil field prints as key=undefined, an absent one does not print.
 func outline(node *estree.Node) string {
 	var builder strings.Builder
-	var write func(value any)
-	write = func(value any) {
+	var write func(value estree.Value)
+	write = func(value estree.Value) {
 		switch typed := value.(type) {
 		case nil:
 			builder.WriteString("undefined")
@@ -36,7 +36,7 @@ func outline(node *estree.Node) string {
 				}
 				builder.WriteString("}")
 			}
-		case []*estree.Node:
+		case estree.Nodes:
 			builder.WriteString("(")
 			for index, child := range typed {
 				if index > 0 {
@@ -45,9 +45,9 @@ func outline(node *estree.Node) string {
 				write(child)
 			}
 			builder.WriteString(")")
-		case string:
-			builder.WriteString(`"` + typed + `"`)
-		case bool:
+		case estree.String:
+			builder.WriteString(`"` + string(typed) + `"`)
+		case estree.Boolean:
 			if typed {
 				builder.WriteString("true")
 			} else {

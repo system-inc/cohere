@@ -1,6 +1,10 @@
 package values
 
-import "math"
+import (
+	"math"
+
+	"github.com/system-inc/cohere/internal/format/estree"
+)
 
 // token is upstream's token array: [type, value, startLine, startColumn, endLine, endColumn, index].
 type token struct {
@@ -16,9 +20,9 @@ type token struct {
 }
 
 // endColumnValue is token[5] as JavaScript holds it: a number, or NaN.
-func (token *token) endColumnValue() any {
+func (token *token) endColumnValue() estree.Value {
 	if token.endColumnIsNaN {
-		return math.NaN()
+		return estree.Number(math.NaN())
 	}
-	return token.endColumn
+	return estree.Integer(token.endColumn)
 }

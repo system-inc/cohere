@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
@@ -48,7 +49,7 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramete
 	}
 
 	// for TypeParameterDeclaration typeParameters is a single node
-	parameters, isArray := value.([]Node)
+	parameters, isArray := value.(estree.Nodes)
 	if !isArray {
 		return print(parametersKey, nil)
 	}

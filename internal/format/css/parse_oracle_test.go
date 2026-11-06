@@ -392,7 +392,7 @@ func dumpGlueParse(text string) (any, error) {
 // dumpGlueValue renders a value in the oracle's shape. The absolute offsets (source.startOffset and
 // endOffset, postcss's source.start.offset and end.offset, and the front matter's start.index and
 // end.index) are converted from bytes to UTF-16. Each node's Range must agree with its source offsets.
-func dumpGlueValue(value any, toUtf16 func(int) any) any {
+func dumpGlueValue(value estree.Value, toUtf16 func(int) any) any {
 	switch typed := value.(type) {
 	case nil:
 		return nil
@@ -431,7 +431,7 @@ func dumpGlueValue(value any, toUtf16 func(int) any) any {
 			}
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no JavaScript array is"
 		}
@@ -440,33 +440,37 @@ func dumpGlueValue(value any, toUtf16 func(int) any) any {
 			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
-	case []any:
+	case estree.Values:
 		result := make([]any, len(typed))
 		for index, child := range typed {
 			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
-	case map[string]any:
+	case estree.Record:
 		result := map[string]any{}
 		for key, child := range typed {
 			result[key] = dumpGlueValue(child, toUtf16)
 		}
 		return result
-	case float64:
+	case estree.Number:
 		// JSON.stringify writes NaN (postcss-values-parser's column for a paren at the start) as null.
-		if math.IsNaN(typed) {
+		if math.IsNaN(float64(typed)) {
 			return nil
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		return float64(typed)
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
+	case estree.Integer:
+		return int(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}
 }
 
-func dumpGlueSource(value any, toUtf16 func(int) any) any {
-	source, isMap := value.(map[string]any)
+func dumpGlueSource(value estree.Value, toUtf16 func(int) any) any {
+	source, isMap := value.(estree.Record)
 	if !isMap {
 		return dumpGlueValue(value, toUtf16)
 	}
@@ -474,13 +478,13 @@ func dumpGlueSource(value any, toUtf16 func(int) any) any {
 	for key, child := range source {
 		switch key {
 		case "startOffset", "endOffset":
-			if offset, isNumber := child.(int); isNumber {
-				result[key] = toUtf16(offset)
+			if offset, isNumber := child.(estree.Integer); isNumber {
+				result[key] = toUtf16(int(offset))
 				continue
 			}
 			result[key] = dumpGlueValue(child, toUtf16)
 		case "start", "end":
-			position, isPosition := child.(map[string]any)
+			position, isPosition := child.(estree.Record)
 			if !isPosition {
 				result[key] = dumpGlueValue(child, toUtf16)
 				continue
@@ -492,8 +496,8 @@ func dumpGlueSource(value any, toUtf16 func(int) any) any {
 				result[key] = dumped
 				continue
 			}
-			if offset, isNumber := position["offset"].(int); isNumber {
-				converted["offset"] = toUtf16(offset)
+			if offset, isNumber := position["offset"].(estree.Integer); isNumber {
+				converted["offset"] = toUtf16(int(offset))
 			}
 			result[key] = converted
 		default:

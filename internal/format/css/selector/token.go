@@ -1,5 +1,7 @@
 package selector
 
+import "github.com/system-inc/cohere/internal/format/estree"
+
 // token is upstream's token array. kind is token[0], value token[1], and rest holds token[2:], whose
 // meaning depends on the kind: [line, column, pos] for a space, combinator or single character, and
 // [line, column, endLine, endColumn, pos] for a string, at-word, word or comment.
@@ -16,9 +18,9 @@ func (token *token) at(index int) int { return token.rest[index-2] }
 // undefined. splitWord can leave currToken on a space token (a word ending in an escaped space, with
 // nothing word-like after it), and upstream then reads that token's [4] (its pos), [5] and [6]
 // (undefined) as if it were a word's.
-func (token *token) loose(index int) any {
+func (token *token) loose(index int) estree.Value {
 	if index-2 < len(token.rest) {
-		return token.rest[index-2]
+		return estree.Integer(token.rest[index-2])
 	}
 	return nil
 }

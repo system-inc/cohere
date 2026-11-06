@@ -68,8 +68,11 @@ func (parser *parser) sourceIndex(index int) int {
 }
 
 // tokenSource is the { start, end } most node kinds take straight from their token.
-func tokenSource(token *token) map[string]any {
-	return source(position(token.startLine, token.startColumn), position(token.endLine, token.endColumnValue()))
+func tokenSource(token *token) estree.Record {
+	return source(
+		position(token.startLine, estree.Integer(token.startColumn)),
+		position(token.endLine, token.endColumnValue()),
+	)
 }
 
 func (parser *parser) colon() {
@@ -199,7 +202,10 @@ func (parser *parser) operator() {
 	node := leaf(
 		"operator",
 		decode(token.value),
-		source(position(token.startLine, token.startColumn), position(token.startLine, token.startColumn)),
+		source(
+			position(token.startLine, estree.Integer(token.startColumn)),
+			position(token.startLine, estree.Integer(token.startColumn)),
+		),
 		parser.sourceIndex(token.endLine),
 	)
 
@@ -279,7 +285,7 @@ func (parser *parser) parenOpen() {
 		kind(parser.currToken()) != ")" && !parser.options.Loose {
 		nextToken := parser.nextToken()
 		value := decode(parser.currToken().value)
-		start := position(parser.currToken().startLine, parser.currToken().startColumn)
+		start := position(parser.currToken().startLine, estree.Integer(parser.currToken().startColumn))
 
 		for nextToken != nil && nextToken.kind != ")" && unbalanced(parser.current) != 0 {
 			parser.position++
@@ -467,8 +473,8 @@ func (parser *parser) splitWord() {
 		var node *estree.Node
 
 		nodeSource := source(
-			position(currToken.startLine, currToken.startColumn+ind),
-			position(currToken.endLine, currToken.startColumn+(index-1)),
+			position(currToken.startLine, estree.Integer(currToken.startColumn+ind)),
+			position(currToken.endLine, estree.Integer(currToken.startColumn+(index-1))),
 		)
 		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[indexIndex])
 
@@ -489,8 +495,8 @@ func (parser *parser) splitWord() {
 				parser.cache = append(parser.cache, parser.current)
 			} else {
 				node = leaf("word", decode(value), nodeSource, nodeSourceIndex)
-				node.Set("isHex", isHex(value))
-				node.Set("isColor", isColor(value))
+				node.Set("isHex", estree.Boolean(isHex(value)))
+				node.Set("isColor", estree.Boolean(isColor(value)))
 			}
 		}
 
@@ -525,7 +531,7 @@ func (parser *parser) string() {
 
 	node := newString(decode(value), tokenSource(token), parser.sourceIndex(token.index), quoted)
 
-	raws(node)["quote"] = quote
+	raws(node)["quote"] = estree.String(quote)
 
 	parser.newNode(node)
 	parser.position++

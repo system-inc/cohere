@@ -676,7 +676,7 @@ func dumpSelector(text string) (any, error) {
 	return result, decodeError
 }
 
-func dumpSelectorValue(value any) any {
+func dumpSelectorValue(value estree.Value) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -689,7 +689,7 @@ func dumpSelectorValue(value any) any {
 			result[key] = dumpSelectorValue(typed.Get(key))
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no library field holds"
 		}
@@ -698,19 +698,23 @@ func dumpSelectorValue(value any) any {
 			result[index] = dumpSelectorValue(child)
 		}
 		return result
-	case map[string]any:
+	case estree.Record:
 		result := map[string]any{}
 		for key, each := range typed {
 			result[key] = dumpSelectorValue(each)
 		}
 		return result
-	case float64:
+	case estree.Number:
 		if typed != typed {
 			return nil // NaN, which JSON.stringify writes as null
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		return float64(typed)
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
+	case estree.Integer:
+		return int(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}

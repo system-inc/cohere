@@ -46,14 +46,21 @@ func rebalanceLogicalTree(node *Node) *Node {
 		return node
 	}
 	right := node.Child("right")
-	left := rebalanceLogicalTree(New("LogicalExpression", LocStart(node.Child("left")), LocEnd(right.Child("left")),
-		"operator", node.String("operator"),
-		"left", node.Child("left"),
-		"right", right.Child("left")))
-	return rebalanceLogicalTree(New("LogicalExpression", LocStart(node), LocEnd(node),
-		"operator", node.String("operator"),
-		"left", left,
-		"right", right.Child("right")))
+	left := rebalanceLogicalTree(New(
+		"LogicalExpression",
+		LocStart(node.Child("left")),
+		LocEnd(right.Child("left")),
+		[]Property{
+			{"operator", String(node.String("operator"))},
+			{"left", node.Child("left")},
+			{"right", right.Child("left")},
+		},
+	))
+	return rebalanceLogicalTree(New("LogicalExpression", LocStart(node), LocEnd(node), []Property{
+		{"operator", String(node.String("operator"))},
+		{"left", left},
+		{"right", right.Child("right")},
+	}))
 }
 
 // StripComments is upstream's stripComments: every comment's characters, except line feeds, become
@@ -129,7 +136,7 @@ func mergeNestledJsdocComments(comments []*Node) []*Node {
 		if following != nil && LocEnd(comment) == LocStart(following) &&
 			IsIndentableBlockComment(comment) && IsIndentableBlockComment(following) {
 			merged = append(merged[:index+1], merged[index+2:]...)
-			comment.Set("value", comment.String("value")+"*//*"+following.String("value"))
+			comment.Set("value", String(comment.String("value")+"*//*"+following.String("value")))
 			comment.Range = [2]int{LocStart(comment), LocEnd(following)}
 		}
 		following = comment

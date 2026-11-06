@@ -1,6 +1,10 @@
 package javascript
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/system-inc/cohere/internal/format/estree"
+)
 
 // utilities/node-types.js, utilities/literal.js, utilities/get-raw.js and the small type predicates
 // built on them. Flow and Babel type names stay in the lists, as upstream has them, so a list reads
@@ -73,7 +77,7 @@ func isBooleanLiteral(node Node) bool {
 	if node.Is("BooleanLiteral") {
 		return true
 	}
-	_, isBool := node.Get("value").(bool)
+	_, isBool := node.Get("value").(estree.Boolean)
 	return node.Is("Literal") && isBool
 }
 
@@ -82,7 +86,7 @@ func isNumericLiteral(node Node) bool {
 	if node.Is("NumericLiteral") {
 		return true
 	}
-	_, isNumber := node.Get("value").(float64)
+	_, isNumber := node.Get("value").(estree.Number)
 	return node.Is("Literal") && isNumber
 }
 
@@ -96,7 +100,7 @@ func isStringLiteral(node Node) bool {
 	if node.Is("StringLiteral") {
 		return true
 	}
-	_, isString := node.Get("value").(string)
+	_, isString := node.Get("value").(estree.String)
 	return node.Is("Literal") && isString
 }
 

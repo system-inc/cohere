@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // comments/handle-comments.js, from isAssignmentLikeNode to the end of the file. The first half is in
 // comments_handle.go.
@@ -61,8 +64,8 @@ func handleIgnoreComments(context *commentContext) bool {
 	if isPrettierIgnoreComment(comment) &&
 		enclosingNode.Is("TSMappedType") &&
 		followingNode == enclosingNode.Child("key") {
-		enclosingNode.Set("prettierIgnore", true)
-		comment.Set("unignore", true)
+		enclosingNode.Set("prettierIgnore", estree.Boolean(true))
+		comment.Set("unignore", estree.Boolean(true))
 		return true
 	}
 	return false

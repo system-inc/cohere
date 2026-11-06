@@ -85,7 +85,7 @@ func holdsTemplateLiteral(node *estree.Node) bool {
 			if holdsTemplateLiteral(child) {
 				return true
 			}
-		case []*estree.Node:
+		case estree.Nodes:
 			for _, element := range child {
 				if holdsTemplateLiteral(element) {
 					return true

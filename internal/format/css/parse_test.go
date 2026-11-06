@@ -47,7 +47,8 @@ func TestParseGlueTypesAndOffsets(test *testing.T) {
 		test.Fatalf("root: %s [%d, %d]", root.Type(), locStart(root), locEnd(root))
 	}
 	rule := root.List("nodes")[0]
-	if !rule.Is("css-rule") || !rule.Child("selector").Is("selector-root") || rawsIn(rule)["selector"] != "a" {
+	if !rule.Is("css-rule") || !rule.Child("selector").Is("selector-root") ||
+		rawsIn(rule)["selector"] != estree.String("a") {
 		test.Fatalf(
 			"rule: %s, selector %s, raws.selector %v",
 			rule.Type(),
@@ -109,8 +110,8 @@ func TestParseGlueUrlArgumentsAreAString(test *testing.T) {
 	if !function.Is("value-func") || function.String("value") != "url" {
 		test.Fatalf("want the url function, got %s", function.Type())
 	}
-	groups, isList := function.Child("group").Get("groups").([]any)
-	if !isList || len(groups) != 1 || groups[0] != "x.png" {
+	groups, isList := function.Child("group").Get("groups").(estree.Values)
+	if !isList || len(groups) != 1 || groups[0] != estree.String("x.png") {
 		test.Fatalf("url groups: %#v", function.Child("group").Get("groups"))
 	}
 }
@@ -168,15 +169,15 @@ func TestParseGlueErrors(test *testing.T) {
 
 func TestParseGlueVisitorKeys(test *testing.T) {
 	test.Parallel()
-	if keys := visitorKeys(estree.New("css-root", 0, 0)); !slices.Equal(keys, []string{"frontMatter", "nodes"}) {
+	if keys := visitorKeys(estree.New("css-root", 0, 0, nil)); !slices.Equal(keys, []string{"frontMatter", "nodes"}) {
 		test.Errorf("css-root: %v", keys)
 	}
 	if keys := visitorKeys(
-		estree.New("value-paren_group", 0, 0),
+		estree.New("value-paren_group", 0, 0, nil),
 	); !slices.Equal(keys, []string{"open", "groups", "close"}) {
 		test.Errorf("value-paren_group: %v", keys)
 	}
-	if _, known := lookupVisitorKeys(estree.New("front-matter", 0, 0)); known {
+	if _, known := lookupVisitorKeys(estree.New("front-matter", 0, 0, nil)); known {
 		test.Errorf("front-matter has no visitor keys upstream")
 	}
 }

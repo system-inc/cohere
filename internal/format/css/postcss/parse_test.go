@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -33,8 +34,8 @@ func TestParseTree(test *testing.T) {
 	if declaration.String("prop") != "b" ||
 		declaration.String("value") != "c" ||
 		!declaration.Bool("important") ||
-		raws["important"] != " ! important" ||
-		raws["between"] != ":" {
+		raws["important"] != estree.String(" ! important") ||
+		raws["between"] != estree.String(":") {
 		test.Errorf("declaration %v %v", declaration.Keys(), raws)
 	}
 	if keys := declaration.Keys(); len(keys) != 5 ||
@@ -52,7 +53,8 @@ func TestParseTree(test *testing.T) {
 		objectOf(test, second.Get("source"), "second rule source")["start"],
 		"second rule source start",
 	)
-	if start["offset"] != 20 || start["line"] != 2 || start["column"] != 1 {
+	if start["offset"] != estree.Integer(20) || start["line"] != estree.Integer(2) ||
+		start["column"] != estree.Integer(1) {
 		test.Errorf("second rule starts at %v", start)
 	}
 	children := second.List("nodes")
@@ -65,8 +67,8 @@ func TestParseTree(test *testing.T) {
 	// The comment starts at column 5 of line 2 (the emoji is two units), 26 bytes into the text.
 	if comment.Type() != "comment" ||
 		comment.String("text") != "x" ||
-		commentStart["column"] != 5 ||
-		commentStart["offset"] != 26 {
+		commentStart["column"] != estree.Integer(5) ||
+		commentStart["offset"] != estree.Integer(26) {
 		test.Errorf("comment %q at %v", comment.String("text"), commentStart)
 	}
 	custom := children[1]
@@ -76,9 +78,9 @@ func TestParseTree(test *testing.T) {
 }
 
 // objectOf is value as the JavaScript object a node field holds, failing the test when it is not one.
-func objectOf(test *testing.T, value any, what string) map[string]any {
+func objectOf(test *testing.T, value estree.Value, what string) estree.Record {
 	test.Helper()
-	object, isObject := value.(map[string]any)
+	object, isObject := value.(estree.Record)
 	if !isObject {
 		test.Fatalf("%s is %#v, want an object", what, value)
 	}

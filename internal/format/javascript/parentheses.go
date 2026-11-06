@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -418,8 +419,8 @@ func needsParentheses(path *Path, options *Options) bool {
 		return key == "objectType" && parent.Is("IndexedAccessType")
 
 	case "StringLiteral", "NumericLiteral", "Literal":
-		_, valueIsString := current.Get("value").(string)
-		_, directiveIsString := parent.Get("directive").(string)
+		_, valueIsString := current.Get("value").(estree.String)
+		_, directiveIsString := parent.Get("directive").(estree.String)
 		if valueIsString && parent.Is("ExpressionStatement") && !directiveIsString {
 			// To avoid becoming a directive
 			grandParent := grandparentOf(path)

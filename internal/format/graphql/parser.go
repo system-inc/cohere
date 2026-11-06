@@ -56,7 +56,9 @@ func parseComments(startToken *token, endToken *token) []*estree.Node {
 	comments := []*estree.Node{}
 	for token := startToken; token != endToken; token = token.next {
 		if token.kind == tokenKindComment {
-			comments = append(comments, estree.New("Comment", token.start, token.end, "value", token.value))
+			comments = append(comments, estree.New("Comment", token.start, token.end, []estree.Property{
+				{Key: "value", Value: estree.String(token.value)},
+			}))
 		}
 	}
 
@@ -95,7 +97,9 @@ func newParser(source string, options parseOptions) *parser {
 func (parser *parser) parseName() *estree.Node {
 	token := parser.expectToken(tokenKindName)
 	return parser.node(token, "Name",
-		"value", token.value,
+		[]estree.Property{
+			{Key: "value", Value: estree.String(token.value)},
+		},
 	)
 }
 
@@ -105,7 +109,9 @@ func (parser *parser) parseName() *estree.Node {
 func (parser *parser) parseDocument() *estree.Node {
 	start := parser.lexer.token
 	return parser.node(start, "Document",
-		"definitions", parser.many(tokenKindSof, parser.parseDefinition, tokenKindEof),
+		[]estree.Property{
+			{Key: "definitions", Value: estree.Nodes(parser.many(tokenKindSof, parser.parseDefinition, tokenKindEof))},
+		},
 	)
 }
 
@@ -201,12 +207,14 @@ func (parser *parser) parseOperationDefinition() *estree.Node {
 	start := parser.lexer.token
 	if parser.peek(tokenKindBraceL) {
 		return parser.node(start, "OperationDefinition",
-			"operation", "query",
-			"description", nil,
-			"name", nil,
-			"variableDefinitions", nil,
-			"directives", nil,
-			"selectionSet", parser.parseSelectionSet(),
+			[]estree.Property{
+				{Key: "operation", Value: estree.String("query")},
+				{Key: "description", Value: nil},
+				{Key: "name", Value: nil},
+				{Key: "variableDefinitions", Value: nil},
+				{Key: "directives", Value: nil},
+				{Key: "selectionSet", Value: parser.parseSelectionSet()},
+			},
 		)
 	}
 	description := parser.parseDescription()
@@ -216,12 +224,14 @@ func (parser *parser) parseOperationDefinition() *estree.Node {
 		name = parser.parseName()
 	}
 	return parser.node(start, "OperationDefinition",
-		"operation", operation,
-		"description", description,
-		"name", name,
-		"variableDefinitions", parser.parseVariableDefinitions(),
-		"directives", parser.parseDirectives(false),
-		"selectionSet", parser.parseSelectionSet(),
+		[]estree.Property{
+			{Key: "operation", Value: estree.String(operation)},
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "variableDefinitions", Value: estree.Nodes(parser.parseVariableDefinitions())},
+			{Key: "directives", Value: estree.Nodes(parser.parseDirectives(false))},
+			{Key: "selectionSet", Value: parser.parseSelectionSet()},
+		},
 	)
 }
 
@@ -257,11 +267,13 @@ func (parser *parser) parseVariableDefinition() *estree.Node {
 		defaultValue = parser.parseConstValueLiteral()
 	}
 	return parser.node(start, "VariableDefinition",
-		"description", description,
-		"variable", variable,
-		"type", typeReference,
-		"defaultValue", defaultValue,
-		"directives", parser.parseConstDirectives(),
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "variable", Value: variable},
+			{Key: "type", Value: typeReference},
+			{Key: "defaultValue", Value: defaultValue},
+			{Key: "directives", Value: estree.Nodes(parser.parseConstDirectives())},
+		},
 	)
 }
 
@@ -270,7 +282,9 @@ func (parser *parser) parseVariable() *estree.Node {
 	start := parser.lexer.token
 	parser.expectToken(tokenKindDollar)
 	return parser.node(start, "Variable",
-		"name", parser.parseName(),
+		[]estree.Property{
+			{Key: "name", Value: parser.parseName()},
+		},
 	)
 }
 
@@ -280,7 +294,12 @@ func (parser *parser) parseVariable() *estree.Node {
 func (parser *parser) parseSelectionSet() *estree.Node {
 	start := parser.lexer.token
 	return parser.node(start, "SelectionSet",
-		"selections", parser.many(tokenKindBraceL, parser.parseSelection, tokenKindBraceR),
+		[]estree.Property{
+			{
+				Key:   "selections",
+				Value: estree.Nodes(parser.many(tokenKindBraceL, parser.parseSelection, tokenKindBraceR)),
+			},
+		},
 	)
 }
 
@@ -321,11 +340,13 @@ func (parser *parser) parseField() *estree.Node {
 		selectionSet = parser.parseSelectionSet()
 	}
 	return parser.node(start, "Field",
-		"alias", alias,
-		"name", name,
-		"arguments", arguments,
-		"directives", directives,
-		"selectionSet", selectionSet,
+		[]estree.Property{
+			{Key: "alias", Value: alias},
+			{Key: "name", Value: name},
+			{Key: "arguments", Value: estree.Nodes(arguments)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "selectionSet", Value: selectionSet},
+		},
 	)
 }
 
@@ -356,8 +377,10 @@ func (parser *parser) parseArgumentConst(isConst bool) *estree.Node {
 
 	parser.expectToken(tokenKindColon)
 	return parser.node(start, "Argument",
-		"name", name,
-		"value", parser.parseValueLiteral(isConst),
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "value", Value: parser.parseValueLiteral(isConst)},
+		},
 	)
 }
 
@@ -371,8 +394,10 @@ func (parser *parser) parseFragmentArgument() *estree.Node {
 
 	parser.expectToken(tokenKindColon)
 	return parser.node(start, "FragmentArgument",
-		"name", name,
-		"value", parser.parseValueLiteral(false),
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "value", Value: parser.parseValueLiteral(false)},
+		},
 	)
 }
 
@@ -393,14 +418,18 @@ func (parser *parser) parseFragment() *estree.Node {
 		if parser.peek(tokenKindParenL) && parser.options.experimentalFragmentArguments {
 			arguments := parser.parseFragmentArguments()
 			return parser.node(start, "FragmentSpread",
-				"name", name,
-				"arguments", arguments,
-				"directives", parser.parseDirectives(false),
+				[]estree.Property{
+					{Key: "name", Value: name},
+					{Key: "arguments", Value: estree.Nodes(arguments)},
+					{Key: "directives", Value: estree.Nodes(parser.parseDirectives(false))},
+				},
 			)
 		}
 		return parser.node(start, "FragmentSpread",
-			"name", name,
-			"directives", parser.parseDirectives(false),
+			[]estree.Property{
+				{Key: "name", Value: name},
+				{Key: "directives", Value: estree.Nodes(parser.parseDirectives(false))},
+			},
 		)
 	}
 	var typeCondition *estree.Node
@@ -409,9 +438,11 @@ func (parser *parser) parseFragment() *estree.Node {
 	}
 	directives := parser.parseDirectives(false)
 	return parser.node(start, "InlineFragment",
-		"typeCondition", typeCondition,
-		"directives", directives,
-		"selectionSet", parser.parseSelectionSet(),
+		[]estree.Property{
+			{Key: "typeCondition", Value: typeCondition},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "selectionSet", Value: parser.parseSelectionSet()},
+		},
 	)
 }
 
@@ -432,12 +463,14 @@ func (parser *parser) parseFragmentDefinition() *estree.Node {
 		typeCondition := parser.parseNamedType()
 		directives := parser.parseDirectives(false)
 		return parser.node(start, "FragmentDefinition",
-			"description", description,
-			"name", name,
-			"variableDefinitions", variableDefinitions,
-			"typeCondition", typeCondition,
-			"directives", directives,
-			"selectionSet", parser.parseSelectionSet(),
+			[]estree.Property{
+				{Key: "description", Value: description},
+				{Key: "name", Value: name},
+				{Key: "variableDefinitions", Value: estree.Nodes(variableDefinitions)},
+				{Key: "typeCondition", Value: typeCondition},
+				{Key: "directives", Value: estree.Nodes(directives)},
+				{Key: "selectionSet", Value: parser.parseSelectionSet()},
+			},
 		)
 	}
 	name := parser.parseFragmentName()
@@ -445,11 +478,13 @@ func (parser *parser) parseFragmentDefinition() *estree.Node {
 	typeCondition := parser.parseNamedType()
 	directives := parser.parseDirectives(false)
 	return parser.node(start, "FragmentDefinition",
-		"description", description,
-		"name", name,
-		"typeCondition", typeCondition,
-		"directives", directives,
-		"selectionSet", parser.parseSelectionSet(),
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "typeCondition", Value: typeCondition},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "selectionSet", Value: parser.parseSelectionSet()},
+		},
 	)
 }
 
@@ -491,12 +526,16 @@ func (parser *parser) parseValueLiteral(isConst bool) *estree.Node {
 	case tokenKindInt:
 		parser.advanceLexer()
 		return parser.node(token, "IntValue",
-			"value", token.value,
+			[]estree.Property{
+				{Key: "value", Value: estree.String(token.value)},
+			},
 		)
 	case tokenKindFloat:
 		parser.advanceLexer()
 		return parser.node(token, "FloatValue",
-			"value", token.value,
+			[]estree.Property{
+				{Key: "value", Value: estree.String(token.value)},
+			},
 		)
 	case tokenKindString, tokenKindBlockString:
 		return parser.parseStringLiteral()
@@ -505,17 +544,23 @@ func (parser *parser) parseValueLiteral(isConst bool) *estree.Node {
 		switch token.value {
 		case "true":
 			return parser.node(token, "BooleanValue",
-				"value", true,
+				[]estree.Property{
+					{Key: "value", Value: estree.Boolean(true)},
+				},
 			)
 		case "false":
 			return parser.node(token, "BooleanValue",
-				"value", false,
+				[]estree.Property{
+					{Key: "value", Value: estree.Boolean(false)},
+				},
 			)
 		case "null":
-			return parser.node(token, "NullValue")
+			return parser.node(token, "NullValue", nil)
 		default:
 			return parser.node(token, "EnumValue",
-				"value", token.value,
+				[]estree.Property{
+					{Key: "value", Value: estree.String(token.value)},
+				},
 			)
 		}
 	case tokenKindDollar:
@@ -542,8 +587,10 @@ func (parser *parser) parseStringLiteral() *estree.Node {
 	token := parser.lexer.token
 	parser.advanceLexer()
 	return parser.node(token, "StringValue",
-		"value", token.value,
-		"block", token.kind == tokenKindBlockString,
+		[]estree.Property{
+			{Key: "value", Value: estree.String(token.value)},
+			{Key: "block", Value: estree.Boolean(token.kind == tokenKindBlockString)},
+		},
 	)
 }
 
@@ -556,7 +603,9 @@ func (parser *parser) parseList(isConst bool) *estree.Node {
 	item := func() *estree.Node { return parser.parseValueLiteral(isConst) }
 	start := parser.lexer.token
 	return parser.node(start, "ListValue",
-		"values", parser.any(tokenKindBracketL, item, tokenKindBracketR),
+		[]estree.Property{
+			{Key: "values", Value: estree.Nodes(parser.any(tokenKindBracketL, item, tokenKindBracketR))},
+		},
 	)
 }
 
@@ -569,7 +618,9 @@ func (parser *parser) parseObject(isConst bool) *estree.Node {
 	item := func() *estree.Node { return parser.parseObjectField(isConst) }
 	start := parser.lexer.token
 	return parser.node(start, "ObjectValue",
-		"fields", parser.any(tokenKindBraceL, item, tokenKindBraceR),
+		[]estree.Property{
+			{Key: "fields", Value: estree.Nodes(parser.any(tokenKindBraceL, item, tokenKindBraceR))},
+		},
 	)
 }
 
@@ -580,8 +631,10 @@ func (parser *parser) parseObjectField(isConst bool) *estree.Node {
 	parser.expectToken(tokenKindColon)
 
 	return parser.node(start, "ObjectField",
-		"name", name,
-		"value", parser.parseValueLiteral(isConst),
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "value", Value: parser.parseValueLiteral(isConst)},
+		},
 	)
 }
 
@@ -611,8 +664,10 @@ func (parser *parser) parseDirective(isConst bool) *estree.Node {
 	parser.expectToken(tokenKindAt)
 	name := parser.parseName()
 	return parser.node(start, "Directive",
-		"name", name,
-		"arguments", parser.parseArguments(isConst),
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "arguments", Value: estree.Nodes(parser.parseArguments(isConst))},
+		},
 	)
 }
 
@@ -631,7 +686,9 @@ func (parser *parser) parseTypeReference() *estree.Node {
 		innerType := parser.parseTypeReference()
 		parser.expectToken(tokenKindBracketR)
 		typeReference = parser.node(start, "ListType",
-			"type", innerType,
+			[]estree.Property{
+				{Key: "type", Value: innerType},
+			},
 		)
 	} else {
 		typeReference = parser.parseNamedType()
@@ -639,7 +696,9 @@ func (parser *parser) parseTypeReference() *estree.Node {
 
 	if parser.expectOptionalToken(tokenKindBang) {
 		return parser.node(start, "NonNullType",
-			"type", typeReference,
+			[]estree.Property{
+				{Key: "type", Value: typeReference},
+			},
 		)
 	}
 
@@ -650,7 +709,9 @@ func (parser *parser) parseTypeReference() *estree.Node {
 func (parser *parser) parseNamedType() *estree.Node {
 	start := parser.lexer.token
 	return parser.node(start, "NamedType",
-		"name", parser.parseName(),
+		[]estree.Property{
+			{Key: "name", Value: parser.parseName()},
+		},
 	)
 }
 
@@ -678,9 +739,11 @@ func (parser *parser) parseSchemaDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	operationTypes := parser.many(tokenKindBraceL, parser.parseOperationTypeDefinition, tokenKindBraceR)
 	return parser.node(start, "SchemaDefinition",
-		"description", description,
-		"directives", directives,
-		"operationTypes", operationTypes,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "operationTypes", Value: estree.Nodes(operationTypes)},
+		},
 	)
 }
 
@@ -691,8 +754,10 @@ func (parser *parser) parseOperationTypeDefinition() *estree.Node {
 	parser.expectToken(tokenKindColon)
 	typeReference := parser.parseNamedType()
 	return parser.node(start, "OperationTypeDefinition",
-		"operation", operation,
-		"type", typeReference,
+		[]estree.Property{
+			{Key: "operation", Value: estree.String(operation)},
+			{Key: "type", Value: typeReference},
+		},
 	)
 }
 
@@ -704,9 +769,11 @@ func (parser *parser) parseScalarTypeDefinition() *estree.Node {
 	name := parser.parseName()
 	directives := parser.parseConstDirectives()
 	return parser.node(start, "ScalarTypeDefinition",
-		"description", description,
-		"name", name,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -724,11 +791,13 @@ func (parser *parser) parseObjectTypeDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseFieldsDefinition()
 	return parser.node(start, "ObjectTypeDefinition",
-		"description", description,
-		"name", name,
-		"interfaces", interfaces,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "interfaces", Value: estree.Nodes(interfaces)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -764,11 +833,13 @@ func (parser *parser) parseFieldDefinition() *estree.Node {
 	typeReference := parser.parseTypeReference()
 	directives := parser.parseConstDirectives()
 	return parser.node(start, "FieldDefinition",
-		"description", description,
-		"name", name,
-		"arguments", arguments,
-		"type", typeReference,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "arguments", Value: estree.Nodes(arguments)},
+			{Key: "type", Value: typeReference},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -793,11 +864,13 @@ func (parser *parser) parseInputValueDef() *estree.Node {
 	}
 	directives := parser.parseConstDirectives()
 	return parser.node(start, "InputValueDefinition",
-		"description", description,
-		"name", name,
-		"type", typeReference,
-		"defaultValue", defaultValue,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "type", Value: typeReference},
+			{Key: "defaultValue", Value: defaultValue},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -814,11 +887,13 @@ func (parser *parser) parseInterfaceTypeDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseFieldsDefinition()
 	return parser.node(start, "InterfaceTypeDefinition",
-		"description", description,
-		"name", name,
-		"interfaces", interfaces,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "interfaces", Value: estree.Nodes(interfaces)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -834,10 +909,12 @@ func (parser *parser) parseUnionTypeDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	types := parser.parseUnionMemberTypes()
 	return parser.node(start, "UnionTypeDefinition",
-		"description", description,
-		"name", name,
-		"directives", directives,
-		"types", types,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "types", Value: estree.Nodes(types)},
+		},
 	)
 }
 
@@ -865,10 +942,12 @@ func (parser *parser) parseEnumTypeDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	values := parser.parseEnumValuesDefinition()
 	return parser.node(start, "EnumTypeDefinition",
-		"description", description,
-		"name", name,
-		"directives", directives,
-		"values", values,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "values", Value: estree.Nodes(values)},
+		},
 	)
 }
 
@@ -886,9 +965,11 @@ func (parser *parser) parseEnumValueDefinition() *estree.Node {
 	name := parser.parseEnumValueName()
 	directives := parser.parseConstDirectives()
 	return parser.node(start, "EnumValueDefinition",
-		"description", description,
-		"name", name,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -914,10 +995,12 @@ func (parser *parser) parseInputObjectTypeDefinition() *estree.Node {
 	directives := parser.parseConstDirectives()
 	fields := parser.parseInputFieldsDefinition()
 	return parser.node(start, "InputObjectTypeDefinition",
-		"description", description,
-		"name", name,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -984,8 +1067,10 @@ func (parser *parser) parseSchemaExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "SchemaExtension",
-		"directives", directives,
-		"operationTypes", operationTypes,
+		[]estree.Property{
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "operationTypes", Value: estree.Nodes(operationTypes)},
+		},
 	)
 }
 
@@ -1003,8 +1088,10 @@ func (parser *parser) parseScalarTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "ScalarTypeExtension",
-		"name", name,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -1026,10 +1113,12 @@ func (parser *parser) parseObjectTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "ObjectTypeExtension",
-		"name", name,
-		"interfaces", interfaces,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "interfaces", Value: estree.Nodes(interfaces)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -1051,10 +1140,12 @@ func (parser *parser) parseInterfaceTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "InterfaceTypeExtension",
-		"name", name,
-		"interfaces", interfaces,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "interfaces", Value: estree.Nodes(interfaces)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -1074,9 +1165,11 @@ func (parser *parser) parseUnionTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "UnionTypeExtension",
-		"name", name,
-		"directives", directives,
-		"types", types,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "types", Value: estree.Nodes(types)},
+		},
 	)
 }
 
@@ -1096,9 +1189,11 @@ func (parser *parser) parseEnumTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "EnumTypeExtension",
-		"name", name,
-		"directives", directives,
-		"values", values,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "values", Value: estree.Nodes(values)},
+		},
 	)
 }
 
@@ -1118,9 +1213,11 @@ func (parser *parser) parseInputObjectTypeExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "InputObjectTypeExtension",
-		"name", name,
-		"directives", directives,
-		"fields", fields,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "fields", Value: estree.Nodes(fields)},
+		},
 	)
 }
 
@@ -1135,8 +1232,10 @@ func (parser *parser) parseDirectiveExtension() *estree.Node {
 		panic(parser.unexpected(nil))
 	}
 	return parser.node(start, "DirectiveExtension",
-		"name", name,
-		"directives", directives,
+		[]estree.Property{
+			{Key: "name", Value: name},
+			{Key: "directives", Value: estree.Nodes(directives)},
+		},
 	)
 }
 
@@ -1156,12 +1255,14 @@ func (parser *parser) parseDirectiveDefinition() *estree.Node {
 	parser.expectKeyword("on")
 	locations := parser.parseDirectiveLocations()
 	return parser.node(start, "DirectiveDefinition",
-		"description", description,
-		"name", name,
-		"arguments", arguments,
-		"directives", directives,
-		"repeatable", repeatable,
-		"locations", locations,
+		[]estree.Property{
+			{Key: "description", Value: description},
+			{Key: "name", Value: name},
+			{Key: "arguments", Value: estree.Nodes(arguments)},
+			{Key: "directives", Value: estree.Nodes(directives)},
+			{Key: "repeatable", Value: estree.Boolean(repeatable)},
+			{Key: "locations", Value: estree.Nodes(locations)},
+		},
 	)
 }
 
@@ -1245,14 +1346,15 @@ func (parser *parser) parseDirectiveLocation() *estree.Node {
 //
 // graphql-js reads lastToken after the object literal is built, so the end covers every field; here
 // the fields are the arguments, which Go evaluates before the call, to the same effect. A field that
-// is a nil list is stored as nil itself: a typed nil slice in an interface would read as present.
-func (parser *parser) node(startToken *token, kind string, keysAndValues ...any) *estree.Node {
-	for index := 1; index < len(keysAndValues); index += 2 {
-		if list, isList := keysAndValues[index].([]*estree.Node); isList && list == nil {
-			keysAndValues[index] = nil
+// is a nil list is stored as nil itself: a nil Nodes is a present, truthy array, where graphql-js leaves
+// the field undefined.
+func (parser *parser) node(startToken *token, kind string, properties []estree.Property) *estree.Node {
+	for index := range properties {
+		if list, isList := properties[index].Value.(estree.Nodes); isList && list == nil {
+			properties[index].Value = nil
 		}
 	}
-	return estree.New(kind, startToken.start, parser.lexer.lastToken.end, keysAndValues...)
+	return estree.New(kind, startToken.start, parser.lexer.lastToken.end, properties)
 }
 
 // peek determines if the next token is of a given kind.

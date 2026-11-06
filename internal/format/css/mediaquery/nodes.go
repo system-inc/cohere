@@ -17,23 +17,31 @@ import "github.com/system-inc/cohere/internal/format/estree"
 // calls on this tree.
 
 // newNode is `new Node(opts)`: a very generic node. Pretty much any element of a media query.
-func newNode(after any, before any, nodeType string, value string, sourceIndex any) *estree.Node {
+func newNode(
+	after estree.Value,
+	before estree.Value,
+	nodeType string,
+	value string,
+	sourceIndex estree.Value,
+) *estree.Node {
 	return estree.New(nodeType, 0, 0,
-		"after", after,
-		"before", before,
-		"value", value,
-		"sourceIndex", sourceIndex,
+		[]estree.Property{
+			{Key: "after", Value: after},
+			{Key: "before", Value: before},
+			{Key: "value", Value: estree.String(value)},
+			{Key: "sourceIndex", Value: sourceIndex},
+		},
 	)
 }
 
 // newContainer is `new Container(opts)`: a node that contains other nodes.
 func newContainer(
-	after any,
-	before any,
+	after estree.Value,
+	before estree.Value,
 	nodeType string,
 	value string,
-	sourceIndex any,
-	nodes []*estree.Node,
+	sourceIndex estree.Value,
+	nodes estree.Nodes,
 ) *estree.Node {
 	container := newNode(after, before, nodeType, value, sourceIndex)
 
@@ -43,7 +51,7 @@ func newContainer(
 		if len(nodes) > 0 {
 			container.Set("after", nodes[len(nodes)-1].Get("after"))
 		} else {
-			container.Set("after", "")
+			container.Set("after", estree.String(""))
 		}
 	}
 
@@ -51,13 +59,13 @@ func newContainer(
 		if len(nodes) > 0 {
 			container.Set("before", nodes[0].Get("before"))
 		} else {
-			container.Set("before", "")
+			container.Set("before", estree.String(""))
 		}
 	}
 
 	if container.Get("sourceIndex") == nil {
 		// this.before.length: before is whitespace from the input, so its byte length is the byte offset.
-		container.Set("sourceIndex", len(container.String("before")))
+		container.Set("sourceIndex", estree.Integer(len(container.String("before"))))
 	}
 
 	return container

@@ -480,7 +480,7 @@ func throughJson(value any) any {
 	return result
 }
 
-func dumpParseValue(value any, offsets func(int) int) any {
+func dumpParseValue(value estree.Value, offsets func(int) int) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -492,13 +492,13 @@ func dumpParseValue(value any, offsets func(int) int) any {
 			result[key] = dumpParseValue(typed.Get(key), offsets)
 		}
 		result["keys"] = keys
-		if source, isMap := typed.Get("source").(map[string]any); isMap {
-			start, _ := source["start"].(map[string]any)
-			end, hasEnd := source["end"].(map[string]any)
+		if source, isMap := typed.Get("source").(estree.Record); isMap {
+			start, _ := source["start"].(estree.Record)
+			end, hasEnd := source["end"].(estree.Record)
 			wantRange := [2]int{0, 0}
 			if start != nil && hasEnd {
-				startOffset, startIsInt := start["offset"].(int)
-				endOffset, endIsInt := end["offset"].(int)
+				startOffset, startIsInt := start["offset"].(estree.Integer)
+				endOffset, endIsInt := end["offset"].(estree.Integer)
 				if !startIsInt || !endIsInt {
 					result["range"] = fmt.Sprintf(
 						"source offsets %#v and %#v are not both ints",
@@ -507,14 +507,14 @@ func dumpParseValue(value any, offsets func(int) int) any {
 					)
 					return result
 				}
-				wantRange = [2]int{startOffset, endOffset}
+				wantRange = [2]int{int(startOffset), int(endOffset)}
 			}
 			if typed.Range != wantRange {
 				result["range"] = fmt.Sprintf("Range %v is not source's %v", typed.Range, wantRange)
 			}
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no postcss field holds"
 		}
@@ -523,20 +523,24 @@ func dumpParseValue(value any, offsets func(int) int) any {
 			result[index] = dumpParseValue(child, offsets)
 		}
 		return result
-	case map[string]any:
+	case estree.Record:
 		result := map[string]any{}
 		for key, each := range typed {
 			if key == "offset" {
-				if offset, isInt := each.(int); isInt {
-					result[key] = offsets(offset)
+				if offset, isInt := each.(estree.Integer); isInt {
+					result[key] = offsets(int(offset))
 					continue
 				}
 			}
 			result[key] = dumpParseValue(each, offsets)
 		}
 		return result
-	case string, bool, int:
-		return typed
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
+	case estree.Integer:
+		return int(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}

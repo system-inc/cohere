@@ -12,7 +12,7 @@ func parseMediaQuery(parameters string) *estree.Node {
 	if parseError != nil {
 		// Ignore bad media queries
 		/* c8 ignore next 4 */
-		return estree.New("selector-unknown", 0, 0, "value", parameters)
+		return estree.New("selector-unknown", 0, 0, []estree.Property{{Key: "value", Value: estree.String(parameters)}})
 	}
 
 	addTypePrefix(addMissingType(result), "media-", nil)

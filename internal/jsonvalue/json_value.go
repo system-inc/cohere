@@ -1,4 +1,4 @@
-package optionschema
+package jsonvalue
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 // JsonValue is one decoded JSON value: a schema, a schema's keyword, or an option element being checked. A
 // schema can hold any JSON shape, so the value is one of six types, one per shape, and a reader takes it
-// apart with a type switch over them. The unexported marker closes the set to the six declared here, so a
+// apart with a type switch over them. The unexported marker closes the set to the six this package declares, so a
 // value can never hold two shapes at once or one this package does not know.
 type JsonValue interface {
 	jsonValue()
@@ -20,25 +20,16 @@ type JsonObject map[string]JsonValue
 // JsonArray is a JSON array, its elements in order.
 type JsonArray []JsonValue
 
-// JsonNumber is a JSON number kept as its own text, as json.Number keeps it, so `1.0` and `1e3` keep their
-// spelling and nothing is lost to float64 before a reader asks for one.
-type JsonNumber json.Number
-
 // JsonString is a JSON string, unquoted.
 type JsonString string
 
 // JsonBoolean is JSON's true or false.
 type JsonBoolean bool
 
-// JsonNull is JSON's null.
-type JsonNull struct{}
-
 func (JsonObject) jsonValue()  {}
 func (JsonArray) jsonValue()   {}
-func (JsonNumber) jsonValue()  {}
 func (JsonString) jsonValue()  {}
 func (JsonBoolean) jsonValue() {}
-func (JsonNull) jsonValue()    {}
 
 // jsonWhitespace is the four bytes JSON allows around a value, and only those.
 const jsonWhitespace = " \t\r\n"

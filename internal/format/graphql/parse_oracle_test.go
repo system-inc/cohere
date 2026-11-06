@@ -412,7 +412,7 @@ func dumpParse(text string) (map[string]any, error) {
 	return result, decodeError
 }
 
-func dumpParseValue(value any, offsets []int) any {
+func dumpParseValue(value estree.Value, offsets []int) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -422,7 +422,7 @@ func dumpParseValue(value any, offsets []int) any {
 			result[key] = dumpParseValue(typed.Get(key), offsets)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no graphql-js field holds"
 		}
@@ -431,8 +431,10 @@ func dumpParseValue(value any, offsets []int) any {
 			result[index] = dumpParseValue(child, offsets)
 		}
 		return result
-	case string, bool:
-		return typed
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}

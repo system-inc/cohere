@@ -48,24 +48,24 @@ func choose(condition bool, document func() doc.Doc) doc.Doc {
 }
 
 // rawsOf is node.raws, postcss's and the sub-parsers' plain object of source details.
-func rawsOf(node *estree.Node) map[string]any {
-	raws, _ := node.Get("raws").(map[string]any)
+func rawsOf(node *estree.Node) estree.Record {
+	raws, _ := node.Get("raws").(estree.Record)
 	return raws
 }
 
 // rawString is node.raws[key] when it is a string, and "" otherwise.
 func rawString(node *estree.Node, key string) string {
-	value, _ := rawsOf(node)[key].(string)
-	return value
+	value, _ := rawsOf(node)[key].(estree.String)
+	return string(value)
 }
 
 // isPresent is JavaScript's truthiness for a property that holds an array, where an empty array is
 // truthy: a nil slice stands for an absent one.
-func isPresent(value any) bool {
+func isPresent(value estree.Value) bool {
 	switch typed := value.(type) {
-	case []*estree.Node:
+	case estree.Nodes:
 		return typed != nil
-	case []any:
+	case estree.Values:
 		return typed != nil
 	}
 	return estree.IsTruthy(value)
@@ -128,15 +128,15 @@ func characterBefore(text string, offset int) string {
 
 // sourceStartLine is node.source.start.line, and whether the node has a source.
 func sourceStartLine(node *estree.Node) (int, bool) {
-	source, _ := node.Get("source").(map[string]any)
+	source, _ := node.Get("source").(estree.Record)
 	if source == nil {
 		return 0, false
 	}
-	start, _ := source["start"].(map[string]any)
+	start, _ := source["start"].(estree.Record)
 	switch line := start["line"].(type) {
-	case int:
-		return line, true
-	case float64:
+	case estree.Integer:
+		return int(line), true
+	case estree.Number:
 		return int(line), true
 	}
 	return 0, true
