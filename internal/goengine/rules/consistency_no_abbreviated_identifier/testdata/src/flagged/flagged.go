@@ -3,6 +3,7 @@ package flagged
 
 import (
 	"context"
+	"foreign"
 	"sort"
 	"time"
 )
@@ -78,3 +79,20 @@ idxLoop: // want `Identifier "idxLoop" should not be abbreviated\. Use "indexLoo
 	_ = argCount
 	_ = time.Duration(timeoutMs)
 }
+
+// A Cmd with foreign.Commander's exact signature, on a type that implements none of the rest, is ours.
+type halfShell struct{}
+
+func (halfShell) Cmd() string { return "" } // want `Identifier "Cmd" abbreviates "Cmd"\. Use "Command"\.`
+
+var _ foreign.Commander
+
+// A Src with the shape of foreign.Source's, on a type that implements none of the rest of Source[int], is ours.
+type halfReader struct{}
+
+func (halfReader) Src() int { return 0 } // want `Identifier "Src" abbreviates "Src"\. Use "Source"\.`
+
+// A Src that shares only the name of foreign.Source's, with another shape, implements no instance of it.
+type wideReader struct{}
+
+func (wideReader) Src(name string) int { return 0 } // want `Identifier "Src" abbreviates "Src"\. Use "Source"\.`
