@@ -4,6 +4,7 @@ package lookalike
 import (
 	buf "bytes"
 	"context"
+	"foreign"
 	"os"
 	"os/exec"
 	"sort"
@@ -58,3 +59,39 @@ type lengther interface {
 }
 
 var _ lengther = &buf.Buffer{}
+
+// foreign.Commander fixes Cmd, and the type implements all of it.
+type shell struct{}
+
+func (shell) Cmd() string { return "" }
+func (shell) Wait() error { return nil }
+
+var _ foreign.Commander = shell{}
+
+// foreign.Source is generic, and the type implements its instance Source[int], read off Src's int result.
+type reader struct{}
+
+func (reader) Src() int     { return 0 }
+func (reader) Close() error { return nil }
+
+var _ foreign.Source[int] = reader{}
+
+// foreign.Target is used only as foreign.Copy's constraint, and the type satisfies its instance Target[string].
+type copier struct{}
+
+func (copier) Dst() string { return "" }
+
+var _ = foreign.Copy[string, copier]
+
+// foreign.Sequence's Seq names none of its type parameters, so no instance can be read off it, and a method with Seq's
+// shape is taken as fixed by it.
+type counter struct{}
+
+func (counter) Seq() int { return 0 }
+
+// An interface method of ours that a method of an instance of a generic foreign type must satisfy: Pool[int]'s Conn.
+type connector interface {
+	Conn() int
+}
+
+var _ connector = foreign.Pool[int]{}

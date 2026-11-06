@@ -54,6 +54,9 @@ type foreignMethod struct {
 	method *types.Func
 	// owner is the interface that declares the method, or nil when a concrete named type does.
 	owner *types.Interface
+	// generic is the type that declares the method when that type has type parameters, nil when it has none. Its
+	// method speaks of those parameters, so it is compared only through an instance.
+	generic *types.Named
 }
 
 // reach is what the rule knows of the packages this one can reach through its imports.
@@ -117,6 +120,9 @@ func isOurs(pass *analysis.Pass, reachable reach, object types.Object) bool {
 // implements anything, so for one the name and signature matching a foreign interface method decides. An interface
 // method of ours matches by name and signature against any foreign method, since a foreign type that has it is what
 // the interface is written to accept, as `interface{ Len() int }` accepts *bytes.Buffer.
+//
+// A method of a generic foreign type is compared through the instance our method would have to match, its type
+// arguments read off our signature, so `func (reader) Src() int` is checked against `Source[int]` as any other.
 func fixedByAnotherPackage(pass *analysis.Pass, reachable reach, method *types.Func) bool {
 	receiver := method.Signature().Recv()
 	if receiver == nil {
@@ -124,7 +130,28 @@ func fixedByAnotherPackage(pass *analysis.Pass, reachable reach, method *types.F
 	}
 	isInterfaceMethod := types.IsInterface(receiver.Type())
 	named := receiverNamed(receiver.Type())
-	for _, foreign := range reachable.methodsByName[method.Name()] {
+	for _, candidate := range reachable.methodsByName[method.Name()] {
+		foreign := candidate
+		if candidate.generic != nil {
+			arguments, determined := typeArgumentsOf(candidate, method.Signature())
+			if !determined {
+				// The foreign signature names too few of its type parameters bare to fix an instance, as
+				// `Seq() int` names none of `Sequence[Item]`'s, so no instance can be compared. Like a generic
+				// receiver, which cannot be asked what it implements, this is decided by the name and the shape of
+				// the signature: as many parameters and results, variadic the same. It errs toward silence only when
+				// that shape matches, and only for a method a foreign interface could fix.
+				if (isInterfaceMethod || candidate.owner != nil) &&
+					haveSameShape(candidate.method.Signature(), method.Signature()) {
+					return true
+				}
+				continue
+			}
+			instance, instantiated := instantiate(candidate, arguments)
+			if !instantiated {
+				continue
+			}
+			foreign = instance
+		}
 		if !types.Identical(foreign.method.Signature(), method.Signature()) {
 			continue
 		}
@@ -157,6 +184,77 @@ func receiverNamed(receiverType types.Type) *types.Named {
 	return named
 }
 
+// typeArgumentsOf reads the type arguments of the instance of a generic foreign type whose method our signature would
+// match: wherever the foreign signature has one of its type parameters bare, as a parameter or a result, our type at
+// the same position is that parameter's argument. It is not determined when the shapes differ or a type parameter
+// appears nowhere bare. Where two positions disagree the first is kept, and the instance then fails to match.
+func typeArgumentsOf(candidate foreignMethod, ours *types.Signature) ([]types.Type, bool) {
+	foreignSignature := candidate.method.Signature()
+	if !haveSameShape(foreignSignature, ours) {
+		return nil, false
+	}
+	// A method declared on a generic concrete type speaks of its receiver's own type parameters, one per parameter of
+	// the type and in the same order; an interface's method speaks of the interface's.
+	typeParameters := candidate.generic.TypeParams()
+	if foreignSignature.RecvTypeParams().Len() > 0 {
+		typeParameters = foreignSignature.RecvTypeParams()
+	}
+	arguments := make([]types.Type, typeParameters.Len())
+	for _, tuples := range [][2]*types.Tuple{
+		{foreignSignature.Params(), ours.Params()},
+		{foreignSignature.Results(), ours.Results()},
+	} {
+		for index := range tuples[0].Len() {
+			typeParameter, isTypeParameter := tuples[0].At(index).Type().(*types.TypeParam)
+			if !isTypeParameter || typeParameter.Index() >= typeParameters.Len() ||
+				typeParameters.At(typeParameter.Index()) != typeParameter ||
+				arguments[typeParameter.Index()] != nil {
+				continue
+			}
+			arguments[typeParameter.Index()] = tuples[1].At(index).Type()
+		}
+	}
+	for _, argument := range arguments {
+		if argument == nil {
+			return nil, false
+		}
+	}
+	return arguments, true
+}
+
+// instantiate is a generic foreign type's method as the instance with these type arguments has it, or false when
+// the arguments do not satisfy the type's constraints, so no instance our method could match exists.
+func instantiate(candidate foreignMethod, arguments []types.Type) (foreignMethod, bool) {
+	instance, instantiateError := types.Instantiate(nil, candidate.generic, arguments, true)
+	if instantiateError != nil {
+		return foreignMethod{}, false
+	}
+	instanceNamed, isNamed := instance.(*types.Named)
+	if !isNamed {
+		return foreignMethod{}, false
+	}
+	if instanceInterface, isInterface := instanceNamed.Underlying().(*types.Interface); isInterface {
+		for index := range instanceInterface.NumMethods() {
+			if instanceInterface.Method(index).Name() == candidate.method.Name() {
+				return foreignMethod{method: instanceInterface.Method(index), owner: instanceInterface}, true
+			}
+		}
+		return foreignMethod{}, false
+	}
+	for index := range instanceNamed.NumMethods() {
+		if instanceNamed.Method(index).Name() == candidate.method.Name() {
+			return foreignMethod{method: instanceNamed.Method(index)}, true
+		}
+	}
+	return foreignMethod{}, false
+}
+
+// haveSameShape is whether two signatures take as many parameters and give as many results, variadic the same.
+func haveSameShape(left *types.Signature, right *types.Signature) bool {
+	return left.Params().Len() == right.Params().Len() && left.Results().Len() == right.Results().Len() &&
+		left.Variadic() == right.Variadic()
+}
+
 // reachOf walks every package this one reaches through its imports, once per package, and indexes what the rule
 // asks of them.
 func reachOf(current *types.Package) reach {
@@ -177,24 +275,28 @@ func reachOf(current *types.Package) reach {
 			if !isTypeName || typeName.IsAlias() {
 				continue
 			}
+			// An alias is indexed where the type it names is declared.
 			named, isNamed := typeName.Type().(*types.Named)
-			// A generic type's methods cannot be compared without instantiating it, and an alias is indexed where
-			// the type it names is declared.
-			if !isNamed || named.TypeParams().Len() > 0 {
+			if !isNamed {
 				continue
+			}
+			// A generic type's methods are compared through an instance, so the type is kept to instantiate.
+			var generic *types.Named
+			if named.TypeParams().Len() > 0 {
+				generic = named
 			}
 			if declaredInterface, isInterface := named.Underlying().(*types.Interface); isInterface {
 				for index := range declaredInterface.NumMethods() {
 					method := declaredInterface.Method(index)
 					reachable.methodsByName[method.Name()] = append(reachable.methodsByName[method.Name()],
-						foreignMethod{method: method, owner: declaredInterface})
+						foreignMethod{method: method, owner: declaredInterface, generic: generic})
 				}
 				continue
 			}
 			for index := range named.NumMethods() {
 				method := named.Method(index)
 				reachable.methodsByName[method.Name()] = append(reachable.methodsByName[method.Name()],
-					foreignMethod{method: method})
+					foreignMethod{method: method, generic: generic})
 			}
 		}
 	}
@@ -214,13 +316,14 @@ func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
 	// The house expands to a descriptive name, never to one Go already gives something else: `ctx` becomes
 	// `requestContext`, not the package name `context`, and `err` becomes `readError`, not the predeclared `error`.
 	// Only a whole-word finding suggests the bare expansion, so only its advice changes, and an advice-style entry
-	// already gives its own.
+	// already gives its own. A word with more than one expansion keeps the vocabulary's advice: it names every
+	// meaning and asks for whichever one the name has, and an ending that named one meaning would be a guess.
 	if finding.Form == abbreviation.FormWhole && finding.Entry.Whole.Style != "advice" &&
-		isTakenInGo(reachable, finding.Entry.Expansion) {
+		len(finding.Entry.Expansions) == 1 && isTakenInGo(reachable, finding.Entry.Expansions[0]) {
 		values = map[string]string{
 			"name": finding.Values["name"],
-			"advice": `Use a descriptive name ending in "` + abbreviation.Capitalize(finding.Entry.Expansion) +
-				`", since "` + finding.Entry.Expansion + `" is already Go's name for something else.`,
+			"advice": `Use a descriptive name ending in "` + abbreviation.Capitalize(finding.Entry.Expansions[0]) +
+				`", since "` + finding.Entry.Expansions[0] + `" is already Go's name for something else.`,
 		}
 	}
 	pass.Report(analysis.Diagnostic{
