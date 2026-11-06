@@ -70,8 +70,7 @@ func (tokens *scssTokenizer) characterCodeAt(index int) int {
 
 // indexOf is css.indexOf(search, from) for an ASCII search string.
 func (tokens *scssTokenizer) indexOf(search string, from int) int {
-	from = max(from, 0)
-	for index := from; index+len(search) <= tokens.length; index++ {
+	for index := max(from, 0); index+len(search) <= tokens.length; index++ {
 		matched := true
 		for offset := 0; offset < len(search); offset++ {
 			if tokens.css[index+offset] != uint16(search[offset]) {
@@ -91,6 +90,9 @@ func (tokens *scssTokenizer) position() int {
 }
 
 func (tokens *scssTokenizer) unclosed(what string) {
+	// Invariant: this is upstream's throw of a CssSyntaxError, which an unclosed string, comment or
+	// interpolation reaches; Parse recovers every *CssSyntaxError and returns it as a syntax error, so the
+	// panic never leaves the package.
 	panic(tokens.input.errorAt("Unclosed "+what, tokens.pos))
 }
 

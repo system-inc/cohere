@@ -44,7 +44,8 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "a long selector list and a long compound selector break",
-		source: ".a-very-long-selector-name-number-one .another-long-descendant-selector > .child-selector-name ~ .sibling-selector-name-here{x:y}\n" +
+		source: ".a-very-long-selector-name-number-one .another-long-descendant-selector > .child-selector-name ~ " +
+			".sibling-selector-name-here{x:y}\n" +
 			".first-selector-in-the-list,.second-selector-in-the-list,.third-selector-in-the-list{x:y}\n" +
 			"a:not(.a-very-long-class-name-number-one,.a-very-long-class-name-number-two,.a-very-long-class-name-number-three){x:y}",
 		contains: []string{".first-selector-in-the-list,\n"},
@@ -53,7 +54,8 @@ var formatCases = []formatCase{
 		name: "@media: types, features, ranges, and, or, not, only, lists",
 		source: "@media screen and (min-width:100px) , print and (orientation:LANDSCAPE){a{x:y}}\n" +
 			"@media (min-width:640PX) and (max-width:1023.50px){a{x:y}}\n@media not all and (monochrome){a{x:y}}\n" +
-			"@media only screen   and (max-width : 100px){a{x:y}}\n@media (width>=600px){a{x:y}}\n@MEDIA print{a{x:y}}\n" +
+			"@media only screen   and (max-width : 100px){a{x:y}}\n@media (width>=600px){a{x:y}}\n" +
+			"@MEDIA print{a{x:y}}\n" +
 			"@media tv2.50,(min-resolution:2.00DPPX){a{x:y}}",
 		contains: []string{
 			"@media screen and (min-width: 100px), print and (orientation: LANDSCAPE) {",
@@ -73,16 +75,20 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "Tailwind v4: @theme, @utility, @apply, @custom-variant, @config, @source, @import with source()",
-		source: "@config '../../TailwindConfiguration.ts';\n@import 'tailwindcss' source(none);\n@source '../../app/';\n" +
+		source: "@config '../../TailwindConfiguration.ts';\n@import 'tailwindcss' source(none);\n" +
+			"@source '../../app/';\n" +
 			"@theme{--color-primary:#FFF;--font-sans:'Inter',sans-serif;--spacing:0.25REM;--breakpoint-xs:30rem}\n" +
-			"@theme inline{--color-x:var(--x)}\n@utility tab-*{tab-size:--value(integer)}\n@utility typing-dots{@apply flex   gap-1;}\n" +
-			"@custom-variant dark (&:where(.scheme-dark,.scheme-dark *));\n@custom-variant hover{&:hover{@media (hover:hover){@slot;}}}\n" +
+			"@theme inline{--color-x:var(--x)}\n@utility tab-*{tab-size:--value(integer)}\n" +
+			"@utility typing-dots{@apply flex   gap-1;}\n" +
+			"@custom-variant dark (&:where(.scheme-dark,.scheme-dark *));\n" +
+			"@custom-variant hover{&:hover{@media (hover:hover){@slot;}}}\n" +
 			".btn{@apply px-4 py-2 rounded-lg hover:bg-blue-500 focus:outline-none;}",
 		contains: []string{"@theme {\n", "--color-primary: #fff;", "@utility tab-* {", "@apply flex   gap-1;"},
 	},
 	{
 		name: "@keyframes with from, to, percentages, and @font-face",
-		source: "@keyframes Bounce{FROM{transform:translateY(0)}50.0%{transform:translateY(-25%)}TO{transform:none}}\n" +
+		source: "@keyframes Bounce{FROM{transform:translateY(0)}50.0%{transform:translateY(-25%)}" +
+			"TO{transform:none}}\n" +
 			"@-webkit-keyframes spin{0%{x:y}100%{x:y}}\n" +
 			"@font-face{font-family:\"Inter\";font-style:normal;font-weight:100 900;font-display:swap;src:url(\"Inter.woff2\") format(\"woff2\"),url(Inter.woff) format('woff');unicode-range:U+0000-00FF,U+0131}",
 		contains: []string{"from {", "to {", "50.0% {", "font-family: 'Inter';", "unicode-range: U+0000-00FF, U+0131;"},
@@ -96,7 +102,8 @@ var formatCases = []formatCase{
 	{
 		name: "comments: top level, in rules, between declarations, inline after declarations, in values, in selectors",
 		source: "/* top */\n/* second */a{/* first */color:red;/* between */\nbackground:blue; /* trailing */\n}\n" +
-			"a /* in selector */ b{x:y}\nb{margin:1px /* in value */ 2px}\n\n/* before at-rule */@media print{/* inside */}\n" +
+			"a /* in selector */ b{x:y}\nb{margin:1px /* in value */ 2px}\n\n" +
+			"/* before at-rule */@media print{/* inside */}\n" +
 			"c{x:y}/* after rule */\n/* last */",
 		contains: []string{
 			"/* top */\n/* second */\na {",
@@ -112,16 +119,21 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "long comma lists and space lists break at the print width",
-		source: "a{transition:opacity 0.3s cubic-bezier(0.25,0.46,0.45,0.94),transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94),visibility 0s linear 0.3s;" +
-			"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji';" +
-			"box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 2px 0 rgba(0,0,0,0.1),0 2px 4px -1px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.1);" +
-			"grid-template-columns:[full-start] minmax(1rem,1fr) [content-start] minmax(0,60rem) [content-end] minmax(1rem,1fr) [full-end] repeat(auto-fill,minmax(10rem,1fr));" +
+		source: "a{transition:opacity 0.3s cubic-bezier(0.25,0.46,0.45,0.94)," +
+			"transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94),visibility 0s linear 0.3s;" +
+			"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif," +
+			"'Apple Color Emoji','Segoe UI Emoji';" +
+			"box-shadow:0 0 0 1px rgba(0,0,0,0.05),0 1px 2px 0 rgba(0,0,0,0.1),0 2px 4px -1px rgba(0,0,0,0.06)," +
+			"inset 0 1px 0 rgba(255,255,255,0.1);" +
+			"grid-template-columns:[full-start] minmax(1rem,1fr) [content-start] minmax(0,60rem) [content-end] " +
+			"minmax(1rem,1fr) [full-end] repeat(auto-fill,minmax(10rem,1fr));" +
 			"mask-image:linear-gradient(to right,transparent 0%,black 10%,black 90%,transparent 100%),linear-gradient(to bottom,transparent,black)}",
 		contains: []string{"transition:\n"},
 	},
 	{
 		name: "a long space-separated value fills its lines",
-		source: "a{mask:linear-gradient(black,transparent) center center / contain no-repeat border-box content-box alpha luminance add subtract intersect exclude;" +
+		source: "a{mask:linear-gradient(black,transparent) center center / contain no-repeat border-box content-box " +
+			"alpha luminance add subtract intersect exclude;" +
 			"margin:var(--a-long-custom-property-name) var(--another-long-custom-property) var(--yet-another-long-property) var(--and-the-last-one-here)}",
 		contains: []string{
 			"mask: linear-gradient(black, transparent) center center / contain no-repeat border-box content-box alpha luminance\n",
@@ -129,7 +141,8 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "grid templates keep their rows on their lines",
-		source: "a{grid-template-areas:\"header header\"\n\"sidebar main\";grid-template-columns:\n[full-start] 1fr\n[full-end];" +
+		source: "a{grid-template-areas:\"header header\"\n\"sidebar main\";grid-template-columns:\n[full-start] 1fr\n" +
+			"[full-end];" +
 			"grid:auto-flow / 1fr 1fr;grid-area:1/2/3/4}",
 		contains: []string{"grid-template-areas:\n"},
 	},
@@ -140,7 +153,8 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "numbers and units: zeros, signs, exponents, unit case, unknown units",
-		source: "a{margin:0.50px +.5em -0.0PX 10.0E3px;width:calc(100% - 10PX);line-height:1.50;transform:rotate(45DEG) scale(1.0);" +
+		source: "a{margin:0.50px +.5em -0.0PX 10.0E3px;width:calc(100% - 10PX);line-height:1.50;" +
+			"transform:rotate(45DEG) scale(1.0);" +
 			"top:00.5Q;x:1e+3;y:1E-03;z:10Hz 2KHZ;opacity:.0;flex:1 1 0%;w:10furlongs;h:+.5;q:1.}",
 		contains: []string{"0.5px", "+0.5em", "rotate(45deg)", "line-height: 1.5;"},
 	},
@@ -152,13 +166,15 @@ var formatCases = []formatCase{
 	},
 	{
 		name: "url(): unquoted, quoted, data URIs, with spaces, in @import",
-		source: "a{background:url(image.png);b:url( 'image.png' );c:url(\"image.png\");d:url(data:image/svg+xml;base64,AAAA);" +
+		source: "a{background:url(image.png);b:url( 'image.png' );c:url(\"image.png\");" +
+			"d:url(data:image/svg+xml;base64,AAAA);" +
 			"e:url(  spaced.png  ) no-repeat,url(two.png)}\n@import url(\"foo.css\") screen and (orientation:landscape);\n@import 'bar.css';\n@import \"baz.css\" layer(base);",
 		contains: []string{"url(image.png)", "@import url('foo.css') screen and (orientation: landscape);"},
 	},
 	{
 		name: "colors, functions, operators, wide keywords",
-		source: "a{color:#FFF;background:#AbCdEf;border-color:RGB(0,0,0);x:INHERIT;y:Initial;z:hsl(120DEG 100% 50%/0.5);" +
+		source: "a{color:#FFF;background:#AbCdEf;border-color:RGB(0,0,0);x:INHERIT;y:Initial;" +
+			"z:hsl(120DEG 100% 50%/0.5);" +
 			"w:calc(1px+2px);v:calc( (100% - 2*10px)/3 );u:min(10px,5vw) max(1px , 2px);t:clamp(1rem,2.5vw,2rem)}",
 		contains: []string{"color: #fff;", "x: inherit;"},
 	},
@@ -313,7 +329,7 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 	}
 	var files []string
 	for _, root := range filepath.SplitList(roots) {
-		_ = filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
+		walkError := filepath.WalkDir(root, func(path string, entry os.DirEntry, pathError error) error {
 			if pathError != nil {
 				return nil
 			}
@@ -329,6 +345,9 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 			}
 			return nil
 		})
+		if walkError != nil {
+			test.Fatal(walkError)
+		}
 	}
 	if len(files) == 0 {
 		test.Fatalf("no corpus files under %s", roots)
@@ -402,12 +421,15 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "css")
 	var files []string
-	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
+	walkError := filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
 		if pathError == nil && !entry.IsDir() && strings.HasSuffix(path, ".css") {
 			files = append(files, path)
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
 
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	golden := oracletest.Open(test, test.Name())
@@ -471,7 +493,8 @@ func firstDifference(expected string, actual string) string {
 	expectedLines := strings.Split(expected, "\n")
 	actualLines := strings.Split(actual, "\n")
 	for index := 0; index < max(len(expectedLines), len(actualLines)); index++ {
-		var expectedLine, actualLine string
+		var expectedLine string
+		var actualLine string
 		if index < len(expectedLines) {
 			expectedLine = expectedLines[index]
 		}
@@ -503,7 +526,8 @@ var scssFormatCases = []formatCase{
 	{
 		name: "maps: flat, nested, lists, map functions, a long map that breaks",
 		source: "$map:(key1:value1,key2:value2,key3:value3);\n$nested:(a:(b:1,c:2),d:(e:3));\n$list:(1,2,3);\n" +
-			"$breakpoints:(small:576px,medium:768px,large:992px,xlarge:1200px,xxlarge:1400px,xxxlarge:1600px,huge:1920px);\n" +
+			"$breakpoints:(small:576px,medium:768px,large:992px,xlarge:1200px,xxlarge:1400px,xxxlarge:1600px," +
+			"huge:1920px);\n" +
 			"a{width:map-get($map,key1);height:map.get($nested,a,b)}",
 		contains: []string{"$map: (\n", "key1: value1,\n", "map-get($map, key1)"},
 	},
@@ -571,8 +595,10 @@ var scssFormatCases = []formatCase{
 	},
 	{
 		name: "control directives, maps and long arguments break at the print width",
-		source: "@include very-long-mixin-name($first-argument-value,$second-argument-value,$third-argument-value,$fourth-argument-value);\n" +
-			"$theme-colors:(\"primary\":$blue,\"secondary\":$gray-600,\"success\":$green,\"info\":$cyan,\"warning\":$yellow);\n" +
+		source: "@include very-long-mixin-name($first-argument-value,$second-argument-value,$third-argument-value," +
+			"$fourth-argument-value);\n" +
+			"$theme-colors:(\"primary\":$blue,\"secondary\":$gray-600,\"success\":$green,\"info\":$cyan," +
+			"\"warning\":$yellow);\n" +
 			"@if $condition-number-one == true and $condition-number-two == false or $condition-number-three != null{a{x:y}}",
 		contains: []string{"$theme-colors: (\n"},
 	},
@@ -692,12 +718,15 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	fixtures := filepath.Join("testdata", "prettier", "scss")
 	var files []string
-	_ = filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
+	walkError := filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
 		if pathError == nil && !entry.IsDir() && strings.HasSuffix(path, ".scss") {
 			files = append(files, path)
 		}
 		return nil
 	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
 
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
 	golden := oracletest.Open(test, test.Name())

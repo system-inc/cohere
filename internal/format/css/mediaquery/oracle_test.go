@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // mediaQueryScript is the oracle: postcss-media-query-parser 0.2.3 from the fork's node_modules. Each
@@ -235,7 +237,10 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			continue
 		}
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("reading %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
 		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
@@ -285,18 +290,19 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", mediaQueryScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
 
-	var records []map[string]any
+	var records []oracleRecord
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var each map[string]any
+		var each oracleRecord
 		if decodeError := json.Unmarshal([]byte(line), &each); decodeError != nil {
 			test.Fatal(decodeError)
 		}
@@ -311,12 +317,15 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		}
 	}
 	for _, want := range records {
-		name, nameIsString := want["name"].(string)
-		parameters, parametersIsString := want["params"].(string)
-		if !nameIsString || !parametersIsString {
-			test.Fatalf("the oracle printed a record without a name and params: %v", want)
+		if want.Name == nil || want.Parameters == nil {
+			test.Fatalf("the oracle printed a record without a name and params: %+v", want)
 		}
-		wantError, oracleRefused := want["error"].(string)
+		name := *want.Name
+		parameters := *want.Parameters
+		wantError, oracleRefused := "", want.Error != nil
+		if oracleRefused {
+			wantError = *want.Error
+		}
 		expectThrow, isFixture := throws[name]
 		if isFixture {
 			fixturesSeen++
@@ -324,7 +333,13 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			corpusParameters++
 		}
 		if isFixture && expectThrow != oracleRefused {
-			fail("%s: the fixture says throws=%v and the library says %v", name, expectThrow, want)
+			fail(
+				"%s: the fixture says throws=%v and the library says error %q, tree %s",
+				name,
+				expectThrow,
+				wantError,
+				want.Tree,
+			)
 			continue
 		}
 		got, dumpMediaQueryError := dumpMediaQuery(parameters)
@@ -348,7 +363,12 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		case dumpMediaQueryError != nil:
 			fail("%s: the library parses %q and Go refused: %v", name, parameters, dumpMediaQueryError)
 		default:
-			if difference := firstMediaQueryDifference(want["tree"], got, "tree"); difference != "" {
+			wantTree, treeError := json_value.Parse(want.Tree)
+			if treeError != nil {
+				fail("%s (%q): the library's tree does not read as JSON: %v", name, parameters, treeError)
+				continue
+			}
+			if difference := firstMediaQueryDifference(wantTree, got, "tree"); difference != "" {
 				fail("%s (%q): %s", name, parameters, difference)
 				continue
 			}
@@ -381,33 +401,39 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 	}
 }
 
-// dumpMediaQuery parses params and renders the tree the way the oracle script does, through JSON, so
-// both sides compare as the same Go values.
-func dumpMediaQuery(parameters string) (any, error) {
+// oracleRecord is one line of the oracle script's output: a params string with its tree, or the
+// message the library threw. name and params are pointers so a record missing either is told apart.
+type oracleRecord struct {
+	Name       *string         `json:"name"`
+	Parameters *string         `json:"params"`
+	Error      *string         `json:"error"`
+	Tree       json.RawMessage `json:"tree"`
+}
+
+// dumpMediaQuery parses params and renders the tree the way the oracle script does, as the JSON value
+// the script prints.
+func dumpMediaQuery(parameters string) (json_value.Value, error) {
 	tree, parseError := Parse(parameters)
 	if parseError != nil {
 		return nil, parseError
 	}
-	encoded, encodeError := json.Marshal(dumpMediaQueryValue(tree, utf16OffsetsOf(parameters)))
-	if encodeError != nil {
-		return nil, encodeError
-	}
-	var result any
-	decodeError := json.Unmarshal(encoded, &result)
-	return result, decodeError
+	return dumpMediaQueryValue(tree, utf16OffsetsOf(parameters)), nil
 }
 
-func dumpMediaQueryValue(value any, offsets []int) any {
+// dumpMediaQueryValue is one value of the tree as JSON. Every string the parser builds is a piece of
+// params cut at an ASCII character or around whitespace, and params come from the oracle's JSON, so
+// each is valid UTF-8 and reads in JSON as it is.
+func dumpMediaQueryValue(value any, offsets []int) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return "<undefined>"
+		return json_value.String("<undefined>")
 	case *estree.Node:
-		result := map[string]any{"type": typed.Type()}
+		result := json_value.Object{"type": json_value.String(typed.Type())}
 		if typed.Type() == "" {
-			result["type"] = "<undefined>"
+			result["type"] = json_value.String("<undefined>")
 		}
 		if typed.Range != [2]int{0, 0} {
-			result["range"] = "a range other than [0, 0], which the library has no use for"
+			result["range"] = json_value.String("a range other than [0, 0], which the library has no use for")
 		}
 		for _, key := range typed.Keys() {
 			result[key] = dumpMediaQueryValue(typed.Get(key), offsets)
@@ -415,9 +441,9 @@ func dumpMediaQueryValue(value any, offsets []int) any {
 		return result
 	case []*estree.Node:
 		if typed == nil {
-			return "a nil list, which no library field holds"
+			return json_value.String("a nil list, which no library field holds")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpMediaQueryValue(child, offsets)
 		}
@@ -425,13 +451,15 @@ func dumpMediaQueryValue(value any, offsets []int) any {
 	case int:
 		// Only sourceIndex is an int: a byte offset here, a UTF-16 index there.
 		if typed < 0 || typed >= len(offsets) {
-			return fmt.Sprintf("an offset %d outside the input", typed)
+			return json_value.String(fmt.Sprintf("an offset %d outside the input", typed))
 		}
-		return offsets[typed]
-	case string, bool:
-		return typed
+		return json_value.Number(strconv.Itoa(offsets[typed]))
+	case string:
+		return json_value.String(typed)
+	case bool:
+		return json_value.Boolean(typed)
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
@@ -453,11 +481,11 @@ func utf16OffsetsOf(text string) []int {
 	return offsets
 }
 
-// firstMediaQueryDifference names the first path where two decoded JSON values differ, or "".
-func firstMediaQueryDifference(want any, got any, path string) string {
+// firstMediaQueryDifference names the first path where two JSON values differ, or "".
+func firstMediaQueryDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
+	case json_value.Object:
+		other, isMap := got.(json_value.Object)
 		if !isMap {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
@@ -491,8 +519,8 @@ func firstMediaQueryDifference(want any, got any, path string) string {
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
@@ -507,8 +535,29 @@ func firstMediaQueryDifference(want any, got any, path string) string {
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if jsonLeafText(want) != jsonLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, jsonLeafText(want), jsonLeafText(got))
 	}
 	return ""
+}
+
+// jsonLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func jsonLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

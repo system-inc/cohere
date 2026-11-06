@@ -34,9 +34,8 @@ func itoa(number int) string {
 		return "0"
 	}
 	digits := ""
-	for number > 0 {
-		digits = string(rune('0'+number%10)) + digits
-		number /= 10
+	for remaining := number; remaining > 0; remaining /= 10 {
+		digits = string(rune('0'+remaining%10)) + digits
 	}
 	return digits
 }

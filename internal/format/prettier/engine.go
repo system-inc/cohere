@@ -1,6 +1,7 @@
 package prettier
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -223,19 +224,25 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 	engine.mutex.Lock()
 	defer engine.mutex.Unlock()
 
-	engine.runtime.Set("__source", text)
-	engine.runtime.Set("__fileName", sourcename.TreatedAs(fileName))
-	engine.runtime.Set("__parser", parser)
-	engine.runtime.Set("__tabWidth", engine.options.TabWidth)
-	engine.runtime.Set("__useTabs", engine.options.UseTabs)
-	engine.runtime.Set("__semi", engine.options.Semi)
-	engine.runtime.Set("__singleQuote", engine.options.SingleQuote)
-	engine.runtime.Set("__printWidth", engine.options.PrintWidth)
-	engine.runtime.Set("__trailingComma", engine.options.TrailingComma)
-	engine.runtime.Set("__bracketSpacing", engine.options.BracketSpacing)
-	engine.runtime.Set("__bracketSameLine", engine.options.BracketSameLine)
-	engine.runtime.Set("__arrowParens", engine.options.ArrowParens)
-	engine.runtime.Set("__endOfLine", engine.options.EndOfLine)
+	// The inputs the format script reads, each set in order, and any one that will not set refuses the format
+	// rather than formatting with the last file's value.
+	if setError := errors.Join(
+		engine.runtime.Set("__source", text),
+		engine.runtime.Set("__fileName", sourcename.TreatedAs(fileName)),
+		engine.runtime.Set("__parser", parser),
+		engine.runtime.Set("__tabWidth", engine.options.TabWidth),
+		engine.runtime.Set("__useTabs", engine.options.UseTabs),
+		engine.runtime.Set("__semi", engine.options.Semi),
+		engine.runtime.Set("__singleQuote", engine.options.SingleQuote),
+		engine.runtime.Set("__printWidth", engine.options.PrintWidth),
+		engine.runtime.Set("__trailingComma", engine.options.TrailingComma),
+		engine.runtime.Set("__bracketSpacing", engine.options.BracketSpacing),
+		engine.runtime.Set("__bracketSameLine", engine.options.BracketSameLine),
+		engine.runtime.Set("__arrowParens", engine.options.ArrowParens),
+		engine.runtime.Set("__endOfLine", engine.options.EndOfLine),
+	); setError != nil {
+		return "", fmt.Errorf("formatting %s: setting the format script's inputs: %w", fileName, setError)
+	}
 
 	value, runStringError := engine.runtime.RunString(formatScript)
 	if runStringError != nil {

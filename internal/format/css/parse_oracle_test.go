@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode/utf16"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/corpus"
 	"github.com/system-inc/cohere/internal/format/estree"
+	"github.com/system-inc/cohere/internal/json_value"
 )
 
 // glueParseScript is the oracle: the fork's own parse with parser "css" (prettier.__debug.parse, which
@@ -232,7 +234,10 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 	for _, corpus := range strings.Split(corpora, ":") {
 		corpus = strings.TrimSpace(corpus)
 		if strings.HasPrefix(corpus, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("expanding %s: %v", corpus, homeError)
+			}
 			corpus = filepath.Join(home, corpus[2:])
 		}
 		walkError := filepath.WalkDir(corpus, func(path string, entry fs.DirEntry, pathError error) error {
@@ -282,25 +287,30 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 	command := exec.Command("node", "--input-type=module", "-e", glueParseScript)
 	command.Dir = root
 	command.Stdin = &stdin
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	oracle := map[string]map[string]any{}
+	oracle := map[string]json_value.Object{}
 	for _, line := range strings.Split(stdout.String(), "\n") {
 		if line == "" {
 			continue
 		}
-		var record map[string]any
-		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
-			test.Fatal(decodeError)
+		parsed, parseError := json_value.Parse([]byte(line))
+		if parseError != nil {
+			test.Fatal(parseError)
 		}
-		name, isString := record["name"].(string)
+		record, isObject := parsed.(json_value.Object)
+		if !isObject {
+			test.Fatalf("the oracle printed a record that is not an object: %s", line)
+		}
+		name, isString := record["name"].(json_value.String)
 		if !isString {
 			test.Fatalf("the oracle printed a record without a name: %s", line)
 		}
-		oracle[name] = record
+		oracle[string(name)] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different, nullEnds := 0, 0, 0, 0, 0
@@ -315,7 +325,7 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 		if !present {
 			test.Fatalf("the oracle printed nothing for %s", each.Name)
 		}
-		wantError, oracleRefused := want["error"].(string)
+		wantError, oracleRefused := want["error"].(json_value.String)
 		if expectMalformed, isFixture := malformed[each.Name]; isFixture && expectMalformed != oracleRefused {
 			fail("%s: the fixture says malformed=%v and the fork says %v", each.Name, expectMalformed, want["error"])
 			continue
@@ -369,40 +379,37 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 // normalizeGlueInput is what Prettier's core does to the text before the parser sees it
 // (normalizeInputAndOptions): a byte order mark dropped, and \r\n and \r turned into \n.
 func normalizeGlueInput(text string) string {
-	text = strings.TrimPrefix(text, "\xef\xbb\xbf")
-	text = strings.ReplaceAll(text, "\r\n", "\n")
-	return strings.ReplaceAll(text, "\r", "\n")
+	withoutByteOrderMark := strings.TrimPrefix(text, "\xef\xbb\xbf")
+	withoutCarriageReturnLineFeeds := strings.ReplaceAll(withoutByteOrderMark, "\r\n", "\n")
+	return strings.ReplaceAll(withoutCarriageReturnLineFeeds, "\r", "\n")
 }
 
-// dumpGlueParse parses one text and renders it the way the oracle script does, through JSON.
-func dumpGlueParse(text string) (any, error) {
+// dumpGlueParse parses one text and renders it the way the oracle script does, as the JSON value the
+// script prints.
+func dumpGlueParse(text string) (json_value.Value, error) {
 	root, parseError := parse(text)
 	if parseError != nil {
 		return nil, parseError
 	}
-	encoded, encodeError := json.Marshal(dumpGlueValue(root, utf16OffsetTable(text)))
-	if encodeError != nil {
-		return nil, encodeError
-	}
-	var result any
-	decodeError := json.Unmarshal(encoded, &result)
-	return result, decodeError
+	return dumpGlueValue(root, utf16OffsetTable(text)), nil
 }
 
-// dumpGlueValue renders a value in the oracle's shape. The absolute offsets (source.startOffset and
-// endOffset, postcss's source.start.offset and end.offset, and the front matter's start.index and
-// end.index) are converted from bytes to UTF-16. Each node's Range must agree with its source offsets.
-func dumpGlueValue(value any, toUtf16 func(int) any) any {
+// dumpGlueValue renders a value in the oracle's shape, as the JSON value json.Marshal would have written
+// for it. The absolute offsets (source.startOffset and endOffset, postcss's source.start.offset and
+// end.offset, and the front matter's start.index and end.index) are converted from bytes to UTF-16. Each
+// node's Range must agree with its source offsets. A float64 JSON cannot carry, which json.Marshal would
+// refuse, becomes a description no oracle prints, so the comparison still fails on it.
+func dumpGlueValue(value any, toUtf16 func(int) json_value.Value) json_value.Value {
 	switch typed := value.(type) {
 	case nil:
-		return nil
+		return json_value.Null{}
 	case *estree.Node:
 		if typed == nil {
-			return nil
+			return json_value.Null{}
 		}
-		result := map[string]any{}
+		result := json_value.Object{}
 		if typed.Type() != "" {
-			result["type"] = typed.Type()
+			result["type"] = textThroughJson(typed.Type())
 		}
 		for _, key := range typed.Keys() {
 			child := typed.Get(key)
@@ -411,13 +418,22 @@ func dumpGlueValue(value any, toUtf16 func(int) any) any {
 				result[key] = dumpGlueSource(child, toUtf16)
 			case typed.Type() == "front-matter" && (key == "start" || key == "end"):
 				dumped := dumpGlueValue(child, toUtf16)
-				position, isPosition := dumped.(map[string]any)
+				position, isPosition := dumped.(json_value.Object)
 				if !isPosition {
 					// Not an object: kept as dumped, so the comparison with the fork names it.
 					result[key] = dumped
 					continue
 				}
-				if index, isNumber := position["index"].(int); isNumber {
+				// The index is converted where the value dumped is an int, which only the Go value tells.
+				index := 0
+				isInt := false
+				switch original := child.(type) {
+				case map[string]any:
+					index, isInt = original["index"].(int)
+				case *estree.Node:
+					index, isInt = original.Get("index").(int)
+				}
+				if isInt {
 					position["index"] = toUtf16(index)
 				}
 				result[key] = position
@@ -427,27 +443,29 @@ func dumpGlueValue(value any, toUtf16 func(int) any) any {
 		}
 		if source := sourceOf(typed); source != nil {
 			if typed.Range != [2]int{locStart(typed), locEnd(typed)} {
-				result["<range>"] = fmt.Sprintf("Range %v disagrees with the source offsets", typed.Range)
+				result["<range>"] = json_value.String(
+					fmt.Sprintf("Range %v disagrees with the source offsets", typed.Range),
+				)
 			}
 		}
 		return result
 	case []*estree.Node:
 		if typed == nil {
-			return "a nil list, which no JavaScript array is"
+			return json_value.String("a nil list, which no JavaScript array is")
 		}
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
 	case []any:
-		result := make([]any, len(typed))
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = dumpGlueValue(child, toUtf16)
 		}
 		return result
 	case map[string]any:
-		result := map[string]any{}
+		result := json_value.Object{}
 		for key, child := range typed {
 			result[key] = dumpGlueValue(child, toUtf16)
 		}
@@ -455,22 +473,50 @@ func dumpGlueValue(value any, toUtf16 func(int) any) any {
 	case float64:
 		// JSON.stringify writes NaN (postcss-values-parser's column for a paren at the start) as null.
 		if math.IsNaN(typed) {
-			return nil
+			return json_value.Null{}
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		if math.IsInf(typed, 0) {
+			return json_value.String(fmt.Sprintf("a float64 of %v, which JSON cannot carry", typed))
+		}
+		return json_value.Number(strconv.FormatFloat(typed, 'g', -1, 64))
+	case string:
+		return textThroughJson(typed)
+	case bool:
+		return json_value.Boolean(typed)
+	case int:
+		return json_value.Number(strconv.Itoa(typed))
 	default:
-		return fmt.Sprintf("an unexpected %T", typed)
+		return json_value.String(fmt.Sprintf("an unexpected %T", typed))
 	}
 }
 
-func dumpGlueSource(value any, toUtf16 func(int) any) any {
+// textThroughJson is text as it comes back from json.Marshal and json.Unmarshal, the trip the whole tree
+// used to make: each byte of invalid UTF-8 becomes U+FFFD, and every other byte is kept. A string sliced
+// at a byte offset inside a character holds such bytes. Keys are left as they are: they are the
+// libraries' own ASCII property names.
+func textThroughJson(text string) json_value.String {
+	if utf8.ValidString(text) {
+		return json_value.String(text)
+	}
+	var builder strings.Builder
+	for index := 0; index < len(text); {
+		character, size := utf8.DecodeRuneInString(text[index:])
+		if character == utf8.RuneError && size == 1 {
+			builder.WriteRune(utf8.RuneError)
+		} else {
+			builder.WriteString(text[index : index+size])
+		}
+		index += size
+	}
+	return json_value.String(builder.String())
+}
+
+func dumpGlueSource(value any, toUtf16 func(int) json_value.Value) json_value.Value {
 	source, isMap := value.(map[string]any)
 	if !isMap {
 		return dumpGlueValue(value, toUtf16)
 	}
-	result := map[string]any{}
+	result := json_value.Object{}
 	for key, child := range source {
 		switch key {
 		case "startOffset", "endOffset":
@@ -486,7 +532,7 @@ func dumpGlueSource(value any, toUtf16 func(int) any) any {
 				continue
 			}
 			dumped := dumpGlueValue(position, toUtf16)
-			converted, isConverted := dumped.(map[string]any)
+			converted, isConverted := dumped.(json_value.Object)
 			if !isConverted {
 				// Not an object: kept as dumped, so the comparison with the fork names it.
 				result[key] = dumped
@@ -505,7 +551,7 @@ func dumpGlueSource(value any, toUtf16 func(int) any) any {
 
 // utf16OffsetTable maps a byte offset into text to its UTF-16 index. An offset inside a character, or
 // past the end, is reported as such, so it cannot pass for a real position.
-func utf16OffsetTable(text string) func(int) any {
+func utf16OffsetTable(text string) func(int) json_value.Value {
 	offsets := make([]int, len(text)+1)
 	starts := make([]bool, len(text)+1)
 	index := 0
@@ -516,14 +562,14 @@ func utf16OffsetTable(text string) func(int) any {
 	}
 	offsets[len(text)] = index
 	starts[len(text)] = true
-	return func(byteOffset int) any {
+	return func(byteOffset int) json_value.Value {
 		if byteOffset < 0 || byteOffset > len(text) {
-			return fmt.Sprintf("byte offset %d outside the text", byteOffset)
+			return json_value.String(fmt.Sprintf("byte offset %d outside the text", byteOffset))
 		}
 		if !starts[byteOffset] {
-			return fmt.Sprintf("byte offset %d inside a character", byteOffset)
+			return json_value.String(fmt.Sprintf("byte offset %d inside a character", byteOffset))
 		}
-		return offsets[byteOffset]
+		return json_value.Number(strconv.Itoa(offsets[byteOffset]))
 	}
 }
 
@@ -536,19 +582,19 @@ func isAscii(text string) bool {
 	return true
 }
 
-// withoutKey drops a key everywhere in a decoded JSON value.
-func withoutKey(value any, key string) any {
+// withoutKey drops a key everywhere in a JSON value.
+func withoutKey(value json_value.Value, key string) json_value.Value {
 	switch typed := value.(type) {
-	case map[string]any:
-		result := map[string]any{}
+	case json_value.Object:
+		result := json_value.Object{}
 		for each, child := range typed {
 			if each != key {
 				result[each] = withoutKey(child, key)
 			}
 		}
 		return result
-	case []any:
-		result := make([]any, len(typed))
+	case json_value.Array:
+		result := make(json_value.Array, len(typed))
 		for index, child := range typed {
 			result[index] = withoutKey(child, key)
 		}
@@ -558,19 +604,19 @@ func withoutKey(value any, key string) any {
 }
 
 // countNullEndOffsets counts sources whose endOffset upstream left null.
-func countNullEndOffsets(value any) int {
+func countNullEndOffsets(value json_value.Value) int {
 	count := 0
 	switch typed := value.(type) {
-	case map[string]any:
-		if source, isMap := typed["source"].(map[string]any); isMap {
-			if endOffset, present := source["endOffset"]; present && endOffset == nil {
+	case json_value.Object:
+		if source, isObject := typed["source"].(json_value.Object); isObject {
+			if _, isNull := source["endOffset"].(json_value.Null); isNull {
 				count++
 			}
 		}
 		for _, child := range typed {
 			count += countNullEndOffsets(child)
 		}
-	case []any:
+	case json_value.Array:
 		for _, child := range typed {
 			count += countNullEndOffsets(child)
 		}
@@ -578,12 +624,12 @@ func countNullEndOffsets(value any) int {
 	return count
 }
 
-// firstGlueDifference names the first path where two decoded JSON values differ, or "".
-func firstGlueDifference(want any, got any, path string) string {
+// firstGlueDifference names the first path where two JSON values differ, or "".
+func firstGlueDifference(want json_value.Value, got json_value.Value, path string) string {
 	switch typed := want.(type) {
-	case map[string]any:
-		other, isMap := got.(map[string]any)
-		if !isMap {
+	case json_value.Object:
+		other, isObject := got.(json_value.Object)
+		if !isObject {
 			return fmt.Sprintf("%s: want an object, got %v", path, got)
 		}
 		keys := map[string]bool{}
@@ -618,8 +664,8 @@ func firstGlueDifference(want any, got any, path string) string {
 			}
 		}
 		return ""
-	case []any:
-		other, isList := got.([]any)
+	case json_value.Array:
+		other, isList := got.(json_value.Array)
 		if !isList || len(other) != len(typed) {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
@@ -634,8 +680,29 @@ func firstGlueDifference(want any, got any, path string) string {
 		}
 		return ""
 	}
-	if fmt.Sprintf("%T %v", want, want) != fmt.Sprintf("%T %v", got, got) {
-		return fmt.Sprintf("%s: want %#v, got %#v", path, want, got)
+	if glueLeafText(want) != glueLeafText(got) {
+		return fmt.Sprintf("%s: want %s, got %s", path, glueLeafText(want), glueLeafText(got))
 	}
 	return ""
+}
+
+// glueLeafText is a JSON value as Go's untyped decode would hold it, its type and its value, so two
+// leaves are equal exactly when they decode to the same thing: a number is read as a float64, so 1
+// and 1.0 are one number, as they are in JavaScript.
+func glueLeafText(value json_value.Value) string {
+	switch typed := value.(type) {
+	case json_value.Number:
+		number, parseError := json.Number(typed).Float64()
+		if parseError != nil {
+			return fmt.Sprintf("a number that does not read as a float64, %q", string(typed))
+		}
+		return fmt.Sprintf("float64 %v", number)
+	case json_value.String:
+		return fmt.Sprintf("string %q", string(typed))
+	case json_value.Boolean:
+		return fmt.Sprintf("bool %v", bool(typed))
+	case json_value.Null:
+		return "null"
+	}
+	return fmt.Sprintf("%T %v", value, value)
 }

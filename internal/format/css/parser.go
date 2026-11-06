@@ -106,6 +106,8 @@ func customSelectorName(parameters string) string {
 	for from := 0; ; {
 		index := indexFrom(parameters, ":--", from)
 		if index == -1 {
+			// Invariant: this is upstream's TypeError, not a crash: parseCatching recovers every
+			// javaScriptError into the parse's error, as upstream's caller catches it.
 			panic(javaScriptError{message: "Cannot read properties of null (reading '0')"})
 		}
 		rest := parameters[index+3:]
@@ -116,6 +118,9 @@ func customSelectorName(parameters string) string {
 		from = index + 1
 	}
 }
+
+// javaScriptNonWhitespaceClass is JavaScript's \S.
+var javaScriptNonWhitespaceClass = "[^" + javaScriptWhitespaceClass[1:]
 
 var (
 	atRootWithPattern = regexp.MustCompile(
@@ -132,9 +137,6 @@ var (
 		javaScriptWhitespaceClass +
 		`+)\(`)
 )
-
-// javaScriptNonWhitespaceClass is JavaScript's \S.
-var javaScriptNonWhitespaceClass = "[^" + javaScriptWhitespaceClass[1:]
 
 var valueParamsAtRuleNames = map[string]bool{
 	"namespace":    true,
@@ -176,7 +178,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	}
 
 	/* c8 ignore next */
-	raws := rawsIn(node)
+	raws, _ := node.Get("raws").(map[string]any)
 	if raws == nil {
 		raws = map[string]any{}
 		node.Set("raws", raws)
@@ -218,6 +220,8 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 			} else {
 				rawValue, isObject := raws["value"].(map[string]any)
 				if !isObject {
+					// Invariant: this is upstream's TypeError, not a crash: parseCatching recovers every
+					// javaScriptError into the parse's error, as upstream's caller catches it.
 					panic(javaScriptError{message: "Cannot read properties of undefined (reading 'raw')"})
 				}
 				node.Set("value", estree.New("value-unknown", 0, 0, "value", rawValue["raw"]))
@@ -229,8 +233,8 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	selector := ""
 
 	if nodeSelector, isString := node.Get("selector").(string); isString {
-		if rawSelector, isObject := raws["selector"].(map[string]any); isObject {
-			selector = scssOrRaw(rawSelector)
+		if rawSelector, isObject := scssOrRaw(node, "selector"); isObject {
+			selector = rawSelector
 		} else {
 			selector = nodeSelector
 		}
@@ -245,8 +249,8 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	value := ""
 
 	if nodeValue, isString := node.Get("value").(string); isString {
-		if rawValue, isObject := raws["value"].(map[string]any); isObject {
-			value = scssOrRaw(rawValue)
+		if rawValue, isObject := scssOrRaw(node, "value"); isObject {
+			value = rawValue
 		} else {
 			value = nodeValue
 		}
@@ -257,8 +261,8 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	parameters := ""
 
 	if nodeParameters, isString := node.Get("params").(string); isString {
-		if rawParameters, isObject := raws["params"].(map[string]any); isObject {
-			parameters = scssOrRaw(rawParameters)
+		if rawParameters, isObject := scssOrRaw(node, "params"); isObject {
+			parameters = rawParameters
 		} else {
 			parameters = nodeParameters
 		}
@@ -278,7 +282,7 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 
 	// Ignore less mixin declaration
 	if trim(selector) != "" {
-		// TODO: confirm this code is dead
+		// Upstream: `TODO: confirm this code is dead`
 		/* c8 ignore next 3 */
 		if strings.HasPrefix(selector, "@") && strings.HasSuffix(selector, ":") {
 			return node
@@ -424,16 +428,27 @@ func parseNestedCss(node *estree.Node, options *parseOptions) *estree.Node {
 	return node
 }
 
-// scssOrRaw is `raws.x.scss ?? raws.x.raw`.
-func scssOrRaw(raw map[string]any) string {
+// scssOrRaw is `raws[key].scss ?? raws[key].raw`, read from node.raws, and whether raws[key] is an
+// object at all.
+func scssOrRaw(node *estree.Node, key string) (string, bool) {
+	raws, _ := node.Get("raws").(map[string]any)
+	raw, isObject := raws[key].(map[string]any)
+	if !isObject {
+		return "", false
+	}
 	if scss, isPresent := raw["scss"]; isPresent && scss != nil {
 		text, _ := scss.(string)
-		return text
+		return text, true
 	}
 	text, _ := raw["raw"].(string)
-	return text
+	return text, true
 }
 
+// parseWithParser is upstream's parseWithParser: the text parsed, its front matter set aside, then the
+// glue's walks over the tree.
+//
+// Mutates: options gets the text as its originalText, as upstream sets options.originalText, so
+// parseNestedCSS can slice a custom property block out of it.
 func parseWithParser(
 	parse func(string) (*estree.Node, error),
 	text string,
@@ -441,7 +456,8 @@ func parseWithParser(
 ) (*estree.Node, error) {
 	frontMatter, textToParse := parseFrontMatter(text)
 
-	// Prevent file access https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
+	// Prevent file access
+	// https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
 	result, parseError := parse(textToParse)
 	if parseError != nil {
 		// Upstream rethrows a CssSyntaxError as createError(`${name}: ${reason}`, {loc}); postcss.Parse
@@ -513,13 +529,11 @@ func parseFrontMatter(text string) (*estree.Node, string) {
 
 	raw := frontMatter.Raw
 	lines := strings.Split(raw, "\n")
-	var explicitLanguage any
-	if frontMatter.ExplicitLanguage != nil {
-		explicitLanguage = *frontMatter.ExplicitLanguage
-	}
+	// explicitLanguage is null until the front matter names one: written first, so the key keeps its
+	// place, and Set below replaces the value in place.
 	node := estree.New("front-matter", 0, len(raw),
 		"language", frontMatter.Language,
-		"explicitLanguage", explicitLanguage,
+		"explicitLanguage", nil,
 		"value", frontMatter.Value,
 		"startDelimiter", frontMatter.StartDelimiter,
 		"endDelimiter", frontMatter.EndDelimiter,
@@ -533,5 +547,8 @@ func parseFrontMatter(text string) (*estree.Node, string) {
 		},
 		"source", map[string]any{"startOffset": 0, "endOffset": len(raw)},
 	)
+	if frontMatter.ExplicitLanguage != nil {
+		node.Set("explicitLanguage", *frontMatter.ExplicitLanguage)
+	}
 	return node, replaceNonLineBreaksWithSpace(raw) + text[len(raw):]
 }

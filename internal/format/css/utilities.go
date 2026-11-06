@@ -212,7 +212,7 @@ func isPostcssSimpleVariableNode(currentNode *estree.Node, nextNode *estree.Node
 	return currentNode.String("value") == "$$" &&
 		currentNode.Type() == "value-func" &&
 		nextNode.Type() == "value-word" &&
-		!estree.IsTruthy(rawsOf(nextNode)["before"])
+		!isRawTruthy(nextNode, "before")
 }
 
 func hasComposesNode(node *estree.Node) bool {
@@ -232,7 +232,7 @@ func hasParensAroundNode(node *estree.Node) bool {
 }
 
 func hasEmptyRawBefore(node *estree.Node) bool {
-	before, isString := rawsOf(node)["before"].(string)
+	before, isString := rawStringIn(node, "before")
 	return isString && before == ""
 }
 
@@ -327,6 +327,8 @@ func arrayLength(value any) int {
 // mustGroups is node.groups read without optional chaining: an absent array is a TypeError upstream.
 func mustGroups(node *estree.Node) []*estree.Node {
 	if !mustNode(node).Has("groups") {
+		// Invariant: this is upstream's TypeError, not a crash: Format and PrintToDoc recover it into
+		// their error, as upstream's caller catches it.
 		panic("TypeError: Cannot read properties of undefined (reading 'some')")
 	}
 	return node.List("groups")

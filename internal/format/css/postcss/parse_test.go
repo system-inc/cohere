@@ -29,7 +29,10 @@ func TestParseTree(test *testing.T) {
 		test.Errorf("first rule %s %q %v", first.Type(), first.String("selector"), first.Range)
 	}
 	declaration := first.List("nodes")[0]
-	raws := objectOf(test, declaration.Get("raws"), "declaration raws")
+	raws, rawsIsObject := declaration.Get("raws").(map[string]any)
+	if !rawsIsObject {
+		test.Fatalf("declaration raws is %#v, want an object", declaration.Get("raws"))
+	}
 	if declaration.String("prop") != "b" ||
 		declaration.String("value") != "c" ||
 		!declaration.Bool("important") ||
@@ -47,21 +50,27 @@ func TestParseTree(test *testing.T) {
 	}
 
 	second := rules[1]
-	start := objectOf(
-		test,
-		objectOf(test, second.Get("source"), "second rule source")["start"],
-		"second rule source start",
-	)
+	secondSource, secondSourceIsObject := second.Get("source").(map[string]any)
+	if !secondSourceIsObject {
+		test.Fatalf("second rule source is %#v, want an object", second.Get("source"))
+	}
+	start, startIsObject := secondSource["start"].(map[string]any)
+	if !startIsObject {
+		test.Fatalf("second rule source start is %#v, want an object", secondSource["start"])
+	}
 	if start["offset"] != 20 || start["line"] != 2 || start["column"] != 1 {
 		test.Errorf("second rule starts at %v", start)
 	}
 	children := second.List("nodes")
 	comment := children[0]
-	commentStart := objectOf(
-		test,
-		objectOf(test, comment.Get("source"), "comment source")["start"],
-		"comment source start",
-	)
+	commentSource, commentSourceIsObject := comment.Get("source").(map[string]any)
+	if !commentSourceIsObject {
+		test.Fatalf("comment source is %#v, want an object", comment.Get("source"))
+	}
+	commentStart, commentStartIsObject := commentSource["start"].(map[string]any)
+	if !commentStartIsObject {
+		test.Fatalf("comment source start is %#v, want an object", commentSource["start"])
+	}
 	// The comment starts at column 5 of line 2 (the emoji is two units), 26 bytes into the text.
 	if comment.Type() != "comment" ||
 		comment.String("text") != "x" ||
@@ -73,16 +82,6 @@ func TestParseTree(test *testing.T) {
 	if custom.String("prop") != "--d" || custom.String("value") != "{e}" {
 		test.Errorf("custom property %q %q", custom.String("prop"), custom.String("value"))
 	}
-}
-
-// objectOf is value as the JavaScript object a node field holds, failing the test when it is not one.
-func objectOf(test *testing.T, value any, what string) map[string]any {
-	test.Helper()
-	object, isObject := value.(map[string]any)
-	if !isObject {
-		test.Fatalf("%s is %#v, want an object", what, value)
-	}
-	return object
 }
 
 // TestParseByteOrderMark checks that offsets count from after the byte order mark, as postcss's do.

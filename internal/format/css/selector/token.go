@@ -12,13 +12,13 @@ type token struct {
 // at is token[index] for index 2 and up, the way the parser reads it.
 func (token *token) at(index int) int { return token.rest[index-2] }
 
-// loose is token[index] where the token may be shorter than the parser assumes, nil standing for
-// undefined. splitWord can leave currToken on a space token (a word ending in an escaped space, with
-// nothing word-like after it), and upstream then reads that token's [4] (its pos), [5] and [6]
-// (undefined) as if it were a word's.
-func (token *token) loose(index int) any {
+// loose is token[index] where the token may be shorter than the parser assumes, and whether the
+// token is that long, false standing for undefined. splitWord can leave currToken on a space token (a
+// word ending in an escaped space, with nothing word-like after it), and upstream then reads that
+// token's [4] (its pos), [5] and [6] (undefined) as if it were a word's.
+func (token *token) loose(index int) (int, bool) {
 	if index-2 < len(token.rest) {
-		return token.rest[index-2]
+		return token.rest[index-2], true
 	}
-	return nil
+	return 0, false
 }

@@ -54,6 +54,8 @@ func calculateLocStart(node *estree.Node, text string) int {
 		return lineColumnToIndex(start, text)
 	}
 
+	// Invariant: this is upstream's throw, not a crash: parseCatching recovers every javaScriptError into
+	// the parse's error, as upstream's caller catches it.
 	/* c8 ignore next */
 	panic(javaScriptError{message: "Can not locate node."})
 }
@@ -96,9 +98,8 @@ func calculateLocEnd(node *estree.Node, text string) (int, bool) {
 		}
 
 		if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
-			raws := rawsIn(node)
-			afterName, _ := raws["afterName"].(string)
-			parameters, _ := raws["params"].(string)
+			afterName, _ := rawStringIn(node, "afterName")
+			parameters, _ := rawStringIn(node, "params")
 			return calculateLocStart(node, text) + 1 + len(name) + len(afterName) + len(parameters), true
 		}
 	}
@@ -171,7 +172,7 @@ func getNestedLoc(parentNode *estree.Node, node *estree.Node, rootOffset int) (s
 		"params",
 	).(*estree.Node); node.Type() == "media-query-list" || (isNode && parameters == node) {
 		return firstTruthyString(
-			rawsIn(parentNode)["params"],
+			rawString(parentNode, "params"),
 			node.Get("value"),
 		), getAtRuleParamsRootOffset(parentNode), true
 	}
@@ -192,11 +193,11 @@ func getValueRootOffset(node *estree.Node) int {
 	}
 
 	if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
-		afterName, _ := rawsIn(node)["afterName"].(string)
+		afterName, _ := rawStringIn(node, "afterName")
 		result += 1 + len(name) + len(leadingColonAndWhitespace(afterName))
 	}
 
-	if between, isString := rawsIn(node)["between"].(string); node.Type() != "css-atrule" && isString {
+	if between, isString := rawStringIn(node, "between"); node.Type() != "css-atrule" && isString {
 		result += len(between)
 	}
 
@@ -207,7 +208,7 @@ func getAtRuleParamsRootOffset(node *estree.Node) int {
 	result, _ := numberIn(sourceOf(node), "startOffset")
 
 	if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
-		afterName, _ := rawsIn(node)["afterName"].(string)
+		afterName, _ := rawStringIn(node, "afterName")
 		result += 1 + len(name) + len(leadingColonAndWhitespace(afterName))
 	}
 
@@ -224,7 +225,7 @@ func leadingColonAndWhitespace(afterName string) string {
 }
 
 func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string, bool) {
-	if selector, isString := rawsIn(selectorNode)["selector"].(string); isString {
+	if selector, isString := rawStringIn(selectorNode, "selector"); isString {
 		return selector, true
 	}
 
@@ -232,28 +233,26 @@ func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string
 		return "", false
 	}
 
-	parentRaws := rawsIn(parentNode)
-
 	if parentNode.Truthy("mixin") {
-		identifier, _ := parentRaws["identifier"].(string)
-		afterName, _ := parentRaws["afterName"].(string)
-		parameters, _ := parentRaws["params"].(string)
+		identifier, _ := rawStringIn(parentNode, "identifier")
+		afterName, _ := rawStringIn(parentNode, "afterName")
+		parameters, _ := rawStringIn(parentNode, "params")
 		return identifier + parentNode.String("name") + afterName + parameters, true
 	}
 
-	if selector, isString := parentRaws["selector"].(string); isString {
+	if selector, isString := rawStringIn(parentNode, "selector"); isString {
 		return selector, true
 	}
 
-	if parameters, isString := parentRaws["params"].(string); parentNode.Truthy("customSelector") && isString {
+	if parameters, isString := rawStringIn(parentNode, "params"); parentNode.Truthy("customSelector") && isString {
 		return trim(sliceJavaScript(parameters, len(parentNode.String("customSelector")), len(parameters))), true
 	}
 
-	if parameters, isString := parentRaws["params"].(string); isString {
+	if parameters, isString := rawStringIn(parentNode, "params"); isString {
 		return parameters, true
 	}
 
-	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {
+	if value, isString := rawStringIn(parentNode, "value"); parentNode.Type() == "css-decl" && isString {
 		if parentNode.Truthy("extend") && strings.HasPrefix(value, "extend(") {
 			return sliceJavaScript(value, len("extend("), len(value)-1), true
 		}
@@ -271,7 +270,7 @@ func getSelectorRootOffset(
 	rootOffset int,
 ) int {
 	if sourceIndex, isNumber := numberProperty(selectorNode, "sourceIndex"); isNumber {
-		if _, isString := rawsIn(selectorNode)["selector"].(string); isString {
+		if _, isString := rawStringIn(selectorNode, "selector"); isString {
 			return rootOffset + sourceIndex
 		}
 	}
@@ -282,17 +281,15 @@ func getSelectorRootOffset(
 		return parentStartOffset
 	}
 
-	parentRaws := rawsIn(parentNode)
-
-	if selector, isString := parentRaws["selector"].(string); isString {
+	if selector, isString := rawStringIn(parentNode, "selector"); isString {
 		return parentStartOffset + getStringOffset(selector, selectorText)
 	}
 
-	if parameters, isString := parentRaws["params"].(string); isString {
+	if parameters, isString := rawStringIn(parentNode, "params"); isString {
 		return getAtRuleParamsRootOffset(parentNode) + getStringOffset(parameters, selectorText)
 	}
 
-	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {
+	if value, isString := rawStringIn(parentNode, "value"); parentNode.Type() == "css-decl" && isString {
 		return getValueRootOffset(parentNode) + getStringOffset(value, selectorText)
 	}
 
@@ -324,7 +321,11 @@ func fillLocFromChildren(node *estree.Node) {
 
 	found := false
 	startOffset, endOffset := 0, 0
-	var start, end any
+	// The children whose offsets won, whose source.start and source.end the node takes. Nothing writes a
+	// source's start or end between here and the reads below, so reading them there reads what upstream
+	// kept while walking.
+	var startChild *estree.Node
+	var endChild *estree.Node
 
 	for _, key := range node.Keys() {
 		if key == "source" || key == "raws" || key == "spaces" {
@@ -342,12 +343,12 @@ func fillLocFromChildren(node *estree.Node) {
 			// Upstream starts from Infinity and -Infinity, so the first child sets both.
 			if !found || childStartOffset < startOffset {
 				startOffset = childStartOffset
-				start = childSource["start"]
+				startChild = childNode
 			}
 
 			if !found || childEndOffset > endOffset {
 				endOffset = childEndOffset
-				end = childSource["end"]
+				endChild = childNode
 			}
 			found = true
 		}
@@ -361,10 +362,10 @@ func fillLocFromChildren(node *estree.Node) {
 		}
 		// `??=` writes the property even when the value it writes is undefined.
 		if source["start"] == nil {
-			source["start"] = start
+			source["start"] = sourceOf(startChild)["start"]
 		}
 		if source["end"] == nil {
-			source["end"] = end
+			source["end"] = sourceOf(endChild)["end"]
 		}
 	}
 }

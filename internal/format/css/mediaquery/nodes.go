@@ -9,15 +9,15 @@ import "github.com/system-inc/cohere/internal/format/estree"
 // nodes for a container. type is the node's type, "" where the library leaves it undefined (a node
 // whose type the post-pass in parseMediaQuery could not decide; Prettier's addMissingType fills it).
 //
-// A field the caller passes as undefined is a nil here (only the root, built by index.js without
-// after, before or sourceIndex, does this), and Container fills it in place, keeping its position the
-// way assigning an existing JavaScript property does.
+// A field the caller passes as undefined is a nil here. Only the root, built by index.js without
+// after, before or sourceIndex, does this, so newRootContainer builds it, and Container fills each in
+// place, keeping its position the way assigning an existing JavaScript property does.
 //
 // Not ported: parent (the brief leaves it out), and Container's walk and each, which Prettier never
 // calls on this tree.
 
 // newNode is `new Node(opts)`: a very generic node. Pretty much any element of a media query.
-func newNode(after any, before any, nodeType string, value string, sourceIndex any) *estree.Node {
+func newNode(after string, before string, nodeType string, value string, sourceIndex int) *estree.Node {
 	return estree.New(nodeType, 0, 0,
 		"after", after,
 		"before", before,
@@ -26,39 +26,49 @@ func newNode(after any, before any, nodeType string, value string, sourceIndex a
 	)
 }
 
-// newContainer is `new Container(opts)`: a node that contains other nodes.
+// newContainer is `new Container(opts)`: a node that contains other nodes. Every field is given, so
+// Container derives none.
 func newContainer(
-	after any,
-	before any,
+	after string,
+	before string,
 	nodeType string,
 	value string,
-	sourceIndex any,
+	sourceIndex int,
 	nodes []*estree.Node,
 ) *estree.Node {
 	container := newNode(after, before, nodeType, value, sourceIndex)
 
 	container.Set("nodes", nodes)
 
-	if container.Get("after") == nil {
-		if len(nodes) > 0 {
-			container.Set("after", nodes[len(nodes)-1].Get("after"))
-		} else {
-			container.Set("after", "")
-		}
+	return container
+}
+
+// newRootContainer is `new Container(opts)` with after, before and sourceIndex undefined in opts, as
+// index.js builds the media-query-list: Container derives each from the nodes.
+func newRootContainer(nodeType string, value string, nodes []*estree.Node) *estree.Node {
+	container := estree.New(nodeType, 0, 0,
+		"after", nil,
+		"before", nil,
+		"value", value,
+		"sourceIndex", nil,
+	)
+
+	container.Set("nodes", nodes)
+
+	if len(nodes) > 0 {
+		container.Set("after", nodes[len(nodes)-1].Get("after"))
+	} else {
+		container.Set("after", "")
 	}
 
-	if container.Get("before") == nil {
-		if len(nodes) > 0 {
-			container.Set("before", nodes[0].Get("before"))
-		} else {
-			container.Set("before", "")
-		}
+	if len(nodes) > 0 {
+		container.Set("before", nodes[0].Get("before"))
+	} else {
+		container.Set("before", "")
 	}
 
-	if container.Get("sourceIndex") == nil {
-		// this.before.length: before is whitespace from the input, so its byte length is the byte offset.
-		container.Set("sourceIndex", len(container.String("before")))
-	}
+	// this.before.length: before is whitespace from the input, so its byte length is the byte offset.
+	container.Set("sourceIndex", len(container.String("before")))
 
 	return container
 }

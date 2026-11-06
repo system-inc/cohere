@@ -6,6 +6,29 @@ import (
 	"sync"
 )
 
+// Status is why a rule did or did not run on a file.
+type Status int
+
+const (
+	// StatusEnabled means the rule runs.
+	StatusEnabled Status = iota
+
+	// StatusScopedOff means the config configures this rule and turned it off, whether at the base
+	// level or through an override. Someone decided this.
+	StatusScopedOff
+
+	// StatusUnconfigured means the config never mentions the rule at all. Nobody decided anything;
+	// the rule was added to the registry and no one has said whether it should run.
+	//
+	// This is a different fact from StatusScopedOff and reporting them as one is a lie. A rule
+	// nobody has configured is a rule waiting on a decision, and it should read that way rather
+	// than as a deliberate exclusion.
+	StatusUnconfigured
+
+	// StatusFileIgnored means no rule runs on this file.
+	StatusFileIgnored
+)
+
 // Resolved is one file's answer: whether it is linted at all, and which rules apply to it.
 //
 // Shared, not owned: files that resolve the same way get the same Rules map, so nothing may write into
@@ -66,29 +89,6 @@ func (resolved Resolved) Enabled(ruleName string) bool {
 	status, _ := resolved.StatusOf(ruleName)
 	return status == StatusEnabled
 }
-
-// Status is why a rule did or did not run on a file.
-type Status int
-
-const (
-	// StatusEnabled means the rule runs.
-	StatusEnabled Status = iota
-
-	// StatusScopedOff means the config configures this rule and turned it off, whether at the base
-	// level or through an override. Someone decided this.
-	StatusScopedOff
-
-	// StatusUnconfigured means the config never mentions the rule at all. Nobody decided anything;
-	// the rule was added to the registry and no one has said whether it should run.
-	//
-	// This is a different fact from StatusScopedOff and reporting them as one is a lie. A rule
-	// nobody has configured is a rule waiting on a decision, and it should read that way rather
-	// than as a deliberate exclusion.
-	StatusUnconfigured
-
-	// StatusFileIgnored means no rule runs on this file.
-	StatusFileIgnored
-)
 
 // StatusOf reports why a rule runs or does not, and its setting when it has one.
 func (resolved Resolved) StatusOf(ruleName string) (Status, RuleSetting) {
