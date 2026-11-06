@@ -407,10 +407,12 @@ var (
 	// The packages the findings cache missed, wrote and could not store, and the facts it dropped, count the
 	// toolchain's own packages, which a Go release changes, as it changes the packages loaded. Hit stays, since a
 	// fresh copy hits nothing.
-	cachePackagesPattern = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped)":\d+`)
-	panicFramesPattern   = regexp.MustCompile(`, at [^"]*"`)
-	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
-	normalizedProvenance = contract.ProvenanceRecord{
+	// The milliseconds the cgo tool's load took vary like any elapsed time.
+	cgoMillisecondsPattern = regexp.MustCompile(`("cgoTranslation":\{"packages":\d+,"milliseconds":)\d+`)
+	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped)":\d+`)
+	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
+	hostTarget             = " on " + runtime.GOOS + "/" + runtime.GOARCH
+	normalizedProvenance   = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
@@ -433,6 +435,7 @@ func normalize(stream string, root string) string {
 	normalized = elapsedPattern.ReplaceAllString(normalized, `"elapsedMilliseconds":0`)
 	normalized = packagesLoaded.ReplaceAllString(normalized, "$1: N packages")
 	normalized = cachePackagesPattern.ReplaceAllString(normalized, `"$1":0`)
+	normalized = cgoMillisecondsPattern.ReplaceAllString(normalized, "${1}0")
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }

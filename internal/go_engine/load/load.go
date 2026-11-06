@@ -80,6 +80,12 @@ type Loaded struct {
 	// the cgo tool translated every cgo file, rather than from source (see translated).
 	CgoTranslated bool
 
+	// CgoTranslatedPackages counts the packages whose cgo files the cgo tool translated, and CgoTranslationElapsed is
+	// how long the go/packages load that ran it took. cgo's preprocessing is the one thing the engine has go build,
+	// so every run says how much there was: both are 0 on the load from source, which runs no cgo tool.
+	CgoTranslatedPackages int
+	CgoTranslationElapsed time.Duration
+
 	// PackagesInWorkspace counts Packages.
 	PackagesInWorkspace int
 
@@ -141,7 +147,12 @@ func loadWorkspace(
 	var loaded *Loaded
 	var loadError error
 	if translateOwnCgo && hasOwnCgo(listed, workspace) {
+		translationStarted := time.Now()
 		roots, loaded, loadError = translated(workspace, patterns, environment, restorer)
+		if loadError == nil {
+			loaded.CgoTranslationElapsed = time.Since(translationStarted)
+			loaded.CgoTranslatedPackages = withCgoFiles(listed)
+		}
 	} else {
 		roots, loaded, loadError = fromSource(workspace, listed, buildContext, restorer)
 	}
@@ -161,6 +172,18 @@ func loadWorkspace(
 	loaded.Excluded, loaded.Unseen = excluded, unseen
 	loaded.Elapsed = time.Since(started)
 	return loaded, nil
+}
+
+// withCgoFiles counts the listed packages with cgo files, each of which the cgo tool translates on the go/packages
+// load, the project's and its dependencies' alike.
+func withCgoFiles(listed *listing) int {
+	count := 0
+	for _, listedPackage := range listed.packages {
+		if len(listedPackage.CgoFiles) > 0 {
+			count++
+		}
+	}
+	return count
 }
 
 // hasOwnCgo reports whether a listed package inside workspace has cgo files, which go list lists only when cgo is

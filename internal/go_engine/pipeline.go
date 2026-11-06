@@ -282,6 +282,10 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			loaded.PackagesLoaded, loaded.PackagesInWorkspace),
 		WithheldInDependencyCgo:           withheld,
 		WithheldDependencyCgoDeclarations: loaded.WithheldDependencyCgoDeclarations,
+		CgoTranslation: contract.CgoTranslation{
+			Packages:     loaded.CgoTranslatedPackages,
+			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
+		},
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

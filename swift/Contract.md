@@ -358,6 +358,14 @@ initial values. It is `0` when there were none. A project with cgo files of its 
 go/packages instead, which has the cgo tool translate every cgo file, so both are empty then, and the record's
 `build` says which load ran.
 
+The Go engine type-checks and never builds, with one exception: cgo's preprocessing, which the
+go/packages load of a project with cgo of its own has the cgo tool run. So the Go engine's types
+record carries one more additive field, `cgoTranslation`, that counts the exception on every run:
+`"cgoTranslation":{"packages":3,"milliseconds":2140}` is how many packages the cgo tool translated,
+the project's and its dependencies' with cgo files alike, and how long that load took. On the load
+from source, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never left
+out, so a front door can always say whether a run built anything.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code

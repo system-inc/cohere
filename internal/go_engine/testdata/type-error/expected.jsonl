@@ -3,7 +3,7 @@
 {"kind":"fix","filesConsidered":1,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every Go file in the module","changedFiles":[]}
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"finding","source":"compiler","file":"/project/broken.go","line":5,"column":17,"severity":"error","rule":"","messageId":"Type","message":"cannot use \"text\" (untyped string constant) as int value in variable declaration","fixes":[],"suggestions":[]}
-{"kind":"types","diagnostics":1,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps with go test's variants built here, each package type-checked from source unless the findings cache holds its export data: N packages, 1 in the workspace","withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0}
+{"kind":"types","diagnostics":1,"files":1,"elapsedMilliseconds":0,"filesWithoutRecord":[],"build":"go list -deps with go test's variants built here, each package type-checked from source unless the findings cache holds its export data: N packages, 1 in the workspace","withheldInDependencyCgo":[],"withheldDependencyCgoDeclarations":0,"cgoTranslation":{"packages":0,"milliseconds":0}}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"lint","outcome":"notReached","elapsedMilliseconds":0,"detail":"types bailed: 1 type errors, so lint findings against wrong semantics would be noise"}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
