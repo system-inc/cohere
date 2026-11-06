@@ -16,52 +16,10 @@ func factorySpace(effects *Effects, ok State, tokenType string, maximum int) Sta
 	return run.startState
 }
 
-// spaceRun is one factorySpace: upstream's closure state, with its states made once per slot.
-type spaceRun struct {
-	effects     *Effects
-	ok          State
-	tokenType   string
-	limit, size int
-
-	startState, prefixState State
-}
-
 func newSpaceRun() *spaceRun {
 	run := &spaceRun{}
 	run.startState, run.prefixState = run.start, run.prefix
 	return run
-}
-
-// release zeroes the run for its next parse, keeping its bound states.
-func (run *spaceRun) release() {
-	*run = spaceRun{startState: run.startState, prefixState: run.prefixState}
-}
-
-// start is upstream's start. Upstream's size is per call of factorySpace, but a state may be entered
-// again once the run it began is done (initializeFlow returns the same one for every line), and there
-// size must start over, as it did when each entry made its own run.
-func (run *spaceRun) start(code Code) State {
-	if !markdownSpace(code) {
-		return run.ok(code)
-	}
-	run.effects.Enter(run.tokenType, nil)
-	run.size = 0
-	return run.prefix(code)
-}
-
-func (run *spaceRun) prefix(code Code) State {
-	if markdownSpace(code) {
-		// `size++ < limit`: the increment happens whether or not the comparison passes.
-		below := run.limit < 0 || run.size < run.limit
-		run.size++
-		if below {
-			run.effects.Consume(code)
-			return run.prefixState
-		}
-	}
-
-	run.effects.Exit(run.tokenType)
-	return run.ok(code)
 }
 
 // factoryWhitespace is micromark-factory-whitespace.
@@ -105,7 +63,10 @@ func factoryLabel(
 	size := 0
 	seen := false
 
-	var start, atBreak, labelInside, labelEscape State
+	var start State
+	var atBreak State
+	var labelInside State
+	var labelEscape State
 
 	start = func(code Code) State {
 		effects.Enter(tokenType, nil)
@@ -190,7 +151,11 @@ func factoryLabel(
 func factoryTitle(effects *Effects, ok State, nok State, tokenType string, markerType string, stringType string) State {
 	var marker Code
 
-	var start, begin, atBreak, inside, escape State
+	var start State
+	var begin State
+	var atBreak State
+	var inside State
+	var escape State
 
 	start = func(code Code) State {
 		if code == CodeQuotationMark || code == CodeApostrophe || code == CodeLeftParenthesis {
@@ -284,7 +249,12 @@ func factoryDestination(
 	unlimited := maximum == 0
 	balance := 0
 
-	var start, enclosedBefore, enclosed, enclosedEscape, raw, rawEscape State
+	var start State
+	var enclosedBefore State
+	var enclosed State
+	var enclosedEscape State
+	var raw State
+	var rawEscape State
 
 	start = func(code Code) State {
 		if code == CodeLessThan {

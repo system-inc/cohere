@@ -11,10 +11,16 @@ import (
 )
 
 // astPath is upstream's AstPath over postcss nodes.
-type astPath = printing.AstPath[*estree.Node]
+type astPath = printing.AstPath[*estree.Node, printSettings]
 
 // printerOptions is upstream's options object for one format.
-type printerOptions = printing.Options[*estree.Node]
+type printerOptions = printing.Options[*estree.Node, printSettings, printing.NoArguments]
+
+// printFunc is upstream's print(selector), which the css printer passes no args.
+type printFunc = printing.PrintFunc[printing.NoArguments]
+
+// pathValue is a value on the path, what a path.match predicate is given.
+type pathValue = printing.Value[*estree.Node]
 
 // currentNode is upstream's path.node.
 func currentNode(path *astPath) *estree.Node {
@@ -23,14 +29,14 @@ func currentNode(path *astPath) *estree.Node {
 }
 
 // asNode is a path.match predicate's node argument as a node, or nil.
-func asNode(value any) *estree.Node {
-	node, _ := value.(*estree.Node)
+func asNode(value pathValue) *estree.Node {
+	node, _ := value.Node()
 	return node
 }
 
 // printAll is upstream's path.map(print, ...names).
-func printAll(path *astPath, print printing.PrintFunc, names ...any) []doc.Doc {
-	return printing.Map(path, func(*astPath, int, any) doc.Doc { return print(nil, nil) }, names...)
+func printAll(path *astPath, print printFunc, names ...string) []doc.Doc {
+	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", nil) }, names...)
 }
 
 // choose is upstream's `condition ? doc : ""`, printing the doc only when it is chosen.

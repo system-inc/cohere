@@ -40,32 +40,25 @@ type tokenStackEntry struct {
 	errorHandler func(context *compileContext, left *micromark.Token, right *micromark.Token)
 }
 
-// compileContext is upstream's CompileContext, with the event's sliceSerialize bound per handler call.
-type compileContext struct {
-	stack      []*Node
-	tokenStack []tokenStackEntry
-	config     *config
-	data       compileData
-
-	tokenizer *micromark.TokenizeContext
-	offsets   []int
-
-	// nodes is where the tree's nodes come from, nil to allocate each (#93dpede).
-	nodes *arena.Arena[Node]
+// parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): micromark's tokens
+// and tokenizers, the text as UTF-16 units, and the map from UTF-16 index to byte offset. The tree compile
+// builds keeps none of them: every point copies its offset out, and every value is copied out of the units
+// as a string.
+type parseMemory struct {
+	parse   *micromark.Memory
+	units   []uint16
+	offsets []int
 }
 
-func (context *compileContext) sliceSerialize(token *micromark.Token) string {
-	return context.tokenizer.SliceSerialize(token, false)
-}
+// parseMemories hold the memory of parses that have finished. A pool, because files are formatted on
+// several goroutines at once and each Get is that caller's alone.
+var parseMemories = sync.Pool{New: func() any {
+	return &parseMemory{parse: micromark.NewMemory()}
+}}
 
-func (context *compileContext) top() *Node {
-	return context.stack[len(context.stack)-1]
-}
-
-// point converts a micromark point, whose offset counts UTF-16 units, to a tree point in bytes.
-func (context *compileContext) point(point micromark.Point) Point {
-	return Point{Line: point.Line, Column: point.Column, Offset: context.offsets[point.Offset]}
-}
+// compileConfig is newConfig, made once: every compile reads the same handlers and never changes them, and
+// making them was a measurable share of a format's allocation (#93dpede).
+var compileConfig = sync.OnceValue(newConfig)
 
 // FromMarkdown parses markdown the way the fork's parseMarkdown does with the given source, and returns
 // the tree. source is the text micromark reads (front matter already blanked by the caller); original is
@@ -76,7 +69,12 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 			fromMarkdownError = fmt.Errorf("markdown: %v", recovered)
 		}
 	}()
-	memory := parseMemories.Get().(*parseMemory)
+	memory, isParseMemory := parseMemories.Get().(*parseMemory)
+	if !isParseMemory {
+		// Invariant: the pool's New makes only a *parseMemory, and the release below puts back only the one
+		// taken here.
+		panic("the parse memory pool held something other than a *parseMemory")
+	}
 	defer func() {
 		memory.parse.Reset()
 		parseMemories.Put(memory)
@@ -95,42 +93,22 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 	return compile(events, compileConfig(), memory.offsets, nodes), nil
 }
 
-// parseMemory is what one parse uses only while it runs, kept for the next (#93dpede): micromark's tokens
-// and tokenizers, the text as UTF-16 units, and the map from UTF-16 index to byte offset. The tree compile
-// builds keeps none of them: every point copies its offset out, and every value is copied out of the units
-// as a string.
-type parseMemory struct {
-	parse   *micromark.Memory
-	units   []uint16
-	offsets []int
-}
-
-// parseMemories hold the memory of parses that have finished. A pool, because files are formatted on
-// several goroutines at once and each Get is that caller's alone.
-var parseMemories = sync.Pool{New: func() any {
-	return &parseMemory{parse: micromark.NewMemory()}
-}}
-
 // byteOffsets maps every UTF-16 index of text, and its end, to a byte offset, appended to offsets. An index
 // inside a surrogate pair maps to the start of its character.
 func byteOffsets(text string, offsets []int) []int {
-	offsets = slices.Grow(offsets, len(text)+1)
+	appended := slices.Grow(offsets, len(text)+1)
 	for index, character := range text {
-		offsets = append(offsets, index)
+		appended = append(appended, index)
 		if character >= 0x10000 && character != utf8.RuneError {
-			offsets = append(offsets, index)
+			appended = append(appended, index)
 		}
 	}
-	return append(offsets, len(text))
+	return append(appended, len(text))
 }
 
 // newConfig is upstream's compiler config with the fork's mdastExtensions configured in, in order:
 // gfmFromMarkdown() (autolink literal without its transform, footnote, strikethrough, table, task list
 // item), mathFromMarkdown(), the wiki-link fromMarkdown() and liquidFromMarkdown().
-// compileConfig is newConfig, made once: every compile reads the same handlers and never changes them, and
-// making them was a measurable share of a format's allocation (#93dpede).
-var compileConfig = sync.OnceValue(newConfig)
-
 func newConfig() *config {
 	configuration := &config{
 		canContainEols: []string{"emphasis", "fragment", "heading", "paragraph", "strong"},
@@ -264,22 +242,25 @@ func compile(events []micromark.Event, configuration *config, offsets []int, nod
 	context := &compileContext{stack: []*Node{tree}, config: configuration, offsets: offsets, nodes: nodes}
 	var listStack []int
 
-	for index := 0; index < len(events); index++ {
+	// preparedEvents is events with the listItem tokens prepareList splices in, as upstream splices them
+	// into its own events.
+	preparedEvents := events
+	for index := 0; index < len(preparedEvents); index++ {
 		// We preprocess lists to add `listItem` tokens, and to infer whether items the list itself are
 		// spread out.
-		if events[index].Token.Type == micromark.TypeListOrdered ||
-			events[index].Token.Type == micromark.TypeListUnordered {
-			if events[index].Enter {
+		if preparedEvents[index].Token.Type == micromark.TypeListOrdered ||
+			preparedEvents[index].Token.Type == micromark.TypeListUnordered {
+			if preparedEvents[index].Enter {
 				listStack = append(listStack, index)
 			} else {
 				tail := listStack[len(listStack)-1]
 				listStack = listStack[:len(listStack)-1]
-				index = prepareList(&events, tail, index)
+				index = prepareList(&preparedEvents, tail, index)
 			}
 		}
 	}
 
-	for _, event := range events {
+	for _, event := range preparedEvents {
 		handlers := configuration.exit
 		if event.Enter {
 			handlers = configuration.enter
@@ -302,10 +283,10 @@ func compile(events []micromark.Event, configuration *config, offsets []int, nod
 	}
 
 	// Figure out `root` position.
-	if len(events) > 0 {
+	if len(preparedEvents) > 0 {
 		tree.Position = &Position{
-			Start: context.point(events[0].Token.Start),
-			End:   context.point(events[len(events)-2].Token.End),
+			Start: context.point(preparedEvents[0].Token.Start),
+			End:   context.point(preparedEvents[len(preparedEvents)-2].Token.End),
 		}
 	} else {
 		tree.Position = &Position{Start: Point{Line: 1, Column: 1}, End: Point{Line: 1, Column: 1}}
@@ -315,8 +296,12 @@ func compile(events []micromark.Event, configuration *config, offsets []int, nod
 }
 
 // prepareList adds listItem tokens and infers spread. Returns the (moved) index of the list's exit.
+//
+// Mutates: eventsPointer the list's items are spliced into the caller's events and its tokens retyped and
+// marked spread in place, as upstream's prepareList edits the events it is handed.
 func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 	events := *eventsPointer
+	exitIndex := length
 	index := start - 1
 	containerBalance := -1
 	listSpread := false
@@ -325,7 +310,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 	firstBlankLineIndex := 0 // Same.
 	atMarker := false
 
-	for index+1 <= length {
+	for index+1 <= exitIndex {
 		index++
 		event := events[index]
 
@@ -412,7 +397,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 					micromark.Event{Enter: false, Token: listItem, Context: event.Context},
 				)
 				index++
-				length++
+				exitIndex++
 			}
 
 			// Create a new list item.
@@ -421,7 +406,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 				listItem = item
 				events = slices.Insert(events, index, micromark.Event{Enter: true, Token: item, Context: event.Context})
 				index++
-				length++
+				exitIndex++
 				firstBlankLineIndex = 0
 				atMarker = true
 			}
@@ -430,7 +415,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 
 	events[start].Token.Spread = listSpread
 	*eventsPointer = events
-	return length
+	return exitIndex
 }
 
 // opener is upstream's opener: create a node and enter it, then run `and`.
@@ -444,23 +429,13 @@ func opener(create func(token *micromark.Token) Node, and handle) handle {
 }
 
 // buffer pushes a fragment to collect text into.
+//
+// Mutates: context the fragment goes on top of the caller's stack, where the resume that ends it pops it.
 func buffer(context *compileContext, _ *micromark.Token) {
 	context.stack = append(
 		context.stack,
 		context.nodes.New(Node{NodeType: "fragment", IsParent: true, Children: []*Node{}}),
 	)
-}
-
-func (context *compileContext) enter(
-	node *Node,
-	token *micromark.Token,
-	errorHandler func(*compileContext, *micromark.Token, *micromark.Token),
-) {
-	parent := context.top()
-	parent.Children = append(parent.Children, node)
-	context.stack = append(context.stack, node)
-	context.tokenStack = append(context.tokenStack, tokenStackEntry{token: token, errorHandler: errorHandler})
-	node.Position = &Position{Start: context.point(token.Start)}
 }
 
 // closer is upstream's closer: run `and`, then exit.
@@ -473,45 +448,13 @@ func closer(and handle) handle {
 	}
 }
 
-func (context *compileContext) exit(
-	token *micromark.Token,
-	onExitError func(*compileContext, *micromark.Token, *micromark.Token),
-) {
-	node := context.stack[len(context.stack)-1]
-	context.stack = context.stack[:len(context.stack)-1]
-
-	if len(context.tokenStack) == 0 {
-		panic(fmt.Sprintf("Cannot close `%s`: it’s not open", token.Type))
-	}
-	open := context.tokenStack[len(context.tokenStack)-1]
-	context.tokenStack = context.tokenStack[:len(context.tokenStack)-1]
-
-	if open.token.Type != token.Type {
-		if onExitError != nil {
-			onExitError(context, token, open.token)
-		} else {
-			handler := open.errorHandler
-			if handler == nil {
-				handler = defaultOnError
-			}
-			handler(context, token, open.token)
-		}
-	}
-
-	node.Position.End = context.point(token.End)
-}
-
-// resume pops the top node and returns its text.
-func (context *compileContext) resume() string {
-	node := context.stack[len(context.stack)-1]
-	context.stack = context.stack[:len(context.stack)-1]
-	return ToString(node)
-}
-
+// defaultOnError is upstream's defaultOnError, which throws.
 func defaultOnError(_ *compileContext, left *micromark.Token, right *micromark.Token) {
 	if left != nil {
+		// Invariant: micromark's events nest, so the token that closes is the one opened last.
 		panic(fmt.Sprintf("Cannot close `%s`: a different token (`%s`) is open", left.Type, right.Type))
 	}
+	// Invariant: micromark's events are balanced, so every token is closed by the end of the document.
 	panic(fmt.Sprintf("Cannot close document, a token (`%s`) is still open", right.Type))
 }
 
@@ -534,6 +477,7 @@ func onEnterListItemValue(context *compileContext, token *micromark.Token) {
 
 // parseIntPrefix is Number.parseInt in base 10 for the digits micromark allows in a list item value.
 func parseIntPrefix(text string) int {
+	// Ignored: micromark allows a list item value only one to nine digits, so Atoi always parses it.
 	value, _ := strconv.Atoi(text)
 	return value
 }
@@ -571,13 +515,14 @@ func onExitCodeIndented(context *compileContext, _ *micromark.Token) {
 // trimOneLineEnding is `.replace(/^(\r?\n|\r)|(\r?\n|\r)$/g, ”)` with either side optional: one line
 // ending at the start, and one at the end. Prettier normalized line endings, so only \n occurs.
 func trimOneLineEnding(data string, start bool, end bool) string {
+	trimmed := data
 	if start {
-		data = strings.TrimPrefix(data, "\n")
+		trimmed = strings.TrimPrefix(trimmed, "\n")
 	}
 	if end {
-		data = strings.TrimSuffix(data, "\n")
+		trimmed = strings.TrimSuffix(trimmed, "\n")
 	}
-	return data
+	return trimmed
 }
 
 func onExitDefinitionLabelString(context *compileContext, token *micromark.Token) {
@@ -621,6 +566,9 @@ func onExitSetextHeading(context *compileContext, _ *micromark.Token) {
 	context.data.setextHeadingSlurpLineEnding = false
 }
 
+// onEnterData is upstream's onenterdata: the top's last text, or a new one, becomes the top to collect into.
+//
+// Mutates: context the text node goes on top of the caller's stack, for onExitData to pop.
 func onEnterData(context *compileContext, token *micromark.Token) {
 	node := context.top()
 	var tail *Node
@@ -638,6 +586,9 @@ func onEnterData(context *compileContext, token *micromark.Token) {
 	context.stack = append(context.stack, tail)
 }
 
+// onExitData is upstream's onexitdata: the token's text is added to the text onEnterData pushed.
+//
+// Mutates: context the text node onEnterData pushed comes off the caller's stack.
 func onExitData(context *compileContext, token *micromark.Token) {
 	tail := context.stack[len(context.stack)-1]
 	context.stack = context.stack[:len(context.stack)-1]
@@ -780,6 +731,9 @@ func onExitCharacterReferenceValue(context *compileContext, token *micromark.Tok
 	context.top().Value += value
 }
 
+// onExitCharacterReference is upstream's onexitcharacterreference: the reference's text ends here.
+//
+// Mutates: context the text node onEnterData pushed for the reference comes off the caller's stack.
 func onExitCharacterReference(context *compileContext, token *micromark.Token) {
 	tail := context.stack[len(context.stack)-1]
 	context.stack = context.stack[:len(context.stack)-1]

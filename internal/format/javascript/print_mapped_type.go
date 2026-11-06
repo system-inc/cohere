@@ -41,16 +41,14 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 		}
 	}
 
-	var danglingCommentsDoc []any
+	var danglingCommentsDoc []Doc
 	danglingComments := getComments(current, commentDangling, nil)
 	if len(danglingComments) > 0 {
 		lastComment := danglingComments[len(danglingComments)-1]
 		// upstream's printDanglingComments without indent returns join(hardline, parts), an array.
 		parts, _ := doc.Parts(printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
 		if len(parts) > 0 {
-			for _, part := range parts[:len(parts)-1] {
-				danglingCommentsDoc = append(danglingCommentsDoc, part)
-			}
+			danglingCommentsDoc = append(danglingCommentsDoc, parts[:len(parts)-1]...)
 			var separator Doc = line
 			if isLineComment(lastComment) ||
 				hasNewline(options.OriginalText, locEnd(lastComment)) {
@@ -70,12 +68,16 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 
 	var readonly Doc = emptyDoc
 	if current.Truthy("readonly") {
-		readonly = concatIn(path, printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly"), " ")
+		readonly = concatIn(
+			path,
+			textDoc(printTypeScriptMappedTypeModifier(current.Get("readonly"), "readonly")),
+			doc.Text(" "),
+		)
 	}
 
 	var nameType Doc = emptyDoc
 	if current.Truthy("nameType") {
-		nameType = concatIn(path, " as ", print("nameType", nil))
+		nameType = concatIn(path, doc.Text(" as "), print("nameType", nil))
 	}
 
 	optional := ""
@@ -90,33 +92,33 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 
 	var semicolon Doc = emptyDoc
 	if settingsOf(options).Semi {
-		semicolon = ifBreak(";", "")
+		semicolon = ifBreak(doc.Text(";"), doc.Text(""))
 	}
 
-	indented := []any{bracketLine}
+	indented := []Doc{bracketLine}
 	indented = append(indented, danglingCommentsDoc...)
 	indented = append(indented,
 		readonly,
-		groupIn(path, concatIn(path, "[",
+		groupIn(path, concatIn(path, doc.Text("["),
 			indentIn(path, concatIn(path, softline,
 				print("key", nil),
-				" in ",
+				doc.Text(" in "),
 				print("constraint", nil),
 				nameType,
 			)),
 			softline,
-			"]",
+			doc.Text("]"),
 		)),
-		optional,
-		colon,
+		textDoc(optional),
+		textDoc(colon),
 		print("typeAnnotation", nil),
 		semicolon,
 	)
 
-	return groupWithIn(path, concatIn(path, "{",
+	return groupWithIn(path, concatIn(path, doc.Text("{"),
 		indentIn(path, concatIn(path, indented...)),
 		bracketLine,
-		"}",
+		doc.Text("}"),
 	),
 		doc.GroupOptions{ShouldBreak: shouldBreak},
 	)

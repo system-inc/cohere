@@ -11,8 +11,8 @@ import (
 )
 
 // Value is one decoded JSON value. JSON can hold any of six shapes, so the value is one of six types, one per
-// shape, and a reader takes it apart with a type switch over them. The unexported marker closes the set to the six declared here, so a
-// value can never hold two shapes at once or one this package does not know.
+// shape, and a reader takes it apart with a type switch over them. The unexported marker closes the set to the six
+// declared here, so a value can never hold two shapes at once or one this package does not know.
 type Value interface {
 	jsonValue()
 }

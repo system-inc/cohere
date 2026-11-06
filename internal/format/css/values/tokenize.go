@@ -43,19 +43,6 @@ const (
 // that opens with one of them ends at column NaN, and later ones end where the previous token did.
 const undefinedNext = math.MinInt
 
-// token is upstream's token array: [type, value, startLine, startColumn, endLine, endColumn, index].
-type token struct {
-	kind        string
-	value       []uint16
-	startLine   int
-	startColumn int
-	endLine     int
-	endColumn   int
-	// endColumnIsNaN is an end column computed from an undefined `next`.
-	endColumnIsNaN bool
-	index          int
-}
-
 // atEnd is upstream's /[ \n\t\r\{\(\)'"\\;,/]/g.
 func atEnd(code uint16) bool {
 	switch code {

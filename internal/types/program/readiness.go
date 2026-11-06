@@ -3,7 +3,6 @@ package program
 import (
 	"encoding/json"
 	"sort"
-	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -33,29 +32,6 @@ func (readiness *Readiness) Measures(ruleName string) bool {
 	return measured
 }
 
-// Findings is the record's total. AdamicRecord itself is the findings cache's, in lint_cache.go.
-func (record *AdamicRecord) Findings() int {
-	total := 0
-	for _, count := range record.Counts {
-		total += int(count.Findings)
-	}
-	return total
-}
-
-// Measured is whether the record can say ready or not: a file has one, and no set rule skipped it. A file
-// with none was replayed from an entry its run never measured, which the findings cache refuses to a run that
-// measures (FindingsReuse.MeasureReadiness), so it reads unmeasured rather than as clean.
-func (record *AdamicRecord) Measured() bool {
-	return record != nil && len(record.Skipped) == 0
-}
-
-// fileReadiness accumulates one file's record while the dispatcher walks it.
-type fileReadiness struct {
-	counts      map[string]int32
-	skipped     []string
-	measureOnly map[string]bool
-}
-
 // newFileReadiness starts a file's record over the set rules among the rules about to walk.
 func newFileReadiness(readiness *Readiness, rules []rule.Entry, measureOnly map[string]bool) *fileReadiness {
 	if readiness == nil {
@@ -67,49 +43,6 @@ func newFileReadiness(readiness *Readiness, rules []rule.Entry, measureOnly map[
 			record.counts[subject.Name] = 0
 		}
 	}
-	return record
-}
-
-// count adds a finding of ruleName, when it is a set rule.
-func (readiness *fileReadiness) count(ruleName string) {
-	if readiness == nil {
-		return
-	}
-	if current, measured := readiness.counts[ruleName]; measured {
-		readiness.counts[ruleName] = current + 1
-	}
-}
-
-// hidden is whether ruleName's findings and notes stay out of the run: a rule running measure-only.
-func (readiness *fileReadiness) hidden(ruleName string) bool {
-	return readiness != nil && readiness.measureOnly[ruleName]
-}
-
-// note keeps a set rule's skip. A skip covered by another check that ran leaves nothing unchecked, so it
-// is no gap here either.
-func (readiness *fileReadiness) note(ruleName string, key string) {
-	if readiness == nil {
-		return
-	}
-	if _, measured := readiness.counts[ruleName]; measured && strings.HasPrefix(key, rule.SkippedNotePrefix) {
-		readiness.skipped = append(readiness.skipped, ruleName)
-	}
-}
-
-// record is the file's measurement, sorted, with a pair for every set rule that ran, zeros included.
-func (readiness *fileReadiness) record() *AdamicRecord {
-	if readiness == nil {
-		return nil
-	}
-	record := &AdamicRecord{Counts: make([]AdamicCount, 0, len(readiness.counts))}
-	for name, findings := range readiness.counts {
-		record.Counts = append(record.Counts, AdamicCount{Rule: name, Findings: findings})
-	}
-	sort.Slice(
-		record.Counts,
-		func(left, right int) bool { return record.Counts[left].Rule < record.Counts[right].Rule },
-	)
-	record.Skipped = sortedUnique(readiness.skipped)
 	return record
 }
 

@@ -33,6 +33,9 @@ const (
 // and required in the Nexus tier.
 const FormatKey = "format"
 
+// SwiftKey is the Swift engine's block, which cohere-swift reads itself.
+const SwiftKey = "swift"
+
 // schemaNode is one node of a schema, in as much of JSON Schema 2020-12 as these schemas use. Its fields are
 // declared in the byte order of their keys, the order encoding/json sorts a map's keys into, so a node encodes
 // with its keys sorted, as the committed files are written. Minimum is a pointer, since a minimum of 0 is
@@ -259,9 +262,6 @@ func goShape() *schemaNode {
 		},
 	}
 }
-
-// SwiftKey is the Swift engine's block, which cohere-swift reads itself.
-const SwiftKey = "swift"
 
 // swiftSeverities are the severities the Swift engine accepts, as written: its RuleConfiguration.Severity,
 // whose raw values are compared exactly. Fewer than the TypeScript loader's, so the block has its own

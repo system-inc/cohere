@@ -32,12 +32,9 @@ package differential
 
 import (
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 
@@ -89,64 +86,6 @@ type FileResult struct {
 
 	// Detail is the first difference for Different, the error for CandidateRefused and OracleFailed.
 	Detail string
-}
-
-// Tally counts outcomes for one language.
-type Tally struct {
-	Identical        int
-	Different        int
-	CandidateRefused int
-	OracleFailed     int
-
-	// RewriteIdentical and RewriteTotal are the same count restricted to files the oracle rewrites.
-	RewriteIdentical int
-	RewriteTotal     int
-}
-
-// Measured is the denominator: every file with a correct answer to match.
-func (tally Tally) Measured() int {
-	return tally.Identical + tally.Different + tally.CandidateRefused
-}
-
-// Percent is the identity rate over measured files. A tally with nothing measured reports zero rather
-// than dividing by zero or claiming a perfect score over an empty set.
-func (tally Tally) Percent() float64 {
-	if tally.Measured() == 0 {
-		return 0
-	}
-	return 100 * float64(tally.Identical) / float64(tally.Measured())
-}
-
-// RewritePercent is the identity rate over files the oracle rewrites.
-func (tally Tally) RewritePercent() float64 {
-	if tally.RewriteTotal == 0 {
-		return 0
-	}
-	return 100 * float64(tally.RewriteIdentical) / float64(tally.RewriteTotal)
-}
-
-// Report is one corpus measured.
-type Report struct {
-	// Root is the corpus that was walked. A percentage means nothing without the root it was taken
-	// against, which is how a measurement silently covers half a tree.
-	Root string
-
-	ByLanguage map[string]*Tally
-	Files      []FileResult
-}
-
-// Total sums every language.
-func (report Report) Total() Tally {
-	total := Tally{}
-	for _, tally := range report.ByLanguage {
-		total.Identical += tally.Identical
-		total.Different += tally.Different
-		total.CandidateRefused += tally.CandidateRefused
-		total.OracleFailed += tally.OracleFailed
-		total.RewriteIdentical += tally.RewriteIdentical
-		total.RewriteTotal += tally.RewriteTotal
-	}
-	return total
 }
 
 // Language buckets a file by what parses it, which is what the port is organized by. An Adamic `.a` file is
@@ -332,103 +271,10 @@ func truncate(line string) string {
 	return line[:limit] + "…"
 }
 
-// Summary renders a report for a terminal: per language, then the total, then failures by name.
-func (report Report) Summary() string {
-	var builder strings.Builder
-	fmt.Fprintf(&builder, "corpus %s\n", report.Root)
-
-	languages := make([]string, 0, len(report.ByLanguage))
-	for language := range report.ByLanguage {
-		languages = append(languages, language)
-	}
-	sort.Strings(languages)
-
-	row := func(name string, tally Tally) {
-		fmt.Fprintf(
-			&builder,
-			"  %-8s %6.2f%%  %5d/%-5d identical  rewrites %6.2f%% (%d/%d)  refused %d  oracle failed %d\n",
-			name,
-			tally.Percent(),
-			tally.Identical,
-			tally.Measured(),
-			tally.RewritePercent(),
-			tally.RewriteIdentical,
-			tally.RewriteTotal,
-			tally.CandidateRefused,
-			tally.OracleFailed,
-		)
-	}
-	for _, language := range languages {
-		row(language, *report.ByLanguage[language])
-	}
-	row("total", report.Total())
-
-	for _, result := range report.Files {
-		if result.Outcome == OracleFailed {
-			fmt.Fprintf(&builder, "  oracle failed: %s: %s\n", result.Path, firstLine(result.Detail))
-		}
-	}
-	return builder.String()
-}
-
 func firstLine(text string) string {
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	if scanner.Scan() {
 		return scanner.Text()
 	}
 	return text
-}
-
-// OracleCache stores oracle output on disk, keyed by everything the output depends on.
-//
-// The key is the bundle digest, a description of the options, the file name (the parser is chosen by
-// it) and the file's bytes. Leave any of those out and a stale answer is served for a changed input,
-// which would make the harness report a match against an oracle that no longer exists. A nil cache
-// formats every time.
-type OracleCache struct {
-	Directory string
-
-	// Identity is the bundle digest plus the options, everything about the oracle that is not the file.
-	Identity string
-}
-
-func (cache *OracleCache) format(oracle Formatter, path string, text string) (string, error) {
-	if cache == nil {
-		return oracle.Format(path, text)
-	}
-
-	hash := sha256.New()
-	fmt.Fprintf(hash, "%s\x00%s\x00%d\x00", cache.Identity, filepath.Base(path), len(text))
-	hash.Write([]byte(text))
-	key := hex.EncodeToString(hash.Sum(nil))
-	entry := filepath.Join(cache.Directory, key[:2], key)
-
-	if cached, readError := os.ReadFile(entry); readError == nil {
-		return string(cached), nil
-	}
-
-	formatted, formatError := oracle.Format(path, text)
-	if formatError != nil {
-		return "", formatError
-	}
-	// A unique temporary per writer, then rename. Two workers can hold the same file (a duplicated
-	// fixture, a copied config) and would otherwise write one shared temporary at the same instant.
-	// The cache is an optimization, so any failure here is swallowed and the answer still returned.
-	if createDirectoryError := os.MkdirAll(filepath.Dir(entry), 0o755); createDirectoryError == nil {
-		if temporary, temporaryFileError := os.CreateTemp(
-			filepath.Dir(entry),
-			key+".*.tmp",
-		); temporaryFileError == nil {
-			_, writeError := temporary.WriteString(formatted)
-			closeError := temporary.Close()
-			if writeError == nil && closeError == nil {
-				// Ignored: a rename that fails leaves the entry uncached, and the next run formats the file again.
-				_ = os.Rename(temporary.Name(), entry)
-			} else {
-				// Ignored: a temporary left behind is only a stray file in the cache directory, never read as an entry.
-				_ = os.Remove(temporary.Name())
-			}
-		}
-	}
-	return formatted, nil
 }

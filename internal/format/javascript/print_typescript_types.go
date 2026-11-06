@@ -14,14 +14,14 @@ import "github.com/system-inc/cohere/internal/format/doc"
 // printMethodSignature is upstream's printMethodSignature.
 func printMethodSignature(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 	kind := ""
 	if current.Truthy("kind") && current.String("kind") != "method" {
 		kind = current.String("kind") + " "
 	}
 	parts = append(parts,
 		printTypeScriptAccessibilityToken(current),
-		kind,
+		textDoc(kind),
 		printKey(path, options, print),
 		printOptionalToken(path),
 	)
@@ -75,7 +75,7 @@ func printEnumMember(path *Path, options *Options, print PrintFunc) Doc {
 		return idDoc
 	}
 
-	return concatIn(path, idDoc, " = ", print(initializerProperty, nil))
+	return concatIn(path, idDoc, doc.Text(" = "), print(initializerProperty, nil))
 }
 
 /*
@@ -91,10 +91,10 @@ func printEnumDeclaration(path *Path, print PrintFunc) Doc {
 		constToken = "const "
 	}
 	return concatIn(path, printDeclareToken(path),
-		constToken,
-		"enum ",
+		textDoc(constToken),
+		doc.Text("enum "),
 		print("id", nil),
-		" ",
+		doc.Text(" "),
 		print("body", nil),
 	)
 }
@@ -110,16 +110,16 @@ func printTypeAssertion(path *Path, options *Options, print PrintFunc) Doc {
 	shouldBreakAfterCast := !(isArrayExpression(current.Child("expression")) ||
 		isObjectExpression(current.Child("expression")))
 
-	castGroup := groupIn(path, concatIn(path, "<",
+	castGroup := groupIn(path, concatIn(path, doc.Text("<"),
 		indentIn(path, concatIn(path, softline, print("typeAnnotation", nil))),
 		softline,
-		">",
+		doc.Text(">"),
 	))
 
-	exprContents := concatIn(path, ifBreak("(", ""),
+	exprContents := concatIn(path, ifBreak(doc.Text("("), doc.Text("")),
 		indentIn(path, concatIn(path, softline, print("expression", nil))),
 		softline,
-		ifBreak(")", ""),
+		ifBreak(doc.Text(")"), doc.Text("")),
 	)
 
 	if shouldBreakAfterCast {
@@ -148,7 +148,7 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 
 	parametersGroup := groupIn(path, concatIn(path, indentIn(
 		path,
-		concatIn(path, softline, join(concatIn(path, ", ", softline), printAll(path, print, "parameters"))),
+		concatIn(path, softline, join(concatIn(path, doc.Text(", "), softline), printAll(path, print, "parameters"))),
 	),
 		trailingComma,
 		softline,
@@ -171,11 +171,11 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 		parameters = parametersGroup
 	}
 
-	return concatIn(path, staticToken,
-		readonly,
-		"[",
+	return concatIn(path, textDoc(staticToken),
+		textDoc(readonly),
+		doc.Text("["),
 		parameters,
-		"]",
+		doc.Text("]"),
 		printTypeAnnotationProperty(path, print),
 		printClassMemberSemicolon(path, options),
 	)
@@ -192,9 +192,9 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 func printIndexedAccessType(path *Path, options *Options, print PrintFunc) Doc {
 	return concatIn(path, print("objectType", nil),
 		printOptionalToken(path),
-		"[",
+		doc.Text("["),
 		print("indexType", nil),
-		"]",
+		doc.Text("]"),
 	)
 }
 
@@ -206,7 +206,7 @@ func printIndexedAccessType(path *Path, options *Options, print PrintFunc) Doc {
 */
 // printInferType is upstream's printInferType.
 func printInferType(path *Path, options *Options, print PrintFunc) Doc {
-	return concatIn(path, "infer ", print("typeParameter", nil))
+	return concatIn(path, doc.Text("infer "), print("typeParameter", nil))
 }
 
 // print/rest-type.js
@@ -218,7 +218,7 @@ func printInferType(path *Path, options *Options, print PrintFunc) Doc {
 // printRestType is upstream's printRestType. The Flow `TupleTypeSpreadElement` label branch is
 // dropped.
 func printRestType(path *Path, options *Options, print PrintFunc) Doc {
-	return concatIn(path, "...",
+	return concatIn(path, doc.Text("..."),
 		print("typeAnnotation", nil),
 	)
 }
@@ -239,9 +239,9 @@ func printTypePredicate(path *Path, print PrintFunc) Doc {
 	}
 	var typeAnnotation Doc = emptyDoc
 	if current.Truthy("typeAnnotation") {
-		typeAnnotation = concatIn(path, " is ", printTypeAnnotationProperty(path, print))
+		typeAnnotation = concatIn(path, doc.Text(" is "), printTypeAnnotationProperty(path, print))
 	}
-	return concatIn(path, prefix,
+	return concatIn(path, textDoc(prefix),
 		print("parameterName", nil),
 		typeAnnotation,
 	)
@@ -259,5 +259,5 @@ func printTypeQuery(path *Path, print PrintFunc) Doc {
 	if node(path).Is("TSTypeQuery") {
 		argumentPropertyName = "exprName"
 	}
-	return concatIn(path, "typeof ", print(argumentPropertyName, nil), print("typeArguments", nil))
+	return concatIn(path, doc.Text("typeof "), print(argumentPropertyName, nil), print("typeArguments", nil))
 }

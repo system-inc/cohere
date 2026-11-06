@@ -11,13 +11,12 @@ import (
 // preprocess is src/language-markdown/print/preprocess.js for the markdown parser (the MDX branches are
 // not ported: no corpus holds .mdx).
 func preprocess(ast *Node, originalText string, tabWidth int, nodes *arena.Arena[Node]) *Node {
-	ast = addRawToText(ast, originalText)
-	ast = mergeContinuousTexts(ast, nodes)
-	ast = transformIndentedCodeblock(ast, originalText)
-	ast = markOriginalImageAndLinkAlt(ast, originalText)
-	ast = markAlignedList(ast, originalText, tabWidth)
-	ast = splitTextIntoSentences(ast, nodes)
-	return ast
+	withRaw := addRawToText(ast, originalText)
+	withMergedTexts := mergeContinuousTexts(withRaw, nodes)
+	withIndentedCode := transformIndentedCodeblock(withMergedTexts, originalText)
+	withOriginalAlt := markOriginalImageAndLinkAlt(withIndentedCode, originalText)
+	withAlignedLists := markAlignedList(withOriginalAlt, originalText, tabWidth)
+	return splitTextIntoSentences(withAlignedLists, nodes)
 }
 
 func addRawToText(ast *Node, originalText string) *Node {
@@ -184,6 +183,9 @@ func splitTextIntoSentences(ast *Node, nodes *arena.Arena[Node]) *Node {
 // a file that reaches it is a file Prettier cannot format.
 func rawOf(node *Node) string {
 	if node.Raw == nil {
+		// Invariant: mdast's onEnterData extends the tail text rather than open a second one, and nothing
+		// else in the parser makes a text, so no two texts stand side by side for mergeContinuousTexts to
+		// merge, and every text keeps the raw addRawToText gave it.
 		panic("markdown: Cannot read properties of undefined (reading 'includes')")
 	}
 	return *node.Raw

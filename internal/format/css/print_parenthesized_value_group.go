@@ -38,16 +38,16 @@ func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
 	return doc.Text("")
 }
 
-func printParenthesizedValueGroup(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printParenthesizedValueGroup(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parent, hasParent := path.Parent()
 	// A url() argument the value parser cannot handle is a plain string among the groups
 	// (parse-value.js), which is why groups are walked as values here and not as nodes.
-	groupDocs := printing.Map(path, func(path *astPath, _ int, _ any) doc.Doc {
-		if text, isString := path.Value().(string); isString {
+	groupDocs := printing.Map(path, func(path *astPath, _ int) doc.Doc {
+		if text, isString := path.Value().Leaf(); isString {
 			return doc.Text(text)
 		}
-		return print(nil, nil)
+		return print("", nil)
 	}, "groups")
 	groupCount := len(groupDocs)
 	groups := node.List("groups")
@@ -86,7 +86,7 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 		return doc.NewIndent(doc.NewGroup(doc.Concat{leading, doc.NewFill(parts)}, doc.GroupOptions{}))
 	}
 
-	parts := printing.Map(path, func(path *astPath, index int, _ any) doc.Doc {
+	parts := printing.Map(path, func(path *astPath, index int) doc.Doc {
 		child := currentNode(path)
 		isLast := path.IsLast()
 		groupDoc := groupDocs[index]
@@ -154,7 +154,7 @@ func printParenthesizedValueGroup(path *astPath, options *printerOptions, print 
 
 func shouldBreakList(path *astPath) bool {
 	return path.Match(
-		func(node any, _ any, _ int, _ bool) bool {
+		func(node pathValue, _ string, _ int, _ bool) bool {
 			value := asNode(node)
 			return value.Type() == "value-paren_group" &&
 				value.Child("open") == nil &&
@@ -163,13 +163,13 @@ func shouldBreakList(path *astPath) bool {
 					func(group *estree.Node) bool { return group.Type() == "value-comma_group" },
 				)
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			return key == "group" && asNode(node).Type() == "value-value"
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			return key == "group" && asNode(node).Type() == "value-root"
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			value := asNode(node)
 			return key == "value" &&
 				((value.Type() == "css-decl" && !strings.HasPrefix(value.String("prop"), "--")) ||
@@ -180,17 +180,17 @@ func shouldBreakList(path *astPath) bool {
 
 func shouldPrecededBySoftline(path *astPath) bool {
 	return path.Match(
-		func(node any, _ any, _ int, _ bool) bool {
+		func(node pathValue, _ string, _ int, _ bool) bool {
 			value := asNode(node)
 			return value.Type() == "value-paren_group" && value.Child("open") == nil
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			return key == "group" && asNode(node).Type() == "value-value"
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			return key == "group" && asNode(node).Type() == "value-root"
 		},
-		func(node any, key any, _ int, _ bool) bool {
+		func(node pathValue, key string, _ int, _ bool) bool {
 			return key == "value" && asNode(node).Type() == "css-decl"
 		},
 	)

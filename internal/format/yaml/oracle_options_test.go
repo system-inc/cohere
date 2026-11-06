@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -72,17 +73,22 @@ func (oracle *optionsOracle) formatLive(
 	options formatoptions.Options,
 	proseWrap string,
 ) (string, error) {
-	oracle.runtime.Set("__source", text)
-	oracle.runtime.Set("__filePath", filePath)
-	oracle.runtime.Set("__parser", parser)
-	oracle.runtime.Set("__proseWrap", proseWrap)
-	oracle.runtime.Set("__printWidth", options.PrintWidth)
-	oracle.runtime.Set("__tabWidth", options.TabWidth)
-	oracle.runtime.Set("__useTabs", options.UseTabs)
-	oracle.runtime.Set("__singleQuote", options.SingleQuote)
-	oracle.runtime.Set("__bracketSpacing", options.BracketSpacing)
-	oracle.runtime.Set("__trailingComma", options.TrailingComma)
-	oracle.runtime.Set("__endOfLine", options.EndOfLine)
+	setGlobalsError := errors.Join(
+		oracle.runtime.Set("__source", text),
+		oracle.runtime.Set("__filePath", filePath),
+		oracle.runtime.Set("__parser", parser),
+		oracle.runtime.Set("__proseWrap", proseWrap),
+		oracle.runtime.Set("__printWidth", options.PrintWidth),
+		oracle.runtime.Set("__tabWidth", options.TabWidth),
+		oracle.runtime.Set("__useTabs", options.UseTabs),
+		oracle.runtime.Set("__singleQuote", options.SingleQuote),
+		oracle.runtime.Set("__bracketSpacing", options.BracketSpacing),
+		oracle.runtime.Set("__trailingComma", options.TrailingComma),
+		oracle.runtime.Set("__endOfLine", options.EndOfLine),
+	)
+	if setGlobalsError != nil {
+		return "", fmt.Errorf("setting the format's options in the oracle runtime: %w", setGlobalsError)
+	}
 	value, runStringError := oracle.runtime.RunString(`prettier.format(__source, {
 		filepath: __filePath, parser: __parser, plugins: prettierPlugins, proseWrap: __proseWrap,
 		printWidth: __printWidth, tabWidth: __tabWidth, useTabs: __useTabs, singleQuote: __singleQuote,

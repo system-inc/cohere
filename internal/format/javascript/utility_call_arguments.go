@@ -53,36 +53,40 @@ func iterateCallArgumentsPath(path *Path, iteratee func(path *Path, index int)) 
 
 // getCallArgumentSelector is upstream's getCallArgumentSelector: the print selector of the argument
 // at index, negative from the end. Upstream's RangeError is a panic.
-func getCallArgumentSelector(node Node, index int) []any {
+func getCallArgumentSelector(node Node, index int) pathSelector {
 	if node.Is("ImportExpression", "TSImportType") {
 		lastIndex := -1
 		if node.Truthy("options") {
 			lastIndex = -2
 		}
 		if index == 0 || index == lastIndex {
-			return []any{"source"}
+			return pathSelector{property: "source"}
 		}
 
 		if node.Truthy("options") && (index == 1 || index == -1) {
-			return []any{"options"}
+			return pathSelector{property: "options"}
 		}
 
+		// Invariant: printCallArguments, the only caller, asks for index 0 or -1, both answered above.
 		panic("javascript: Invalid argument index")
 	}
 
 	if node.Is("TSExternalModuleReference") {
 		if index == 0 || index == -1 {
-			return []any{"expression"}
+			return pathSelector{property: "expression"}
 		}
 	} else {
-		if index < 0 {
-			index = len(node.List("arguments")) + index
+		argumentIndex := index
+		if argumentIndex < 0 {
+			argumentIndex = len(node.List("arguments")) + index
 		}
-		if index >= 0 && index < len(node.List("arguments")) {
-			return []any{"arguments", index}
+		if argumentIndex >= 0 && argumentIndex < len(node.List("arguments")) {
+			return pathSelector{property: "arguments", index: argumentIndex, endsInIndex: true}
 		}
 	}
 
+	// Invariant: printCallArguments, the only caller, asks for index 0 or -1 of a call with at least one
+	// argument, which the branches above answer.
 	panic("javascript: Invalid argument index")
 }
 
@@ -200,25 +204,25 @@ func isSimpleCallArgument(node Node, depth int) bool {
 
 	isChildSimple := func(child Node) bool { return isSimpleCallArgument(child, depth-1) }
 
-	node = stripChainElementWrappers(node)
+	unwrapped := stripChainElementWrappers(node)
 
-	if isRegExpLiteral(node) {
-		return doc.StringWidth(regExpPattern(node)) <= 5
+	if isRegExpLiteral(unwrapped) {
+		return doc.StringWidth(regExpPattern(unwrapped)) <= 5
 	}
 
-	if isLiteral(node) ||
-		isSingleWordType(node) ||
-		node.Is("ArgumentPlaceholder") {
+	if isLiteral(unwrapped) ||
+		isSingleWordType(unwrapped) ||
+		unwrapped.Is("ArgumentPlaceholder") {
 		return true
 	}
 
-	if node.Is("TemplateLiteral") {
-		for _, element := range node.List("quasis") {
+	if unwrapped.Is("TemplateLiteral") {
+		for _, element := range unwrapped.List("quasis") {
 			if strings.Contains(templateElementRaw(element), "\n") {
 				return false
 			}
 		}
-		for _, expression := range node.List("expressions") {
+		for _, expression := range unwrapped.List("expressions") {
 			if !isChildSimple(expression) {
 				return false
 			}
@@ -226,8 +230,8 @@ func isSimpleCallArgument(node Node, depth int) bool {
 		return true
 	}
 
-	if isObjectExpression(node) {
-		for _, property := range node.List("properties") {
+	if isObjectExpression(unwrapped) {
+		for _, property := range unwrapped.List("properties") {
 			if !(!property.Truthy("computed") &&
 				(property.Truthy("shorthand") ||
 					property.Child("value") != nil && isChildSimple(property.Child("value")))) {
@@ -237,8 +241,8 @@ func isSimpleCallArgument(node Node, depth int) bool {
 		return true
 	}
 
-	if isArrayExpression(node) {
-		for _, element := range node.List("elements") {
+	if isArrayExpression(unwrapped) {
+		for _, element := range unwrapped.List("elements") {
 			if !(element == nil || isChildSimple(element)) {
 				return false
 			}
@@ -246,10 +250,10 @@ func isSimpleCallArgument(node Node, depth int) bool {
 		return true
 	}
 
-	if isCallLikeExpression(node) {
-		if node.Is("ImportExpression") ||
-			isSimpleCallArgument(node.Child("callee"), depth) {
-			arguments := getCallArguments(node)
+	if isCallLikeExpression(unwrapped) {
+		if unwrapped.Is("ImportExpression") ||
+			isSimpleCallArgument(unwrapped.Child("callee"), depth) {
+			arguments := getCallArguments(unwrapped)
 			if len(arguments) > depth {
 				return false
 			}
@@ -263,15 +267,15 @@ func isSimpleCallArgument(node Node, depth int) bool {
 		return false
 	}
 
-	if isMemberExpression(node) {
-		return isSimpleCallArgument(node.Child("object"), depth) &&
-			isSimpleCallArgument(node.Child("property"), depth)
+	if isMemberExpression(unwrapped) {
+		return isSimpleCallArgument(unwrapped.Child("object"), depth) &&
+			isSimpleCallArgument(unwrapped.Child("property"), depth)
 	}
 
-	if node.Is("UnaryExpression") &&
-		simpleCallArgumentUnaryOperators[node.String("operator")] ||
-		node.Is("UpdateExpression") {
-		return isSimpleCallArgument(node.Child("argument"), depth)
+	if unwrapped.Is("UnaryExpression") &&
+		simpleCallArgumentUnaryOperators[unwrapped.String("operator")] ||
+		unwrapped.Is("UpdateExpression") {
+		return isSimpleCallArgument(unwrapped.Child("argument"), depth)
 	}
 
 	return false

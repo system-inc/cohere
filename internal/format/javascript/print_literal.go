@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
@@ -13,27 +14,29 @@ import (
 func printLiteral(path *Path, options *Options) Doc {
 	current := node(path)
 	if regex, isRegex := current.Get("regex").(*estree.Regex); isRegex {
-		return concatIn(path, printRegex(regex))
+		return concatIn(path, textDoc(printRegex(regex)))
 	}
 	if current.Truthy("bigint") {
-		return concatIn(path, printBigInt(current.String("raw")))
+		return concatIn(path, textDoc(printBigInt(current.String("raw"))))
 	}
 	switch value := current.Get("value").(type) {
 	case float64:
-		return concatIn(path, printNumber(current.String("raw")))
+		return concatIn(path, textDoc(printNumber(current.String("raw"))))
 	case string:
 		if isDirective(path) {
-			return concatIn(path, printDirective(current.String("raw"), options))
+			return concatIn(path, textDoc(printDirective(current.String("raw"), options)))
 		}
 		return replaceEndOfLine(printString(current.String("raw"), options))
 	case bool:
 		if value {
-			return concatIn(path, "true")
+			return concatIn(path, doc.Text("true"))
 		}
-		return concatIn(path, "false")
+		return concatIn(path, doc.Text("false"))
 	case nil:
-		return concatIn(path, "null")
+		return concatIn(path, doc.Text("null"))
 	}
+	// Invariant: estree builds a Literal's value as a number, string, boolean or null, or sets regex or bigint
+	// above, as upstream's printLiteral assumes.
 	panic("unknown literal value")
 }
 

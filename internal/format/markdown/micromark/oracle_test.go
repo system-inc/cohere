@@ -144,7 +144,8 @@ func compareEvents(test *testing.T, inputs []string) (failures int) {
 
 func firstEventDifference(expected []string, actual []string) string {
 	for index := 0; index < len(expected) || index < len(actual); index++ {
-		var want, got string
+		var want string
+		var got string
 		if index < len(expected) {
 			want = expected[index]
 		}

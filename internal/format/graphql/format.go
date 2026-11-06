@@ -14,10 +14,13 @@ import (
 )
 
 // astPath is upstream's AstPath over GraphQL nodes.
-type astPath = printing.AstPath[*estree.Node]
+type astPath = printing.AstPath[*estree.Node, formatoptions.Options]
 
 // printerOptions is upstream's options object for one format.
-type printerOptions = printing.Options[*estree.Node]
+type printerOptions = printing.Options[*estree.Node, formatoptions.Options, printing.NoArguments]
+
+// printFunc is upstream's print(selector), which the GraphQL printer passes no args.
+type printFunc = printing.PrintFunc[printing.NoArguments]
 
 // locStart and locEnd are loc.js: a node's or token's loc.start and loc.end, which are the Range here.
 func locStart(nodeOrToken *estree.Node) int { return nodeOrToken.Range[0] }
@@ -25,7 +28,7 @@ func locEnd(nodeOrToken *estree.Node) int   { return nodeOrToken.Range[1] }
 
 // graphqlPrinter is printer-graphql.js's printer object. massageAstNode is test-only upstream and
 // insertPragma runs only under insertPragma, which cohere never sets, so neither is here.
-var graphqlPrinter = &printing.Printer[*estree.Node]{
+var graphqlPrinter = &printing.Printer[*estree.Node, formatoptions.Options, printing.NoArguments]{
 	Print:             genericPrint,
 	LocStart:          locStart,
 	LocEnd:            locEnd,
@@ -38,13 +41,7 @@ var graphqlPrinter = &printing.Printer[*estree.Node]{
 // settingsOf is the resolved Prettier options a format carries in options.Settings. The printer reads
 // one of them, bracketSpacing (options.js).
 func settingsOf(options *printerOptions) formatoptions.Options {
-	settings, isOptions := options.Settings.(formatoptions.Options)
-	if !isOptions {
-		// Invariant: printToDoc is the only place a graphql printerOptions is built, and it always sets
-		// Settings to the formatoptions.Options it was given; Format and PrintToDoc recover the panic.
-		panic(fmt.Sprintf("graphql: the printer's settings are a %T, not formatoptions.Options", options.Settings))
-	}
-	return settings
+	return options.Settings
 }
 
 // Format is Prettier's format for a GraphQL file: parse, attach comments, print to a doc, lay it out.

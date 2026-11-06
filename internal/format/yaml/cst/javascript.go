@@ -13,10 +13,7 @@ func characterAt(text []uint16, index int) int {
 
 // indexOf is `text.indexOf(character, from)`. A from past the end finds nothing; a negative from is 0.
 func indexOf(text []uint16, character uint16, from int) int {
-	if from < 0 {
-		from = 0
-	}
-	for index := from; index < len(text); index++ {
+	for index := max(from, 0); index < len(text); index++ {
 		if text[index] == character {
 			return index
 		}
@@ -26,38 +23,41 @@ func indexOf(text []uint16, character uint16, from int) int {
 
 // substring is `text.substring(start, end)`: both clamped to [0, length], swapped when start > end.
 func substring(text []uint16, start int, end int) []uint16 {
-	start = clamp(start, 0, len(text))
-	end = clamp(end, 0, len(text))
-	if start > end {
-		start, end = end, start
+	clampedStart := clamp(start, 0, len(text))
+	clampedEnd := clamp(end, 0, len(text))
+	if clampedStart > clampedEnd {
+		clampedStart, clampedEnd = clampedEnd, clampedStart
 	}
-	return text[start:end:end]
+	return text[clampedStart:clampedEnd:clampedEnd]
 }
 
 // substr is `text.substr(start, length)`: a negative start counts from the end, the length is clamped.
 func substr(text []uint16, start int, length int) []uint16 {
-	if start < 0 {
-		start = max(len(text)+start, 0)
+	resolvedStart := start
+	if resolvedStart < 0 {
+		resolvedStart = max(len(text)+resolvedStart, 0)
 	}
-	start = min(start, len(text))
-	end := clamp(start+length, start, len(text))
-	return text[start:end:end]
+	resolvedStart = min(resolvedStart, len(text))
+	end := clamp(resolvedStart+length, resolvedStart, len(text))
+	return text[resolvedStart:end:end]
 }
 
 // slice is `text.slice(start, end)`: negatives count from the end, an end before the start is empty.
 func slice(text []uint16, start int, end int) []uint16 {
-	if start < 0 {
-		start = max(len(text)+start, 0)
+	resolvedStart := start
+	if resolvedStart < 0 {
+		resolvedStart = max(len(text)+resolvedStart, 0)
 	}
-	if end < 0 {
-		end = max(len(text)+end, 0)
+	resolvedEnd := end
+	if resolvedEnd < 0 {
+		resolvedEnd = max(len(text)+resolvedEnd, 0)
 	}
-	start = min(start, len(text))
-	end = min(end, len(text))
-	if end < start {
-		return text[start:start:start]
+	resolvedStart = min(resolvedStart, len(text))
+	resolvedEnd = min(resolvedEnd, len(text))
+	if resolvedEnd < resolvedStart {
+		return text[resolvedStart:resolvedStart:resolvedStart]
 	}
-	return text[start:end:end]
+	return text[resolvedStart:resolvedEnd:resolvedEnd]
 }
 
 // startsWith is `text.startsWith(prefix)` for an ASCII prefix.

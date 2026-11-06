@@ -8,14 +8,14 @@ import (
 // print/assignment.js. experimentalTernaries is always false, so the branches that read it keep only
 // the false side.
 
-// printAssignment is upstream's printAssignment. operator is `any` because upstream passes both a
-// string (" =", ":") and an array ([" ", node.operator]). An absent rightPropertyName is "".
+// printAssignment is upstream's printAssignment. Upstream passes operator as a string (" =", ":") or an
+// array ([" ", node.operator]); here either is a Doc. An absent rightPropertyName is "".
 func printAssignment(
 	path *Path,
 	options *Options,
 	print PrintFunc,
 	leftDoc Doc,
-	operator any,
+	operator Doc,
 	rightPropertyName string,
 ) Doc {
 	layout := chooseLayout(path, options, print, leftDoc, rightPropertyName)
@@ -37,7 +37,7 @@ func printAssignment(
 
 	// First break right-hand side, then left-hand side
 	case "never-break-after-operator":
-		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, " ", rightDoc))
+		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, doc.Text(" "), rightDoc))
 
 	// First break right-hand side, then after operator
 	case "fluid":
@@ -50,7 +50,7 @@ func printAssignment(
 		))
 
 	case "break-lhs":
-		return groupIn(path, concatIn(path, leftDoc, operator, " ", groupIn(path, rightDoc)))
+		return groupIn(path, concatIn(path, leftDoc, operator, doc.Text(" "), groupIn(path, rightDoc)))
 
 	// Parts of assignment chains aren't wrapped in groups.
 	// Once one of them breaks, the chain breaks too.
@@ -66,7 +66,8 @@ func printAssignment(
 	case "only-left":
 		return leftDoc
 	}
-	// Upstream falls off the switch and returns undefined; chooseLayout never returns another layout.
+	// Upstream falls off the switch and returns undefined.
+	// Invariant: chooseLayout returns only the layouts this switch handles.
 	panic("javascript: unknown assignment layout " + layout)
 }
 
@@ -78,14 +79,14 @@ func printAssignmentExpression(path *Path, options *Options, print PrintFunc) Do
 		options,
 		print,
 		print("left", nil),
-		concatIn(path, " ", current.String("operator")),
+		concatIn(path, doc.Text(" "), textDoc(current.String("operator"))),
 		"right",
 	)
 }
 
 // printVariableDeclarator is upstream's printVariableDeclarator.
 func printVariableDeclarator(path *Path, options *Options, print PrintFunc) Doc {
-	return printAssignment(path, options, print, print("id", nil), " =", "init")
+	return printAssignment(path, options, print, print("id", nil), doc.Text(" ="), "init")
 }
 
 // chooseLayout is upstream's chooseLayout.
@@ -106,16 +107,16 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 
 	isTail := !isAssignment(rightNode)
 	shouldUseChainFormatting := path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignment(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignmentOrVariableDeclarator(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return !isTail ||
 				(!matched.Is("ExpressionStatement") &&
 					!matched.Is("VariableDeclaration"))
@@ -213,7 +214,7 @@ func shouldBreakAfterOperator(path *Path, options *Options, print PrintFunc, has
 	}
 
 	current := rightNode
-	var propertiesForPath []any
+	var propertiesForPath []string
 	for {
 		if current.Is("UnaryExpression") ||
 			current.Is("AwaitExpression") ||
@@ -388,10 +389,9 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	if !isObjectProperty(current) {
 		return false
 	}
-	// TODO: for performance, it might make sense to use a more lightweight
-	// version of cleanDoc, such that it would stop once it detects that
-	// the doc can't be reduced to a string.
-	keyDoc = doc.CleanDoc(keyDoc)
+	// Upstream notes that a lighter cleanDoc, one that stops once it sees the doc can't be reduced to a
+	// string, might be faster.
+	cleanedKeyDoc := doc.CleanDoc(keyDoc)
 	const minimumOverlapForBreak = 3
 	//   ↓↓ - insufficient overlap for a line break
 	// key1: longValue1,
@@ -400,7 +400,7 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	//   longValue2
 	//
 	// Upstream's `typeof keyDoc === "string"`; getStringWidth is doc.StringWidth.
-	text, isText := keyDoc.(doc.Text)
+	text, isText := cleanedKeyDoc.(doc.Text)
 	return isText &&
 		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minimumOverlapForBreak
 }

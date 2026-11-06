@@ -122,13 +122,13 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		} else if current.Is("TSNonNullExpression") && !needsParentheses(path, options) {
 			unshift(printedNode{
 				node:    current,
-				printed: printing.PrintComments(path, concatIn(path, "!"), options, nil),
+				printed: printing.PrintComments(path, concatIn(path, doc.Text("!")), options, nil),
 			})
 			call(path, rec, "expression")
 		} else {
 			unshift(printedNode{
 				node:    current,
-				printed: print(nil, nil),
+				printed: print("", nil),
 			})
 		}
 		return struct{}{}
@@ -447,7 +447,8 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 	// We don't want to print in one line if at least one of these conditions occurs:
 	//  * the chain has comments,
 	//  * the chain is an expression statement and all the arguments are literal-like ("fluent configuration" pattern),
-	//  * the chain is longer than 2 calls and has non-trivial arguments or more than 2 arguments in any call but the first one,
+	//  * the chain is longer than 2 calls and has non-trivial arguments or more than 2 arguments in any call but the
+	//    first one,
 	//  * any group but the last one has a hard line,
 	//  * the last call's arguments have a hard line and other calls have non-trivial arguments.
 	if nodeHasComment ||

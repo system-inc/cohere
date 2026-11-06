@@ -7,7 +7,11 @@ var codeIndented = &Construct{Name: "codeIndented", Tokenize: tokenizeCodeIndent
 var codeIndentedFurtherStart = &Construct{Partial: true, Tokenize: tokenizeCodeIndentedFurtherStart}
 
 func tokenizeCodeIndented(self *Self, effects *Effects, ok State, nok State) State {
-	var start, afterPrefix, atBreak, inside, after State
+	var start State
+	var afterPrefix State
+	var atBreak State
+	var inside State
+	var after State
 
 	// Parsing note: it is not needed to check if this first line is a filled line (that it has a
 	// non-whitespace character), because blank lines are parsed already, so we never run into that.
@@ -66,7 +70,8 @@ func tokenizeCodeIndented(self *Self, effects *Effects, ok State, nok State) Sta
 }
 
 func tokenizeCodeIndentedFurtherStart(self *Self, effects *Effects, ok State, nok State) State {
-	var furtherStart, afterPrefix State
+	var furtherStart State
+	var afterPrefix State
 
 	// At eol, trying to parse another indent.
 	furtherStart = func(code Code) State {

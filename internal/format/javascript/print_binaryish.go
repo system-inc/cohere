@@ -174,7 +174,7 @@ func printBinaryishExpressions(
 
 	// Simply print the node normally.
 	if !isBinaryish(current) {
-		return []Doc{groupIn(path, print(nil, nil))}
+		return []Doc{groupIn(path, print("", nil))}
 	}
 
 	var parts []Doc
@@ -218,9 +218,9 @@ func printBinaryishExpressions(
 		if hasLeadingOwnLineComment(originalText(options), rightNodeToCheckComments) {
 			rightContent = indentIn(path, concatIn(path, line, print("right", nil), emptyDoc))
 		} else {
-			rightContent = concatIn(path, " ", print("right", nil), emptyDoc)
+			rightContent = concatIn(path, doc.Text(" "), print("right", nil), emptyDoc)
 		}
-		right = concatIn(path, operator, rightContent)
+		right = concatIn(path, textDoc(operator), rightContent)
 	} else {
 		// Upstream's isHackPipeline recursion into "right" is unreachable for TypeScript.
 		rightContent := print("right", nil)
@@ -230,7 +230,7 @@ func printBinaryishExpressions(
 			beforeOperator = line
 			afterOperator = doc.Text(" ")
 		}
-		right = concatIn(path, beforeOperator, operator, afterOperator, rightContent, emptyDoc)
+		right = concatIn(path, beforeOperator, textDoc(operator), afterOperator, rightContent, emptyDoc)
 	}
 
 	// If there's only a single binary expression, we want to create a group

@@ -27,29 +27,6 @@ import (
 // then come from a binary no hash vouches for.
 const SwiftEngineOverrideVariable = "COHERE_SWIFT_ENGINE"
 
-// SwiftEngineDirectory is where the Swift engine's package lives inside the cohere module.
-func (paths Paths) SwiftEngineDirectory() string {
-	return filepath.Join(paths.ModuleDirectory, "swift")
-}
-
-// SwiftBuildDirectory is the scratch path the engine is built in.
-//
-// Its own, rather than the package's `.build`: that one belongs to whoever is developing the engine,
-// and a build here taking its lock, or replacing its products mid-test, would be one process breaking
-// another for no reason a reader of either could see.
-func (paths Paths) SwiftBuildDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "swift-build")
-}
-
-// SwiftEngineBinaryPath is where the engine built from inputs with this hash lives, named the way
-// BinaryPath names cohere's, platform included.
-func (paths Paths) SwiftEngineBinaryPath(hash string) string {
-	return filepath.Join(
-		paths.BinaryDirectory(),
-		fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash),
-	)
-}
-
 // buildSwiftProduct builds the engine package at packageDirectory and copies the product to binaryPath.
 //
 // A variable so a test can stand in for SwiftPM: a cold build compiles swift-syntax and swift-format,

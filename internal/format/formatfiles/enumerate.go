@@ -10,11 +10,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/system-inc/cohere/internal/format/formatoptions"
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
@@ -78,45 +76,6 @@ type Enumeration struct {
 	// source from a libfoo.a: only a program whose tsconfig lists ".a" in its sourceExtensions can. A run
 	// offers one to the formatter once the program holds it, and never before the graph is built.
 	Adamic []string
-}
-
-// ignoreLayer is one of the project's ignore lists after git's, and how its patterns are read.
-type ignoreLayer struct {
-	name string
-
-	// lines, when set, is the house list: lines of an ignore file, read with git's syntax relative to the
-	// walk root. Otherwise globs are lint's globs, relative to globsFrom: the `ignorePatterns` layer.
-	lines     *gitignore.Patterns
-	globs     []string
-	globsFrom string
-}
-
-// covers reports whether the layer excludes a path, given relative to the walk root. A directory is
-// covered when the layer prunes it whole.
-func (layer ignoreLayer) covers(root string, relative string, directory bool) bool {
-	if layer.lines != nil {
-		ignored, _ := layer.lines.Ignored(relative, directory)
-		return ignored
-	}
-
-	fromSettings, relativePathError := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
-	if relativePathError != nil ||
-		fromSettings == ".." ||
-		strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
-		return false
-	}
-	fromSettings = filepath.ToSlash(fromSettings)
-	for _, pattern := range layer.globs {
-		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
-		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
-		if directory && pattern != "**" && !strings.HasSuffix(pattern, "/**") {
-			continue
-		}
-		if configuration.Match(pattern, fromSettings) {
-			return true
-		}
-	}
-	return false
 }
 
 // The names the walk's layers are counted under. GitignoreLayer counts every git ignore source together:
@@ -420,20 +379,6 @@ func lstatEntries(directory string) ([]os.FileInfo, error) {
 	}
 	return information, nil
 }
-
-// listedInformation is a listed entry as the walk's callback reads it: its name, whether it is a directory and
-// its type bits. Size and modification time are not in a listing, so both are zero, and Enumerate's callback
-// must never read them: from Walk it would get the true values and from a listed walk zero, silently.
-type listedInformation struct {
-	entry os.DirEntry
-}
-
-func (information listedInformation) Name() string       { return information.entry.Name() }
-func (information listedInformation) Size() int64        { return 0 }
-func (information listedInformation) Mode() os.FileMode  { return information.entry.Type() }
-func (information listedInformation) ModTime() time.Time { return time.Time{} }
-func (information listedInformation) IsDir() bool        { return information.entry.IsDir() }
-func (information listedInformation) Sys() any           { return nil }
 
 // hasOwnRepositoryListed is HasOwnRepository, answered false from a listing of directory that shows no `.git`,
 // as the stat would then fail. A `.git` the listing names, or a directory it does not hold, is asked of the disk.

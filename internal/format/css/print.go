@@ -37,7 +37,7 @@ var (
 	valueAllSpacePattern      = regexp.MustCompile(`^ *$`)
 )
 
-func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
+func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	// The core's front matter support prints front matter that is not embedded as written
@@ -115,12 +115,12 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	// postcss-media-query-parser
 	case "media-query-list":
 		parts := []doc.Doc{}
-		path.Each(func(path *astPath, _ int, _ any) {
+		path.Each(func(path *astPath, _ int) {
 			node := currentNode(path)
 			if node.Type() == "media-query" && node.String("value") == "" {
 				return
 			}
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 		}, "nodes")
 
 		return doc.NewGroup(doc.NewIndent(doc.Join(doc.LineDoc, parts)), doc.GroupOptions{})
@@ -350,7 +350,7 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	panic(fmt.Sprintf("Unexpected PostCSS node type: %q.", node.Type()))
 }
 
-func printDeclaration(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printDeclaration(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 
@@ -451,7 +451,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 	}
 }
 
-func printAtRule(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	isTemplatePlaceholderNodeWithoutSemiColon := isTemplatePlaceholderNode(node) &&

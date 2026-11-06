@@ -72,6 +72,8 @@ func TraverseDoc(root Doc, onEnter func(Doc) bool, onExit func(Doc), shouldTrave
 		default:
 			parts, isArray := Parts(current)
 			if !isArray {
+				// Invariant: the cases above, nil among them, and Parts cover every Doc this package defines
+				// but fillProgress, which lives only on the printer's stack and never in a doc handed here.
 				panic(fmt.Sprintf("invalid doc %T", current))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {
@@ -241,6 +243,8 @@ func mapOne(document Doc, rec func(Doc) Doc, transform func(Doc) Doc) Doc {
 	case Text, trimDoc, lineSuffixBoundaryDoc, *Line, breakParentDoc, nil:
 		return transform(document)
 	}
+	// Invariant: Parts and the cases above cover every Doc this package defines but fillProgress and
+	// traverseExit, which live only on the printer's and the traversal's stacks and never in a doc mapped here.
 	panic(fmt.Sprintf("invalid doc %T", document))
 }
 
@@ -309,65 +313,6 @@ func cleanDocInto(document Doc, slab *arena.Slab[Doc]) Doc {
 	cleaner := &docCleaner{slab: slab}
 	cleaner.rec = cleaner.clean
 	return cleaner.clean(document)
-}
-
-// docCleaner is CleanDoc's walk. It is MapDoc with cleanDocFn, with one difference: a concat's cleaned
-// children are gathered in buffer, one stretch per concat on the walk's path, and the concat is built
-// once, at its cleaned length, or handed back as it is when cleaning leaves it unchanged. MapDoc builds
-// the mapped concat, then cleanDocFn builds the cleaned one by appending.
-type docCleaner struct {
-	// mapped is MapDoc's cache by identity, made at the first node that can carry one.
-	mapped map[Doc]Doc
-	buffer []Doc
-	rec    func(Doc) Doc
-	// slab is where the concats cleaning rebuilds come from, nil to allocate each (#v6ksqg3).
-	slab *arena.Slab[Doc]
-}
-
-func (cleaner *docCleaner) clean(document Doc) Doc {
-	cacheable := isPointerDoc(document)
-	if cacheable {
-		if result, present := cleaner.mapped[document]; present {
-			return result
-		}
-	}
-	var result Doc
-	if parts, isArray := Parts(document); isArray {
-		result = cleaner.cleanConcat(document, parts)
-	} else {
-		result = mapOne(document, cleaner.rec, cleanDoc)
-	}
-	if cacheable {
-		if cleaner.mapped == nil {
-			cleaner.mapped = map[Doc]Doc{}
-		}
-		cleaner.mapped[document] = result
-	}
-	return result
-}
-
-// cleanConcat is mapOne and cleanDocFn for a concat. Each child's own walk leaves buffer as it found it,
-// so the concat's children are buffer[start:] once they are all cleaned.
-func (cleaner *docCleaner) cleanConcat(document Doc, parts []Doc) Doc {
-	start := len(cleaner.buffer)
-	changed := false
-	for _, part := range parts {
-		cleaned := cleaner.clean(part)
-		if !sameDoc(cleaned, part) {
-			changed = true
-		}
-		cleaner.buffer = append(cleaner.buffer, cleaned)
-	}
-	children := cleaner.buffer[start:]
-	var result Doc
-	if !changed && isCleanConcat(parts) {
-		result = document
-	} else {
-		result = cleanParts(children, cleaner.slab)
-	}
-	clear(children)
-	cleaner.buffer = cleaner.buffer[:start]
-	return result
 }
 
 func cleanDoc(document Doc) Doc {
@@ -508,8 +453,9 @@ func sameStates(left []Doc, right []Doc) bool {
 // ReplaceEndOfLine is upstream's replaceEndOfLine: every newline in every string becomes replacement,
 // literalline by default.
 func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
+	separator := replacement
 	if replacement == nil {
-		replacement = Literalline
+		separator = Literalline
 	}
 	return MapDoc(document, func(current Doc) Doc {
 		text, isText := current.(Text)
@@ -521,7 +467,7 @@ func ReplaceEndOfLine(document Doc, replacement Doc) Doc {
 		for index, line := range lines {
 			parts[index] = Text(line)
 		}
-		return Join(replacement, parts)
+		return Join(separator, parts)
 	})
 }
 
@@ -576,19 +522,19 @@ func StripTrailingHardlineWith(document Doc, slab *arena.Slab[Doc]) Doc {
 }
 
 func stripTrailingHardlineFromParts(parts []Doc) []Doc {
-	parts = append([]Doc(nil), parts...)
-	for len(parts) >= 2 {
-		_, isLine := parts[len(parts)-2].(*Line)
-		_, isBreakParent := parts[len(parts)-1].(breakParentDoc)
+	stripped := append([]Doc(nil), parts...)
+	for len(stripped) >= 2 {
+		_, isLine := stripped[len(stripped)-2].(*Line)
+		_, isBreakParent := stripped[len(stripped)-1].(breakParentDoc)
 		if !isLine || !isBreakParent {
 			break
 		}
-		parts = parts[:len(parts)-2]
+		stripped = stripped[:len(stripped)-2]
 	}
-	if len(parts) > 0 {
-		parts[len(parts)-1] = stripTrailingHardlineFromDoc(parts[len(parts)-1])
+	if len(stripped) > 0 {
+		stripped[len(stripped)-1] = stripTrailingHardlineFromDoc(stripped[len(stripped)-1])
 	}
-	return parts
+	return stripped
 }
 
 func stripTrailingHardlineFromDoc(document Doc) Doc {

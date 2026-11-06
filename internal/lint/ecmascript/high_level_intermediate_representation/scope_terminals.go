@@ -8,7 +8,7 @@
 // # What this pass does, and why it is a rewrite rather than an annotation
 //
 // Every pass before this one records scopes in a side table: `scopes.go` assigns them,
-// `align_scopes.go` widens them to block boundaries, `merge_scopes.go` unions the overlapping ones.
+// `align_sweep_state.go` widens them to block boundaries, `merge_scopes.go` unions the overlapping ones.
 // After all three, a scope is still only a pair of evaluation-order positions with a member list.
 // Nothing in the control-flow graph knows a scope exists.
 //
@@ -49,7 +49,7 @@
 //
 // Three stages exist because of that assertion. Measured on this corpus, scope-versus-scope
 // non-nesting was 40 before `merge_scopes.go` and 0 after; the full assertion, which also compares
-// every block's fallthrough subtree, was 249 before `align_scopes.go` and 8 after on the current
+// every block's fallthrough subtree, was 249 before `align_sweep_state.go` and 8 after on the current
 // live corpus. All eight are scope-involving residues in plain helper functions; components and
 // hooks are at zero. The former block-against-block residue disappeared when reverse postorder began
 // matching React's traversal. `ScopeTerminalsPrecondition` reports whether a function satisfies the
@@ -98,7 +98,7 @@ import (
 //
 // A value's scope id comes from `ReactiveScopes.ScopeOf`, which is the pre-merge table.
 // `merge_scopes.go` then unions overlapping scopes, so several pre-merge ids can name one surviving
-// scope, and `align_scopes.go` widens the ranges under both. A pass that keys on the pre-merge id
+// scope, and `align_sweep_state.go` widens the ranges under both. A pass that keys on the pre-merge id
 // while reading the merged range gets a coherent-looking wrong answer: every scope has a plausible
 // range, so nothing is empty, nothing is inverted, and the nesting precondition still passes.
 //
@@ -116,42 +116,6 @@ type ScopeIdentity interface {
 	GroupOf(scope ScopeId) ScopeId
 	// RangeOf gives the surviving scope's final range, after alignment and merging.
 	RangeOf(scope ScopeId) mutation_aliasing.MutableRange
-}
-
-// MergedScopeIdentity resolves scope identity through an align-then-merge result.
-//
-// This is what a caller holding the output of `AlignThenMergeReactiveScopes` passes.
-type MergedScopeIdentity struct {
-	Aligned *AlignedScopes
-	Merged  *MergedScopes
-}
-
-// GroupOf returns the merged group a pre-merge scope belongs to, or the scope itself when the merge
-// left it alone.
-func (identity MergedScopeIdentity) GroupOf(scope ScopeId) ScopeId {
-	if scope == 0 {
-		return 0
-	}
-	if identity.Merged != nil {
-		if group := identity.Merged.GroupOf(scope); group != 0 {
-			return group
-		}
-	}
-	return scope
-}
-
-// RangeOf returns the surviving scope's range, preferring the merged table and falling back to the
-// aligned one for a scope the merge did not touch.
-func (identity MergedScopeIdentity) RangeOf(scope ScopeId) mutation_aliasing.MutableRange {
-	if identity.Merged != nil {
-		if bounds := identity.Merged.RangeOf(scope); bounds.Start != bounds.End {
-			return bounds
-		}
-	}
-	if identity.Aligned != nil {
-		return identity.Aligned.RangeOf(scope)
-	}
-	return mutation_aliasing.MutableRange{}
 }
 
 // ScopeTerminalsGap names a rule this pass cannot apply, for a caller that needs to know.
@@ -225,7 +189,7 @@ type scopeRewrite struct {
 //
 // This compares scopes to each other only. Upstream's `assertValidBlockNesting` additionally folds
 // in every block's fallthrough subtree; that check belongs with the pass that aligns them and lives
-// in `align_scopes.go`.
+// in `align_sweep_state.go`.
 func ScopeTerminalsPrecondition(function *Function, scopes *ReactiveScopes,
 	identity ScopeIdentity) int {
 	items := scopeItemsInNestingOrder(function, scopes, identity)
@@ -643,17 +607,6 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 
 	Finalize(function)
 	return result
-}
-
-// reindexBlocks rebuilds the id-to-block index from Function.Blocks.
-//
-// Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the
-// block slice wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
-func (function *Function) reindexBlocks() {
-	function.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(function.Blocks))
-	for _, block := range function.Blocks {
-		function.blocksById[block.Id] = block
-	}
 }
 
 // phisFor gives the first block carved out of an original its phis and every later one none.

@@ -619,7 +619,8 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
-	var names, texts []string
+	var names []string
+	var texts []string
 	yamlFiles, frontMatters, tooLarge := 0, 0, 0
 	pending := strings.Split(roots, ":")
 	seen := map[string]bool{}
@@ -629,7 +630,10 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -720,30 +724,26 @@ func TestComparisonSeesEveryField(test *testing.T) {
 	if differences := compareParse(text, expected); len(differences) != 0 {
 		test.Fatalf("the uncorrupted tree differs: %v", differences)
 	}
-	// find returns the first object, depth first, of the type.
-	var find func(node any, nodeType string) map[string]any
-	find = func(node any, nodeType string) map[string]any {
-		switch value := node.(type) {
-		case map[string]any:
-			if value["type"] == nodeType {
-				return value
-			}
-			for _, key := range []string{
-				"children",
-				"tag",
-				"anchor",
-				"middleComments",
-				"leadingComments",
-				"indicatorComment",
-				"trailingComment",
-				"endComments",
-			} {
-				if found := find(value[key], nodeType); found != nil {
-					return found
-				}
-			}
-		case []any:
-			for _, each := range value {
+	// find returns the first node, depth first, of the type, through the fields the comparison walks.
+	var find func(node *jsonNode, nodeType string) *jsonNode
+	find = func(node *jsonNode, nodeType string) *jsonNode {
+		if node == nil {
+			return nil
+		}
+		if node.Type == nodeType {
+			return node
+		}
+		for _, nodes := range [][]*jsonNode{
+			node.Children,
+			{node.Tag},
+			{node.Anchor},
+			node.MiddleComments,
+			node.LeadingComments,
+			{node.IndicatorComment},
+			{node.TrailingComment},
+			node.EndComments,
+		} {
+			for _, each := range nodes {
 				if found := find(each, nodeType); found != nil {
 					return found
 				}
@@ -751,79 +751,80 @@ func TestComparisonSeesEveryField(test *testing.T) {
 		}
 		return nil
 	}
-	point := func(node map[string]any, which string) map[string]any {
-		return node["position"].(map[string]any)[which].(map[string]any)
-	}
-	corruptions := map[string]func(root map[string]any){
-		"start offset": func(root map[string]any) {
-			point(find(root, "plain"), "start")["offset"] = point(find(root, "plain"), "start")["offset"].(float64) + 1
-		},
-		"end line":      func(root map[string]any) { point(find(root, "mapping"), "end")["line"] = 99.0 },
-		"start column":  func(root map[string]any) { point(find(root, "comment"), "start")["column"] = 7.0 },
-		"document end":  func(root map[string]any) { point(find(root, "document"), "end")["offset"] = 3.0 },
-		"value":         func(root map[string]any) { find(root, "alias")["value"] = "b" },
-		"tag value":     func(root map[string]any) { find(root, "tag")["value"] = "!u" },
-		"anchor value":  func(root map[string]any) { find(root, "anchor")["value"] = "" },
-		"comment value": func(root map[string]any) { find(root, "comment")["value"] = " x" },
-		"chomping":      func(root map[string]any) { find(root, "blockLiteral")["chomping"] = "keep" },
-		"indent":        func(root map[string]any) { find(root, "blockLiteral")["indent"] = nil },
-		"type":          func(root map[string]any) { find(root, "blockLiteral")["type"] = "blockFolded" },
-		"marker":        func(root map[string]any) { find(root, "document")["directivesEndMarker"] = false },
-		"end marker":    func(root map[string]any) { find(root, "document")["documentEndMarker"] = true },
-		"name":          func(root map[string]any) { find(root, "directive")["name"] = "TAG" },
-		"parameters":    func(root map[string]any) { find(root, "directive")["parameters"] = []any{} },
-		"parent":        func(root map[string]any) { find(root, "plain")["parent"] = 0.0 },
-		"identity":      func(root map[string]any) { find(root, "comment")["id"] = 9999.0 },
-		"keys":          func(root map[string]any) { find(root, "plain")["keys"] = []any{"type"} },
-		"null for []":   func(root map[string]any) { find(root, "mappingValue")["leadingComments"] = nil },
-		"no tag":        func(root map[string]any) { find(root, "blockLiteral")["tag"] = nil },
-		"no indicator":  func(root map[string]any) { find(root, "blockLiteral")["indicatorComment"] = nil },
-		"trailing moved": func(root map[string]any) {
+	// Each corruption edits the tree decoded into jsonNode, the shape compareParse reads it back into, so
+	// encoding it again keeps every field the comparison sees, null told apart from an empty array.
+	corruptions := map[string]func(root *jsonNode){
+		"start offset":  func(root *jsonNode) { find(root, "plain").Position.Start.Offset++ },
+		"end line":      func(root *jsonNode) { find(root, "mapping").Position.End.Line = 99 },
+		"start column":  func(root *jsonNode) { find(root, "comment").Position.Start.Column = 7 },
+		"document end":  func(root *jsonNode) { find(root, "document").Position.End.Offset = 3 },
+		"value":         func(root *jsonNode) { find(root, "alias").Value = new("b") },
+		"tag value":     func(root *jsonNode) { find(root, "tag").Value = new("!u") },
+		"anchor value":  func(root *jsonNode) { find(root, "anchor").Value = new("") },
+		"comment value": func(root *jsonNode) { find(root, "comment").Value = new(" x") },
+		"chomping":      func(root *jsonNode) { find(root, "blockLiteral").Chomping = new("keep") },
+		"indent":        func(root *jsonNode) { find(root, "blockLiteral").Indent = nil },
+		"type":          func(root *jsonNode) { find(root, "blockLiteral").Type = "blockFolded" },
+		"marker":        func(root *jsonNode) { find(root, "document").DirectivesEndMarker = new(false) },
+		"end marker":    func(root *jsonNode) { find(root, "document").DocumentEndMarker = new(true) },
+		"name":          func(root *jsonNode) { find(root, "directive").Name = new("TAG") },
+		"parameters":    func(root *jsonNode) { find(root, "directive").Parameters = []string{} },
+		"parent":        func(root *jsonNode) { find(root, "plain").Parent = 0 },
+		"identity":      func(root *jsonNode) { find(root, "comment").Id = 9999 },
+		"keys":          func(root *jsonNode) { find(root, "plain").Keys = []string{"type"} },
+		"null for []":   func(root *jsonNode) { find(root, "mappingValue").LeadingComments = nil },
+		"no tag":        func(root *jsonNode) { find(root, "blockLiteral").Tag = nil },
+		"no indicator":  func(root *jsonNode) { find(root, "blockLiteral").IndicatorComment = nil },
+		"trailing moved": func(root *jsonNode) {
 			alias := find(root, "alias")
-			alias["leadingComments"] = []any{alias["trailingComment"]}
-			alias["trailingComment"] = nil
+			alias.LeadingComments = []*jsonNode{alias.TrailingComment}
+			alias.TrailingComment = nil
 		},
-		"end comment": func(root map[string]any) {
-			var corrupt func(node any) bool
-			corrupt = func(node any) bool {
-				switch value := node.(type) {
-				case map[string]any:
-					if comments, isList := value["endComments"].([]any); isList && len(comments) > 0 {
-						value["endComments"] = []any{}
+		"end comment": func(root *jsonNode) {
+			var corrupt func(node *jsonNode) bool
+			corrupt = func(node *jsonNode) bool {
+				if node == nil {
+					return false
+				}
+				if len(node.EndComments) > 0 {
+					node.EndComments = []*jsonNode{}
+					return true
+				}
+				for _, child := range node.Children {
+					if corrupt(child) {
 						return true
 					}
-					for _, key := range []string{"children", "tag", "anchor"} {
-						if corrupt(value[key]) {
-							return true
-						}
-					}
-				case []any:
-					for _, each := range value {
-						if corrupt(each) {
-							return true
-						}
-					}
 				}
-				return false
+				return corrupt(node.Tag) || corrupt(node.Anchor)
 			}
 			if !corrupt(root) {
 				test.Error("the fixture has no end comment to corrupt")
 			}
 		},
-		"root comments": func(root map[string]any) { root["comments"] = root["comments"].([]any)[1:] },
-		"child dropped": func(root map[string]any) {
+		"root comments": func(root *jsonNode) { root.Comments = root.Comments[1:] },
+		"child dropped": func(root *jsonNode) {
 			flow := find(root, "flowSequence")
-			flow["children"] = flow["children"].([]any)[:1]
+			flow.Children = flow.Children[:1]
 		},
-		"middle comments": func(
-			root map[string]any,
-		) {
-			find(root, "plain")["middleComments"] = []any{find(root, "comment")}
+		"middle comments": func(root *jsonNode) {
+			find(root, "plain").MiddleComments = []*jsonNode{find(root, "comment")}
 		},
 	}
+	// The round trip alone must still read as upstream's tree, or every corruption would differ for it.
+	untouched := &jsonNode{}
+	if decodeError := json.Unmarshal(expected.Root, untouched); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	reencoded, reencodeError := json.Marshal(untouched)
+	if reencodeError != nil {
+		test.Fatal(reencodeError)
+	}
+	if differences := compareParse(text, oracleResult{Root: reencoded}); len(differences) != 0 {
+		test.Fatalf("the tree differs once decoded and encoded again: %v", differences)
+	}
 	for name, corrupt := range corruptions {
-		var root map[string]any
-		if decodeError := json.Unmarshal(expected.Root, &root); decodeError != nil {
+		root := &jsonNode{}
+		if decodeError := json.Unmarshal(expected.Root, root); decodeError != nil {
 			test.Fatal(decodeError)
 		}
 		corrupt(root)

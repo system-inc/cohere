@@ -39,6 +39,7 @@ func main() {
 
 	generated, generateError := generate()
 	if generateError != nil {
+		// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
@@ -46,10 +47,12 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
+			// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 			fmt.Fprintf(os.Stderr, "%s is stale: regenerate it\n", *output)
 			os.Exit(1)
 		}
@@ -57,6 +60,7 @@ func main() {
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}

@@ -182,7 +182,8 @@ func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(test *testing.T) 
 		want       string
 	}{
 		{"the fork, after another submodule, over ssh",
-			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
+			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n" +
+				"\turl = https://github.com/someone/other.git\n" +
 				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
 			"system-inc/TypeScript"},
 		{

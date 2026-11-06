@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/printing"
+import (
+	"github.com/system-inc/cohere/internal/format/doc"
+	"github.com/system-inc/cohere/internal/format/printing"
+)
 
 // print/miscellaneous.js.
 
@@ -12,19 +15,18 @@ func printOptionalToken(path *Path) Doc {
 	}
 	if isCallExpression(current) || isMemberExpression(current) && current.Bool("computed") ||
 		current.Is("OptionalIndexedAccessType") {
-		return concatIn(path, "?.")
+		return concatIn(path, doc.Text("?."))
 	}
-	return concatIn(path, "?")
+	return concatIn(path, doc.Text("?"))
 }
 
 // printDefiniteToken is upstream's printDefiniteToken.
 func printDefiniteToken(path *Path) Doc {
-	if node(path).Bool("definite") || path.Match(nil, func(value any, name any, _ int, _ bool) bool {
-		parent, _ := value.(Node)
-		key, _ := name.(string)
-		return key == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
+	if node(path).Bool("definite") || path.Match(nil, func(value PathValue, name string, _ int, _ bool) bool {
+		parent, _ := value.Node()
+		return name == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
 	}) {
-		return concatIn(path, "!")
+		return concatIn(path, doc.Text("!"))
 	}
 	return emptyDoc
 }
@@ -48,7 +50,7 @@ func shouldPrintDeclareToken(path *Path) bool {
 // printDeclareToken is upstream's printDeclareToken.
 func printDeclareToken(path *Path) Doc {
 	if shouldPrintDeclareToken(path) {
-		return concatIn(path, "declare ")
+		return concatIn(path, doc.Text("declare "))
 	}
 	return emptyDoc
 }
@@ -62,7 +64,7 @@ func isTsAbstractNode(node Node) bool {
 func printAbstractToken(path *Path) Doc {
 	current := node(path)
 	if current.Truthy("abstract") || isTsAbstractNode(current) {
-		return concatIn(path, "abstract ")
+		return concatIn(path, doc.Text("abstract "))
 	}
 	return emptyDoc
 }
@@ -70,7 +72,7 @@ func printAbstractToken(path *Path) Doc {
 // printTypeScriptAccessibilityToken is upstream's printTypeScriptAccessibilityToken.
 func printTypeScriptAccessibilityToken(node Node) Doc {
 	if accessibility := node.String("accessibility"); accessibility != "" {
-		return concat(accessibility + " ")
+		return concat(textDoc(accessibility + " "))
 	}
 	return emptyDoc
 }
@@ -88,11 +90,11 @@ func shouldInlineCondition(node Node) bool {
 	if !isLogicalNot(node) {
 		return false
 	}
-	node = node.Child("argument")
-	if isLogicalNot(node) {
-		node = node.Child("argument")
+	argument := node.Child("argument")
+	if isLogicalNot(argument) {
+		argument = argument.Child("argument")
 	}
-	return node.Is("LogicalExpression")
+	return argument.Is("LogicalExpression")
 }
 
 // printIfOrWhileConditionOrWithStatementObject is upstream's function of that name, exported upstream
@@ -144,11 +146,12 @@ func printDanglingCommentsInList(path *Path, options *Options, filter func(Node)
 // printTrailingComma is upstream's printTrailingComma(options, level). level "" is upstream's default
 // "es5".
 func printTrailingComma(options *Options, level string) Doc {
-	if level == "" {
-		level = "es5"
+	resolvedLevel := level
+	if resolvedLevel == "" {
+		resolvedLevel = "es5"
 	}
-	if shouldPrintTrailingComma(options, level) {
-		return ifBreak(",", "")
+	if shouldPrintTrailingComma(options, resolvedLevel) {
+		return ifBreak(doc.Text(","), doc.Text(""))
 	}
 	return emptyDoc
 }
@@ -156,7 +159,7 @@ func printTrailingComma(options *Options, level string) Doc {
 // printSemicolon is upstream's printSemicolon.
 func printSemicolon(options *Options) Doc {
 	if settingsOf(options).Semi {
-		return concat(";")
+		return concat(doc.Text(";"))
 	}
 	return emptyDoc
 }

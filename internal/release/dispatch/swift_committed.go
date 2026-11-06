@@ -35,23 +35,6 @@ import (
 // The worktree belongs to this cache and nobody edits it. If it is ever found dirty the build is refused
 // rather than forced, because forcing would discard something without knowing what it was.
 
-// SwiftSourceWorktree is the worktree the committed engine is built from.
-func (paths Paths) SwiftSourceWorktree() string {
-	return filepath.Join(paths.CacheDirectory, "swift-source")
-}
-
-// SwiftCommittedBuildDirectory is the SwiftPM scratch path for committed builds. Separate from the
-// working-tree engine's, because one scratch path fed two package directories would rebuild cold every
-// time the other was used.
-func (paths Paths) SwiftCommittedBuildDirectory() string {
-	return filepath.Join(paths.CacheDirectory, "swift-build-committed")
-}
-
-// swiftSourceLock serializes moving the worktree and building in it.
-func (paths Paths) swiftSourceLock() string {
-	return filepath.Join(paths.CacheDirectory, "swift-source.lock")
-}
-
 // swiftEngineInputs are what decide the engine, as `commit:path` objects: the same three the
 // working-tree hash reads, so a commit that changes only tests reuses the binary.
 var swiftEngineInputs = []string{"swift/Package.swift", "swift/Package.resolved", "swift/Sources"}

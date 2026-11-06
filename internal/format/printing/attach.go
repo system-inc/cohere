@@ -50,7 +50,7 @@ type decorated[N Node[N]] struct {
 
 // AttachComments is upstream's attachComments, src/main/comments/attach.js: decide, for every comment,
 // which node it belongs to and whether it leads, trails or dangles there.
-func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
+func AttachComments[N Node[N], S any, A any](ast N, comments []N, options *Options[N, S, A]) {
 	printer := options.Printer
 	if len(comments) == 0 || printer.CanAttachComment == nil {
 		return
@@ -59,11 +59,11 @@ func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
 	childNodesCache := map[N][]N{}
 	text := options.OriginalText
 
-	contexts := make([]*CommentContext[N], len(comments))
+	contexts := make([]*CommentContext[N, S, A], len(comments))
 	var noEnclosing N
 	for index, comment := range comments {
 		found := decorateComment(ast, comment, options, noEnclosing, false, nil, childNodesCache)
-		contexts[index] = &CommentContext[N]{
+		contexts[index] = &CommentContext[N, S, A]{
 			Comment:       comment,
 			Text:          text,
 			Options:       options,
@@ -75,7 +75,7 @@ func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
 		}
 	}
 
-	var tiesToBreak []*CommentContext[N]
+	var tiesToBreak []*CommentContext[N, S, A]
 	for index, context := range contexts {
 		comment := context.Comment
 		placement := "remaining"
@@ -93,7 +93,7 @@ func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
 		fields.Following, fields.hasFollowing = context.Following, context.HasFollowing
 		fields.Placement = placement
 
-		handle := func(handler func(*CommentContext[N]) bool) bool {
+		handle := func(handler func(*CommentContext[N, S, A]) bool) bool {
 			return handler != nil && handler(context)
 		}
 
@@ -161,10 +161,10 @@ func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
 
 // decorateComment is upstream's decorateComment: binary-search the sorted children of node for the
 // nodes around comment, descending into a child that contains it.
-func decorateComment[N Node[N]](
+func decorateComment[N Node[N], S any, A any](
 	node N,
 	comment N,
-	options *Options[N],
+	options *Options[N, S, A],
 	enclosing N,
 	hasEnclosing bool,
 	ancestors []N,
@@ -200,6 +200,8 @@ func decorateComment[N Node[N]](
 			right = middle
 			continue
 		}
+		// Invariant: a comment is a token between tokens, so the parser builds no node whose range cuts through
+		// one, as Prettier's attacher assumes when it throws "Comment location overlaps with node location".
 		panic(fmt.Sprintf(
 			"printing: comment at %d-%d overlaps a %s at %d-%d",
 			commentStart,
@@ -230,7 +232,9 @@ func decorateComment[N Node[N]](
 // sortedChildNodes is upstream's getSortedChildNodes, src/main/utilities/get-sorted-child-nodes.js: the
 // attachable descendants of node, flattening through nodes a comment cannot attach to, sorted by
 // position. Cached per node, as upstream caches in childNodesCache.
-func sortedChildNodes[N Node[N]](node N, ancestors []N, options *Options[N], cache map[N][]N) []N {
+//
+// Mutates: cache every node walked gets its sorted children stored, so the next comment's search reuses them
+func sortedChildNodes[N Node[N], S any, A any](node N, ancestors []N, options *Options[N, S, A], cache map[N][]N) []N {
 	if cached, present := cache[node]; present {
 		return cached
 	}
@@ -276,19 +280,18 @@ func childNodes[N Node[N]](node N, visitorKeys func(N) []string) []N {
 	var children []N
 	for _, key := range visitorKeys(node) {
 		value := node.Field(key)
-		if isNil(value) {
+		if value.IsNil() {
 			continue
 		}
-		if isSlice(value) {
-			for index := 0; index < sliceLength(value); index++ {
-				element, _ := sliceElement(value, index)
-				if child, isNode := asNode[N](element); isNode && !isNil(element) {
+		if value.IsList() {
+			for index := 0; index < value.Len(); index++ {
+				if child, isNode := value.Element(index).Node(); isNode && !isNilNode(child) {
 					children = append(children, child)
 				}
 			}
 			continue
 		}
-		if child, isNode := asNode[N](value); isNode {
+		if child, isNode := value.Node(); isNode {
 			children = append(children, child)
 		}
 	}
@@ -306,10 +309,10 @@ func isAllEmptyAndNoLineBreak(text string) bool {
 }
 
 // isOwnLineComment is upstream's isOwnLineComment.
-func isOwnLineComment[N Node[N]](
+func isOwnLineComment[N Node[N], S any, A any](
 	text string,
-	options *Options[N],
-	contexts []*CommentContext[N],
+	options *Options[N, S, A],
+	contexts []*CommentContext[N, S, A],
 	commentIndex int,
 ) bool {
 	current := contexts[commentIndex]
@@ -329,10 +332,10 @@ func isOwnLineComment[N Node[N]](
 }
 
 // isEndOfLineComment is upstream's isEndOfLineComment.
-func isEndOfLineComment[N Node[N]](
+func isEndOfLineComment[N Node[N], S any, A any](
 	text string,
-	options *Options[N],
-	contexts []*CommentContext[N],
+	options *Options[N, S, A],
+	contexts []*CommentContext[N, S, A],
 	commentIndex int,
 ) bool {
 	current := contexts[commentIndex]
@@ -353,7 +356,7 @@ func isEndOfLineComment[N Node[N]](
 
 // breakTies is upstream's breakTies: of comments between the same preceding and following node, the
 // trailing run of ones separated from the following node by only gaps lead it; the rest trail.
-func breakTies[N Node[N]](tiesToBreak []*CommentContext[N], options *Options[N]) {
+func breakTies[N Node[N], S any, A any](tiesToBreak []*CommentContext[N, S, A], options *Options[N, S, A]) {
 	tieCount := len(tiesToBreak)
 	if tieCount == 0 {
 		return
@@ -367,6 +370,9 @@ func breakTies[N Node[N]](tiesToBreak []*CommentContext[N], options *Options[N])
 	for ; indexOfFirstLeadingComment > 0; indexOfFirstLeadingComment-- {
 		tie := tiesToBreak[indexOfFirstLeadingComment-1]
 		if tie.Preceding != preceding || tie.Following != following {
+			// Invariant: AttachComments flushes the ties whenever the following node changes, and two comments
+			// with one following node have no child between them, so they share the preceding one too, as
+			// Prettier's assert.strictEqual on both holds.
 			panic("printing: a tie to break does not share its neighbours")
 		}
 		gap := options.OriginalText[printer.LocEnd(tie.Comment):gapEnd]
@@ -397,7 +403,7 @@ func breakTies[N Node[N]](tiesToBreak []*CommentContext[N], options *Options[N])
 
 // isGap is upstream's `printer.isGap?.(gap, options) ?? /^[\s(]*$/.test(gap)`: the printer decides if
 // it has an opinion, and otherwise a gap is whitespace and opening parentheses.
-func isGap[N Node[N]](gap string, options *Options[N]) bool {
+func isGap[N Node[N], S any, A any](gap string, options *Options[N, S, A]) bool {
 	if options.Printer.IsGap != nil {
 		if answer, decided := options.Printer.IsGap(gap, options); decided {
 			return answer
@@ -409,7 +415,7 @@ func isGap[N Node[N]](gap string, options *Options[N]) bool {
 }
 
 // findExpressionIndexForComment is upstream's findExpressionIndexForComment.
-func findExpressionIndexForComment[N Node[N]](quasis []N, comment N, options *Options[N]) int {
+func findExpressionIndexForComment[N Node[N], S any, A any](quasis []N, comment N, options *Options[N, S, A]) int {
 	startPosition := options.Printer.LocStart(comment) - 1
 	for index := 1; index < len(quasis); index++ {
 		if startPosition < options.Printer.LocStart(quasis[index]) {

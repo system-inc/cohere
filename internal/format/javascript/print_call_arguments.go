@@ -1,6 +1,10 @@
 package javascript
 
-import "github.com/system-inc/cohere/internal/format/doc"
+import (
+	"slices"
+
+	"github.com/system-inc/cohere/internal/format/doc"
+)
 
 // print/call-arguments.js.
 
@@ -20,7 +24,12 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	arguments := getCallArguments(current)
 
 	if len(arguments) == 0 {
-		return groupIn(path, concatIn(path, "(", printDanglingCommentsInList(path, options, nil), ")"))
+		return groupIn(path, concatIn(
+			path,
+			doc.Text("("),
+			printDanglingCommentsInList(path, options, nil),
+			doc.Text(")"),
+		))
 	}
 
 	lastArgIndex := len(arguments) - 1
@@ -28,14 +37,14 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	// useEffect(() => { ... }, [foo, bar, baz])
 	// useImperativeHandle(ref, () => { ... }, [foo, bar, baz])
 	if isReactHookCallWithDepsArray(arguments) {
-		parts := []any{"("}
+		parts := []Doc{doc.Text("(")}
 		iterateCallArgumentsPath(path, func(path *Path, index int) {
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 			if index != lastArgIndex {
-				parts = append(parts, ", ")
+				parts = append(parts, doc.Text(", "))
 			}
 		})
-		parts = append(parts, ")")
+		parts = append(parts, doc.Text(")"))
 		return concatIn(path, parts...)
 	}
 
@@ -43,15 +52,15 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	var printedArguments []Doc
 	iterateCallArgumentsPath(path, func(path *Path, index int) {
 		argument := node(path)
-		argumentDoc := print(nil, nil)
+		argumentDoc := print("", nil)
 
 		if index == lastArgIndex {
 			// do nothing
 		} else if isNextLineEmptyAfter(argument, options) {
 			anyArgEmptyLine = true
-			argumentDoc = concatIn(path, argumentDoc, ",", hardline, hardline)
+			argumentDoc = concatIn(path, argumentDoc, doc.Text(","), hardline, hardline)
 		} else {
-			argumentDoc = concatIn(path, argumentDoc, ",", line)
+			argumentDoc = concatIn(path, argumentDoc, doc.Text(","), line)
 		}
 
 		printedArguments = append(printedArguments, argumentDoc)
@@ -70,11 +79,11 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	allArgsBrokenOut := func() Doc {
 		return groupWithIn(path, concatIn(
 			path,
-			"(",
-			indentIn(path, concatIn(path, spreadDocs(line, printedArguments)...)),
+			doc.Text("("),
+			indentIn(path, concatIn(path, slices.Concat([]Doc{line}, printedArguments)...)),
 			trailingComma,
 			line,
-			")",
+			doc.Text(")"),
 		),
 			doc.GroupOptions{ShouldBreak: true},
 		)
@@ -93,6 +102,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			}
 		}
 		firstArgument, bailedOut := printCatchingArgExpansionBailout(
+			path,
 			print,
 			getCallArgumentSelector(current, 0),
 			&printArguments{expandFirstArgument: true},
@@ -104,12 +114,14 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		if doc.WillBreak(firstArgument) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs(
-						"(",
-						groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}),
-						", ",
+					concatIn(path, slices.Concat(
+						[]Doc{
+							doc.Text("("),
+							groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}),
+							doc.Text(", "),
+						},
 						tailArguments,
-						")",
+						[]Doc{doc.Text(")")},
 					)...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
@@ -117,13 +129,19 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}
 
 		return conditionalGroup([]Doc{
-			concatIn(path, spreadDocs("(", firstArgument, ", ", tailArguments, ")")...),
-			concatIn(path, spreadDocs(
-				"(",
-				groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}),
-				", ",
+			concatIn(path, slices.Concat(
+				[]Doc{doc.Text("("), firstArgument, doc.Text(", ")},
 				tailArguments,
-				")",
+				[]Doc{doc.Text(")")},
+			)...),
+			concatIn(path, slices.Concat(
+				[]Doc{
+					doc.Text("("),
+					groupWithIn(path, firstArgument, doc.GroupOptions{ShouldBreak: true}),
+					doc.Text(", "),
+				},
+				tailArguments,
+				[]Doc{doc.Text(")")},
 			)...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
@@ -137,6 +155,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			}
 		}
 		lastArgument, bailedOut := printCatchingArgExpansionBailout(
+			path,
 			print,
 			getCallArgumentSelector(current, -1),
 			&printArguments{expandLastArgument: true},
@@ -148,11 +167,10 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		if doc.WillBreak(lastArgument) {
 			return concatIn(path, breakParent,
 				conditionalGroup([]Doc{
-					concatIn(path, spreadDocs(
-						"(",
+					concatIn(path, slices.Concat(
+						[]Doc{doc.Text("(")},
 						headArguments,
-						groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}),
-						")",
+						[]Doc{groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}), doc.Text(")")},
 					)...),
 					allArgsBrokenOut(),
 				}, doc.GroupOptions{}),
@@ -160,22 +178,21 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}
 
 		return conditionalGroup([]Doc{
-			concatIn(path, spreadDocs("(", headArguments, lastArgument, ")")...),
-			concatIn(path, spreadDocs(
-				"(",
+			concatIn(path, slices.Concat([]Doc{doc.Text("(")}, headArguments, []Doc{lastArgument, doc.Text(")")})...),
+			concatIn(path, slices.Concat(
+				[]Doc{doc.Text("(")},
 				headArguments,
-				groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}),
-				")",
+				[]Doc{groupWithIn(path, lastArgument, doc.GroupOptions{ShouldBreak: true}), doc.Text(")")},
 			)...),
 			allArgsBrokenOut(),
 		}, doc.GroupOptions{})
 	}
 
-	contents := concatIn(path, "(",
-		indentIn(path, concatIn(path, spreadDocs(softline, printedArguments)...)),
+	contents := concatIn(path, doc.Text("("),
+		indentIn(path, concatIn(path, slices.Concat([]Doc{softline}, printedArguments)...)),
 		trailingComma,
 		softline,
-		")",
+		doc.Text(")"),
 	)
 	if isLongCurriedCallExpression(path) {
 		// By not wrapping the arguments in a group, the printer prioritizes
@@ -199,10 +216,12 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 //
 // as a function: Go has no try/catch, so the deferred recover takes the place of the catch. The
 // second result is true where upstream caught ArgExpansionBailout; any other panic is re-raised, as
-// upstream rethrows.
+// upstream rethrows. The selector ends in an index for a call's argument, so it is printed through
+// callSelector, the Call that mainPrint runs for an array selector.
 func printCatchingArgExpansionBailout(
+	path *Path,
 	print PrintFunc,
-	selector []any,
+	selector pathSelector,
 	arguments *printArguments,
 ) (printed Doc, bailedOut bool) {
 	defer func() {
@@ -215,23 +234,7 @@ func printCatchingArgExpansionBailout(
 			panic(caught)
 		}
 	}()
-	return print(selector, arguments), false
-}
-
-// spreadDocs is a JavaScript array literal with `...docs` spread into it: each []Doc part is
-// flattened in place, so the Go builds the same flat array upstream does.
-func spreadDocs(parts ...any) []any {
-	result := make([]any, 0, len(parts))
-	for _, part := range parts {
-		if spread, isSpread := part.([]Doc); isSpread {
-			for _, element := range spread {
-				result = append(result, element)
-			}
-			continue
-		}
-		result = append(result, part)
-	}
-	return result
+	return callSelector(path, func(*Path) Doc { return print("", arguments) }, selector), false
 }
 
 // couldExpandArgument is upstream's couldExpandArgument. Upstream's arrowChainRecursion defaults to false; Go

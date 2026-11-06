@@ -9,19 +9,6 @@ import (
 	"strings"
 )
 
-// YamlError is a YAMLParseError or a YAMLWarning.
-type YamlError struct {
-	// Name is "YAMLParseError" or "YAMLWarning".
-	Name string
-	// Code is upstream's ErrorCode, such as "BAD_INDENT" or "MISSING_CHAR".
-	Code    string
-	Message string
-	// Position is the [start, end] of the error in UTF-16 code units.
-	Position [2]int
-}
-
-func (yamlError *YamlError) Error() string { return yamlError.Message }
-
 func newYamlParseError(position [2]int, code string, message string) *YamlError {
 	return &YamlError{Name: "YAMLParseError", Code: code, Message: message, Position: position}
 }
@@ -30,18 +17,14 @@ func newYamlWarning(position [2]int, code string, message string) *YamlError {
 	return &YamlError{Name: "YAMLWarning", Code: code, Message: message, Position: position}
 }
 
-// errorString is an Error upstream throws, whose message a caller catches and reports.
-type errorString string
-
-func (message errorString) Error() string { return string(message) }
-
 // containsSameValueZero is `array.includes(value)`: SameValueZero, so NaN finds NaN and objects (a
 // MergeKey, Date or Binary here) find only themselves.
-func containsSameValueZero(values []any, value any) bool {
+func containsSameValueZero(values []ScalarValue, value ScalarValue) bool {
 	for _, each := range values {
 		switch typed := value.(type) {
-		case float64:
-			if e, isNumber := each.(float64); isNumber && (e == typed || math.IsNaN(e) && math.IsNaN(typed)) {
+		case ScalarNumber:
+			number, isNumber := each.(ScalarNumber)
+			if isNumber && (number == typed || math.IsNaN(float64(number)) && math.IsNaN(float64(typed))) {
 				return true
 			}
 		case Date, Binary:
@@ -57,20 +40,23 @@ func containsSameValueZero(values []any, value any) bool {
 
 // javaScriptString is `${value}` for a primitive scalar value: null, a boolean, a number or a string.
 // Only those can be found again by containsSameValueZero, so only those reach it.
-func javaScriptString(value any) string {
+func javaScriptString(value ScalarValue) string {
 	switch typed := value.(type) {
 	case nil:
 		return "null"
-	case bool:
+	case ScalarBoolean:
 		if typed {
 			return "true"
 		}
 		return "false"
-	case float64:
-		return numberToString(typed)
-	case string:
-		return typed
+	case ScalarNumber:
+		return numberToString(float64(typed))
+	case ScalarString:
+		return string(typed)
 	}
+	// Invariant: the one caller, omapTag, converts a key's value only once containsSameValueZero has
+	// found it among the earlier keys, and a MergeKey, Date or Binary is a fresh object for every scalar,
+	// found by no other, so only the four primitives above get here.
 	panic("compose: no string conversion for this value")
 }
 
@@ -88,14 +74,17 @@ func numberToString(value float64) string {
 		return "-Infinity"
 	}
 	sign := ""
+	magnitude := value
 	if value < 0 {
 		sign = "-"
-		value = -value
+		magnitude = -value
 	}
 	// d.dddde±x: the digits without the dot, and n, the decimal point's position after the first.
-	formatted := strconv.FormatFloat(value, 'e', -1, 64)
+	formatted := strconv.FormatFloat(magnitude, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(formatted, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
+	// Ignored: exponentText is the exponent strconv.FormatFloat just wrote in its 'e' format, a sign
+	// and decimal digits, which Atoi always reads.
 	exponent, _ := strconv.Atoi(exponentText)
 	n := exponent + 1
 	k := len(digits)

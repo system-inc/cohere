@@ -1,6 +1,7 @@
 package javascript
 
 import (
+	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -14,9 +15,9 @@ import (
 func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
 	opening := groupIn(path, concatIn(path, // @system-inc: no space between `if` and `(`.
-		"if(",
+		doc.Text("if("),
 		printIfStatementCondition(path, options, print),
-		")",
+		doc.Text(")"),
 		printIfStatementConsequent(path, options, print),
 	))
 	if current.Child("alternate") == nil {
@@ -24,7 +25,7 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	// @system-inc: always put `else` on its own line, never cuddled with `}`.
-	parts := []any{opening, hardline}
+	parts := []Doc{opening, hardline}
 	danglingComments := getComments(current, commentDangling, nil)
 	if len(danglingComments) > 0 {
 		firstComment := danglingComments[0]
@@ -33,7 +34,7 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 		if isPreviousLineEmptyBefore(firstComment, options) {
 			parts = append(parts, hardline)
 		}
-		var separator Doc = concatIn(path, " ")
+		var separator Doc = concatIn(path, doc.Text(" "))
 		if needsHardlineAfterDanglingComment(current) ||
 			hasNewline(options.OriginalText, locEnd(danglingComments[len(danglingComments)-1])) {
 			separator = hardline
@@ -44,7 +45,7 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 			separator,
 		)
 	}
-	parts = append(parts, "else", groupIn(path, printIfStatementAlternate(path, options, print)))
+	parts = append(parts, doc.Text("else"), groupIn(path, printIfStatementAlternate(path, options, print)))
 	return concatIn(path, parts...)
 }
 
@@ -64,7 +65,7 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 		return concatIn(
 			path,
 			printedComments,
-			groupIn(path, concatIn(path /* @system-inc: no space */, "for(;;)", body)),
+			groupIn(path, concatIn(path /* @system-inc: no space */, doc.Text("for(;;)"), body)),
 		)
 	}
 
@@ -74,14 +75,23 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 	}
 	return concatIn(path, printedComments,
 		groupIn(path, concatIn(path, // @system-inc: no space between `for` and `(`.
-			"for(",
+			doc.Text("for("),
 			groupIn(path, concatIn(path, indentIn(
 				path,
-				concatIn(path, softline, print("init", nil), ";", line, print("test", nil), ";", update),
+				concatIn(
+					path,
+					softline,
+					print("init", nil),
+					doc.Text(";"),
+					line,
+					print("test", nil),
+					doc.Text(";"),
+					update,
+				),
 			),
 				softline,
 			)),
-			")",
+			doc.Text(")"),
 			body,
 		)),
 	)
@@ -98,16 +108,16 @@ func printForXStatement(path *Path, options *Options, print PrintFunc) Doc {
 			await = " await"
 		}
 	}
-	return groupIn(path, concatIn(path, "for",
-		await,
+	return groupIn(path, concatIn(path, doc.Text("for"),
+		textDoc(await),
 		// @system-inc: no space between `for` and `(`.
-		"(",
+		doc.Text("("),
 		print("left", nil),
-		" ",
-		keyword,
-		" ",
+		doc.Text(" "),
+		textDoc(keyword),
+		doc.Text(" "),
 		print("right", nil),
-		")",
+		doc.Text(")"),
 		printClause(path, options, print, "body"),
 	))
 }
@@ -118,11 +128,11 @@ func printWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 	if node(path).Is("WithStatement") {
 		keyword = "with"
 	}
-	return groupIn(path, concatIn(path, keyword,
+	return groupIn(path, concatIn(path, textDoc(keyword),
 		// @system-inc: no space between the keyword and `(`.
-		"(",
+		doc.Text("("),
 		printWhileStatementCondition(path, options, print),
-		")",
+		doc.Text(")"),
 		printClause(path, options, print, "body"),
 	))
 }
@@ -131,14 +141,14 @@ func printWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 	var separator Doc = hardline
 	if node(path).Child("body").Is("BlockStatement") {
-		separator = concatIn(path, " ")
+		separator = concatIn(path, doc.Text(" "))
 	}
-	return concatIn(path, groupIn(path, concatIn(path, "do", printClause(path, options, print, "body"))),
+	return concatIn(path, groupIn(path, concatIn(path, doc.Text("do"), printClause(path, options, print, "body"))),
 		separator,
 		// @system-inc: no space between `while` and `(`.
-		"while(",
+		doc.Text("while("),
 		printDoWhileStatementCondition(path, options, print),
-		")",
+		doc.Text(")"),
 		printSemicolon(options),
 	)
 }
@@ -146,16 +156,17 @@ func printDoWhileStatement(path *Path, options *Options, print PrintFunc) Doc {
 // printTryStatement is upstream's printTryStatement.
 func printTryStatement(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var handler, finalizer Doc = emptyDoc, emptyDoc
+	var handler Doc = emptyDoc
+	var finalizer Doc = emptyDoc
 	if current.Child("handler") != nil {
 		handler = print("handler", nil)
 	}
 	if current.Child("finalizer") != nil {
-		finalizer = concatIn(path, hardline, "finally ", print("finalizer", nil))
+		finalizer = concatIn(path, hardline, doc.Text("finally "), print("finalizer", nil))
 	}
 	// @system-inc: block boundaries always break the line, so neither `catch` nor `finally` is cuddled
 	// with the preceding `}`. printCatchClause emits its own leading hardline; `finally` gets one here.
-	return concatIn(path, "try ", print("block", nil), handler, finalizer)
+	return concatIn(path, doc.Text("try "), print("block", nil), handler, finalizer)
 }
 
 // printCatchClause is upstream's printCatchClause.
@@ -172,14 +183,20 @@ func printCatchClause(path *Path, options *Options, print PrintFunc) Doc {
 		printedParameter := print("param", nil)
 		var parameter Doc
 		if parameterHasComments {
-			parameter = concatIn(path, "(", indentIn(path, concatIn(path, softline, printedParameter)), softline, ") ")
+			parameter = concatIn(
+				path,
+				doc.Text("("),
+				indentIn(path, concatIn(path, softline, printedParameter)),
+				softline,
+				doc.Text(") "),
+			)
 		} else {
-			parameter = concatIn(path, "(", printedParameter, ") ")
+			parameter = concatIn(path, doc.Text("("), printedParameter, doc.Text(") "))
 		}
 		// @system-inc: `catch` starts on its own line, never cuddled with `}`.
-		return concatIn(path, hardline, "catch", parameter, print("body", nil))
+		return concatIn(path, hardline, doc.Text("catch"), parameter, print("body", nil))
 	}
-	return concatIn(path, hardline, "catch ", print("body", nil))
+	return concatIn(path, hardline, doc.Text("catch "), print("body", nil))
 }
 
 // printSwitchStatement is upstream's printSwitchStatement.
@@ -192,36 +209,40 @@ func printSwitchStatement(path *Path, options *Options, print PrintFunc) Doc {
 			if !path.IsLast() && isNextLineEmptyAfter(node(path), options) {
 				blank = hardline
 			}
-			return concatIn(path, print(nil, nil), blank)
+			return concatIn(path, print("", nil), blank)
 		}, "cases")
 		cases = indentIn(path, concatIn(path, hardline, join(hardline, printed)))
 	} else {
 		cases = printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: true})
 	}
 	return concatIn(path, groupIn(path, concatIn(path, // @system-inc: no space between `switch` and `(`.
-		"switch(",
+		doc.Text("switch("),
 		indentIn(path, concatIn(path, softline, print("discriminant", nil))),
 		softline,
-		")",
+		doc.Text(")"),
 	)),
-		" {",
+		doc.Text(" {"),
 		cases,
 		hardline,
-		"}",
+		doc.Text("}"),
 	)
 }
 
 // printSwitchCase is upstream's printSwitchCase.
 func printSwitchCase(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	var parts []any
+	var parts []Doc
 	if current.Child("test") != nil {
-		parts = append(parts, "case ", print("test", nil), ":")
+		parts = append(parts, doc.Text("case "), print("test", nil), doc.Text(":"))
 	} else {
-		parts = append(parts, "default:")
+		parts = append(parts, doc.Text("default:"))
 	}
 	if hasComment(current, commentDangling, nil) {
-		parts = append(parts, " ", printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}))
+		parts = append(
+			parts,
+			doc.Text(" "),
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+		)
 	}
 	var consequent []Node
 	for _, statement := range current.List("consequent") {
@@ -232,7 +253,7 @@ func printSwitchCase(path *Path, options *Options, print PrintFunc) Doc {
 	if len(consequent) > 0 {
 		printed := printStatementSequence(path, options, print, "consequent")
 		if len(consequent) == 1 && consequent[0].Is("BlockStatement") {
-			parts = append(parts, concatIn(path, " ", printed))
+			parts = append(parts, concatIn(path, doc.Text(" "), printed))
 		} else {
 			parts = append(parts, indentIn(path, concatIn(path, hardline, printed)))
 		}
@@ -257,10 +278,10 @@ func shouldPrintLeadingHardline(node Node, options *Options) bool {
 func printClause(path *Path, options *Options, print PrintFunc, property string) Doc {
 	return call(path, func(path *Path) Doc {
 		current := node(path)
-		printed := print(nil, nil)
+		printed := print("", nil)
 		if current.Is("EmptyStatement") {
 			if hasComment(current, commentLeading, nil) {
-				return concatIn(path, " ", printed)
+				return concatIn(path, doc.Text(" "), printed)
 			}
 			return printed
 		}
@@ -273,7 +294,7 @@ func printClause(path *Path, options *Options, print PrintFunc, property string)
 		}
 		if isBlockStatement ||
 			current.Is("IfStatement") && parentOf(path).Is("IfStatement") && keyOf(path) == "alternate" {
-			return concatIn(path, " ", printed)
+			return concatIn(path, doc.Text(" "), printed)
 		}
 		return indentIn(path, concatIn(path, line, printed))
 	}, property)

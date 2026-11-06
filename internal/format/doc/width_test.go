@@ -113,7 +113,8 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 	command := exec.Command("node", "--input-type=module", "-e", script)
 	command.Dir = root
 	command.Stdin = bytes.NewReader(encoded)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
@@ -138,6 +139,8 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 //
 // Invalid UTF-8 is skipped: json.Marshal would replace it before node saw it, so the two sides would
 // be measuring different strings, which is exactly the comparison that looks clean and proves nothing.
+//
+// Mutates: seen gains every line collected, so the caller's next corpus skips the lines this one found.
 func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string {
 	test.Helper()
 	engine, newPrettierError := prettier.New(formatoptions.Default())
@@ -185,7 +188,11 @@ func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string 
 				seen[line] = true
 				lines = append(lines, line)
 			}
+			// Ignored: the file was only read, so closing it can lose nothing the scan did not already see.
 			file.Close()
+			if scanError := scanner.Err(); scanError != nil {
+				test.Fatalf("reading %s: %v", path, scanError)
+			}
 		}
 	}
 	test.Logf("corpora walked: %d\n  %s", len(measured), strings.Join(measured, "\n  "))

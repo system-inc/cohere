@@ -1,5 +1,7 @@
 package javascript
 
+import "github.com/system-inc/cohere/internal/format/doc"
+
 // print/call-expression.js.
 
 /*
@@ -40,16 +42,16 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		isTestCall(current, parentOf(path)) {
 		var printed []Doc
 		iterateCallArgumentsPath(path, func(*Path, int) {
-			printed = append(printed, print(nil, nil))
+			printed = append(printed, print("", nil))
 		})
 		// Upstream skips this return when `printed[0].label?.embed`. The JavaScript printer has no embed
 		// hook (printer.go), so no printed argument carries that label and the condition always holds.
 		return concatIn(path, printCallee(path, print),
 			optional,
 			typeArgumentsDoc,
-			"(",
-			join(", ", printed),
-			")",
+			doc.Text("("),
+			join(doc.Text(", "), printed),
+			doc.Text(")"),
 		)
 	}
 
@@ -60,7 +62,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	if !isDynamicImportLike &&
 		!isNewExpression &&
 		isMemberish(current.Child("callee")) {
-		names := []any{"callee"}
+		names := []string{"callee"}
 		if current.Child("callee").Is("ChainExpression") {
 			names = append(names, "expression")
 		}
@@ -93,22 +95,22 @@ func printCallee(path *Path, print PrintFunc) Doc {
 		if current.Truthy("phase") {
 			phase = "." + current.String("phase")
 		}
-		return concatIn(path, "import"+phase)
+		return concatIn(path, textDoc("import"+phase))
 	}
 
 	if current.Is("TSImportType") {
-		return concatIn(path, "import")
+		return concatIn(path, doc.Text("import"))
 	}
 
 	if current.Is("TSExternalModuleReference") {
-		return concatIn(path, "require")
+		return concatIn(path, doc.Text("require"))
 	}
 
 	newKeyword := ""
 	if current.Is("NewExpression") {
 		newKeyword = "new "
 	}
-	return concatIn(path, newKeyword,
+	return concatIn(path, textDoc(newKeyword),
 		print("callee", nil),
 		lineSuffixBoundary,
 	)

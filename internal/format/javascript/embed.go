@@ -125,18 +125,11 @@ func printEmbedUnsupported(language string) embedPrint {
 	}
 }
 
-type unsupportedEmbedError string
-
-func (language unsupportedEmbedError) Error() string {
-	return "no native printer embeds " + string(language) + " in a template literal yet"
-}
-
 // predicate adapts a (node, key) test to the print core's path.match predicate.
 func predicate(test func(node Node, name string) bool) printing.Predicate[Node] {
-	return func(value any, name any, _ int, _ bool) bool {
-		current, _ := value.(Node)
-		key, _ := name.(string)
-		return current != nil && test(current, key)
+	return func(value PathValue, name string, _ int, _ bool) bool {
+		current, _ := value.Node()
+		return current != nil && test(current, name)
 	}
 }
 
@@ -214,6 +207,8 @@ func isAsConstExpression(node Node) bool {
 
 // embed/css.js
 
+var errorCouldNotInsertExpressions = errors.New("couldn't insert all the expressions")
+
 // printEmbedCss is upstream's printEmbedCss: the template with each expression replaced by a
 // placeholder, formatted as scss, and the expressions put back.
 func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
@@ -236,10 +231,8 @@ func printEmbedCss(textToDoc printing.TextToDoc, print PrintFunc, path *Path, op
 	if newDoc == nil {
 		return nil, errorCouldNotInsertExpressions
 	}
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, newDoc)), softline, "`"), nil
+	return concatIn(path, doc.Text("`"), indentIn(path, concatIn(path, hardline, newDoc)), softline, doc.Text("`")), nil
 }
-
-var errorCouldNotInsertExpressions = errors.New("Couldn't insert all the expressions")
 
 var placeholderPattern = regexp.MustCompile(`@prettier-placeholder-(\d+)-id`)
 
@@ -265,9 +258,11 @@ func replacePlaceholders(quasisDoc Doc, expressionDocs []Doc) Doc {
 		position := 0
 		for _, match := range placeholderPattern.FindAllStringSubmatchIndex(string(text), -1) {
 			parts = append(parts, replaceEndOfLine(string(text)[position:match[0]]))
-			number, _ := strconv.Atoi(string(text)[match[2]:match[3]])
+			number, numberError := strconv.Atoi(string(text)[match[2]:match[3]])
 			replaceCounter++
-			if number < len(expressionDocs) {
+			// The pattern matches only digits, so the one error is a number too large for an int, which is past
+			// every expression too.
+			if numberError == nil && number < len(expressionDocs) {
 				parts = append(parts, expressionDocs[number])
 			} else {
 				// expressionDocs[component] is undefined upstream, and the doc printer throws on it.
@@ -394,6 +389,9 @@ func isEmbedMarkdown(path *Path) bool {
 
 // embed/graphql.js
 
+// commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.
+var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
+
 // printEmbedGraphQl is upstream's printEmbedGraphQl.
 func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunc, path *Path, options *Options) (Doc, error) {
 	current := node(path)
@@ -469,11 +467,14 @@ func printEmbedGraphQl(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		}
 	}
 
-	return concatIn(path, "`", indentIn(path, concatIn(path, hardline, join(hardline, parts))), hardline, "`"), nil
+	return concatIn(
+		path,
+		doc.Text("`"),
+		indentIn(path, concatIn(path, hardline, join(hardline, parts))),
+		hardline,
+		doc.Text("`"),
+	), nil
 }
-
-// commentAtLineEnd is upstream's /#[^\n\r]*$/ over one line.
-var commentAtLineEnd = regexp.MustCompile(`#[^\n\r]*$`)
 
 // isCommentOrWhitespaceLine is upstream's /^\s*(?:#[^\n\r]*)?$/ over one line. JavaScript's \s reaches
 // past ASCII, so the leading whitespace is trimmed with its definition rather than RE2's.
@@ -502,7 +503,7 @@ func printGraphqlComments(lines []string) Doc {
 		if index > 0 && trimmed[index-1] == "" && seenComment {
 			// If a non-first comment is preceded by a blank (whitespace only) line,
 			// add in a blank line.
-			parts = append(parts, concat(hardline, textLine))
+			parts = append(parts, concat(hardline, textDoc(textLine)))
 		} else {
 			parts = append(parts, doc.Text(textLine))
 		}

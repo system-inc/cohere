@@ -59,13 +59,13 @@ func printFunctionParameters(
 
 	if len(parameters) == 0 {
 		return concatIn(path, typeParametersDoc,
-			"(",
+			doc.Text("("),
 			printDanglingCommentsInList(
 				path,
 				options,
 				functionParameterDanglingCommentFilter,
 			),
-			")",
+			doc.Text(")"),
 		)
 	}
 
@@ -76,15 +76,15 @@ func printFunctionParameters(
 	iterateFunctionParametersPath(path, func(parameterPath *Path, index int) {
 		isLastParameter := index == len(parameters)-1
 		if isLastParameter && functionNode.Truthy("rest") {
-			printed = append(printed, toDoc("..."))
+			printed = append(printed, doc.Text("..."))
 		}
-		printed = append(printed, print(nil, nil))
+		printed = append(printed, print("", nil))
 		if isLastParameter {
 			return
 		}
-		printed = append(printed, toDoc(","))
+		printed = append(printed, doc.Text(","))
 		if isParametersInTestCall || shouldHugParameters {
-			printed = append(printed, toDoc(" "))
+			printed = append(printed, doc.Text(" "))
 		} else if isNextLineEmptyAfter(parameters[index], options) {
 			printed = append(printed, hardline, hardline)
 		} else {
@@ -105,12 +105,14 @@ func printFunctionParameters(
 	if shouldExpandParameters && !isDecoratedFunction(path) {
 		if doc.WillBreak(typeParametersDoc) || doc.WillBreak(doc.Concat(printed)) {
 			// Removing lines in this case leads to broken or ugly output
+			// Invariant: shouldExpandParameters comes from expandFirstArg or expandLastArg, set only by
+			// printCallArguments inside printCatchingArgExpansionBailout, whose recover catches this.
 			panic(argumentExpansionBailout{})
 		}
 		return groupIn(path, concatIn(path, doc.RemoveLines(typeParametersDoc),
-			"(",
+			doc.Text("("),
 			doc.RemoveLines(doc.Concat(printed)),
-			")",
+			doc.Text(")"),
 		))
 	}
 
@@ -149,11 +151,11 @@ func printFunctionParameters(
 		trailingComma = printTrailingComma(options, "all")
 	}
 	return concatIn(path, typeParametersDoc,
-		"(",
-		indentIn(path, append([]Doc{softline}, printed...)),
+		doc.Text("("),
+		indentIn(path, doc.Concat(append([]Doc{softline}, printed...))),
 		trailingComma,
 		softline,
-		")",
+		doc.Text(")"),
 	)
 }
 
@@ -161,9 +163,9 @@ func printFunctionParameters(
 // array is.
 func wrapParameters(typeParametersDoc Doc, printed []Doc) Doc {
 	parts := make(doc.Concat, 0, len(printed)+3)
-	parts = append(parts, typeParametersDoc, toDoc("("))
+	parts = append(parts, typeParametersDoc, doc.Text("("))
 	parts = append(parts, printed...)
-	parts = append(parts, toDoc(")"))
+	parts = append(parts, doc.Text(")"))
 	return parts
 }
 
@@ -253,13 +255,13 @@ func shouldGroupFunctionParameters(functionNode Node, returnTypeDoc Doc) bool {
 // isDecoratedFunction is upstream's isDecoratedFunction.
 func isDecoratedFunction(path *Path) bool {
 	return path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return node.Is("ArrowFunctionExpression") &&
 				node.Child("body").Is("BlockStatement")
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, name string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			if node.Is("CallExpression") &&
 				name == "arguments" &&
 				len(node.List("arguments")) == 1 &&
@@ -273,8 +275,8 @@ func isDecoratedFunction(path *Path) bool {
 			}
 			return false
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, name string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return (node.Is("VariableDeclarator") && name == "init") ||
 				(node.Is("ExportDefaultDeclaration") && name == "declaration") ||
 				(node.Is("TSExportAssignment") && name == "expression") ||
@@ -286,8 +288,8 @@ func isDecoratedFunction(path *Path) bool {
 					node.Child("left").Child("property").Is("Identifier") &&
 					node.Child("left").Child("property").String("name") == "exports")
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return !node.Is("VariableDeclaration") ||
 				(node.String("kind") == "const" && len(node.List("declarations")) == 1)
 		},

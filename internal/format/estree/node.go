@@ -75,7 +75,14 @@ type Regex struct {
 func New(nodeType string, start int, end int, keysAndValues ...any) *Node {
 	node := &Node{nodeType: nodeType, Range: [2]int{start, end}, properties: make([]property, 0, len(keysAndValues)/2)}
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		node.Set(keysAndValues[index].(string), keysAndValues[index+1])
+		key, ok := keysAndValues[index].(string)
+		if !ok {
+			// Invariant: every caller passes its keys as string literals, key then value, and the forwarders
+			// (the arena, the GraphQL parser's node, the selector parser's newSelectorNode) pass on keys their
+			// own callers wrote as literals.
+			panic("estree: a node property key that is not a string")
+		}
+		node.Set(key, keysAndValues[index+1])
 	}
 	return node
 }
@@ -119,14 +126,42 @@ func (node *Node) Get(key string) any {
 
 // Field is node[name] for the shared print core. "comments" is the attached comments, which live in
 // CommentFields rather than among the properties.
-func (node *Node) Field(name string) any {
+//
+// A property's value is converted by its dynamic type until the properties are typed themselves. The core
+// navigates only to children, lists of them, and css's url() string among a paren group's groups, so a
+// string is a leaf and any other scalar reads as missing, which no printer reaches: the core asks only for
+// visitor keys, "comments" and the children a printer names.
+func (node *Node) Field(name string) printing.Value[*Node] {
 	if name == "comments" {
 		if node == nil || len(node.Comments) == 0 {
-			return nil
+			return printing.Value[*Node]{}
 		}
-		return node.Comments
+		return printing.ListValue(node.Comments)
 	}
-	return node.Get(name)
+	switch typed := node.Get(name).(type) {
+	case *Node:
+		return printing.NodeValue(typed)
+	case []*Node:
+		return printing.ListValue(typed)
+	case []any:
+		// A nil list stays nil, which the core reads as nothing, as it read the nil slice.
+		var values []printing.Value[*Node]
+		if typed != nil {
+			values = make([]printing.Value[*Node], len(typed))
+		}
+		for index, element := range typed {
+			switch typedElement := element.(type) {
+			case *Node:
+				values[index] = printing.NodeValue(typedElement)
+			case string:
+				values[index] = printing.LeafValue[*Node](typedElement)
+			}
+		}
+		return printing.MixedListValue(values)
+	case string:
+		return printing.LeafValue[*Node](typed)
+	}
+	return printing.Value[*Node]{}
 }
 
 // CommentData is the shared print core's access to the comment bookkeeping.
@@ -148,23 +183,24 @@ func (node *Node) Has(key string) bool {
 // Set writes node[key], appending a new property at the end the way JavaScript does.
 func (node *Node) Set(key string, value any) {
 	// A typed nil stored in an interface is not == nil, which would make a missing child look present.
+	stored := value
 	switch typed := value.(type) {
 	case *Node:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	case *TemplateValue:
 		if typed == nil {
-			value = nil
+			stored = nil
 		}
 	}
 	for index := range node.properties {
 		if node.properties[index].key == key {
-			node.properties[index].value = value
+			node.properties[index].value = stored
 			return
 		}
 	}
-	node.properties = append(node.properties, property{key: key, value: value})
+	node.properties = append(node.properties, property{key: key, value: stored})
 }
 
 // Delete removes node[key].

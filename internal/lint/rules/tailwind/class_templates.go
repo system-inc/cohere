@@ -46,28 +46,6 @@ const (
 	TemplateBoundarySideAfterHole TemplateBoundarySide = "AfterHole"
 )
 
-// ClassTemplatesIn returns every seam a node's class text has with a runtime value: each template
-// with holes the reader found, and each string a `+` joins to something, which upstream's
-// no-concatenated-classes reports alike (isConcatenatedLiteral).
-//
-// Read from the same reading as ClassLiteralsIn, so a rule reading seams covers exactly the strings a
-// rule reading classes does. Anything else is a difference in coverage that nobody declared.
-func (reader *ClassLiteralReader) ClassTemplatesIn(node *ast.Node) []ClassTemplate {
-	values := reader.classValuesIn(node)
-	var templates []ClassTemplate
-	for _, template := range values.templates {
-		if classTemplate, hasBoundaries := templateBoundaries(template); hasBoundaries {
-			templates = append(templates, classTemplate)
-		}
-	}
-	for _, literal := range values.literals {
-		if classTemplate, hasBoundaries := concatenationBoundaries(literal); hasBoundaries {
-			templates = append(templates, classTemplate)
-		}
-	}
-	return templates
-}
-
 // concatenationBoundaries is a concatenated string's seams: its first class when a `+` joins
 // something before it and no whitespace separates them, and its last when one joins something after.
 func concatenationBoundaries(literal ClassLiteral) (ClassTemplate, bool) {

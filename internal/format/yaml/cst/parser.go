@@ -69,6 +69,17 @@ func getPrevProperties(parent *Token) *[]*Token {
 	}
 }
 
+// endsKeyStartProperties is the switch upstream's getFirstKeyStartProps breaks its labeled loop on: the
+// tokens after which the props of a key start.
+func endsKeyStartProperties(tokenType string) bool {
+	switch tokenType {
+	case "doc-start", "explicit-key-ind", "map-value-ind", "seq-item-ind", "newline":
+		return true
+	default:
+		return false
+	}
+}
+
 // getFirstKeyStartProperties. Note: May modify input array.
 func getFirstKeyStartProperties(previousField *[]*Token) []*Token {
 	previous := *previousField
@@ -76,15 +87,10 @@ func getFirstKeyStartProperties(previousField *[]*Token) []*Token {
 		return []*Token{}
 	}
 	index := len(previous)
-loop:
 	for {
 		index--
-		if index < 0 {
+		if index < 0 || endsKeyStartProperties(previous[index].Type) {
 			break
-		}
-		switch previous[index].Type {
-		case "doc-start", "explicit-key-ind", "map-value-ind", "seq-item-ind", "newline":
-			break loop
 		}
 	}
 	for {
@@ -100,11 +106,14 @@ loop:
 
 // spliceTail is `list.splice(start)`: it removes the elements from start on and returns them, as a
 // new array.
+//
+// Mutates: field is cut to the elements before start, because splice shortens the array in place and the
+// caller's owning field must see the shorter array.
 func spliceTail(field *[]*Token, start int) []*Token {
 	list := *field
-	start = clamp(start, 0, len(list))
-	removed := append([]*Token{}, list[start:]...)
-	*field = list[:start:start]
+	clampedStart := clamp(start, 0, len(list))
+	removed := append([]*Token{}, list[clampedStart:]...)
+	*field = list[:clampedStart:clampedStart]
 	return removed
 }
 
@@ -480,6 +489,10 @@ func (parser *Parser) stream() {
 	}))
 }
 
+// document steps the parser inside a document at the top of the stack.
+//
+// Mutates: doc gains the current token in its start: it is the top of the parser's own stack, which
+// upstream builds in place.
 func (parser *Parser) document(doc *Token) {
 	if doc.Value != nil {
 		parser.lineEnd(doc)
@@ -512,6 +525,10 @@ func (parser *Parser) document(doc *Token) {
 	}
 }
 
+// scalar steps the parser after a flow scalar at the top of the stack.
+//
+// Mutates: scalar gives its end to the block map it becomes the key of: it is the top of the parser's own
+// stack, and upstream moves the array between tokens.
 func (parser *Parser) scalar(scalar *Token) {
 	if parser.tokenType == "map-value-ind" {
 		previous := getPrevProperties(parser.peek(2))
@@ -538,6 +555,10 @@ func (parser *Parser) scalar(scalar *Token) {
 	}
 }
 
+// blockScalar steps the parser inside a block scalar at the top of the stack.
+//
+// Mutates: scalar gains its props and source: it is the top of the parser's own stack, which upstream
+// fills in place.
 func (parser *Parser) blockScalar(scalar *Token) {
 	switch parser.tokenType {
 	case "space", "comment", "newline":
@@ -563,6 +584,10 @@ func (parser *Parser) blockScalar(scalar *Token) {
 	}
 }
 
+// blockMap steps the parser inside a block map at the top of the stack.
+//
+// Mutates: blockMap gains and drops items: it is the top of the parser's own stack, which upstream builds
+// in place.
 func (parser *Parser) blockMap(blockMap *Token) {
 	it := blockMap.Items[len(blockMap.Items)-1]
 	// it.sep is true-ish if pair already has key or : separator
@@ -717,26 +742,24 @@ func (parser *Parser) blockMap(blockMap *Token) {
 				} else {
 					it.Sep = append(it.Sep, parser.sourceToken())
 				}
+			} else if it.Sep == nil {
+				it.setKey(nil)
+				it.Sep = []*Token{parser.sourceToken()}
+			} else if it.Value != nil || atNextItem {
+				item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
+				item.setKey(nil)
+				blockMap.Items = append(blockMap.Items, item)
+			} else if includesToken(it.Sep, "map-value-ind") {
+				item := &CollectionItem{Start: []*Token{}, Sep: []*Token{parser.sourceToken()}}
+				item.setKey(nil)
+				parser.stack = append(parser.stack, parser.Tokens.New(Token{
+					Type:   "block-map",
+					Offset: parser.offset,
+					Indent: parser.indent,
+					Items:  []*CollectionItem{item},
+				}))
 			} else {
-				if it.Sep == nil {
-					it.setKey(nil)
-					it.Sep = []*Token{parser.sourceToken()}
-				} else if it.Value != nil || atNextItem {
-					item := &CollectionItem{Start: start, Sep: []*Token{parser.sourceToken()}}
-					item.setKey(nil)
-					blockMap.Items = append(blockMap.Items, item)
-				} else if includesToken(it.Sep, "map-value-ind") {
-					item := &CollectionItem{Start: []*Token{}, Sep: []*Token{parser.sourceToken()}}
-					item.setKey(nil)
-					parser.stack = append(parser.stack, parser.Tokens.New(Token{
-						Type:   "block-map",
-						Offset: parser.offset,
-						Indent: parser.indent,
-						Items:  []*CollectionItem{item},
-					}))
-				} else {
-					it.Sep = append(it.Sep, parser.sourceToken())
-				}
+				it.Sep = append(it.Sep, parser.sourceToken())
 			}
 			parser.onKeyLine = true
 			return
@@ -783,6 +806,10 @@ func (parser *Parser) blockMap(blockMap *Token) {
 	parser.step()
 }
 
+// blockSequence steps the parser inside a block sequence at the top of the stack.
+//
+// Mutates: seq gains and drops items: it is the top of the parser's own stack, which upstream builds in
+// place.
 func (parser *Parser) blockSequence(seq *Token) {
 	it := seq.Items[len(seq.Items)-1]
 	switch parser.tokenType {
@@ -845,6 +872,10 @@ func (parser *Parser) blockSequence(seq *Token) {
 	parser.step()
 }
 
+// flowCollection steps the parser inside a flow collection at the top of the stack.
+//
+// Mutates: fc gains items and end tokens: it is the top of the parser's own stack, which upstream builds
+// in place.
 func (parser *Parser) flowCollection(fc *Token) {
 	var it *CollectionItem
 	if len(fc.Items) > 0 {
@@ -1032,6 +1063,10 @@ func (parser *Parser) atIndentedComment(start []*Token, indent int) bool {
 	return true
 }
 
+// documentEnd steps the parser after a document end marker at the top of the stack.
+//
+// Mutates: docEnd gains the current token in its end: it is the top of the parser's own stack, which
+// upstream fills in place.
 func (parser *Parser) documentEnd(docEnd *Token) {
 	if parser.tokenType != "doc-mode" {
 		if docEnd.End != nil {
@@ -1045,6 +1080,10 @@ func (parser *Parser) documentEnd(docEnd *Token) {
 	}
 }
 
+// lineEnd steps the parser at the end of a line after token, the top of the stack.
+//
+// Mutates: token gains the current token in its end: it is the top of the parser's own stack, which
+// upstream fills in place.
 func (parser *Parser) lineEnd(token *Token) {
 	switch parser.tokenType {
 	case "comma", "doc-start", "doc-end", "flow-seq-end", "flow-map-end", "map-value-ind":

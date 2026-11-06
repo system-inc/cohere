@@ -128,16 +128,6 @@ type extractedContext struct {
 	UnlistedStatics map[string]*reading `json:"unlistedStatics"`
 }
 
-// pathList collects a repeatable flag.
-type pathList []string
-
-func (list *pathList) String() string { return strings.Join(*list, ",") }
-
-func (list *pathList) Set(value string) error {
-	*list = append(*list, value)
-	return nil
-}
-
 // system is one design system's pair of extractions.
 type system struct {
 	table   extractedTable

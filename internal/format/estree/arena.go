@@ -33,7 +33,14 @@ var arenas = sync.Pool{New: func() any {
 
 // AcquireArena is an arena for one format, from the pool. Release it once the file is printed and nothing
 // will read its tree again.
-func AcquireArena() *Arena { return arenas.Get().(*Arena) }
+func AcquireArena() *Arena {
+	nodes, ok := arenas.Get().(*Arena)
+	if !ok {
+		// Invariant: the pool's only writers are its New and Release, and both store an *Arena.
+		panic("estree: the arena pool held something other than an *Arena")
+	}
+	return nodes
+}
 
 // Release resets the arena and returns it to the pool. Every node it handed out is gone.
 func (nodes *Arena) Release() {
@@ -65,7 +72,13 @@ func (nodes *Arena) node(nodeType string, start int, end int, keysAndValues []an
 		Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)},
 	)
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
-		created.Set(keysAndValues[index].(string), keysAndValues[index+1])
+		key, ok := keysAndValues[index].(string)
+		if !ok {
+			// Invariant: node's only caller is the converter's node helpers, and every conversion passes its keys
+			// as string literals, key then value.
+			panic("estree: a node property key that is not a string")
+		}
+		created.Set(key, keysAndValues[index+1])
 	}
 	return created
 }
