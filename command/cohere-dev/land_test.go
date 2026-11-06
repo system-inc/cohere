@@ -575,6 +575,13 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	if output, landError := land(); landError != nil || !strings.Contains(output, "landed") {
 		test.Errorf("the landing did not land once the nested test passed (%v):\n%s", landError, output)
 	}
+	// The landing commit names what the gate tested by module, as the gate's report does.
+	if body := fixture.git(fixture.repository, "log", "-1", "--format=%b", "main"); !strings.Contains(
+		body,
+		"go test of 2 modules from go.work (., inner)",
+	) {
+		test.Errorf("the landing's body does not name the modules gated:\n%s", body)
+	}
 }
 
 // The landing gate checks the docs data, so a change that leaves an example stale is refused where it's
@@ -693,7 +700,7 @@ func TestALandingIsOneMergeCommitOntoMain(test *testing.T) {
 	}
 	body := fixture.git(fixture.repository, "log", "-1", "--format=%b", landing)
 	for _, want := range []string{"a at " + head[:8] + ", onto main at " + before[:8], fixtureSubject("add a.txt"),
-		"and 2 merges of the branch's own", "Gated by cohere-dev land in"} {
+		"and 2 merges of the branch's own", "Gated by cohere-dev land in", ": go vet, go test of the module."} {
 		if !strings.Contains(body, want) {
 			test.Errorf("the landing's body lacks %q:\n%s", want, body)
 		}

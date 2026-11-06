@@ -189,9 +189,9 @@ func checkSubjects(commits []branchCommit, vocabulary map[string]bool) error {
 		return nil
 	}
 	return fmt.Errorf("a landing's commits read `area: what changed (#task)`, up to %d characters, with the story in "+
-		"the body, and the area a folder or top-level file in the tree. These don't:\n%s\nReword each and land "+
-		"again: the last commit with `git commit --amend`, an earlier one by cherry-picking the branch onto a new "+
-		"one from main with `git cherry-pick -e`", subjectLimit, strings.Join(problems, "\n"))
+		"the body, and the area a folder or top-level file in the tree. These don't:\n%s\nCommit the same changes "+
+		"again on a new branch from main, each with a subject that fits (`git diff main...<branch> | git apply` "+
+		"brings them over), and land that branch", subjectLimit, strings.Join(problems, "\n"))
 }
 
 // taskReference is a task named in a subject, `#` and its id.
