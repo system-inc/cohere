@@ -1,4 +1,4 @@
-package oracletest
+package oracle_testing
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package cgotest
+package cgo_testing
 
 import (
 	"os"

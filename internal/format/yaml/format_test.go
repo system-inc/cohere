@@ -11,7 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -439,8 +439,8 @@ func compareFormat(test *testing.T, inputs []string) int {
 	test.Helper()
 	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for index, input := range inputs {
@@ -525,7 +525,7 @@ func TestFormatFixturesMatchOracle(test *testing.T) {
 // against the oracle's for another.
 func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
-	engine := oracletest.Open(test, test.Name()).Engine(format_options.Default())
+	engine := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
 	expected, formatError := engine.Format("fixture.yaml", "a: [b]")
 	if formatError != nil {
 		test.Fatal(formatError)

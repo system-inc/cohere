@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/go_engine/cgotest"
+	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 )
 
 // cgoPackageFiles is one cgo package, the same bytes in every directory it is written to, so go can serve a
@@ -28,7 +28,7 @@ var cgoPackageFiles = map[string]string{
 // stand-in go, as Loom's, which refuses to compile.
 func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 	test.Parallel()
-	cgotest.RequireTranslation(test)
+	cgo_testing.RequireTranslation(test)
 
 	for _, directory := range []string{test.TempDir(), test.TempDir()} {
 		for name, contents := range cgoPackageFiles {
@@ -75,7 +75,7 @@ func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 // runner refuses the go env it runs under the spellings `--trimpath` and `-trimpathy` besides.
 func TestTranslatedEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 	test.Parallel()
-	cgotest.RequireTranslation(test)
+	cgo_testing.RequireTranslation(test)
 
 	directory := test.TempDir()
 	for given, want := range map[string]string{

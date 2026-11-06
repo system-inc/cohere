@@ -7,7 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -252,8 +252,8 @@ var formatVariants = func() []format_options.Options {
 func compareFormat(test *testing.T, inputs []string) int {
 	test.Helper()
 	failures := 0
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for _, input := range inputs {
@@ -288,8 +288,8 @@ func TestFormatFixturesMatchOracle(test *testing.T) {
 // compared against the oracle's for another must differ.
 func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	engine := oracletest.Open(test, test.Name()).Engine(format_options.Default())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	engine := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
 	expected, formatError := engine.Format("fixture.md", "* a")
 	if formatError != nil {
 		test.Fatal(formatError)
@@ -327,7 +327,7 @@ func TestExhaustiveDelimitersMatchOracle(test *testing.T) {
 	}
 	extend("", 0)
 
-	// The live oracle, not a golden (see oracletest): an opt-in measuring sweep of some 19,500 inputs that
+	// The live oracle, not a golden (see oracle_testing): an opt-in measuring sweep of some 19,500 inputs that
 	// no default run reaches, so recording it would check in its answers for nothing a default run reads.
 	engine, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {

@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -21,12 +21,12 @@ import (
 // oracle runs. Every node of the Go tree must carry the same type, the same fields with the same values
 // (null distinct from absent), and the same positions, offsets converted from UTF-16 to bytes.
 //
-// The fixtures' trees are recorded (see oracletest) as the JSON text upstream's parser serializes, so no
+// The fixtures' trees are recorded (see oracle_testing) as the JSON text upstream's parser serializes, so no
 // JavaScript runs for them and the runtime is built only when they are recorded again. The corpus reads
 // files off disk, so its oracle stays live, with no golden.
 
 type treeOracle struct {
-	golden    *oracletest.Golden
+	golden    *oracle_testing.Golden
 	once      sync.Once
 	runtime   *goja.Runtime
 	loadError error
@@ -35,7 +35,7 @@ type treeOracle struct {
 // newTreeOracle answers from the test's golden.
 func newTreeOracle(test *testing.T) *treeOracle {
 	test.Helper()
-	return &treeOracle{golden: oracletest.Open(test, test.Name())}
+	return &treeOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
 // newLiveTreeOracle answers from the bundle's parser on every call.
@@ -163,7 +163,7 @@ func (oracle *treeOracle) parse(text string) (treeValue, error) {
 	if oracle.golden == nil {
 		serialized, serializeError = oracle.serialize(text)
 	} else {
-		serialized, serializeError = oracle.golden.Answer(oracletest.Key("tree", text), func() (string, error) {
+		serialized, serializeError = oracle.golden.Answer(oracle_testing.Key("tree", text), func() (string, error) {
 			oracle.once.Do(oracle.load)
 			if oracle.loadError != nil {
 				return "", oracle.loadError

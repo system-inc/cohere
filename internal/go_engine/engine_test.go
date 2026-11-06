@@ -21,7 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/printf"
 
-	"github.com/system-inc/cohere/internal/go_engine/cgotest"
+	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -213,7 +213,7 @@ type endToEndCase struct {
 
 	// needsCgo marks a case whose project has cgo of its own, which the engine loads through go/packages and the cgo
 	// tool: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
-	// refuses to compile (see cgotest).
+	// refuses to compile (see cgo_testing).
 	needsCgo bool
 
 	// rules replaces the registry when set.
@@ -293,7 +293,7 @@ func TestEndToEnd(test *testing.T) {
 func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
 	if endToEnd.needsCgo {
-		cgotest.RequireTranslation(test)
+		cgo_testing.RequireTranslation(test)
 	}
 	fixture := cmp.Or(endToEnd.fixture, endToEnd.name)
 	root := copyFixture(test, filepath.Join("testdata", fixture))

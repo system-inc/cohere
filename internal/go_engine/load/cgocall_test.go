@@ -8,7 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/cgocall"
 
-	"github.com/system-inc/cohere/internal/go_engine/cgotest"
+	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 )
 
@@ -27,7 +27,7 @@ var cgocallFiles = map[string]string{
 // Loom's, which refuses to compile.
 func TestCgocallFindsItsViolationInAProjectsCgoPackage(test *testing.T) {
 	test.Parallel()
-	cgotest.RequireTranslation(test)
+	cgo_testing.RequireTranslation(test)
 
 	directory := test.TempDir()
 	for name, contents := range cgocallFiles {

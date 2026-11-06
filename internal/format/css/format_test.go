@@ -9,7 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -215,8 +215,8 @@ func formatOptionSets() map[string]format_options.Options {
 
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range formatCases {
@@ -281,8 +281,8 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 // What the fork refuses, Format refuses, as a syntax error.
 func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	test.Parallel()
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(test, test.Name()).Engine(format_options.Default())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	oracle := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
 		if _, formatError := oracle.Format("Probe.css", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
@@ -353,7 +353,7 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 		test.Fatalf("no corpus files under %s", roots)
 	}
 	rewritten := 0
-	// The live oracle, not a golden (see oracletest): the corpus is the projects' own CSS as it stands
+	// The live oracle, not a golden (see oracle_testing): the corpus is the projects' own CSS as it stands
 	// today, which changes with every edit to them, so recorded answers would only ever be stale.
 	for optionsName, options := range formatOptionSets() {
 		oracle, newPrettierError := prettier.New(options)
@@ -431,8 +431,8 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 		test.Fatal(walkError)
 	}
 
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		compared, refusedByBoth := 0, 0
@@ -606,8 +606,8 @@ var scssFormatCases = []formatCase{
 
 func TestFormatScssMatchesTheFork(test *testing.T) {
 	test.Parallel()
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		for _, testCase := range scssFormatCases {
@@ -651,8 +651,8 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 // not Format under another name. Each of these is printed differently by the fork as .css and as .scss.
 func TestFormatScssIsNotFormat(test *testing.T) {
 	test.Parallel()
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(test, test.Name()).Engine(format_options.Default())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	oracle := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
 	for _, source := range []string{
 		"a{\n// comment\ncolor:red;\n}",
 		"$map:(key1:value1,key2:value2);",
@@ -728,8 +728,8 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 		test.Fatal(walkError)
 	}
 
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for optionsName, options := range formatOptionSets() {
 		oracle := golden.Engine(options)
 		compared, matched, rewritten, refusedByBoth, skipped := 0, 0, 0, 0, 0

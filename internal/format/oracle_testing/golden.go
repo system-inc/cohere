@@ -1,4 +1,4 @@
-// Package oracletest keeps what the embedded Prettier answered for a test's fixtures in a checked-in golden
+// Package oracle_testing keeps what the embedded Prettier answered for a test's fixtures in a checked-in golden
 // file, so the test compares bytes and runs no JavaScript (#nxgt2ca).
 //
 // The live oracle formatted every fixture under every option set on every run, and yaml, css and markdown
@@ -11,7 +11,7 @@
 //
 // The checks themselves are untouched: every fixture is still compared under every option set, against
 // the same bytes the oracle gives.
-package oracletest
+package oracle_testing
 
 import (
 	"compress/gzip"

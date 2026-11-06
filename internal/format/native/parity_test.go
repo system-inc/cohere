@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 )
 
 // TestEmptyTextAndNumericSeparatorsMatchTheFork holds the nine inputs @system_adamic's JSON audit found
@@ -40,7 +40,7 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 	}
 
 	options := format_options.Default()
-	oracle := oracletest.Open(test, test.Name()).Engine(options)
+	oracle := oracle_testing.Open(test, test.Name()).Engine(options)
 	formatter := Formatter{Options: options}
 	compared, refusedByBoth := 0, 0
 	for _, each := range inputs {

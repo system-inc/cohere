@@ -11,7 +11,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/format_options"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -20,9 +20,9 @@ import (
 // and every corpus leaves at "preserve", and a file path the engine does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
-// Its answers are recorded (see oracletest), so the runtime is built only when they are recorded again.
+// Its answers are recorded (see oracle_testing), so the runtime is built only when they are recorded again.
 type optionsOracle struct {
-	golden    *oracletest.Golden
+	golden    *oracle_testing.Golden
 	once      sync.Once
 	runtime   *goja.Runtime
 	loadError error
@@ -30,7 +30,7 @@ type optionsOracle struct {
 
 func newOptionsOracle(test *testing.T) *optionsOracle {
 	test.Helper()
-	return &optionsOracle{golden: oracletest.Open(test, test.Name())}
+	return &optionsOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
 func (oracle *optionsOracle) load() {
@@ -56,7 +56,7 @@ func (oracle *optionsOracle) format(
 	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
-	key := oracletest.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
+	key := oracle_testing.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
 		if oracle.loadError != nil {
