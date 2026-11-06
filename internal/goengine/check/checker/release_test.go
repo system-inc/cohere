@@ -12,7 +12,8 @@ import (
 	"weak"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/goengine/load"
 )
 
 // heavyResult stands in for a large intermediate Result such as staticcheck's IR of a package.
@@ -96,17 +97,13 @@ func TestAResultIsReleasedWhenItsLastReaderFinishesAndARootsIsKept(test *testing
 			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
-	loaded, loadError := packages.Load(&packages.Config{
-		Mode: packages.LoadAllSyntax,
-		Dir:  directory,
-		Env:  append(os.Environ(), "GOWORK=off"),
-	}, "./...")
-	if loadError != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
+	loaded, loadError := load.Packages(directory, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Roots) != 1 || len(loaded.Roots[0].Errors) > 0 {
 		test.Fatalf("loading the fixture: %v, %+v", loadError, loaded)
 	}
 
 	analyzers := []*analysis.Analyzer{observerAnalyzer, rootHeavy}
-	graph, analyzeError := Analyze(analyzers, loaded, &Options{Sequential: true})
+	graph, analyzeError := Analyze(analyzers, loaded.Roots, &Options{Sequential: true})
 	if analyzeError != nil {
 		test.Fatalf("analyzing: %v", analyzeError)
 	}
@@ -179,22 +176,18 @@ func TestADependencysSyntaxIsReleasedOnceItsLastActionFinishesAndAGivenPackagesI
 			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
-	loaded, loadError := packages.Load(&packages.Config{
-		Mode: packages.LoadAllSyntax,
-		Dir:  directory,
-		Env:  append(os.Environ(), "GOWORK=off"),
-	}, "./upper")
-	if loadError != nil || len(loaded) != 1 || len(loaded[0].Errors) > 0 {
+	loaded, loadError := load.Packages(directory, []string{"./upper"}, []string{"GOWORK=off"}, nil)
+	if loadError != nil || len(loaded.Roots) != 1 || len(loaded.Roots[0].Errors) > 0 {
 		test.Fatalf("loading the fixture: %v, %+v", loadError, loaded)
 	}
-	lower, imported := loaded[0].Imports["example.com/syntax/lower"]
+	lower, imported := loaded.Roots[0].Imports["example.com/syntax/lower"]
 	if !imported || len(lower.Syntax) != 1 || lower.TypesInfo == nil {
-		test.Fatalf("want lower loaded from source as upper's dependency, got %+v", loaded[0].Imports)
+		test.Fatalf("want lower loaded from source as upper's dependency, got %+v", loaded.Roots[0].Imports)
 	}
 	lowerFile := weak.Make(lower.Syntax[0])
 	lowerTypesInfo := weak.Make(lower.TypesInfo)
 
-	graph, analyzeError := Analyze([]*analysis.Analyzer{declaredAnalyzer}, loaded, nil)
+	graph, analyzeError := Analyze([]*analysis.Analyzer{declaredAnalyzer}, loaded.Roots, nil)
 	if analyzeError != nil {
 		test.Fatalf("analyzing: %v", analyzeError)
 	}
@@ -211,7 +204,7 @@ func TestADependencysSyntaxIsReleasedOnceItsLastActionFinishesAndAGivenPackagesI
 		test.Errorf("want lower's syntax tree and type information collected while the graph is alive, and the " +
 			"graph still holds them")
 	}
-	if len(loaded[0].Syntax) != 1 || loaded[0].TypesInfo == nil {
+	if len(loaded.Roots[0].Syntax) != 1 || loaded.Roots[0].TypesInfo == nil {
 		test.Errorf("want upper, a package the graph was given, to keep its syntax and type information")
 	}
 	runtime.KeepAlive(graph)
