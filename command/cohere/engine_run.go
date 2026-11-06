@@ -187,11 +187,12 @@ type engineRuleRecord struct {
 	Severity string `json:"severity"`
 }
 
-// engineInputsRecord is every path a Go check run's verdict depends on, absolute and sorted, which the Go engine
-// writes once before its summary: each file whose bytes it read, each directory whose listing decided which
-// packages or files exist, and each path whose absence the load depended on, such as a go.work in an ancestor.
-// Additive within contract 3, and the run cache's proof for a Go run: the front door cannot watch what `go list`
-// reads in a process of its own, so the engine says, and a run that ends without saying is never recorded.
+// engineInputsRecord is every path a check run's verdict depends on, absolute and sorted, which the Go and Swift
+// engines write once before their summary: each file whose bytes it read, each directory whose listing decided which
+// packages or files exist, and each path whose absence the run depended on, such as a go.work in an ancestor.
+// Additive within contract 3, and the run cache's proof for an engine's run: the front door cannot watch what `go
+// list`, SwiftPM or the engine read in processes of their own, so the engine says, and a run that ends without saying
+// is never recorded.
 type engineInputsRecord struct {
 	Files       []string `json:"files"`
 	Directories []string `json:"directories"`
@@ -1107,7 +1108,8 @@ func (run *engineRun) acceptRule(record *engineRuleRecord) error {
 
 // acceptInputs keeps what a check run read, once. Every path must be absolute: the front door stats them from a
 // working directory that need not be the engine's, so a relative one would prove a different file unchanged. And a
-// record naming no file is refused, since a check run reads at least its go.mod, and an empty proof matches any tree.
+// record naming no file is refused, since a check run reads at least the file its project is defined by, a go.mod or
+// a Package.swift, and an empty proof matches any tree.
 func (run *engineRun) acceptInputs(record *engineInputsRecord) error {
 	if run.mode != engineModeCheck {
 		return fmt.Errorf("an inputs record in a %s run", run.mode)
@@ -1116,7 +1118,7 @@ func (run *engineRun) acceptInputs(record *engineInputsRecord) error {
 		return fmt.Errorf("a second inputs record")
 	}
 	if len(record.Files) == 0 {
-		return fmt.Errorf("an inputs record naming no file, and a check run reads at least its go.mod")
+		return fmt.Errorf("an inputs record naming no file, and a check run reads at least its project's definition")
 	}
 	for _, paths := range [][]string{record.Files, record.Directories, record.Absent} {
 		for _, path := range paths {

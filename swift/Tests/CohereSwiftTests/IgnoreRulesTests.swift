@@ -141,7 +141,9 @@ struct IgnoreRulesTests {
     /*
      The engine's own scratch is never the project's source, so after a build a package whose `.gitignore` does not
      list `.cache` names none of the build's generated sources as a file nothing checked, as ahraos-macos named six
-     under `DerivedSources` on every run. SwiftPM's `.build` is skipped the same way when SwiftPM's cache tag is in it.
+     under `DerivedSources` on every run. Nor is anything else in cohere's cache directory beside it, the front door's
+     table among it, whose listing would otherwise be an input every run moves, nor a nested project's own. SwiftPM's
+     `.build` is skipped the same way when SwiftPM's cache tag is in it.
      */
     @Test func theBuildScratchesHoldNoFileNothingChecks() throws {
         let excluded = try Self.excluded(packageFiles: [
@@ -149,10 +151,13 @@ struct IgnoreRulesTests {
             ".cache/cohere/swift/out/Intermediates.noindex/A.build/Debug/A-p.build/DerivedSources/resource_bundle_accessor.swift":
                 "",
             ".cache/cohere/swift/package-description.json": "{}",
+            ".cache/cohere/notes/Stray.swift": "",
+            "Tools/Probe/Package.swift": "",
+            "Tools/Probe/.cache/cohere/swift/DerivedSources/resource_bundle_accessor.swift": "",
             ".build/CACHEDIR.TAG": FileSet.cacheDirectoryTagSignature + "\n# a cache directory tag\n",
             ".build/debug/A.build/DerivedSources/resource_bundle_accessor.swift": "",
         ])
-        #expect(excluded == ["Package.swift": "a package manifest"])
+        #expect(excluded == ["Package.swift": "a package manifest", "Tools/Probe/Package.swift": "a package manifest"])
     }
 
     /* A `.build` with no cache tag is not known to be SwiftPM's, so it is walked as any directory is, and so is a `.cache` that is not the engine's scratch. */

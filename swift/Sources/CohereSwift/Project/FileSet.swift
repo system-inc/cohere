@@ -35,6 +35,13 @@ public struct FileSet: Equatable, Sendable {
     public var excluded: [ProjectRecord.ExcludedFile]
     /* Empty inside a git repository. Otherwise why every target source was treated as ours. */
     public var note: String
+    /*
+     What deciding the set read beyond the targets' files, for the run's inputs record (`RunInputs`): every ignore file
+     and git config file consulted, there or not, and every directory the walk for files no target compiles listed.
+     Empty outside a git repository, where nothing is consulted or walked.
+     */
+    public var ignoreFilesConsulted: [String] = []
+    public var directoriesListed: [String] = []
 
     public init(filesInPackage: [URL], owned: [OwnedFile], excluded: [ProjectRecord.ExcludedFile], note: String) {
         self.filesInPackage = filesInPackage
@@ -90,7 +97,11 @@ public struct FileSet: Equatable, Sendable {
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
             let visible = Set(
-                ignoreRules.visibleFiles(under: resolvedRoot, skipping: Self.buildScratches(of: package))
+                ignoreRules.visibleFiles(
+                    under: resolvedRoot,
+                    skipping: Self.buildScratches(of: package),
+                    skippingWhere: Self.isCohereCache,
+                )
             )
             for path in visible.sorted()
             where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
@@ -107,7 +118,10 @@ public struct FileSet: Equatable, Sendable {
             ignoreRules == nil
             ? "not a git repository, so every file a target compiles was treated as ours"
             : ""
-        return FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
+        var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
+        fileSet.ignoreFilesConsulted = (ignoreRules?.filesConsulted ?? []).sorted()
+        fileSet.directoriesListed = ignoreRules?.directoriesListed ?? []
+        return fileSet
     }
 
     /*
@@ -115,10 +129,12 @@ public struct FileSet: Equatable, Sendable {
      absolute paths with symlinks resolved, the way the walk spells them. Each is told by structure, never by a
      directory's name:
 
-     - the engine's own scratch, `Pipeline.scratchPath(for:)`, which the engine itself writes. A repository
-       whose `.gitignore` does not list `.cache` otherwise had every run after the first build name the build's
-       generated sources as Swift files nothing checked (ahraos-macos, 2026-11-06: six under `DerivedSources`)
-       and walk some 9,800 entries of the scratch for them;
+     - cohere's cache directory, `.cache/cohere`, which holds the engine's own scratch, `Pipeline.scratchPath(for:)`,
+       beside the front door's table, and which every run writes. A repository whose `.gitignore` does not list
+       `.cache` otherwise had every run after the first build name the build's generated sources as Swift files
+       nothing checked (ahraos-macos, 2026-11-06: six under `DerivedSources`) and walk some 9,800 entries of the
+       scratch for them. The whole directory rather than the scratch alone, since the walk's listings are inputs of
+       the run (`RunInputs`), and the table the front door writes there after every run would make the next one miss;
      - SwiftPM's own default scratch, the root's `.build`, only when it holds the cache directory tag SwiftPM
        writes into every scratch (`CACHEDIR.TAG`, with the signature the tag's specification fixes), so a
        `.build` that SwiftPM did not make is walked as before.
@@ -127,13 +143,28 @@ public struct FileSet: Equatable, Sendable {
         var scratches: Set<String> = []
         for member in package.allPackages {
             let root = member.root.resolvingSymlinksInPath()
-            scratches.insert(Pipeline.scratchPath(for: root).standardizedFileURL.path)
+            scratches.insert(Pipeline.scratchPath(for: root).deletingLastPathComponent().standardizedFileURL.path)
             let swiftPackageScratch = root.appendingPathComponent(".build", isDirectory: true)
             if Self.isTaggedCache(swiftPackageScratch) {
                 scratches.insert(swiftPackageScratch.standardizedFileURL.path)
             }
         }
         return scratches
+    }
+
+    /*
+     Whether `directory` is cohere's cache directory for another project below the root: a `.cache/cohere` beside a
+     project definition cohere checks, where the front door keeps that project's table and the engine its scratch
+     (`cacheDirectory` in command/cohere). It is never source, and the run checking that project writes it, so a walk
+     that listed it would name a build's generated sources as files nothing checked and hold a listing every one of
+     that project's runs moves (ahraos-macos's `tools/scroll-probe`).
+     */
+    static func isCohereCache(_ directory: String) -> Bool {
+        guard directory.hasSuffix("/.cache/cohere") else { return false }
+        let project = URL(fileURLWithPath: directory).deletingLastPathComponent().deletingLastPathComponent()
+        return ["Package.swift", "tsconfig.json", "go.mod", "go.work", "project.yml"].contains {
+            FileManager.default.fileExists(atPath: project.appendingPathComponent($0).path)
+        }
     }
 
     /* The first line every cache directory tag begins with, from its specification (bford.info/cachedir). */
