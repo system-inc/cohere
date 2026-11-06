@@ -259,11 +259,11 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 // Mutates: read gains the files, their syntax and their errors, as the package being loaded
 func (loader *loader) parse(listedPackage *listedPackage, names []string, withListErrors bool, read *Package) {
 	if withListErrors && listedPackage.Error != nil {
-		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Err))
+		read.Errors = append(read.Errors, errors.New(listedPackage.Error.Message))
 	}
 	if withListErrors {
 		for _, dependencyError := range listedPackage.DepsErrors {
-			read.Errors = append(read.Errors, errors.New(dependencyError.Err))
+			read.Errors = append(read.Errors, errors.New(dependencyError.Message))
 		}
 	}
 	for _, name := range names {

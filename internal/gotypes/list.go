@@ -45,8 +45,14 @@ type listedPackage struct {
 	ImportMap  map[string]string
 	Deps       []string
 	Module     *listedModule
-	Error      *struct{ Err string }
-	DepsErrors []*struct{ Err string }
+	Error      *listedError
+	DepsErrors []*listedError
+}
+
+// listedError is an error go list reports for a package or one of its dependencies. go list names the text
+// Err, and the tag keeps that key.
+type listedError struct {
+	Message string `json:"Err"`
 }
 
 // listedModule is the module a listed package belongs to.
