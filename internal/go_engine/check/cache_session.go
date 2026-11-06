@@ -3,6 +3,7 @@ package check
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -258,6 +259,8 @@ func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]store
 
 // save counts every package the load reached as a hit or a miss, and writes the entry of each miss with no load
 // error on which every action finished without one, from its actions, its types and what the load withheld of it.
+// The entries are encoded and written as many at once as there are cores: writing a package's export data is most of
+// a cold run's save, and each package's is its own.
 func (session *CacheSession) save(
 	graph *checker.Graph,
 	withheld map[*packages.Package]load.PackageWithheld,
@@ -268,35 +271,51 @@ func (session *CacheSession) save(
 	for action := range graph.All() {
 		actionsOf[action.Package] = append(actionsOf[action.Package], action)
 	}
-	for keyed, key := range session.keys {
+	var saving []*packages.Package
+	for keyed := range session.keys {
 		if session.restored(keyed) {
 			session.counts.Hit++
 			continue
 		}
 		session.counts.Missed++
-		if len(keyed.Errors) > 0 || keyed.IllTyped || !finishedClean(actionsOf[keyed]) {
-			continue
+		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) {
+			saving = append(saving, keyed)
 		}
-		entry, dropped, encodeError := encodeEntry(session.known, session.ruleOf, keyed, actionsOf[keyed],
-			withheld[keyed], files[keyed])
-		if errors.Is(encodeError, errorUnstorable) {
-			session.counts.Unstorable++
-			continue
-		}
-		if encodeError != nil {
-			session.problem(encodeError.Error())
-			continue
-		}
-		session.counts.FactsDropped += dropped
-		if putError := session.caching.Store.Put(key, entry); putError != nil {
-			if session.counts.WriteFailed == 0 {
-				session.problem(putError.Error())
-			}
-			session.counts.WriteFailed++
-			continue
-		}
-		session.counts.Written++
 	}
+	var countsLock sync.Mutex
+	var group sync.WaitGroup
+	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
+	for _, saved := range saving {
+		group.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer group.Done()
+			defer func() { <-slots }()
+			entry, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
+				withheld[saved], files[saved])
+			var putError error
+			if encodeError == nil {
+				putError = session.caching.Store.Put(session.keys[saved], entry)
+			}
+			countsLock.Lock()
+			defer countsLock.Unlock()
+			switch {
+			case errors.Is(encodeError, errorUnstorable):
+				session.counts.Unstorable++
+			case encodeError != nil:
+				session.problem(encodeError.Error())
+			case putError != nil:
+				if session.counts.WriteFailed == 0 {
+					session.problem(putError.Error())
+				}
+				session.counts.WriteFailed++
+			default:
+				session.counts.FactsDropped += dropped
+				session.counts.Written++
+			}
+		}()
+	}
+	group.Wait()
 }
 
 // problem records one reason the cache was not read or written.
