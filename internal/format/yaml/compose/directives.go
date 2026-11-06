@@ -182,16 +182,16 @@ func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
 		}
 		return high<<4 | low, true
 	}
-	for k := 0; k < len(text); k++ {
-		if text[k] != '%' {
-			decoded = append(decoded, text[k])
+	for index := 0; index < len(text); index++ {
+		if text[index] != '%' {
+			decoded = append(decoded, text[index])
 			continue
 		}
-		first, isByte := hexByte(k)
+		first, isByte := hexByte(index)
 		if !isByte {
 			return nil, false
 		}
-		k += 2
+		index += 2
 		if first < 0x80 {
 			decoded = append(decoded, uint16(first))
 			continue
@@ -205,16 +205,16 @@ func decodeURIComponent(text []uint16) (decoded []uint16, ok bool) {
 			return nil, false
 		}
 		octets := []byte{first}
-		if k+3*(count-1) >= len(text) {
+		if index+3*(count-1) >= len(text) {
 			return nil, false
 		}
-		for j := 1; j < count; j++ {
-			k++
-			octet, isOctet := hexByte(k)
+		for continuation := 1; continuation < count; continuation++ {
+			index++
+			octet, isOctet := hexByte(index)
 			if !isOctet || octet&0xC0 != 0x80 {
 				return nil, false
 			}
-			k += 2
+			index += 2
 			octets = append(octets, octet)
 		}
 		character, size := utf8.DecodeRune(octets)

@@ -75,10 +75,10 @@ type parser struct {
 }
 
 func newParser(in *input) *parser {
-	p := &parser{}
-	p.this = p
-	p.construct(in)
-	return p
+	created := &parser{}
+	created.this = created
+	created.construct(in)
+	return created
 }
 
 // construct is Parser's constructor, split from newParser so a subclass sets this first and its own
@@ -364,8 +364,8 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 		} else if lowered == "important" {
 			cache := copyTokens(tokens, 0, len(tokens))
 			text := ""
-			for j := index; j > 0; j-- {
-				kind := cache[j].kind
+			for cursor := index; cursor > 0; cursor-- {
+				kind := cache[cursor].kind
 				if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 					break
 				}

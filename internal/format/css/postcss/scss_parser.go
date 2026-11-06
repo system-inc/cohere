@@ -20,10 +20,10 @@ type scssParser struct {
 
 // newScssParser is new ScssParser(input): Parser's constructor with this ScssParser.
 func newScssParser(in *input) *parser {
-	s := &scssParser{parser: &parser{}}
-	s.this = s
-	s.construct(in)
-	return s.parser
+	created := &scssParser{parser: &parser{}}
+	created.this = created
+	created.construct(in)
+	return created.parser
 }
 
 func (parser *scssParser) atrule(atToken token) {
@@ -208,12 +208,12 @@ func (parser *scssParser) rule(tokens []token) {
 		node.raws["between"] = node.rawString("between") + parser.spacesAndCommentsFromStart(&tokens)
 		// precheckMissedSemicolon is a hook for postcss-safe-parser; the base parser's does nothing.
 
-		for i := len(tokens) - 1; i > 0; i-- {
-			each = tokens[i]
+		for index := len(tokens) - 1; index > 0; index-- {
+			each = tokens[index]
 			if each.value == "!important" {
 				node.important = true
 				node.mark("important")
-				text := parser.stringFrom(&tokens, i)
+				text := parser.stringFrom(&tokens, index)
 				text = parser.spacesFromEnd(&tokens) + text
 				if text != " !important" {
 					node.raws["important"] = text
@@ -222,8 +222,8 @@ func (parser *scssParser) rule(tokens []token) {
 			} else if each.value == "important" {
 				cache := copyTokens(tokens, 0, len(tokens))
 				text := ""
-				for j := i; j > 0; j-- {
-					kind := cache[j].kind
+				for cursor := index; cursor > 0; cursor-- {
+					kind := cache[cursor].kind
 					if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 						break
 					}

@@ -30,16 +30,16 @@ import (
 // Parse is Prettier's GraphQL parser: graphql-js's parse(text, { experimentalFragmentArguments: true }),
 // then parseComments, which collects the Comment tokens from the token stream, since graphql-js's AST
 // has no comments. Each comment is a "Comment" node whose value is the text after the "#".
-func Parse(text string) (document *estree.Node, comments []*estree.Node, err error) {
+func Parse(text string) (document *estree.Node, comments []*estree.Node, parseError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			parseError, isSyntaxError := recovered.(*SyntaxError)
+			syntaxError, isSyntaxError := recovered.(*SyntaxError)
 			if !isSyntaxError {
 				panic(recovered)
 			}
 			// Marked as a parse failure, so the format phase skips the file rather than reporting a broken
 			// formatter.
-			document, comments, err = nil, nil, printing.Syntax(parseError)
+			document, comments, parseError = nil, nil, printing.Syntax(syntaxError)
 		}
 	}()
 

@@ -70,9 +70,9 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 		return resolveCollection(composition, token, onError, tagName, nil)
 	}
 	var tag *Tag
-	for _, t := range composition.schema.Tags {
-		if t.Tag == tagName && t.Collection == expType {
-			tag = t
+	for _, candidate := range composition.schema.Tags {
+		if candidate.Tag == tagName && candidate.Collection == expType {
+			tag = candidate
 			break
 		}
 	}
