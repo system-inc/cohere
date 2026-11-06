@@ -38,6 +38,8 @@ import (
 // arguments anyway, so admitting more later is a change to one condition rather than to the proof, plus
 // declaring whatever the new run reads that the graph build does not.
 //
+// At a Go root the same runs are admitted, and the Go engine declares what they read (see go_run_cache.go).
+//
 // # Which exits
 //
 // A run is recorded only when it ends in a verdict about the tree: clean, findings, or the type bail.
@@ -146,7 +148,8 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// The root resolved, and the files below it from it, so a run through another spelling of the same
 	// directory has the same key (#547dhjz).
 	anchor := program.NewPathAnchor(location.Root)
-	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
+	walkSections := program.CacheTableSections{Findings: true, Signatures: true, Types: true}
+	session := beginRunCacheSession(location.Root, anchor, walkSections,
 		"root="+anchor.Resolved(),
 		"tsconfig="+anchor.Stable(location.ConfigFileName),
 		"lint-config="+anchor.Stable(location.LintConfigFileName),
@@ -155,13 +158,31 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// arguments do not show. See ownership.go.
 		"yield="+activeProjectYieldFingerprint(),
 	)
+	if session == nil {
+		return nil
+	}
+	return session.recorder
+}
+
+// beginRunCacheSession is the half of beginning a run cache every engine shares: the key, from this invocation's
+// arguments and the facts its engine names; the recorded run's check, which replays it and exits on a hit; and
+// otherwise the session that records this run, its streams teed. sections are the parts of the table beyond the
+// run that this engine's walk reuses, read only on a miss, since a replay needs nothing else. Nil when no session
+// could begin, and then nothing is recorded.
+func beginRunCacheSession(
+	root string,
+	anchor program.PathAnchor,
+	sections program.CacheTableSections,
+	facts ...string,
+) *runCacheSession {
+	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(), facts...)
 	if runCacheKeyPartsOfError != nil {
 		return nil
 	}
 	key := keyParts.Key()
 
-	prepareCacheDirectory(location.Root)
-	directory := cacheDirectory(location.Root)
+	prepareCacheDirectory(root)
+	directory := cacheDirectory(root)
 	printPreviousNotes(directory)
 	// The run before this one may still be writing the table after answering its caller, and reading
 	// before its renames would miss what it recorded, or see its run beside the findings before them. So the
@@ -186,10 +207,13 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		release()
 		replayRunCache(stored, anchor)
 	}
-	sections, sectionsError := program.ReadCacheTable(directory, identity,
-		program.CacheTableSections{Findings: true, Signatures: true, Types: true}, anchor)
+	var sectionsError error
+	if sections.Findings || sections.Signatures || sections.Types {
+		var reused *program.CacheTable
+		reused, sectionsError = program.ReadCacheTable(directory, identity, sections, anchor)
+		table.Findings, table.Signatures, table.Types = reused.Findings, reused.Signatures, reused.Types
+	}
 	release()
-	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
 	for _, readError := range []error{readCacheTableError, sectionsError} {
 		if errors.Is(readError, program.ErrCacheTableUnreadable) ||
 			errors.Is(readError, program.ErrCacheTablePartlyKept) {
@@ -224,7 +248,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		return nil
 	}
 	activeRunCache = session
-	return session.recorder
+	return session
 }
 
 // cacheDirectory is where cohere keeps what it caches for one project, the cache table's files among it:

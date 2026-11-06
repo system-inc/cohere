@@ -33,12 +33,15 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
 // with its absolute path, and the engine reads that file's `go` block in place of the root's settings. Any
-// flag in neither list is refused by name, among them the unused report, timing, explain, the tsconfig, the
-// cache and fix passes, none of which the Go engine implements yet.
+// flag in neither list is refused by name, among them the unused report, timing, explain, the tsconfig and
+// fix passes, none of which the Go engine implements yet.
+//
+// `no-cache` is the front door's as much as the engine's: the run neither replays nor records (see
+// beginGoRunCache), and it is forwarded so a cache the engine keeps of its own is off too.
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version",
+		"rules", "rules-enabled", "version", "no-cache",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open",
@@ -77,11 +80,22 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 		return 1, fmt.Errorf("finding this cohere's own executable, which runs as the Go engine: %w", executableError)
 	}
 
+	// Before the engine is started, so a run with nothing changed replays here and exits without one. Only a
+	// check: a listing is no verdict, and none of its flags is one the run cache admits anyway.
+	if mode == engineModeCheck {
+		beginGoRunCache(location)
+	}
+
 	run := newEngineRun(streams.Output, mode, language, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
-	return runEngineBinary(executable, append([]string{goEngineVerb}, arguments...), run, os.Stderr)
+	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.
+	exitCode, runError := runEngineBinary(executable, append([]string{goEngineVerb}, arguments...), run, os.Stderr)
+	if runError == nil {
+		declareGoRunCacheInputs(run, exitCode, location.LintConfigFileName)
+	}
+	return exitCode, runError
 }
 
 // goContainer is what a Go root is called in the run's words: a workspace when it holds a go.work, which is

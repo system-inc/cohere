@@ -93,11 +93,11 @@ func goLanguage(container string) engineLanguage {
 		FileNoun:      "Go files",
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
-		// The Go engine keeps no cache of its own: it loads the packages through the go command, whose build
-		// cache is go's (internal/go_engine/load). A Go run refuses `--no-cache` today (goFlags), so this is
-		// said only once the flag reaches it.
-		CacheOffDetail: "the Go engine keeps no cache of its own, and the go command's build cache, which " +
-			"loading the packages reads and may fill, is go's to keep",
+		// A Go run's cache is the run cache's table, which replays a verdict with nothing changed (beginGoRunCache).
+		// The engine loads the packages through the go command, whose build cache is go's
+		// (internal/go_engine/load), so the sentence says which of the two the flag reaches.
+		CacheOffDetail: "no recorded run was replayed and this one was not recorded, and the go command's " +
+			"build cache, which loading the packages reads and may fill, is go's to keep",
 	}
 }
 

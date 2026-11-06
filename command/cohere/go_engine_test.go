@@ -69,11 +69,12 @@ func TestGoEngineArgumentsForwardWhatTheGoEngineReads(test *testing.T) {
 }
 
 // TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement: every flag the Go engine has no meaning for is
-// refused by name, naming Go, rather than dropped into a run that looks like it honored it.
+// refused by name, naming Go, rather than dropped into a run that looks like it honored it. `--no-cache` left this
+// list when the run cache came to Go (see TestGoEngineArgumentsForwardNoCache).
 func TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement(test *testing.T) {
 	test.Parallel()
 	for _, refused := range []string{
-		"unused", "unused-all", "unused-deep", "timing", "explain", "no-cache", "fix-passes", "print-config",
+		"unused", "unused-all", "unused-deep", "timing", "explain", "fix-passes", "print-config",
 	} {
 		test.Run(refused, func(test *testing.T) {
 			test.Parallel()
@@ -84,6 +85,23 @@ func TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement(test *testing.T)
 				test.Fatalf("--%s was not refused by name for Go: %v", refused, argumentsError)
 			}
 		})
+	}
+}
+
+// TestGoEngineArgumentsForwardNoCache: `--no-cache` is taken, not refused, and forwarded to the engine, so a cache
+// the engine keeps of its own is off along with the front door's run cache.
+func TestGoEngineArgumentsForwardNoCache(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	arguments, mode, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
+		map[string]bool{"no-fix": true, "no-cache": true}, typedTrue, nil)
+	if argumentsError != nil {
+		test.Fatalf("--no-cache was refused for Go: %v", argumentsError)
+	}
+	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--no-cache"}
+	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
+		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
+			engineModeCheck)
 	}
 }
 
