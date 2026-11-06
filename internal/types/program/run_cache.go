@@ -293,9 +293,9 @@ func signaturesOf(paths []string) ([]RunCacheInput, error) {
 		}()
 	}
 	group.Wait()
-	for _, err := range failures {
-		if err != nil {
-			return nil, err
+	for _, failure := range failures {
+		if failure != nil {
+			return nil, failure
 		}
 	}
 	return inputs, nil

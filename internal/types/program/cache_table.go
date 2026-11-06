@@ -413,26 +413,26 @@ type cacheTableRead struct {
 //
 // Mutates: read records that the file was there, and why it was not kept when it is not
 func readCacheTableSection[Body any](read *cacheTableRead, name string, section string, body *Body) bool {
-	contents, err := os.ReadFile(filepath.Join(read.directory, name))
-	if errors.Is(err, os.ErrNotExist) {
+	contents, readError := os.ReadFile(filepath.Join(read.directory, name))
+	if errors.Is(readError, os.ErrNotExist) {
 		return false
 	}
 	read.found = true
-	if err == nil {
-		err = decodeCacheTableFile(contents, section, read.identity, body)
+	if readError == nil {
+		readError = decodeCacheTableFile(contents, section, read.identity, body)
 	}
 	switch {
-	case err == nil:
+	case readError == nil:
 		return true
-	case errors.Is(err, errorWrittenByAnotherCommit):
+	case errors.Is(readError, errorWrittenByAnotherCommit):
 		if section == cacheTableFormatSection {
 			return true
 		}
-		read.anotherCommit = strings.TrimPrefix(err.Error(), errorWrittenByAnotherCommit.Error()+" ")
+		read.anotherCommit = strings.TrimPrefix(readError.Error(), errorWrittenByAnotherCommit.Error()+" ")
 		read.dropped = append(read.dropped, name)
 	default:
 		read.onlyAnotherCommit = false
-		read.dropped = append(read.dropped, fmt.Sprintf("%s (%v)", name, err))
+		read.dropped = append(read.dropped, fmt.Sprintf("%s (%v)", name, readError))
 	}
 	return false
 }
