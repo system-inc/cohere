@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -180,21 +179,23 @@ func RecordRunCache(
 	exitCode int,
 	readSince time.Time,
 ) (*RunCache, error) {
-	return RecordRunCacheBelow(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince)
+	return RecordRunCacheWithin(nil, key, files, extraDirectories, absent, probed, output, exitCode, readSince)
 }
 
-// RecordRunCacheBelow is RecordRunCache recording no directory above any of roots as the directory holding a
-// file, for a run whose inputs name every path above its root whose presence decides its verdict, as the Go
-// engine's record does (a staticcheck.conf or a .gitignore in each directory above the module, there or absent).
-// For such a run a file added beside one of them changes nothing, and the directory would only move with whatever
-// else lives there: a home directory or a repository's top, which something changes all day, so the run would
-// never replay and nothing would say why (the same trap as #r9jevk9's parent of the project's own directory).
-// Nil roots record every holding directory, as RecordRunCache does.
+// RecordRunCacheWithin is RecordRunCache recording the directory holding a file only when that directory is one of
+// roots or lies inside one, for a run whose inputs name every path outside them whose presence decides its verdict,
+// as the Go engine's record does: a staticcheck.conf or a .gitignore above the module, the toolchain's files, the
+// module cache's, the git index in a worktree's git directory, each there or absent. Such a file is decided by its
+// own signature; a file added beside it changes nothing, and its directory would only move with whatever else lives
+// there: a home directory, a repository's top, a git directory that every git command in the worktree writes a lock
+// file into. Recorded, it would refuse or miss nearly every run and nothing would say why (the same trap as
+// #r9jevk9's parent of the project's own directory). Nil roots record every holding directory, as RecordRunCache
+// does.
 //
 // Such a run's extraDirectories are listings it read, each deciding which files exist, so each is held to readSince
 // as a file is, whether or not it holds a file the run read: a package directory created under one mid-run moved its
 // listing after the run read it, and recorded with its new signature it would replay a verdict that never saw it.
-func RecordRunCacheBelow(
+func RecordRunCacheWithin(
 	roots []string,
 	key string,
 	files []string,
@@ -230,8 +231,12 @@ func RecordRunCacheBelow(
 	// every replay depend on whatever else lives beside the project, ~/Projects on a developer's machine and
 	// the benchmark's work directory, where something is created all day (#r9jevk9).
 	directorySet := map[string]struct{}{}
+	rootSet := map[string]bool{}
+	for _, root := range roots {
+		rootSet[filepath.Clean(root)] = true
+	}
 	for _, input := range inputs {
-		if !input.Directory && !aboveAny(filepath.Dir(input.Path), roots) {
+		if !input.Directory && (roots == nil || withinAny(filepath.Dir(input.Path), rootSet)) {
 			directorySet[filepath.Dir(input.Path)] = struct{}{}
 		}
 	}
@@ -307,16 +312,17 @@ func RecordRunCacheBelow(
 	return cache, nil
 }
 
-// aboveAny reports whether directory is an ancestor of one of roots, never one of them itself.
-func aboveAny(directory string, roots []string) bool {
-	for _, root := range roots {
-		relative, relativeError := filepath.Rel(directory, root)
-		if relativeError == nil && relative != "." && relative != ".." &&
-			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+// withinAny reports whether directory is one of roots or lies inside one. It walks up from directory, so a set of
+// thousands of roots, every directory a Go run listed, costs each file a few lookups rather than one per root.
+func withinAny(directory string, roots map[string]bool) bool {
+	for current := filepath.Clean(directory); ; current = filepath.Dir(current) {
+		if roots[current] {
 			return true
 		}
+		if filepath.Dir(current) == current {
+			return false
+		}
 	}
-	return false
 }
 
 // signaturesOf stats every path in parallel, as Check does, each into its own slot, so the order and the

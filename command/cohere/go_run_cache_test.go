@@ -309,7 +309,7 @@ func TestDeclareGoRunCacheInputsDeclaresTheEnginesAndTheFrontDoors(test *testing
 	}
 
 	// A record naming the cache the run writes is declined, and said beside the table for the next run.
-	activeRunCache = &runCacheSession{directory: test.TempDir(), declaredAbove: []string{root}}
+	activeRunCache = &runCacheSession{directory: test.TempDir(), projectRoots: []string{root}}
 	cached := declaring()
 	cached.inputs.Files = append(cached.inputs.Files, filepath.Join(cacheDirectory(root), "go", "entry"))
 	declareGoRunCacheInputs(cached, 0, present)

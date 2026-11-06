@@ -34,7 +34,7 @@ func beginGoRunCache(location projectLocation) {
 	// and the Go engine walks none of them.
 	session := beginRunCacheSession(location.Root, anchor, program.CacheTableSections{}, facts...)
 	if session != nil {
-		session.declaredAbove = []string{anchor.Root(), anchor.Resolved()}
+		session.projectRoots = []string{anchor.Root(), anchor.Resolved()}
 	}
 }
 
@@ -112,6 +112,9 @@ func goOnPath(lookPath func(string) (string, error)) string {
 // never built its graph is not: with no inputs there is nothing to prove a later tree unchanged against. What is
 // declared is the engine's files, the directories it listed as extra directories, its absent paths as absent, and
 // the settings file this front door handed it, present or absent, which the engine names in no record of its own.
+// The directory holding a file is recorded only within the project's root and the directories the engine listed,
+// which lie in the roots it walked: a file outside them, the git index in a worktree's git directory among them, is
+// decided by its own signature, since its directory moves with every lock file git writes there.
 func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) {
 	session := activeRunCache
 	if session == nil || run.inputs == nil {
@@ -121,7 +124,7 @@ func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) 
 		declineRunCache(reason)
 		return
 	}
-	if reason := goInputsUnreplayable(run.inputs, session.declaredAbove); reason != "" {
+	if reason := goInputsUnreplayable(run.inputs, session.projectRoots); reason != "" {
 		// Said, and kept for the next run, since a record like this would never replay and nothing else would say
 		// why: it is the engine's record that is wrong, and only a cold run every time shows it.
 		declineRunCache(reason)
@@ -130,6 +133,7 @@ func declareGoRunCacheInputs(run *engineRun, exitCode int, settingsFile string) 
 	}
 	declareRunCacheInputs(run.inputs.Files...)
 	session.extraDirectories = append(session.extraDirectories, run.inputs.Directories...)
+	session.recordedWithin = slices.Concat(session.projectRoots, run.inputs.Directories)
 	session.extraAbsent = append(session.extraAbsent, run.inputs.Absent...)
 	if _, statError := os.Stat(settingsFile); statError == nil {
 		session.extraFiles = append(session.extraFiles, settingsFile)

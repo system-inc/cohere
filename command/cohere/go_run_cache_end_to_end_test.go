@@ -800,3 +800,59 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 		test.Errorf("the Go project's engine ran on the second run:\n%s", second["Go"])
 	}
 }
+
+// TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory: a go.work root checked out as a git worktree, whose record
+// names the index in the main repository's git directory, the file its gitlinks are read from. A file created
+// beside that index, as every git command in the worktree creates a lock file there, leaves the next run a replay,
+// since only the index decides the verdict and the directory holding it is outside the roots the run walked. The
+// index itself changing still misses.
+func TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	base := test.TempDir()
+	main, worktree := filepath.Join(base, "main"), filepath.Join(base, "worktree")
+	git := func(directory string, arguments ...string) {
+		test.Helper()
+		command := exec.Command("git", append([]string{"-c", "user.email=fixture@example.com", "-c",
+			"user.name=fixture"}, arguments...)...)
+		command.Dir = directory
+		if output, gitError := command.CombinedOutput(); gitError != nil {
+			test.Fatalf("git %v: %v\n%s", arguments, gitError, output)
+		}
+	}
+	writeTree(test, main, map[string]string{
+		".gitignore":          ".cache/\n",
+		"go.work":             "go 1.27\n\nuse ./module\n",
+		"module/go.mod":       "module example.com/worked\n\ngo 1.27\n",
+		"module/go.sum":       "",
+		"module/a.go":         goReplaySource("worked", "Greet"),
+		"CohereSettings.json": `{"go":{"rules":{}}}`,
+	})
+	git(main, "init", "--quiet")
+	git(main, "add", "-A")
+	git(main, "commit", "--quiet", "-m", "fixture")
+	git(main, "worktree", "add", "--quiet", worktree)
+	gitDirectory := filepath.Join(main, ".git", "worktrees", "worktree")
+	if _, statError := os.Stat(filepath.Join(gitDirectory, "index")); statError != nil {
+		test.Fatalf("the worktree has no index in the main repository's git directory: %v", statError)
+	}
+	fixture := &goReplayFixture{test: test, binary: binary, parent: base, root: worktree,
+		environment: []string{"CGO_ENABLED=0"}}
+	arguments := []string{"--no-fix", "--verbose"}
+	fixture.establishHit(arguments...)
+
+	sibling := filepath.Join(gitDirectory, "sibling.lock")
+	if writeError := os.WriteFile(sibling, []byte("held\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if replayed := fixture.run(true, arguments...); !isGoReplay(replayed) {
+		test.Fatalf("a file created beside the worktree's index kept the next run from replaying:\n%s%s",
+			replayed.stdout, replayed.stderr)
+	}
+
+	// The index alone: a mode staged for a file the working tree leaves as it is.
+	git(worktree, "update-index", "--chmod=+x", filepath.Join("module", "a.go"))
+	if changed := fixture.run(true, arguments...); isGoReplay(changed) {
+		test.Fatalf("the worktree's index changed and the run replayed:\n%s", changed.stdout)
+	}
+}
