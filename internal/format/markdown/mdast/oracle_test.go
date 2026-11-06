@@ -26,10 +26,10 @@ import (
 // files off disk, so its oracle stays live, with no golden.
 
 type treeOracle struct {
-	golden  *oracletest.Golden
-	once    sync.Once
-	runtime *goja.Runtime
-	err     error
+	golden    *oracletest.Golden
+	once      sync.Once
+	runtime   *goja.Runtime
+	loadError error
 }
 
 // newTreeOracle answers from the test's golden.
@@ -43,8 +43,8 @@ func newLiveTreeOracle(test *testing.T) *treeOracle {
 	test.Helper()
 	oracle := &treeOracle{}
 	oracle.once.Do(oracle.load)
-	if oracle.err != nil {
-		test.Fatal(oracle.err)
+	if oracle.loadError != nil {
+		test.Fatal(oracle.loadError)
 	}
 	return oracle
 }
@@ -52,13 +52,13 @@ func newLiveTreeOracle(test *testing.T) *treeOracle {
 func (oracle *treeOracle) load() {
 	bundles, bundlesError := prettier.Bundles()
 	if bundlesError != nil {
-		oracle.err = bundlesError
+		oracle.loadError = bundlesError
 		return
 	}
 	runtime := goja.New()
 	for _, name := range []string{"standalone.js", "plugins/markdown.js"} {
 		if _, runStringError := runtime.RunString(string(bundles.Files[name])); runStringError != nil {
-			oracle.err = fmt.Errorf("evaluating %s: %w", name, runStringError)
+			oracle.loadError = fmt.Errorf("evaluating %s: %w", name, runStringError)
 			return
 		}
 	}
@@ -165,8 +165,8 @@ func (oracle *treeOracle) parse(text string) (treeValue, error) {
 	} else {
 		serialized, serializeError = oracle.golden.Answer(oracletest.Key("tree", text), func() (string, error) {
 			oracle.once.Do(oracle.load)
-			if oracle.err != nil {
-				return "", oracle.err
+			if oracle.loadError != nil {
+				return "", oracle.loadError
 			}
 			return oracle.serialize(text)
 		})

@@ -65,35 +65,35 @@ func TestCaseEquivalents(test *testing.T) {
 	test.Parallel()
 	tests := []struct {
 		name        string
-		r           rune
+		character   rune
 		unicodeMode bool
 		want        []rune
 	}{
-		{name: "ascii letter", r: 'k', want: []rune{'K', 'k'}},
-		{name: "sigma", r: 0x03A3, want: []rune{0x03A3, 0x03C2, 0x03C3}},
+		{name: "ascii letter", character: 'k', want: []rune{'K', 'k'}},
+		{name: "sigma", character: 0x03A3, want: []rune{0x03A3, 0x03C2, 0x03C3}},
 		// Alone in its group, so there is nothing to widen to.
-		{name: "kelvin sign", r: 0x212A, want: nil},
-		{name: "long s", r: 0x017F, want: nil},
-		{name: "digit", r: '4', want: nil},
+		{name: "kelvin sign", character: 0x212A, want: nil},
+		{name: "long s", character: 0x017F, want: nil},
+		{name: "digit", character: '4', want: nil},
 		// Under `u` the same two characters pull `k` and `s` into their group.
-		{name: "ascii letter under u", r: 'k', unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
-		{name: "kelvin sign under u", r: 0x212A, unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
-		{name: "long s under u", r: 0x017F, unicodeMode: true, want: []rune{'S', 's', 0x017F}},
-		{name: "digit under u", r: '4', unicodeMode: true, want: nil},
+		{name: "ascii letter under u", character: 'k', unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
+		{name: "kelvin sign under u", character: 0x212A, unicodeMode: true, want: []rune{'K', 'k', 0x212A}},
+		{name: "long s under u", character: 0x017F, unicodeMode: true, want: []rune{'S', 's', 0x017F}},
+		{name: "digit under u", character: '4', unicodeMode: true, want: nil},
 		// A pair that folds together with no case mapping between its members.
-		{name: "st ligature", r: 0xFB05, want: nil},
-		{name: "st ligature under u", r: 0xFB05, unicodeMode: true, want: []rune{0xFB05, 0xFB06}},
-		{name: "iota with dialytika under u", r: 0x1FD3, unicodeMode: true, want: []rune{0x0390, 0x1FD3}},
+		{name: "st ligature", character: 0xFB05, want: nil},
+		{name: "st ligature under u", character: 0xFB05, unicodeMode: true, want: []rune{0xFB05, 0xFB06}},
+		{name: "iota with dialytika under u", character: 0x1FD3, unicodeMode: true, want: []rune{0x0390, 0x1FD3}},
 	}
 
 	for _, testCase := range tests {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			got := CaseEquivalents(testCase.r, testCase.unicodeMode)
+			got := CaseEquivalents(testCase.character, testCase.unicodeMode)
 			if !slices.Equal(got, testCase.want) {
 				test.Errorf(
 					"CaseEquivalents(%U, %v) = %U, want %U",
-					testCase.r,
+					testCase.character,
 					testCase.unicodeMode,
 					got,
 					testCase.want,

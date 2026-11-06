@@ -387,8 +387,8 @@ func formatParsed(
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
-	if tree.err != "" {
-		return "", fmt.Errorf("the parser failed: %s", tree.err)
+	if tree.parseFailure != "" {
+		return "", fmt.Errorf("the parser failed: %s", tree.parseFailure)
 	}
 	formatted, printFileError := printFile(fileName, tree.root, text, options, proseWrap, textToDoc, 0)
 	if printFileError != nil {
@@ -449,7 +449,7 @@ func compareFormat(test *testing.T, inputs []string) int {
 			if oracleError != nil {
 				// Prettier cannot format it; the parser must refuse it too.
 				oracleFailures++
-				if trees[index].err == "" {
+				if trees[index].parseFailure == "" {
 					failures++
 					test.Errorf(
 						"variant %d, %q: the oracle failed (%v) but the parser did not",

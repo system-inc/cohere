@@ -195,9 +195,9 @@ func (golden *Golden) Engine(options formatoptions.Options) *Engine {
 }
 
 var bundlesDigest struct {
-	once   sync.Once
-	digest string
-	err    error
+	once        sync.Once
+	digest      string
+	digestError error
 }
 
 // BundlesDigest is the digest of the Prettier bundles this build embeds, read once.
@@ -205,10 +205,10 @@ func BundlesDigest() (string, error) {
 	bundlesDigest.once.Do(func() {
 		bundles, bundlesError := prettier.Bundles()
 		if bundlesError != nil {
-			bundlesDigest.err = bundlesError
+			bundlesDigest.digestError = bundlesError
 			return
 		}
-		bundlesDigest.digest, bundlesDigest.err = prettier.DigestBundles(bundles.Files)
+		bundlesDigest.digest, bundlesDigest.digestError = prettier.DigestBundles(bundles.Files)
 	})
-	return bundlesDigest.digest, bundlesDigest.err
+	return bundlesDigest.digest, bundlesDigest.digestError
 }

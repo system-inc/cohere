@@ -111,8 +111,8 @@ func Resolve(directory string) (Resolution, error) {
 // resolved is one directory's answer, a refusal included, since a refusal is as much the answer for
 // every directory below it as options are.
 type resolved struct {
-	resolution Resolution
-	err        error
+	resolution   Resolution
+	resolveError error
 }
 
 // NewResolver starts a Resolver that remembers nothing yet.

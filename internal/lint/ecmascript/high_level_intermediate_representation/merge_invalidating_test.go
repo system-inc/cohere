@@ -115,55 +115,55 @@ func TestAreEqualDependenciesIsSetEquality(test *testing.T) {
 	}
 
 	for _, testCase := range []struct {
-		name string
-		a, b []ReactiveScopeDependency
-		want bool
+		name     string
+		right, b []ReactiveScopeDependency
+		want     bool
 	}{
 		{
-			name: "same set in a different order",
-			a:    []ReactiveScopeDependency{plain(1, "a", false), plain(2, "b", false)},
-			b:    []ReactiveScopeDependency{plain(2, "b", false), plain(1, "a", false)},
-			want: true,
+			name:  "same set in a different order",
+			right: []ReactiveScopeDependency{plain(1, "a", false), plain(2, "b", false)},
+			b:     []ReactiveScopeDependency{plain(2, "b", false), plain(1, "a", false)},
+			want:  true,
 		},
 		{
-			name: "different lengths",
-			a:    []ReactiveScopeDependency{plain(1, "a", false)},
-			b:    []ReactiveScopeDependency{plain(1, "a", false), plain(2, "b", false)},
-			want: false,
+			name:  "different lengths",
+			right: []ReactiveScopeDependency{plain(1, "a", false)},
+			b:     []ReactiveScopeDependency{plain(1, "a", false), plain(2, "b", false)},
+			want:  false,
 		},
 		{
-			name: "different identifier",
-			a:    []ReactiveScopeDependency{plain(1, "a", false)},
-			b:    []ReactiveScopeDependency{plain(2, "a", false)},
-			want: false,
+			name:  "different identifier",
+			right: []ReactiveScopeDependency{plain(1, "a", false)},
+			b:     []ReactiveScopeDependency{plain(2, "a", false)},
+			want:  false,
 		},
 		{
-			name: "different property",
-			a:    []ReactiveScopeDependency{plain(1, "a", false)},
-			b:    []ReactiveScopeDependency{plain(1, "b", false)},
-			want: false,
+			name:  "different property",
+			right: []ReactiveScopeDependency{plain(1, "a", false)},
+			b:     []ReactiveScopeDependency{plain(1, "b", false)},
+			want:  false,
 		},
 		{
-			name: "optional differs, which is a real difference",
-			a:    []ReactiveScopeDependency{plain(1, "a", false)},
-			b:    []ReactiveScopeDependency{plain(1, "a", true)},
-			want: false,
+			name:  "optional differs, which is a real difference",
+			right: []ReactiveScopeDependency{plain(1, "a", false)},
+			b:     []ReactiveScopeDependency{plain(1, "a", true)},
+			want:  false,
 		},
 		{
-			name: "both empty",
-			a:    nil,
-			b:    nil,
-			want: true,
+			name:  "both empty",
+			right: nil,
+			b:     nil,
+			want:  true,
 		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if got := AreEqualDependencies(testCase.a, testCase.b); got != testCase.want {
+			if got := AreEqualDependencies(testCase.right, testCase.b); got != testCase.want {
 				test.Errorf("got %t, want %t", got, testCase.want)
 			}
 			// Symmetry is asserted rather than assumed: the implementation walks one side looking
 			// into the other, and a length check is the only thing making that symmetric.
-			if got := AreEqualDependencies(testCase.b, testCase.a); got != testCase.want {
+			if got := AreEqualDependencies(testCase.b, testCase.right); got != testCase.want {
 				test.Errorf("reversed: got %t, want %t", got, testCase.want)
 			}
 		})

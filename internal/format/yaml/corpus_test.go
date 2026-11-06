@@ -70,8 +70,8 @@ func (candidate frontMatterCandidate) Format(fileName string, _ string) (string,
 		embedded, formatError = FormatDoc(candidate.values[fileName], candidate.options, nil)
 	} else {
 		tree := candidate.trees[fileName]
-		if tree.err != "" {
-			return "", fmt.Errorf("the parser failed: %s", tree.err)
+		if tree.parseFailure != "" {
+			return "", fmt.Errorf("the parser failed: %s", tree.parseFailure)
 		}
 		embedded, formatError = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
 	}
@@ -310,23 +310,23 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		for index, tree := range parseTrees(test, values) {
 			frontMatters.trees[frontMatterFiles[index]] = tree
 			// The Go parser must refuse exactly the values the real one refuses.
-			if _, parseError := parse(values[index], nil); (parseError != nil) != (tree.err != "") {
+			if _, parseError := parse(values[index], nil); (parseError != nil) != (tree.parseFailure != "") {
 				parseDisagreements++
 				report.WriteString(fmt.Sprintf(
 					"front matter: the Go parser disagrees (real: %q, Go: %v): %s\n",
-					tree.err,
+					tree.parseFailure,
 					parseError,
 					frontMatterFiles[index],
 				))
 			}
-			if tree.err != "" {
+			if tree.parseFailure != "" {
 				// Prettier prints such front matter as written, since the embed fails; there is no
 				// YAML output to compare.
 				syntaxErrors++
 				report.WriteString(fmt.Sprintf(
 					"front matter: YAML syntax error, not measured: %s: %s\n",
 					frontMatterFiles[index],
-					tree.err,
+					tree.parseFailure,
 				))
 				continue
 			}
