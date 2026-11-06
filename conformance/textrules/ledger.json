@@ -157,30 +157,6 @@
     },
     {
         "engine": "go",
-        "family": "shouting",
-        "case": "sh01",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh11",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh12",
-        "kind": "span",
-        "task": "rv17qp3",
-        "reason": "covers the whole comment rather than the shouted word"
-    },
-    {
-        "engine": "go",
         "family": "utils-folder",
         "case": "uf01",
         "kind": "span",
@@ -218,5 +194,13 @@
         "kind": "span",
         "task": "mxe7xjy",
         "reason": "covers the package clause `package utils` rather than the file's start"
+    },
+    {
+        "engine": "typescript",
+        "family": "shouting",
+        "case": "sh15",
+        "kind": "span",
+        "task": "34fejeq",
+        "reason": "covers the whole comment line `// This is REALLY important.` rather than the shouted word"
     }
 ]
