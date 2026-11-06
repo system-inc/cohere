@@ -7,7 +7,7 @@ import (
 
 // classMethodsUseThisChecker carries the walk state that upstream keeps on its stack.
 type classMethodsUseThisChecker struct {
-	ctx                   rule.Context
+	ruleContext           rule.Context
 	exceptMethods         map[string]bool
 	enforceForClassFields bool
 	ignoreOverrideMethods bool
@@ -73,7 +73,7 @@ func (checker *classMethodsUseThisChecker) walk(node *ast.Node) {
 	checker.stack = checker.stack[:len(checker.stack)-1]
 
 	if checker.isIncludedInstanceMember(node) && !usedThis {
-		checker.ctx.ReportNode(
+		checker.ruleContext.ReportNode(
 			classMethodsUseThisReportAnchor(node),
 			classMethodsUseThisMissingThis(classMethodsUseThisNameWithKind(node)),
 		)

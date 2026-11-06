@@ -333,12 +333,12 @@ func purityReportImpureCalls(
 	emit bool,
 ) []purityFinding {
 	unit := &purityUnit{
-		ctx:       ruleContext,
-		values:    map[static_single_assignment.IdentifierId]purityValue{},
-		byName:    map[string]purityValue{},
-		nested:    map[*high_level_intermediate_representation.Function][]purityFinding{},
-		reported:  map[*ast.Node]bool{},
-		analysing: map[*high_level_intermediate_representation.Function]bool{},
+		ruleContext: ruleContext,
+		values:      map[static_single_assignment.IdentifierId]purityValue{},
+		byName:      map[string]purityValue{},
+		nested:      map[*high_level_intermediate_representation.Function][]purityFinding{},
+		reported:    map[*ast.Node]bool{},
+		analysing:   map[*high_level_intermediate_representation.Function]bool{},
 	}
 	return unit.walk(function, emit)
 }

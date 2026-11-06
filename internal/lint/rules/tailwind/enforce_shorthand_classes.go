@@ -206,7 +206,7 @@ var shorthandGroups = [][]shorthandRule{
 // state upstream's fix passes through rather than anything in the source a reader wrote.
 var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ruleContext rule.Context, options rule.Given[EnforceShorthandClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {

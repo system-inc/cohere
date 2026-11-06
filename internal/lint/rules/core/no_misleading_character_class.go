@@ -375,7 +375,7 @@ func checkRegexPatternMapped(
 	offsets []int,
 	source memberSource,
 ) {
-	collector := &mappedFindingCollector{ctx: ruleContext, bodyStart: bodyStart, offsets: offsets}
+	collector := &mappedFindingCollector{ruleContext: ruleContext, bodyStart: bodyStart, offsets: offsets}
 	checkRegexPatternWithReporter(pattern, flagsText, source, collector.report)
 }
 

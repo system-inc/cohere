@@ -13,8 +13,8 @@ import (
 // unifiedSignaturesChecker carries what every helper needs: the context for reporting and reading
 // source text, and the two options.
 type unifiedSignaturesChecker struct {
-	ctx      rule.Context
-	settings UnifiedSignaturesOptions
+	ruleContext rule.Context
+	settings    UnifiedSignaturesOptions
 }
 
 // checkScope groups the signatures directly inside one scope, compares each group pairwise, and
@@ -33,7 +33,7 @@ func (checker *unifiedSignaturesChecker) checkScope(scope *ast.Node, outerTypePa
 		if !unifiedSignaturesIsOverload(member) {
 			continue
 		}
-		key := unifiedSignaturesOverloadKey(checker.ctx, member)
+		key := unifiedSignaturesOverloadKey(checker.ruleContext, member)
 		if _, seen := groups[key]; !seen {
 			order = append(order, key)
 		}
@@ -173,10 +173,10 @@ func (checker *unifiedSignaturesChecker) reportSameLength(
 		return
 	}
 
-	checker.ctx.ReportNode(second, rule.Message{
+	checker.ruleContext.ReportNode(second, rule.Message{
 		Id: "singleParameterDifference",
 		Description: fmt.Sprintf("%s taking `%s`.",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, first),
+			unifiedSignaturesFailureStart(checker.ruleContext, onlyTwo, first),
 			checker.unifiedTypeText(unifiedSignaturesParameterType(first),
 				unifiedSignaturesParameterType(second))),
 	})
@@ -241,10 +241,10 @@ func (checker *unifiedSignaturesChecker) reportDifferentLength(
 		messageId = "omittingRestParameter"
 		description = "with a rest parameter."
 	}
-	checker.ctx.ReportNode(extra, rule.Message{
+	checker.ruleContext.ReportNode(extra, rule.Message{
 		Id: messageId,
 		Description: fmt.Sprintf("%s %s",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, shorterSignature), description),
+			unifiedSignaturesFailureStart(checker.ruleContext, onlyTwo, shorterSignature), description),
 	})
 }
 
@@ -257,10 +257,10 @@ func (checker *unifiedSignaturesChecker) reportAllParametersAreSame(
 	signatureB *ast.Node,
 	onlyTwo bool,
 ) {
-	checker.ctx.ReportRange(unifiedSignaturesValueRange(checker.ctx, signatureB), rule.Message{
+	checker.ruleContext.ReportRange(unifiedSignaturesValueRange(checker.ruleContext, signatureB), rule.Message{
 		Id: "allParametersAreSame",
 		Description: fmt.Sprintf("%s with identical parameters.",
-			unifiedSignaturesFailureStart(checker.ctx, onlyTwo, signatureA)),
+			unifiedSignaturesFailureStart(checker.ruleContext, onlyTwo, signatureA)),
 	})
 }
 
@@ -273,8 +273,8 @@ func (checker *unifiedSignaturesChecker) typesAreEqual(typeA *ast.Node, typeB *a
 	if typeA == nil || typeB == nil {
 		return false
 	}
-	return unifiedSignaturesNodeText(checker.ctx, typeA) ==
-		unifiedSignaturesNodeText(checker.ctx, typeB)
+	return unifiedSignaturesNodeText(checker.ruleContext, typeA) ==
+		unifiedSignaturesNodeText(checker.ruleContext, typeB)
 }
 
 // parametersAreEqual is upstream's `parametersAreEqual`: same sigils, same type text.
@@ -368,7 +368,7 @@ func (checker *unifiedSignaturesChecker) unifiedTypeText(typeA *ast.Node, typeB 
 // reassociate: a conditional, a constructor type, and a function type. `A | () => B` would parse as
 // a function returning `B` rather than as a union.
 func (checker *unifiedSignaturesChecker) unionMemberText(node *ast.Node) string {
-	text := unifiedSignaturesNodeText(checker.ctx, node)
+	text := unifiedSignaturesNodeText(checker.ruleContext, node)
 	switch node.Kind {
 	case ast.KindConditionalType, ast.KindConstructorType, ast.KindFunctionType:
 		return "(" + text + ")"
@@ -397,10 +397,10 @@ func (checker *unifiedSignaturesChecker) unionMemberText(node *ast.Node) string 
 // position 0 both reads start at the file's beginning and a first-line comment comes twice, which cannot
 // change which block comment is last.
 func (checker *unifiedSignaturesChecker) blockCommentFor(signature *ast.Node) string {
-	sourceText := checker.ctx.SourceFile.Text()
-	trivia := shimcore.NewTextRange(signature.Pos(), rule.TokenRange(checker.ctx.SourceFile, signature).Pos())
+	sourceText := checker.ruleContext.SourceFile.Text()
+	trivia := shimcore.NewTextRange(signature.Pos(), rule.TokenRange(checker.ruleContext.SourceFile, signature).Pos())
 	text := ""
-	for commentRange := range type_checking.GetCommentsInRange(checker.ctx.SourceFile, trivia) {
+	for commentRange := range type_checking.GetCommentsInRange(checker.ruleContext.SourceFile, trivia) {
 		if commentRange.Kind == ast.KindMultiLineCommentTrivia {
 			text = sourceText[commentRange.Pos()+len("/*") : commentRange.End()-len("*/")]
 		}

@@ -7,7 +7,7 @@ import (
 
 // funcNameMatchingChecker carries the resolved configuration across the listeners.
 type funcNameMatchingChecker struct {
-	ctx                        rule.Context
+	ruleContext                rule.Context
 	direction                  string
 	considerPropertyDescriptor bool
 	includeModuleExports       bool
@@ -23,7 +23,7 @@ func (checker *funcNameMatchingChecker) shouldWarn(left string, right string) bo
 
 // report emits the finding, choosing among the four messages the way upstream's `report` does.
 func (checker *funcNameMatchingChecker) report(node *ast.Node, name string, functionName string, isProperty bool) {
-	checker.ctx.ReportNode(node, funcNameMatchingMessage(checker.direction, isProperty, functionName, name))
+	checker.ruleContext.ReportNode(node, funcNameMatchingMessage(checker.direction, isProperty, functionName, name))
 }
 
 // checkVariableDeclarator is upstream's `VariableDeclarator` listener.

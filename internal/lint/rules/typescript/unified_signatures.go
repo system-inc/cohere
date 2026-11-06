@@ -87,7 +87,7 @@ var UnifiedSignatures = rule.Rule[UnifiedSignaturesOptions]{
 		// exactly the signatures among its own members and nesting is containment.
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				checker := &unifiedSignaturesChecker{ctx: ruleContext, settings: settings}
+				checker := &unifiedSignaturesChecker{ruleContext: ruleContext, settings: settings}
 				checker.checkScope(node, nil)
 			},
 		}

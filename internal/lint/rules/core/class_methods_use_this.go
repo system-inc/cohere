@@ -126,7 +126,7 @@ var ClassMethodsUseThis = rule.Rule[ClassMethodsUseThisOptions]{
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				checker := &classMethodsUseThisChecker{
-					ctx:                   ruleContext,
+					ruleContext:           ruleContext,
 					exceptMethods:         exceptMethods,
 					enforceForClassFields: enforceForClassFields,
 					ignoreOverrideMethods: resolved.IgnoreOverrideMethods,

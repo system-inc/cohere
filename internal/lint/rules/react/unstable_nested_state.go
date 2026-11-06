@@ -8,7 +8,7 @@ import (
 // unstableNestedState carries what every judgment needs, so the helpers below read as upstream's
 // free functions rather than as a chain of parameters.
 type unstableNestedState struct {
-	ctx         rule.Context
+	ruleContext rule.Context
 	isComponent map[*ast.Node]bool
 
 	allowAsProps        bool
@@ -94,7 +94,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 		message += componentAsPropsInfo
 	}
 
-	state.ctx.ReportNode(node, rule.Message{
+	state.ruleContext.ReportNode(node, rule.Message{
 		Id:          "unstableNestedComponent",
 		Description: message,
 	})
@@ -262,14 +262,14 @@ func (state *unstableNestedState) isDirectValueOfRenderProperty(node *ast.Node) 
 func (state *unstableNestedState) isComponentInProperty(node *ast.Node) bool {
 	if parent := semanticParentOf(node); parent != nil &&
 		parent.Kind == ast.KindPropertyAssignment {
-		return returnsJsx(state.ctx, node)
+		return returnsJsx(state.ruleContext, node)
 	}
 
 	attribute := closestMatchingAncestor(node, isJsxAttributeOfExpressionContainer)
 	if attribute == nil {
 		return state.isComponentInsideCreateElementProperties(node)
 	}
-	return returnsJsx(state.ctx, node)
+	return returnsJsx(state.ruleContext, node)
 }
 
 // isComponentInsideCreateElementProperties is upstream's `isComponentInsideCreateElementsProp`.
@@ -292,7 +292,7 @@ func (state *unstableNestedState) isComponentInsideCreateElementProperties(node 
 	// The cost of getting this wrong is not this rule's verdict: the walk recovers per file, so a
 	// panic here takes that file away from every rule in the tree.
 	call := closestMatchingAncestor(node, func(candidate *ast.Node) bool {
-		return candidate.Kind == ast.KindCallExpression && createElementCallCounts(state.ctx, candidate)
+		return candidate.Kind == ast.KindCallExpression && createElementCallCounts(state.ruleContext, candidate)
 	})
 	if call == nil {
 		return false
@@ -325,11 +325,11 @@ func (state *unstableNestedState) isComponentInsideCreateElementProperties(node 
 // registry holds the anchor a component reports on and this question is about the node itself. A
 // `memo(() => null)` is in the registry under the call while this asks about the arrow.
 func (state *unstableNestedState) isStatelessComponentReturningNull(node *ast.Node) bool {
-	component, isStateless := statelessComponentFor(state.ctx, node, nil)
+	component, isStateless := statelessComponentFor(state.ruleContext, node, nil)
 	if !isStateless {
 		return false
 	}
-	return !returnsJsx(state.ctx, component)
+	return !returnsJsx(state.ruleContext, component)
 }
 
 // isInsideRenderMethod is upstream's function of the same name, and here it is structurally
@@ -426,10 +426,10 @@ func (state *unstableNestedState) isFunctionComponentInsideClassComponent(node *
 	if parentStateless == nil {
 		return false
 	}
-	if _, isStateless := statelessComponentFor(state.ctx, parentStateless, nil); !isStateless {
+	if _, isStateless := statelessComponentFor(state.ruleContext, parentStateless, nil); !isStateless {
 		return false
 	}
-	return returnsJsx(state.ctx, node)
+	return returnsJsx(state.ruleContext, node)
 }
 
 // parentComponentOf is upstream's `getParentComponent`, which tries the class forms and then falls
@@ -501,7 +501,7 @@ func (state *unstableNestedState) parentStatelessComponentOf(node *ast.Node) *as
 	for current := node; current != nil; current = semanticParentOf(current) {
 		switch current.Kind {
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
-			if component, isStateless := statelessComponentFor(state.ctx, current, nil); isStateless {
+			if component, isStateless := statelessComponentFor(state.ruleContext, current, nil); isStateless {
 				return component
 			}
 		}

@@ -52,10 +52,10 @@ type Program interface {
 	GetSourceFileForResolvedModule(fileName string) *ast.SourceFile
 	SourceFiles() []*ast.SourceFile
 	GetSourceFile(fileName string) *ast.SourceFile
-	FS() vfs.FS
+	FileSystem() vfs.FS
 
 	// ReadsDesignSystem: a file system that records every path it is asked about and refuses writes.
-	DesignSystemFS() *RecordingFileSystem
+	DesignSystemFileSystem() *RecordingFileSystem
 
 	// Identity reads nothing.
 	Identity() ProgramIdentity

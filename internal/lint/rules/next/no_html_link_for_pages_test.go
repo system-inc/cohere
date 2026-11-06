@@ -883,7 +883,7 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testin
 	var fileSystem *countingFileSystem
 	probe := NoHtmlLinkForPages
 	probe.Run = func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
-		fileSystem = &countingFileSystem{FS: ruleContext.Program.FS(), checks: map[string]int{}}
+		fileSystem = &countingFileSystem{FS: ruleContext.Program.FileSystem(), checks: map[string]int{}}
 		program := countingProgram{Program: ruleContext.Program, fileSystem: fileSystem}
 		var wait sync.WaitGroup
 		for worker := range workers {

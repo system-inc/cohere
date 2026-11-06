@@ -180,7 +180,7 @@ var ForbidPropTypes = rule.Rule[ForbidPropTypesOptions]{
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
-				walker := &forbidPropTypesWalker{ctx: ruleContext, settings: settings}
+				walker := &forbidPropTypesWalker{ruleContext: ruleContext, settings: settings}
 				walker.collectImports(node)
 				walker.walk(node)
 			},

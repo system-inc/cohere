@@ -214,7 +214,7 @@ var FuncNameMatching = rule.Rule[FuncNameMatchingOptions]{
 		}
 
 		checker := &funcNameMatchingChecker{
-			ctx:                        ruleContext,
+			ruleContext:                ruleContext,
 			direction:                  direction,
 			considerPropertyDescriptor: resolved.ConsiderPropertyDescriptor,
 			includeModuleExports:       resolved.IncludeCommonJsModuleExports,

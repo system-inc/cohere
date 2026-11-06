@@ -8,10 +8,10 @@ import (
 
 // noRestrictedExportsChecker carries the resolved configuration across the listeners.
 type noRestrictedExportsChecker struct {
-	ctx        rule.Context
-	restricted map[string]bool
-	pattern    *esregexp.RegExp
-	defaults   *NoRestrictedExportsRestrictDefaultExports
+	ruleContext rule.Context
+	restricted  map[string]bool
+	pattern     *esregexp.RegExp
+	defaults    *NoRestrictedExportsRestrictDefaultExports
 }
 
 // checkDeclarationStatement handles a declaration that carries its own export modifier.
@@ -132,7 +132,7 @@ func (checker *noRestrictedExportsChecker) checkExportedName(node *ast.Node) {
 	}
 
 	if matchesPattern || checker.restricted[name] {
-		checker.ctx.ReportNode(node, noRestrictedExportsRestrictedNamedMessage(name))
+		checker.ruleContext.ReportNode(node, noRestrictedExportsRestrictedNamedMessage(name))
 		return
 	}
 
@@ -183,6 +183,6 @@ func (checker *noRestrictedExportsChecker) checkExportedName(node *ast.Node) {
 // reportDefaultIf reports the restricted-default message when the flag that selects this form is on.
 func (checker *noRestrictedExportsChecker) reportDefaultIf(node *ast.Node, restricted bool) {
 	if restricted {
-		checker.ctx.ReportNode(node, messageNoRestrictedExportsRestrictedDefault)
+		checker.ruleContext.ReportNode(node, messageNoRestrictedExportsRestrictedDefault)
 	}
 }

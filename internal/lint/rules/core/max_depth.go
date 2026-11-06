@@ -187,7 +187,7 @@ var MaxDepth = rule.Rule[MaxDepthSettings]{
 				// The walk is done here rather than through per-kind listeners because the rule
 				// needs a counter that rises entering a block and falls leaving it, and the
 				// listener walk is pre-order with no exit hook to decrement on.
-				walker := &maximumDepthWalker{ctx: ruleContext, settings: settings}
+				walker := &maximumDepthWalker{ruleContext: ruleContext, settings: settings}
 				// Upstream's `Program: startFunction`: the file itself is a function frame, so
 				// top-level blocks are measured rather than ignored.
 				walker.depths = append(walker.depths, 0)

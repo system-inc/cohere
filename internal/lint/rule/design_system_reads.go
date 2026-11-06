@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/compiler"
 )
 
-// designSystemRecordings keeps every recording file system DesignSystemFS handed out, by the program it was
+// designSystemRecordings keeps every recording file system DesignSystemFileSystem handed out, by the program it was
 // handed out for, so the findings cache can learn what the design system read without importing the reader
 // (#35nqkwc).
 //

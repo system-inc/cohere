@@ -14,7 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
-// designSystemRule reads the design system the way the Tailwind rules do, through DesignSystemFS: it flags
+// designSystemRule reads the design system the way the Tailwind rules do, through DesignSystemFileSystem: it flags
 // every declaration when theme.css says "flag", or when a candidate stylesheet it looked for and missed exists.
 func designSystemRule(root string) rule.Rule[rule.NoOptions] {
 	return rule.Rule[rule.NoOptions]{
@@ -22,7 +22,7 @@ func designSystemRule(root string) rule.Rule[rule.NoOptions] {
 		ProgramReads: rule.ReadsDesignSystem,
 		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				fileSystem := ruleContext.Program.DesignSystemFS()
+				fileSystem := ruleContext.Program.DesignSystemFileSystem()
 				theme, _ := fileSystem.ReadFile(tspath.RootedFilePath(filepath.Join(root, "theme.css")))
 				// Asked every time, not after the theme in an ||: a question never asked is not in the read set.
 				candidate := fileSystem.FileExists(tspath.RootedFilePath(filepath.Join(root, "candidate.css")))
@@ -158,7 +158,7 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 		for kind, listener := range inner.Run(ruleContext, options) {
 			listeners[kind] = func(node *ast.Node) {
 				listener(node)
-				rule.ViewProgram(other.Program, nil, innerTraits).DesignSystemFS()
+				rule.ViewProgram(other.Program, nil, innerTraits).DesignSystemFileSystem()
 			}
 		}
 		return listeners

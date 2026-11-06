@@ -164,7 +164,7 @@ func classOrderOptionsFrom(configured EnforceConsistentClassOrderOptions) classO
 // they did not ask for. `reorderFixes` names the other two cases.
 var EnforceConsistentClassOrder = rule.Rule[EnforceConsistentClassOrderOptions]{
 	Name: "better-tailwindcss/enforce-consistent-class-order",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentClassOrderOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {

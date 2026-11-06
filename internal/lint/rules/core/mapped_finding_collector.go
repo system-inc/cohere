@@ -7,16 +7,16 @@ import (
 
 // mappedFindingCollector reports a finding at the raw offsets its cooked span maps to.
 type mappedFindingCollector struct {
-	ctx       rule.Context
-	bodyStart int
-	offsets   []int
+	ruleContext rule.Context
+	bodyStart   int
+	offsets     []int
 }
 
 func (collector *mappedFindingCollector) report(finding pendingMisleadingFinding) {
 	if finding.start >= len(collector.offsets) || finding.end >= len(collector.offsets) {
 		return
 	}
-	collector.ctx.ReportRange(
+	collector.ruleContext.ReportRange(
 		core.NewTextRange(
 			collector.bodyStart+collector.offsets[finding.start],
 			collector.bodyStart+collector.offsets[finding.end]),

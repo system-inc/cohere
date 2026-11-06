@@ -9,13 +9,13 @@ import (
 // correctnessNoProcessExitAfterOutputWriters answers whether a call writes, directly or through one
 // callee, remembering each callee's answer for the file.
 type correctnessNoProcessExitAfterOutputWriters struct {
-	ctx           rule.Context
+	ruleContext   rule.Context
 	byDeclaration map[*ast.Node]bool
 }
 
 // writes says whether a call writes to stdout or stderr itself, or runs a callee whose own body does.
 func (writers correctnessNoProcessExitAfterOutputWriters) writes(call *ast.Node) bool {
-	if correctnessNoProcessExitAfterOutputIsWrite(writers.ctx, call) {
+	if correctnessNoProcessExitAfterOutputIsWrite(writers.ruleContext, call) {
 		return true
 	}
 	callee := writers.followedCallee(call)
@@ -24,7 +24,7 @@ func (writers correctnessNoProcessExitAfterOutputWriters) writes(call *ast.Node)
 	}
 	answer, known := writers.byDeclaration[callee]
 	if !known {
-		answer = correctnessNoProcessExitAfterOutputBodyWrites(writers.ctx, callee)
+		answer = correctnessNoProcessExitAfterOutputBodyWrites(writers.ruleContext, callee)
 		writers.byDeclaration[callee] = answer
 	}
 	return answer
@@ -33,7 +33,7 @@ func (writers correctnessNoProcessExitAfterOutputWriters) writes(call *ast.Node)
 // followedCallee is the function a call runs, when the rule reads its body: see the rule's doc
 // comment for each refusal. Nil means the call is not followed.
 func (writers correctnessNoProcessExitAfterOutputWriters) followedCallee(call *ast.Node) *ast.Node {
-	signature := writers.ctx.TypeChecker.GetResolvedSignature(call)
+	signature := writers.ruleContext.TypeChecker.GetResolvedSignature(call)
 	if signature == nil {
 		return nil
 	}
@@ -51,7 +51,7 @@ func (writers correctnessNoProcessExitAfterOutputWriters) followedCallee(call *a
 	}
 	file := ast.GetSourceFileOfNode(declaration)
 	// A declaration file needs no test of its own: it has no bodies, so the check above refused it
-	if file == nil || (file != writers.ctx.SourceFile && !ast.IsExternalModule(file)) {
+	if file == nil || (file != writers.ruleContext.SourceFile && !ast.IsExternalModule(file)) {
 		return nil
 	}
 	flags := ast.GetFunctionFlags(declaration)
@@ -61,7 +61,7 @@ func (writers correctnessNoProcessExitAfterOutputWriters) followedCallee(call *a
 	if flags&ast.FunctionFlagsAsync != 0 && !correctnessNoProcessExitAfterOutputIsAwaited(call) {
 		return nil
 	}
-	returnType := writers.ctx.TypeChecker.GetReturnTypeOfSignature(signature)
+	returnType := writers.ruleContext.TypeChecker.GetReturnTypeOfSignature(signature)
 	if returnType != nil && returnType.Flags()&checker.TypeFlagsNever != 0 {
 		return nil
 	}

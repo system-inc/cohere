@@ -202,9 +202,9 @@ type concurrencyNoCheckThenWriteComparison struct {
 // creates it without exclusive create.
 func concurrencyNoCheckThenWriteCheckLoop(ruleContext rule.Context, loop *ast.Node) {
 	analysis := &concurrencyNoCheckThenWriteLoop{
-		ctx:      ruleContext,
-		loop:     loop,
-		function: scope.EnclosingFunctionLike(loop),
+		ruleContext: ruleContext,
+		loop:        loop,
+		function:    scope.EnclosingFunctionLike(loop),
 	}
 	if !analysis.findCheck() {
 		return

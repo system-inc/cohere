@@ -7,7 +7,7 @@ import (
 
 // noArrayIndexKeyWalker carries the index-name stack across the recursion.
 type noArrayIndexKeyWalker struct {
-	ctx rule.Context
+	ruleContext rule.Context
 
 	// indexNames is every index parameter name currently in scope, outermost first. A name is
 	// pushed on entering an iterator call whose callback declares one and popped on leaving it.
@@ -101,7 +101,7 @@ func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 
 	// `key={i}`.
 	if walker.isArrayIndex(node) {
-		walker.ctx.ReportNode(node, messageNoArrayIndexKey)
+		walker.ruleContext.ReportNode(node, messageNoArrayIndexKey)
 		return
 	}
 
@@ -118,7 +118,7 @@ func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 				continue
 			}
 			if walker.isArrayIndex(span.AsTemplateSpan().Expression) {
-				walker.ctx.ReportNode(node, messageNoArrayIndexKey)
+				walker.ruleContext.ReportNode(node, messageNoArrayIndexKey)
 			}
 		}
 		return
@@ -153,7 +153,7 @@ func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 			return
 		}
 		for range walker.binaryIdentifiersNamingAnIndex(node) {
-			walker.ctx.ReportNode(node, messageNoArrayIndexKey)
+			walker.ruleContext.ReportNode(node, messageNoArrayIndexKey)
 		}
 		return
 
@@ -171,7 +171,7 @@ func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 			if walker.isArrayIndex(access.Expression) &&
 				methodName != nil && methodName.Kind == ast.KindIdentifier &&
 				methodName.Text() == "toString" {
-				walker.ctx.ReportNode(node, messageNoArrayIndexKey)
+				walker.ruleContext.ReportNode(node, messageNoArrayIndexKey)
 			}
 			return
 		}
@@ -181,7 +181,7 @@ func (walker *noArrayIndexKeyWalker) checkKeyExpression(node *ast.Node) {
 		if callee.Kind == ast.KindIdentifier && callee.Text() == "String" &&
 			call.Arguments != nil && len(call.Arguments.Nodes) > 0 &&
 			walker.isArrayIndex(call.Arguments.Nodes[0]) {
-			walker.ctx.ReportNode(call.Arguments.Nodes[0], messageNoArrayIndexKey)
+			walker.ruleContext.ReportNode(call.Arguments.Nodes[0], messageNoArrayIndexKey)
 		}
 	}
 }
@@ -399,7 +399,7 @@ func (walker *noArrayIndexKeyWalker) isCreateOrCloneElement(callee *ast.Node) bo
 // rather than upstream being right, and it is reproduced: the name has already been used as a
 // callee with a props object, so the shapes that reach this are narrow in practice.
 func (walker *noArrayIndexKeyWalker) resolvesToReactImport(identifier *ast.Node) bool {
-	symbol := walker.ctx.TypeChecker.GetSymbolAtLocation(identifier)
+	symbol := walker.ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil {
 		return false
 	}

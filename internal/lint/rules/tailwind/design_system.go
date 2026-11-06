@@ -170,7 +170,7 @@ func DesignSystemForProgramAt(program rule.Program, location DesignSystemLocatio
 // Call `DesignSystemForProgram` rather than this: an uncached call re-walks the `@import` graph, and
 // the rules that will read it run on every file in the tree.
 func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocation) DesignSystemResult {
-	fileSystem := program.DesignSystemFS()
+	fileSystem := program.DesignSystemFileSystem()
 	result := loadDesignSystemThrough(program, fileSystem, location)
 	result.Reads = fileSystem.Reads()
 	return result

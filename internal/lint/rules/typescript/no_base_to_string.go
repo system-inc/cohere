@@ -148,7 +148,7 @@ var NoBaseToString = rule.Rule[NoBaseToStringOptions]{
 		if !isSettings {
 			settings = DefaultNoBaseToStringSettings()
 		}
-		state := &noBaseToStringState{ctx: ruleContext, settings: settings}
+		state := &noBaseToStringState{ruleContext: ruleContext, settings: settings}
 
 		return rule.Listeners{
 			// `a + b` and `a += b`, which our parser files under one kind rather than upstream's two.

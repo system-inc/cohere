@@ -9,7 +9,7 @@ import (
 // typeUsageWalk carries the state upstream keeps in the closure variables of
 // `collectTypeParameterUsageCounts`. One walk is one call to that function.
 type typeUsageWalk struct {
-	ctx rule.Context
+	ruleContext rule.Context
 
 	// counts is upstream's `foundIdentifierUsages`, keyed on the type parameter declaration node
 	// rather than on its name identifier. Same identity, one dereference fewer.
@@ -156,7 +156,7 @@ func (walk *typeUsageWalk) visitTypeParameter(subject *checker.Type, assumeMulti
 	// Visiting the type of a constrained type parameter recurses into the constraint, so each
 	// constraint is visited at most once to avoid an infinite loop.
 	if constraint := declarationData.Constraint; constraint != nil {
-		constraintType := walk.ctx.TypeChecker.GetTypeAtLocation(constraint)
+		constraintType := walk.ruleContext.TypeChecker.GetTypeAtLocation(constraint)
 		if constraintType != nil && !walk.visitedConstraints[constraintType] {
 			walk.visitedConstraints[constraintType] = true
 			walk.visitType(constraintType, false, false)
@@ -170,7 +170,7 @@ func (walk *typeUsageWalk) visitTypeParameter(subject *checker.Type, assumeMulti
 	// distinguishing input was found, so this is recorded as unmeasured rather than as equivalent.
 	if defaultType := declarationData.DefaultType; defaultType != nil && !walk.visitedDefault {
 		walk.visitedDefault = true
-		walk.visitType(walk.ctx.TypeChecker.GetTypeAtLocation(defaultType), false, false)
+		walk.visitType(walk.ruleContext.TypeChecker.GetTypeAtLocation(defaultType), false, false)
 	}
 }
 
@@ -189,7 +189,7 @@ func (walk *typeUsageWalk) visitTypeParameter(subject *checker.Type, assumeMulti
 func (walk *typeUsageWalk) visitTypeReference(subject *checker.Type, assumeMultipleUses bool, isReturnType bool) {
 	target := subject.Target()
 
-	for _, typeArgument := range walk.ctx.TypeChecker.GetTypeArguments(subject) {
+	for _, typeArgument := range walk.ruleContext.TypeChecker.GetTypeArguments(subject) {
 		// In a class context everything is accepted.
 		thisAssumeMultipleUses := walk.fromClass || assumeMultipleUses
 
@@ -199,7 +199,7 @@ func (walk *typeUsageWalk) visitTypeReference(subject *checker.Type, assumeMulti
 				// A readonly tuple is considered to use the parameter once; a mutable one counts
 				// multiply only when it is returned.
 				thisAssumeMultipleUses = isReturnType && !target.AsTupleType().IsReadonly()
-			case target != nil && walk.ctx.TypeChecker.IsArrayType(target):
+			case target != nil && walk.ruleContext.TypeChecker.IsArrayType(target):
 				// ReadonlyArray is considered a single use, so the symbol name is what separates
 				// the two rather than the target's shape.
 				symbol := subject.Symbol()
@@ -237,18 +237,21 @@ func (walk *typeUsageWalk) visitTypeReference(subject *checker.Type, assumeMulti
 func (walk *typeUsageWalk) visitObjectType(subject *checker.Type) {
 	if !walk.visitedPropertyLists[subject] {
 		walk.visitedPropertyLists[subject] = true
-		walk.visitSymbolsList(walk.ctx.TypeChecker.GetPropertiesOfType(subject), false)
+		walk.visitSymbolsList(walk.ruleContext.TypeChecker.GetPropertiesOfType(subject), false)
 	}
 
-	walk.visitType(walk.ctx.TypeChecker.GetNumberIndexType(subject), true, false)
-	walk.visitType(walk.ctx.TypeChecker.GetStringIndexType(subject), true, false)
+	walk.visitType(walk.ruleContext.TypeChecker.GetNumberIndexType(subject), true, false)
+	walk.visitType(walk.ruleContext.TypeChecker.GetStringIndexType(subject), true, false)
 
-	for _, signature := range walk.ctx.TypeChecker.GetSignaturesOfType(subject, checker.SignatureKindCall) {
+	for _, signature := range walk.ruleContext.TypeChecker.GetSignaturesOfType(subject, checker.SignatureKindCall) {
 		walk.functionLikeType = true
 		walk.visitSignature(signature)
 	}
 
-	for _, signature := range walk.ctx.TypeChecker.GetSignaturesOfType(subject, checker.SignatureKindConstruct) {
+	for _, signature := range walk.ruleContext.TypeChecker.GetSignaturesOfType(
+		subject,
+		checker.SignatureKindConstruct,
+	) {
 		walk.functionLikeType = true
 		walk.visitSignature(signature)
 	}
@@ -272,11 +275,11 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 	// structural: it holds only while the threshold is 2 and while every `this` type is also
 	// syntactically visible, and neither is a property this rule guarantees.
 	if thisParameter := signature.ThisParameter(); thisParameter != nil {
-		walk.visitType(walk.ctx.TypeChecker.GetTypeOfSymbol(thisParameter), false, false)
+		walk.visitType(walk.ruleContext.TypeChecker.GetTypeOfSymbol(thisParameter), false, false)
 	}
 
 	for _, parameter := range signature.Parameters() {
-		walk.visitType(walk.ctx.TypeChecker.GetTypeOfSymbol(parameter), false, false)
+		walk.visitType(walk.ruleContext.TypeChecker.GetTypeOfSymbol(parameter), false, false)
 	}
 
 	for _, typeParameter := range signature.TypeParameters() {
@@ -285,8 +288,8 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 
 	// A type predicate stands in for the return type when the signature has one, so `input is T`
 	// counts its T in return position exactly as a returned `T` would.
-	returnType := walk.ctx.TypeChecker.GetReturnTypeOfSignature(signature)
-	if predicate := walk.ctx.TypeChecker.GetTypePredicateOfSignature(
+	returnType := walk.ruleContext.TypeChecker.GetReturnTypeOfSignature(signature)
+	if predicate := walk.ruleContext.TypeChecker.GetTypePredicateOfSignature(
 		signature,
 	); predicate != nil && predicate.Type() != nil {
 		returnType = predicate.Type()
@@ -298,7 +301,7 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 // caller, visitObjectType, keyed on the type that owns the list.
 func (walk *typeUsageWalk) visitSymbolsList(symbols []*ast.Symbol, assumeMultipleUses bool) {
 	for _, symbol := range symbols {
-		walk.visitType(walk.ctx.TypeChecker.GetTypeOfSymbol(symbol), assumeMultipleUses, false)
+		walk.visitType(walk.ruleContext.TypeChecker.GetTypeOfSymbol(symbol), assumeMultipleUses, false)
 	}
 }
 

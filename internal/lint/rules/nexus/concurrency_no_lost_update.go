@@ -235,7 +235,7 @@ type concurrencyNoLostUpdateNestedUsage struct {
 
 func analyzeConcurrencyNoLostUpdateRoot(ruleContext rule.Context, root *ast.Node) {
 	analysis := &concurrencyNoLostUpdateRoot{
-		ctx:              ruleContext,
+		ruleContext:      ruleContext,
 		root:             root,
 		locals:           map[*ast.Symbol]*concurrencyNoLostUpdateLocal{},
 		between:          map[concurrencyNoLostUpdateBetweenKey]bool{},

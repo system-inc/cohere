@@ -695,7 +695,7 @@ func collectTypeParameterUsageCounts(
 	fromClass bool,
 ) {
 	walk := &typeUsageWalk{
-		ctx:                  ruleContext,
+		ruleContext:          ruleContext,
 		counts:               counts,
 		typeUsages:           map[*checker.Type]int{},
 		visitedConstraints:   map[*checker.Type]bool{},
