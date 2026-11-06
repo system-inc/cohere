@@ -36,7 +36,7 @@ var fieldsNotWritten = map[Kind][]string{
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
 	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache"},
-	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations"},
+	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
 }
 
 // dictionaryFields are objects keyed by data (a reason, a rule name) rather than by field names, so their

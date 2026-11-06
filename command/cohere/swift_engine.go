@@ -60,7 +60,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(given["verbose"] && flagValue("verbose") == "true")
-	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(location, release.Current())
+	binaryPath, sourceCommit, resolveSwiftEngineBinaryError := resolvedSwiftEngineBinary(location)
 	dispatch.Report.Clear()
 	if resolveSwiftEngineBinaryError != nil {
 		return 1, resolveSwiftEngineBinaryError
@@ -124,6 +124,9 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 			named,
 			dispatch.SwiftEngineOverrideVariable,
 		)
+		// Asked for the engine's sake, as for a shipped one below.
+		// Ignored: a toolchain that does not answer is the engine's to report.
+		_, _ = swiftVersionOutput()
 		return named, "", nil
 	}
 
@@ -137,6 +140,9 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 	}
 
 	if !provenance.IsDevelopment() {
+		// Asked for the engines' sake, which read it rather than each asking again (see swift_toolchain.go).
+		// Ignored: a toolchain that does not answer is the engine's to report, as it was before this asked.
+		_, _ = swiftVersionOutput()
 		binaryPath, shippedSwiftEngineError := shippedSwiftEngine(provenance)
 		return binaryPath, "", shippedSwiftEngineError
 	}
@@ -150,10 +156,15 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 		)
 	}
 	commit := committedSwiftSource(provenance)
+	versionOutput, swiftVersionOutputError := swiftVersionOutput()
+	if swiftVersionOutputError != nil {
+		return "", "", swiftVersionOutputError
+	}
 	binaryPath, _, resolveSwiftEngineError := dispatch.ResolveSwiftEngine(
 		dispatch.DefaultPaths(moduleDirectory),
 		commit,
 		engineContractVersion,
+		versionOutput,
 	)
 	if resolveSwiftEngineError != nil {
 		return "", "", resolveSwiftEngineError

@@ -9,7 +9,6 @@ package check
 import (
 	"cmp"
 	"fmt"
-	"go/ast"
 	"go/token"
 	"slices"
 	"strings"
@@ -19,7 +18,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/copied"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -29,8 +28,13 @@ type Options struct {
 	SingleThreaded bool
 
 	// Cache is the per-package findings cache the run reads and writes, or nil for a run that does neither, as
-	// under `--no-cache`. The findings are the same either way.
-	Cache *Caching
+	// under `--no-cache`. The findings are the same either way. The load is given it first (see
+	// load.PackagesRestoring), so the packages it holds were never parsed; a session no load was given opens here,
+	// over packages the load checked whole.
+	Cache *CacheSession
+
+	// Withheld is the load's Loaded.Withheld, which the cache keeps with each package it saves.
+	Withheld map[*packages.Package]load.PackageWithheld
 }
 
 // Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
@@ -144,10 +148,11 @@ type findingKey struct {
 // what a rule gets wrong on a package is a Crash. The packages below analyzed come back without their syntax and
 // type information, which the run let go once their facts were learned.
 //
-// With options.Cache, a package whose key has an entry that decodes whole is restored rather than analyzed: its
-// findings come from the entry, into the same dedupe and withholding as live ones, and its facts reach its
-// importers as a run's would. Every package that missed, and on which every action finished without an error, is
-// written once the graph has finished.
+// With options.Cache, a package the cache holds is restored rather than analyzed: Analyze is given only the packages
+// that missed, a restored package's facts reach the importers that missed as a run's would, and a restored package
+// to analyze gives its findings and its files' walk from its entry, into the same dedupe and withholding as live
+// ones. Every package that missed, with no load error and on which every action finished without one, is written
+// once the graph has finished.
 func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Result, error) {
 	started := time.Now()
 	ruleOf := make(map[*analysis.Analyzer]rule.Rule, len(rules))
@@ -167,14 +172,28 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded}
-	var cached *cacheRun
-	if options.Cache != nil {
-		cached = openCache(options.Cache, ruleOf, analyzers, analyzed)
-		checkerOptions.Restored, checkerOptions.Restore = cached.restored, cached.restore
+	session := options.Cache
+	roots := analyzed
+	if session != nil {
+		if !session.opened {
+			var reachable []*packages.Package
+			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
+			session.Restore(load.LoaderSource, reachable, analyzed)
+		}
+		checkerOptions.Restored, checkerOptions.Restore = session.restored, session.restore
+		roots = slices.DeleteFunc(slices.Clone(analyzed), session.restored)
 	}
-	graph, analyzeError := checker.Analyze(analyzers, analyzed, checkerOptions)
+	graph, analyzeError := checker.Analyze(analyzers, roots, checkerOptions)
 	if analyzeError != nil {
-		return nil, fmt.Errorf("analyzing %d packages: %w", len(analyzed), analyzeError)
+		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
+	}
+	type rootKey struct {
+		analyzer        *analysis.Analyzer
+		analyzedPackage *packages.Package
+	}
+	actionOf := make(map[rootKey]*checker.Action, len(graph.Roots))
+	for _, action := range graph.Roots {
+		actionOf[rootKey{action.Analyzer, action.Package}] = action
 	}
 
 	result := &Result{
@@ -186,43 +205,52 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	for _, enabled := range rules {
 		result.FindingsByRule[enabled.Name] = 0
 	}
-	generated := generatedFiles(analyzed)
-	copies := copiedFiles(analyzed)
+	files := analyzedFiles(analyzed, session)
+	generated, copies := withheldFiles(files)
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
-	for _, action := range graph.Roots {
-		actionRule, known := ruleOf[action.Analyzer]
-		if !known {
-			return nil, fmt.Errorf("reading the analysis of %s: analyzer %s is no rule's", action.Package.ID,
-				action.Analyzer.Name)
-		}
-		if action.Err != nil {
-			crash := Crash{File: firstFile(action.Package), Error: crashSentence(actionRule, action)}
-			if !seenCrashes[crash] {
-				seenCrashes[crash] = true
-				result.Crashes = append(result.Crashes, crash)
+	// In the order of graph.Roots, each analyzer over each package, so of two findings alike the one kept is the
+	// one a run without the cache keeps.
+	for _, analyzer := range analyzers {
+		analyzerRule := ruleOf[analyzer]
+		for _, analyzedPackage := range analyzed {
+			found, restored := session.findingsOf(analyzer, analyzedPackage)
+			if !restored {
+				action, ran := actionOf[rootKey{analyzer, analyzedPackage}]
+				if !ran {
+					return nil, fmt.Errorf("reading the analysis of %s: analyzer %s has no action on it",
+						analyzedPackage.ID, analyzer.Name)
+				}
+				if action.Err != nil {
+					crash := Crash{File: firstFile(action.Package), Error: crashSentence(analyzerRule, action)}
+					if !seenCrashes[crash] {
+						seenCrashes[crash] = true
+						result.Crashes = append(result.Crashes, crash)
+					}
+					if !slices.Contains(result.CrashedRules, analyzerRule.Name) {
+						result.CrashedRules = append(result.CrashedRules, analyzerRule.Name)
+					}
+					continue
+				}
+				found = actionFindings(analyzerRule, action)
 			}
-			if !slices.Contains(result.CrashedRules, actionRule.Name) {
-				result.CrashedRules = append(result.CrashedRules, actionRule.Name)
+			for _, finding := range found {
+				key := findingKey{finding.Rule, finding.File, finding.Line, finding.Column, finding.Message}
+				if seenFindings[key] {
+					continue
+				}
+				seenFindings[key] = true
+				if analyzerRule.Origin == rule.OriginHouse && generated[finding.File] {
+					result.WithheldAsGenerated[finding.Rule]++
+					continue
+				}
+				if analyzerRule.Origin == rule.OriginHouse && copies[finding.File] {
+					result.WithheldAsCopied[finding.Rule]++
+					continue
+				}
+				result.Findings = append(result.Findings, finding)
+				result.FindingsByRule[finding.Rule]++
 			}
-			continue
-		}
-		for _, found := range actionFindings(cached, actionRule, action) {
-			key := findingKey{found.Rule, found.File, found.Line, found.Column, found.Message}
-			if seenFindings[key] {
-				continue
-			}
-			seenFindings[key] = true
-			if actionRule.Origin == rule.OriginHouse && generated[found.File] {
-				result.WithheldAsGenerated[found.Rule]++
-				continue
-			}
-			if actionRule.Origin == rule.OriginHouse && copies[found.File] {
-				result.WithheldAsCopied[found.Rule]++
-				continue
-			}
-			result.Findings = append(result.Findings, found)
-			result.FindingsByRule[found.Rule]++
 		}
 	}
 	slices.SortFunc(result.Findings, func(left, right Finding) int {
@@ -239,23 +267,17 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Error, right.Error))
 	})
 	slices.Sort(result.CrashedRules)
-	result.FilesWalked, result.NodesVisited = walk(analyzed)
-	if cached != nil {
-		cached.save(graph, ruleOf)
-		result.Cache = cached.counts
+	result.FilesWalked, result.NodesVisited = walk(files)
+	if session != nil {
+		session.save(graph, options.Withheld, files)
+		result.Cache = session.counts
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil
 }
 
-// actionFindings is what action found, as newFinding makes it: from the cache's entry when its package was
-// restored, else from its diagnostics.
-func actionFindings(cached *cacheRun, actionRule rule.Rule, action *checker.Action) []Finding {
-	if cached != nil {
-		if restored, hit := cached.findings(action); hit {
-			return restored
-		}
-	}
+// actionFindings is what action found, as newFinding makes it.
+func actionFindings(actionRule rule.Rule, action *checker.Action) []Finding {
 	found := make([]Finding, 0, len(action.Diagnostics))
 	for _, diagnostic := range action.Diagnostics {
 		found = append(found, newFinding(actionRule, action.Package.Fset, diagnostic))
@@ -349,52 +371,46 @@ func firstFile(analyzedPackage *packages.Package) string {
 	return analyzedPackage.ID
 }
 
-// generatedFiles is every file of the analyzed packages that go/ast.IsGenerated reads as generated, a comment line
-// `// Code generated ... DO NOT EDIT.` before the package clause, judged on the syntax the rules were given rather
-// than on a second read of the disk, which could disagree with it.
-func generatedFiles(analyzed []*packages.Package) map[string]bool {
-	generated := map[string]bool{}
+// analyzedFiles is each analyzed package's files as the rules were given them, with each one's walk and whether it
+// is generated or copied, read from the syntax, or from the entry of a package the cache restored, which has none.
+func analyzedFiles(analyzed []*packages.Package, session *CacheSession) map[*packages.Package][]storedFile {
+	files := make(map[*packages.Package][]storedFile, len(analyzed))
 	for _, analyzedPackage := range analyzed {
-		for _, file := range analyzedPackage.Syntax {
-			if ast.IsGenerated(file) {
-				generated[analyzedPackage.Fset.PositionFor(file.FileStart, false).Filename] = true
-			}
+		if restored, hit := session.filesOf(analyzedPackage); hit {
+			files[analyzedPackage] = restored
+			continue
 		}
+		files[analyzedPackage] = storedFiles(analyzedPackage)
 	}
-	return generated
+	return files
 }
 
-// copiedFiles is every file of the analyzed packages whose header declares it a copy of upstream source, judged,
-// as generatedFiles judges, on the syntax the rules were given.
-func copiedFiles(analyzed []*packages.Package) map[string]bool {
-	copies := map[string]bool{}
-	for _, analyzedPackage := range analyzed {
-		for _, file := range analyzedPackage.Syntax {
-			if copied.IsCopied(file) {
-				copies[analyzedPackage.Fset.PositionFor(file.FileStart, false).Filename] = true
-			}
+// withheldFiles is every file of the analyzed packages that go/ast.IsGenerated reads as generated, a comment line
+// `// Code generated ... DO NOT EDIT.` before the package clause, and every one whose header declares it a copy of
+// upstream source (see package copied), judged on the syntax the rules were given rather than on a second read of
+// the disk, which could disagree with it.
+func withheldFiles(files map[*packages.Package][]storedFile) (generated map[string]bool, copies map[string]bool) {
+	generated, copies = map[string]bool{}, map[string]bool{}
+	for _, packageFiles := range files {
+		for _, file := range packageFiles {
+			generated[file.Name] = generated[file.Name] || file.Generated
+			copies[file.Name] = copies[file.Name] || file.Copied
 		}
 	}
-	return copies
+	return generated, copies
 }
 
 // walk counts the distinct files the rules were given, the syntax trees go/packages parsed from each package's
 // CompiledGoFiles, and the nodes of one ast.Inspect over them.
-func walk(analyzed []*packages.Package) (files int, nodes int) {
+func walk(files map[*packages.Package][]storedFile) (filesWalked int, nodes int) {
 	seen := map[string]bool{}
-	for _, analyzedPackage := range analyzed {
-		for _, file := range analyzedPackage.Syntax {
-			name := analyzedPackage.Fset.PositionFor(file.FileStart, false).Filename
-			if seen[name] {
+	for _, packageFiles := range files {
+		for _, file := range packageFiles {
+			if seen[file.Name] {
 				continue
 			}
-			seen[name] = true
-			ast.Inspect(file, func(node ast.Node) bool {
-				if node != nil {
-					nodes++
-				}
-				return true
-			})
+			seen[file.Name] = true
+			nodes += file.Nodes
 		}
 	}
 	return len(seen), nodes

@@ -42,22 +42,11 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	}
 
 	started := time.Now()
-	var enabled []rule.Rule
-	var turnedOff []string
-	for _, registeredRule := range engine.registered {
-		if _, on := engine.severityOf(registeredRule.Name); on {
-			enabled = append(enabled, registeredRule)
-			continue
-		}
-		turnedOff = append(turnedOff, registeredRule.Name)
-	}
-	caching, cachingError := lintCache(engine.request, engine.described.workspace, loaded, enabled)
-	if cachingError != nil {
-		engine.note("the findings cache sat this run out: %v", cachingError)
-	}
+	enabled, turnedOff := engine.enabledRules()
 	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
 		SingleThreaded: engine.request.switches["single-threaded"],
-		Cache:          caching,
+		Cache:          engine.session,
+		Withheld:       loaded.Withheld,
 	})
 	if checkError != nil {
 		engine.note("the rules could not run: %v", checkError)
@@ -123,6 +112,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 		Written:      result.Cache.Written,
 		Unstorable:   result.Cache.Unstorable,
 		FactsDropped: result.Cache.FactsDropped,
+		FactsSkipped: result.Cache.FactsSkipped,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
@@ -133,6 +123,32 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	record.ElapsedMilliseconds = int(time.Since(started).Milliseconds())
 	engine.write(record)
 	engine.phase(contract.PhaseLint, contract.OutcomeRan, time.Since(started), "")
+}
+
+// enabledRules are the registered rules the settings leave on, which run, and the names of those they turn off.
+func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string) {
+	for _, registeredRule := range engine.registered {
+		if _, on := engine.severityOf(registeredRule.Name); on {
+			enabled = append(enabled, registeredRule)
+			continue
+		}
+		turnedOff = append(turnedOff, registeredRule.Name)
+	}
+	return enabled, turnedOff
+}
+
+// cacheSession is the findings cache for the run's enabled rules, made before the load so the load restores what
+// it holds, and nil under `--no-cache` or when what every key shares cannot be read, which the run says on stderr.
+func (engine *pipeline) cacheSession() *check.CacheSession {
+	enabled, _ := engine.enabledRules()
+	caching, cachingError := lintCache(engine.request, engine.described.workspace, enabled)
+	if cachingError != nil {
+		engine.note("the findings cache sat this run out: %v", cachingError)
+	}
+	if caching == nil {
+		return nil
+	}
+	return check.NewCacheSession(caching, enabled)
 }
 
 // suppressedFindings is what the //cohere:ignore comments left of the lint phase's findings.

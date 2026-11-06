@@ -11,7 +11,14 @@ import (
 // every cgo file and the project's own cgo code is type-checked as it builds, never with package "C" faked. It is
 // the load for a project with cgo files of its own, and needs a go that builds: a runner of prebuilt tests, which
 // refuses -compiled, cannot run it. Nothing is withheld, since nothing is faked.
-func translated(workspace string, patterns []string, environment []string) ([]*packages.Package, *Loaded, error) {
+//
+// The findings cache restores analysis only on this load: by the time it is asked, every package is checked.
+func translated(
+	workspace string,
+	patterns []string,
+	environment []string,
+	restorer Restorer,
+) ([]*packages.Package, *Loaded, error) {
 	fullEnvironment, environmentError := translatedEnvironment(workspace, environment)
 	if environmentError != nil {
 		return nil, nil, environmentError
@@ -29,8 +36,14 @@ func translated(workspace string, patterns []string, environment []string) ([]*p
 	if loadError != nil {
 		return nil, nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, loadError)
 	}
+	analyzedPackages := analyzed(roots)
+	if restorer != nil {
+		var reachable []*packages.Package
+		packages.Visit(roots, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
+		restorer.Restore(LoaderCgoTranslated, reachable, analyzedPackages)
+	}
 	return roots, &Loaded{
-		Packages:                analyzed(roots),
+		Packages:                analyzedPackages,
 		WithheldInDependencyCgo: []Withheld{},
 		CgoTranslated:           true,
 	}, nil

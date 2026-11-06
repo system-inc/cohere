@@ -63,6 +63,8 @@ func main() {
 }
 
 func run() error {
+	// First, before anything reads them or starts a process that would inherit them. See swift_toolchain.go.
+	trustInheritedSwiftResolution()
 	// A subcommand is matched before flag.Parse, because the flag package stops at the first
 	// argument it does not recognize and would hand `rename` back as a positional while
 	// swallowing the flags meant for it. The dispatcher forwards unknown arguments untouched, so the
