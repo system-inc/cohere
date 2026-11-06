@@ -52,7 +52,10 @@ func init() {
 			Rule:   ConsistencyNoStutteringName,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoStutteringNameOptions](),
 		},
-		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoUtilsFolder},
+		rule.Registration[ConsistencyNoUtilsFolderOptions]{
+			Rule:     ConsistencyNoUtilsFolder,
+			DecodeAt: decodeConsistencyNoUtilsFolderOptions,
+		},
 		rule.Registration[ConsistencyRequireConstantCasingOptions]{
 			Rule:   ConsistencyRequireConstantCasing,
 			Decode: rule.DecodeOptionsInto[ConsistencyRequireConstantCasingOptions](),

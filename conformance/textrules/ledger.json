@@ -133,38 +133,6 @@
     },
     {
         "engine": "typescript",
-        "family": "utils-folder",
-        "case": "uf02",
-        "kind": "verdict",
-        "task": "xrcx4sx",
-        "reason": "silent, since it bans `utils` and `_utils` and not `util`"
-    },
-    {
-        "engine": "typescript",
-        "family": "utils-folder",
-        "case": "uf03",
-        "kind": "verdict",
-        "task": "xrcx4sx",
-        "reason": "silent on `Utils`, since it matches a folder's name with its case"
-    },
-    {
-        "engine": "typescript",
-        "family": "utils-folder",
-        "case": "uf06",
-        "kind": "verdict",
-        "task": "xrcx4sx",
-        "reason": "reports a project checked out under a directory named `utils`, since it matches the absolute path"
-    },
-    {
-        "engine": "typescript",
-        "family": "utils-folder",
-        "case": "uf07",
-        "kind": "verdict",
-        "task": "xrcx4sx",
-        "reason": "silent on `_Utils`, since it matches a folder's name with its case"
-    },
-    {
-        "engine": "typescript",
         "family": "warning-comments",
         "case": "wc01",
         "kind": "span",
