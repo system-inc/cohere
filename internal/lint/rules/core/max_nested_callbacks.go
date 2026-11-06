@@ -63,7 +63,7 @@ func DefaultMaxNestedCallbacksSettings() MaxNestedCallbacksOptions {
 // the preference is expressed in a way that has an observable defect. See the decoder.
 type maxNestedCallbacksObjectShape struct {
 	Maximum                       *int  `json:"maximum"`
-	Max                           *int  `json:"max"`
+	DeprecatedMaximum             *int  `json:"max"`
 	CheckConstructorCallCallbacks *bool `json:"checkConstructorCallCallbacks"`
 }
 
@@ -126,12 +126,12 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (MaxNestedCallbacksOptions, err
 	var resolved *int
 	if object.Maximum != nil && *object.Maximum != 0 {
 		resolved = object.Maximum
-	} else if object.Max != nil && *object.Max != 0 {
-		resolved = object.Max
+	} else if object.DeprecatedMaximum != nil && *object.DeprecatedMaximum != 0 {
+		resolved = object.DeprecatedMaximum
 	} else if object.Maximum != nil {
 		resolved = object.Maximum
-	} else if object.Max != nil {
-		resolved = object.Max
+	} else if object.DeprecatedMaximum != nil {
+		resolved = object.DeprecatedMaximum
 	}
 	if resolved != nil {
 		if *resolved < 0 {

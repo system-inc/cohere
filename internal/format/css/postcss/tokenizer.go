@@ -85,7 +85,7 @@ type tokenizer struct {
 	css   []uint16
 
 	length       int
-	pos          int
+	offset       int
 	buffer       []token
 	returned     []token
 	lastBadParen int
@@ -96,7 +96,7 @@ func newTokenizer(in *input) *tokenizer {
 		input:        in,
 		css:          in.units,
 		length:       len(in.units),
-		pos:          0,
+		offset:       0,
 		buffer:       []token{},
 		returned:     []token{},
 		lastBadParen: -1,
@@ -130,15 +130,15 @@ func (tokens *tokenizer) indexOf(search string, from int) int {
 }
 
 func (tokens *tokenizer) position() int {
-	return tokens.pos
+	return tokens.offset
 }
 
 func (tokens *tokenizer) unclosed(what string) {
-	panic(tokens.input.errorAt("Unclosed "+what, tokens.pos))
+	panic(tokens.input.errorAt("Unclosed "+what, tokens.offset))
 }
 
 func (tokens *tokenizer) endOfFile() bool {
-	return len(tokens.returned) == 0 && tokens.pos >= tokens.length
+	return len(tokens.returned) == 0 && tokens.offset >= tokens.length
 }
 
 // nextToken returns the next token, and false where upstream returns undefined.
@@ -148,13 +148,13 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 		tokens.returned = tokens.returned[:len(tokens.returned)-1]
 		return last, true
 	}
-	if tokens.pos >= tokens.length {
+	if tokens.offset >= tokens.length {
 		return token{}, false
 	}
 
 	var currentToken token
 	var next int
-	position := tokens.pos
+	position := tokens.offset
 	code := tokens.characterCodeAt(position)
 
 	switch code {
@@ -196,7 +196,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				next = tokens.indexOf(")", next+1)
 				if next == -1 {
 					// ignore and ignoreUnclosed are always false here.
-					tokens.pos = position
+					tokens.offset = position
 					tokens.unclosed("bracket")
 				}
 				escapePosition := next
@@ -255,7 +255,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			next = tokens.indexOf(quote, next+1)
 			if next == -1 {
 				// ignore and ignoreUnclosed are always false here.
-				tokens.pos = position
+				tokens.offset = position
 				tokens.unclosed("string")
 			}
 			escapePosition := next
@@ -326,7 +326,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			next = tokens.indexOf("*/", position+2) + 1
 			if next == 0 {
 				// ignore and ignoreUnclosed are always false here.
-				tokens.pos = position
+				tokens.offset = position
 				tokens.unclosed("comment")
 			}
 
@@ -360,7 +360,7 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 	}
 
 	position++
-	tokens.pos = position
+	tokens.offset = position
 	return currentToken, true
 }
 
