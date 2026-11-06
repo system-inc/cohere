@@ -78,7 +78,7 @@ var fixtures struct {
 // TestMain removes the fixtures once every test is done with them.
 func TestMain(tests *testing.M) {
 	code := tests.Run()
-	for _, root := range []string{fixtures.root, cgoFixtures.root} {
+	for _, root := range []string{fixtures.root, cgoFixtures.root, inputsFixture.root} {
 		if root != "" {
 			// Ignored: a temporary directory left behind fails nothing.
 			_ = os.RemoveAll(root)

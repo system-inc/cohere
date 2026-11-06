@@ -3,10 +3,10 @@ import Foundation
 /*
  Symbols for the files typed rules need, from the cheapest source that can vouch for each file as it stands.
 
- First the build's index store, which costs a record read: it holds every file the last build compiled, and a
- unit newer than the file vouches for it. Then sourcekitd in process, about half a second a file, for a file
- the index cannot vouch for: one the bodies-only path checked without building, or one edited since. A file
- neither can describe gets a reason instead, which the linter reports as unchecked.
+ First the build's index store, which costs a record read, every file's read side by side: it holds every file
+ the last build compiled, and a unit newer than the file vouches for it. Then sourcekitd in process, about half a
+ second a file, for a file the index cannot vouch for: one the bodies-only path checked without building, or one
+ edited since. A file neither can describe gets a reason instead, which the linter reports as unchecked.
 
  The package's local packages build into their own scratch paths, so each has its own store and its own
  compile commands; every one is consulted. An Xcode root has one layout, its xcodebuild's derived data, read
@@ -37,8 +37,8 @@ struct SymbolProvider {
             }
         }
         var needSourcekitd: [ParsedFile] = []
-        for file in files {
-            if var found = stores.lazy.compactMap({ $0.symbols(of: file.url) }).first {
+        for (file, indexed) in zip(files, IndexStore.symbols(of: files.map(\.url), in: stores)) {
+            if var found = indexed {
                 found.ownedModules = ownedModules
                 result.symbols[file.url.path] = found
                 result.fromIndex += 1

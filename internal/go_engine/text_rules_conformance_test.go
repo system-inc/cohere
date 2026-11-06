@@ -127,8 +127,38 @@ func writeTextRulesFile(test *testing.T, directory string, name string, contents
 	return path
 }
 
+// textRulesDeparture is the reason a case's settings give for a rule its options loosen. The case's own options
+// are the whole of its reason: a project states a departure for a looser rule, and so does a case.
+const textRulesDeparture = "the conformance case's own loosening"
+
+// textRulesLoosens is whether the case's options loosen the named rule, asked of each option's value as a
+// rule.Loosening, as configureRules asks it, on an analyzer built for the question, so asking sets nothing an
+// analyzer the case runs reads.
+func textRulesLoosens(name string, testCase text_rules.Case) bool {
+	newAnalyzer, hasConstructor := textRulesOwnAnalyzers[name]
+	// textRulesRule refuses a case's options on a rule with flags and no constructor, so a rule this reaches with
+	// no constructor has no option that could loosen it.
+	if !hasConstructor {
+		return false
+	}
+	probe := newAnalyzer()
+	for option, value := range testCase.Options {
+		optionFlag := probe.Flags.Lookup(option)
+		// An option the rule lacks, or a value it refuses, loosens nothing here: configureRules refuses the case's
+		// options for it, which is the case's failure to report, not this question's.
+		if optionFlag == nil || optionFlag.Value.Set(optionText(value)) != nil {
+			continue
+		}
+		if loosening, isLoosening := optionFlag.Value.(rule.Loosening); isLoosening && loosening.Loosens() {
+			return true
+		}
+	}
+	return false
+}
+
 // textRulesSettings is a CohereSettings.json whose go block runs each of the rules at error, with the case's
-// options when it has any.
+// options when it has any, and a departure for each rule those options loosen, as a project's settings must
+// state one.
 func textRulesSettings(test *testing.T, ruleNames []string, testCase text_rules.Case) []byte {
 	test.Helper()
 	// A rule's entry is its severity alone, or `[severity, options]`, as settings.Load reads it.
@@ -151,6 +181,12 @@ func textRulesSettings(test *testing.T, ruleNames []string, testCase text_rules.
 	file.Go.Rules = map[string]json.RawMessage{}
 	for _, ruleName := range ruleNames {
 		file.Go.Rules[ruleName] = setting
+		if textRulesLoosens(ruleName, testCase) {
+			if file.Go.Departures == nil {
+				file.Go.Departures = map[string]string{}
+			}
+			file.Go.Departures[ruleName] = textRulesDeparture
+		}
 	}
 	contents, encodeError := json.Marshal(file)
 	if encodeError != nil {
@@ -160,10 +196,12 @@ func textRulesSettings(test *testing.T, ruleNames []string, testCase text_rules.
 }
 
 // textRulesSettingsFile is the part of CohereSettings.json a case writes: the go block's rules, each a rule's
-// entry as written.
+// entry as written, and its departures, left out when the case loosens nothing, since a departure excusing nothing
+// is refused.
 type textRulesSettingsFile struct {
 	Go struct {
-		Rules map[string]json.RawMessage `json:"rules"`
+		Rules      map[string]json.RawMessage `json:"rules"`
+		Departures map[string]string          `json:"departures,omitempty"`
 	} `json:"go"`
 }
 

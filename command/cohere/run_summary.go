@@ -42,6 +42,8 @@ type runSummary struct {
 	Formatting time.Duration
 
 	Cache cacheUse
+	// PackageCache is what the Go engine's per-package findings cache did, nil for every other run.
+	PackageCache *packageCacheUse
 
 	TypeErrors int
 	Findings   int

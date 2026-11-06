@@ -15,6 +15,12 @@ import (
 // record, so an option the rule does not have, or a value it refuses, is a refusal rather than a run that quietly
 // used its default.
 //
+// It also holds the settings' departures to the options they excuse, both ways. An option whose value says, as a
+// rule.Loosening, that it loosens the house's is refused unless the go block states a departure for its rule, and a
+// departure for a rule whose options loosen nothing is refused as dead, since a stale exemption is a rule quietly
+// loosened for no one. The value decides, not a list kept here, so a rule that grows a loosening option is held to
+// it with nothing to update.
+//
 // This sets flags on package-level analyzers, which outlive the run. That is safe because the engine is a child
 // process that runs once, which Main enforces by refusing a second call, and the settings are the only thing that
 // sets them. A test running the engine in process many times (TestEndToEnd) gives any rule it configures an
@@ -24,6 +30,8 @@ func configureRules(ruleSettings settings.Settings, registered []rule.Rule) erro
 	for _, registeredRule := range registered {
 		analyzerRules[registeredRule.Name] = registeredRule
 	}
+	// The rules whose configured options loosen the house's, which are the ones a departure may excuse.
+	loosened := map[string]bool{}
 	// Sorted, so a config with two bad options names the same one on every run.
 	for _, name := range slices.Sorted(maps.Keys(ruleSettings.Rules)) {
 		setting := ruleSettings.Rules[name]
@@ -47,6 +55,24 @@ func configureRules(ruleSettings settings.Settings, registered []rule.Rule) erro
 			if setError := configured.Analyzer.Flags.Set(option, text); setError != nil {
 				return fmt.Errorf("setting option %q of %s to %s: %w", option, name, text, setError)
 			}
+			// Asked after the value is set, so it answers for the value the settings gave rather than the default.
+			loosening, isLoosening := configured.Analyzer.Flags.Lookup(option).Value.(rule.Loosening)
+			if !isLoosening || !loosening.Loosens() {
+				continue
+			}
+			loosened[name] = true
+			if _, hasDeparture := ruleSettings.Departures[name]; !hasDeparture {
+				return fmt.Errorf("configuring %s: option %q of %s loosens the house's %s, so the go block must state "+
+					"a departure for %s under \"departures\" with the reason the project loosens it",
+					name, option, text, loosening.HouseValue(), name)
+			}
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(ruleSettings.Departures)) {
+		if !loosened[name] {
+			return fmt.Errorf("configuring %s: the go block states a departure for it, %q, and none of its options "+
+				"loosens the house's, so the departure is dead and exempts nothing; remove it", name,
+				ruleSettings.Departures[name])
 		}
 	}
 	return nil

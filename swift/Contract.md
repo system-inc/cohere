@@ -79,6 +79,18 @@ the run, prints a sentence on stderr naming both versions, and exits 2. The firs
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
 there too, because the record and the flag are two independent ways for the versions to disagree.
 
+The front door asks the toolchain once per process tree and hands the answers down, so an engine need not ask
+again (#nkk91tv). Each is optional, and an engine that finds one missing, or unusable, asks for itself:
+
+- `COHERE_SWIFT_VERSION_OUTPUT` is what `swift --version` printed, unchanged. The engine reads its
+  `swiftlang-` token exactly as from its own call, and ignores a value without one.
+- `COHERE_SWIFT_EXECUTABLE` is the `swift` that `xcrun --find swift` names. The engine uses it only when it
+  is an absolute path to an executable file.
+
+Both feed the engine's cache keys, so the front door never passes on a value it did not ask for or receive
+from the cohere process that started it: a cohere run from a shell drops any it inherits and asks fresh
+(command/cohere/swift_toolchain.go).
+
 ## Records
 
 Every record has `kind`. Fields not listed are not part of the contract and the front door ignores
@@ -358,6 +370,14 @@ initial values. It is `0` when there were none. A project with cgo files of its 
 go/packages instead, which has the cgo tool translate every cgo file, so both are empty then, and the record's
 `build` says which load ran.
 
+The Go engine type-checks and never builds, with one exception: cgo's preprocessing, which the
+go/packages load of a project with cgo of its own has the cgo tool run. So the Go engine's types
+record carries one more additive field, `cgoTranslation`, that counts the exception on every run:
+`"cgoTranslation":{"packages":3,"milliseconds":2140}` is how many packages the cgo tool translated,
+the project's and its dependencies' with cgo files alike, and how long that load took. On the load
+from source, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never left
+out, so a front door can always say whether a run built anything.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code
@@ -370,6 +390,38 @@ file changes what other files in the module mean, and the compiler checks the wh
 regardless. Narrowing what is reported to the scope would hide findings the edit caused. The
 front door prints `  types: covered the whole package, not only the N files in scope` when the two
 differ.
+
+### `inputs`, the Go engine's, just before `summary`
+
+```json
+{"kind":"inputs","files":["/…/go.mod","/…/go.sum","/…/p/p.go","<goroot>/VERSION","<goroot>/bin/go","<goroot>/src/fmt/print.go"],
+ "directories":["/…","/…/p"],"absent":["/…/CohereSettings.json","/…/staticcheck.conf","/go.work"]}
+```
+
+Additive within contract 3, and written only by the Go engine, once, in a check run whose load ran, just before
+the summary. Swift's engine does not write it. It declares what the run's verdict was decided from, so the front
+door can replay that verdict without starting the engine when nothing it names has moved: `go list` and the load
+read in a subprocess and in the engine's own process, where the front door cannot observe them.
+
+- `files` are the files whose bytes the verdict can depend on: every file of every package in the loaded graph, the
+  standard library's and the module cache's too, the project's census, every module's go.mod, each module root's
+  go.sum and `vendor/modules.txt`, the go.work in use and its go.work.sum, PATH's `go`, the `bin/go`, `VERSION` and
+  `go.env` of the toolchain that ran (one in the module cache when `GOTOOLCHAIN` switched), the go env file, the
+  settings file, a staticcheck.conf at or above an analyzed package, the ignore files the census reads, and at a
+  go.work root the git index its gitlinks come from. A file in the build cache is never one: go writes it during
+  the run, and its bytes follow from what is named.
+- `directories` are the directories whose listing decides which packages or files exist: every directory under a
+  module root, or a local replacement's, that `./...` could reach, and the package and embedded directories among
+  them. None is above a module root, in the build cache, or below a directory whose name starts with `.`, such as
+  `.cache`, since a listing the run writes into would never let one replay. The standard library's and the module
+  cache's directories are the toolchain's and pinned versions', which the files above stand for.
+- `absent` are paths whose absence the run depends on: a go.work in each directory above a module root while none
+  is in use, and each of the files above that is not there. An ancestor is only ever named this way, as a path.
+
+Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
+an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes
+stale, so whatever the load, or a later cache of the engine's, reads to decide a verdict must be named here. A
+check run whose load failed, or that asked for no load, writes none, and the front door records nothing for it.
 
 ### `lint`
 
@@ -384,6 +436,27 @@ Rendered by the existing lint line and coverage printers:
 `lint: 3 findings — 15 rules over 149 files, 412233 nodes visited, in 96ms`, followed by the rule
 coverage, crash, and config notes. `reusedFrom` names the phase whose walk was reused (`fix`), and
 the line then says so instead of printing a duration.
+
+The Go engine's lint record carries one more field, additive within contract 3 as the types record's
+are, so a front door that does not read it yet loses only what it counts:
+`"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0}`.
+It is what the engine's per-package findings cache did, by package. Every package the load reached,
+each analyzed package and test variant and each dependency, was either `hit` or `missed`. A hit is
+restored from its entry: the load from source neither parses nor type-checks it, and reads its types
+from the entry's export data only when a package that missed imports it, and no analyzer runs on it.
+A miss is checked and analyzed from source. Of the misses, `written` got an entry, and `unstorable`
+held what no entry can hold, a fact gob cannot encode or types export data cannot carry, so it got
+none and is checked again next run; a miss that is neither had a load error, had a rule fail on it,
+or its write failed, which the engine says on stderr. `factsDropped` counts the facts the written
+entries left out because nothing outside their package can name their object, such as a wrapper
+closure printf marks: no importer can look such a fact up, so leaving it out changes no finding.
+`factsSkipped` counts the restored facts whose object the package's export data does not hold, which
+no importer can name either. The entries live in `<root>/.cache/cohere/go/`, beside the front door's
+own cache. The cache changes no finding and no other field of any record: a run with it and a run
+under `--no-cache` write the same stream but for this field and the elapsed times. Under `--no-cache`
+the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
+its own is loaded through go/packages, which type-checks every package whatever the cache holds, so
+there the cache restores analysis only, and the types record's `build` says so.
 
 ### `phase`
 

@@ -1,0 +1,16 @@
+{
+    "why": "us05: call 4, a leading underscore is flagged: a local `_cache` is reported at its declaration. The bare `_` stays a discard (am02)",
+    "expect": [
+        {
+            "covers": "_cache",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

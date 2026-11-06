@@ -1,0 +1,16 @@
+{
+    "why": "lb00: the control, call 5: a label on a loop, with no jump naming it, is reported once, at the label. Go has no form: a label no jump names does not compile in Go",
+    "control": true,
+    "expect": [
+        {
+            "covers": "outer",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

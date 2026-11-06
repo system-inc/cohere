@@ -579,16 +579,19 @@ final class IgnoreRules {
      Every file git would list below `directory` (absolute, symlinks resolved), as absolute paths with
      symlinks resolved, the way the file set compares them. Pruned as git prunes: an ignored directory and
      another repository are never entered. A symlink is a file here, as it is to git, never followed.
+
+     `skipping` holds directories (absolute, symlinks resolved) the caller knows are not the repository's source
+     whatever its ignore files say, such as the engine's own scratch, and they are never entered either.
      */
-    func visibleFiles(under directory: String) -> [String] {
+    func visibleFiles(under directory: String, skipping: Set<String> = []) -> [String] {
         guard directory == rootPath || isVisible(directory, isDirectory: true) else { return [] }
         let relative = directory == rootPath ? "" : String(directory.dropFirst(rootPath.count + 1))
         var files: [String] = []
-        collect(relativeDirectory: relative, into: &files)
+        collect(relativeDirectory: relative, skipping: skipping, into: &files)
         return files
     }
 
-    private func collect(relativeDirectory: String, into files: inout [String]) {
+    private func collect(relativeDirectory: String, skipping: Set<String>, into files: inout [String]) {
         let absolute = relativeDirectory.isEmpty ? rootPath : rootPath + "/" + relativeDirectory
         let entries: [URL]
         do {
@@ -606,11 +609,14 @@ final class IgnoreRules {
             let relative = relativeDirectory.isEmpty ? name : relativeDirectory + "/" + name
             let isSymbolicLink = Self.isSymbolicLink(entry)
             let isDirectory = !isSymbolicLink && Self.isDirectory(entry)
+            if isDirectory && skipping.contains(rootPath + "/" + relative) {
+                continue
+            }
             guard admits(name: name, relative: relative, parent: relativeDirectory, isDirectory: isDirectory) else {
                 continue
             }
             if isDirectory {
-                collect(relativeDirectory: relative, into: &files)
+                collect(relativeDirectory: relative, skipping: skipping, into: &files)
             }
             else {
                 let path = rootPath + "/" + relative

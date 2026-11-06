@@ -89,6 +89,21 @@
                         "findingsMissReason": { "type": "string", "description": "Why files' findings were not replayed: none on record, a key and which of its parts moved, or how many files had no entry, changed bytes or rules, or were taken without measuring readiness. Absent when every file looked up was replayed." }
                     }
                 },
+                "packageCache": {
+                    "type": "object",
+                    "description": "What the Go engine's per-package findings cache did in the lint phase, by package. Present only for a Go run that linted, and absent from a replay, which started no engine.",
+                    "additionalProperties": false,
+                    "required": ["on", "hit", "missed", "written", "unstorable", "factsDropped", "factsSkipped"],
+                    "properties": {
+                        "on": { "type": "boolean", "description": "False under `--no-cache`, and then every count is zero." },
+                        "hit": { "type": "integer", "description": "Packages restored from an entry, with nothing run on them." },
+                        "missed": { "type": "integer", "description": "Packages analyzed from source." },
+                        "written": { "type": "integer", "description": "Missed packages that got an entry." },
+                        "unstorable": { "type": "integer", "description": "Missed packages that held a fact no entry can hold." },
+                        "factsDropped": { "type": "integer", "description": "Facts the written entries left out, since nothing outside their package can name their object." },
+                        "factsSkipped": { "type": "integer", "description": "Restored facts skipped, whose object the package's export data does not hold." }
+                    }
+                },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },
                 "filesFixed": { "type": "integer" },

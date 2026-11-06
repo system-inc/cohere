@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +38,8 @@ import (
 // people repeat, and every other flag widens the set of things the output could depend on. The key covers
 // arguments anyway, so admitting more later is a change to one condition rather than to the proof, plus
 // declaring whatever the new run reads that the graph build does not.
+//
+// At a Go root the same runs are admitted, and the Go engine declares what they read (see go_run_cache.go).
 //
 // # Which exits
 //
@@ -110,12 +113,47 @@ func recordRunSummary(summary runSummary) {
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
 // arguments happen to be admitted next.
+//
+// One of discovery's children is judged by the command line its parent was given (see runCacheArguments).
 func runCacheEligible() bool {
 	if cacheOff {
 		return false
 	}
+	return runCacheAdmits(runCacheArguments(os.Args[1:], os.Getenv(projectEngineVariable) != ""))
+}
+
+// runCacheArguments is the part of a command line the run cache judges. For one of discovery's children (child, its
+// engine variable set) that is what its parent was given: the leading `--directory <project>` and `--tsconfig
+// <file>` runProject prepends and the trailing `--lint-config <absolute path>` childArguments appends are taken off,
+// in exactly those places and nowhere else. Without that, every project of a root holding several, cohere's own
+// among them, ran cold every time, since `--directory` admits no run.
+//
+// Sound because the key already holds what those flags choose: every argument as given, the project's root
+// resolved, its tsconfig and lint config, what it yields to nearer projects, and its label (see beginRunCache and
+// beginRunCacheSession). A person who types `--directory` is no child, so their run stays ineligible and the runs
+// that replay are still the ones runCacheEligible names, run from a root or as one of its projects. The `--no-cache`
+// a parent adds for a shared directory makes its child ineligible through cacheOff.
+func runCacheArguments(arguments []string, child bool) []string {
+	if !child {
+		return arguments
+	}
+	judged := arguments
+	if len(judged) >= 2 && judged[0] == "--directory" {
+		judged = judged[2:]
+		if len(judged) >= 2 && judged[0] == "--tsconfig" {
+			judged = judged[2:]
+		}
+	}
+	if last := len(judged) - 2; last >= 0 && judged[last] == "--lint-config" && filepath.IsAbs(judged[last+1]) {
+		judged = judged[:last]
+	}
+	return judged
+}
+
+// runCacheAdmits reports whether arguments are a command line the run cache serves. See runCacheEligible.
+func runCacheAdmits(arguments []string) bool {
 	seen := map[string]bool{}
-	for _, argument := range os.Args[1:] {
+	for _, argument := range arguments {
 		switch argument {
 		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness":
 		default:
@@ -146,7 +184,8 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// The root resolved, and the files below it from it, so a run through another spelling of the same
 	// directory has the same key (#547dhjz).
 	anchor := program.NewPathAnchor(location.Root)
-	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(),
+	walkSections := program.CacheTableSections{Findings: true, Signatures: true, Types: true}
+	session := beginRunCacheSession(location.Root, anchor, walkSections,
 		"root="+anchor.Resolved(),
 		"tsconfig="+anchor.Stable(location.ConfigFileName),
 		"lint-config="+anchor.Stable(location.LintConfigFileName),
@@ -155,13 +194,34 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		// arguments do not show. See ownership.go.
 		"yield="+activeProjectYieldFingerprint(),
 	)
+	if session == nil {
+		return nil
+	}
+	return session.recorder
+}
+
+// beginRunCacheSession is the half of beginning a run cache every engine shares: the key, from this invocation's
+// arguments and the facts its engine names; the recorded run's check, which replays it and exits on a hit; and
+// otherwise the session that records this run, its streams teed. sections are the parts of the table beyond the
+// run that this engine's walk reuses, read only on a miss, since a replay needs nothing else. Nil when no session
+// could begin, and then nothing is recorded.
+func beginRunCacheSession(
+	root string,
+	anchor program.PathAnchor,
+	sections program.CacheTableSections,
+	facts ...string,
+) *runCacheSession {
+	// The label a project of several is run under, which its summary carries and so a replay prints: the same project
+	// run from another root is another label, and must not replay this one's. Empty for a run that is no child.
+	labeled := append(slices.Clone(facts), "label="+os.Getenv(projectLabelVariable))
+	keyParts, runCacheKeyPartsOfError := program.RunCacheKeyPartsOf(os.Args[1:], anchor.Resolved(), labeled...)
 	if runCacheKeyPartsOfError != nil {
 		return nil
 	}
 	key := keyParts.Key()
 
-	prepareCacheDirectory(location.Root)
-	directory := cacheDirectory(location.Root)
+	prepareCacheDirectory(root)
+	directory := cacheDirectory(root)
 	printPreviousNotes(directory)
 	// The run before this one may still be writing the table after answering its caller, and reading
 	// before its renames would miss what it recorded, or see its run beside the findings before them. So the
@@ -186,10 +246,13 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		release()
 		replayRunCache(stored, anchor)
 	}
-	sections, sectionsError := program.ReadCacheTable(directory, identity,
-		program.CacheTableSections{Findings: true, Signatures: true, Types: true}, anchor)
+	var sectionsError error
+	if sections.Findings || sections.Signatures || sections.Types {
+		var reused *program.CacheTable
+		reused, sectionsError = program.ReadCacheTable(directory, identity, sections, anchor)
+		table.Findings, table.Signatures, table.Types = reused.Findings, reused.Signatures, reused.Types
+	}
 	release()
-	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
 	for _, readError := range []error{readCacheTableError, sectionsError} {
 		if errors.Is(readError, program.ErrCacheTableUnreadable) ||
 			errors.Is(readError, program.ErrCacheTablePartlyKept) {
@@ -224,7 +287,7 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 		return nil
 	}
 	activeRunCache = session
-	return session.recorder
+	return session
 }
 
 // cacheDirectory is where cohere keeps what it caches for one project, the cache table's files among it:
@@ -282,12 +345,21 @@ func prepareCacheDirectory(root string) {
 			return
 		}
 		ignoreFile := filepath.Join(root, gitignore.IgnoreFileName)
-		matcher, newGitignoreError := gitignore.New(root)
+		// Asked as git asks it, from the repository's root down to the project, so a repository whose root
+		// `.gitignore` ignores `.cache/` silences it for every project beneath, one of discovery's children among
+		// them. Rooted at the project, every such child said its cache would be tracked, which git would not do.
+		repository := ignoreRulesRoot(root)
+		matcher, newGitignoreError := gitignore.New(repository)
 		if newGitignoreError != nil {
 			return
 		}
+		projectFromRepository, relativePathError := filepath.Rel(repository, root)
+		if relativePathError != nil {
+			return
+		}
+		tablePath := filepath.ToSlash(filepath.Join(projectFromRepository, ".cache", "cohere", "findings.gob"))
 		if ignored, _, ignoredPathError := matcher.IgnoredPath(
-			".cache/cohere/findings.gob",
+			tablePath,
 			false,
 		); ignoredPathError == nil && !ignored {
 			fmt.Fprintf(
@@ -299,6 +371,20 @@ func prepareCacheDirectory(root string) {
 			showWarning()
 		}
 	})
+}
+
+// ignoreRulesRoot is the repository whose ignore rules govern root: the nearest directory at or above it holding a
+// `.git`, a clone's directory or a worktree's or submodule's file, and root itself when none does, as a fixture or a
+// tarball is read on its own.
+func ignoreRulesRoot(root string) string {
+	for directory := filepath.Clean(root); ; directory = filepath.Dir(directory) {
+		if format_files.HasOwnRepository(directory) {
+			return directory
+		}
+		if filepath.Dir(directory) == directory {
+			return filepath.Clean(root)
+		}
+	}
 }
 
 // readFormatSection is the format record's section of this root's table, nil when there is none or the
@@ -460,6 +546,8 @@ func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
 	// Every file in scope was answered by the cache, so the count says so: --json read 0 here, the number a run
 	// that replayed nothing reads, and a reader took a whole replay for a full check (#547dhjz).
 	replayed.Cache = cacheUse{Replayed: true, FilesReplayed: recorded.FilesInScope}
+	// The engine's cache was not consulted by a replay, which started no engine, so what it did is the recorded run's.
+	replayed.PackageCache = nil
 	replayed.FilesChecked, replayed.FilesCached = 0, recorded.FilesInScope
 	replayed.Changed = nil
 	replayed.Nodes = 0

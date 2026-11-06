@@ -83,6 +83,9 @@ func TestParseInvocationReads(test *testing.T) {
 		{"rules before version", append(slices.Clone(contractArguments), "--version", "--rules"), modeRules, nil, nil},
 		{"rules-enabled", append(slices.Clone(contractArguments), "--rules-enabled"), modeRulesEnabled, nil, nil},
 		{"version", append(slices.Clone(contractArguments), "--version"), modeVersion, nil, nil},
+		// The front door forwards it for a cache the engine will keep of its own, so it is read, never refused.
+		{"no-cache", append(slices.Clone(contractArguments), "--no-cache", "--no-fix"), modeCheck,
+			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, nil},
 		{"values after an equals sign", []string{"--contract=3", "--root=/project", "/project/a"}, modeCheck,
 			[]contract.PhaseName{contract.PhaseFix, contract.PhaseTypes, contract.PhaseLint}, []string{"/project/a"}},
 		{"a path after -- that looks like a flag", append(slices.Clone(contractArguments), "--", "/project/--fix"),

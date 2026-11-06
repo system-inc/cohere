@@ -51,6 +51,16 @@ type runCacheSession struct {
 	// does not have, so one appearing moves an input. See declareFormatWalk.
 	extraAbsent []string
 
+	// projectRoots is the root, as given and resolved, of a run whose engine declares its inputs, a Go run's; nil
+	// for a TypeScript run, whose recorder observes its reads.
+	projectRoots []string
+
+	// recordedWithin is where a directory holding a file the run read is recorded: the project roots and every
+	// directory the engine listed, which lie in the roots it walked. A file outside them, as the git index in a
+	// worktree's git directory or a file of the toolchain, is decided by its own signature alone (see
+	// program.RecordRunCacheWithin). Nil records every holding directory, as a TypeScript run does.
+	recordedWithin []string
+
 	// declined is the reason this run must not be recorded, empty while it may be.
 	declined string
 
@@ -86,8 +96,9 @@ func (session *runCacheSession) record(exitCode int) *program.RunCache {
 	present, absent, probed := session.recorder.Inputs()
 	files := append(present, session.extraFiles...)
 	absent = append(absent, session.extraAbsent...)
-	cache, recordRunCacheError := program.RecordRunCache(session.key, files, session.extraDirectories, absent, probed,
-		recordedOutput(session.stdout.buffer.Bytes(), session.anchor), exitCode, session.readSince)
+	cache, recordRunCacheError := program.RecordRunCacheWithin(session.recordedWithin, session.key, files,
+		session.extraDirectories, absent, probed, recordedOutput(session.stdout.buffer.Bytes(), session.anchor),
+		exitCode, session.readSince)
 	if recordRunCacheError != nil {
 		// Not recording is always safe. Said on stderr because a cache that silently never records is
 		// a saving that quietly never appears.

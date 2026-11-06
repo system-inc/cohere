@@ -83,11 +83,15 @@ type summaryJson struct {
 	// formatter ran.
 	FormattingSeconds float64  `json:"formattingSeconds,omitempty"`
 	Cache             cacheUse `json:"cache"`
-	TypeErrors        int      `json:"typeErrors"`
-	Findings          int      `json:"findings"`
-	FilesFixed        int      `json:"filesFixed"`
-	FilesFormatted    int      `json:"filesFormatted"`
-	WouldChange       int      `json:"wouldChange"`
+
+	// PackageCache is what the Go engine's per-package findings cache did, absent for every other run.
+	PackageCache *packageCacheUse `json:"packageCache,omitempty"`
+
+	TypeErrors     int `json:"typeErrors"`
+	Findings       int `json:"findings"`
+	FilesFixed     int `json:"filesFixed"`
+	FilesFormatted int `json:"filesFormatted"`
+	WouldChange    int `json:"wouldChange"`
 	// Cohered is the files rewritten; Checked and Cached split FilesInScope between fresh and cached.
 	Cohered      int `json:"cohered"`
 	FilesInScope int `json:"filesInScope"`
@@ -143,6 +147,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		Phases:            phases,
 		FormattingSeconds: summary.Formatting.Seconds(),
 		Cache:             summary.Cache,
+		PackageCache:      summary.PackageCache,
 		TypeErrors:        summary.TypeErrors,
 		Findings:          summary.Findings,
 		FilesFixed:        summary.filesFixed(),

@@ -5,7 +5,7 @@
 //	go run ./command/cohere-dev test --fast           the edit loop: all but the landing gate's own (fast.go)
 //	go run ./command/cohere-dev build|vet [packages]  go build or go vet
 //	go run ./command/cohere-dev exec -- <command>     any other heavy command: a bench, a cohere run, clang
-//	go run ./command/cohere-dev land                  merge main, gate and fast-forward main, one landing at a time
+//	go run ./command/cohere-dev land                  one merge commit onto main, gated, one landing at a time
 //	go run ./command/cohere-dev status                the pool: its tokens, their holders, the line, the cache
 //	go run ./command/cohere-dev quiet on|off          a quiet window: the cache trim holds off until off (quiet.go)
 //	go run ./command/cohere-dev worktree <name>       a hand's worktree, made or moved to main by git (worktree.go)
@@ -80,7 +80,7 @@ func usage() int {
 	fmt.Fprintln(streams.Errors, "usage: cohere-dev test [--fast] [--full-priority] [go test flags] [packages]\n"+
 		"       cohere-dev build|vet [--full-priority] [go flags] [packages]\n"+
 		"       cohere-dev exec [--full-priority] -- <command> [arguments]\n"+
-		"       cohere-dev land\n"+
+		"       cohere-dev land [--task <id>] [--message <what landed>]\n"+
 		"       cohere-dev status\n"+
 		"       cohere-dev quiet [on [--for <duration>] [why] | off]\n"+
 		"       cohere-dev worktree <name> [--branch <branch>]   "+

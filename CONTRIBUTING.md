@@ -84,12 +84,27 @@ nothing more is held back: its packages and `t.Parallel` tests use the whole sha
 
 Work lands on main through `go run ./command/cohere-dev land`, run in the worktree being landed, with
 its work committed (#fz6xejy). It takes the machine's one land lock in arrival order and holds it from
-merge to fast-forward: it merges current main in, gates the result (`go vet ./...` and the whole
-module's tests, through a pool token), and fast-forwards main to it, checkout and all. Nothing landed
-this way moves main during another's gate. A fast-forward of main by hand does, and when one happens
-mid-gate, land merges it and gates again. A merge that conflicts is undone and its files named. On a
-loaded morning a branch gated green eight times without landing, and every one of those gates compiled a
-merge that never existed again.
+merge to fast-forward. It makes one merge commit of the worktree's head onto current main, first parent
+main and second the head, checks the worktree out at it, gates that tree (`go vet ./...` and the whole
+module's tests, through a pool token), and moves main to it, checkout and all (#4v9pmef). Main's
+first-parent line gains that one commit per landing, and the branch's own history, its merges of main
+included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
+detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and
+when one happens mid-gate, land merges onto it and gates again. A merge that conflicts is refused with its
+files named, and the worktree is left as it was. Every landing runs main's own land: when the worktree's
+`command/cohere-dev` differs from main's, land says so and runs main's from the main checkout, against the
+worktree (#8wpk5tp), so a worktree on older code can't land the old way. On a loaded morning a branch gated green eight times
+without landing, and every one of those gates compiled a merge that never existed again.
+
+A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
+body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a
+top-level file's name lowercased (`contributing`). Land refuses a landing whose commits break that, naming
+each commit, before it waits for the lock: a merge needs no area, but is held to the length. The landing
+commit's subject is `Land #<task>: <what landed>`: the task is the one the commits' subjects name, or
+`--task <id>`, and what landed is the one commit's subject, or `--message` for a branch of several. Its
+body lists the commits and says what the gate ran. Before this, 114 of main's last 300 first-parent
+commits were merges like "Merge main into the work being landed", subjects averaged 105 characters, and
+one area went by five prefixes.
 
 Bisect main with `git bisect start --first-parent`. Main's first-parent chain is where a regression is
 traced to the unit that brought it. Commits off it are the inside of a unit's branch, and some never

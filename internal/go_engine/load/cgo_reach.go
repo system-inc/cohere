@@ -148,22 +148,23 @@ func (reach *cgoReach) errorReaches(syntax []*ast.File, position token.Pos) bool
 }
 
 // withholdCgoDeclarations gives the analyzers, of every package outside the workspace with cgo files, each function
-// whose body withholds (see cgoReach.withholds) without its body, and each package-level variable whose initial
-// value withholds without that value, and returns how many declarations it withheld from, each once though a
-// package and its test variants share the syntax. The faked package "C" leaves its names, and what they reach,
-// without types, and the analyzers that read every expression (buildssa, staticcheck's buildir, printf, SA1019)
-// panic on one. A function then reaches them as an assembly function does, its signature without a body, and a
-// variable as one declared without a value: its initializer leaves the syntax and TypesInfo.InitOrder, which
-// buildssa and buildir build the package's initialization from, so dropping it from the syntax alone still has
-// them build it. Constants are left as they are: their values are folded, and no analyzer stopped on one in a load
-// of net and os/user for linux, though net's cgoAddrInfoFlags is untyped. It runs once every package is
-// type-checked, so it changes only what the analyzers are given, and the rules that read only syntax still see
-// everything else.
+// whose body withholds (see cgoReach.withholds) without its body, and each package-level variable whose initial value
+// withholds without that value, and returns, by package, the position of each declaration it withheld from: a package
+// and its test variants share the syntax, so a declaration is counted once by its position. The faked package "C"
+// leaves its names, and what they reach, without types, and the analyzers that read every expression (buildssa,
+// staticcheck's buildir, printf, SA1019) panic on one. A function then reaches them as an assembly function does, its
+// signature without a body, and a variable as one declared without a value: its initializer leaves the syntax and
+// TypesInfo.InitOrder, which buildssa and buildir build the package's initialization from, so dropping it from the
+// syntax alone still has them build it. Constants are left as they are: their values are folded, and no analyzer
+// stopped on one in a load of net and os/user for linux, though net's cgoAddrInfoFlags is untyped. It runs once every
+// package is type-checked, so it changes only what the analyzers are given, and the rules that read only syntax still
+// see everything else.
 //
 // Mutates: reachable the declarations of its packages that withhold lose their bodies and initial values, and
 // those packages' InitOrder loses the initializers
-func withholdCgoDeclarations(fileSet *token.FileSet, reachable []*node) int {
+func withholdCgoDeclarations(fileSet *token.FileSet, reachable []*node) map[*packages.Package][]string {
 	withheld := map[ast.Node]bool{}
+	positions := map[*packages.Package][]string{}
 	for _, current := range reachable {
 		if !current.withholds || current.loaded.TypesInfo == nil {
 			continue
@@ -175,9 +176,12 @@ func withholdCgoDeclarations(fileSet *token.FileSet, reachable []*node) int {
 			for _, declaration := range file.Decls {
 				switch declared := declaration.(type) {
 				case *ast.FuncDecl:
-					if declared.Body != nil && reach.withholds(declared.Body) {
+					// A test variant shares its package's syntax, whose body is gone by the time it comes.
+					if withheld[declared] || declared.Body != nil && reach.withholds(declared.Body) {
 						declared.Body = nil
 						withheld[declared] = true
+						positions[current.loaded] = append(positions[current.loaded],
+							fileSet.Position(declared.Pos()).String())
 					}
 				case *ast.GenDecl:
 					if declared.Tok != token.VAR {
@@ -185,14 +189,16 @@ func withholdCgoDeclarations(fileSet *token.FileSet, reachable []*node) int {
 					}
 					for _, specification := range declared.Specs {
 						value, isValue := specification.(*ast.ValueSpec)
-						if isValue && len(value.Values) > 0 && reach.withholds(value) {
+						if isValue && (withheld[value] || len(value.Values) > 0 && reach.withholds(value)) {
 							value.Values = nil
 							withheld[value] = true
+							positions[current.loaded] = append(positions[current.loaded],
+								fileSet.Position(value.Pos()).String())
 						}
 					}
 				}
 			}
 		}
 	}
-	return len(withheld)
+	return positions
 }

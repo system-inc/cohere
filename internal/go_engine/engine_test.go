@@ -402,18 +402,25 @@ func lineAt(lines []string, index int) string {
 
 // The parts of a stream that vary from run to run and machine to machine.
 var (
-	elapsedPattern       = regexp.MustCompile(`"elapsedMilliseconds":\d+`)
-	packagesLoaded       = regexp.MustCompile(`type-checked from source: \d+ packages`)
-	panicFramesPattern   = regexp.MustCompile(`, at [^"]*"`)
-	hostTarget           = " on " + runtime.GOOS + "/" + runtime.GOARCH
-	normalizedProvenance = contract.ProvenanceRecord{
+	elapsedPattern = regexp.MustCompile(`"elapsedMilliseconds":\d+`)
+	packagesLoaded = regexp.MustCompile(`(holds its export data|restoring analysis only): \d+ packages`)
+	// The packages the findings cache missed, wrote and could not store, and the facts it dropped, count the
+	// toolchain's own packages, which a Go release changes, as it changes the packages loaded. Hit stays, since a
+	// fresh copy hits nothing.
+	// The milliseconds the cgo tool's load took vary like any elapsed time.
+	cgoMillisecondsPattern = regexp.MustCompile(`("cgoTranslation":\{"packages":\d+,"milliseconds":)\d+`)
+	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped)":\d+`)
+	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
+	hostTarget             = " on " + runtime.GOOS + "/" + runtime.GOARCH
+	normalizedProvenance   = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
 	}
 )
 
 // normalize makes a stream comparable across runs: the copy's root reads /project, every elapsed time 0, the
-// provenance fixed, the standard library's package count (which moves with the toolchain) N, a panic's frames
-// (which move with this file) left out, and the host's target `host`.
+// provenance fixed, the inputs held to the copy's own paths (the toolchain's, the module cache's and the temporary
+// directory's move with the machine), the standard library's package count (which moves with the toolchain) N, a
+// panic's frames (which move with this file) left out, and the host's target `host`.
 func normalize(stream string, root string) string {
 	lines := strings.SplitAfter(stream, "\n")
 	for index, line := range lines {
@@ -423,13 +430,49 @@ func normalize(stream string, root string) string {
 				lines[index] = provenance.String()
 			}
 		}
+		if strings.HasPrefix(line, `{"kind":"inputs"`) {
+			lines[index] = inputsInside(line, root)
+		}
 	}
 	normalized := strings.Join(lines, "")
 	normalized = strings.ReplaceAll(normalized, root, "/project")
 	normalized = elapsedPattern.ReplaceAllString(normalized, `"elapsedMilliseconds":0`)
-	normalized = packagesLoaded.ReplaceAllString(normalized, "type-checked from source: N packages")
+	normalized = packagesLoaded.ReplaceAllString(normalized, "$1: N packages")
+	normalized = cachePackagesPattern.ReplaceAllString(normalized, `"$1":0`)
+	normalized = cgoMillisecondsPattern.ReplaceAllString(normalized, "${1}0")
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
+}
+
+// inputsInside is an inputs record's line with only the paths at or below root kept, or the line as it was when it
+// does not decode, so the comparison shows it.
+func inputsInside(line string, root string) string {
+	var record contract.InputsRecord
+	if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+		return line
+	}
+	keep := func(paths []string) []string {
+		kept := []string{}
+		for _, path := range paths {
+			if insideScope(path, []string{root}) {
+				kept = append(kept, path)
+			}
+		}
+		return kept
+	}
+	record = contract.InputsRecord{
+		Files: keep(record.Files), Directories: keep(record.Directories), Absent: keep(record.Absent),
+	}
+	var written bytes.Buffer
+	writer := contract.NewWriter(&written)
+	if writeError := writer.Write(normalizedProvenance); writeError != nil {
+		return line
+	}
+	written.Reset()
+	if writeError := writer.Write(record); writeError != nil {
+		return line
+	}
+	return written.String()
 }
 
 // copyFixture copies a fixture into a fresh directory named project, in a git repository of its own with the
@@ -556,6 +599,7 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 	var phases []string
 	findings, findingsInPhase, filesRewritten, changedFiles := 0, 0, 0, 0
 	gap, summarized := false, false
+	inputsLine := -1
 	for index, line := range lines {
 		var record struct {
 			Kind               string            `json:"kind"`
@@ -609,8 +653,19 @@ func checkStream(test *testing.T, stream string, exitCode int) {
 			findingsInPhase = 0
 			gap = gap || record.Outcome == "notReached" ||
 				(record.Outcome == "skipped" && record.Name != "fix" && record.Detail != detailNotRequested)
+		case "inputs":
+			if inputsLine >= 0 {
+				test.Errorf("line %d is a second inputs record", index+1)
+			}
+			inputsLine = index
+			if len(phases) != 4 {
+				test.Errorf("line %d is the inputs record after phases %v, and it follows every phase", index+1, phases)
+			}
 		case "summary":
 			summarized = true
+			if inputsLine >= 0 && inputsLine != index-1 {
+				test.Errorf("the inputs record is on line %d, and it comes just before the summary", inputsLine+1)
+			}
 			if !slices.Equal(phases, []string{"fix", "types", "lint", "unused"}) {
 				test.Errorf("phases %v, want fix, types, lint and unused once each, in order", phases)
 			}

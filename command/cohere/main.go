@@ -63,6 +63,8 @@ func main() {
 }
 
 func run() error {
+	// First, before anything reads them or starts a process that would inherit them. See swift_toolchain.go.
+	trustInheritedSwiftResolution()
 	// A subcommand is matched before flag.Parse, because the flag package stops at the first
 	// argument it does not recognize and would hand `rename` back as a positional while
 	// swallowing the flags meant for it. The dispatcher forwards unknown arguments untouched, so the
@@ -333,8 +335,10 @@ func run() error {
 		if goEngineError != nil {
 			return goEngineError
 		}
+		// Through the run cache, which records a Go verdict (see beginGoRunCache): a failing tree's exit is one, and
+		// exiting around it would leave the run unrecorded and the last of its output in the tee's pipe.
 		if exitCode != 0 {
-			exitProcess(exitCode)
+			finishRunCache(exitCode)
 		}
 		return nil
 	}

@@ -26,6 +26,26 @@ type LintRecord struct {
 	WithheldBySuppression map[string]int `json:"withheldBySuppression"`
 	WithheldAsGenerated   map[string]int `json:"withheldAsGenerated"`
 	WithheldAsCopied      map[string]int `json:"withheldAsCopied"`
+
+	// Cache is what the Go engine's per-package findings cache did in the lint phase, additive within contract 3
+	// as the withheld counts are. It changes no finding and no count above.
+	Cache LintCache `json:"cache"`
+}
+
+// LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,
+// restored from an entry with nothing parsed, type-checked or run on it, or missed, checked and analyzed from source.
+// Of the misses, written got an entry and unstorable held what no entry can hold. FactsDropped counts the facts the
+// written entries left out because nothing outside their package can name their object, and FactsSkipped the
+// restored facts whose object the package's export data does not hold. On is false, and every count 0, under
+// `--no-cache`.
+type LintCache struct {
+	On           bool `json:"on"`
+	Hit          int  `json:"hit"`
+	Missed       int  `json:"missed"`
+	Written      int  `json:"written"`
+	Unstorable   int  `json:"unstorable"`
+	FactsDropped int  `json:"factsDropped"`
+	FactsSkipped int  `json:"factsSkipped"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

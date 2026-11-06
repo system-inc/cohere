@@ -1,0 +1,16 @@
+{
+    "why": "lb01: call 5, one finding per label (P1): a label that a `continue` and a `break` name is reported once, at the label, and the jumps are not",
+    "expect": [
+        {
+            "covers": "outer",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

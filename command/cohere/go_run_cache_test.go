@@ -1,0 +1,435 @@
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"os"
+	"path/filepath"
+	"regexp"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/system-inc/cohere/internal/types/program"
+)
+
+// goInputsLine is an inputs record whose paths are all below root, as the Go engine writes one.
+func goInputsLine(root string) string {
+	return `{"kind":"inputs","files":["` + filepath.Join(root, "a.go") + `","` + filepath.Join(root, "go.mod") +
+		`"],"directories":["` + root + `"],"absent":["` + filepath.Join(filepath.Dir(root), "go.work") + `"]}`
+}
+
+// goStreamWith is the Go contract's clean stream with extra records placed before its summary, where the engine
+// writes its inputs record.
+func goStreamWith(test *testing.T, extra ...string) []string {
+	test.Helper()
+	lines := contractFixture(test, "GoClean.jsonl")
+	last := len(lines) - 1
+	if !strings.HasPrefix(lines[last], `{"kind":"summary"`) {
+		test.Fatal("GoClean.jsonl does not end on its summary")
+	}
+	return append(append(slices.Clone(lines[:last]), extra...), lines[last])
+}
+
+// acceptGoStream feeds a Go stream to a fresh run in mode and ends it as an engine exiting 0 would, giving the run
+// and the first refusal.
+func acceptGoStream(test *testing.T, mode engineMode, lines []string) (*engineRun, error) {
+	test.Helper()
+	var out bytes.Buffer
+	stream := bufio.NewWriter(&out)
+	run := newEngineRun(stream, mode, goLanguage("module"), "", time.Now())
+	for _, line := range lines {
+		if acceptError := run.accept([]byte(line)); acceptError != nil {
+			return run, acceptError
+		}
+	}
+	_, finishError := run.finish(0, "exited 0")
+	return run, finishError
+}
+
+// TestEngineRunKeepsTheGoInputsRecord: a check run's inputs record is kept on the run whole, which is what the run
+// cache records a Go run by, and a stream that breaks the record's rules is refused: a second record, which would
+// leave one of two proofs unread, a relative path, which the front door would stat from the wrong directory, a
+// record naming no file, which would match any tree, and an inputs record in a listing, which is no verdict.
+// Not parallel: it renders check runs through engineRun, whose record acceptors set the package-level activeSummary.
+func TestEngineRunKeepsTheGoInputsRecord(test *testing.T) {
+	root := filepath.Join(test.TempDir(), "module")
+	run, acceptError := acceptGoStream(test, engineModeCheck, goStreamWith(test, goInputsLine(root)))
+	if acceptError != nil {
+		test.Fatalf("a clean stream with an inputs record was refused: %v", acceptError)
+	}
+	if run.inputs == nil {
+		test.Fatal("the inputs record was accepted and not kept")
+	}
+	if !slices.Equal(run.inputs.Files, []string{filepath.Join(root, "a.go"), filepath.Join(root, "go.mod")}) ||
+		!slices.Equal(run.inputs.Directories, []string{root}) ||
+		!slices.Equal(run.inputs.Absent, []string{filepath.Join(filepath.Dir(root), "go.work")}) {
+		test.Errorf("the inputs kept are %+v", *run.inputs)
+	}
+
+	refusals := []struct {
+		name    string
+		mode    engineMode
+		lines   []string
+		refusal string
+	}{
+		{"a second inputs record", engineModeCheck,
+			goStreamWith(test, goInputsLine(root), goInputsLine(root)), "a second inputs record"},
+		{"a relative file", engineModeCheck,
+			goStreamWith(test, `{"kind":"inputs","files":["a.go"],"directories":[],"absent":[]}`),
+			`naming "a.go", which is not an absolute path`},
+		{"a relative directory", engineModeCheck,
+			goStreamWith(test, `{"kind":"inputs","files":["/m/a.go"],"directories":["m"],"absent":[]}`),
+			`naming "m", which is not an absolute path`},
+		{"a relative absent path", engineModeCheck,
+			goStreamWith(test, `{"kind":"inputs","files":["/m/a.go"],"directories":[],"absent":["go.work"]}`),
+			`naming "go.work", which is not an absolute path`},
+		{"no file", engineModeCheck,
+			goStreamWith(test, `{"kind":"inputs","files":[],"directories":["/m"],"absent":[]}`),
+			"an inputs record naming no file"},
+		{"an inputs record in a version listing", engineModeVersion,
+			[]string{contractFixture(test, "GoClean.jsonl")[0], goInputsLine(root)},
+			"an inputs record in a Version run"},
+	}
+	for _, refused := range refusals {
+		// Not parallel: it renders check runs through engineRun, whose record acceptors set activeSummary.
+		test.Run(refused.name, func(test *testing.T) {
+			_, refusalError := acceptGoStream(test, refused.mode, refused.lines)
+			if refusalError == nil || !strings.Contains(refusalError.Error(), refused.refusal) {
+				test.Fatalf("refusal %v, want one saying %q", refusalError, refused.refusal)
+			}
+		})
+	}
+}
+
+// TestGoRunCacheFactsMoveWithWhatALoadReads: every fact a Go load depends on that is no file moves the run's key,
+// and a variable no load reads, or the same environment in another order, leaves it where it was. A key that
+// stayed put under a moved fact would replay a verdict about another build: the tags of `GOFLAGS`, the target, cgo
+// and the toolchain each decide which files go loads.
+func TestGoRunCacheFactsMoveWithWhatALoadReads(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	anchor := program.NewPathAnchor(root)
+	settingsFile := filepath.Join(root, "CohereSettings.json")
+	toolchains := test.TempDir()
+	goPath := func(name string) string {
+		path := filepath.Join(toolchains, name)
+		if writeError := os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755); writeError != nil {
+			test.Fatal(writeError)
+		}
+		return path
+	}
+	firstGo, secondGo := goPath("first-go"), goPath("second-go")
+	link := filepath.Join(toolchains, "go")
+	if linkError := os.Symlink(firstGo, link); linkError != nil {
+		test.Fatal(linkError)
+	}
+	found := func(path string) func(string) (string, error) {
+		return func(string) (string, error) { return path, nil }
+	}
+	base := []string{
+		"PATH=/usr/bin", "GOFLAGS=-trimpath", "GOOS=darwin", "CGO_ENABLED=1", "HOME=/home/someone", "EDITOR=vi",
+	}
+	key := func(environment []string, lookPath func(string) (string, error)) string {
+		test.Helper()
+		parts, partsError := program.RunCacheKeyPartsOf(nil, anchor.Resolved(),
+			goRunCacheFacts(anchor, settingsFile, false, environment, lookPath)...)
+		if partsError != nil {
+			test.Fatal(partsError)
+		}
+		return parts.Key()
+	}
+	replaced := func(name string, value string) []string {
+		environment := []string{}
+		for _, variable := range base {
+			if !strings.HasPrefix(variable, name+"=") {
+				environment = append(environment, variable)
+			}
+		}
+		return append(environment, name+"="+value)
+	}
+	baseline := key(base, found(link))
+
+	moves := []struct {
+		name        string
+		environment []string
+		lookPath    func(string) (string, error)
+	}{
+		{"GOFLAGS gained a build tag", replaced("GOFLAGS", "-trimpath -tags=replaytest"), found(link)},
+		{"GOOS changed", replaced("GOOS", "linux"), found(link)},
+		{"GOARCH set", append(slices.Clone(base), "GOARCH=amd64"), found(link)},
+		{"CGO_ENABLED changed", replaced("CGO_ENABLED", "0"), found(link)},
+		{"GOWORK set", append(slices.Clone(base), "GOWORK=off"), found(link)},
+		{"HOME changed", replaced("HOME", "/home/another"), found(link)},
+		{"CC set", append(slices.Clone(base), "CC=clang"), found(link)},
+		{"CXX set", append(slices.Clone(base), "CXX=clang++"), found(link)},
+		{"PKG_CONFIG set", append(slices.Clone(base), "PKG_CONFIG=/opt/bin/pkg-config"), found(link)},
+		{"BURNTSUSHI_TOML_110 set", append(slices.Clone(base), "BURNTSUSHI_TOML_110=1"), found(link)},
+		{"another go found on PATH", base, found(secondGo)},
+		{"no go found on PATH", base, func(string) (string, error) { return "", os.ErrNotExist }},
+	}
+	for _, moved := range moves {
+		if key(moved.environment, moved.lookPath) == baseline {
+			test.Errorf("%s and the key stayed put", moved.name)
+		}
+	}
+
+	// The go PATH finds is a link the toolchain's installer moves, and only where it leads changed.
+	if removeError := os.Remove(link); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if linkError := os.Symlink(secondGo, link); linkError != nil {
+		test.Fatal(linkError)
+	}
+	if key(base, found(link)) == baseline {
+		test.Error("the go on PATH was relinked to another toolchain and the key stayed put")
+	}
+	if removeError := os.Remove(link); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if linkError := os.Symlink(firstGo, link); linkError != nil {
+		test.Fatal(linkError)
+	}
+
+	reordered := slices.Clone(base)
+	slices.Reverse(reordered)
+	stays := []struct {
+		name        string
+		environment []string
+	}{
+		{"a variable no load reads changed", replaced("EDITOR", "nano")},
+		{"PATH changed and finds the same go", replaced("PATH", "/opt/bin:/usr/bin")},
+		{"the same environment in another order", reordered},
+	}
+	for _, stayed := range stays {
+		if key(stayed.environment, found(link)) != baseline {
+			test.Errorf("%s and the key moved, so an unchanged load would never replay", stayed.name)
+		}
+	}
+}
+
+// TestGoRunUnrecordableKeepsAllButAVerdict: only exit 0 or 1 from a run that called itself complete and rewrote
+// nothing is recorded. A run that fell short, ended as no verdict, or rewrote the tree it read is checked again.
+func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
+	test.Parallel()
+	ended := func(complete bool, exitCode int) *engineRun {
+		summary := engineSummaryRecord{
+			Findings: new(int), Complete: new(bool), ExitCode: new(int),
+		}
+		*summary.Findings, *summary.Complete, *summary.ExitCode = exitCode, complete, exitCode
+		return &engineRun{summary: &summary}
+	}
+	rewrote := ended(true, 0)
+	rewrote.filesRewritten = 2
+	cases := []struct {
+		name     string
+		run      *engineRun
+		exitCode int
+		reason   string
+	}{
+		{"a clean verdict", ended(true, 0), 0, ""},
+		{"a failing verdict", ended(true, 1), 1, ""},
+		{"a run that did not run", ended(true, 0), 2, "the run exited 2"},
+		{"a run that fell short", ended(false, 1), 1, "did not check everything"},
+		{"a run with no summary", &engineRun{}, 0, "without a summary"},
+		{"a run whose fix phase rewrote files", rewrote, 0, "the fix phase rewrote 2 files"},
+	}
+	for _, testCase := range cases {
+		reason := goRunUnrecordable(testCase.run, testCase.exitCode)
+		wrong := reason != ""
+		if testCase.reason != "" {
+			wrong = !strings.Contains(reason, testCase.reason)
+		}
+		if wrong {
+			test.Errorf("%s: the reason is %q, want %q", testCase.name, reason, testCase.reason)
+		}
+	}
+}
+
+// TestDeclareGoRunCacheInputsDeclaresTheEnginesAndTheFrontDoors: a verdict is declared with the engine's files,
+// directories and absent paths, and the settings file the front door handed the engine, present or absent. A run
+// whose engine wrote no inputs record is never declared, and one that is no verdict is declined.
+// Not parallel: it sets the package-level activeRunCache for its length.
+func TestDeclareGoRunCacheInputsDeclaresTheEnginesAndTheFrontDoors(test *testing.T) {
+	previous := activeRunCache
+	defer func() { activeRunCache = previous }()
+	root := test.TempDir()
+	present := filepath.Join(root, "CohereSettings.json")
+	if writeError := os.WriteFile(present, []byte(`{"go":{"rules":{}}}`), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	absent := filepath.Join(root, "Missing.json")
+	complete, exitCode, findings := true, 0, 0
+	declaring := func() *engineRun {
+		return &engineRun{
+			summary: &engineSummaryRecord{Findings: &findings, Complete: &complete, ExitCode: &exitCode},
+			inputs: &engineInputsRecord{
+				Files:       []string{filepath.Join(root, "a.go")},
+				Directories: []string{root},
+				Absent:      []string{filepath.Join(filepath.Dir(root), "go.work")},
+			},
+		}
+	}
+
+	for _, settingsFile := range []string{present, absent} {
+		activeRunCache = &runCacheSession{}
+		declareGoRunCacheInputs(declaring(), 0, settingsFile)
+		session := activeRunCache
+		if !session.declared || session.declined != "" {
+			test.Fatalf("a verdict with inputs was not declared (declined %q)", session.declined)
+		}
+		wantFiles := []string{filepath.Join(root, "a.go")}
+		wantAbsent := []string{filepath.Join(filepath.Dir(root), "go.work")}
+		if settingsFile == present {
+			wantFiles = append(wantFiles, present)
+		} else {
+			wantAbsent = append(wantAbsent, absent)
+		}
+		if !slices.Equal(session.extraFiles, wantFiles) || !slices.Equal(session.extraDirectories, []string{root}) ||
+			!slices.Equal(session.extraAbsent, wantAbsent) {
+			test.Errorf("with %s declared files %q, directories %q, absent %q; want %q, [%s], %q",
+				filepath.Base(settingsFile), session.extraFiles, session.extraDirectories, session.extraAbsent,
+				wantFiles, root, wantAbsent)
+		}
+	}
+
+	activeRunCache = &runCacheSession{}
+	withoutInputs := declaring()
+	withoutInputs.inputs = nil
+	declareGoRunCacheInputs(withoutInputs, 0, present)
+	if activeRunCache.declared || len(activeRunCache.extraFiles) > 0 {
+		test.Error("a run whose engine wrote no inputs record was declared, so it would be recorded with no proof")
+	}
+
+	activeRunCache = &runCacheSession{}
+	declareGoRunCacheInputs(declaring(), 2, present)
+	if activeRunCache.declared || activeRunCache.declined == "" {
+		test.Error("a run that exited 2 was declared rather than declined")
+	}
+
+	// A record naming the cache the run writes is declined, and said beside the table for the next run.
+	activeRunCache = &runCacheSession{directory: test.TempDir(), projectRoots: []string{root}}
+	cached := declaring()
+	cached.inputs.Files = append(cached.inputs.Files, filepath.Join(cacheDirectory(root), "go", "entry"))
+	declareGoRunCacheInputs(cached, 0, present)
+	if activeRunCache.declared || !strings.Contains(activeRunCache.declined, "inside the cache directory") {
+		test.Errorf("a record naming the cache directory was not declined (declined %q)", activeRunCache.declined)
+	}
+}
+
+// TestGoInputsUnreplayableRefusesWhatWouldNeverReplay: an inputs record naming a path inside a root's cache
+// directory, which the run writes after its record is taken, or listing a directory above the root, whose listing
+// moves with everything beside the project, is refused, since either would make every later run a miss that only a
+// cold run every time would show. A record of the module's own paths, and of files above it, is kept.
+func TestGoInputsUnreplayableRefusesWhatWouldNeverReplay(test *testing.T) {
+	test.Parallel()
+	root := "/work/module"
+	roots := []string{root, "/private/work/module"}
+	cases := []struct {
+		name   string
+		inputs engineInputsRecord
+		reason string
+	}{
+		{"the module's own paths, and a file above it", engineInputsRecord{
+			Files:       []string{"/work/module/a.go", "/work/staticcheck.conf"},
+			Directories: []string{root, "/work/module/sub"},
+			Absent:      []string{"/work/go.work"},
+		}, ""},
+		{"a file in the engine's cache", engineInputsRecord{
+			Files: []string{"/work/module/a.go", "/work/module/.cache/cohere/go/entry"},
+		}, "inside the cache directory"},
+		{"the cache directory listed, under the resolved root", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Directories: []string{"/private/work/module/.cache/cohere"},
+		}, "inside the cache directory"},
+		{"an absent path in the cache", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Absent: []string{"/work/module/.cache/cohere/run"},
+		}, "inside the cache directory"},
+		{"a directory above the root listed", engineInputsRecord{
+			Files: []string{"/work/module/a.go"}, Directories: []string{"/work"},
+		}, "a directory above the root"},
+	}
+	for _, testCase := range cases {
+		reason := goInputsUnreplayable(&testCase.inputs, roots)
+		wrong := reason != ""
+		if testCase.reason != "" {
+			wrong = !strings.Contains(reason, testCase.reason)
+		}
+		if wrong {
+			test.Errorf("%s: the reason is %q, want %q", testCase.name, reason, testCase.reason)
+		}
+	}
+}
+
+// goStreamWithLintCache is the Go contract's clean stream with a `cache` object on its lint record, as the engine's
+// per-package findings cache writes it.
+func goStreamWithLintCache(test *testing.T, cacheObject string) []string {
+	test.Helper()
+	lines := contractFixture(test, "GoClean.jsonl")
+	for index, line := range lines {
+		if strings.HasPrefix(line, `{"kind":"lint"`) {
+			lines[index] = strings.TrimSuffix(line, "}") + `,"cache":` + cacheObject + "}"
+			return lines
+		}
+	}
+	test.Fatal("GoClean.jsonl holds no lint record")
+	return nil
+}
+
+// TestAGoRunSaysWhatItsPackageCacheDid: a Go lint record's `cache` object is one line of the --verbose account, its
+// two rarer counts only when they are not zero and `off` under `--no-cache`, and a field of the `--json` summary of
+// its own; a record without it, as every Swift record is, prints neither, so a Swift run's output is as it was.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
+	savedOutput, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	cases := []struct {
+		name        string
+		lines       []string
+		line        string
+		summaryJson string
+	}{
+		{"a warm run", goStreamWithLintCache(test,
+			`{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,"factsSkipped":0}`),
+			"  lint: package cache hit 412, missed 3, wrote 3\n",
+			`"packageCache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,` +
+				`"factsSkipped":0}`},
+		{"a run with unstorable packages and dropped and skipped facts", goStreamWithLintCache(test,
+			`{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,"factsSkipped":5}`),
+			"  lint: package cache hit 1, missed 4, wrote 2, 2 unstorable, 7 facts dropped, 5 facts skipped\n",
+			`"packageCache":{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,` +
+				`"factsSkipped":5}`},
+		{"a run under --no-cache", goStreamWithLintCache(test,
+			`{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0}`),
+			"  lint: package cache off\n",
+			`"packageCache":{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,` +
+				`"factsSkipped":0}`},
+		{"a record with no cache object", contractFixture(test, "GoClean.jsonl"), "", ""},
+	}
+	for _, testCase := range cases {
+		verbose, _ := renderGoStreamAs(test, outputVerbose, testCase.lines)
+		said := regexp.MustCompile(`(?m)^  lint: package cache.*\n`).FindString(verbose)
+		if said != testCase.line {
+			test.Errorf("%s: the account says %q, want %q:\n%s", testCase.name, said, testCase.line, verbose)
+		}
+		asJson, _ := renderGoStreamAs(test, outputJson, testCase.lines)
+		summaryLine := summaryJsonOf(test, asJson)
+		wrong := strings.Contains(summaryLine, "packageCache")
+		if testCase.summaryJson != "" {
+			wrong = !strings.Contains(summaryLine, testCase.summaryJson)
+		}
+		if wrong {
+			test.Errorf("%s: the summary is %s, want %q in it", testCase.name, summaryLine, testCase.summaryJson)
+		}
+	}
+
+	// Swift's records never carry the object, so neither view of a Swift run gains anything.
+	activeOutput, activeSummary = outputSettings{Mode: outputVerbose}, runSummary{}
+	swift, _, renderError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+	if renderError != nil {
+		test.Fatal(renderError)
+	}
+	if strings.Contains(swift, "package cache") || activeSummary.PackageCache != nil {
+		test.Errorf("a Swift run said a package cache:\n%s", swift)
+	}
+}
