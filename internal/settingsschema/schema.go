@@ -230,10 +230,17 @@ func typeShape(name string, fieldType reflect.Type) (*schemaNode, error) {
 	)
 }
 
-// goShape is the Go engine's block, as internal/goengine/settings reads it: rules alone, each a severity or
-// [severity] or [severity, options object]. Its severities are that loader's own list, exact, so the schema
-// never allows what the engine refuses. Rule names are left open, since the Go engine's registry is not the
-// TypeScript one this package lists; the engine refuses a name it does not know.
+// goReasonPattern matches a reason that is not blank: one character, at least, outside the White_Space set that
+// strings.TrimSpace trims, which is what the Go engine's loader refuses a departure's reason by. A plain `\S` would
+// differ from it on `U+0085` and `U+FEFF`, since JavaScript's whitespace is not the same set.
+const goReasonPattern = `[^\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]`
+
+// goShape is the Go engine's block, as internal/goengine/settings reads it: rules, each a severity or
+// [severity] or [severity, options object], and departures, each rule's reason for loosening it past the house.
+// Its severities are that loader's own list, exact, so the schema never allows what the engine refuses. Rule
+// names are left open, in rules and departures alike, since the Go engine's registry is not the TypeScript one
+// this package lists; the engine refuses a name it does not know. Which options loosen a rule is the rule's to
+// say, so a departure excusing nothing is the engine's refusal, at configuration, and not the schema's.
 func goShape() *schemaNode {
 	severity := &schemaNode{Type: "string", Enum: settings.SeveritySpellings}
 	setting := &schemaNode{
@@ -258,6 +265,15 @@ func goShape() *schemaNode {
 				Type:                 "object",
 				Description:          "Each cohere-go/<rule> the Go engine runs, and its severity.",
 				AdditionalProperties: &additionalProperties{schema: setting},
+			},
+			"departures": {
+				Type: "object",
+				Description: "For each cohere-go/<rule> whose options loosen it past the house's value, why, in a " +
+					"sentence. The engine refuses a loosening option with no departure, and a departure for a rule " +
+					"whose options loosen nothing.",
+				AdditionalProperties: &additionalProperties{
+					schema: &schemaNode{Type: "string", Pattern: goReasonPattern},
+				},
 			},
 		},
 	}

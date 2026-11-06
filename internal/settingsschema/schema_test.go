@@ -194,6 +194,10 @@ var goBlocks = []string{
 	`{"rules": {"` + goBlockRule + `": ["error"]}}`,
 	`{"rules": {"` + goBlockRule + `": ["warn", {}]}}`,
 	`{"rules": {"` + goBlockRule + `": ["off", {"limit": 3}]}}`,
+	`{"rules": {}, "departures": {}}`,
+	`{"rules": {"` + goBlockRule + `": ["error", {"limit": 3}]}, "departures": {"` + goBlockRule + `": "why"}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": " a reason padded "}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": "\ufeff"}}`,
 
 	`{}`,
 	`[]`,
@@ -218,6 +222,17 @@ var goBlocks = []string{
 	`{"rules": {"` + goBlockRule + `": ["error", "always"]}}`,
 	`{"rules": {"` + goBlockRule + `": ["error", null]}}`,
 	`{"rules": {"` + goBlockRule + `": ["error", [{}]]}}`,
+	`{"departures": {"` + goBlockRule + `": "why"}}`,
+	`{"rules": {}, "departures": []}`,
+	`{"rules": {}, "departures": null}`,
+	`{"rules": {}, "departures": "why"}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": ""}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": " \t\n "}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": "\u00a0\u3000\u2028"}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": "\u0085"}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": 2}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": null}}`,
+	`{"rules": {}, "departures": {"` + goBlockRule + `": ["why"]}}`,
 }
 
 // TestTheGoSchemaAcceptsExactlyWhatTheGoEngineAccepts: every go block above is read by

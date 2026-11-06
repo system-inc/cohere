@@ -49,10 +49,12 @@ var topLevelDescriptions = map[string]string{
 
 	"go": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the " +
 		"one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, " +
-		"exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at " +
-		"error and every run says so. A rule name the engine does not know, any key besides rules, and a format key " +
-		"are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this " +
-		"block alone.",
+		"exactly as written) or [severity, options] with one options object. Its departures state why a rule is " +
+		"loosened past the house: an option looser than the house's value, as a cohere-go/consistency-no-long-file " +
+		"max above 2,000, runs only beside a departure for its rule with a reason, and a departure for a rule whose " +
+		"options loosen nothing is refused. With no go block, every Go rule runs at error and every run says so. A " +
+		"rule name the engine does not know, any key besides rules and departures, and a format key are refused: " +
+		"gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.",
 
 	"output": "How a run prints, for this repository. phases: true puts where the time went (graph, fix, format, " +
 		"types, lint) first in the footer's parentheses, as --phases does. Read only from the file cohere reads " +

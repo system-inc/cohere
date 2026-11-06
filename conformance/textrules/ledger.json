@@ -40,14 +40,6 @@
         "reason": "`no-labels` reports the `continue` and the `break` naming the label too, three findings for one label"
     },
     {
-        "engine": "go",
-        "family": "long-file",
-        "case": "lf06",
-        "kind": "verdict",
-        "task": "phdc7aa",
-        "reason": "the rule refuses a `max` above the house limit of 2,000, so it never runs"
-    },
-    {
         "engine": "swift",
         "family": "ambiguous-identifier",
         "case": "am03",
