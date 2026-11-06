@@ -77,7 +77,7 @@ type EnforceConsistentVariantOrderOptions struct {
 // `better-tailwindcss/enforce-consistent-variant-order` line a project already has.
 var EnforceConsistentVariantOrder = rule.Rule[EnforceConsistentVariantOrderOptions]{
 	Name: "better-tailwindcss/enforce-consistent-variant-order",
-	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
+	// The design system: its stylesheets, read through the recording file system (DesignSystemFileSystem).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentVariantOrderOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {

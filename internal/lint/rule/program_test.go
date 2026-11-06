@@ -72,8 +72,12 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 		},
 		{methodName(Program.SourceFiles), ReadsOtherFiles, func(view Program) { view.SourceFiles() }},
 		{methodName(Program.GetSourceFile), ReadsOtherFiles, func(view Program) { view.GetSourceFile("other.ts") }},
-		{methodName(Program.FS), ReadsOtherFiles, func(view Program) { view.FS() }},
-		{methodName(Program.DesignSystemFS), ReadsDesignSystem, func(view Program) { view.DesignSystemFS() }},
+		{methodName(Program.FileSystem), ReadsOtherFiles, func(view Program) { view.FileSystem() }},
+		{
+			methodName(Program.DesignSystemFileSystem),
+			ReadsDesignSystem,
+			func(view Program) { view.DesignSystemFileSystem() },
+		},
 	}
 	program := new(compiler.Program)
 	for _, method := range methods {
@@ -187,8 +191,8 @@ func TestASlotViewKeptPastItsFileFailsOnEveryRead(test *testing.T) {
 		},
 		{methodName(Program.SourceFiles), func(view Program) { view.SourceFiles() }},
 		{methodName(Program.GetSourceFile), func(view Program) { view.GetSourceFile("other.ts") }},
-		{methodName(Program.FS), func(view Program) { view.FS() }},
-		{methodName(Program.DesignSystemFS), func(view Program) { view.DesignSystemFS() }},
+		{methodName(Program.FileSystem), func(view Program) { view.FileSystem() }},
+		{methodName(Program.DesignSystemFileSystem), func(view Program) { view.DesignSystemFileSystem() }},
 		{methodName(Program.Identity), func(view Program) { view.Identity() }},
 	}
 

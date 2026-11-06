@@ -276,8 +276,8 @@ var programReadsByMethod = map[string]programRead{
 	programMethodName(rule.Program.GetSourceFileForResolvedModule): readsOtherFiles,
 	programMethodName(rule.Program.SourceFiles):                    readsOtherFiles,
 	programMethodName(rule.Program.GetSourceFile):                  readsOtherFiles,
-	programMethodName(rule.Program.FS):                             readsOtherFiles,
-	programMethodName(rule.Program.DesignSystemFS):                 readsDesignSystem,
+	programMethodName(rule.Program.FileSystem):                     readsOtherFiles,
+	programMethodName(rule.Program.DesignSystemFileSystem):         readsDesignSystem,
 	programMethodName(rule.Program.Identity):                       0,
 }
 

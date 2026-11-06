@@ -76,7 +76,7 @@ func noHtmlLinkForPagesRouteModelFor(
 	if model, built := noHtmlLinkForPagesRouteModels.models[key]; built {
 		return model
 	}
-	model := buildNoHtmlLinkForPagesRouteModel(program.FS(), root, settings)
+	model := buildNoHtmlLinkForPagesRouteModel(program.FileSystem(), root, settings)
 	noHtmlLinkForPagesRouteModels.models[key] = model
 	return model
 }

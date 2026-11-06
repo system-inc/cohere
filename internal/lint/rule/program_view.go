@@ -117,13 +117,13 @@ func (view *programView) GetSourceFile(fileName string) *ast.SourceFile {
 	return view.program.GetSourceFile(tspath.RootedFilePath(fileName))
 }
 
-func (view *programView) FS() vfs.FS {
-	view.require(ReadsOtherFiles, "FS")
+func (view *programView) FileSystem() vfs.FS {
+	view.require(ReadsOtherFiles, "FileSystem")
 	return view.program.Host().FS()
 }
 
-func (view *programView) DesignSystemFS() *RecordingFileSystem {
-	view.require(ReadsDesignSystem, "DesignSystemFS")
+func (view *programView) DesignSystemFileSystem() *RecordingFileSystem {
+	view.require(ReadsDesignSystem, "DesignSystemFileSystem")
 	recorder := NewRecordingFileSystem(view.program.Host().FS())
 	recordDesignSystemFileSystem(view.program, recorder)
 	return recorder

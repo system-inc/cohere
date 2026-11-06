@@ -55,7 +55,7 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 //
 // # Declared reads, and how it is cached
 //
-// The page files are read through ctx.Program.FS(), declared ReadsOtherFiles, since creating or
+// The page files are read through ruleContext.Program.FileSystem(), declared ReadsOtherFiles, since creating or
 // deleting a page changes findings in files that did not change. The model is built once per run and
 // root, not per file. Its routes are the rule's program fingerprint (noHtmlLinkForPagesFingerprint),
 // so the findings cache replays a file's verdict while its bytes and the routes hold, and walks every
