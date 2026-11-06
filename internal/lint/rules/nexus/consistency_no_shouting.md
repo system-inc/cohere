@@ -10,9 +10,10 @@
 
 ## What it checks
 
-An uppercase token in a comment is shouting unless it is on the safe list (`allowedUppercaseTokens`
-plus the `ISO` 4217 currency codes), carries a digit or an underscore, is a two-letter abbreviation,
-or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
+An uppercase token in a comment is shouting unless it is on the safe list (`policy/Shouting.json`'s
+allowed groups: acronyms, file names and the `ISO` 4217 currency codes, the one list Swift's
+`cohere-swift/consistency-no-shouting` reads too), carries a digit or an underscore, is a two-letter
+abbreviation, or has no vowel. Code is masked first: fenced blocks, backticks, double-quoted strings, single-quoted
 tokens, single-quoted capital phrases, `@example` blocks, and command lines.
 
 A run of `//` comments on consecutive lines, with nothing but whitespace between them, is masked as
@@ -23,8 +24,9 @@ are fixed by go.dev/s/generatedcode, which tools match exactly. Each finding cov
 each occurrence, and names it. The text rules corpus holds all three (`sh04`, `sh05`, `sh10`, and the
 span cases), task #34fejeq.
 
-The safe list and the masks live in `internal/shouting/shouting.go`, which the Go engine's
-`cohere-go/consistency-no-shouting` reads too, so both engines agree on what an acronym is.
+The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
+`internal/shouting/vocabulary.go` reads. The Go engine's `cohere-go/consistency-no-shouting` reads both
+too, and Swift compiles in the same list, so every engine agrees on what an acronym is.
 
 Kirk's ruling on the 2026-10-01 review: all caps belongs in backticks, single quotes or double quotes
 unless it is on the safe list. The safe list is the authority for what an acronym is.

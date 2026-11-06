@@ -5,7 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // utilities/call-arguments.js, utilities/call-or-new-expression-parentheses.js,
@@ -338,7 +338,7 @@ func isLoneShortArgument(node Node, options *Options) bool {
 		// Upstream passes `{ printWidth }` alone, so a string argument goes through printString with
 		// singleQuote unset, preferring double quotes. The zero settings reproduce that object.
 		return isLoneShortArgument(node.Child("argument"), &Options{
-			Settings: &settings{Options: formatoptions.Options{PrintWidth: printWidth}},
+			Settings: &settings{Options: format_options.Options{PrintWidth: printWidth}},
 		})
 	}
 

@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -43,7 +43,12 @@ var estreePrinter = &printing.Printer[*estree.Node, *settings, printArguments]{
 // Format is Prettier's format for a TypeScript file: parse, attach comments, print to a doc, and lay the
 // doc out. fileName decides JSX and is what upstream's options.filepath carries. textToDoc formats the
 // languages a file embeds (GraphQL in a gql template), or is nil.
-func Format(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func Format(
+	fileName string,
+	text string,
+	options format_options.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return format(fileName, text, nil, options, "typescript", textToDoc)
 }
 
@@ -54,7 +59,7 @@ func FormatParsed(
 	fileName string,
 	text string,
 	parsed *ast.SourceFile,
-	options formatoptions.Options,
+	options format_options.Options,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
 	return format(fileName, text, parsed, options, "typescript", textToDoc)
@@ -66,7 +71,7 @@ func FormatParsed(
 func FormatJavaScript(
 	fileName string,
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
 	return format(fileName, text, nil, options, "babel", textToDoc)
@@ -74,7 +79,7 @@ func FormatJavaScript(
 
 // FormatJson is Prettier's format for a JSON file, with the parser JSONParser picks. JSON embeds
 // nothing.
-func FormatJson(fileName string, text string, options formatoptions.Options) (string, error) {
+func FormatJson(fileName string, text string, options format_options.Options) (string, error) {
 	return format(fileName, text, nil, options, JsonParser(fileName), nil)
 }
 
@@ -95,7 +100,7 @@ func format(
 	fileName string,
 	text string,
 	parsed *ast.SourceFile,
-	options formatoptions.Options,
+	options format_options.Options,
 	parser string,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
@@ -121,7 +126,7 @@ func format(
 // for text embedded in another language's file, with its trailing hardline stripped, for the outer
 // printer to lay out at its own indentation. parser is "typescript", "babel", "json" or
 // "json-stringify"; parentParser is the outer file's parser, which upstream sets on every embed.
-func PrintToDoc(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
+func PrintToDoc(fileName string, text string, options format_options.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error) {
 	// The doc is laid out later, by the outer printer, so its tree outlives this call and comes from the heap.
 	document, printToDocError := printToDoc(fileName, text, nil, options, parser, parentParser, textToDoc, nil, nil)
@@ -141,7 +146,7 @@ func printToDoc(
 	fileName string,
 	text string,
 	parsed *ast.SourceFile,
-	options formatoptions.Options,
+	options format_options.Options,
 	parser string,
 	parentParser string,
 	textToDoc printing.TextToDoc,

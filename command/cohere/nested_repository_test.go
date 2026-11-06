@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -119,8 +119,8 @@ func TestTheProjectReadsItsLibrariesDrift(test *testing.T) {
 	test.Parallel()
 	root := nestedTree(test)
 	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
 	}
 	before := treeSnapshot(test, root)
 
@@ -157,8 +157,8 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 	library := filepath.Join(root, "library")
 	inner := filepath.Join(library, "inner")
 	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
 	}
 	check := func(label string, wantChecked int, wantDrift ...string) {
 		test.Helper()
@@ -296,8 +296,8 @@ func TestASignedEntryStillReadsAnEditedFile(test *testing.T) {
 		test.Fatal(createDirectoryError)
 	}
 	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
 	}
 	// Older than the second a fresh write is left unsigned for.
 	tidy := filepath.Join(library, "source", "Tidy.ts")
@@ -480,8 +480,8 @@ func TestAFreshClonesLibrariesGetTheirCacheAtStartup(test *testing.T) {
 	library := filepath.Join(root, "library")
 	inner := filepath.Join(library, "inner")
 	engine := prettierLike()
-	engine.enumerate = func(walkRoot string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(walkRoot, engine.Handles)
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
 	}
 
 	prepareNestedCacheDirectories(root)

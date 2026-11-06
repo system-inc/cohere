@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -22,7 +22,7 @@ func TestEmbeddedCodeMatchesTheFork(test *testing.T) {
 		"```ts\nfunction identity<T,>(value: T) { return value }\n```\n\n" +
 		"```json\n{ \"a\": 1, b: [1,2,], }\n```\n\n" +
 		"- item\n\n  ```tsx\n  <Nested prop={1} />\n  ```\n"
-	options := formatoptions.Default()
+	options := format_options.Default()
 	oracle, newPrettierError := prettier.New(options)
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
@@ -120,7 +120,7 @@ const empty = css` + "`  `" + `;
 func TestCssTemplatesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	for _, width := range []int{120, 80} {
-		options := formatoptions.Default()
+		options := format_options.Default()
 		options.PrintWidth = width
 		oracle, newPrettierError := prettier.New(options)
 		if newPrettierError != nil {
@@ -152,7 +152,7 @@ func TestCssTemplatesMatchTheFork(test *testing.T) {
 func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 	test.Parallel()
 	for _, width := range []int{120, 80} {
-		options := formatoptions.Default()
+		options := format_options.Default()
 		options.PrintWidth = width
 		oracle, newPrettierError := prettier.New(options)
 		if newPrettierError != nil {

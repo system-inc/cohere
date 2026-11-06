@@ -38,7 +38,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // Formatter is either side of the comparison.
@@ -91,7 +91,7 @@ type FileResult struct {
 // Language buckets a file by what parses it, which is what the port is organized by. An Adamic `.a` file is
 // parsed as TypeScript, so it buckets with `.ts` (#6mhafvb).
 func Language(fileName string) string {
-	switch strings.ToLower(filepath.Ext(sourcename.TreatedAs(fileName))) {
+	switch strings.ToLower(filepath.Ext(source_name.TreatedAs(fileName))) {
 	case ".ts", ".mts", ".cts":
 		return "ts"
 	case ".tsx":

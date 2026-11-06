@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/differential"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -35,7 +35,7 @@ func TestByteOrderMarksAndCarriageReturnsMatchTheForkInEveryLanguage(test *testi
 		"both, crlf + mark": func(text string) string { return "\ufeff" + strings.ReplaceAll(text, "\n", "\r\n") },
 	}
 
-	options := formatoptions.Default()
+	options := format_options.Default()
 	oracle, newPrettierError := prettier.New(options)
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)

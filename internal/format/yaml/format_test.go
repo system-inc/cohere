@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/differential"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -365,15 +365,15 @@ var formatFixtures = []string{
 // formatVariants are the option sets every fixture runs under: our defaults (tabWidth 4, single quotes,
 // printWidth 120), narrow (printWidth 40, tabWidth 2, double quotes), tabs, and the less common
 // settings the printer reads (no bracket spacing, no trailing comma, CRLF).
-var formatVariants = func() []formatoptions.Options {
-	defaults := formatoptions.Default()
-	narrow := formatoptions.Default()
+var formatVariants = func() []format_options.Options {
+	defaults := format_options.Default()
+	narrow := format_options.Default()
 	narrow.PrintWidth, narrow.TabWidth, narrow.SingleQuote = 40, 2, false
-	tabs := formatoptions.Default()
+	tabs := format_options.Default()
 	tabs.UseTabs, tabs.SingleQuote, tabs.PrintWidth, tabs.EndOfLine = true, false, 40, "cr"
-	other := formatoptions.Default()
+	other := format_options.Default()
 	other.PrintWidth, other.BracketSpacing, other.TrailingComma, other.EndOfLine = 40, false, "none", "crlf"
-	return []formatoptions.Options{defaults, narrow, tabs, other}
+	return []format_options.Options{defaults, narrow, tabs, other}
 }()
 
 // formatParsed prints a parsed input the way Prettier's core wraps the printer: the byte order mark comes
@@ -383,7 +383,7 @@ func formatParsed(
 	tree parsed,
 	text string,
 	hasByteOrderMark bool,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
@@ -405,7 +405,7 @@ func formatParsed(
 func formatFullStack(
 	fileName string,
 	input string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
@@ -439,8 +439,8 @@ func compareFormat(test *testing.T, inputs []string) int {
 	test.Helper()
 	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	failures, fullStackFailures, compared, oracleFailures := 0, 0, 0, 0
-	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	golden := oracletest.Open(test, test.Name())
+	// The oracle's answers, recorded (see oracle_testing), so no JavaScript runs here.
+	golden := oracle_testing.Open(test, test.Name())
 	for variantIndex, options := range formatVariants {
 		engine := golden.Engine(options)
 		for index, input := range inputs {
@@ -525,7 +525,7 @@ func TestFormatFixturesMatchOracle(test *testing.T) {
 // against the oracle's for another.
 func TestFormatOracleCanFail(test *testing.T) {
 	test.Parallel()
-	engine := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
+	engine := oracle_testing.Open(test, test.Name()).Engine(format_options.Default())
 	expected, formatError := engine.Format("fixture.yaml", "a: [b]")
 	if formatError != nil {
 		test.Fatal(formatError)
@@ -534,7 +534,7 @@ func TestFormatOracleCanFail(test *testing.T) {
 	if byteOrderMarks[0] {
 		test.Fatal("the fixture has no byte order mark")
 	}
-	actual, printError := Print(trees[0].root, texts[0], formatoptions.Default(), nil)
+	actual, printError := Print(trees[0].root, texts[0], format_options.Default(), nil)
 	if printError != nil {
 		test.Fatal(printError)
 	}
@@ -548,7 +548,7 @@ func TestFormatOracleCanFail(test *testing.T) {
 func TestPrintDocLeavesTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	texts, _, trees := parseInputs(test, []string{"a: b\n"})
-	document, printDocError := PrintDoc(trees[0].root, texts[0], formatoptions.Default(), nil)
+	document, printDocError := PrintDoc(trees[0].root, texts[0], format_options.Default(), nil)
 	if printDocError != nil {
 		test.Fatal(printDocError)
 	}

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // formatScope is which files the format phase considers, and how that set was decided.
@@ -55,7 +55,7 @@ type formatScope struct {
 	// verdict is formatting alone must not read that empty scope as a clean tree.
 	failure error
 
-	// adamic is the walk's held-back Adamic `.a` files (formatfiles.Enumeration.Adamic): admitted by the
+	// adamic is the walk's held-back Adamic `.a` files (format_files.Enumeration.Adamic): admitted by the
 	// ignore layers, and in no scope until the program claims them, since `.a` is also a static library's
 	// extension (#6mhafvb). See claimAdamic.
 	adamic []string
@@ -92,7 +92,7 @@ func (scope formatScope) claimAdamic(held map[string]struct{}) (formatScope, []s
 	for _, fileName := range scope.FileNames {
 		_, isHeld := held[fileName]
 		_, isAdmitted := admitted[fileName]
-		if sourcename.IsAdamic(fileName) && !(isHeld && isAdmitted) {
+		if source_name.IsAdamic(fileName) && !(isHeld && isAdmitted) {
 			continue
 		}
 		fileNames = append(fileNames, fileName)
@@ -207,7 +207,7 @@ func (scope formatScope) includes(fileName string) bool {
 // before and after the engine's filter, and every declined extension by name. A file the engine
 // cannot handle has to be a named zero rather than an absence, which is the one place in this
 // pipeline where a file could previously be silently missing.
-func (scope formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration) formatScope {
+func (scope formatScope) narrowToEnumeration(enumeration format_files.Enumeration) formatScope {
 	if scope.Everything {
 		// A whole-tree scope becomes the enumeration itself: every file the walk found and the engine
 		// handles, rather than every file in the type graph.

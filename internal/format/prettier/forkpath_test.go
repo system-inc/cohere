@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 /*
@@ -33,7 +33,7 @@ import (
 func TestOverrideReachesTheLoader(test *testing.T) {
 	test.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
-	if _, newPrettierError := New(formatoptions.Default()); newPrettierError == nil {
+	if _, newPrettierError := New(format_options.Default()); newPrettierError == nil {
 		test.Fatalf(
 			"New succeeded with %s pointed at a nonexistent path, so the loader is not reading it",
 			ForkPathVariable,
@@ -80,7 +80,7 @@ func TestOverrideIsTheOnlyKnobThatMoves(test *testing.T) {
 func TestEmbeddedBundlesNeedNoFork(test *testing.T) {
 	test.Setenv(ForkPathVariable, "")
 
-	if _, newPrettierError := New(formatoptions.Default()); newPrettierError != nil {
+	if _, newPrettierError := New(format_options.Default()); newPrettierError != nil {
 		test.Fatalf("building an engine from the embedded bundles: %v", newPrettierError)
 	}
 }

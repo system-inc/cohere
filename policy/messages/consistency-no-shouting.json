@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-shouting",
-    "Go": "cohere-go/consistency-no-shouting"
+    "Go": "cohere-go/consistency-no-shouting",
+    "Swift": "cohere-swift/consistency-no-shouting"
   },
   "messages": {
     "shoutingInComment": {

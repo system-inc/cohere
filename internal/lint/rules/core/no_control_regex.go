@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexpattern"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_pattern"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -29,7 +29,7 @@ import (
 // U+0009, a control character by value, and is silent. What is refused is writing a control code out
 // by its number, so the predicate is how the character was spelled rather than what it matches.
 //
-// That is why this uses `regexpattern.Walk`, whose `CharacterKind` records the spelling. The shelf
+// That is why this uses `regex_pattern.Walk`, whose `CharacterKind` records the spelling. The shelf
 // doc names this rule as the reason that field exists: a walk reporting only values cannot express
 // the distinction and would flag every `\n` in the tree.
 //
@@ -50,14 +50,14 @@ var NoControlRegex = rule.Rule[rule.NoOptions]{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
 
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regex_syntax.PatternAndFlags(text)
 				if pattern == "" {
 					return
 				}
 
 				var spelled []string
-				regexpattern.Walk(pattern, regexsyntax.ParseRegexFlags(flags),
-					func(character regexpattern.Character) bool {
+				regex_pattern.Walk(pattern, regex_syntax.ParseRegexFlags(flags),
+					func(character regex_pattern.Character) bool {
 						if isSpelledControlCharacter(pattern, character) {
 							spelled = append(spelled, pattern[character.Start:character.End])
 						}
@@ -94,7 +94,7 @@ var NoControlRegex = rule.Rule[rule.NoOptions]{
 // the control range. The spelling has to be a hexadecimal or unicode escape, so a named escape like
 // `\t` is silent even though it is a control character by value. And the null character written as
 // `\0` is excluded by kind, since that is the character written as itself rather than as a number.
-func isSpelledControlCharacter(pattern string, character regexpattern.Character) bool {
+func isSpelledControlCharacter(pattern string, character regex_pattern.Character) bool {
 	if character.Value > 0x1F {
 		return false
 	}

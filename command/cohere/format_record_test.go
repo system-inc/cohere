@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
 // The format record decides what the default format scope holds, so each test below asserts the exact
@@ -46,8 +46,8 @@ func newRecordFixture(test *testing.T) recordFixture {
 		"projects/clone/Outer.ts":  "export const outer = 5;\n",
 	})
 	engine := &fakeEngine{handled: []string{".ts"}}
-	engine.enumerate = func(directory string) (formatfiles.Enumeration, error) {
-		return formatfiles.Enumerate(directory, engine.Handles)
+	engine.enumerate = func(directory string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(directory, engine.Handles)
 	}
 	return recordFixture{root: root, engine: engine}
 }
@@ -450,7 +450,7 @@ func sourceSnapshot(test *testing.T) string {
 		"TypeScript-shim",
 		"static_single_assignment",
 		"mutation_aliasing",
-		"unicodeproperties",
+		"unicode_properties",
 	} {
 		source := filepath.Join(moduleRoot, directory)
 		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, pathError error) error {

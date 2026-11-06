@@ -199,9 +199,9 @@
   },
   {
     "typeScriptRule": "nexus/consistency-no-shouting",
-    "verdict": "Port",
-    "swiftRule": null,
-    "reason": "Uppercase words in comments carry over directly to Swift comment trivia, provided the TypeScript safe list is shared so acronyms are not reported."
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-shouting",
+    "reason": null
   },
   {
     "typeScriptRule": "nexus/consistency-no-single-line-jsdoc",

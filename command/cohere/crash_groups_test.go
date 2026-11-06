@@ -40,7 +40,7 @@ type crashEngine struct {
 const swiftCrashSentence = "no index store described it, so the rules that read what its names resolve to " +
 	"could not judge it (cohere-swift/correctness-no-unused-declaration); every other rule ran on it"
 
-// goCrashSentence is the Go engine's crash, worded as internal/goengine/check's crashSentence words one: the
+// goCrashSentence is the Go engine's crash, worded as internal/go_engine/check's crashSentence words one: the
 // rule, and what failed. Every other rule ran on the package.
 const goCrashSentence = "cohere-go/correctness-no-ignored-error: analysis failed: unexpected node"
 

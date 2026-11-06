@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -397,7 +397,7 @@ const nestedProjectsLayer = "nearer projects"
 
 // withoutYieldedDirectories is a format walk less the files under the directories this run yields, each the
 // run of the project there formats. A walk the run yields nothing from is returned as it is.
-func withoutYieldedDirectories(enumeration formatfiles.Enumeration) formatfiles.Enumeration {
+func withoutYieldedDirectories(enumeration format_files.Enumeration) format_files.Enumeration {
 	yield, activeProjectYieldError := activeProjectYield()
 	if activeProjectYieldError != nil || len(yield.Directories) == 0 {
 		return enumeration

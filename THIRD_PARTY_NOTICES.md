@@ -719,7 +719,7 @@ SOFTWARE.
 - Source: https://pkg.go.dev/golang.org/x/tools@v0.50.0/go/analysis/checker
 - Version: v0.50.0
 - License: `BSD-3-Clause`
-- In cohere: The analysis driver copied into internal/goengine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/goengine/check/analysistest, with what it calls: go/analysis/internal in internal/goengine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/goengine/check/diff and internal/goengine/check/astutil/free.
+- In cohere: The analysis driver copied into internal/go_engine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_engine/check/analysistest, with what it calls: go/analysis/internal in internal/go_engine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_engine/check/diff and internal/go_engine/check/astutil/free.
 
 ````text
 Copyright 2009 The Go Authors.
@@ -1187,7 +1187,7 @@ THE SOFTWARE.
 - Source: https://github.com/dryoma/postcss-media-query-parser
 - Version: 0.2.3
 - License: `MIT`
-- In cohere: The media query parser in internal/format/css/mediaquery, ported.
+- In cohere: The media query parser in internal/format/css/media_query, ported.
 
 No license text is published with this package or in its repository. Its package.json declares MIT, and names dryoma as its author.
 
@@ -2723,6 +2723,68 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+````
+
+### cspell dict-en_us
+
+- Source: https://github.com/streetsidesoftware/cspell-dicts
+- Version: 4.4.35
+- License: `MIT`
+- In cohere: English words captured into policy/Words.txt, which cohere-go's separated-folder-words rule splits with.
+
+````text
+MIT License
+
+Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
+
+### cspell dict-software-terms
+
+- Source: https://github.com/streetsidesoftware/cspell-dicts
+- Version: 5.2.2
+- License: `MIT`
+- In cohere: Software terms captured into policy/Words.txt, which cohere-go's separated-folder-words rule splits with.
+
+````text
+The MIT License (MIT)
+
+Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 ````
 
 ## In the Swift engine

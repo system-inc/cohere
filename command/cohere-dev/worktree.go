@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/goengine/project"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/streams"
 )
 

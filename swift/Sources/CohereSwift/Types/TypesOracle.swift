@@ -136,6 +136,14 @@ public struct TypesOracle {
             /* Every target of the project builds into the one derived data, so one task store holds every command. */
             commandTables.append(try CompileCommands.read(layout: .xcode(derivedData: xcodePhase.derivedData)))
         }
+        else if XcodePackageTypesPhase.leavesOutHost(package) {
+            /* A package built for a platform it names builds into one derived data as well (`XcodePackageTypesPhase`). */
+            commandTables.append(
+                try CompileCommands.read(
+                    layout: .xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratchPath))
+                )
+            )
+        }
         else {
             commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath)))
             /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */

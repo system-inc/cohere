@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/literal"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexpattern"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_pattern"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -44,7 +44,7 @@ var messageRegexSpaces = rule.Message{
 // **Depth is the whole discrimination and it is checked on the character, not the pattern.** A
 // space inside a quantifier or a character class is not a run somebody lost count of: `/  +/` is
 // one space repeated and `/[  ]/` is a set that happens to name the space twice. The walk carries
-// both depths so this rule can skip either, which is the case `regexpattern` was built for.
+// both depths so this rule can skip either, which is the case `regex_pattern` was built for.
 //
 // **The constructor path parses the cooked string but reports raw offsets, and it needs both.** For
 // a regex literal the two texts are the same and none of this arises. For the constructor they are
@@ -100,7 +100,7 @@ var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 				return
 			}
 
-			start, end, found := firstConsecutiveSpaces(pattern, regexsyntax.ParseRegexFlags(flags))
+			start, end, found := firstConsecutiveSpaces(pattern, regex_syntax.ParseRegexFlags(flags))
 			if !found {
 				return
 			}
@@ -166,7 +166,7 @@ var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 				return
 			}
 
-			start, end, found := firstConsecutiveSpaces(cooked, regexsyntax.ParseRegexFlags(flags))
+			start, end, found := firstConsecutiveSpaces(cooked, regex_syntax.ParseRegexFlags(flags))
 			if !found {
 				return
 			}
@@ -181,7 +181,7 @@ var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regex_syntax.PatternAndFlags(text)
 				if pattern == "" {
 					return
 				}
@@ -218,11 +218,11 @@ var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 // A walk that cannot make sense of the pattern returns nothing rather than a partial answer, since
 // a span measured inside a pattern the scanner lost track of is a position in a file that does not
 // parse.
-func firstConsecutiveSpaces(pattern string, flags regexsyntax.RegexFlags) (int, int, bool) {
+func firstConsecutiveSpaces(pattern string, flags regex_syntax.RegexFlags) (int, int, bool) {
 	start, end := 0, 0
 	held := false
 
-	walked := regexpattern.Walk(pattern, flags, func(character regexpattern.Character) bool {
+	walked := regex_pattern.Walk(pattern, flags, func(character regex_pattern.Character) bool {
 		if character.QuantifierDepth > 0 || character.ClassDepth > 0 {
 			return true
 		}

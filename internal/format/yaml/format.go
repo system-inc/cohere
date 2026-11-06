@@ -10,7 +10,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
@@ -43,16 +43,21 @@ func releaseNodes(nodes *arena.Arena[unist.Node]) {
 // reads to print a .prettierrc as JSON through textToDoc; textToDoc may be nil.
 //
 // A file that does not parse fails with an error printing.IsSyntax recognizes.
-func Format(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func Format(
+	fileName string,
+	text string,
+	options format_options.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return formatWithProseWrap(fileName, text, options, "preserve", textToDoc)
 }
 
-// formatWithProseWrap is Format with proseWrap given. formatoptions.Options does not carry it and none of our
+// formatWithProseWrap is Format with proseWrap given. format_options.Options does not carry it and none of our
 // repositories sets it, so only the tests reach always and never.
 func formatWithProseWrap(
 	fileName string,
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
@@ -74,7 +79,7 @@ func formatWithProseWrap(
 // as it is, with no byte order mark or line ending normalization, as textToDoc takes it. The doc still
 // ends in its trailing hardline, which the caller strips (doc.StripTrailingHardline) as upstream's
 // textToDoc does. A text that does not parse fails with an error printing.IsSyntax recognizes.
-func FormatDoc(text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
+func FormatDoc(text string, options format_options.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
 	nodes := acquireNodes()
 	defer releaseNodes(nodes)
 	root, parseError := parse(text, nodes)

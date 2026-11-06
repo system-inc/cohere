@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 /*
@@ -146,7 +146,7 @@ func drainPromise(vm *goja.Runtime, value goja.Value) (string, error) {
 // does and keep the comma (#6mhafvb).
 //
 // The options are passed explicitly rather than resolved inside the runtime, because this runtime has
-// no filesystem: the config is the caller's to supply, through formatoptions.Resolve, and
+// no filesystem: the config is the caller's to supply, through format_options.Resolve, and
 // hardcoding it here would silently ignore a project that configured something else.
 const formatScript = `
 	(function () {
@@ -175,7 +175,7 @@ const formatScript = `
 // set is changed files, typically one to a dozen, where a pool's construction cost -- roughly 100ms
 // of bundle evaluation per runtime -- would exceed what it saves.
 type Engine struct {
-	options formatoptions.Options
+	options format_options.Options
 
 	mutex   sync.Mutex
 	runtime *goja.Runtime
@@ -185,7 +185,7 @@ type Engine struct {
 //
 // Evaluation happens once, here, rather than per format. It costs about 100ms, and paying it per
 // file would dominate the formatting itself.
-func New(options formatoptions.Options) (*Engine, error) {
+func New(options format_options.Options) (*Engine, error) {
 	sources, loadBundlesError := loadBundles()
 	if loadBundlesError != nil {
 		return nil, loadBundlesError
@@ -228,7 +228,7 @@ func (engine *Engine) Format(fileName string, text string) (string, error) {
 	// rather than formatting with the last file's value.
 	if setError := errors.Join(
 		engine.runtime.Set("__source", text),
-		engine.runtime.Set("__fileName", sourcename.TreatedAs(fileName)),
+		engine.runtime.Set("__fileName", source_name.TreatedAs(fileName)),
 		engine.runtime.Set("__parser", parser),
 		engine.runtime.Set("__tabWidth", engine.options.TabWidth),
 		engine.runtime.Set("__useTabs", engine.options.UseTabs),

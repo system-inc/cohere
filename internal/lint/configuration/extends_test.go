@@ -422,7 +422,7 @@ func TestABrokenChainRefusesTheWholeLoad(test *testing.T) {
 
 // `settings` are read from the project's own file only, as ESLint reads them from the project's
 // config, so a value in a base would be ignored silently. `format` has a reader that follows the chain
-// (formatoptions applies each file's block over the one it extends), so a base may carry it. Both still
+// (format_options applies each file's block over the one it extends), so a base may carry it. Both still
 // load from the project's own file.
 func TestABaseMayCarryOnlyKeysWhoseReadersFollowTheChain(test *testing.T) {
 	test.Parallel()

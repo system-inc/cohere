@@ -483,7 +483,7 @@ func needsParentheses(path *Path, options *Options) bool {
 
 		case "ConditionalExpression":
 			// Upstream keeps this case only until it removes the experimentalTernaries flag.
-			// options.experimentalTernaries is always false here: formatoptions.Options does not carry it.
+			// options.experimentalTernaries is always false here: format_options.Options does not carry it.
 			return key == "test"
 
 		case "MemberExpression", "OptionalMemberExpression":

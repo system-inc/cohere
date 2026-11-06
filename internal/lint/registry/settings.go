@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/optionschema"
+	"github.com/system-inc/cohere/internal/lint/option_schema"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -108,7 +108,7 @@ func checkNamespace(registration rule.SettingsRegistration, namespace string, ba
 				return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, decodeError)
 			}
 		}
-		if checkError := optionschema.Check(ruleName, []json.RawMessage{part}); checkError != nil {
+		if checkError := option_schema.Check(ruleName, []json.RawMessage{part}); checkError != nil {
 			return fmt.Errorf("settings[%q], as %s reads it: %w", namespace, ruleName, checkError)
 		}
 	}

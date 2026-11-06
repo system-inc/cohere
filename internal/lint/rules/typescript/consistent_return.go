@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/checking"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/consistentreturn"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/consistent_return"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -191,11 +191,11 @@ var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 			// judgment is about a function as a whole and the walk here is pre-order: a listener on
 			// the function cannot see the returns that follow it.
 			ast.KindSourceFile: func(node *ast.Node) {
-				consistentreturn.Judge(node,
-					consistentreturn.Settings{
+				consistent_return.Judge(node,
+					consistent_return.Settings{
 						TreatUndefinedAsUnspecified: settings.TreatUndefinedAsUnspecified,
 					},
-					consistentreturn.Hooks{
+					consistent_return.Hooks{
 						SuppressBareReturn: func(scope *ast.Node, _ *ast.Node) bool {
 							return consistentReturnIsVoidOrThenableVoid(ruleContext, scope)
 						},
@@ -211,8 +211,8 @@ var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 }
 
 // consistentReturnReporter wires the shared judgment's findings into this rule's context.
-func consistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
-	return consistentreturn.Reporter{
+func consistentReturnReporter(ruleContext rule.Context) consistent_return.Reporter {
+	return consistent_return.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
 			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
@@ -230,15 +230,15 @@ func consistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporte
 // The casing difference between the two shapes is upstream's and both corpora assert it: the
 // per-return messages take a capitalised name, `missingReturn` takes a lower-case one.
 func consistentReturnDescribe(messageId string, name string) string {
-	if messageId == consistentreturn.MessageIdMissingReturn {
+	if messageId == consistent_return.MessageIdMissingReturn {
 		return fmt.Sprintf("Expected to return a value at the end of %s. %s",
 			name, messageConsistentReturnMissingReturn.Description)
 	}
 	description := messageConsistentReturnMissingReturnValue.Description
-	if messageId == consistentreturn.MessageIdUnexpectedReturnValue {
+	if messageId == consistent_return.MessageIdUnexpectedReturnValue {
 		description = messageConsistentReturnUnexpectedReturnValue.Description
 	}
-	return fmt.Sprintf("%s %s %s", name, consistentreturn.Verb(messageId), description)
+	return fmt.Sprintf("%s %s %s", name, consistent_return.Verb(messageId), description)
 }
 
 // consistentReturnIsVoidOrThenableVoid is upstream's `isReturnVoidOrThenableVoid`.
@@ -254,7 +254,7 @@ func consistentReturnDescribe(messageId string, name string) string {
 func consistentReturnIsVoidOrThenableVoid(ruleContext rule.Context, scope *ast.Node) bool {
 	// The Program is a scope for the judgment but has no type, and upstream's wrapper only ever
 	// receives the three function kinds.
-	if !consistentreturn.IsScope(scope) {
+	if !consistent_return.IsScope(scope) {
 		return false
 	}
 	if ruleContext.TypeChecker == nil {

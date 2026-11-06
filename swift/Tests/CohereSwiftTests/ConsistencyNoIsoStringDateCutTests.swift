@@ -112,7 +112,7 @@ struct ConsistencyNoIsoStringDateCutTests {
 
     /*
      `ahraos-presence` `Sources/AhraOSPresence/Studio/Designer/DesignerBodiesProbe.swift:125` on 2026-10-03, `order(model:)`:
-     each body's added date in the BODY ORDER diagnostic line, the UTC day of a file's local creation time.
+     each body's added date in the `BODY ORDER` diagnostic line, the UTC day of a file's local creation time.
      */
     static func bodiesProbe(added: String) -> String {
         """

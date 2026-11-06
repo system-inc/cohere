@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/gitignore"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // programExtensions are the extensions a tsconfig can put into a program at all. Anything else, a
@@ -17,7 +17,7 @@ import (
 var programExtensions = map[string]bool{
 	".ts": true, ".tsx": true, ".mts": true, ".cts": true,
 	".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
-	sourcename.AdamicExtension: true,
+	source_name.AdamicExtension: true,
 }
 
 // namedPathsOutsideProgramError is the refusal for a named-path run that reached no program file,

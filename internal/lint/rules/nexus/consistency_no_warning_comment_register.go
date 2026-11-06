@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // at once touch nothing in common.
 //
 // No decoder: the rule takes no options. The words are the house's, read by every engine from
-// internal/warningcomment, and an option adding or removing one would let a project's engines disagree.
+// internal/warning_comment, and an option adding or removing one would let a project's engines disagree.
 func init() {
 	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoWarningComment})
 }

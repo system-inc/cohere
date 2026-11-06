@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/sqltext"
+	"github.com/system-inc/cohere/internal/sql_text"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -258,17 +258,17 @@ func securityNoInterpolatedSqlStringOpensWithStatement(head string) bool {
 // and `(`.
 func securityNoInterpolatedSqlStringLeadingWord(head string) string {
 	trimmed := strings.TrimLeft(head, " \t\r\n(")
-	return trimmed[:sqltext.WordLength(trimmed, 0)]
+	return trimmed[:sql_text.WordLength(trimmed, 0)]
 }
 
 // securityNoInterpolatedSqlStringReadStatement reads a template's texts as one SQL statement, with each
 // interpolation an opaque value between two texts, and returns the indexes of the interpolations that
 // sit inside a single-quoted string in a value position, and of those bare after a comparison. The
-// reading is package sqltext's, shared with the Go engine's twin. It returns nothing when the reading is
+// reading is package sql_text's, shared with the Go engine's twin. It returns nothing when the reading is
 // uncertain anywhere (see the doc comment), or when the text is not confirmed as SQL: a second uppercase
 // keyword outside its strings and comments, or a leading `WHERE` or `HAVING`.
 func securityNoInterpolatedSqlStringReadStatement(texts []string) ([]int, []int) {
-	statement, certain := sqltext.ReadStatement(texts)
+	statement, certain := sql_text.ReadStatement(texts)
 	if !certain {
 		return nil, nil
 	}
@@ -334,14 +334,14 @@ func securityNoInterpolatedSqlStringReadLikePatterns(texts []string) []int {
 				continue
 			}
 			if !strings.HasPrefix(text[index:], "LIKE") ||
-				(index > 0 && sqltext.IsWordCharacter(text[index-1])) {
+				(index > 0 && sql_text.IsWordCharacter(text[index-1])) {
 				continue
 			}
 			quote := index + len("LIKE")
-			if quote >= len(text) || !sqltext.IsWhitespace(text[quote]) {
+			if quote >= len(text) || !sql_text.IsWhitespace(text[quote]) {
 				continue
 			}
-			for quote < len(text) && sqltext.IsWhitespace(text[quote]) {
+			for quote < len(text) && sql_text.IsWhitespace(text[quote]) {
 				quote++
 			}
 			if quote >= len(text) || text[quote] != '\'' {
@@ -370,7 +370,7 @@ func securityNoInterpolatedSqlStringReadLikePatterns(texts []string) []int {
 func securityNoInterpolatedSqlStringHasFragmentKeyword(texts []string) bool {
 	for _, text := range texts {
 		for index := 0; index < len(text); {
-			length := sqltext.WordLength(text, index)
+			length := sql_text.WordLength(text, index)
 			if length == 0 {
 				index++
 				continue

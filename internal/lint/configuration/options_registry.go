@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/system-inc/cohere/internal/lint/optionschema"
+	"github.com/system-inc/cohere/internal/lint/option_schema"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -89,7 +89,7 @@ func (registry OptionsRegistry) Decode(ruleName string, elements []json.RawMessa
 	// schema's refusal is for what the decoder let through. A bare severity is not checked, since no
 	// upstream schema refuses an empty list (TestEverySchemaAcceptsTheBareSeverity).
 	if len(elements) > 0 {
-		if checkError := optionschema.Check(ruleName, elements); checkError != nil {
+		if checkError := option_schema.Check(ruleName, elements); checkError != nil {
 			return rule.Bound{}, fmt.Errorf("rule %s: %w", ruleName, checkError)
 		}
 	}

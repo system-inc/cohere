@@ -5,7 +5,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown"
 )
 
@@ -25,7 +25,7 @@ func init() {
 	// TextToDoc. markdown's embed passes upstream's parser name, or for ts, typescript and tsx the file
 	// name upstream overrides the filepath with, because the trailing comma of type parameters depends
 	// on it.
-	Register(".md", func(_ string, text string, options formatoptions.Options) (string, error) {
+	Register(".md", func(_ string, text string, options format_options.Options) (string, error) {
 		docs, isSlab := embedDocs.Get().(*arena.Slab[doc.Doc])
 		if !isSlab {
 			// Invariant: embedDocs builds only doc slabs, and the one Put below returns the slab this Get took.

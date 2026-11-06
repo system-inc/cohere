@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/docsdata/capture"
+	"github.com/system-inc/cohere/internal/docs_data/capture"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 

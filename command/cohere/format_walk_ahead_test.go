@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/native"
 )
 
@@ -17,7 +17,7 @@ type countingEngine struct {
 	walks int
 }
 
-func (engine *countingEngine) Enumerate(root string) (formatfiles.Enumeration, error) {
+func (engine *countingEngine) Enumerate(root string) (format_files.Enumeration, error) {
 	engine.walks++
 	return engine.Resolving.Enumerate(root)
 }

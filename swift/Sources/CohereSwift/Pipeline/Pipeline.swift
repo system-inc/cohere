@@ -154,7 +154,26 @@ public struct Pipeline {
                 )
             }
         }
-        let fileRules = RuleRegistry.fileRules(vocabulary: vocabulary, configuration: configuration)
+        /* The shouting rule's words, by the same reasoning: with none, every acronym with a vowel would read as shouting. */
+        var shoutingVocabulary = ShoutingVocabulary()
+        if configuration.severity(of: ConsistencyNoShouting.ruleName) != .off
+            && (options.proposeFixes || options.runLint)
+        {
+            do {
+                shoutingVocabulary = try ShoutingVocabulary.compiledIn()
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the shouting rule's compiled-in words (policy/Shouting.json) could not be loaded, so nothing was checked: \(error)"
+                )
+            }
+        }
+        let fileRules = RuleRegistry.fileRules(
+            vocabulary: vocabulary,
+            shoutingVocabulary: shoutingVocabulary,
+            configuration: configuration,
+        )
 
         let describeStart = Date()
         let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
@@ -831,11 +850,12 @@ public struct Pipeline {
 
     /*
      Every build of this package that writes an index store and compile commands: for a package, the root's scratch
-     and each local package's that the types phase builds for its tests; for an Xcode root, the one xcodebuild's
-     derived data, which every target and linked package builds into.
+     and each local package's that the types phase builds for its tests; for an Xcode root, and for a package whose
+     platforms leave out macOS (`XcodePackageTypesPhase`), the one xcodebuild's derived data, which every target and
+     linked package builds into.
      */
     static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
-        guard package.projectKind == .swiftPackage else {
+        guard package.projectKind == .swiftPackage, !XcodePackageTypesPhase.leavesOutHost(package) else {
             return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
         }
         let scratchPaths =

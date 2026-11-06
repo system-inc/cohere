@@ -14,8 +14,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
@@ -83,14 +83,14 @@ func perturbMarkdown(text string) string {
 type markdownCorpus struct {
 	root    string
 	files   []string
-	options formatoptions.Options
+	options format_options.Options
 }
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the engine's
 // ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -114,7 +114,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -123,7 +123,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 		}
 
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
@@ -139,8 +139,8 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 				files = append(files, file)
 			}
 		}
-		resolution, resolveError := formatoptions.Resolve(root)
-		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := format_options.Resolve(root)
+		if errors.Is(resolveError, format_options.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
 			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
@@ -169,7 +169,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 // Mutates: fellBack gains each parser the oracle stood in for, which the caller reads after the format
 // to name the languages a miss belongs to.
 func standInEmbeds(
-	options formatoptions.Options,
+	options format_options.Options,
 	engine *prettier.Engine,
 	fellBack map[string]bool,
 ) printing.TextToDoc {
@@ -203,7 +203,7 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 
 	type job struct {
 		path    string
-		options formatoptions.Options
+		options format_options.Options
 	}
 	type outcome struct {
 		job
@@ -217,7 +217,7 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 		narrow.PrintWidth, narrow.TabWidth = 40, 2
 		tabs := corpus.options
 		tabs.UseTabs, tabs.SingleQuote = true, !tabs.SingleQuote
-		for _, options := range []formatoptions.Options{corpus.options, narrow, tabs} {
+		for _, options := range []format_options.Options{corpus.options, narrow, tabs} {
 			for _, path := range corpus.files {
 				jobs = append(jobs, job{path: path, options: options})
 			}
@@ -231,7 +231,7 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
-			engines := map[formatoptions.Options]*prettier.Engine{}
+			engines := map[format_options.Options]*prettier.Engine{}
 			for job := range queue {
 				engine := engines[job.options]
 				if engine == nil {

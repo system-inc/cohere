@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/checker"
 	"github.com/system-inc/cohere/internal/lint/checking"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/dotnotation"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/dot_notation"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -47,7 +47,7 @@ type DotNotationOptions struct {
 // Upstream's wrapper is `baseRule.create(context)` with one question asked first, and only when one
 // of the three options is on: does the accessed property's first declaration carry `private` or
 // `protected` as its first modifier, or, failing any property, does the object reach a string index
-// signature. Everything that reports comes from the core judgment in `ecmascript/dotnotation`, shared
+// signature. Everything that reports comes from the core judgment in `ecmascript/dot_notation`, shared
 // with `dot-notation`, so this file carries the question and nothing else.
 //
 // # How the property is found, which decides the corner cases
@@ -79,9 +79,9 @@ var DotNotation = rule.Rule[DotNotationOptions]{
 		if !isDotNotationOptions {
 			resolved = DefaultDotNotationOptions()
 		}
-		settings := dotnotation.Settings{
+		settings := dot_notation.Settings{
 			AllowKeywords: true,
-			AllowPattern:  dotnotation.CompileAllowPattern(resolved.AllowPattern),
+			AllowPattern:  dot_notation.CompileAllowPattern(resolved.AllowPattern),
 		}
 		if resolved.AllowKeywords != nil {
 			settings.AllowKeywords = *resolved.AllowKeywords
@@ -132,7 +132,7 @@ var DotNotation = rule.Rule[DotNotationOptions]{
 				return false
 			}
 		}
-		return dotnotation.Listeners(ruleContext, settings)
+		return dot_notation.Listeners(ruleContext, settings)
 	},
 }
 

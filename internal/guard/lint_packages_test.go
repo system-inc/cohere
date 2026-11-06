@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/gotypes"
+	"github.com/system-inc/cohere/internal/go_types"
 )
 
 // lintTypes is the export data of every package outside cohere that ./internal/lint/... imports: the
@@ -16,7 +16,7 @@ import (
 // packages from source, overlay and all, and those from this product, which is built where building is
 // allowed and never here: a guard that compiled ran `go list -compiled`, which a runner of prebuilt tests
 // refuses (#qnnnkbf).
-var lintTypes = gotypes.Product{
+var lintTypes = go_types.Product{
 	Name:      "lint",
 	Test:      "TestProduct_LintTypes (internal/guard)",
 	Directory: "../..",
@@ -53,7 +53,7 @@ var lintLoads = struct {
 // The packages it returns are the named roots, each with its syntax and type information, so the scans see
 // the same calls they saw when every dependency was type-checked from source too: a dependency's types are
 // the same read either way, and no scan reads a dependency's syntax.
-func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package {
+func lintPackages(test *testing.T, overlay map[string][]byte) []*go_types.Package {
 	test.Helper()
 
 	key := overlayKey(overlay)
@@ -74,7 +74,7 @@ func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package
 
 type lintLoad struct {
 	once     sync.Once
-	packages []*gotypes.Package
+	packages []*go_types.Package
 
 	// failure, when set, is what every caller fails with: one test cannot fail another, so the load
 	// records it and each caller reports it.
@@ -96,7 +96,7 @@ func overlayKey(overlay map[string][]byte) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
+func loadLintPackages(overlay map[string][]byte) ([]*go_types.Package, string) {
 	root, absolutePathError := filepath.Abs("../..")
 	if absolutePathError != nil {
 		return nil, absolutePathError.Error()
@@ -105,8 +105,8 @@ func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
 	if lintExportsError != nil {
 		return nil, lintExportsError.Error()
 	}
-	loaded, loadError := gotypes.Load(
-		gotypes.Configuration{Directory: root, Overlay: overlay, Exports: exports},
+	loaded, loadError := go_types.Load(
+		go_types.Configuration{Directory: root, Overlay: overlay, Exports: exports},
 		"./internal/lint/...",
 	)
 	if loadError != nil {

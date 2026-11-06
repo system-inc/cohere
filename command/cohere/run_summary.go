@@ -223,7 +223,7 @@ type uncheckedSwiftFile struct {
 
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
 // the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
-// writes (internal/goengine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
+// writes (internal/go_engine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
 type withheldCgoFile struct {
 	Package string `json:"package"`
 	File    string `json:"file"`

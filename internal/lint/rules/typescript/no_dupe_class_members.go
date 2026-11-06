@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/classmembers"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/class_members"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -61,11 +61,11 @@ var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 		// would give the two rules two chances to disagree about the same question.
 		// The collision judgment, shared with the bare `no-dupe-class-members` rather than
 		// re-derived. It used to reach for `core.NoDupeClassMembers.Run` directly, which broke the
-		// leaf property a rule package is held to; the judgment now lives in `classmembers` and both
+		// leaf property a rule package is held to; the judgment now lives in `class_members` and both
 		// rules call it. Behaviour is unchanged: the same members collide, this file still carries
 		// only the difference.
 		coreCheck := func(members *ast.NodeList) {
-			classmembers.ForEachDuplicate(members, func(name *ast.Node, key classmembers.Key) {
+			class_members.ForEachDuplicate(members, func(name *ast.Node, key class_members.Key) {
 				ruleContext.ReportNode(name, rule.Message{
 					Id: "noDupeClassMembers",
 					Description: fmt.Sprintf(

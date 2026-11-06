@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	shimchecker "github.com/microsoft/TypeScript/tsc/shim/checker"
 	shimcore "github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -557,18 +557,18 @@ func preferIncludesRegexInitializerText(initializer *ast.Node) (string, bool) {
 		if pattern.Kind != ast.KindStringLiteral && pattern.Kind != ast.KindNoSubstitutionTemplateLiteral {
 			return "", false
 		}
-		return preferIncludesSimplePatternText(pattern.Text(), regexsyntax.ParseRegexFlags(""))
+		return preferIncludesSimplePatternText(pattern.Text(), regex_syntax.ParseRegexFlags(""))
 	}
 	return "", false
 }
 
 // preferIncludesSimplePatternFromLiteral splits a regex literal and answers its fixed string.
 func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
-	pattern, flags := regexsyntax.PatternAndFlags(literalText)
+	pattern, flags := regex_syntax.PatternAndFlags(literalText)
 
 	// Upstream rejects `i` and `g` outright: a case-insensitive pattern does not match one fixed
 	// string, and a global one carries `lastIndex` state that `includes` does not have.
-	parsed := regexsyntax.ParseRegexFlags(flags)
+	parsed := regex_syntax.ParseRegexFlags(flags)
 	if strings.ContainsAny(flags, "ig") {
 		return "", false
 	}
@@ -580,7 +580,7 @@ func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
 //
 // # Why this is written here rather than taken from the shelf
 //
-// `regexpattern.Walk` is the shelf's pattern walker and it cannot answer this, which was measured
+// `regex_pattern.Walk` is the shelf's pattern walker and it cannot answer this, which was measured
 // rather than assumed. Walk reports characters with a depth counter and erases exactly the
 // distinctions the question turns on. Run over this rule's own patterns it renders `b.r` as `b.r`,
 // `^bar` and `bar$` and `(bar)` and `b(?:a)r` all as `bar`, and `foo|bar` as `foobar`, so a port
@@ -589,7 +589,7 @@ func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
 //
 // The shelf's own doc says as much: it is "deliberately not a regex AST", and a caller wanting
 // alternation "should reach for the layer underneath rather than extend this". That is what this
-// does. `regexsyntax.SkipPatternEscape` handles the escape grammar and everything else is a
+// does. `regex_syntax.SkipPatternEscape` handles the escape grammar and everything else is a
 // metacharacter test, which is the whole of upstream's question and none of a parse tree.
 //
 // Note `SkipPatternEscape` returns a length rather than an absolute index. A probe reading it as an
@@ -602,7 +602,7 @@ func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
 //	/ba[rz]/    decline  /foo|bar/   decline  /b.r/      decline /ba+r/    decline
 //	/^bar/      decline  /bar$/      decline  /(bar)/    decline /b(?:a)r/ decline
 //	/\d/        decline  /a{2}/      decline  /bar/i     decline /bar/g    decline
-func preferIncludesSimplePatternText(pattern string, flags regexsyntax.RegexFlags) (string, bool) {
+func preferIncludesSimplePatternText(pattern string, flags regex_syntax.RegexFlags) (string, bool) {
 	var builder strings.Builder
 
 	for index := 0; index < len(pattern); {
@@ -616,7 +616,7 @@ func preferIncludesSimplePatternText(pattern string, flags regexsyntax.RegexFlag
 			return "", false
 
 		case '\\':
-			length, ok := regexsyntax.SkipPatternEscape(pattern, index, flags)
+			length, ok := regex_syntax.SkipPatternEscape(pattern, index, flags)
 			if !ok || length <= 0 || index+length > len(pattern) {
 				return "", false
 			}
@@ -670,17 +670,17 @@ func preferIncludesDecodeEscape(escaped string) (rune, bool) {
 	case 'd', 'D', 's', 'S', 'w', 'W', 'b', 'B', 'p', 'P', 'k', 'q':
 		return 0, false
 	case 'x':
-		if len(escaped) == 4 && regexsyntax.AllHexDigits(escaped[2:]) {
-			return rune(regexsyntax.ParseHexUint(escaped[2:])), true
+		if len(escaped) == 4 && regex_syntax.AllHexDigits(escaped[2:]) {
+			return rune(regex_syntax.ParseHexUint(escaped[2:])), true
 		}
 		return 0, false
 	case 'u':
-		if len(escaped) == 6 && regexsyntax.AllHexDigits(escaped[2:]) {
-			return rune(regexsyntax.ParseHexUint(escaped[2:])), true
+		if len(escaped) == 6 && regex_syntax.AllHexDigits(escaped[2:]) {
+			return rune(regex_syntax.ParseHexUint(escaped[2:])), true
 		}
 		if len(escaped) > 4 && escaped[2] == '{' && escaped[len(escaped)-1] == '}' &&
-			regexsyntax.AllHexDigits(escaped[3:len(escaped)-1]) {
-			return rune(regexsyntax.ParseHexUint(escaped[3 : len(escaped)-1])), true
+			regex_syntax.AllHexDigits(escaped[3:len(escaped)-1]) {
+			return rune(regex_syntax.ParseHexUint(escaped[3 : len(escaped)-1])), true
 		}
 		return 0, false
 	case 'c':

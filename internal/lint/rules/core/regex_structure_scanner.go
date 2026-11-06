@@ -3,13 +3,13 @@ package core
 import (
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 )
 
 // regexStructureScanner walks a pattern once, keeping a stack of what encloses the current byte.
 type regexStructureScanner struct {
 	pattern   string
-	flags     regexsyntax.RegexFlags
+	flags     regex_syntax.RegexFlags
 	structure regexStructure
 	// stack holds the indices of the currently open nodes, outermost first.
 	stack []int
@@ -63,7 +63,7 @@ func (scanner *regexStructureScanner) run() bool {
 		case '[':
 			// Everything inside a character class is a literal, which is the whole of
 			// `/^[\1](a)$/` being clean: the `\1` there matches a control character, not a group.
-			end, ok := regexsyntax.ClassEnd(pattern, index, scanner.flags)
+			end, ok := regex_syntax.ClassEnd(pattern, index, scanner.flags)
 			if !ok {
 				return false
 			}
@@ -221,7 +221,7 @@ func (scanner *regexStructureScanner) readEscape(index int) (int, bool) {
 		}
 	}
 
-	step, ok := regexsyntax.SkipPatternEscape(pattern, index, scanner.flags)
+	step, ok := regex_syntax.SkipPatternEscape(pattern, index, scanner.flags)
 	if !ok {
 		return 0, false
 	}

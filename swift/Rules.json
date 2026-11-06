@@ -61,6 +61,11 @@
     "typeAware": false
   },
   {
+    "name": "cohere-swift/consistency-no-shouting",
+    "origin": "house",
+    "typeAware": false
+  },
+  {
     "name": "cohere-swift/consistency-no-stuttering-name",
     "origin": "house",
     "typeAware": false

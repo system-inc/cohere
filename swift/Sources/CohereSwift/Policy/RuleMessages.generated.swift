@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "541d598823f3a0417ca5270382c84a1dc92c993fc9005bf64eb7194330bc6ea8"
+    static let sourceDigest = "8d46e6ac620f698cdf75c8d4ba873ec5b1325a630a764ed1c69d1a9d35379b89"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -34,6 +34,7 @@ enum RuleMessages {
         "ConsistencyNoIsoStringDateCut.isoStringCutToDate",
         "ConsistencyNoPrint.consistencyNoConsole",
         "ConsistencyNoPropertyAlias.noPropertyAlias",
+        "ConsistencyNoShouting.shoutingInComment",
         "ConsistencyNoStutteringName.stutteringName",
         "ConsistencyNoUtilsFolder.noUnderscoreUtils",
         "ConsistencyNoUtilsFolder.noUtils",
@@ -287,6 +288,17 @@ enum RuleMessages {
                 id: "noPropertyAlias",
                 text:
                     #"`\#(name)` is a pure alias for `\#(reach)`. It is read once, and nothing runs between its declaration and that read. Write `\#(reach)` where `\#(name)` is read and delete the declaration, so the value keeps the object it came from and a naked local still means this scope made it."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-no-shouting */
+    enum ConsistencyNoShouting {
+        static func shoutingInComment(tokens: String) -> Message {
+            Message(
+                id: "shoutingInComment",
+                text:
+                    #"\#(tokens) in a comment reads as shouting, and the register spreads: the next reader mirrors it, so emphasis on everything becomes emphasis on nothing. If it is code, put it in backticks. If it is a point, make it in a normal voice, and if the sentence needed the volume to land, it probably needed the reason instead."#,
             )
         }
     }

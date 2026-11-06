@@ -5,27 +5,27 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/unicodeproperties"
+	"github.com/system-inc/cohere/unicode_properties"
 )
 
 // propertyAtom remains one set atom even though it contains many intervals. Expanding it into
 // rune atoms before joinRanges would let a following dash turn its last interval into an endpoint.
 func propertyAtom(escape decodedEscape) classAtom {
-	property, _ := unicodeproperties.Lookup(escape.property)
+	property, _ := unicode_properties.Lookup(escape.property)
 	ranges := property.Ranges
 	if escape.negated {
 		// ECMAScript u complements before case closure. For example Greek mu is in Greek, but the
 		// micro sign is not: both therefore match \P{Script=Greek} under iu after closure.
-		complement := []unicodeproperties.Range{}
+		complement := []unicode_properties.Range{}
 		next := rune(0)
 		for _, span := range ranges {
 			if next < span.Lo {
-				complement = append(complement, unicodeproperties.Range{Lo: next, Hi: span.Lo - 1})
+				complement = append(complement, unicode_properties.Range{Lo: next, Hi: span.Lo - 1})
 			}
 			next = span.Hi + 1
 		}
 		if next <= unicode.MaxRune {
-			complement = append(complement, unicodeproperties.Range{Lo: next, Hi: unicode.MaxRune})
+			complement = append(complement, unicode_properties.Range{Lo: next, Hi: unicode.MaxRune})
 		}
 		ranges = complement
 	}
@@ -44,13 +44,13 @@ func propertyAtom(escape decodedEscape) classAtom {
 // canonicalizes after every added range and can invert a nearly-full class prematurely; appending
 // fold members after that inversion would change the excluded set instead of the included set.
 func writePropertyClass(atoms []classAtom, negated bool, options rewriteOptions) string {
-	var ranges []unicodeproperties.Range
+	var ranges []unicode_properties.Range
 	for _, atom := range atoms {
 		switch atom.kind {
 		case classRune, classDash:
-			ranges = append(ranges, unicodeproperties.Range{Lo: atom.lo, Hi: atom.lo})
+			ranges = append(ranges, unicode_properties.Range{Lo: atom.lo, Hi: atom.lo})
 		case classRange:
-			ranges = append(ranges, unicodeproperties.Range{Lo: atom.lo, Hi: atom.hi})
+			ranges = append(ranges, unicode_properties.Range{Lo: atom.lo, Hi: atom.hi})
 		case classSet:
 			if atom.ranges != nil {
 				ranges = append(ranges, atom.ranges...)
@@ -61,11 +61,11 @@ func writePropertyClass(atoms []classAtom, negated bool, options rewriteOptions)
 	}
 	ranges = mergePropertyRanges(ranges)
 	if options.ignoreCase {
-		var extras []unicodeproperties.Range
+		var extras []unicode_properties.Range
 		for _, group := range CaseEquivalenceGroups(options.unicode) {
 			if slices.ContainsFunc(group, func(character rune) bool { return propertyRangesCover(ranges, character) }) {
 				for _, character := range group {
-					extras = append(extras, unicodeproperties.Range{Lo: character, Hi: character})
+					extras = append(extras, unicode_properties.Range{Lo: character, Hi: character})
 				}
 			}
 		}
@@ -92,8 +92,8 @@ func writePropertyClass(atoms []classAtom, negated bool, options rewriteOptions)
 	out.WriteByte(']')
 	return out.String()
 }
-func propertyRangesCover(ranges []unicodeproperties.Range, character rune) bool {
-	_, ok := slices.BinarySearchFunc(ranges, character, func(span unicodeproperties.Range, target rune) int {
+func propertyRangesCover(ranges []unicode_properties.Range, character rune) bool {
+	_, ok := slices.BinarySearchFunc(ranges, character, func(span unicode_properties.Range, target rune) int {
 		if span.Hi < target {
 			return -1
 		}
@@ -104,8 +104,8 @@ func propertyRangesCover(ranges []unicodeproperties.Range, character rune) bool 
 	})
 	return ok
 }
-func mergePropertyRanges(ranges []unicodeproperties.Range) []unicodeproperties.Range {
-	slices.SortFunc(ranges, func(left, right unicodeproperties.Range) int { return int(left.Lo - right.Lo) })
+func mergePropertyRanges(ranges []unicode_properties.Range) []unicode_properties.Range {
+	slices.SortFunc(ranges, func(left, right unicode_properties.Range) int { return int(left.Lo - right.Lo) })
 	out := ranges[:0]
 	for _, span := range ranges {
 		if len(out) > 0 && span.Lo <= out[len(out)-1].Hi+1 {
@@ -116,20 +116,20 @@ func mergePropertyRanges(ranges []unicodeproperties.Range) []unicodeproperties.R
 	}
 	return out
 }
-func builtinSetRanges(text string) []unicodeproperties.Range {
-	var ranges []unicodeproperties.Range
+func builtinSetRanges(text string) []unicode_properties.Range {
+	var ranges []unicode_properties.Range
 	switch text[1] {
 	case 'd', 'D':
-		ranges = []unicodeproperties.Range{{Lo: '0', Hi: '9'}}
+		ranges = []unicode_properties.Range{{Lo: '0', Hi: '9'}}
 	case 'w', 'W':
-		ranges = []unicodeproperties.Range{
+		ranges = []unicode_properties.Range{
 			{Lo: '0', Hi: '9'},
 			{Lo: 'A', Hi: 'Z'},
 			{Lo: '_', Hi: '_'},
 			{Lo: 'a', Hi: 'z'},
 		}
 	case 's', 'S':
-		ranges = []unicodeproperties.Range{
+		ranges = []unicode_properties.Range{
 			{Lo: 9, Hi: 13},
 			{Lo: 0x20, Hi: 0x20},
 			{Lo: 0xa0, Hi: 0xa0},
@@ -143,16 +143,16 @@ func builtinSetRanges(text string) []unicodeproperties.Range {
 		}
 	}
 	if text[1] >= 'A' && text[1] <= 'Z' {
-		complement := []unicodeproperties.Range{}
+		complement := []unicode_properties.Range{}
 		next := rune(0)
 		for _, span := range ranges {
 			if next < span.Lo {
-				complement = append(complement, unicodeproperties.Range{Lo: next, Hi: span.Lo - 1})
+				complement = append(complement, unicode_properties.Range{Lo: next, Hi: span.Lo - 1})
 			}
 			next = span.Hi + 1
 		}
 		if next <= unicode.MaxRune {
-			complement = append(complement, unicodeproperties.Range{Lo: next, Hi: unicode.MaxRune})
+			complement = append(complement, unicode_properties.Range{Lo: next, Hi: unicode.MaxRune})
 		}
 		return complement
 	}

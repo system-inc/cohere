@@ -88,7 +88,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tooldirectory"
+	"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tool_directory"
 )
 
 // enumeration is what enumerate.mjs reports.
@@ -681,7 +681,7 @@ func enumerate(packageRoot string, designSystem string) (*enumeration, error) {
 	if !ok {
 		return nil, fmt.Errorf("cannot locate this tool's directory, so enumerate.mjs cannot be found")
 	}
-	directory, toolDirectoryOfError := tooldirectory.Of(thisFile)
+	directory, toolDirectoryOfError := tool_directory.Of(thisFile)
 	if toolDirectoryOfError != nil {
 		return nil, toolDirectoryOfError
 	}

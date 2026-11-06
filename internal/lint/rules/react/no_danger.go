@@ -147,7 +147,7 @@ const dangerousPropertyName = "dangerouslySetInnerHTML"
 // # The glob dialect, measured rather than assumed
 //
 // Upstream uses minimatch; this uses `path.Match`, which is also the format walk's glob
-// (`internal/format/formatfiles/enumerate.go`). They are different implementations, so the substitution was
+// (`internal/format/format_files/enumerate.go`). They are different implementations, so the substitution was
 // measured rather than argued: minimatch's answers were enumerated over 204 pattern-and-name pairs
 // covering every pattern the corpus uses plus the dotted, namespaced and character-class shapes this
 // rule can produce, and `filepath.Match` was run over the same table, on Unix, where it is

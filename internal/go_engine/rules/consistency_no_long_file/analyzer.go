@@ -1,0 +1,116 @@
+// Package consistency_no_long_file is the Go engine's rule that a file holds at most 2,000 lines.
+//
+// The size of a file is what a reader pays for: a file past the limit is one no reader can hold whole, and it has
+// seams in it to split along. The limit is the house max-lines and cohere-swift's file-length, and lines are counted
+// the way both count them and an editor shows them: every line, comments and blank lines included, with a final
+// newline ending the last line rather than starting another. A comment is part of what a reader holds, and a count
+// that skipped comments would reward moving explanation out of the file.
+//
+// The finding covers the lines past the limit, from the start of the first one over to the end of the file, which is
+// what a split has to move out. A file whose base name has the `*.generated.*` shape, such as SecretKey.generated.ts
+// or schema.generated.go, gets no finding whatever its length or header: the name is the house's mark of a file a
+// generator writes, and its size is the generator's to keep, not a reader's to split. The engine's separate drop of a
+// file go/ast.IsGenerated accepts still applies on top of this.
+package consistency_no_long_file
+
+import (
+	"fmt"
+	"path"
+	"path/filepath"
+	"strconv"
+
+	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/policy"
+)
+
+// Name is what a finding of this rule prints.
+const Name = "cohere-go/consistency-no-long-file"
+
+// maximumOption is the option naming the most lines a file may hold, `max`, as every engine's long-file rule
+// spells it.
+const maximumOption = "max"
+
+// generatedNamePattern is the base name a generated file carries, matched with path.Match, so the word alone, as in
+// generated_long.go, is not the mark.
+const generatedNamePattern = "*.generated.*"
+
+// defaultLimit is the house limit, Kirk's ruling of 2026-10-03 (#r3hfpe8), shared with cohere-swift's file-length.
+const defaultLimit = 2000
+
+// NewAnalyzer builds the rule's analyzer with a flag set of its own. The rule reads its max option from the
+// analyzer running it, so a test can run a configured and the default analyzer side by side without one setting a
+// flag the other reads.
+func NewAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "consistency_no_long_file",
+		Doc: "Flags a file of more than 2,000 lines once, from the start of its 2,001st line to its end. Every " +
+			"line counts, comments and blank lines included, and a final newline ends the last line rather than " +
+			"adding one, so a file of 2,000 lines ending in a newline is not over. A file whose base name matches " +
+			"*.generated.* is exempt. The max option sets a stricter limit, and a looser one is refused.",
+		Run: run,
+	}
+	// A repository may hold its files to fewer lines than the house does, so the limit is the max option. It may only
+	// make the rule stricter: the house limit is a ruling, not a default to raise. Its value is refused below one or
+	// above the house limit when it is set, so a bad setting fails the run's configuration rather than this rule.
+	limit := lineLimit(defaultLimit)
+	analyzer.Flags.Var(&limit, maximumOption, "the most lines a file may hold, from 1 to 2000")
+	return analyzer
+}
+
+// Analyzer runs the rule over one package.
+var Analyzer = NewAnalyzer()
+
+// Rule is this rule's entry in the Go engine's registry. It reads the files' line tables, never the types.
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+
+var tooManyLinesMessage = policy.MessageOf(Name, "tooManyLines")
+
+// limitOf is the max option of the analyzer running pass. NewAnalyzer is the only way the rule's analyzer is built,
+// but an analyzer assembled some other way has no limit of its own, so it runs at the house limit.
+func limitOf(pass *analysis.Pass) int {
+	option := pass.Analyzer.Flags.Lookup(maximumOption)
+	if option == nil {
+		return defaultLimit
+	}
+	limit, isLineLimit := option.Value.(*lineLimit)
+	if !isLineLimit {
+		return defaultLimit
+	}
+	return int(*limit)
+}
+
+func run(pass *analysis.Pass) (any, error) {
+	limit := limitOf(pass)
+	for _, file := range pass.Files {
+		// The line table counts every newline the scanner read, in comments and raw strings too, and a newline at
+		// the very end starts no line, which is the count an editor shows. It is the file as written, which a
+		// //line directive does not change.
+		tokenFile := pass.Fset.File(file.FileStart)
+		hasGeneratedName, matchError := path.Match(generatedNamePattern, filepath.Base(tokenFile.Name()))
+		if matchError != nil {
+			return nil, fmt.Errorf("matching %s against %s: %w", tokenFile.Name(), generatedNamePattern, matchError)
+		}
+		if hasGeneratedName {
+			continue
+		}
+		lineCount := tokenFile.LineCount()
+		if lineCount <= limit {
+			continue
+		}
+		// The finding starts where the file goes past the limit, so a reader jumping to it lands on the first line
+		// over, the natural place to look for a seam, and runs to the end of the file, the last byte as written,
+		// so its range is every line a split has to move out.
+		pass.Report(analysis.Diagnostic{
+			Pos:      tokenFile.LineStart(limit + 1),
+			End:      file.FileEnd,
+			Category: tooManyLinesMessage.Id,
+			Message: tooManyLinesMessage.Render(map[string]string{
+				"lineCount": strconv.Itoa(lineCount),
+				"max":       strconv.Itoa(limit),
+			}),
+		})
+	}
+	return nil, nil
+}

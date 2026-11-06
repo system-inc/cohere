@@ -249,14 +249,14 @@ func TestReExportIsAPassThrough(test *testing.T) {
 // nothing checked it.
 func TestDeadCodeReferenceStillCountsAsAUse(test *testing.T) {
 	test.Parallel()
-	deadrefFixture := fixturePath(test, "deadref")
+	deadReferenceFixture := fixturePath(test, "dead_reference")
 	graph, buildError := program.Build(program.Options{
-		ConfigFileName:   deadrefFixture + "/tsconfig.json",
-		CurrentDirectory: deadrefFixture,
+		ConfigFileName:   deadReferenceFixture + "/tsconfig.json",
+		CurrentDirectory: deadReferenceFixture,
 		SingleThreaded:   true,
 	})
 	if buildError != nil {
-		test.Fatalf("building the deadref fixture: %v", buildError)
+		test.Fatalf("building the dead_reference fixture: %v", buildError)
 	}
 	report, runError := Run(context.Background(), graph, graph.ProjectFiles(), true)
 	if runError != nil {

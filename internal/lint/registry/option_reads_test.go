@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/gotypes"
+	"github.com/system-inc/cohere/internal/go_types"
 )
 
 /*
@@ -82,7 +82,7 @@ func findUnreadOptionFields(
 
 	// Every field an option decode reaches, by its declaring object.
 	fields := map[*types.Var]optionField{}
-	nonTestFiles := func(loadedPackage *gotypes.Package) []*ast.File {
+	nonTestFiles := func(loadedPackage *go_types.Package) []*ast.File {
 		files := []*ast.File{}
 		for _, file := range loadedPackage.Syntax {
 			if !strings.HasSuffix(loadedPackage.Fset.Position(file.Pos()).Filename, "_test.go") {
@@ -362,11 +362,11 @@ func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
 // above is a measurement rather than a matcher that never matches.
 func TestTheOptionReadGuardSeesAnUnreadField(test *testing.T) {
 	test.Parallel()
-	plantedRoot, absolutePathError := filepath.Abs("testdata/optionreads")
+	plantedRoot, absolutePathError := filepath.Abs("testdata/option_reads")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	findings := findUnreadOptionFields(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optionreads")
+	findings := findUnreadOptionFields(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/option_reads")
 
 	unread := map[string]bool{}
 	for _, field := range findings.unread {

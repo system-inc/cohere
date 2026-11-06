@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // yamlCandidate is the port, measured two ways. The full stack is Format: the Go parser and the printer,
@@ -13,7 +13,7 @@ import (
 // the comparison starts, so the printer is measured apart from the parser; Format then checks it is
 // printing the text the tree was parsed from.
 type yamlCandidate struct {
-	options   formatoptions.Options
+	options   format_options.Options
 	fullStack bool
 	texts     map[string]string
 	trees     map[string]parsed

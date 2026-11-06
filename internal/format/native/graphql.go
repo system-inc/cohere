@@ -2,7 +2,7 @@ package native
 
 import (
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/graphql"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -10,13 +10,13 @@ import (
 // The GraphQL printer: Prettier's language-graphql printer over graphql-js's parse, ported in
 // internal/format/graphql. Its doc entry is what gql and graphql templates in TypeScript embed.
 func init() {
-	print := func(_ string, text string, options formatoptions.Options) (string, error) {
+	print := func(_ string, text string, options format_options.Options) (string, error) {
 		return graphql.Format(text, options)
 	}
 	printDoc := func(
 		_ string,
 		text string,
-		options formatoptions.Options,
+		options format_options.Options,
 		_ string,
 		_ string,
 		_ printing.TextToDoc,

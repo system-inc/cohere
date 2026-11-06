@@ -1,3 +1,4 @@
+//cohere:ignore cohere-go/consistency-require-separated-folder-words the micromark library's name
 package micromark
 
 import "slices"

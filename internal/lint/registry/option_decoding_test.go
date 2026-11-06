@@ -327,11 +327,11 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testin
 // package, so a clean result above is a measurement rather than a matcher that never matches.
 func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(test *testing.T) {
 	test.Parallel()
-	plantedRoot, absolutePathError := filepath.Abs("testdata/optiondecoding")
+	plantedRoot, absolutePathError := filepath.Abs("testdata/option_decoding")
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
-	findings := findOptionDecodes(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/optiondecoding")
+	findings := findOptionDecodes(test, "../../..", plantedRoot, "./internal/lint/registry/testdata/option_decoding")
 
 	loose := map[string]bool{}
 	for _, decode := range findings.loose {

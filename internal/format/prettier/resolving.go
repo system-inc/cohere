@@ -5,13 +5,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // Resolving formats each file with the options Prettier would resolve for that file.
 //
-// The format phase used to build one Engine from formatoptions.Default, ahra's block, and run it over
+// The format phase used to build one Engine from format_options.Default, ahra's block, and run it over
 // whatever repository cohere was pointed at. That formatted api-phi-health with the wrong
 // bracketSameLine, which a differential measured as 41 files "rewritten" that are in fact a fixed point
 // of their own configuration. Formatting a repository with another repository's options is a bug,
@@ -28,8 +28,8 @@ import (
 type Resolving struct {
 	mutex       sync.Mutex
 	first       *Engine
-	engines     map[formatoptions.Options]*Engine
-	byDirectory map[string]formatoptions.Resolution
+	engines     map[format_options.Options]*Engine
+	byDirectory map[string]format_options.Resolution
 }
 
 // NewResolving builds the engine for startDirectory's options eagerly.
@@ -39,8 +39,8 @@ type Resolving struct {
 // file after the fix phase has begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
 	resolving := &Resolving{
-		engines:     map[formatoptions.Options]*Engine{},
-		byDirectory: map[string]formatoptions.Resolution{},
+		engines:     map[format_options.Options]*Engine{},
+		byDirectory: map[string]format_options.Resolution{},
 	}
 	resolution, resolveError := resolving.resolve(startDirectory)
 	if resolveError != nil {
@@ -55,7 +55,7 @@ func NewResolving(startDirectory string) (*Resolving, error) {
 }
 
 // Resolution returns what a file resolves to, for callers that need to say which config applied.
-func (resolving *Resolving) Resolution(fileName string) (formatoptions.Resolution, error) {
+func (resolving *Resolving) Resolution(fileName string) (format_options.Resolution, error) {
 	return resolving.resolve(filepath.Dir(fileName))
 }
 
@@ -65,7 +65,7 @@ func (resolving *Resolving) Handles(fileName string) bool {
 }
 
 // Enumerate walks a tree for formattable files. Options do not change which files those are.
-func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, error) {
+func (resolving *Resolving) Enumerate(root string) (format_files.Enumeration, error) {
 	return resolving.first.Enumerate(root)
 }
 
@@ -82,10 +82,10 @@ func (resolving *Resolving) Format(fileName string, text string) (string, error)
 	return engine.Format(fileName, text)
 }
 
-func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution, error) {
+func (resolving *Resolving) resolve(directory string) (format_options.Resolution, error) {
 	absolute, absolutePathError := filepath.Abs(directory)
 	if absolutePathError != nil {
-		return formatoptions.Resolution{}, absolutePathError
+		return format_options.Resolution{}, absolutePathError
 	}
 	resolving.mutex.Lock()
 	cached, present := resolving.byDirectory[absolute]
@@ -94,9 +94,9 @@ func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution,
 		return cached, nil
 	}
 
-	resolution, resolveError := formatoptions.Resolve(absolute)
+	resolution, resolveError := format_options.Resolve(absolute)
 	if resolveError != nil {
-		return formatoptions.Resolution{}, resolveError
+		return format_options.Resolution{}, resolveError
 	}
 	resolving.mutex.Lock()
 	resolving.byDirectory[absolute] = resolution
@@ -104,7 +104,7 @@ func (resolving *Resolving) resolve(directory string) (formatoptions.Resolution,
 	return resolution, nil
 }
 
-func (resolving *Resolving) engineFor(options formatoptions.Options) (*Engine, error) {
+func (resolving *Resolving) engineFor(options format_options.Options) (*Engine, error) {
 	resolving.mutex.Lock()
 	defer resolving.mutex.Unlock()
 	if engine, present := resolving.engines[options]; present {

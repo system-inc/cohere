@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/release/gocache"
+	"github.com/system-inc/cohere/internal/release/go_cache"
 )
 
 // The Go build cache holds itself under a cap (#jc6ca7r).
@@ -163,7 +163,7 @@ func trimCache() int {
 		return 2
 	}
 	// Measured first, removing nothing, so a cache under its cap costs no one a token.
-	measured, trimError := gocache.Trim(cache, gocache.Limit{Cap: math.MaxInt64}, time.Now())
+	measured, trimError := go_cache.Trim(cache, go_cache.Limit{Cap: math.MaxInt64}, time.Now())
 	if trimError != nil {
 		recordCacheLook(directory, trimError.Error())
 		return 1
@@ -206,9 +206,9 @@ func trimCache() int {
 		return 0
 	}
 	started := time.Now()
-	trimmed, trimError := gocache.Trim(
+	trimmed, trimError := go_cache.Trim(
 		cache,
-		gocache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare},
+		go_cache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare},
 		started,
 	)
 	release()
