@@ -30,11 +30,11 @@ type earlyFormat struct {
 	lineEndings *crlfFiles
 
 	// ready closes once universe, scope and speculation are set.
-	ready       chan struct{}
-	universe    formatUniverse
-	err         error
-	scope       formatScope
-	speculation *formatSpeculation
+	ready         chan struct{}
+	universe      formatUniverse
+	universeError error
+	scope         formatScope
+	speculation   *formatSpeculation
 
 	// narrowing guards speculation's arrival against the fix phase's narrowing of it. The walk can begin before
 	// this pass has a speculation, since it no longer waits for the scope (#g3046x5), so the share the fix phase
@@ -65,8 +65,8 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 		); parseDurationError == nil {
 			time.Sleep(held)
 		}
-		early.universe, early.err = enumerateFormatUniverse(engine, root)
-		if early.err != nil {
+		early.universe, early.universeError = enumerateFormatUniverse(engine, root)
+		if early.universeError != nil {
 			early.started(speculateFormatOn(nil, nil, maximumPasses, 0, nil))
 			return
 		}
@@ -121,12 +121,12 @@ func (early *earlyFormat) transform(engine formatEngine) edit.Transform {
 // declining it, as unformattedScope does.
 func (early *earlyFormat) formatScopeOf() (formatScope, []string) {
 	<-early.ready
-	if early.err != nil {
+	if early.universeError != nil {
 		declineRunCache("the format walk failed")
 		return formatScope{
 			index:       map[string]struct{}{},
-			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", early.err),
-			failure:     early.err,
+			Description: fmt.Sprintf("nothing (could not enumerate the tree: %v)", early.universeError),
+			failure:     early.universeError,
 		}, nil
 	}
 	declareFormatWalk(early.universe.root)

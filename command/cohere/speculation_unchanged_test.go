@@ -118,7 +118,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 		}
 	}
 	attempt, kept := speculation.attempts[unchanged]
-	if !kept || attempt.err != nil || attempt.result.Changed {
+	if !kept || attempt.formatError != nil || attempt.result.Changed {
 		test.Fatalf("the unchanged file was not kept as formatted: kept %v, %+v", kept, attempt)
 	}
 	// Unsafe: each pointer is only compared, to tell one string's memory from another's, never followed.

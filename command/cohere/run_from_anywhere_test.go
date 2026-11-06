@@ -49,11 +49,11 @@ func fixtureProject(test *testing.T) string {
 // the package's wall time (#nxgt2ca). A test that needs a binary of its own, stamped or installed
 // somewhere particular, builds it itself.
 var sharedBinary struct {
-	once      sync.Once
-	directory string
-	path      string
-	output    []byte
-	err       error
+	once       sync.Once
+	directory  string
+	path       string
+	output     []byte
+	buildError error
 }
 
 // stampedBinaries is this command built once per version stamp for the package run, each in a directory
@@ -65,11 +65,11 @@ var stampedBinaries = struct {
 }{byVersion: map[string]*stampedBinary{}}
 
 type stampedBinary struct {
-	once      sync.Once
-	directory string
-	path      string
-	output    []byte
-	err       error
+	once       sync.Once
+	directory  string
+	path       string
+	output     []byte
+	buildError error
 }
 
 // runWithEngine runs cohere from a directory with the Swift engine the override names, or none when it is empty.
@@ -97,16 +97,16 @@ func runWithEngine(test *testing.T, binary string, engine string, directory stri
 func buildCohere(test *testing.T) string {
 	test.Helper()
 	sharedBinary.once.Do(func() {
-		sharedBinary.directory, sharedBinary.err = os.MkdirTemp("", "cohere-test-binary-")
-		if sharedBinary.err != nil {
+		sharedBinary.directory, sharedBinary.buildError = os.MkdirTemp("", "cohere-test-binary-")
+		if sharedBinary.buildError != nil {
 			return
 		}
 		sharedBinary.path = filepath.Join(sharedBinary.directory, "cohere")
 		build := exec.Command("go", "build", "-o", sharedBinary.path, ".")
-		sharedBinary.output, sharedBinary.err = build.CombinedOutput()
+		sharedBinary.output, sharedBinary.buildError = build.CombinedOutput()
 	})
-	if sharedBinary.err != nil {
-		test.Fatalf("cannot build cohere: %v\n%s", sharedBinary.err, sharedBinary.output)
+	if sharedBinary.buildError != nil {
+		test.Fatalf("cannot build cohere: %v\n%s", sharedBinary.buildError, sharedBinary.output)
 	}
 	return sharedBinary.path
 }

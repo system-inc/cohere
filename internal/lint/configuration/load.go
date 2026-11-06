@@ -530,7 +530,7 @@ func IgnorePatternsOf(path string) ([]string, error) {
 // layers it names in `extends`, by path.
 type configurationLayer struct {
 	path     string
-	raw      rawConfig
+	raw      rawConfiguration
 	present  map[string]bool
 	extended []string
 }
@@ -569,7 +569,7 @@ func readConfigLayers(path string, chain []string) ([]configurationLayer, error)
 		return nil, checkOverrideKeysError
 	}
 
-	var raw rawConfig
+	var raw rawConfiguration
 	if decodeError := json.Unmarshal(contents, &raw); decodeError != nil {
 		return nil, fmt.Errorf("parsing lint config %s: %w", absolute, decodeError)
 	}
@@ -795,7 +795,7 @@ func refuseUnreasonedOffs(loaded *Configuration, writtenBy map[string]string, in
 		strings.Join(unreasoned, ", "))
 }
 
-type rawConfig struct {
+type rawConfiguration struct {
 	Extends        extendsList                `json:"extends"`
 	Departures     map[string]string          `json:"departures"`
 	Reasons        map[string]string          `json:"reasons"`
@@ -807,7 +807,7 @@ type rawConfig struct {
 	Settings       map[string]json.RawMessage `json:"settings"`
 }
 
-// parsedTopLevelKeys are the keys `rawConfig` decodes and the loader acts on.
+// parsedTopLevelKeys are the keys `rawConfiguration` decodes and the loader acts on.
 var parsedTopLevelKeys = map[string]bool{
 	"extends":        true,
 	"departures":     true,
@@ -909,7 +909,7 @@ func checkTopLevelKeys(contents []byte, path string) error {
 	return fmt.Errorf(
 		"lint config %s declares %s, which this loader does not implement: the key would be "+
 			"discarded silently and whatever it configures would never take effect. Either "+
-			"implement it in `rawConfig` and act on it, or add it to `ignoredTopLevelKeys` "+
+			"implement it in `rawConfiguration` and act on it, or add it to `ignoredTopLevelKeys` "+
 			"with a note saying why ignoring it is correct",
 		path, strings.Join(quoteEach(unimplemented), ", "))
 }

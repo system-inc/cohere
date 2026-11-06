@@ -14,7 +14,7 @@ func availableMemory() (uint64, error) {
 		return contents
 	}
 	return linuxAvailableMemory(meminfo, linuxCgroupMemory{
-		v2Max:     read("/sys/fs/cgroup/memory.max"),
+		v2Maximum: read("/sys/fs/cgroup/memory.max"),
 		v2Current: read("/sys/fs/cgroup/memory.current"),
 		v1Limit:   read("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
 		v1Usage:   read("/sys/fs/cgroup/memory/memory.usage_in_bytes"),

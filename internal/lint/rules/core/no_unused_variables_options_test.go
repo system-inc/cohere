@@ -708,7 +708,7 @@ func TestNoUnusedVariablesVariablesCaughtErrorsAndDestructuredArrayIgnorePattern
 func TestDecodeNoUnusedVariablesOptionsModesAndShorthand(test *testing.T) {
 	test.Parallel()
 
-	accepted := map[string]NoUnusedVarsOptions{
+	accepted := map[string]NoUnusedVariablesOptions{
 		`"local"`:                  {Variables: "local", Arguments: "after-used", CaughtErrors: "all"},
 		`"all"`:                    {Variables: "all", Arguments: "after-used", CaughtErrors: "all"},
 		`{"vars": "local"}`:        {Variables: "local", Arguments: "after-used", CaughtErrors: "all"},

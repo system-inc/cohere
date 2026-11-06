@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// NoUnusedVarsOptions is the rule's configuration surface.
+// NoUnusedVariablesOptions is the rule's configuration surface.
 //
 // Every field is taken from oxc's `options.rs` rather than from the inventory, which records this
 // rule as having no options and is wrong: the option module alone is 891 lines. The defaults are
@@ -24,7 +24,7 @@ import (
 // typescript-eslint 8.71's and ESLint 10.8.1's core schema's too, and `enableAutofixRemoval` is
 // typescript-eslint's alone, all ported against upstream's rows (#e1zk9s0). Each defaults to false,
 // the zero value.
-type NoUnusedVarsOptions struct {
+type NoUnusedVariablesOptions struct {
 	// Variables is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
 	// only a script has; see isGlobalScopeBinding.
 	Variables string `json:"vars"`
@@ -61,26 +61,26 @@ type NoUnusedVarsOptions struct {
 	// EnableAutofixRemoval is typescript-eslint's alone (core ESLint has no fixer here). Its one key,
 	// imports, makes the removal of an unused import a fix the edit engine applies; off, the default,
 	// the same removal is offered as a suggestion. See importRemoval.
-	EnableAutofixRemoval NoUnusedVarsAutofixRemoval `json:"enableAutofixRemoval"`
+	EnableAutofixRemoval NoUnusedVariablesAutofixRemoval `json:"enableAutofixRemoval"`
 }
 
 // UnmarshalJSON reads upstream's two forms: the object, decoded strictly, and the bare string
 // `"all"` or `"local"`, which is shorthand for `{"vars": ...}` (`["error", "local"]`). A mode value
 // outside upstream's enum is refused by key and value.
-func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
+func (options *NoUnusedVariablesOptions) UnmarshalJSON(raw []byte) error {
 	var shorthand string
 	if decodeError := json.Unmarshal(raw, &shorthand); decodeError == nil {
 		if shorthand != "all" && shorthand != "local" {
 			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
 		}
-		*options = NoUnusedVarsOptions{Variables: shorthand}
+		*options = NoUnusedVariablesOptions{Variables: shorthand}
 		return nil
 	}
-	var fields noUnusedVarsOptionFields
+	var fields noUnusedVariablesOptionFields
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &fields); unmarshalOptionsError != nil {
 		return unmarshalOptionsError
 	}
-	decoded := NoUnusedVarsOptions(fields)
+	decoded := NoUnusedVariablesOptions(fields)
 	for _, mode := range noUnusedVariablesModes {
 		value := mode.value(&decoded)
 		if value != "" && !slices.Contains(mode.allowed, value) {

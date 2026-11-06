@@ -55,9 +55,9 @@ func init() {
 			Rule:   NoUnusedExpressions,
 			Decode: rule.DecodeOptionsInto[NoUnusedExpressionsOptions](),
 		},
-		rule.Registration[NoUnusedVarsOptions]{
+		rule.Registration[NoUnusedVariablesOptions]{
 			Rule:   NoUnusedVariables,
-			Decode: rule.DecodeOptionsInto[NoUnusedVarsOptions](),
+			Decode: rule.DecodeOptionsInto[NoUnusedVariablesOptions](),
 		},
 		rule.Registration[rule.NoOptions]{Rule: NoUnusedPrivateClassMembers},
 		rule.Registration[PreferConstOptions]{

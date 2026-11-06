@@ -221,12 +221,12 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		}
 		check.Checked += len(unformatted)
 		for index, outcome := range formatNestedFiles(transform, unformatted) {
-			if outcome.err != nil {
+			if outcome.fileError != nil {
 				return check, fmt.Errorf(
 					"formatting %s in nested repository %s: %w",
 					unformatted[index],
 					relative,
-					outcome.err,
+					outcome.fileError,
 				)
 			}
 			if outcome.drifted {
@@ -261,8 +261,8 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 
 // nestedCheckResult is checkNestedRepositories' answer, carried from the goroutine it ran on.
 type nestedCheckResult struct {
-	check nestedDriftCheck
-	err   error
+	check      nestedDriftCheck
+	checkError error
 }
 
 // startNestedCheck runs checkNestedRepositories beside the project's fix phase and hands back where its
@@ -273,7 +273,7 @@ func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan n
 	answer := make(chan nestedCheckResult, 1)
 	go func() {
 		check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, formatAll)
-		answer <- nestedCheckResult{check: check, err: checkNestedRepositoriesError}
+		answer <- nestedCheckResult{check: check, checkError: checkNestedRepositoriesError}
 	}()
 	return answer
 }
@@ -281,8 +281,8 @@ func startNestedCheck(engine formatEngine, root string, formatAll bool) <-chan n
 // nestedOutcome is one nested file's answer from the formatter: whether its own run would rewrite it, or
 // why it could not be read or formatted.
 type nestedOutcome struct {
-	drifted bool
-	err     error
+	drifted   bool
+	fileError error
 
 	// unchecked is why the formatter declined the file, which for a file the walk offered it means the file
 	// could not be read as its language (see unparseableSkipReason).
@@ -308,7 +308,7 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 			for index := range next {
 				contents, readError := os.ReadFile(fileNames[index])
 				if readError != nil {
-					outcomes[index] = nestedOutcome{err: readError}
+					outcomes[index] = nestedOutcome{fileError: readError}
 					continue
 				}
 				formatted, transformError := transform(fileNames[index], string(contents), nil)
@@ -318,7 +318,7 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 						unchecked: strings.TrimPrefix(transformError.Error(), edit.ErrSkipped.Error()+": "),
 					}
 				case transformError != nil:
-					outcomes[index] = nestedOutcome{err: transformError}
+					outcomes[index] = nestedOutcome{fileError: transformError}
 				default:
 					outcomes[index] = nestedOutcome{drifted: formatted != string(contents)}
 				}

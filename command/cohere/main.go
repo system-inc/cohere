@@ -1165,8 +1165,8 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
-				if answer.err != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.err)
+				if answer.checkError != nil {
+					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
 				}
 				nested := answer.check
 				for _, walk := range nested.Walks {

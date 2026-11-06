@@ -97,7 +97,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 		var added []discoveredProject
 		for _, project := range queue {
 			read, isRead := reads[found.configurationPath(project)]
-			if project.Engine != engineTypeScript || !isRead || read.err != nil {
+			if project.Engine != engineTypeScript || !isRead || read.readError != nil {
 				continue
 			}
 			for _, reference := range read.configuration.References {
@@ -125,7 +125,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for _, project := range found.Projects {
 		if read, isRead := reads[found.configurationPath(
 			project,
-		)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
+		)]; project.Engine == engineTypeScript && isRead && read.readError == nil &&
 			len(read.configuration.FileNames) == 0 && len(read.configuration.References) > 0 {
 			decided.Solutions = append(decided.Solutions, projectLabel(project))
 			continue
@@ -138,7 +138,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	includers := map[string][]int{}
 	for index, project := range found.Projects {
 		read, isRead := reads[found.configurationPath(project)]
-		if project.Engine != engineTypeScript || !isRead || read.err != nil {
+		if project.Engine != engineTypeScript || !isRead || read.readError != nil {
 			continue
 		}
 		for _, fileName := range read.configuration.FileNames {
@@ -163,7 +163,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	for index, project := range found.Projects {
 		read, isRead := reads[found.configurationPath(project)]
 		if isRead &&
-			read.err == nil &&
+			read.readError == nil &&
 			len(read.configuration.FileNames) > 0 &&
 			len(yielded[index]) == len(read.configuration.FileNames) {
 			decided.Yielding = append(decided.Yielding, projectLabel(project))
@@ -209,7 +209,7 @@ func resolveOwnership(found *discovery) (ownership, error) {
 // still runs, and its own run reports what is wrong with it.
 type projectConfigRead struct {
 	configuration program.ProjectConfiguration
-	err           error
+	readError     error
 }
 
 // readProjectConfigs reads the TypeScript projects' tsconfigs, several at once, by absolute path.
@@ -232,7 +232,7 @@ func readProjectConfigs(found discovery, projects []discoveredProject) map[strin
 			lock.Lock()
 			reads[configurationFile] = projectConfigRead{
 				configuration: configuration,
-				err:           readProjectConfigurationError,
+				readError:     readProjectConfigurationError,
 			}
 			lock.Unlock()
 		}()

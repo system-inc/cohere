@@ -22,10 +22,10 @@ type TopLevelKey struct {
 }
 
 // TopLevelKeys returns every key the loader accepts at the top of a settings file, sorted by name: the
-// ones rawConfig decodes, typed by its fields, and the ones it ignores on purpose, with the reason.
+// ones rawConfiguration decodes, typed by its fields, and the ones it ignores on purpose, with the reason.
 func TopLevelKeys() []TopLevelKey {
 	var keys []TopLevelKey
-	for _, field := range jsonFields(reflect.TypeOf(rawConfig{})) {
+	for _, field := range jsonFields(reflect.TypeOf(rawConfiguration{})) {
 		keys = append(keys, TopLevelKey{Name: field.Name, Field: field.Type})
 	}
 	for name, reason := range ignoredTopLevelKeys {
@@ -36,7 +36,7 @@ func TopLevelKeys() []TopLevelKey {
 }
 
 // ParsedTopLevelKeyNames is the loader's own list of the keys it acts on, which the schema test holds
-// equal to rawConfig's fields: two lists of one thing must not drift.
+// equal to rawConfiguration's fields: two lists of one thing must not drift.
 func ParsedTopLevelKeyNames() []string {
 	return sortedKeys(parsedTopLevelKeys)
 }
@@ -63,7 +63,9 @@ func OverrideKeyNames() []string {
 
 // RuleValueType is the Go type a rule's value decodes from before parseRuleSetting reads it: the
 // schema renders a field of this type as a rule setting rather than as free JSON.
-var RuleValueType = reflect.TypeOf(rawConfig{}).Field(fieldIndex(reflect.TypeOf(rawConfig{}), "rules")).Type.Elem()
+var RuleValueType = reflect.TypeOf(rawConfiguration{}).Field(
+	fieldIndex(reflect.TypeOf(rawConfiguration{}), "rules"),
+).Type.Elem()
 
 // ExtendsListType is the type `extends` decodes into: one path or rule set, or a list of them. The
 // schema renders it as either shape.
@@ -104,9 +106,9 @@ func fieldIndex(structType reflect.Type, jsonName string) int {
 			return index
 		}
 	}
-	// Invariant: the one caller asks for rawConfig's "rules", which rawConfig declares, so a renamed
+	// Invariant: the one caller asks for rawConfiguration's "rules", which rawConfiguration declares, so a renamed
 	// tag stops the package at load, in every test, before any config is read.
-	panic("configuration: rawConfig has no field " + jsonName)
+	panic("configuration: rawConfiguration has no field " + jsonName)
 }
 
 func sortedKeys(set map[string]bool) []string {

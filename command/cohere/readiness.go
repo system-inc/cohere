@@ -149,15 +149,15 @@ func joinedOptions(names []string) string {
 var readinessLoaded = struct {
 	once      sync.Once
 	readiness *program.Readiness
-	err       error
+	loadError error
 }{}
 
 // readinessSet is the set to measure against, or why there is none.
 func readinessSet() (*program.Readiness, error) {
 	readinessLoaded.once.Do(func() {
-		readinessLoaded.readiness, readinessLoaded.err = loadReadiness()
+		readinessLoaded.readiness, readinessLoaded.loadError = loadReadiness()
 	})
-	return readinessLoaded.readiness, readinessLoaded.err
+	return readinessLoaded.readiness, readinessLoaded.loadError
 }
 
 // adamicReadinessRequested is --adamic-readiness: whether this run measures readiness at all.

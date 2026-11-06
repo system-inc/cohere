@@ -51,7 +51,7 @@ type OneVariableSettings struct {
 	SeparateRequires bool
 }
 
-// oneVarObjectOptions is the wire shape of the object form.
+// oneVariableObjectOptions is the wire shape of the object form.
 //
 // Every field is a pointer for the same reason `oneVariableGroup`'s are: upstream distinguishes an
 // absent key from a present one with `Object.hasOwn`, and the two take different paths. A plain
@@ -62,7 +62,7 @@ type OneVariableSettings struct {
 // they are disjoint by `additionalProperties: false` and a config carrying keys from both is
 // refused below. Decoding into one struct and then refusing the mixture keeps the refusal in a
 // place that can explain itself.
-type oneVarObjectOptions struct {
+type oneVariableObjectOptions struct {
 	SeparateRequires *bool   `json:"separateRequires"`
 	Variable         *string `json:"var"`
 	Let              *string `json:"let"`
@@ -143,7 +143,7 @@ func DecodeOneVariableOptions(raw []byte) (OneVariableSettings, error) {
 		return OneVariableSettings{Variable: group, Let: group, Const: group, Using: group, AwaitUsing: group}, nil
 	}
 
-	var object oneVarObjectOptions
+	var object oneVariableObjectOptions
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return DefaultOneVariableSettings(),
 			fmt.Errorf("one-var takes a string or an object, %q: %w", string(raw), unmarshalOptionsError)

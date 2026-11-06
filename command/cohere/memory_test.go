@@ -79,21 +79,25 @@ func TestLinuxAvailableMemoryTakesTheSmallerOfMemAvailableAndTheCgroup(test *tes
 		want   uint64
 	}{
 		{"no cgroup", linuxCgroupMemory{}, host},
-		{"v2 without a limit", linuxCgroupMemory{v2Max: []byte("max\n"), v2Current: []byte("1000\n")}, host},
+		{"v2 without a limit", linuxCgroupMemory{v2Maximum: []byte("max\n"), v2Current: []byte("1000\n")}, host},
 		{
 			"v2 limit with usage",
-			linuxCgroupMemory{v2Max: []byte("4294967296\n"), v2Current: []byte("1073741824\n")},
+			linuxCgroupMemory{v2Maximum: []byte("4294967296\n"), v2Current: []byte("1073741824\n")},
 			3 << 30,
 		},
-		{"v2 limit without usage", linuxCgroupMemory{v2Max: []byte("4294967296\n")}, 4 << 30},
-		{"v2 over its limit", linuxCgroupMemory{v2Max: []byte("1000\n"), v2Current: []byte("2000\n")}, 0},
+		{"v2 limit without usage", linuxCgroupMemory{v2Maximum: []byte("4294967296\n")}, 4 << 30},
+		{"v2 over its limit", linuxCgroupMemory{v2Maximum: []byte("1000\n"), v2Current: []byte("2000\n")}, 0},
 		{"v1 unlimited", linuxCgroupMemory{v1Limit: []byte("9223372036854771712\n"), v1Usage: []byte("1000\n")}, host},
 		{
 			"v1 limit with usage",
 			linuxCgroupMemory{v1Limit: []byte("2147483648\n"), v1Usage: []byte("1073741824\n")},
 			1 << 30,
 		},
-		{"a cgroup above the host", linuxCgroupMemory{v2Max: []byte("68719476736\n"), v2Current: []byte("0\n")}, host},
+		{
+			"a cgroup above the host",
+			linuxCgroupMemory{v2Maximum: []byte("68719476736\n"), v2Current: []byte("0\n")},
+			host,
+		},
 	}
 	for _, entry := range cases {
 		got, linuxAvailableMemoryError := linuxAvailableMemory(meminfo, entry.cgroup)

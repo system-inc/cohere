@@ -26,7 +26,7 @@ func renderRequested(
 	for index, line := range lines {
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			flushStream(test, stream)
-			return out.String(), 1, &recordError{index: index, err: acceptError}
+			return out.String(), 1, &recordError{index: index, acceptError: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited")

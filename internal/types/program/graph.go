@@ -688,11 +688,11 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 					localIgnored++
 					return
 				}
-				if selection.err != nil {
+				if selection.decodeError != nil {
 					// A rule that requires an option and did not get one is a hard failure, never a
 					// quiet decline. Declining is indistinguishable from finding nothing, and that
 					// ambiguity kept a dead rule alive for months.
-					localFailures = append(localFailures, selection.err)
+					localFailures = append(localFailures, selection.decodeError)
 					return
 				}
 				if len(selection.applicable) == 0 {
@@ -1157,7 +1157,7 @@ func (graph *Graph) rulesFor(
 			selections[identity] = selection
 		}
 	}
-	if selection.err != nil {
+	if selection.decodeError != nil {
 		return selection, resolution
 	}
 
@@ -1185,7 +1185,7 @@ func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Res
 				// the chain says, and run at the set's own options.
 				bound, decodeError := graph.Bind(subject, graph.Readiness.Options[subject.Name])
 				if decodeError != nil {
-					selection.err = decodeError
+					selection.decodeError = decodeError
 					return selection
 				}
 				selection.options[subject.Name] = bound
@@ -1215,7 +1215,7 @@ func (graph *Graph) selectRules(rules []rule.Entry, resolution configuration.Res
 		raw := resolution.RawOptionsFor(subject.Name)
 		bound, decodeError := graph.Bind(subject, raw)
 		if decodeError != nil {
-			selection.err = decodeError
+			selection.decodeError = decodeError
 			return selection
 		}
 		selection.options[subject.Name] = bound

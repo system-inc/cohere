@@ -66,7 +66,7 @@ func renderRecordsIn(
 		if acceptError := run.accept([]byte(line)); acceptError != nil {
 			run.writeUnfinished(language.theEngine() + " broke its contract")
 			flushStream(test, stream)
-			return out.String(), 1, &recordError{index: index, err: acceptError}
+			return out.String(), 1, &recordError{index: index, acceptError: acceptError}
 		}
 	}
 	exitCode, finishError := run.finish(engineExit, "exited "+string(rune('0'+engineExit)))
@@ -76,11 +76,11 @@ func renderRecordsIn(
 
 // recordError says which record a refusal came at, so a failing case names the line that tripped.
 type recordError struct {
-	index int
-	err   error
+	index       int
+	acceptError error
 }
 
-func (recordError *recordError) Error() string { return recordError.err.Error() }
+func (recordError *recordError) Error() string { return recordError.acceptError.Error() }
 
 func requireLines(test *testing.T, output string, wanted ...string) {
 	test.Helper()

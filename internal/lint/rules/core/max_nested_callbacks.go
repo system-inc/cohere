@@ -57,11 +57,11 @@ func DefaultMaxNestedCallbacksSettings() MaxNestedCallbacksOptions {
 	}
 }
 
-// maxNestedCallbacksObjectShape is the object arm of upstream's `oneOf`.
+// maximumNestedCallbacksObjectShape is the object arm of upstream's `oneOf`.
 //
 // Both spellings of the limit are carried because upstream accepts both and prefers `maximum`, and
 // the preference is expressed in a way that has an observable defect. See the decoder.
-type maxNestedCallbacksObjectShape struct {
+type maximumNestedCallbacksObjectShape struct {
 	Maximum                       *int  `json:"maximum"`
 	DeprecatedMaximum             *int  `json:"max"`
 	CheckConstructorCallCallbacks *bool `json:"checkConstructorCallCallbacks"`
@@ -117,7 +117,7 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (MaxNestedCallbacksOptions, err
 		return settings, nil
 	}
 
-	var object maxNestedCallbacksObjectShape
+	var object maximumNestedCallbacksObjectShape
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &object); unmarshalOptionsError != nil {
 		return DefaultMaxNestedCallbacksSettings(), unmarshalOptionsError
 	}
