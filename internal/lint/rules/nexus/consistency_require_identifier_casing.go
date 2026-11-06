@@ -58,6 +58,11 @@ func messageIdentifierCasing(
 // and methods. Types are classes, interfaces, type aliases and enums. A name is judged once, where it is
 // declared, and its reads are not reported again.
 //
+// A name judged as UpperCamelCase may open with a brand policy/Brands.json lists, spelled exactly as its
+// owner spells it, followed by nothing or by an UpperCamelCase rest: `iMessageCommandLineInterface` passes,
+// and `iMessagecommandLineInterface` is told `iMessageCommandLineInterface`. It is vocabulary, as the
+// shouting and abbreviation lists are, and the file states the bar a brand meets to join it.
+//
 // Each shape has one owner, so no name is judged twice by rules that could disagree. A `const` of the
 // module or of a namespace body belongs to consistency-require-constant-casing, whose casing there
 // signals reach, and a SCREAMING_SNAKE_CASE `const` at any scope to consistency-no-screaming-snake-case, which
@@ -293,11 +298,11 @@ func judgeIdentifierCasingType(ruleContext rule.Context, node *ast.Node) {
 		declaration = "enum"
 	}
 	text := name.Text()
-	if !isJudgedCasing(text) || isPascalCase(text) {
+	if !isJudgedCasing(text) || isUpperCamelCaseName(text) {
 		return
 	}
-	suggestion := constantNameToPascalCase(text)
-	if !isPascalCase(suggestion) {
+	suggestion := upperCamelCaseSuggestion(text)
+	if !isUpperCamelCaseName(suggestion) {
 		return
 	}
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingTypeText, declaration, text, suggestion))
@@ -345,14 +350,43 @@ func judgeIdentifierCasingValue(
 // component is told the form JSX can still read.
 func judgeIdentifierCasingCapital(ruleContext rule.Context, name *ast.Node, declaration string) {
 	text := strings.TrimPrefix(name.Text(), "#")
-	if isPascalCase(text) {
+	if isUpperCamelCaseName(text) {
 		return
 	}
-	suggestion := constantNameToPascalCase(text)
-	if !isPascalCase(suggestion) {
+	suggestion := upperCamelCaseSuggestion(text)
+	if !isUpperCamelCaseName(suggestion) {
 		return
 	}
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingCapitalText, declaration, text, suggestion))
+}
+
+// isUpperCamelCaseName reports a name the rule reads as UpperCamelCase: one opening on a capital, or on a
+// brand policy/Brands.json lists, spelled exactly as listed, with nothing after it or an UpperCamelCase
+// rest. The rest opens on its capital, never on an underscore, which the converter's own predicate would
+// skip, so `iMessage_Thing` is not read as `iMessageThing`.
+func isUpperCamelCaseName(name string) bool {
+	if isPascalCase(name) {
+		return true
+	}
+	brand, opensOnBrand := policy.Brands.LeadingBrand(name)
+	if !opensOnBrand {
+		return false
+	}
+	rest := strings.TrimPrefix(name, brand)
+	return rest == "" || (!strings.HasPrefix(rest, "_") && isPascalCase(rest))
+}
+
+// upperCamelCaseSuggestion is the UpperCamelCase form the advice names. A name opening on a listed brand
+// keeps the brand as its owner spells it, so `iMessagecommandLineInterface` is told
+// `iMessageCommandLineInterface` rather than to respell the brand, and any other name is the converter's.
+func upperCamelCaseSuggestion(name string) string {
+	if brand, opensOnBrand := policy.Brands.LeadingBrand(name); opensOnBrand {
+		rest := strings.TrimLeft(strings.TrimPrefix(name, brand), "_")
+		if suggestion := brand + constantNameToPascalCase(rest); isUpperCamelCaseName(suggestion) {
+			return suggestion
+		}
+	}
+	return constantNameToPascalCase(name)
 }
 
 // isJudgedCasing reports a name whose casing is this rule's to judge. A leading or a trailing underscore

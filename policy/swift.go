@@ -43,6 +43,9 @@ var swiftPolicyFiles = []struct {
 	{"Abbreviations.json", "PolicyAbbreviations", func() ([]byte, error) {
 		return swiftSource("Abbreviations.json", "PolicyAbbreviations", abbreviationsFile)
 	}},
+	{"Brands.json", "PolicyBrands", func() ([]byte, error) {
+		return swiftSource("Brands.json", "PolicyBrands", brandsFile)
+	}},
 	{"messages/", "RuleMessages", func() ([]byte, error) {
 		return swiftMessagesSource(Messages, swiftMessagesDigest(Messages))
 	}},

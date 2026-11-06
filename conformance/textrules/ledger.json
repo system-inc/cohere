@@ -1,6 +1,14 @@
 [
     {
         "engine": "swift",
+        "family": "casing",
+        "case": "us12",
+        "kind": "verdict",
+        "task": "v1hnsz8",
+        "reason": "the type walk reports `iMessageThing`, since it reads no brand list and judges every lowercase first letter"
+    },
+    {
+        "engine": "swift",
         "family": "shouting",
         "task": "y8whqbe",
         "reason": "Swift has no shouting rule"
