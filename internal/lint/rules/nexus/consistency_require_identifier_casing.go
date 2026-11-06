@@ -60,7 +60,9 @@ func messageIdentifierCasing(
 //
 // Each shape has one owner, so no name is judged twice by rules that could disagree. A `const` of the
 // module or of a namespace body belongs to consistency-require-constant-casing, whose casing there
-// signals reach, and a SCREAMING_SNAKE_CASE name of any kind to consistency-no-screaming-snake-case.
+// signals reach, and a SCREAMING_SNAKE_CASE `const` at any scope to consistency-no-screaming-snake-case, which
+// judges exactly that: a `const` bound to a plain name. A shouting `let`, parameter, function or type has no
+// other owner, so it is judged here like any other name that is not camel case.
 //
 // A property name is not judged, of an object type, an interface, a class or an object literal. In
 // TypeScript a property's name is its wire key: Go keeps a field's wire spelling in a tag and Swift in
@@ -138,6 +140,11 @@ func judgeIdentifierCasingVariable(ruleContext rule.Context, node *ast.Node) {
 		return
 	}
 	if list.Flags&ast.NodeFlagsConst != 0 {
+		// consistency-no-screaming-snake-case's own boundary: a declaration bound to a plain name in a list
+		// carrying the `const` flag, which a loop head's `const` and an `await using` carry too.
+		if isScreamingSnakeCase(name.Text()) {
+			return
+		}
 		if isModuleScopeConstant(list) || keepsAConstantShapesCasing(declaration) {
 			return
 		}
@@ -323,8 +330,9 @@ func judgeIdentifierCasingValue(
 	}
 	message := messageIdentifierCasing(identifierCasingValueText, declaration, text, suggestion)
 	// A name opening on an acronym, `URLPath`, converts to `uRLPath`, which is advice a reader can
-	// correct and a rename should not write.
-	if fixable && !opensOnTwoCapitals(text) {
+	// correct and a rename should not write. A shouting name's words are capitals whole, which the
+	// converter lowers whole, so `MAX_SIZE` becomes `maxSize` and is renamed.
+	if fixable && (!opensOnTwoCapitals(text) || isScreamingSnakeCase(text)) {
 		if fix, isSafe := fileLocalRenameFix(ruleContext, name, suggestion); isSafe {
 			ruleContext.ReportNodeWithFixes(name, message, fix)
 			return
@@ -349,11 +357,10 @@ func judgeIdentifierCasingCapital(ruleContext rule.Context, name *ast.Node, decl
 
 // isJudgedCasing reports a name whose casing is this rule's to judge. A leading or a trailing underscore
 // is a taste call pending with Kirk, so `_cache`, `event_` and `__meta__` are left alone whatever else
-// they spell, and the bare `_` with them. A SCREAMING_SNAKE_CASE name belongs to
-// consistency-no-screaming-snake-case, and a reserved word's escape to the keyword it escapes.
+// they spell, and the bare `_` with them. A reserved word's escape belongs to the keyword it escapes.
 func isJudgedCasing(name string) bool {
 	return name != "" && !strings.HasPrefix(name, "_") && !strings.HasSuffix(name, "_") &&
-		!isScreamingSnakeCase(name) && !escapesAReservedWord(name)
+		!escapesAReservedWord(name)
 }
 
 // isAmbientDeclaration reports a declaration under `declare`, in a declaration file, or in a `declare

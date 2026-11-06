@@ -1,0 +1,16 @@
+{
+    "why": "us11: a SCREAMING_SNAKE_CASE mutable local is a value like any other, so it is reported at its declaration. The shouting shape's own rule owns a constant only, so a `let` or `var` falls to the casing rule for every other name",
+    "expect": [
+        {
+            "covers": "MAX_SIZE",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

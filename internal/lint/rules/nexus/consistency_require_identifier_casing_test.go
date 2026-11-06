@@ -135,6 +135,22 @@ func TestConsistencyRequireIdentifierCasingFires(test *testing.T) {
 			"import { constants } from 'wire';\nexport function mode() { let read_mode = constants.open_mode; return read_mode; }\n",
 			[]string{"read_mode"},
 		},
+		// A shouting name that is not a `const` has no other owner, so it is judged here (us11).
+		{"a screaming let", "export function limit() { let MAX_SIZE = 10; return MAX_SIZE; }\n", []string{"MAX_SIZE"}},
+		{"a screaming var", "export function limit() { var MAX_SIZE = 10; return MAX_SIZE; }\n", []string{"MAX_SIZE"}},
+		{
+			"a screaming parameter",
+			"export function limit(MAX_SIZE: number) { return MAX_SIZE; }\n",
+			[]string{"MAX_SIZE"},
+		},
+		{"a screaming function", "export function DO_WORK(): void {}\n", []string{"DO_WORK"}},
+		{"a screaming method", "export class Book { DO_WORK(): void {} }\n", []string{"DO_WORK"}},
+		{
+			"screaming types",
+			"export class ORDER_BOOK {}\nexport interface ORDER_LINE {}\nexport type ORDER_KIND = 'Open';\n" +
+				"export enum ORDER_STATE { Open }\n",
+			[]string{"ORDER_BOOK", "ORDER_LINE", "ORDER_KIND", "ORDER_STATE"},
+		},
 		{
 			"an underscore inside a component's name",
 			"export function Order_List() { return <ul />; }\n",
@@ -172,10 +188,16 @@ func TestConsistencyRequireIdentifierCasingStaysSilent(test *testing.T) {
 			"const MaxSize = 1;\nconst unit_price = 2;\nexport const Total = MaxSize + unit_price;\n",
 		},
 		{"a namespace constant", "export namespace Limits { export const max_size = 1; }\n"},
-		// The shouting shape is consistency-no-screaming-snake-case's, at any scope and in any binding.
+		// A shouting `const` is consistency-no-screaming-snake-case's, at any scope, in a loop head too.
 		{
-			"a screaming name",
-			"export function limit(MAX_SIZE: number) { let RETRY_COUNT = 3; const LOCAL_LIMIT = 2; return MAX_SIZE + RETRY_COUNT + LOCAL_LIMIT; }\n",
+			"a screaming constant",
+			"const MODULE_LIMIT = 1;\nexport function limit() { const LOCAL_LIMIT = 2; " +
+				"for (const ITEM_VALUE of [1]) { return ITEM_VALUE; } return MODULE_LIMIT + LOCAL_LIMIT; }\n",
+		},
+		// An exact environment mirror keeps the key's own case.
+		{
+			"a screaming environment mirror",
+			"export function address() { let DATABASE_URL = process.env.DATABASE_URL ?? ''; return DATABASE_URL; }\n",
 		},
 		// Property names are wire keys in TypeScript, so none is judged.
 		{
@@ -422,6 +444,11 @@ func TestConsistencyRequireIdentifierCasingRenamesWhatTheFileOwns(test *testing.
 			"a local, its shorthand key kept",
 			"export function row() { let unit_price = 1; return { unit_price }; }\n",
 			"export function row() { let unitPrice = 1; return { unit_price: unitPrice }; }\n",
+		},
+		{
+			"a screaming local, its words lowered whole",
+			"export function limit() { let MAX_SIZE = 10; return MAX_SIZE * 2; }\n",
+			"export function limit() { let maxSize = 10; return maxSize * 2; }\n",
 		},
 		{
 			"a file-local function",
