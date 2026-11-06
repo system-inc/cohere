@@ -45,6 +45,7 @@ func TestAnalyzer(test *testing.T) {
 		"flagged/middle/util/inner",
 		"flagged/clause",
 		"flagged/clausecase",
+		"flagged/clauseunderscores",
 		"flagged/nested/utils",
 		"flagged/generated/utils",
 		"allowed/utilities",
