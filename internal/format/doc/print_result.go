@@ -42,5 +42,7 @@ func (result *printResult) finish() string {
 	if len(result.buffer) == 0 {
 		return ""
 	}
+	// Unsafe: the buffer is never written again once finished, as above, and is not empty, so the string
+	// points at bytes that stay put for as long as it lives.
 	return unsafe.String(&result.buffer[0], len(result.buffer))
 }

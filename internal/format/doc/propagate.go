@@ -61,6 +61,9 @@ func traverse(root Doc, onEnter func(Doc) bool, onExit func(Doc)) {
 		default:
 			parts, isArray := Parts(current)
 			if !isArray {
+				// Invariant: the cases above and Parts cover every Doc this package defines, and an exit
+				// marker is taken before the switch, so only a nil doc lands here, which is a bug in the
+				// printer that built it and which upstream's traverseDoc throws InvalidDocError for.
 				panic(fmt.Sprintf("invalid doc %T", current))
 			}
 			for index := len(parts) - 1; index >= 0; index-- {

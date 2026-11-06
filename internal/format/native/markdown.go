@@ -26,7 +26,11 @@ func init() {
 	// name upstream overrides the filepath with, because the trailing comma of type parameters depends
 	// on it.
 	Register(".md", func(_ string, text string, options formatoptions.Options) (string, error) {
-		docs := embedDocs.Get().(*arena.Slab[doc.Doc])
+		docs, isSlab := embedDocs.Get().(*arena.Slab[doc.Doc])
+		if !isSlab {
+			// Invariant: embedDocs builds only doc slabs, and the one Put below returns the slab this Get took.
+			panic("native: the markdown embed pool held something other than a doc slab")
+		}
 		defer func() {
 			docs.Reset()
 			embedDocs.Put(docs)

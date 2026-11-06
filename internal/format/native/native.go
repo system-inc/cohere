@@ -59,16 +59,21 @@ var (
 	rawDocPrinters = map[string]bool{}
 )
 
+// byteOrderMark is the mark core.js takes off a file's text before parsing and puts back on after.
+const byteOrderMark = "\ufeff"
+
 // RegisterDoc routes an extension to a printer's doc entry, for embedding. A printer without one is
 // embedded through its Print, as text.
 func RegisterDoc(extension string, printDoc PrintDoc) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := docPrinters[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice for embedding", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := docPrinters[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice for embedding", lowercaseExtension))
 	}
-	docPrinters[extension] = printDoc
+	docPrinters[lowercaseExtension] = printDoc
 }
 
 // RegisterRawDoc is RegisterDoc for a doc entry that returns its doc with the trailing hardline still on:
@@ -168,11 +173,13 @@ func lookupParsed(fileName string) (PrintParsed, bool) {
 func RegisterParsed(extension string, printParsed PrintParsed) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := parsedPrinters[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice to take a tree", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := parsedPrinters[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice to take a tree", lowercaseExtension))
 	}
-	parsedPrinters[extension] = printParsed
+	parsedPrinters[lowercaseExtension] = printParsed
 }
 
 // Register routes an extension (".tsx", with the dot) to a printer. Registering one twice is a
@@ -181,11 +188,13 @@ func RegisterParsed(extension string, printParsed PrintParsed) {
 func Register(extension string, print Print) {
 	mutex.Lock()
 	defer mutex.Unlock()
-	extension = strings.ToLower(extension)
-	if _, taken := printers[extension]; taken {
-		panic(fmt.Sprintf("native: %s is registered twice", extension))
+	lowercaseExtension := strings.ToLower(extension)
+	if _, taken := printers[lowercaseExtension]; taken {
+		// Invariant: every caller outside the tests that prove this refusal is an init function in this package
+		// naming a fixed extension, so a second claim fails at startup, never in a file being formatted.
+		panic(fmt.Sprintf("native: %s is registered twice", lowercaseExtension))
 	}
-	printers[extension] = print
+	printers[lowercaseExtension] = print
 }
 
 // Extensions lists what is registered, for a report to say which languages the native side covers.
@@ -199,8 +208,6 @@ func Extensions() []string {
 	sort.Strings(extensions)
 	return extensions
 }
-
-const byteOrderMark = "\ufeff"
 
 func lookup(fileName string) (Print, bool) {
 	mutex.RLock()

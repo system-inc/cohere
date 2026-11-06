@@ -16,8 +16,12 @@ type Tag struct {
 	NodeClass string
 
 	// resolveScalar is a scalar tag's resolve. It returns a *Node when upstream's returns a Scalar,
-	// otherwise the raw value, and an error where upstream's throws.
-	resolveScalar func(value []uint16, onError func(message string), options *Options) (any, error)
+	// otherwise nil and the raw value, and an error where upstream's throws.
+	resolveScalar func(
+		value []uint16,
+		onError func(message string),
+		options *Options,
+	) (*Node, ScalarValue, error)
 	// resolveCollection is a collection tag's resolve.
 	resolveCollection func(collection *Node, onError func(message string)) *Node
 

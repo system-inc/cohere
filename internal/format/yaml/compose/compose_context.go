@@ -12,7 +12,7 @@ type composeContext struct {
 
 // newScalar, newPair and newCollection on a context take the node from the parse's arena when the
 // options carry one (Options.Nodes), and allocate it otherwise (#v6ksqg3).
-func (composition *composeContext) newScalar(value any) *Node {
+func (composition *composeContext) newScalar(value ScalarValue) *Node {
 	return composition.options.Nodes.New(Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value})
 }
 

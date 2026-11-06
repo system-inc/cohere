@@ -8,24 +8,26 @@ func splice[T any](list []T, start int, remove int, items []T) []T {
 	end := len(list)
 
 	// Make start between zero and `end` (included).
+	clampedStart := start
 	if start < 0 {
 		if -start > end {
-			start = 0
+			clampedStart = 0
 		} else {
-			start = end + start
+			clampedStart = end + start
 		}
 	} else if start > end {
-		start = end
+		clampedStart = end
 	}
 
+	clampedRemove := remove
 	if remove < 0 {
-		remove = 0
+		clampedRemove = 0
 	}
-	if start+remove > end {
-		remove = end - start
+	if clampedStart+clampedRemove > end {
+		clampedRemove = end - clampedStart
 	}
 
-	return slices.Insert(slices.Delete(list, start, start+remove), start, items...)
+	return slices.Insert(slices.Delete(list, clampedStart, clampedStart+clampedRemove), clampedStart, items...)
 }
 
 func spliceEvents(list []Event, start int, remove int, items []Event) []Event {
@@ -50,32 +52,34 @@ func pushEvents(list []Event, items []Event) []Event {
 
 // resolveAllEntries is upstream's micromark-util-resolve-all, for the tokenizer's own list.
 func resolveAllEntries(entries []resolvable, events []Event, context *TokenizeContext) []Event {
+	resolvedEvents := events
 	var called []*Resolver
 
 	for _, entry := range entries {
 		resolve := entry.resolveAll()
 
 		if resolve != nil && !slices.Contains(called, resolve) {
-			events = resolve.Resolve(events, context)
+			resolvedEvents = resolve.Resolve(resolvedEvents, context)
 			called = append(called, resolve)
 		}
 	}
 
-	return events
+	return resolvedEvents
 }
 
 // resolveAll is upstream's micromark-util-resolve-all over constructs.
 func resolveAll(constructs []*Construct, events []Event, context *TokenizeContext) []Event {
+	resolvedEvents := events
 	var called []*Resolver
 
 	for _, construct := range constructs {
 		resolve := construct.ResolveAll
 
 		if resolve != nil && !slices.Contains(called, resolve) {
-			events = resolve.Resolve(events, context)
+			resolvedEvents = resolve.Resolve(resolvedEvents, context)
 			called = append(called, resolve)
 		}
 	}
 
-	return events
+	return resolvedEvents
 }

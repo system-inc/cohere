@@ -39,19 +39,24 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 	commentSep := ""
 	hasNewline := false
 	requiresSpace := false
-	var tab, anchor, tag, newlineAfterProperty, comma, found *cst.Token
+	var tab *cst.Token
+	var anchor *cst.Token
+	var tag *cst.Token
+	var newlineAfterProperty *cst.Token
+	var comma *cst.Token
+	var found *cst.Token
 	start, startSet := 0, false
 	for _, token := range tokens {
 		if requiresSpace {
 			if token.Type != "space" && token.Type != "newline" && token.Type != "comma" {
-				onError(token.Offset, "MISSING_CHAR",
+				onError(errorOffset(token.Offset), "MISSING_CHAR",
 					"Tags and anchors must be separated from the next token by white space", false)
 			}
 			requiresSpace = false
 		}
 		if tab != nil {
 			if atNewline && token.Type != "comment" && token.Type != "newline" {
-				onError(tab, "TAB_AS_INDENT", "Tabs are not allowed as indentation", false)
+				onError(errorToken{token: tab}, "TAB_AS_INDENT", "Tabs are not allowed as indentation", false)
 			}
 			tab = nil
 		}
@@ -67,7 +72,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 			hasSpace = true
 		case "comment":
 			if !hasSpace {
-				onError(token, "MISSING_CHAR",
+				onError(errorToken{token: token}, "MISSING_CHAR",
 					"Comments must be separated from other tokens by white space characters", false)
 			}
 			// `token.source.substring(1) || ' '`
@@ -100,10 +105,15 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 			hasSpace = true
 		case "anchor":
 			if anchor != nil {
-				onError(token, "MULTIPLE_ANCHORS", "A node can have at most one anchor", false)
+				onError(errorToken{token: token}, "MULTIPLE_ANCHORS", "A node can have at most one anchor", false)
 			}
 			if characterAt(token.Source, len(token.Source)-1) == ':' {
-				onError(token.Offset+len(token.Source)-1, "BAD_ALIAS", "Anchor ending in : is ambiguous", true)
+				onError(
+					errorOffset(token.Offset+len(token.Source)-1),
+					"BAD_ALIAS",
+					"Anchor ending in : is ambiguous",
+					true,
+				)
 			}
 			anchor = token
 			if !startSet {
@@ -114,7 +124,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 			requiresSpace = true
 		case "tag":
 			if tag != nil {
-				onError(token, "MULTIPLE_TAGS", "A node can have at most one tag", false)
+				onError(errorToken{token: token}, "MULTIPLE_TAGS", "A node can have at most one tag", false)
 			}
 			tag = token
 			if !startSet {
@@ -126,7 +136,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 		case indicator:
 			// Could here handle preceding comments differently
 			if anchor != nil || tag != nil {
-				onError(token, "BAD_PROP_ORDER",
+				onError(errorToken{token: token}, "BAD_PROP_ORDER",
 					"Anchors and tags must be after the "+unitsToString(token.Source)+" indicator", false)
 			}
 			if found != nil {
@@ -135,7 +145,12 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 				if in == "" {
 					in = "collection"
 				}
-				onError(token, "UNEXPECTED_TOKEN", "Unexpected "+unitsToString(token.Source)+" in "+in, false)
+				onError(
+					errorToken{token: token},
+					"UNEXPECTED_TOKEN",
+					"Unexpected "+unitsToString(token.Source)+" in "+in,
+					false,
+				)
 			}
 			found = token
 			atNewline = indicator == "seq-item-ind" || indicator == "explicit-key-ind"
@@ -143,7 +158,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 		case "comma":
 			if flow != "" {
 				if comma != nil {
-					onError(token, "UNEXPECTED_TOKEN", "Unexpected , in "+flow, false)
+					onError(errorToken{token: token}, "UNEXPECTED_TOKEN", "Unexpected , in "+flow, false)
 				}
 				comma = token
 				atNewline = false
@@ -153,7 +168,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 			// else fallthrough
 			fallthrough
 		default:
-			onError(token, "UNEXPECTED_TOKEN", "Unexpected "+token.Type+" token", false)
+			onError(errorToken{token: token}, "UNEXPECTED_TOKEN", "Unexpected "+token.Type+" token", false)
 			atNewline = false
 			hasSpace = false
 		}
@@ -166,7 +181,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 	if requiresSpace && next != nil && next.Type != "space" && next.Type != "newline" && next.Type != "comma" &&
 		(next.Type != "scalar" || len(next.Source) != 0) {
 		onError(
-			next.Offset,
+			errorOffset(next.Offset),
 			"MISSING_CHAR",
 			"Tags and anchors must be separated from the next token by white space",
 			false,
@@ -174,7 +189,7 @@ func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 	}
 	if tab != nil && (atNewline && tab.Indent <= options.parentIndent ||
 		next != nil && (next.Type == "block-map" || next.Type == "block-seq")) {
-		onError(tab, "TAB_AS_INDENT", "Tabs are not allowed as indentation", false)
+		onError(errorToken{token: tab}, "TAB_AS_INDENT", "Tabs are not allowed as indentation", false)
 	}
 	if !startSet {
 		start = end
@@ -202,6 +217,7 @@ type resolvedEnd struct {
 // is nil for upstream's undefined.
 func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErrorFunc) resolvedEnd {
 	comment := ""
+	endOffset := offset
 	if end != nil {
 		hasSpace := false
 		sep := ""
@@ -212,7 +228,7 @@ func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErro
 				hasSpace = true
 			case "comment":
 				if requiresSpace && !hasSpace {
-					onError(token, "MISSING_CHAR",
+					onError(errorToken{token: token}, "MISSING_CHAR",
 						"Comments must be separated from other tokens by white space characters", false)
 				}
 				// `source.substring(1) || ' '`
@@ -232,12 +248,12 @@ func resolveEnd(end []*cst.Token, offset int, requiresSpace bool, onError onErro
 				}
 				hasSpace = true
 			default:
-				onError(token, "UNEXPECTED_TOKEN", "Unexpected "+tokenType+" at node end", false)
+				onError(errorToken{token: token}, "UNEXPECTED_TOKEN", "Unexpected "+tokenType+" at node end", false)
 			}
 			// `offset += source.length`: a token without a source (a collection) would make this NaN
 			// upstream; the parser never ends a node with one.
-			offset += len(source)
+			endOffset += len(source)
 		}
 	}
-	return resolvedEnd{comment: comment, offset: offset}
+	return resolvedEnd{comment: comment, offset: endOffset}
 }

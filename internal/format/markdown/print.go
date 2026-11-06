@@ -116,6 +116,12 @@ func isNextTokenFakeSetextH2Line(path *astPath) bool {
 
 var syntaxLeadingPattern = regexp.MustCompile(`^>|^(?:[*+-]|#{1,6}|\d+[).])$`)
 
+var (
+	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
+	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
+	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
+)
+
 func printMdast(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
@@ -228,6 +234,8 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 	case "wikiLink":
 		if node.ValueNull {
 			// Upstream prints a null value into the doc, which the doc printer rejects.
+			// Invariant: the wiki link syntax refuses a link without target data, and the target's exit in
+			// wikiLinkFromMarkdown sets the value, so a parsed wiki link always has one.
 			panic("markdown: a wiki link with no target")
 		}
 		contents := node.Value
@@ -434,15 +442,11 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 		return replaceEndOfLine(node.Value, doc.Hardline)
 	default:
 		// tableRow is handled in "table" and listItem in "list".
+		// Invariant: mdast builds only the node types above, a fragment never outlives the resume that
+		// pops it, and table and list print their rows and items themselves.
 		panic("markdown: unexpected node type " + node.NodeType)
 	}
 }
-
-var (
-	tabsAndNewlinesPattern = regexp.MustCompile(`[\t\n]+`)
-	htmlCommentPattern     = regexp.MustCompile(`(?s)^<!--.*-->$`)
-	javaScriptSpaceRuns    = regexp.MustCompile(`[` + javaScriptSpace + `]+`)
-)
 
 func isJavaScriptSpace(character rune) bool {
 	return character >= 0 && strings.ContainsRune(javaScriptSpaceText, character)
@@ -534,10 +538,11 @@ func shouldRemainTheSameContent(path *astPath) bool {
 
 // encodeUrl is encodeUrl: each character replaced by its encodeURIComponent.
 func encodeUrl(link string, characters string) string {
+	encoded := link
 	for _, character := range characters {
-		link = strings.ReplaceAll(link, string(character), url.PathEscape(string(character)))
+		encoded = strings.ReplaceAll(encoded, string(character), url.PathEscape(string(character)))
 	}
-	return link
+	return encoded
 }
 
 // printUrl is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.

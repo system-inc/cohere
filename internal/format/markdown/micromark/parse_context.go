@@ -30,6 +30,8 @@ func (parser *ParseContext) create(contentType string, from *Point) *TokenizeCon
 	case ContentTypeText:
 		initial = textInitial
 	default:
+		// Invariant: every content type comes from this package's ContentType constants, set by Parse and by
+		// the constructs on the chunk tokens subtokenize hands back here, all of them handled above.
 		panic("micromark: unknown content type " + contentType)
 	}
 	return createTokenizer(parser, initial, from)

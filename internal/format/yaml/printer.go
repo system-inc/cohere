@@ -505,6 +505,8 @@ func printNode(path *astPath, options *options, print printFunc) doc.Doc {
 	case "flowSequenceItem":
 		return print("content", nil)
 	default:
+		// Invariant: unist's transform builds only the node types above, and getVisitorKeys has already
+		// stopped any other on the walk here. printDocFile recovers this into an error, as upstream throws.
 		panic(fmt.Sprintf("Unexpected node type %q in YAML", node.NodeType))
 	}
 }

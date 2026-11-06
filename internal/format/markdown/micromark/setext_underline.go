@@ -14,30 +14,33 @@ var setextUnderline = &Construct{
 // it would in JavaScript, where 0 is falsy too.
 func resolveToSetextUnderline(events []Event, context *TokenizeContext) []Event {
 	// To do: resolve like `markdown-rs`.
-	index := len(events)
-	var content, text, definition int
+	resolvedEvents := events
+	index := len(resolvedEvents)
+	var content int
+	var text int
+	var definition int
 
 	// Find the opening of the content.
 	// It’ll always exist: we don’t tokenize if it isn’t there.
 	for index > 0 {
 		index--
-		if events[index].Enter {
-			if events[index].Token.Type == TypeContent {
+		if resolvedEvents[index].Enter {
+			if resolvedEvents[index].Token.Type == TypeContent {
 				content = index
 				break
 			}
-			if events[index].Token.Type == TypeParagraph {
+			if resolvedEvents[index].Token.Type == TypeParagraph {
 				text = index
 			}
 		} else {
 			// Exit
-			if events[index].Token.Type == TypeContent {
+			if resolvedEvents[index].Token.Type == TypeContent {
 				// Remove the content end (if needed we’ll add it later)
-				events = spliceEvents(events, index, 1, nil)
+				resolvedEvents = spliceEvents(resolvedEvents, index, 1, nil)
 			}
 			// After the splice above, events[index] is the event that followed the removed one, as it is
 			// upstream.
-			if definition == 0 && events[index].Token.Type == TypeDefinition {
+			if definition == 0 && resolvedEvents[index].Token.Type == TypeDefinition {
 				definition = index
 			}
 		}
@@ -46,37 +49,40 @@ func resolveToSetextUnderline(events []Event, context *TokenizeContext) []Event 
 	// Upstream spreads the points into fresh objects; Points are values here.
 	heading := &Token{
 		Type:  TypeSetextHeading,
-		Start: events[content].Token.Start,
-		End:   events[len(events)-1].Token.End,
+		Start: resolvedEvents[content].Token.Start,
+		End:   resolvedEvents[len(resolvedEvents)-1].Token.End,
 	}
 
 	// Change the paragraph to setext heading text.
-	events[text].Token.Type = TypeSetextHeadingText
+	resolvedEvents[text].Token.Type = TypeSetextHeadingText
 
 	// If we have definitions in the content, we’ll keep on having content,
 	// but we need move it.
 	if definition != 0 {
-		events = spliceEvents(events, text, 0, []Event{{Enter: true, Token: heading, Context: context}})
-		events = spliceEvents(
-			events,
+		resolvedEvents = spliceEvents(resolvedEvents, text, 0, []Event{{Enter: true, Token: heading, Context: context}})
+		resolvedEvents = spliceEvents(
+			resolvedEvents,
 			definition+1,
 			0,
-			[]Event{{Enter: false, Token: events[content].Token, Context: context}},
+			[]Event{{Enter: false, Token: resolvedEvents[content].Token, Context: context}},
 		)
-		events[content].Token.End = events[definition].Token.End
+		resolvedEvents[content].Token.End = resolvedEvents[definition].Token.End
 	} else {
-		events[content].Token = heading
+		resolvedEvents[content].Token = heading
 	}
 
 	// Add the heading exit at the end.
-	events = append(events, Event{Enter: false, Token: heading, Context: context})
-	return events
+	resolvedEvents = append(resolvedEvents, Event{Enter: false, Token: heading, Context: context})
+	return resolvedEvents
 }
 
 func tokenizeSetextUnderline(self *Self, effects *Effects, ok State, nok State) State {
 	var marker Code
 
-	var start, before, inside, after State
+	var start State
+	var before State
+	var inside State
+	var after State
 
 	// At start of heading (setext) underline.
 	//

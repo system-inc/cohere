@@ -2,6 +2,14 @@ package micromark
 
 import "slices"
 
+// The extension's own token types.
+const (
+	typeStrikethrough                  = "strikethrough"
+	typeStrikethroughSequence          = "strikethroughSequence"
+	typeStrikethroughSequenceTemporary = "strikethroughSequenceTemporary"
+	typeStrikethroughText              = "strikethroughText"
+)
+
 // gfmStrikethroughExtension is micromark-extension-gfm-strikethrough/lib/syntax.js, gfmStrikethrough().
 //
 // The fork's gfm() is called without options and passes none through, so singleTilde is upstream's
@@ -11,16 +19,17 @@ func gfmStrikethroughExtension() *Extension {
 
 	// Take events and resolve strikethrough.
 	resolveAllStrikethrough := func(events []Event, context *TokenizeContext) []Event {
+		resolvedEvents := events
 		index := -1
 
 		// Walk through all events.
-		for index+1 < len(events) {
+		for index+1 < len(resolvedEvents) {
 			index++
 
 			// Find a token that can close.
-			if events[index].Enter &&
-				events[index].Token.Type == typeStrikethroughSequenceTemporary &&
-				events[index].Token.close {
+			if resolvedEvents[index].Enter &&
+				resolvedEvents[index].Token.Type == typeStrikethroughSequenceTemporary &&
+				resolvedEvents[index].Token.close {
 				open := index
 
 				// Now walk back to find an opener. Upstream's `while (open--)` tests, then decrements.
@@ -28,32 +37,33 @@ func gfmStrikethroughExtension() *Extension {
 					open--
 
 					// Find a token that can open the closer.
-					if !events[open].Enter &&
-						events[open].Token.Type == typeStrikethroughSequenceTemporary &&
-						events[open].Token.open &&
+					if !resolvedEvents[open].Enter &&
+						resolvedEvents[open].Token.Type == typeStrikethroughSequenceTemporary &&
+						resolvedEvents[open].Token.open &&
 						// If the sizes are the same:
-						events[index].Token.End.Offset-events[index].Token.Start.Offset == events[open].Token.End.Offset-events[open].Token.Start.Offset {
-						events[index].Token.Type = typeStrikethroughSequence
-						events[open].Token.Type = typeStrikethroughSequence
+						resolvedEvents[index].Token.End.Offset-resolvedEvents[index].Token.Start.Offset ==
+							resolvedEvents[open].Token.End.Offset-resolvedEvents[open].Token.Start.Offset {
+						resolvedEvents[index].Token.Type = typeStrikethroughSequence
+						resolvedEvents[open].Token.Type = typeStrikethroughSequence
 
 						// Points are values here, so upstream's `Object.assign({}, point)` copies are assignments.
 						strikethrough := &Token{
 							Type:  typeStrikethrough,
-							Start: events[open].Token.Start,
-							End:   events[index].Token.End,
+							Start: resolvedEvents[open].Token.Start,
+							End:   resolvedEvents[index].Token.End,
 						}
 
 						text := &Token{
 							Type:  typeStrikethroughText,
-							Start: events[open].Token.End,
-							End:   events[index].Token.Start,
+							Start: resolvedEvents[open].Token.End,
+							End:   resolvedEvents[index].Token.Start,
 						}
 
 						// Opening.
 						nextEvents := []Event{
 							{Enter: true, Token: strikethrough, Context: context},
-							{Enter: true, Token: events[open].Token, Context: context},
-							{Enter: false, Token: events[open].Token, Context: context},
+							{Enter: true, Token: resolvedEvents[open].Token, Context: context},
+							{Enter: false, Token: resolvedEvents[open].Token, Context: context},
 							{Enter: true, Token: text, Context: context},
 						}
 
@@ -67,19 +77,19 @@ func gfmStrikethroughExtension() *Extension {
 								nextEvents,
 								len(nextEvents),
 								0,
-								resolveAll(insideSpan, slices.Clone(events[open+1:index]), context),
+								resolveAll(insideSpan, slices.Clone(resolvedEvents[open+1:index]), context),
 							)
 						}
 
 						// Closing.
 						nextEvents = splice(nextEvents, len(nextEvents), 0, []Event{
 							{Enter: false, Token: text, Context: context},
-							{Enter: true, Token: events[index].Token, Context: context},
-							{Enter: false, Token: events[index].Token, Context: context},
+							{Enter: true, Token: resolvedEvents[index].Token, Context: context},
+							{Enter: false, Token: resolvedEvents[index].Token, Context: context},
 							{Enter: false, Token: strikethrough, Context: context},
 						})
 
-						events = spliceEvents(events, open-1, index-open+3, nextEvents)
+						resolvedEvents = spliceEvents(resolvedEvents, open-1, index-open+3, nextEvents)
 
 						index = open + len(nextEvents) - 2
 						break
@@ -88,20 +98,21 @@ func gfmStrikethroughExtension() *Extension {
 			}
 		}
 
-		for _, event := range events {
+		for _, event := range resolvedEvents {
 			if event.Token.Type == typeStrikethroughSequenceTemporary {
 				event.Token.Type = TypeData
 			}
 		}
 
-		return events
+		return resolvedEvents
 	}
 
 	tokenizeStrikethrough := func(self *Self, effects *Effects, ok State, nok State) State {
 		previous := self.Previous
 		size := 0
 
-		var start, more State
+		var start State
+		var more State
 
 		start = func(code Code) State {
 			// Upstream captures `this.events` at tokenize and reads it here, before anything can change it, so
@@ -155,11 +166,3 @@ func gfmStrikethroughExtension() *Extension {
 		AttentionMarkers: []Code{CodeTilde},
 	}
 }
-
-// The extension's own token types.
-const (
-	typeStrikethrough                  = "strikethrough"
-	typeStrikethroughSequence          = "strikethroughSequence"
-	typeStrikethroughSequenceTemporary = "strikethroughSequenceTemporary"
-	typeStrikethroughText              = "strikethroughText"
-)

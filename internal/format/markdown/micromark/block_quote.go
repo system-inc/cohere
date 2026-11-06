@@ -8,7 +8,8 @@ var blockQuote = &Construct{Name: "blockQuote", Tokenize: tokenizeBlockQuoteStar
 func init() { blockQuote.Continuation = &Construct{Tokenize: tokenizeBlockQuoteContinuation} }
 
 func tokenizeBlockQuoteStart(self *Self, effects *Effects, ok State, nok State) State {
-	var start, after State
+	var start State
+	var after State
 
 	// Start of block quote.
 	//
@@ -61,7 +62,8 @@ func tokenizeBlockQuoteStart(self *Self, effects *Effects, ok State, nok State) 
 //	> | > b
 //	    ^
 func tokenizeBlockQuoteContinuation(self *Self, effects *Effects, ok State, nok State) State {
-	var contStart, contBefore State
+	var contStart State
+	var contBefore State
 
 	// Start of block quote continuation.
 	//

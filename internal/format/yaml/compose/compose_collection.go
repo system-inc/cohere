@@ -37,7 +37,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 	tagName := ""
 	if tagToken != nil {
 		tagName = composition.directives.tagName(tagToken.Source, func(message string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
+			onError(errorToken{token: tagToken}, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	if token.Type == "block-seq" {
@@ -56,7 +56,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 		}
 		if lastProperty != nil && (nl == nil || nl.Offset < lastProperty.Offset) {
 			message := "Missing newline after block sequence props"
-			onError(lastProperty, "MISSING_CHAR", message, false)
+			onError(errorToken{token: lastProperty}, "MISSING_CHAR", message, false)
 		}
 	}
 	expType := "seq"
@@ -89,10 +89,10 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 				if expects == "" {
 					expects = "scalar"
 				}
-				onError(tagToken, "BAD_COLLECTION_TYPE", kt.tagString()+" used for "+expType+
+				onError(errorToken{token: tagToken}, "BAD_COLLECTION_TYPE", kt.tagString()+" used for "+expType+
 					" collection, but expects "+expects, true)
 			} else {
-				onError(tagToken, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, true)
+				onError(errorToken{token: tagToken}, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, true)
 			}
 			return resolveCollection(composition, token, onError, tagName, nil)
 		}
@@ -103,7 +103,7 @@ func composeCollection(composition *composeContext, token *cst.Token, properties
 	node := coll
 	if tag.resolveCollection != nil {
 		node = tag.resolveCollection(coll, func(message string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
+			onError(errorToken{token: tagToken}, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	node.Range = coll.Range
@@ -153,7 +153,7 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 	tagName := ""
 	if tagToken != nil {
 		tagName = composition.directives.tagName(tagToken.Source, func(message string) {
-			onError(tagToken, "TAG_RESOLVE_FAILED", message, false)
+			onError(errorToken{token: tagToken}, "TAG_RESOLVE_FAILED", message, false)
 		})
 	}
 	var tag *Tag
@@ -167,24 +167,25 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 		tag = composition.schema.scalarTag()
 	}
 	// `tagToken ?? token`
-	var errorSource any = token
+	reportedToken := token
 	if tagToken != nil {
-		errorSource = tagToken
+		reportedToken = tagToken
 	}
 	var scalar *Node
 	if tag.resolveScalar == nil {
 		// An inherited property found by knownTag: `tag.resolve(...)` throws a TypeError.
-		onError(errorSource, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
-		scalar = composition.newScalar(unitsToString(value))
+		onError(errorToken{token: reportedToken}, "TAG_RESOLVE_FAILED", "tag.resolve is not a function", false)
+		scalar = composition.newScalar(ScalarString(unitsToString(value)))
 	} else {
-		result, resolveScalarError := tag.resolveScalar(value, func(message string) {
-			onError(errorSource, "TAG_RESOLVE_FAILED", message, false)
+		resolvedNode, result, resolveScalarError := tag.resolveScalar(value, func(message string) {
+			onError(errorToken{token: reportedToken}, "TAG_RESOLVE_FAILED", message, false)
 		}, composition.options)
 		if resolveScalarError != nil {
-			onError(errorSource, "TAG_RESOLVE_FAILED", resolveScalarError.Error(), false)
-			scalar = composition.newScalar(unitsToString(value))
-		} else if node, isNode := result.(*Node); isNode && IsScalar(node) {
-			scalar = node
+			onError(errorToken{token: reportedToken}, "TAG_RESOLVE_FAILED", resolveScalarError.Error(), false)
+			scalar = composition.newScalar(ScalarString(unitsToString(value)))
+		} else if IsScalar(resolvedNode) {
+			// `isScalar(res) ? res : new Scalar(res)`
+			scalar = resolvedNode
 		} else {
 			scalar = composition.newScalar(result)
 		}
@@ -207,6 +208,11 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 	return scalar
 }
 
+// findScalarTagByName is upstream's: the scalar tag tagName names, the first of the schema's own tags or
+// else a known tag, and the string tag when none resolves.
+//
+// Mutates: schema a known tag it reaches is appended to schema.Tags without a test or a default, as
+// upstream pushes it, so it is there for stringifying and found by name again
 func findScalarTagByName(
 	schema *Schema,
 	value []uint16,
@@ -242,7 +248,7 @@ func findScalarTagByName(
 		schema.Tags = append(schema.Tags, copied)
 		return kt
 	}
-	onError(tagToken, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, tagName != stringTagName)
+	onError(errorToken{token: tagToken}, "TAG_RESOLVE_FAILED", "Unresolved tag: "+tagName, tagName != stringTagName)
 	return schema.scalarTag()
 }
 

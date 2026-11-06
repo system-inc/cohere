@@ -7,7 +7,11 @@ var contentInitial *InitialConstruct
 func init() { contentInitial = &InitialConstruct{Tokenize: initializeContent} }
 
 func initializeContent(self *Self, effects *Effects) State {
-	var contentStart, afterContentStartConstruct, paragraphInitial, lineStart, data State
+	var contentStart State
+	var afterContentStartConstruct State
+	var paragraphInitial State
+	var lineStart State
+	var data State
 	var previous *Token
 
 	afterContentStartConstruct = func(code Code) State {
