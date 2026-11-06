@@ -151,16 +151,16 @@ func unitsToString(units []uint16) string {
 
 // throwError is `throw new Error(message)`.
 func throwError(format string, arguments ...any) {
-	// Invariant: Parse recovers every *ThrownError into the error it returns, as upstream's caller catches
-	// the throw, so this panic never leaves the package.
+	// Invariant: upstream throws here, and Parse recovers this panic into a returned *ThrownError, so it never
+	// leaves the package.
 	panic(&ThrownError{Name: "Error", Message: fmt.Sprintf(format, arguments...)})
 }
 
 // throwTypeError is the TypeError V8 raises reading property of undefined or null (missing names
 // which).
 func throwTypeError(missing string, property string) {
-	// Invariant: Parse recovers every *ThrownError into the error it returns, as upstream's caller catches
-	// the throw, so this panic never leaves the package.
+	// Invariant: upstream throws here, and Parse recovers this panic into a returned *ThrownError, so it never
+	// leaves the package.
 	panic(&ThrownError{
 		Name:    "TypeError",
 		Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property),
