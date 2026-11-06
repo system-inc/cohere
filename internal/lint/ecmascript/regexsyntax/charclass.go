@@ -17,8 +17,8 @@ type RegexFlags struct {
 	UnicodeSets bool // v flag
 }
 
-// UV reports whether unicode/unicodeSets mode is active (either u or v).
-func (flags RegexFlags) UV() bool { return flags.Unicode || flags.UnicodeSets }
+// UnicodeMode reports whether unicode/unicodeSets mode is active (either u or v).
+func (flags RegexFlags) UnicodeMode() bool { return flags.Unicode || flags.UnicodeSets }
 
 // ParseRegexFlags returns a RegexFlags from a flag string (e.g. "gui").
 func ParseRegexFlags(flags string) RegexFlags {
@@ -70,7 +70,7 @@ type RegexCharElement struct {
 	IsUBrace        bool
 	IsLoneSurrogate bool
 
-	Max         uint32
+	Maximum     uint32
 	MaxIsUBrace bool
 
 	Start int
@@ -228,7 +228,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		return 2, true
 	case 'u':
 		if index+2 < len(pattern) && pattern[index+2] == '{' {
-			if !flags.UV() {
+			if !flags.UnicodeMode() {
 				return 2, true
 			}
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
@@ -247,7 +247,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		}
 		return 2, true
 	case 'p', 'P':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
@@ -255,7 +255,7 @@ func SkipPatternEscape(pattern string, index int, flags RegexFlags) (int, bool) 
 		}
 		return 2, true
 	case 'q':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel >= 0 {
 				return 3 + closeRel + 1, true
@@ -292,7 +292,7 @@ func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]Re
 	return parseRegexCharacterClass(pattern, start, flags, 0)
 }
 
-const maxRegexCharacterClassPreallocation = 16 << 10
+const maximumRegexCharacterClassPreallocation = 16 << 10
 
 // ParseRegexCharacterClassWithEnd is ParseRegexCharacterClass with a
 // previously discovered class end. Non-v callers use the known byte span as
@@ -310,8 +310,8 @@ func ParseRegexCharacterClassWithEnd(pattern string, start, end int, flags Regex
 		elementCapacity = end - start - 2
 		if elementCapacity < 0 {
 			elementCapacity = 0
-		} else if elementCapacity > maxRegexCharacterClassPreallocation {
-			elementCapacity = maxRegexCharacterClassPreallocation
+		} else if elementCapacity > maximumRegexCharacterClassPreallocation {
+			elementCapacity = maximumRegexCharacterClassPreallocation
 		}
 	}
 	elements, parsedEnd, ok := parseRegexCharacterClass(pattern, start, flags, elementCapacity)
@@ -402,7 +402,7 @@ func parseRegexCharacterClass(
 					return nil, start, false
 				}
 			} else {
-				nextEl, step, ok = readRawClassChar(pattern, index, flags)
+				nextEl, step, ok = readRawClassCharacter(pattern, index, flags)
 				if !ok {
 					return nil, start, false
 				}
@@ -418,7 +418,7 @@ func parseRegexCharacterClass(
 				Kind:        RegexCharRange,
 				Value:       minimumEl.Value,
 				IsUBrace:    minimumEl.IsUBrace,
-				Max:         nextEl.Value,
+				Maximum:     nextEl.Value,
 				MaxIsUBrace: nextEl.IsUBrace,
 				Start:       minimumEl.Start,
 				End:         nextEl.End,
@@ -432,7 +432,7 @@ func parseRegexCharacterClass(
 			pendingIndex = -1
 
 		default:
-			el, step, ok := readRawClassChar(pattern, index, flags)
+			el, step, ok := readRawClassCharacter(pattern, index, flags)
 			if !ok {
 				return nil, start, false
 			}
@@ -474,7 +474,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			}, 2, true
 		}
 		if next == 'B' {
-			if flags.UV() {
+			if flags.UnicodeMode() {
 				return RegexCharElement{}, 0, false // u mode syntax error
 			}
 			// Under non-u, identity escape.
@@ -484,7 +484,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}
 		return RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2}, 2, true
 	case 'p', 'P':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
@@ -497,7 +497,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			Kind: RegexCharSingle, Value: uint32(next), Start: index, End: index + 2,
 		}, 2, true
 	case 'q':
-		if flags.UV() && index+2 < len(pattern) && pattern[index+2] == '{' {
+		if flags.UnicodeMode() && index+2 < len(pattern) && pattern[index+2] == '{' {
 			closeRel := strings.IndexByte(pattern[index+3:], '}')
 			if closeRel < 0 {
 				return RegexCharElement{}, 0, false
@@ -520,7 +520,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 		}, 2, true
 	case 'u':
 		if index+2 < len(pattern) && pattern[index+2] == '{' {
-			if !flags.UV() {
+			if !flags.UnicodeMode() {
 				// Non-u mode: treat `\u` as identity `u`.
 				return RegexCharElement{
 					Kind: RegexCharSingle, Value: 'u', Start: index, End: index + 2,
@@ -544,7 +544,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 			hi := ParseHexUint(pattern[index+2 : index+6])
 			// Surrogate pair `\uHHHH\uHHHH` under u/v collapses to one element
 			// with an astral value.
-			if flags.UV() && hi >= 0xD800 && hi <= 0xDBFF && index+11 < len(pattern) &&
+			if flags.UnicodeMode() && hi >= 0xD800 && hi <= 0xDBFF && index+11 < len(pattern) &&
 				pattern[index+6] == '\\' && pattern[index+7] == 'u' && AllHexDigits(pattern[index+8:index+12]) {
 				lo := ParseHexUint(pattern[index+8 : index+12])
 				if lo >= 0xDC00 && lo <= 0xDFFF {
@@ -599,7 +599,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 	}, 1 + size, true
 }
 
-// readRawClassChar reads a non-`\`-prefixed character inside a class body
+// readRawClassCharacter reads a non-`\`-prefixed character inside a class body
 // (i.e. a raw character at pattern[index]). Raw astral in non-u/v mode emits
 // the high surrogate only: callers handle the low-surrogate companion by
 // inspecting IsLoneSurrogate and stepping via a subsequent call.
@@ -609,7 +609,7 @@ func readClassEscape(pattern string, index int, flags RegexFlags) (RegexCharElem
 // misleading-character-class rule accepts this because it gets raw astrals
 // only in string-literal contexts, where the layer-3 parser already does the
 // UTF-16 surrogate split.
-func readRawClassChar(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
+func readRawClassCharacter(pattern string, index int, flags RegexFlags) (RegexCharElement, int, bool) {
 	character, size := utf8.DecodeRuneInString(pattern[index:])
 	if size == 0 {
 		return RegexCharElement{}, 0, false

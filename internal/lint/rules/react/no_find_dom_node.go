@@ -5,7 +5,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-var messageNoFindDOMNode = rule.Message{
+var messageNoFindDomNode = rule.Message{
 	Id: "noFindDOMNode",
 	Description: "`findDOMNode` was deprecated in 2018 and removed in React 19, so this call " +
 		"throws on any current React. Even where it still runs it reaches around the " +
@@ -15,10 +15,10 @@ var messageNoFindDOMNode = rule.Message{
 		"the component decides what it hands out.",
 }
 
-// findDOMNodeName is the one function this rule is about.
-const findDOMNodeName = "findDOMNode"
+// findDomNodeName is the one function this rule is about.
+const findDomNodeName = "findDOMNode"
 
-// NoFindDOMNode flags a call to `findDOMNode`, bare or through a React namespace.
+// NoFindDomNode flags a call to `findDOMNode`, bare or through a React namespace.
 //
 //	valid:   var Hello = function() {};
 //	valid:   this.someFunc = React.findDOMNode;
@@ -102,7 +102,7 @@ const findDOMNodeName = "findDOMNode"
 // different node. That is upstream being narrow rather than upstream being right, and it is
 // reproduced rather than improved on, because a differential run against oxlint is what this port
 // has to survive.
-var NoFindDOMNode = rule.Rule[rule.NoOptions]{
+var NoFindDomNode = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-find-dom-node` and the parity guard strips
 	// the namespace on a `/` boundary, so `react-no-find-dom-node` would match no inventory entry,
 	// lint no files, and still pass every fixture in this package.
@@ -110,7 +110,7 @@ var NoFindDOMNode = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				name := findDOMNodeCalleeName(node.AsCallExpression().Expression)
+				name := findDomNodeCalleeName(node.AsCallExpression().Expression)
 				if name == nil {
 					return
 				}
@@ -118,13 +118,13 @@ var NoFindDOMNode = rule.Rule[rule.NoOptions]{
 				// rather than the whole call. For a subscript this is the string or template
 				// literal node, so the quotes are included, which is upstream's span and not a
 				// slip.
-				ruleContext.ReportNode(name, messageNoFindDOMNode)
+				ruleContext.ReportNode(name, messageNoFindDomNode)
 			},
 		}
 	},
 }
 
-// findDOMNodeCalleeName returns the node to underline when a callee names `findDOMNode`, else nil.
+// findDomNodeCalleeName returns the node to underline when a callee names `findDOMNode`, else nil.
 //
 // Returning the node rather than a bool is what keeps the span correct at the one call site: the
 // thing being reported is never the node the listener received, and a signature answering only
@@ -134,7 +134,7 @@ var NoFindDOMNode = rule.Rule[rule.NoOptions]{
 // Parentheses are skipped here, matching oxc's accessors. See the note on the rule above for the
 // three measured cases, and note that this differs from `no-is-mounted` in this same package, which
 // deliberately does not skip them because *its* upstream does not.
-func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
+func findDomNodeCalleeName(callee *ast.Node) *ast.Node {
 	unwrapped := ast.SkipParentheses(callee)
 	if unwrapped == nil {
 		return nil
@@ -142,7 +142,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 
 	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		if unwrapped.Text() == findDOMNodeName {
+		if unwrapped.Text() == findDomNodeName {
 			return unwrapped
 		}
 		// oxc returns unconditionally from its identifier arm rather than falling through to the
@@ -151,7 +151,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 
 	case ast.KindPropertyAccessExpression:
 		access := unwrapped.AsPropertyAccessExpression()
-		if !isReactDOMReceiver(access.Expression) {
+		if !isReactDomReceiver(access.Expression) {
 			return nil
 		}
 		name := access.Name()
@@ -159,13 +159,13 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 		// `KindPrivateIdentifier` node's `Text()` carries its `#` and so never equals the bare
 		// name. No kind check is written for it, because a branch that cannot change a verdict is a
 		// branch no fixture can guard.
-		if name != nil && name.Text() == findDOMNodeName {
+		if name != nil && name.Text() == findDomNodeName {
 			return name
 		}
 
 	case ast.KindElementAccessExpression:
 		access := unwrapped.AsElementAccessExpression()
-		if !isReactDOMReceiver(access.Expression) {
+		if !isReactDomReceiver(access.Expression) {
 			return nil
 		}
 		argument := access.ArgumentExpression
@@ -177,7 +177,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 		// names whatever `k` holds and is silent on the release binary.
 		switch argument.Kind {
 		case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-			if argument.Text() == findDOMNodeName {
+			if argument.Text() == findDomNodeName {
 				// The literal node, so the reported span includes its quotes or backticks. That is
 				// thirteen bytes for `"findDOMNode"` and it is what upstream underlines.
 				return argument
@@ -187,7 +187,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 	return nil
 }
 
-// isReactDOMReceiver reports whether an expression is one of the three accepted namespace objects.
+// isReactDomReceiver reports whether an expression is one of the three accepted namespace objects.
 //
 // The set is closed and the casing is exact, reproducing oxc's three `is_specific_id` calls.
 // `ReactDom` is in there because upstream ships a fail case for it, and `reactdom` is not, which was
@@ -195,7 +195,7 @@ func findDOMNodeCalleeName(callee *ast.Node) *ast.Node {
 //
 // Written as a helper rather than inline because both member arms above ask it, and because a
 // mutation to the accepted set should have one place to land.
-func isReactDOMReceiver(expression *ast.Node) bool {
+func isReactDomReceiver(expression *ast.Node) bool {
 	unwrapped := ast.SkipParentheses(expression)
 	if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier {
 		return false

@@ -457,7 +457,7 @@ func buildOnce(options Options) (*Graph, error) {
 		disk = options.FileSystem
 	}
 	if options.Listings != nil {
-		disk = &listingFS{FS: disk, listings: options.Listings}
+		disk = &listingFileSystem{FS: disk, listings: options.Listings}
 	}
 	// Without a pack, the program still records the stat each file was read under, so ReadUnchanged can answer.
 	var identities *readIdentities
@@ -465,29 +465,29 @@ func buildOnce(options Options) (*Graph, error) {
 		disk = options.ContentPack.wrap(disk)
 	} else {
 		identities = &readIdentities{byPath: map[string]fileIdentity{}}
-		disk = &identityFS{FS: disk, identities: identities}
+		disk = &identityFileSystem{FS: disk, identities: identities}
 	}
 	var checkedAnswers atomic.Int64
 	if options.CheckedStats != nil {
-		disk = &checkedStatsFS{FS: disk, snapshot: options.CheckedStats, answered: &checkedAnswers}
+		disk = &checkedStatsFileSystem{FS: disk, snapshot: options.CheckedStats, answered: &checkedAnswers}
 	}
 	if options.Inputs != nil {
-		disk = &recordingFS{FS: disk, recorder: options.Inputs}
+		disk = &recordingFileSystem{FS: disk, recorder: options.Inputs}
 	}
 	// Timed just beneath the cache, so it counts the calls that reach the disk (or the pack), and what the
 	// recorder costs them, but not the ones the cache answered.
-	var timedDisk *timingFS
+	var timedDisk *timingFileSystem
 	var configurationDisk diskCounters
 	var programDisk diskCounters
 	if options.Timing != nil {
 		options.Timing.Builds++
-		timedDisk = &timingFS{FS: disk}
+		timedDisk = &timingFileSystem{FS: disk}
 		timedDisk.current.Store(&configurationDisk)
 		disk = timedDisk
 	}
 	var fileSystem vfs.FS = cachedvfs.From(bundled.WrapFS(disk))
 	if len(options.Overlay) > 0 {
-		fileSystem = newOverlayFS(fileSystem, options.Overlay)
+		fileSystem = newOverlayFileSystem(fileSystem, options.Overlay)
 	}
 
 	configurationStarted := time.Now()

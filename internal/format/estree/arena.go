@@ -53,9 +53,9 @@ func (nodes *Arena) Release() {
 	arenas.Put(nodes)
 }
 
-// Len is how many nodes the arena has handed out since it was acquired: a file's tree, and any node the
+// Length is how many nodes the arena has handed out since it was acquired: a file's tree, and any node the
 // postprocess made and dropped. Zero for a nil arena.
-func (nodes *Arena) Len() int {
+func (nodes *Arena) Length() int {
 	if nodes == nil {
 		return 0
 	}

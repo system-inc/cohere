@@ -55,7 +55,7 @@ func DefaultMaxClassesPerFileSettings() MaxClassesPerFileOptions {
 // maxClassesPerFileObjectShape is the object arm of upstream's `oneOf`, named so the decoder can try
 // it after the integer arm fails.
 type maxClassesPerFileObjectShape struct {
-	Max               *int  `json:"max"`
+	Maximum           *int  `json:"max"`
 	IgnoreExpressions *bool `json:"ignoreExpressions"`
 }
 
@@ -104,12 +104,12 @@ func DecodeMaxClassesPerFileOptions(raw []byte) (MaxClassesPerFileOptions, error
 		return DefaultMaxClassesPerFileSettings(), unmarshalOptionsError
 	}
 	// A nil Max is upstream's `option.max || 1` and stays at the default rather than becoming zero.
-	if object.Max != nil {
-		if *object.Max < 1 {
+	if object.Maximum != nil {
+		if *object.Maximum < 1 {
 			return DefaultMaxClassesPerFileSettings(), fmt.Errorf(
-				"max-classes-per-file takes a maximum of at least 1, got %d", *object.Max)
+				"max-classes-per-file takes a maximum of at least 1, got %d", *object.Maximum)
 		}
-		settings.Maximum = object.Max
+		settings.Maximum = object.Maximum
 	}
 	if object.IgnoreExpressions != nil {
 		settings.IgnoreExpressions = object.IgnoreExpressions

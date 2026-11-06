@@ -218,18 +218,18 @@ func Compare(
 
 	for index := range files {
 		select {
-		case err := <-errs:
+		case receivedError := <-errs:
 			close(indexes)
 			group.Wait()
-			return Report{}, err
+			return Report{}, receivedError
 		case indexes <- index:
 		}
 	}
 	close(indexes)
 	group.Wait()
 	select {
-	case err := <-errs:
-		return Report{}, err
+	case receivedError := <-errs:
+		return Report{}, receivedError
 	default:
 	}
 

@@ -40,9 +40,9 @@ func TestTheSpeculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *te
 
 func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T, withPack bool) {
 	// Resolved, so the names are the program's own: on macOS the temporary directory is behind a symbolic link.
-	directory, err := filepath.EvalSymlinks(test.TempDir())
-	if err != nil {
-		test.Fatal(err)
+	directory, resolveSymlinksError := filepath.EvalSymlinks(test.TempDir())
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
 	}
 	unchanged := filepath.Join(directory, "Unchanged.ts")
 	edited := filepath.Join(directory, "Edited.ts")
@@ -70,14 +70,15 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	}
 	var pack *program.ContentPack
 	if withPack {
-		if pack, err = program.OpenContentPack(test.TempDir()); err != nil {
-			test.Fatal(err)
+		var openContentPackError error
+		if pack, openContentPackError = program.OpenContentPack(test.TempDir()); openContentPackError != nil {
+			test.Fatal(openContentPackError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory,
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory,
 		ContentPack: pack})
-	if err != nil {
-		test.Fatal(err)
+	if buildError != nil {
+		test.Fatal(buildError)
 	}
 	// Bound, as the speculation requires of a tree before it takes one.
 	_, release := graph.Program.GetTypeCheckerForFile(

@@ -43,21 +43,22 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 		"other.ts":            "export const a = 3;\n",
 		"quiet.ts":            "export function f(): void {}\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		rule_testing.EntriesOf(test, byName, constant),
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	want := map[string]program.RuleNotes{
@@ -89,21 +90,22 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 			"export function touch(hub: HubInterface): void { hub.count += 1; hub.names.push('x'); }\n" +
 			"export function plain(state: PlainInterface): void { state.count = 1; }\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		[]rule.Entry{rule_testing.EntryOf(test, nexus.CorrectnessNoCallerDataMutation)},
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	hub := filepath.Join(directory, "hub.ts")
@@ -142,21 +144,22 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 			"job.log.push('done'); context.status = 'x'; }\n" +
 			"}\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
-	if err != nil {
-		test.Fatalf("building: %v", err)
+	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	if buildError != nil {
+		test.Fatalf("building: %v", buildError)
 	}
-	graph.LintConfig, err = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
-	if err != nil {
-		test.Fatalf("loading the config: %v", err)
+	var loadError error
+	graph.LintConfig, loadError = configuration.Load(filepath.Join(directory, "CohereSettings.json"))
+	if loadError != nil {
+		test.Fatalf("loading the config: %v", loadError)
 	}
-	result, err := graph.Walk(
+	result, walkError := graph.Walk(
 		context.Background(),
 		graph.ProjectFiles(),
 		[]rule.Entry{rule_testing.EntryOf(test, nexus.CorrectnessNoCallerDataMutation)},
 	)
-	if err != nil {
-		test.Fatalf("walking: %v", err)
+	if walkError != nil {
+		test.Fatalf("walking: %v", walkError)
 	}
 
 	job := filepath.Join(directory, "job.ts")

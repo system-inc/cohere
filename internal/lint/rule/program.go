@@ -117,7 +117,7 @@ type Program interface {
 	FS() vfs.FS
 
 	// ReadsDesignSystem: a file system that records every path it is asked about and refuses writes.
-	DesignSystemFS() *RecordingFS
+	DesignSystemFS() *RecordingFileSystem
 
 	// Identity reads nothing.
 	Identity() ProgramIdentity
@@ -282,10 +282,10 @@ func (view *programView) FS() vfs.FS {
 	return view.program.Host().FS()
 }
 
-func (view *programView) DesignSystemFS() *RecordingFS {
+func (view *programView) DesignSystemFS() *RecordingFileSystem {
 	view.require(ReadsDesignSystem, "DesignSystemFS")
-	recorder := NewRecordingFs(view.program.Host().FS())
-	recordDesignSystemFs(view.program, recorder)
+	recorder := NewRecordingFileSystem(view.program.Host().FS())
+	recordDesignSystemFileSystem(view.program, recorder)
 	return recorder
 }
 

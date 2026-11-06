@@ -54,7 +54,7 @@ func init() {
 		rule.Registration[NoMethodSetStateOptions]{Rule: NoDidMountSetState, Decode: DecodeNoMethodSetStateOptions},
 		rule.Registration[NoMethodSetStateOptions]{Rule: NoDidUpdateSetState, Decode: DecodeNoMethodSetStateOptions},
 		rule.Registration[rule.NoOptions]{Rule: NoDirectMutationState},
-		rule.Registration[rule.NoOptions]{Rule: NoFindDOMNode},
+		rule.Registration[rule.NoOptions]{Rule: NoFindDomNode},
 		rule.Registration[rule.NoOptions]{Rule: NoIsMounted},
 		rule.Registration[rule.NoOptions]{Rule: NoRenderReturnValue},
 		rule.Registration[rule.NoOptions]{Rule: NoThisInSfc},

@@ -80,7 +80,7 @@ var spaceAtStartPattern = func(text string) bool {
 	return inClass(spaceSeparatorRanges, []rune(text)[0])
 }
 
-func prevOrNextWord(path *astPath) bool {
+func previousOrNextWord(path *astPath) bool {
 	previous, next := previousNode(path), nextNode(path)
 	return (previous != nil && previous.NodeType == "sentence" &&
 		len(previous.Children) > 0 && previous.Children[len(previous.Children)-1].NodeType == "word" &&
@@ -182,10 +182,10 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 		if len(node.Children) > 0 && isAutolink(node.Children[0]) {
 			style = options.OriginalText[node.Position.Start.Offset : node.Position.Start.Offset+1]
 		} else {
-			hasPrevOrNextWord := prevOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
+			hasPrevOrNextWord := previousOrNextWord(path) // `1*2*3` is considered emphasis but `1_2_3` is not
 			// `1***2***3` is considered strong emphasis but `1**_2_**3` is not
 			inStrongAndHasPrevOrNextWord := printing.CallParent(path, func(path *astPath) bool {
-				return currentNode(path).NodeType == "strong" && prevOrNextWord(path)
+				return currentNode(path).NodeType == "strong" && previousOrNextWord(path)
 			}, 0)
 			if hasPrevOrNextWord || inStrongAndHasPrevOrNextWord ||
 				path.HasAncestor(func(node *Node) bool { return node.NodeType == "emphasis" }) {
@@ -240,18 +240,18 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 		switch options.OriginalText[node.Position.Start.Offset] {
 		case '<':
 			mailto := "mailto:"
-			link := node.URL
+			link := node.Url
 			// <hello@example.com> is parsed as { url: "mailto:hello@example.com" }
 			start := node.Position.Start.Offset + 1
 			end := min(start+len(mailto), len(options.OriginalText))
-			if strings.HasPrefix(node.URL, mailto) && options.OriginalText[start:end] != mailto {
-				link = node.URL[len(mailto):]
+			if strings.HasPrefix(node.Url, mailto) && options.OriginalText[start:end] != mailto {
+				link = node.Url[len(mailto):]
 			}
 			return doc.Concat{doc.Text("<"), doc.Text(link), doc.Text(">")}
 		case '[':
 			destination := doc.Text("<>")
-			if node.URL != "" {
-				destination = doc.Text(printURL(node.URL, ")"))
+			if node.Url != "" {
+				destination = doc.Text(printUrl(node.Url, ")"))
 			}
 			return doc.Concat{
 				doc.Text("["),
@@ -266,8 +266,8 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 		}
 	case "image":
 		destination := "<>"
-		if node.URL != "" {
-			destination = printURL(node.URL, ")")
+		if node.Url != "" {
+			destination = printUrl(node.Url, ")")
 		}
 		return doc.Concat{
 			doc.Text("!["),
@@ -365,8 +365,8 @@ func printMdast(path *astPath, options *options, print printFunc, _ *printing.No
 			lineOrSpace = doc.LineDoc
 		}
 		destination := doc.Text("<>")
-		if node.URL != "" {
-			destination = doc.Text(printURL(node.URL, ""))
+		if node.Url != "" {
+			destination = doc.Text(printUrl(node.Url, ""))
 		}
 		var title doc.Doc = doc.Text("")
 		if node.Title != nil {
@@ -532,19 +532,19 @@ func shouldRemainTheSameContent(path *astPath) bool {
 	return found && (node.NodeType != "linkReference" || node.ReferenceType != "full")
 }
 
-// encodeURL is encodeUrl: each character replaced by its encodeURIComponent.
-func encodeURL(link string, characters string) string {
+// encodeUrl is encodeUrl: each character replaced by its encodeURIComponent.
+func encodeUrl(link string, characters string) string {
 	for _, character := range characters {
 		link = strings.ReplaceAll(link, string(character), url.PathEscape(string(character)))
 	}
 	return link
 }
 
-// printURL is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.
-func printURL(link string, dangerousCharacter string) string {
+// printUrl is printUrl: wrap the url in `<>` when it holds a space or the dangerous character.
+func printUrl(link string, dangerousCharacter string) string {
 	dangerous := strings.Contains(link, " ") || (dangerousCharacter != "" && strings.Contains(link, dangerousCharacter))
 	if dangerous {
-		return "<" + encodeURL(link, "<>") + ">"
+		return "<" + encodeUrl(link, "<>") + ">"
 	}
 	return link
 }

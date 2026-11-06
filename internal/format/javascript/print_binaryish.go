@@ -137,7 +137,7 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 
 	// Upstream names the Symbol "logicalChain-" + ++uid; the name is for debugging only, so the module
 	// counter is not ported.
-	groupID := newGroupID("logicalChain")
+	groupId := newGroupId("logicalChain")
 
 	chainParts := make([]Doc, 0, len(headParts)+1)
 	// Don't include the initial expression in the indentation
@@ -145,14 +145,14 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 	// left-most expression.
 	chainParts = append(chainParts, headParts...)
 	chainParts = append(chainParts, indentIn(path, doc.Concat(rest)))
-	chain := groupWithIn(path, doc.Concat(chainParts), doc.GroupOptions{ID: groupID})
+	chain := groupWithIn(path, doc.Concat(chainParts), doc.GroupOptions{Id: groupId})
 
 	if !hasJsx {
 		return chain
 	}
 
 	jsxPart := parts[len(parts)-1]
-	return groupIn(path, concatIn(path, chain, indentIfBreak(jsxPart, groupID, false)))
+	return groupIn(path, concatIn(path, chain, indentIfBreak(jsxPart, groupId, false)))
 }
 
 // For binary expressions to be consistent, we need to group

@@ -198,7 +198,7 @@ switch (day) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(true),
 			})},
 		{"upstream valid 7 [defaults]",
 			`
@@ -259,8 +259,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 11 [allowDefault=false, requireDefault=false]",
 			`
@@ -275,8 +275,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 12 [allowDefault=false, requireDefault=false]",
 			`
@@ -291,8 +291,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 13 [allowDefault=false, requireDefault=false]",
 			`
@@ -307,8 +307,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 14 [allowDefault=false, requireDefault=false]",
 			`
@@ -322,8 +322,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 15 [allowDefault=false, requireDefault=false]",
 			`
@@ -338,8 +338,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 16 [allowDefault=false, requireDefault=true]",
 			`
@@ -350,8 +350,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 17 [allowDefault=false, requireDefault=true]",
 			`
@@ -362,8 +362,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 18 [allowDefault=false, requireDefault=true]",
 			`
@@ -374,8 +374,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 19 [allowDefault=false, requireDefault=true]",
 			`
@@ -388,8 +388,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 20 [allowDefault=false, requireDefault=true]",
 			`
@@ -400,8 +400,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 21 [allowDefault=false, requireDefault=true]",
 			`
@@ -414,8 +414,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 22 [allowDefault=false, requireDefault=true]",
 			`
@@ -430,8 +430,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 23 [allowDefault=true, requireDefault=false]",
 			`
@@ -444,8 +444,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 24 [allowDefault=true, requireDefault=false]",
 			`
@@ -460,8 +460,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 25 [allowDefault=false, requireDefault=false]",
 			`
@@ -476,8 +476,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 26 [allowDefault=true, requireDefault=false]",
 			`
@@ -492,8 +492,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 27 [allowDefault=true, requireDefault=true]",
 			`
@@ -508,8 +508,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 28 [allowDefault=true, considerDefault=true, requireDefault=false]",
 			`
@@ -522,9 +522,9 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 29 [allowDefault=false, considerDefault=true, requireDefault=false]",
 			`
@@ -537,9 +537,9 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 30 [allowDefault=true, requireDefault=false]",
 			`
@@ -550,8 +550,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 31 [allowDefault=false, requireDefault=true]",
 			`
@@ -565,8 +565,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 32 [allowDefault=false, requireDefault=false]",
 			`
@@ -577,8 +577,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 33 [allowDefault=true, requireDefault=false]",
 			`
@@ -587,8 +587,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 34 [allowDefault=false, requireDefault=true]",
 			`
@@ -599,8 +599,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 35 [allowDefault=false, requireDefault=false]",
 			`
@@ -612,8 +612,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 36 [allowDefault=true, requireDefault=false]",
 			`
@@ -624,8 +624,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 37 [allowDefault=true, requireDefault=false]",
 			`
@@ -637,8 +637,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 38 [allowDefault=true, requireDefault=true]",
 			`
@@ -652,8 +652,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 39 [allowDefault=true, requireDefault=true]",
 			`
@@ -667,8 +667,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 40 [allowDefault=true, considerDefault=true, requireDefault=true]",
 			`
@@ -680,9 +680,9 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 41 [allowDefault=false, considerDefault=true, requireDefault=true]",
 			`
@@ -695,9 +695,9 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			})},
 		{"upstream valid 42 [allowDefault=true, requireDefault=false]",
 			`
@@ -714,8 +714,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 43 [allowDefault=true, requireDefault=false]",
 			`
@@ -734,8 +734,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			})},
 		{"upstream valid 44 [considerDefault=true, requireDefault=true]",
 			`
@@ -748,8 +748,8 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
-				RequireDefaultForNonUnion:          type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(true),
+				RequireDefaultForNonUnion:          type_checking.Reference(true),
 			})},
 		{"upstream valid 45 [considerDefault=true]",
 			`
@@ -762,7 +762,7 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(true),
 			})},
 		{"upstream valid 46 [allowDefault=false]",
 			`
@@ -775,7 +775,7 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
 			})},
 		{"upstream valid 47 [considerDefault=true]",
 			`
@@ -798,7 +798,7 @@ switch (myEnum) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(true),
 			})},
 		{"upstream valid 48 [considerDefault=true]",
 			`
@@ -812,7 +812,7 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(true),
 			})},
 	}
 	for _, testCase := range cases {
@@ -861,8 +861,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 1 [allowDefault=false, requireDefault=true]",
@@ -872,8 +872,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 2 [allowDefault=false, requireDefault=true]",
@@ -885,8 +885,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 3 [allowDefault=true, requireDefault=false]",
@@ -898,8 +898,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 4 [allowDefault=true, requireDefault=true]",
@@ -911,8 +911,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 5 [allowDefault=true, requireDefault=true]",
@@ -924,8 +924,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 6 [allowDefault=false, requireDefault=true]",
@@ -935,8 +935,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 7 [allowDefault=false, requireDefault=true]",
@@ -948,8 +948,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 8 [allowDefault=false, requireDefault=true]",
@@ -962,8 +962,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 9 [allowDefault=false, requireDefault=true]",
@@ -975,8 +975,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 10 [allowDefault=false, requireDefault=true]",
@@ -989,8 +989,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 11 [allowDefault=false, requireDefault=true]",
@@ -1004,8 +1004,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 12 [allowDefault=false, requireDefault=true]",
@@ -1018,8 +1018,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 13 [allowDefault=false, requireDefault=false]",
@@ -1029,8 +1029,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 14 [allowDefault=false, requireDefault=true]",
@@ -1042,8 +1042,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 15 [allowDefault=false, requireDefault=true]",
@@ -1055,8 +1055,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 16 [allowDefault=false, requireDefault=true]",
@@ -1068,8 +1068,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 17 [allowDefault=true, requireDefault=true]",
@@ -1087,8 +1087,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 18 [defaults]",
@@ -1288,8 +1288,8 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
-				RequireDefaultForNonUnion:           type_checking.Ref(true),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(true),
+				RequireDefaultForNonUnion:           type_checking.Reference(true),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 31 [defaults]",
@@ -1318,8 +1318,8 @@ switch (myUnion) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 34 [allowDefault=false, requireDefault=false]",
@@ -1344,8 +1344,8 @@ switch (myEnum) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 35 [allowDefault=false, requireDefault=false]",
@@ -1370,8 +1370,8 @@ switch (myEnum) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 36 [allowDefault=false, requireDefault=false]",
@@ -1389,8 +1389,8 @@ switch (myBoolean) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 37 [allowDefault=false, requireDefault=false]",
@@ -1408,8 +1408,8 @@ switch (myValue) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 38 [allowDefault=false, requireDefault=false]",
@@ -1427,8 +1427,8 @@ switch (myValue) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 39 [allowDefault=false, requireDefault=false]",
@@ -1450,8 +1450,8 @@ switch (myValue) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
 			}),
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 40 [considerDefault=false]",
@@ -1466,7 +1466,7 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 41 [defaults]",
@@ -1491,7 +1491,7 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 43 [considerDefault=false]",
@@ -1506,7 +1506,7 @@ switch (literal) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 44 [considerDefault=false]",
@@ -1528,7 +1528,7 @@ switch (myEnum) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 45 [considerDefault=false]",
@@ -1541,7 +1541,7 @@ switch (value) {
 }
       `,
 			rule.Configured(SwitchExhaustivenessCheckOptions{
-				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions: type_checking.Reference(false),
 			}),
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 50 [defaults]",
@@ -1964,7 +1964,7 @@ switch (literal) {
 
 	result := rule_testing.RunTypedWithOptions(
 		test, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText,
-		SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false)},
+		SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false)},
 	)
 	rule_testing.ExpectFindings(test, result, "dangerousDefaultCase")
 
@@ -2236,9 +2236,9 @@ switch (myBoolean) {
 		test,
 		rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
 			SwitchExhaustivenessCheckOptions{
-				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-				RequireDefaultForNonUnion:           type_checking.Ref(false),
-				DefaultCaseCommentPattern:           type_checking.Ref("(a|aa)+$"),
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Reference(false),
+				RequireDefaultForNonUnion:           type_checking.Reference(false),
+				DefaultCaseCommentPattern:           type_checking.Reference("(a|aa)+$"),
 			}),
 	)
 }

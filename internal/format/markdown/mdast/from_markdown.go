@@ -157,9 +157,9 @@ func newConfig() *config {
 			"emphasis":                    opener(newParent("emphasis"), nil),
 			"hardBreakEscape":             opener(newHardBreak, nil),
 			"hardBreakTrailing":           opener(newHardBreak, nil),
-			"htmlFlow":                    opener(newHTML, buffer),
+			"htmlFlow":                    opener(newHtml, buffer),
 			"htmlFlowData":                onEnterData,
-			"htmlText":                    opener(newHTML, buffer),
+			"htmlText":                    opener(newHtml, buffer),
 			"htmlTextData":                onEnterData,
 			"image":                       opener(newImage, nil),
 			"label":                       buffer,
@@ -205,9 +205,9 @@ func newConfig() *config {
 			"emphasis":                            closer(nil),
 			"hardBreakEscape":                     closer(onExitHardBreak),
 			"hardBreakTrailing":                   closer(onExitHardBreak),
-			"htmlFlow":                            closer(onExitHTMLFlow),
+			"htmlFlow":                            closer(onExitHtmlFlow),
 			"htmlFlowData":                        onExitData,
-			"htmlText":                            closer(onExitHTMLText),
+			"htmlText":                            closer(onExitHtmlText),
 			"htmlTextData":                        onExitData,
 			"image":                               closer(onExitImage),
 			"label":                               onExitLabel,
@@ -594,7 +594,7 @@ func onExitDefinitionTitleString(context *compileContext, _ *micromark.Token) {
 
 func onExitDefinitionDestinationString(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
-	context.top().URL = data
+	context.top().Url = data
 }
 
 func onExitAtxHeadingSequence(context *compileContext, token *micromark.Token) {
@@ -666,12 +666,12 @@ func onExitHardBreak(context *compileContext, _ *micromark.Token) {
 	context.data.atHardBreak = true
 }
 
-func onExitHTMLFlow(context *compileContext, _ *micromark.Token) {
+func onExitHtmlFlow(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
 	context.top().Value = data
 }
 
-func onExitHTMLText(context *compileContext, _ *micromark.Token) {
+func onExitHtmlText(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
 	context.top().Value = data
 }
@@ -694,7 +694,7 @@ func onExitLink(context *compileContext, _ *micromark.Token) {
 
 		node.NodeType += "Reference"
 		node.ReferenceType = referenceType
-		node.URL = ""
+		node.Url = ""
 		node.Title = nil
 	} else {
 		node.Identifier = ""
@@ -733,7 +733,7 @@ func onExitLabel(context *compileContext, _ *micromark.Token) {
 
 func onExitResourceDestinationString(context *compileContext, _ *micromark.Token) {
 	data := context.resume()
-	context.top().URL = data
+	context.top().Url = data
 }
 
 func onExitResourceTitleString(context *compileContext, _ *micromark.Token) {
@@ -788,12 +788,12 @@ func onExitCharacterReference(context *compileContext, token *micromark.Token) {
 
 func onExitAutolinkProtocol(context *compileContext, token *micromark.Token) {
 	onExitData(context, token)
-	context.top().URL = context.sliceSerialize(token)
+	context.top().Url = context.sliceSerialize(token)
 }
 
 func onExitAutolinkEmail(context *compileContext, token *micromark.Token) {
 	onExitData(context, token)
-	context.top().URL = "mailto:" + context.sliceSerialize(token)
+	context.top().Url = "mailto:" + context.sliceSerialize(token)
 }
 
 //
@@ -820,7 +820,7 @@ func newHeading(*micromark.Token) Node {
 
 func newHardBreak(*micromark.Token) Node { return Node{NodeType: "break"} }
 
-func newHTML(*micromark.Token) Node { return Node{NodeType: "html", IsLiteral: true} }
+func newHtml(*micromark.Token) Node { return Node{NodeType: "html", IsLiteral: true} }
 
 func newImage(*micromark.Token) Node { return Node{NodeType: "image"} }
 

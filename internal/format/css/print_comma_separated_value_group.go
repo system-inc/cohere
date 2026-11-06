@@ -21,7 +21,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 		(declAncestorProperty == "grid" ||
 			strings.HasPrefix(declAncestorProperty, "grid-template"))
 	atRuleAncestorNode, _ := path.FindAncestor(func(node *estree.Node) bool { return node.Type() == "css-atrule" })
-	isControlDirective := atRuleAncestorNode != nil && isSCSSControlDirectiveNode(atRuleAncestorNode, options)
+	isControlDirective := atRuleAncestorNode != nil && isScssControlDirectiveNode(atRuleAncestorNode, options)
 	groups := node.List("groups")
 	hasInlineComment := someNode(groups, isInlineValueCommentNode)
 
@@ -38,9 +38,9 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 	appendToLast := func(document doc.Doc) {
 		parts[len(parts)-1] = doc.Concat{parts[len(parts)-1], document}
 	}
-	insideURLFunction := insideValueFunctionNode(path, "url")
+	insideUrlFunction := insideValueFunctionNode(path, "url")
 
-	insideSCSSInterpolationInString := false
+	insideScssInterpolationInString := false
 	didBreak := false
 
 	groupAt := func(index int) *estree.Node {
@@ -67,7 +67,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 
 		appendToLast(printed[index])
 
-		if insideURLFunction {
+		if insideUrlFunction {
 			if (iNextNode != nil && isAdditionNode(iNextNode)) || isAdditionNode(iNode) {
 				appendToLast(doc.Text(" "))
 			}
@@ -134,15 +134,15 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			positionOfOpeningInterpolation := strings.LastIndex(iNode.String("value"), "#{")
 			positionOfClosingInterpolation := strings.LastIndex(iNode.String("value"), "}")
 			if positionOfOpeningInterpolation != -1 && positionOfClosingInterpolation != -1 {
-				insideSCSSInterpolationInString = positionOfOpeningInterpolation > positionOfClosingInterpolation
+				insideScssInterpolationInString = positionOfOpeningInterpolation > positionOfClosingInterpolation
 			} else if positionOfOpeningInterpolation != -1 {
-				insideSCSSInterpolationInString = true
+				insideScssInterpolationInString = true
 			} else if positionOfClosingInterpolation != -1 {
-				insideSCSSInterpolationInString = false
+				insideScssInterpolationInString = false
 			}
 		}
 
-		if insideSCSSInterpolationInString {
+		if insideScssInterpolationInString {
 			continue
 		}
 
@@ -447,7 +447,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 	// and node has two groups
 	// when type is value-comma_group
 	// example @import url("verylongurl") projection,tv
-	if insideURLFunctionInImportAtRuleNode(path) {
+	if insideUrlFunctionInImportAtRuleNode(path) {
 		return doc.NewGroup(doc.NewFill(parts), doc.GroupOptions{})
 	}
 

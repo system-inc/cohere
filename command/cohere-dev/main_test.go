@@ -384,7 +384,7 @@ func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 
 // A test or vet run turns VCS stamping off, which a worktree with TypeScript a symlink needs for any go build
 // a test runs, adding `GOFLAGS` if there was none, and a caller's own -buildvcs stands.
-func TestATestRunStampsNoVCS(test *testing.T) {
+func TestATestRunStampsNoVcs(test *testing.T) {
 	test.Parallel()
 	for _, row := range []struct {
 		environment []string
@@ -396,7 +396,7 @@ func TestATestRunStampsNoVCS(test *testing.T) {
 		{[]string{"GOFLAGS=-buildvcs=true -p=2"}, "GOFLAGS=-buildvcs=true -p=2"},
 		{[]string{"GOFLAGS=-p=2 -buildvcs"}, "GOFLAGS=-p=2 -buildvcs"},
 	} {
-		if got := strings.Join(withoutVCSStamping(row.environment), "|"); got != row.want {
+		if got := strings.Join(withoutVcsStamping(row.environment), "|"); got != row.want {
 			test.Errorf("withoutVCSStamping(%q) is %q, want %q", row.environment, got, row.want)
 		}
 	}

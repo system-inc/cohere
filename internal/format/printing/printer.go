@@ -12,7 +12,7 @@ import (
 // a printer here walks those through Call or CallElement and prints "" inside, which is the same Call
 // mainPrint runs. args is the language's own arguments to a child's print; a non-nil args is never
 // cached, as upstream caches only a print without them.
-type PrintFunc[A any] func(selector string, args *A) doc.Doc
+type PrintFunc[A any] func(selector string, arguments *A) doc.Doc
 
 // NoArguments is the args of a language whose printer passes none.
 type NoArguments struct{}
@@ -58,7 +58,7 @@ type TextToDoc func(text string, parser string) (doc.Doc, error)
 //
 // S is the language's per-print state, Options.Settings, and A its arguments to a child's print.
 type Printer[N Node[N], S any, A any] struct {
-	Print func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], args *A) doc.Doc
+	Print func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], arguments *A) doc.Doc
 
 	// LocStart and LocEnd are upstream's options.locStart and locEnd: byte offsets, with the
 	// language's own overrides.
@@ -77,7 +77,7 @@ type Printer[N Node[N], S any, A any] struct {
 	EmbedVisitorKeys     func(node N) []string
 	Preprocess           func(ast N, options *Options[N, S, A]) N
 	HasPrettierIgnore    func(path *AstPath[N, S]) bool
-	PrintPrettierIgnored func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], args *A) doc.Doc
+	PrintPrettierIgnored func(path *AstPath[N, S], options *Options[N, S, A], print PrintFunc[A], arguments *A) doc.Doc
 	WillPrintOwnComments func(path *AstPath[N, S], options *Options[N, S, A]) bool
 
 	CanAttachComment     func(node N, ancestors []N) bool
@@ -158,30 +158,30 @@ func PrintAstToDoc[N Node[N], S any, A any](ast N, comments []N, options *Option
 	embeds := map[N]doc.Doc{}
 
 	var mainPrint PrintFunc[A]
-	mainPrintInternal := func(args *A) doc.Doc {
+	mainPrintInternal := func(arguments *A) doc.Doc {
 		ensurePrintingNode(path, options)
 		value := path.Value()
 		if value.IsNil() {
 			return doc.Text("")
 		}
 		node, isNode := value.Node()
-		shouldCache := isNode && args == nil
+		shouldCache := isNode && arguments == nil
 		if shouldCache {
 			if cached, present := cache[node]; present {
 				return cached
 			}
 		}
-		printed := callPluginPrintFunction(path, options, mainPrint, args, embeds)
+		printed := callPluginPrintFunction(path, options, mainPrint, arguments, embeds)
 		if shouldCache {
 			cache[node] = printed
 		}
 		return printed
 	}
-	mainPrint = func(selector string, args *A) doc.Doc {
+	mainPrint = func(selector string, arguments *A) doc.Doc {
 		if selector == "" {
-			return mainPrintInternal(args)
+			return mainPrintInternal(arguments)
 		}
-		return Call(path, func(*AstPath[N, S]) doc.Doc { return mainPrintInternal(args) }, selector)
+		return Call(path, func(*AstPath[N, S]) doc.Doc { return mainPrintInternal(arguments) }, selector)
 	}
 
 	printEmbeddedLanguages(path, mainPrint, options, embeds)
@@ -198,7 +198,7 @@ func callPluginPrintFunction[N Node[N], S any, A any](
 	path *AstPath[N, S],
 	options *Options[N, S, A],
 	print PrintFunc[A],
-	args *A,
+	arguments *A,
 	embeds map[N]doc.Doc,
 ) doc.Doc {
 	node, _ := path.Node()
@@ -207,12 +207,12 @@ func callPluginPrintFunction[N Node[N], S any, A any](
 	var printed doc.Doc
 	switch {
 	case printer.HasPrettierIgnore != nil && printer.HasPrettierIgnore(path):
-		printed = printIgnored(path, options, print, args)
+		printed = printIgnored(path, options, print, arguments)
 	default:
 		if embedded, present := embeds[node]; present {
 			printed = embedded
 		} else {
-			printed = printer.Print(path, options, print, args)
+			printed = printer.Print(path, options, print, arguments)
 		}
 	}
 
@@ -231,7 +231,7 @@ func printIgnored[N Node[N], S any, A any](
 	path *AstPath[N, S],
 	options *Options[N, S, A],
 	print PrintFunc[A],
-	args *A,
+	arguments *A,
 ) doc.Doc {
 	node, _ := path.Node()
 	start := options.Printer.LocStart(node)
@@ -242,7 +242,7 @@ func printIgnored[N Node[N], S any, A any](
 		}
 	}
 	if options.Printer.PrintPrettierIgnored != nil {
-		return options.Printer.PrintPrettierIgnored(path, options, print, args)
+		return options.Printer.PrintPrettierIgnored(path, options, print, arguments)
 	}
 	return doc.Text(options.OriginalText[start:end])
 }

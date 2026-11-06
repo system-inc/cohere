@@ -32,7 +32,7 @@ func printFunction(out *strings.Builder, function *Function, depth int) {
 		name = "<anonymous>"
 	}
 	fmt.Fprintf(out, "%sfunction %s(", indent, name)
-	for index, parameter := range function.Params {
+	for index, parameter := range function.Parameters {
 		if index > 0 {
 			out.WriteString(", ")
 		}
@@ -138,17 +138,17 @@ func printValue(function *Function, value InstructionValue) string {
 			"Call %s%s(%s)",
 			place(typed.Callee),
 			optionalMark(typed.Optional),
-			printArgs(function, typed.Args),
+			printArguments(function, typed.Arguments),
 		)
 	case *MethodCall:
 		return fmt.Sprintf(
 			"MethodCall %s.%s(%s)",
 			place(typed.Receiver),
 			place(typed.Property),
-			printArgs(function, typed.Args),
+			printArguments(function, typed.Arguments),
 		)
 	case *NewExpression:
-		return fmt.Sprintf("New %s(%s)", place(typed.Callee), printArgs(function, typed.Args))
+		return fmt.Sprintf("New %s(%s)", place(typed.Callee), printArguments(function, typed.Arguments))
 	case *BinaryExpression:
 		return fmt.Sprintf("Binary %s %s %s", place(typed.Left), typed.Operator, place(typed.Right))
 	case *UnaryExpression:
@@ -219,7 +219,7 @@ func printValue(function *Function, value InstructionValue) string {
 		if typed.Tag.Place != nil {
 			tag = place(*typed.Tag.Place)
 		}
-		return fmt.Sprintf("Jsx <%s> props=%d children=%d", tag, len(typed.Props), len(typed.Children))
+		return fmt.Sprintf("Jsx <%s> props=%d children=%d", tag, len(typed.Properties), len(typed.Children))
 	case *JsxFragment:
 		return fmt.Sprintf("JsxFragment children=%d", len(typed.Children))
 	case *JsxText:
@@ -304,14 +304,14 @@ func printPattern(function *Function, pattern Pattern) string {
 	return "<pattern>"
 }
 
-func printArgs(function *Function, args []Argument) string {
-	parts := make([]string, 0, len(args))
-	for _, arg := range args {
-		if arg.Spread {
-			parts = append(parts, "..."+function.PlaceString(arg.Place))
+func printArguments(function *Function, arguments []Argument) string {
+	parts := make([]string, 0, len(arguments))
+	for _, argument := range arguments {
+		if argument.Spread {
+			parts = append(parts, "..."+function.PlaceString(argument.Place))
 			continue
 		}
-		parts = append(parts, function.PlaceString(arg.Place))
+		parts = append(parts, function.PlaceString(argument.Place))
 	}
 	return strings.Join(parts, ", ")
 }

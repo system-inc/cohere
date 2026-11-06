@@ -40,8 +40,8 @@ func (listings *DirectoryListings) Add(directory string, entries []os.DirEntry) 
 	listings.entries[filepath.ToSlash(filepath.Clean(directory))] = entries
 }
 
-// Len is how many directories are held.
-func (listings *DirectoryListings) Len() int {
+// Length is how many directories are held.
+func (listings *DirectoryListings) Length() int {
 	listings.mutex.RLock()
 	defer listings.mutex.RUnlock()
 	return len(listings.entries)
@@ -59,13 +59,13 @@ func (listings *DirectoryListings) Listing(directory string) ([]os.DirEntry, boo
 	return entries, listed
 }
 
-// listingFS serves GetAccessibleEntries from the listings and everything else from the disk beneath.
-type listingFS struct {
+// listingFileSystem serves GetAccessibleEntries from the listings and everything else from the disk beneath.
+type listingFileSystem struct {
 	vfs.FS
 	listings *DirectoryListings
 }
 
-func (fileSystem *listingFS) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
+func (fileSystem *listingFileSystem) GetAccessibleEntries(directory tspath.RootedDirectoryPath) vfs.Entries {
 	entries, listed := fileSystem.listings.Listing(directory.AsString())
 	if !listed {
 		return fileSystem.FS.GetAccessibleEntries(directory)

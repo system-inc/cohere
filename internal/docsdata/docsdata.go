@@ -33,14 +33,14 @@ import (
 
 // The files Build produces, relative to the module root.
 const (
-	Directory          = "docs/data"
-	RulesPath          = Directory + "/rules.json"
-	SetsPath           = Directory + "/sets.json"
-	CliPath            = Directory + "/cli.json"
-	ChangelogPath      = Directory + "/changelog.json"
-	BenchmarksPath     = Directory + "/benchmarks.json"
-	ExamplesDirectory  = Directory + "/examples"
-	settingsSchemaName = "CohereSettings.schema.json"
+	Directory                = "docs/data"
+	RulesPath                = Directory + "/rules.json"
+	SetsPath                 = Directory + "/sets.json"
+	CommandLineInterfacePath = Directory + "/cli.json"
+	ChangelogPath            = Directory + "/changelog.json"
+	BenchmarksPath           = Directory + "/benchmarks.json"
+	ExamplesDirectory        = Directory + "/examples"
+	settingsSchemaName       = "CohereSettings.schema.json"
 )
 
 // Inputs is every source Build reads, gathered by the generator, so a test can hand it a changed
@@ -148,7 +148,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 	files[BenchmarksPath] = encodedBenchmarks
 
 	if inputs.Help != nil {
-		cli, parseCommandLineInterfaceError := parseCli(inputs.Help, inputs.VerbHelp)
+		cli, parseCommandLineInterfaceError := parseCommandLineInterface(inputs.Help, inputs.VerbHelp)
 		if parseCommandLineInterfaceError != nil {
 			return nil, parseCommandLineInterfaceError
 		}
@@ -156,7 +156,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		if encodeError != nil {
 			return nil, encodeError
 		}
-		files[CliPath] = encodedCommandLineInterface
+		files[CommandLineInterfacePath] = encodedCommandLineInterface
 	}
 
 	for path, contents := range inputs.SettingsSchemas {

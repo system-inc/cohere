@@ -418,7 +418,7 @@ var gapEmitters = map[string]GapEmitter{
 				return declarations("background-position")
 			case branch.isOneOf(DataTypeBackgroundSize, DataTypeLength):
 				return declarations("background-size")
-			case branch.isOneOf(DataTypeImage, DataTypeURL):
+			case branch.isOneOf(DataTypeImage, DataTypeUrl):
 				return declarations("background-image")
 			default:
 				return declarations("background-color")

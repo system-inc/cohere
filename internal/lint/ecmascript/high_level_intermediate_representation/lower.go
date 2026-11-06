@@ -161,7 +161,7 @@ func lowerNested(node *ast.Node, typeChecker *checker.Checker, enclosing *builde
 	// function yields has one thing to ask about.
 	function.Returns = builder.newTemporary(nil)
 
-	builder.lowerParams(node)
+	builder.lowerParameters(node)
 
 	if body.Kind == ast.KindBlock {
 		builder.lowerStatements(body.AsBlock().Statements)
@@ -513,7 +513,7 @@ func (builder *builder) emitTo(lvalue Place, value InstructionValue, node *ast.N
 // Parameters
 // ---------------------------------------------------------------------------
 
-func (builder *builder) lowerParams(node *ast.Node) {
+func (builder *builder) lowerParameters(node *ast.Node) {
 	parameters := functionParameters(node)
 	if parameters == nil {
 		return
@@ -528,11 +528,11 @@ func (builder *builder) lowerParams(node *ast.Node) {
 		// Function.Params stays flat and a pass reading it never walks a pattern.
 		if name.Kind == ast.KindIdentifier {
 			place := builder.bind(name.Text(), builder.symbolOf(name), name)
-			builder.function.Params = append(builder.function.Params, place)
+			builder.function.Parameters = append(builder.function.Parameters, place)
 			continue
 		}
 		temporary := builder.newTemporary(name)
-		builder.function.Params = append(builder.function.Params, temporary)
+		builder.function.Parameters = append(builder.function.Parameters, temporary)
 		pattern := builder.lowerPattern(name)
 		builder.emit(&Destructure{LValue: pattern, Value: temporary, Kind: InstructionKindLet, Pattern: pattern}, name)
 	}

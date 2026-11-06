@@ -66,8 +66,8 @@ type settings struct {
 	// strippedText is the text without its comments, shared with the parse's postprocess when it ran one.
 	strippedText *estree.StrippedText
 
-	// groupIDs holds createGroupIdMapper's ids, by the mapper's description and then the node.
-	groupIDs map[string]map[Node]*doc.GroupID
+	// groupIds holds createGroupIdMapper's ids, by the mapper's description and then the node.
+	groupIds map[string]map[Node]*doc.GroupId
 
 	// inJestEach is upstream's options.__inJestEach, set by print/template-literal.js while it
 	// prints a jest `each` table and read by print/array.js.
@@ -82,9 +82,9 @@ func settingsOf(options *Options) *settings {
 // printArguments are upstream's `args` to print: an object a parent passes to shape a child's print. A
 // print given none is cached; one given any is not, as upstream's.
 type printArguments struct {
-	expandFirstArg   bool
-	expandLastArg    bool
-	assignmentLayout string
+	expandFirstArgument bool
+	expandLastArgument  bool
+	assignmentLayout    string
 }
 
 // node is path.node.

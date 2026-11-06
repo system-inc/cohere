@@ -392,10 +392,10 @@ func TestTheHelpParserReadsWhatTheFlagPackageWrites(test *testing.T) {
 		test.Fatalf("%v\n%s", parseFlagHelpError, printed.String())
 	}
 
-	var want []CliFlag
+	var want []CommandLineInterfaceFlag
 	set.VisitAll(func(each *flag.Flag) {
 		argument, usage := flag.UnquoteUsage(each)
-		entry := CliFlag{Name: each.Name, Argument: argument, Usage: usage}
+		entry := CommandLineInterfaceFlag{Name: each.Name, Argument: argument, Usage: usage}
 		if !map[string]bool{"": true, "false": true, "0": true, "0s": true}[each.DefValue] {
 			entry.Default = each.DefValue
 		}
@@ -418,7 +418,7 @@ func TestTheVerbHelpKeepsItsSynopsis(test *testing.T) {
 		"       cohere rename <name> <newName>\n\n" +
 		"Renames a symbol.\nNothing is written without --write.\n\n" +
 		"  -write\n    \tapply the rename\n"
-	cli, parseCommandLineInterfaceError := parseCli(
+	cli, parseCommandLineInterfaceError := parseCommandLineInterface(
 		[]byte("  -fix\n    \tapply fixes only\n"),
 		map[string][]byte{"rename": []byte(help)},
 	)

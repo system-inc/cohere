@@ -128,8 +128,8 @@ func includesUnit(text []uint16, character uint16) bool {
 	return false
 }
 
-// equalsASCII is `text === literal` for an ASCII literal.
-func equalsASCII(text []uint16, literal string) bool {
+// equalsAscii is `text === literal` for an ASCII literal.
+func equalsAscii(text []uint16, literal string) bool {
 	if len(text) != len(literal) {
 		return false
 	}
@@ -194,11 +194,11 @@ func trim(text []uint16) []uint16 {
 // lone surrogates as \udxxx, everything else as itself.
 func jsonStringify(units []uint16) string {
 	var builder strings.Builder
-	writeJSONString(&builder, units)
+	writeJsonString(&builder, units)
 	return builder.String()
 }
 
-func writeJSONString(builder *strings.Builder, units []uint16) {
+func writeJsonString(builder *strings.Builder, units []uint16) {
 	builder.WriteByte('"')
 	for index := 0; index < len(units); index++ {
 		unit := units[index]

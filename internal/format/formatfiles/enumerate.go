@@ -217,7 +217,7 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 
 	walk := filepath.Walk
 	if listing != nil {
-		walk = func(root string, walkFn filepath.WalkFunc) error { return walkListed(root, listing, walkFn) }
+		walk = func(root string, walkVisit filepath.WalkFunc) error { return walkListed(root, listing, walkVisit) }
 	}
 	walkError := walk(root, func(path string, info os.FileInfo, pathError error) error {
 		if pathError != nil {
@@ -326,12 +326,12 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 // before walkFn is told of it, with the read's error, and its entries go by name, as os.ReadDir sorts a
 // listing. A listed entry's FileInfo is its listing's, the type an lstat gives (so a symbolic link is never a
 // directory) and nothing else, where Walk lstats each entry; the walk's callback reads only the name and type.
-func walkListed(root string, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
+func walkListed(root string, listing gitignore.Listing, walkVisit filepath.WalkFunc) error {
 	information, err := os.Lstat(root)
 	if err != nil {
-		err = walkFn(root, nil, err)
+		err = walkVisit(root, nil, err)
 	} else {
-		err = walkListedFrom(root, information, listing, walkFn)
+		err = walkListedFrom(root, information, listing, walkVisit)
 	}
 	if err == filepath.SkipDir || err == filepath.SkipAll {
 		return nil
@@ -339,9 +339,14 @@ func walkListed(root string, listing gitignore.Listing, walkFn filepath.WalkFunc
 	return err
 }
 
-func walkListedFrom(path string, information os.FileInfo, listing gitignore.Listing, walkFn filepath.WalkFunc) error {
+func walkListedFrom(
+	path string,
+	information os.FileInfo,
+	listing gitignore.Listing,
+	walkVisit filepath.WalkFunc,
+) error {
 	if !information.IsDir() {
-		return walkFn(path, information, nil)
+		return walkVisit(path, information, nil)
 	}
 	var entries []os.FileInfo
 	var readError error
@@ -350,7 +355,7 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 	} else {
 		entries, readError = lstatEntries(path)
 	}
-	if walkError := walkFn(path, information, readError); readError != nil || walkError != nil {
+	if walkError := walkVisit(path, information, readError); readError != nil || walkError != nil {
 		return walkError
 	}
 	for _, entry := range entries {
@@ -361,7 +366,7 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 			filepath.Join(path, entry.Name()),
 			entry,
 			listing,
-			walkFn,
+			walkVisit,
 		); walkListedFromError != nil {
 			if !entry.IsDir() || walkListedFromError != filepath.SkipDir {
 				return walkListedFromError

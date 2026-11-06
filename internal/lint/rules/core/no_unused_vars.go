@@ -294,7 +294,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		// asked whether it is used. `vars: "local"` first, then an ignored array element, then a class
 		// with a static block, then the two kinds a mode skips whole, then each kind's ignore pattern,
 		// then `using`. See isExemptFromUnusedReport for what follows.
-		if settings.Vars == "local" && isGlobalScopeBinding(ruleContext.SourceFile, candidate) {
+		if settings.Variables == "local" && isGlobalScopeBinding(ruleContext.SourceFile, candidate) {
 			continue
 		}
 		name := candidate.name.Text()
@@ -332,7 +332,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		if candidate.kind == bindingCaughtError && settings.CaughtErrors == "none" {
 			continue
 		}
-		if candidate.kind == bindingParameter && settings.Args == "none" {
+		if candidate.kind == bindingParameter && settings.Arguments == "none" {
 			continue
 		}
 		if matchesIgnorePattern(candidate, settings) {
@@ -774,7 +774,7 @@ func isExemptFromUnusedReport(
 		if isStructurallyRequiredParameter(declaringParameter(candidate)) {
 			return true
 		}
-		if settings.Args != "all" && candidate.declaration.Kind == ast.KindParameter &&
+		if settings.Arguments != "all" && candidate.declaration.Kind == ast.KindParameter &&
 			isParameterBeforeAUsedOne(ruleContext, candidate, all, reads) {
 			return true
 		}
@@ -1517,7 +1517,7 @@ func ignorePatternFor(kind unusedBindingKind, settings NoUnusedVarsOptions) (str
 	case bindingCaughtError:
 		return "caughtErrorsIgnorePattern", settings.CaughtErrorsIgnorePattern, "a caught error"
 	}
-	return "varsIgnorePattern", settings.VarsIgnorePattern, "a variable"
+	return "varsIgnorePattern", settings.VariablesIgnorePattern, "a variable"
 }
 
 // hasStaticBlock reports whether a class's body holds a `static {}` block, which
@@ -1563,7 +1563,7 @@ func matchesIgnorePattern(candidate candidateBinding, settings NoUnusedVarsOptio
 // binding does not have yet: whether prefixing an underscore would silence it, which decides
 // whether the message may offer that escape.
 func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUnusedVarsOptions) bool {
-	pattern := settings.VarsIgnorePattern
+	pattern := settings.VariablesIgnorePattern
 	switch kind {
 	case bindingParameter:
 		pattern = settings.ArgsIgnorePattern
@@ -1603,13 +1603,13 @@ func nameMatchesIgnorePattern(name string, kind unusedBindingKind, settings NoUn
 // typescript-eslint's alone, all ported against upstream's rows (#e1zk9s0). Each defaults to false,
 // the zero value.
 type NoUnusedVarsOptions struct {
-	// Vars is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
+	// Variables is `all` or `local`. Default `all`. `local` skips a binding in the global scope, which
 	// only a script has; see isGlobalScopeBinding.
-	Vars string `json:"vars"`
-	// VarsIgnorePattern is a regular expression naming variables to skip.
-	VarsIgnorePattern string `json:"varsIgnorePattern"`
-	// Args is `all`, `after-used`, or `none`. Default `after-used`.
-	Args string `json:"args"`
+	Variables string `json:"vars"`
+	// VariablesIgnorePattern is a regular expression naming variables to skip.
+	VariablesIgnorePattern string `json:"varsIgnorePattern"`
+	// Arguments is `all`, `after-used`, or `none`. Default `after-used`.
+	Arguments string `json:"args"`
 	// ArgsIgnorePattern is a regular expression naming parameters to skip.
 	ArgsIgnorePattern string `json:"argsIgnorePattern"`
 	// CaughtErrors is `all` or `none`. Default `all`, which is oxc's answer and differs from older
@@ -1659,8 +1659,12 @@ var noUnusedVarsModes = []struct {
 	allowed []string
 	value   func(*NoUnusedVarsOptions) string
 }{
-	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Vars }},
-	{"args", []string{"all", "after-used", "none"}, func(options *NoUnusedVarsOptions) string { return options.Args }},
+	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Variables }},
+	{
+		"args",
+		[]string{"all", "after-used", "none"},
+		func(options *NoUnusedVarsOptions) string { return options.Arguments },
+	},
 	{
 		"caughtErrors",
 		[]string{"all", "none"},
@@ -1677,7 +1681,7 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 		if shorthand != "all" && shorthand != "local" {
 			return fmt.Errorf("the string form is \"all\" or \"local\", and the config gives %q", shorthand)
 		}
-		*options = NoUnusedVarsOptions{Vars: shorthand}
+		*options = NoUnusedVarsOptions{Variables: shorthand}
 		return nil
 	}
 	var fields noUnusedVarsOptionFields
@@ -1704,11 +1708,11 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 func resolveNoUnusedVarsOptions(options rule.Given[NoUnusedVarsOptions]) NoUnusedVarsOptions {
 	settings, _ := options.Read()
 
-	if settings.Vars == "" {
-		settings.Vars = "all"
+	if settings.Variables == "" {
+		settings.Variables = "all"
 	}
-	if settings.Args == "" {
-		settings.Args = "after-used"
+	if settings.Arguments == "" {
+		settings.Arguments = "after-used"
 	}
 	if settings.CaughtErrors == "" {
 		settings.CaughtErrors = "all"

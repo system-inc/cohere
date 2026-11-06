@@ -242,9 +242,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	if repository == "" {
 		repository = root
 	}
-	rootScope, err := newIgnoreScope(repository)
-	if err != nil {
-		return discovery{}, err
+	rootScope, newIgnoreScopeError := newIgnoreScope(repository)
+	if newIgnoreScopeError != nil {
+		return discovery{}, newIgnoreScopeError
 	}
 	fromRepository := func(relative string) string {
 		// Ignored: repository is root or a directory above it, both absolute, and Rel fails only between paths
@@ -257,8 +257,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return inRepository
 	}
 	if prefix := fromRepository("."); prefix != "" {
-		if rootScope, err = rootScope.Enter(prefix); err != nil {
-			return discovery{}, err
+		var enterError error
+		if rootScope, enterError = rootScope.Enter(prefix); enterError != nil {
+			return discovery{}, enterError
 		}
 	}
 
@@ -289,10 +290,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	visit = func(relative string, scope ignoreScope) {
 		defer group.Done()
 		reading <- struct{}{}
-		entries, err := os.ReadDir(filepath.Join(root, relative))
+		entries, readDirectoryError := os.ReadDir(filepath.Join(root, relative))
 		<-reading
-		if err != nil {
-			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), err))
+		if readDirectoryError != nil {
+			fail(fmt.Errorf("reading %s: %w", filepath.Join(root, relative), readDirectoryError))
 			return
 		}
 		found.Listings.Add(filepath.Join(root, relative), entries)
@@ -317,8 +318,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		directoryScope := scope
 		if relative != "." {
-			if directoryScope, err = scope.Enter(fromRepository(relative)); err != nil {
-				fail(err)
+			var enterError error
+			if directoryScope, enterError = scope.Enter(fromRepository(relative)); enterError != nil {
+				fail(enterError)
 				return
 			}
 		}
@@ -331,7 +333,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				continue
 			}
 			filePath := path.Join(relative, entry.Name())
-			if directoryScope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
+			if directoryScope.Ignored(fromRepository(filePath), false) ||
+				configuration.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
 			swiftFileCount++

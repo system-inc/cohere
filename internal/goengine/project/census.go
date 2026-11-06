@@ -66,9 +66,9 @@ func TakeCensus(workspace Workspace) (Census, error) {
 		if directivesError != nil {
 			return Census{}, directivesError
 		}
-		walkError := filepath.WalkDir(moduleDirectory, func(visited string, entry fs.DirEntry, walkError error) error {
-			if walkError != nil {
-				return walkError
+		walkError := filepath.WalkDir(moduleDirectory, func(visited string, entry fs.DirEntry, pathError error) error {
+			if pathError != nil {
+				return pathError
 			}
 			if entry.IsDir() {
 				if visited != moduleDirectory {

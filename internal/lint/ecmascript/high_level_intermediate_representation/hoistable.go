@@ -382,7 +382,7 @@ func collectNonNullsInBlocks(
 	// direction. The verdict expires if the seed ever becomes load-bearing, which it would the
 	// moment a component reads a parameter property that nothing else dereferences.
 	if isLikelyComponentFunction(function) {
-		known[registry.identifierNode(function.Params[0].Identifier, true)] = true
+		known[registry.identifierNode(function.Parameters[0].Identifier, true)] = true
 	}
 
 	// The loads that exist only to build a memo call's dependency array, which must not be read as
@@ -490,13 +490,13 @@ func collectNonNullsInBlocks(
 // approximated here by name as `isLikelyComponentFunction` already does -- see the divergence note
 // at `collectNonNullsInBlocks` for why a name rather than an inferred function type.
 func isKnownImmutableParameter(function *Function, id static_single_assignment.IdentifierId) bool {
-	if function == nil || len(function.Params) == 0 {
+	if function == nil || len(function.Parameters) == 0 {
 		return false
 	}
 	if !isLikelyComponentFunction(function) && !isHookName(function.Name) {
 		return false
 	}
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		if parameter.Identifier == id {
 			return true
 		}
@@ -506,7 +506,7 @@ func isKnownImmutableParameter(function *Function, id static_single_assignment.I
 
 // isLikelyComponentFunction reports whether this function is one React would seed as a component.
 func isLikelyComponentFunction(function *Function) bool {
-	if function == nil || len(function.Params) == 0 || function.Name == "" {
+	if function == nil || len(function.Parameters) == 0 || function.Name == "" {
 		return false
 	}
 	runes := []rune(function.Name)

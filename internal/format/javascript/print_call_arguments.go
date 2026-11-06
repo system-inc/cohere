@@ -21,9 +21,9 @@ import (
 func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
 
-	args := getCallArguments(current)
+	arguments := getCallArguments(current)
 
-	if len(args) == 0 {
+	if len(arguments) == 0 {
 		return groupIn(path, concatIn(
 			path,
 			doc.Text("("),
@@ -32,11 +32,11 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		))
 	}
 
-	lastArgIndex := len(args) - 1
+	lastArgIndex := len(arguments) - 1
 
 	// useEffect(() => { ... }, [foo, bar, baz])
 	// useImperativeHandle(ref, () => { ... }, [foo, bar, baz])
-	if isReactHookCallWithDepsArray(args) {
+	if isReactHookCallWithDepsArray(arguments) {
 		parts := []Doc{doc.Text("(")}
 		iterateCallArgumentsPath(path, func(path *Path, index int) {
 			parts = append(parts, print("", nil))
@@ -51,19 +51,19 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	anyArgEmptyLine := false
 	var printedArguments []Doc
 	iterateCallArgumentsPath(path, func(path *Path, index int) {
-		arg := node(path)
-		argDoc := print("", nil)
+		argument := node(path)
+		argumentDoc := print("", nil)
 
 		if index == lastArgIndex {
 			// do nothing
-		} else if isNextLineEmptyAfter(arg, options) {
+		} else if isNextLineEmptyAfter(argument, options) {
 			anyArgEmptyLine = true
-			argDoc = concatIn(path, argDoc, doc.Text(","), hardline, hardline)
+			argumentDoc = concatIn(path, argumentDoc, doc.Text(","), hardline, hardline)
 		} else {
-			argDoc = concatIn(path, argDoc, doc.Text(","), line)
+			argumentDoc = concatIn(path, argumentDoc, doc.Text(","), line)
 		}
 
-		printedArguments = append(printedArguments, argDoc)
+		printedArguments = append(printedArguments, argumentDoc)
 	})
 
 	// Upstream also requires `path.root.type !== "NGRoot"` (Angular does not allow trailing comma);
@@ -90,11 +90,11 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if anyArgEmptyLine ||
-		(!parentOf(path).Is("Decorator") && isFunctionCompositionArguments(args)) {
+		(!parentOf(path).Is("Decorator") && isFunctionCompositionArguments(arguments)) {
 		return allArgsBrokenOut()
 	}
 
-	if shouldExpandFirstArg(args) {
+	if shouldExpandFirstArgument(arguments) {
 		tailArguments := printedArguments[1:]
 		for _, tailArgument := range tailArguments {
 			if doc.WillBreak(tailArgument) {
@@ -105,7 +105,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			path,
 			print,
 			getCallArgumentSelector(current, 0),
-			&printArguments{expandFirstArg: true},
+			&printArguments{expandFirstArgument: true},
 		)
 		if bailedOut {
 			return allArgsBrokenOut()
@@ -147,7 +147,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 		}, doc.GroupOptions{})
 	}
 
-	if shouldExpandLastArg(args, printedArguments, options) {
+	if shouldExpandLastArgument(arguments, printedArguments, options) {
 		headArguments := printedArguments[:len(printedArguments)-1]
 		for _, headArgument := range headArguments {
 			if doc.WillBreak(headArgument) {
@@ -158,7 +158,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			path,
 			print,
 			getCallArgumentSelector(current, -1),
-			&printArguments{expandLastArg: true},
+			&printArguments{expandLastArgument: true},
 		)
 		if bailedOut {
 			return allArgsBrokenOut()
@@ -222,11 +222,11 @@ func printCatchingArgExpansionBailout(
 	path *Path,
 	print PrintFunc,
 	selector pathSelector,
-	args *printArguments,
+	arguments *printArguments,
 ) (printed Doc, bailedOut bool) {
 	defer func() {
 		if caught := recover(); caught != nil {
-			if _, isBailout := caught.(argExpansionBailout); isBailout {
+			if _, isBailout := caught.(argumentExpansionBailout); isBailout {
 				printed, bailedOut = nil, true
 				return
 			}
@@ -234,34 +234,34 @@ func printCatchingArgExpansionBailout(
 			panic(caught)
 		}
 	}()
-	return callSelector(path, func(*Path) Doc { return print("", args) }, selector), false
+	return callSelector(path, func(*Path) Doc { return print("", arguments) }, selector), false
 }
 
-// couldExpandArg is upstream's couldExpandArg. Upstream's arrowChainRecursion defaults to false; Go
+// couldExpandArgument is upstream's couldExpandArgument. Upstream's arrowChainRecursion defaults to false; Go
 // has no default parameters, so callers pass it.
-func couldExpandArg(arg Node, arrowChainRecursion bool) bool {
-	if isObjectExpression(arg) &&
-		(len(arg.List("properties")) > 0 || hasAnyComment(arg)) {
+func couldExpandArgument(argument Node, arrowChainRecursion bool) bool {
+	if isObjectExpression(argument) &&
+		(len(argument.List("properties")) > 0 || hasAnyComment(argument)) {
 		return true
 	}
 
-	if isArrayExpression(arg) && (len(arg.List("elements")) > 0 || hasAnyComment(arg)) {
+	if isArrayExpression(argument) && (len(argument.List("elements")) > 0 || hasAnyComment(argument)) {
 		return true
 	}
 
-	if (isBinaryCastExpression(arg) || arg.Is("TSTypeAssertion")) &&
-		couldExpandArg(arg.Child("expression"), false) {
+	if (isBinaryCastExpression(argument) || argument.Is("TSTypeAssertion")) &&
+		couldExpandArgument(argument.Child("expression"), false) {
 		return true
 	}
 
-	if arg.Is("FunctionExpression") ||
-		arg.Is("DoExpression") ||
-		arg.Is("ModuleExpression") {
+	if argument.Is("FunctionExpression") ||
+		argument.Is("DoExpression") ||
+		argument.Is("ModuleExpression") {
 		return true
 	}
 
-	if arg.Is("ArrowFunctionExpression") {
-		body := arg.Child("body")
+	if argument.Is("ArrowFunctionExpression") {
+		body := argument.Child("body")
 
 		if body.Is("BlockStatement") ||
 			isJsxElement(body) ||
@@ -270,7 +270,7 @@ func couldExpandArg(arg Node, arrowChainRecursion bool) bool {
 			return true
 		}
 
-		if body.Is("ArrowFunctionExpression") && couldExpandArg(body, true) {
+		if body.Is("ArrowFunctionExpression") && couldExpandArgument(body, true) {
 			return true
 		}
 
@@ -288,37 +288,37 @@ func couldExpandArg(arg Node, arrowChainRecursion bool) bool {
 	return false
 }
 
-// shouldExpandLastArg is upstream's shouldExpandLastArg.
-func shouldExpandLastArg(args []Node, argDocs []Doc, options *Options) bool {
+// shouldExpandLastArgument is upstream's shouldExpandLastArgument.
+func shouldExpandLastArgument(arguments []Node, argumentDocs []Doc, options *Options) bool {
 	// Upstream first returns true for a lone argument whose doc carries `label.embed` (and not
 	// `label.hug === false`). The JavaScript printer has no embed hook (printer.go), so no argument doc
 	// carries that label and the branch is never taken; argDocs is kept for upstream's signature.
 
-	lastArgument := args[len(args)-1]
+	lastArgument := arguments[len(arguments)-1]
 	var penultimateArgument Node
-	if len(args) >= 2 {
-		penultimateArgument = args[len(args)-2]
+	if len(arguments) >= 2 {
+		penultimateArgument = arguments[len(arguments)-2]
 	}
 	return !hasComment(lastArgument, commentLeading, nil) &&
 		!hasComment(lastArgument, commentTrailing, nil) &&
-		couldExpandArg(lastArgument, false) &&
+		couldExpandArgument(lastArgument, false) &&
 		// If the last two arguments are of the same type,
 		// disable last element expansion.
 		(penultimateArgument == nil || penultimateArgument.Type() != lastArgument.Type()) &&
 		// useMemo(() => func(), [foo, bar, baz])
-		(len(args) != 2 ||
+		(len(arguments) != 2 ||
 			!penultimateArgument.Is("ArrowFunctionExpression") ||
 			!isArrayExpression(lastArgument)) &&
-		!(len(args) > 1 && isConciselyPrintedArray(lastArgument, options))
+		!(len(arguments) > 1 && isConciselyPrintedArray(lastArgument, options))
 }
 
-// shouldExpandFirstArg is upstream's shouldExpandFirstArg.
-func shouldExpandFirstArg(args []Node) bool {
-	if len(args) != 2 {
+// shouldExpandFirstArgument is upstream's shouldExpandFirstArgument.
+func shouldExpandFirstArgument(arguments []Node) bool {
+	if len(arguments) != 2 {
 		return false
 	}
 
-	firstArgument, secondArgument := args[0], args[1]
+	firstArgument, secondArgument := arguments[0], arguments[1]
 
 	if firstArgument.Is("ModuleExpression") &&
 		isTypeModuleObjectExpression(secondArgument) {
@@ -333,7 +333,7 @@ func shouldExpandFirstArg(args []Node) bool {
 		!secondArgument.Is("ArrowFunctionExpression") &&
 		!secondArgument.Is("ConditionalExpression") &&
 		isHopefullyShortCallArgument(secondArgument) &&
-		!couldExpandArg(secondArgument, false)
+		!couldExpandArgument(secondArgument, false)
 }
 
 // isHopefullyShortCallArgument is upstream's isHopefullyShortCallArgument.
@@ -388,39 +388,39 @@ func isHopefullyShortCallArgument(node Node) bool {
 // isReactHookCallWithDepsArray is upstream's isReactHookCallWithDepsArray.
 //
 // Checks if the arguments of a function are a call to a React Hook with a dependencies array.
-func isReactHookCallWithDepsArray(args []Node) bool {
-	if len(args) == 2 {
+func isReactHookCallWithDepsArray(arguments []Node) bool {
+	if len(arguments) == 2 {
 		/**
 		 * useEffect(() => {
 		 *   // do something
 		 * }, [dep1, dep2, dep2])
 		 */
-		return isValidHookCallbackAndDepsFormat(args /* baseIndex */, 0)
+		return isValidHookCallbackAndDepsFormat(arguments /* baseIndex */, 0)
 	}
-	if len(args) == 3 {
+	if len(arguments) == 3 {
 		/**
 		 * useImperativeHandle(ref, () => {
 		 *   // do something
 		 * }, [dep1, dep2, dep2]);
 		 */
-		return args[0].Is("Identifier") &&
-			isValidHookCallbackAndDepsFormat(args /* baseIndex */, 1)
+		return arguments[0].Is("Identifier") &&
+			isValidHookCallbackAndDepsFormat(arguments /* baseIndex */, 1)
 	}
 	return false
 }
 
 // isValidHookCallbackAndDepsFormat is upstream's isValidHookCallbackAndDepsFormat.
-func isValidHookCallbackAndDepsFormat(args []Node, baseIndex int) bool {
-	maybeArrowFunction := args[baseIndex]
-	maybeDepsArray := args[baseIndex+1]
+func isValidHookCallbackAndDepsFormat(arguments []Node, baseIndex int) bool {
+	maybeArrowFunction := arguments[baseIndex]
+	maybeDepsArray := arguments[baseIndex+1]
 	if !(maybeArrowFunction.Is("ArrowFunctionExpression") &&
 		len(getFunctionParameters(maybeArrowFunction)) == 0 &&
 		maybeArrowFunction.Child("body").Is("BlockStatement") &&
 		maybeDepsArray.Is("ArrayExpression")) {
 		return false
 	}
-	for _, arg := range args {
-		if hasAnyComment(arg) {
+	for _, argument := range arguments {
+		if hasAnyComment(argument) {
 			return false
 		}
 	}

@@ -26,7 +26,7 @@ type outputMode int
 const (
 	outputHuman outputMode = iota
 	outputVerbose
-	outputJSON
+	outputJson
 )
 
 // outputSettings is the run's choice of view, set once from the flags and the project's settings.
@@ -77,8 +77,8 @@ func printFinding(out *bufio.Writer, finding runFinding, verboseLine string) {
 	switch activeOutput.Mode {
 	case outputVerbose:
 		fmt.Fprint(out, verboseLine)
-	case outputJSON:
-		writeJSONLine(out, findingAsJSON(finding))
+	case outputJson:
+		writeJsonLine(out, findingAsJson(finding))
 	default:
 		fmt.Fprintln(out, findingLine(finding, activeOutput.Style))
 	}
@@ -105,7 +105,7 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Co
 	finding := runFinding{
 		Severity:  "error",
 		Rule:      diagnostic.RuleName,
-		MessageID: diagnostic.Message.Id,
+		MessageId: diagnostic.Message.Id,
 		Message:   singleLineDescription(diagnostic.Message.Description),
 	}
 	if diagnostic.RuleName == configuration.UnusedDisable {
@@ -179,8 +179,8 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 		}
 		printInvocation(out, "%s\n",
 			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
-	case outputJSON:
-		printInvocation(out, "%s", jsonLine(summaryAsJSON(summary)))
+	case outputJson:
+		printInvocation(out, "%s", jsonLine(summaryAsJson(summary)))
 	default:
 		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
@@ -216,9 +216,9 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 // lines of JSON under `--json`. `--verbose` has the fix phase's own line for it instead.
 func printChangedFiles(out *bufio.Writer, changed []changedFile) {
 	switch activeOutput.Mode {
-	case outputJSON:
-		for _, line := range changedFilesAsJSON(changed) {
-			writeJSONLine(out, line)
+	case outputJson:
+		for _, line := range changedFilesAsJson(changed) {
+			writeJsonLine(out, line)
 		}
 	case outputHuman:
 		for _, line := range changedFileLines(changed, activeOutput.Style) {

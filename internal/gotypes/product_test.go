@@ -30,12 +30,12 @@ func keyFixture(test *testing.T, root string, source string) *listing {
 		{ImportPath: "strings", Name: "strings", Standard: true, GoFiles: []string{"builder.go", "strings.go"}},
 		{ImportPath: "golang.org/x/sync/errgroup", Name: "errgroup", GoFiles: []string{"errgroup.go"},
 			Module: &listedModule{
-				Path:    "golang.org/x/sync",
-				Version: "v0.17.0",
-				Dir:     filepath.Join(test.TempDir(), "mod", "golang.org", "x", "sync@v0.17.0"),
+				Path:      "golang.org/x/sync",
+				Version:   "v0.17.0",
+				Directory: filepath.Join(test.TempDir(), "mod", "golang.org", "x", "sync@v0.17.0"),
 			}},
-		{ImportPath: "example.com/shim/ast", Name: "ast", Dir: shim, GoFiles: []string{"ast.go"},
-			Module: &listedModule{Path: "example.com/shim/ast", Dir: shim, GoMod: filepath.Join(shim, "go.mod")}},
+		{ImportPath: "example.com/shim/ast", Name: "ast", Directory: shim, GoFiles: []string{"ast.go"},
+			Module: &listedModule{Path: "example.com/shim/ast", Directory: shim, GoMod: filepath.Join(shim, "go.mod")}},
 	}
 	result := &listing{packages: packages, byPath: map[string]*listedPackage{}}
 	for _, listedPackage := range packages {

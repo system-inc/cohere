@@ -84,7 +84,7 @@ type jsonPosition struct {
 // jsonNode is a node as the oracle writes it. Unknown fields fail the decode, so a field upstream adds
 // that unist.Node does not carry is noticed rather than dropped.
 type jsonNode struct {
-	ID        int          `json:"id"`
+	Id        int          `json:"id"`
 	Parent    int          `json:"parent"`
 	Keys      []string     `json:"keys"`
 	Undefined bool         `json:"undefined"`
@@ -170,8 +170,8 @@ func oracleParse(test testing.TB, texts []string) []oracleResult {
 // comparison walks the two trees in step.
 type comparison struct {
 	offsets unitOffsets
-	// byID is the port's node for each oracle id, and idOf the oracle id for each port node.
-	byID map[int]*Node
+	// byId is the port's node for each oracle id, and idOf the oracle id for each port node.
+	byId map[int]*Node
 	idOf map[*Node]int
 	// parents are the port's nodes with the oracle's parent id for each.
 	parents     map[*Node]int
@@ -251,19 +251,19 @@ func (comparison *comparison) node(path string, mine *Node, theirs *jsonNode) {
 	path = path + "<" + theirs.Type + ">"
 
 	// Identity: one object upstream is one node here, and the other way round.
-	if known, seen := comparison.byID[theirs.ID]; seen {
+	if known, seen := comparison.byId[theirs.Id]; seen {
 		if known != mine {
-			comparison.differ(path, "upstream reaches its object #%d again, the port a different node", theirs.ID)
+			comparison.differ(path, "upstream reaches its object #%d again, the port a different node", theirs.Id)
 		}
 	} else {
-		comparison.byID[theirs.ID] = mine
+		comparison.byId[theirs.Id] = mine
 	}
 	if known, seen := comparison.idOf[mine]; seen {
-		if known != theirs.ID {
-			comparison.differ(path, "the port reaches one node as upstream's objects #%d and #%d", known, theirs.ID)
+		if known != theirs.Id {
+			comparison.differ(path, "the port reaches one node as upstream's objects #%d and #%d", known, theirs.Id)
 		}
 	} else {
-		comparison.idOf[mine] = theirs.ID
+		comparison.idOf[mine] = theirs.Id
 	}
 	comparison.parents[mine] = theirs.Parent
 
@@ -373,17 +373,17 @@ func compareParse(text string, expected oracleResult) []string {
 	if decodeError := decoder.Decode(&theirs); decodeError != nil {
 		return []string{fmt.Sprintf("decoding upstream's tree: %v", decodeError)}
 	}
-	c := &comparison{offsets: offsets, byID: map[int]*Node{}, idOf: map[*Node]int{}, parents: map[*Node]int{}}
+	c := &comparison{offsets: offsets, byId: map[int]*Node{}, idOf: map[*Node]int{}, parents: map[*Node]int{}}
 	c.node("root", root, &theirs)
-	for node, parentID := range c.parents {
-		switch parentID {
+	for node, parentId := range c.parents {
+		switch parentId {
 		case -1, -2:
 			// null (the root), or never defined: nil either way here.
 			if node.Parent != nil {
 				c.differ(node.NodeType, "has a parent where upstream's has none")
 			}
 		default:
-			if expected, known := c.byID[parentID]; !known || node.Parent != expected {
+			if expected, known := c.byId[parentId]; !known || node.Parent != expected {
 				c.differ(node.NodeType+"@"+fmt.Sprint(node.Position.Start), "parent is not upstream's _parent")
 			}
 		}

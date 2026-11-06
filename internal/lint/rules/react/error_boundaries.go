@@ -264,12 +264,12 @@ func isInsideTryBlockWithin(node *ast.Node, boundary *ast.Node) bool {
 // The order matters and is upstream's: a function *declaration* whose name is a component or hook
 // name is accepted on syntax alone, through `isComponentDeclaration`, before the inferred path with
 // its parameter and return tests runs. Every other shape goes through `getComponentOrHookLike`.
-func isReactCompiledFunction(fn *ast.Node) bool {
-	if !isTopLevelCompilationCandidate(fn) {
+func isReactCompiledFunction(function *ast.Node) bool {
+	if !isTopLevelCompilationCandidate(function) {
 		return false
 	}
 
-	name, named := reactFunctionNameOf(fn)
+	name, named := reactFunctionNameOf(function)
 	if !named {
 		return false
 	}
@@ -288,7 +288,7 @@ func isReactCompiledFunction(fn *ast.Node) bool {
 	// `isComponentDeclaration` reads that way. Measured: `function Component(a, b, c)` is clean
 	// upstream, and so is `function Component(...props)`, so the parameter test is reached for a
 	// declaration too and an early accept would report on both.
-	return hasValidComponentParameters(fn) && !returnsNonNode(fn)
+	return hasValidComponentParameters(function) && !returnsNonNode(function)
 }
 
 // isTopLevelCompilationCandidate reports whether the program-level traversal would reach fn.
@@ -301,8 +301,8 @@ func isReactCompiledFunction(fn *ast.Node) bool {
 // Measured in both directions: a `Component` declared inside `widget` is clean, and a `Component`
 // declared inside `Outer` is clean as well, so this is about nesting rather than about whether the
 // outer function was itself accepted.
-func isTopLevelCompilationCandidate(fn *ast.Node) bool {
-	for current := fn.Parent; current != nil; current = current.Parent {
+func isTopLevelCompilationCandidate(function *ast.Node) bool {
+	for current := function.Parent; current != nil; current = current.Parent {
 		if isFunctionLike(current) {
 			return false
 		}
@@ -311,7 +311,7 @@ func isTopLevelCompilationCandidate(fn *ast.Node) bool {
 			return false
 		}
 	}
-	switch fn.Kind {
+	switch function.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
 		return true
 	}
@@ -326,17 +326,17 @@ func isTopLevelCompilationCandidate(fn *ast.Node) bool {
 // of the single variable declarator it initializes. An anonymous function expression in any other
 // position has no name and is declined, which is why `export default function (props) {}` is clean
 // and `export default function Component(props) {}` reports.
-func reactFunctionNameOf(fn *ast.Node) (string, bool) {
-	if fn.Kind == ast.KindFunctionDeclaration {
-		if name := fn.Name(); name != nil && name.Kind == ast.KindIdentifier {
+func reactFunctionNameOf(function *ast.Node) (string, bool) {
+	if function.Kind == ast.KindFunctionDeclaration {
+		if name := function.Name(); name != nil && name.Kind == ast.KindIdentifier {
 			return name.Text(), true
 		}
 		return "", false
 	}
-	if name := fn.Name(); name != nil && name.Kind == ast.KindIdentifier {
+	if name := function.Name(); name != nil && name.Kind == ast.KindIdentifier {
 		return name.Text(), true
 	}
-	parent := fn.Parent
+	parent := function.Parent
 	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
 		return "", false
 	}
@@ -361,8 +361,8 @@ func reactFunctionNameOf(fn *ast.Node) (string, bool) {
 // input it would exclude is one where this rule would otherwise report; so omitting it can only add
 // findings on annotated props, never remove them. Stated as a divergence rather than left implicit,
 // and it is the one clause here that was not pinned by a measurement.
-func hasValidComponentParameters(fn *ast.Node) bool {
-	parameters := parametersOf(fn)
+func hasValidComponentParameters(function *ast.Node) bool {
+	parameters := parametersOf(function)
 	switch len(parameters) {
 	case 0:
 		return true
@@ -376,7 +376,7 @@ func hasValidComponentParameters(fn *ast.Node) bool {
 		if second == nil || second.Kind != ast.KindIdentifier {
 			return false
 		}
-		return mentionsRef(second.Text())
+		return mentionsReference(second.Text())
 	}
 	return false
 }
@@ -385,8 +385,8 @@ func hasValidComponentParameters(fn *ast.Node) bool {
 //
 // Routed through the shim's own `Parameters` helper rather than a kind switch, because every
 // function-like node carries the list and the accessor knows which field holds it.
-func parametersOf(fn *ast.Node) []*ast.Node {
-	list := fn.Parameters()
+func parametersOf(function *ast.Node) []*ast.Node {
+	list := function.Parameters()
 	if list == nil {
 		return nil
 	}
@@ -399,12 +399,12 @@ func isRestParameter(parameter *ast.Node) bool {
 		parameter.AsParameterDeclaration().DotDotDotToken != nil
 }
 
-// mentionsRef reports whether a second parameter's name claims to be a ref.
+// mentionsReference reports whether a second parameter's name claims to be a ref.
 //
 // Substring rather than equality, which is upstream's own test: `name.includes('ref') ||
 // name.includes('Ref')`. So `forwardedRef` and `myref` both count, and that looseness is upstream's
 // rather than an approximation here.
-func mentionsRef(name string) bool {
+func mentionsReference(name string) bool {
 	return strings.Contains(name, "ref") || strings.Contains(name, "Ref")
 }
 
@@ -422,12 +422,12 @@ func mentionsRef(name string) bool {
 // clean, while the same two returns in the opposite order reports. Writing this as "any return is a
 // non-node" would have been the sensible-looking version and would disagree with upstream on
 // exactly those inputs.
-func returnsNonNode(fn *ast.Node) bool {
-	body := fn.Body()
+func returnsNonNode(function *ast.Node) bool {
+	body := function.Body()
 	if body == nil {
 		return false
 	}
-	if fn.Kind == ast.KindArrowFunction && body.Kind != ast.KindBlock {
+	if function.Kind == ast.KindArrowFunction && body.Kind != ast.KindBlock {
 		return isNonNodeExpression(body)
 	}
 

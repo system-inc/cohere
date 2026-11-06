@@ -61,10 +61,10 @@ func matchReference(value string, ampersand int) (int, string, bool) {
 			cursor++
 		}
 		digits := cursor - digitsStart
-		limit := characterReferenceDecimalSizeMax
+		limit := characterReferenceDecimalSizeMaximum
 		base := 10
 		if hexadecimal {
-			limit = characterReferenceHexadecimalSizeMax
+			limit = characterReferenceHexadecimalSizeMaximum
 			base = 16
 		}
 		if digits >= 1 && digits <= limit && cursor < len(value) && value[cursor] == ';' {
@@ -79,7 +79,7 @@ func matchReference(value string, ampersand int) (int, string, bool) {
 		cursor++
 	}
 	letters := cursor - start
-	if letters >= 1 && letters <= characterReferenceNamedSizeMax && cursor < len(value) && value[cursor] == ';' {
+	if letters >= 1 && letters <= characterReferenceNamedSizeMaximum && cursor < len(value) && value[cursor] == ';' {
 		if decoded, present := DecodeNamedCharacterReference(value[start:cursor]); present {
 			return cursor + 1, decoded, true
 		}

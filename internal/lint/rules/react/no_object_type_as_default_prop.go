@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// messageForbiddenTypeDefaultParam builds the finding for one offending default.
+// messageForbiddenTypeDefaultParameter builds the finding for one offending default.
 //
 // Upstream interpolates two placeholders and uses the forbidden type's name twice, including the
 // ungrammatical "a/an" that avoids choosing an article. Both are reproduced verbatim rather than
@@ -15,7 +15,7 @@ import (
 //
 // A rendered-text assertion covers this in the test file. A message-id assertion could not see any
 // of it: an interpolation defect leaves the id and the count untouched.
-func messageForbiddenTypeDefaultParam(propertyName string, forbiddenType string) rule.Message {
+func messageForbiddenTypeDefaultParameter(propertyName string, forbiddenType string) rule.Message {
 	return rule.Message{
 		Id: "forbiddenTypeDefaultParam",
 		Description: propertyName + " has a/an " + forbiddenType +
@@ -141,7 +141,7 @@ func reportForbiddenDefaults(ruleContext rule.Context, component *ast.Node) {
 		// Upstream reports on `prop.value`, the whole assignment pattern, so the span covers the
 		// name, the equals sign and the value rather than the value alone. Measured by slicing the
 		// installed build's reported range: `a = {}` for `function C({a = {}, b = []})`.
-		ruleContext.ReportNode(element, messageForbiddenTypeDefaultParam(propertyName, forbiddenType))
+		ruleContext.ReportNode(element, messageForbiddenTypeDefaultParameter(propertyName, forbiddenType))
 	}
 }
 

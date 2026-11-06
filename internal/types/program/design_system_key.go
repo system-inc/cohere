@@ -97,13 +97,14 @@ func readDesignSystemPath(path string) (DesignSystemKeyRead, error) {
 	read.Present = true
 	hash := sha256.New()
 	if info.Mode()&fs.ModeSymlink != 0 {
-		target, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			return read, err
+		target, resolveSymlinksError := filepath.EvalSymlinks(path)
+		if resolveSymlinksError != nil {
+			return read, resolveSymlinksError
 		}
 		hash.Write([]byte("link\x00" + target + "\x00"))
-		if info, err = os.Stat(path); err != nil {
-			return read, err
+		var statError error
+		if info, statError = os.Stat(path); statError != nil {
+			return read, statError
 		}
 	}
 	if info.IsDir() {

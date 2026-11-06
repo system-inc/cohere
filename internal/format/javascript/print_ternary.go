@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/format/doc"
 
 // printTernary is upstream's printTernary. The experimental-ternaries branch is dropped; args is only
 // read there, so it is unused here.
-func printTernary(path *Path, options *Options, print PrintFunc, args *printArguments) Doc {
+func printTernary(path *Path, options *Options, print PrintFunc, arguments *printArguments) Doc {
 	return printTernaryOld(path, options, print)
 }
 

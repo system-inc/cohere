@@ -11,14 +11,14 @@ import (
 	"strings"
 )
 
-// MinimumSwiftEngineMacOS is the oldest macOS a released cohere-swift may require.
+// MinimumSwiftEngineMacOs is the oldest macOS a released cohere-swift may require.
 //
 // The engine's own floor is macOS 15, set by Synchronization's Mutex, and @system_cohere_swift
 // measured it. The release reads the minimum from the built binary itself and refuses anything above
 // this. Otherwise a Package.swift that drifted back to a newer deployment target would ship an engine
 // that will not even launch on most of the Macs people have, and nothing would say so until a user
 // ran it.
-const MinimumSwiftEngineMacOS = "15.0"
+const MinimumSwiftEngineMacOs = "15.0"
 
 // swiftArchitecture is Swift's name for a Go architecture, which is what `swift build --arch` takes.
 func swiftArchitecture(goArchitecture string) (string, error) {
@@ -126,7 +126,7 @@ func buildSwiftEngine(
 	if requireArchitectureError := requireArchitecture(destination, architecture); requireArchitectureError != nil {
 		return requireArchitectureError
 	}
-	return requireMinimumMacOS(destination, MinimumSwiftEngineMacOS)
+	return requireMinimumMacOs(destination, MinimumSwiftEngineMacOs)
 }
 
 // requireSwiftContract refuses a package whose cohere and cohere-swift would refuse each other.
@@ -246,12 +246,12 @@ func requireArchitecture(path string, architecture string) error {
 	return nil
 }
 
-// requireMinimumMacOS refuses a binary whose minimum macOS, as recorded in the binary, is newer than
+// requireMinimumMacOs refuses a binary whose minimum macOS, as recorded in the binary, is newer than
 // allowed.
 //
 // It reads `minos` from the load commands with vtool, which is what the loader enforces, rather than
 // trusting Package.swift to say what it built.
-func requireMinimumMacOS(path string, allowed string) error {
+func requireMinimumMacOs(path string, allowed string) error {
 	output, outputError := exec.Command("vtool", "-show-build", path).Output()
 	if outputError != nil {
 		return fmt.Errorf("reading the minimum macOS of %s: %w", path, outputError)
@@ -271,7 +271,7 @@ func requireMinimumMacOS(path string, allowed string) error {
 		)
 	}
 
-	newer, macOsVersionIsNewerError := macOSVersionIsNewer(minimum, allowed)
+	newer, macOsVersionIsNewerError := macOsVersionIsNewer(minimum, allowed)
 	if macOsVersionIsNewerError != nil {
 		return macOsVersionIsNewerError
 	}
@@ -286,8 +286,8 @@ func requireMinimumMacOS(path string, allowed string) error {
 	return nil
 }
 
-// macOSVersionIsNewer reports whether version is newer than than, comparing major then minor.
-func macOSVersionIsNewer(version string, than string) (bool, error) {
+// macOsVersionIsNewer reports whether version is newer than than, comparing major then minor.
+func macOsVersionIsNewer(version string, than string) (bool, error) {
 	// A missing minor reads as 0, so "15" and "15.0" compare equal; a patch is ignored.
 	parse := func(text string) ([2]int, error) {
 		var parts [2]int

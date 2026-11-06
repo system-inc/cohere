@@ -359,8 +359,8 @@ func TestHoistableHandlesNilInputs(test *testing.T) {
 	if got := CollectHoistablePropertyLoads(nil, nil, nil, nil, nil); got != nil {
 		test.Error("a nil function produced hoistable loads")
 	}
-	if got := CollectScopeDependenciesWithHoistable(nil, nil, nil, nil); got.Len() != 0 {
-		test.Errorf("a nil function produced %d scopes", got.Len())
+	if got := CollectScopeDependenciesWithHoistable(nil, nil, nil, nil); got.Length() != 0 {
+		test.Errorf("a nil function produced %d scopes", got.Length())
 	}
 	var empty *HoistableAnalysis
 	if empty.Converged() || empty.Iterations() != 0 || empty.hoistableAt(1) != nil {

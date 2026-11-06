@@ -240,14 +240,14 @@ func (state *strictVoidReturnState) isVoidReturningFunctionType(subject *checker
 	// `tsutils.getCallSignaturesOfType`, which upstream calls, does this splitting itself. The shim
 	// exposes the raw checker method, which does not.
 	found := 0
-	for part := range type_checking.UnionTypePartsSeq(subject) {
+	for part := range type_checking.UnionTypePartsSequence(subject) {
 		for _, signature := range checker.Checker_getSignaturesOfType(
 			state.ctx.TypeChecker,
 			part,
 			checker.SignatureKindCall,
 		) {
 			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
-			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
+			for constituent := range type_checking.UnionTypePartsSequence(returnType) {
 				found++
 				if !type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsVoid) {
 					return false
@@ -382,7 +382,7 @@ func (state *strictVoidReturnState) reportIfNonVoidFunctionAtProperty(property *
 		return
 	}
 	var expected *checker.Type
-	for part := range type_checking.UnionTypePartsSeq(objectExpected) {
+	for part := range type_checking.UnionTypePartsSequence(objectExpected) {
 		symbol := checker.Checker_getPropertyOfType(state.ctx.TypeChecker, part, propertyName)
 		if symbol == nil {
 			continue
@@ -436,14 +436,14 @@ func (state *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool 
 	// Already void: every constituent of every call signature's return type is acceptable.
 	acceptable := true
 	sawOne := false
-	for part := range type_checking.UnionTypePartsSeq(actual) {
+	for part := range type_checking.UnionTypePartsSequence(actual) {
 		for _, signature := range checker.Checker_getSignaturesOfType(
 			state.ctx.TypeChecker,
 			part,
 			checker.SignatureKindCall,
 		) {
 			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
-			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
+			for constituent := range type_checking.UnionTypePartsSequence(returnType) {
 				sawOne = true
 				if !type_checking.IsTypeFlagSet(constituent, allowed) {
 					acceptable = false
@@ -562,7 +562,7 @@ func (state *strictVoidReturnState) checkCall(node *ast.Node) {
 		return
 	}
 	signatures := []*checker.Signature{}
-	for constituent := range type_checking.UnionTypePartsSeq(calleeType) {
+	for constituent := range type_checking.UnionTypePartsSequence(calleeType) {
 		signatures = append(signatures,
 			checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, constituent, signatureKind)...)
 	}
@@ -582,7 +582,7 @@ func (state *strictVoidReturnState) checkCall(node *ast.Node) {
 			if parameterType == nil {
 				continue
 			}
-			for constituent := range type_checking.UnionTypePartsSeq(parameterType) {
+			for constituent := range type_checking.UnionTypePartsSequence(parameterType) {
 				for _, parameterSignature := range checker.Checker_getSignaturesOfType(
 					state.ctx.TypeChecker, constituent, checker.SignatureKindCall) {
 					expectedReturns = append(expectedReturns,

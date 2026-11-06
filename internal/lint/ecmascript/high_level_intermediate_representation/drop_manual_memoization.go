@@ -435,9 +435,9 @@ func extractManualMemoArguments(
 	var arguments []Argument
 	switch value := instruction.Value.(type) {
 	case *CallExpression:
-		arguments = value.Args
+		arguments = value.Arguments
 	case *MethodCall:
-		arguments = value.Args
+		arguments = value.Arguments
 	}
 	if len(arguments) == 0 || arguments[0].Spread {
 		return extractedMemoArguments{}, false

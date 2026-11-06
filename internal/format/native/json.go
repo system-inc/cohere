@@ -9,7 +9,7 @@ import (
 // javascript.FormatJSON, the way language-json's languages choose them.
 func init() {
 	Register(".json", func(fileName string, text string, options formatoptions.Options) (string, error) {
-		return javascript.FormatJSON(fileName, text, options)
+		return javascript.FormatJson(fileName, text, options)
 	})
 	RegisterDoc(".json", javascript.PrintToDoc)
 }

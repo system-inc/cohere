@@ -98,7 +98,7 @@ func insideAtRuleNode(path *astPath, atRuleNames ...string) bool {
 	return found && slices.Contains(atRuleNames, toLowerCase(atRuleAncestorNode.String("name")))
 }
 
-func insideURLFunctionInImportAtRuleNode(path *astPath) bool {
+func insideUrlFunctionInImportAtRuleNode(path *astPath) bool {
 	node := currentNode(path)
 	groups := node.List("groups")
 	if len(groups) == 0 || groups[0].String("value") != "url" || len(groups) != 2 {
@@ -108,7 +108,7 @@ func insideURLFunctionInImportAtRuleNode(path *astPath) bool {
 	return found && atRule.String("name") == "import"
 }
 
-func isURLFunctionNode(node *estree.Node) bool {
+func isUrlFunctionNode(node *estree.Node) bool {
 	return node.Type() == "value-func" && toLowerCase(node.String("value")) == "url"
 }
 
@@ -184,7 +184,7 @@ func isRelationalOperatorNode(node *estree.Node) bool {
 	return node.Type() == "value-word" && slices.Contains([]string{"<", ">", "<=", ">="}, node.String("value"))
 }
 
-func isSCSSControlDirectiveNode(node *estree.Node, options *printerOptions) bool {
+func isScssControlDirectiveNode(node *estree.Node, options *printerOptions) bool {
 	return parserOf(options) == "scss" &&
 		node.Type() == "css-atrule" &&
 		slices.Contains([]string{"if", "else", "for", "each", "while"}, node.String("name"))
@@ -243,7 +243,7 @@ func isKeyValuePairInParenGroupNode(node *estree.Node) bool {
 	return node.Type() == "value-paren_group" && len(groups) > 0 && groups[0] != nil && isKeyValuePairNode(groups[0])
 }
 
-func isSCSSMapItemNode(path *astPath, options *printerOptions) bool {
+func isScssMapItemNode(path *astPath, options *printerOptions) bool {
 	if parserOf(options) != "scss" {
 		return false
 	}

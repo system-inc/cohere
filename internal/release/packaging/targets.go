@@ -52,11 +52,11 @@ func (target Target) String() string {
 	return target.GoOperatingSystem + "/" + target.GoArchitecture
 }
 
-// IsMacOS reports whether this target needs signing and notarization.
+// IsMacOs reports whether this target needs signing and notarization.
 //
 // Gatekeeper blocks an unsigned binary downloaded from the network, and an npm tarball counts. It
 // does not block one built locally, which is exactly why this is easy to miss: it works on the
 // machine that built it and fails on every machine that installs it.
-func (target Target) IsMacOS() bool {
+func (target Target) IsMacOs() bool {
 	return target.GoOperatingSystem == "darwin"
 }

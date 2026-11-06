@@ -64,8 +64,8 @@ package cst
 // The control characters the lexer emits besides slices of the input, upstream's `BOM`, `DOCUMENT`, `FLOW_END`
 // and `SCALAR`.
 const (
-	// BOM is the byte order mark.
-	BOM uint16 = 0xFEFF
+	// Bom is the byte order mark.
+	Bom uint16 = 0xFEFF
 	// Document is the start of doc-mode (C0: Start of Text).
 	Document uint16 = 0x02
 	// FlowEnd is an unexpected end of flow-mode (C0: Cancel).
@@ -93,8 +93,8 @@ type Token struct {
 	// End is the tokens after a document, document end marker, flow scalar or flow collection; nil when
 	// absent.
 	End []*Token
-	// Props is a block scalar's header, and the comments and spaces on its line.
-	Props []*Token
+	// Properties is a block scalar's header, and the comments and spaces on its line.
+	Properties []*Token
 	// Items is a block map's, block sequence's or flow collection's items.
 	Items []*CollectionItem
 
@@ -155,7 +155,7 @@ func TokenType(source []uint16) string {
 		return "newline"
 	case 1:
 		switch source[0] {
-		case BOM:
+		case Bom:
 			return "byte-order-mark"
 		case Document:
 			return "doc-mode"

@@ -242,7 +242,7 @@ func TestMergeMatchesReact(test *testing.T) {
 						scope, got.Start, got.End, want.Start, want.End)
 				}
 			}
-			if got, want := merged.Len(), len(testCase.wantRanges); got != want {
+			if got, want := merged.Length(), len(testCase.wantRanges); got != want {
 				test.Errorf("%d scopes survived, want %d", got, want)
 			}
 		})
@@ -265,9 +265,9 @@ func TestMergeIsNotAPairwiseOverlapRule(test *testing.T) {
 	})
 	merged := MergeOverlappingReactiveScopes(function, scopes)
 
-	if merged.Len() != 1 {
+	if merged.Length() != 1 {
 		test.Fatalf("got %d surviving scopes, want 1; the interleaving use did not union them, which "+
-			"is what a pairwise range comparison would also conclude", merged.Len())
+			"is what a pairwise range comparison would also conclude", merged.Length())
 	}
 	// And the ranges genuinely nest, which is what makes this a control rather than a duplicate.
 	outer, inner := mutation_aliasing.MutableRange{Start: 1, End: 9}, mutation_aliasing.MutableRange{Start: 3, End: 5}
@@ -407,7 +407,7 @@ func TestMergeGapsAreDeclared(test *testing.T) {
 func TestMergeHandlesAnEmptyScopeTable(test *testing.T) {
 	test.Parallel()
 
-	if got := MergeOverlappingReactiveScopes(nil, nil); got.Len() != 0 || got.Unions() != 0 {
+	if got := MergeOverlappingReactiveScopes(nil, nil); got.Length() != 0 || got.Unions() != 0 {
 		test.Error("a nil input produced a non-empty result")
 	}
 	// A scope this pass never saw must answer itself, which is what lets a caller key a map on
@@ -434,7 +434,7 @@ func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, uni
 		scopes *ReactiveScopes,
 	) {
 		functions++
-		before += scopes.Len()
+		before += scopes.Length()
 
 		beforeRanges := map[ScopeId]mutation_aliasing.MutableRange{}
 		for _, scope := range scopes.Ids() {
@@ -447,7 +447,7 @@ func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, uni
 		nonNestedBefore += countNonNestedPairs(beforeRanges)
 
 		merged := MergeOverlappingReactiveScopes(function, scopes)
-		after += merged.Len()
+		after += merged.Length()
 		unions += merged.Unions()
 
 		afterRanges := map[ScopeId]mutation_aliasing.MutableRange{}
@@ -778,7 +778,7 @@ func TestMergeFunctionOperandSkipUpperBound(test *testing.T) {
 
 // unionsSkippingFunctionOperands runs the sweep with every function-expression use-operand skipped.
 func unionsSkippingFunctionOperands(function *Function, scopes *ReactiveScopes) int {
-	if function == nil || scopes == nil || scopes.Len() == 0 {
+	if function == nil || scopes == nil || scopes.Length() == 0 {
 		return 0
 	}
 	state := &mergeSweepState{rangeOf: scopes.RangeOf}
@@ -884,7 +884,7 @@ func TestMergeIsDeterministic(test *testing.T) {
 		first := MergeOverlappingReactiveScopes(function, scopes)
 		second := MergeOverlappingReactiveScopes(function, scopes)
 		merges += first.Unions()
-		if first.Len() != second.Len() || first.Unions() != second.Unions() {
+		if first.Length() != second.Length() || first.Unions() != second.Unions() {
 			mismatches++
 			return
 		}
@@ -997,9 +997,9 @@ func TestMergeRegistersScopesFromTerminals(test *testing.T) {
 	// reaches position 9, so scope 1 never closes and no union fires. Asserted so a change that
 	// starts merging here is caught rather than read as an improvement.
 	merged := MergeOverlappingReactiveScopes(function, scopes)
-	if merged.Len() != 2 || merged.Unions() != 0 {
+	if merged.Length() != 2 || merged.Unions() != 0 {
 		test.Errorf("got %d scopes and %d unions, want 2 and 0; React leaves these separate",
-			merged.Len(), merged.Unions())
+			merged.Length(), merged.Unions())
 	}
 
 	// The corpus half: the measurement that explains the survivor.
@@ -1032,7 +1032,7 @@ func TestMergeRegistersScopesFromTerminals(test *testing.T) {
 				}
 			})
 		}
-		total += scopes.Len()
+		total += scopes.Length()
 		for scope := range fromTerminal {
 			if !fromInstruction[scope] {
 				onlyTerminal++

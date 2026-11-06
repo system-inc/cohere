@@ -10,11 +10,11 @@ import "github.com/system-inc/cohere/internal/format/yaml/cst"
 type Kind string
 
 const (
-	KindAlias  Kind = "Alias"
-	KindMap    Kind = "Map"
-	KindPair   Kind = "Pair"
-	KindScalar Kind = "Scalar"
-	KindSeq    Kind = "Seq"
+	KindAlias    Kind = "Alias"
+	KindMap      Kind = "Map"
+	KindPair     Kind = "Pair"
+	KindScalar   Kind = "Scalar"
+	KindSequence Kind = "Seq"
 )
 
 // Scalar types, upstream's Scalar.BLOCK_FOLDED and friends, with upstream's spelling: they are the
@@ -44,12 +44,12 @@ type Node struct {
 	// Range is [start, value end, node end] in UTF-16 code units: the end of the value, then the end
 	// of the node including any comment on the same line.
 	Range []int
-	// SrcToken is the CST token the node was composed from (keepSourceTokens): every scalar, alias and
+	// SourceToken is the CST token the node was composed from (keepSourceTokens): every scalar, alias and
 	// collection composed from a token, but not an empty node composed from nothing, nor the map a
 	// flow sequence wraps around a pair.
-	SrcToken *cst.Token
-	// SrcItem is a Pair's srcToken: the collection item it was composed from.
-	SrcItem *cst.CollectionItem
+	SourceToken *cst.Token
+	// SourceItem is a Pair's srcToken: the collection item it was composed from.
+	SourceItem *cst.CollectionItem
 
 	// Anchor is the anchor's name without the &, set by composeNode; HasAnchor says whether it is set.
 	Anchor        string
@@ -157,9 +157,9 @@ func collectionNode(class string) Node {
 	case "YAMLSet":
 		return Node{Kind: KindMap, Class: class, Items: []*Node{}, Tag: setTagName}
 	case "YAMLSeq":
-		return Node{Kind: KindSeq, Class: class, Items: []*Node{}}
+		return Node{Kind: KindSequence, Class: class, Items: []*Node{}}
 	case "YAMLOMap":
-		return Node{Kind: KindSeq, Class: class, Items: []*Node{}, Tag: omapTagName}
+		return Node{Kind: KindSequence, Class: class, Items: []*Node{}, Tag: omapTagName}
 	}
 	panic("compose: unknown collection class " + class)
 }
@@ -191,7 +191,7 @@ func assignCollection(class string, collection *Node) *Node {
 	if collection.anchorPresent {
 		node.SetAnchor(collection.Anchor)
 	}
-	node.SrcToken = collection.SrcToken
+	node.SourceToken = collection.SourceToken
 	return node
 }
 
@@ -207,11 +207,11 @@ func IsPair(node *Node) bool { return node != nil && node.Kind == KindPair }
 // IsScalar is upstream's isScalar.
 func IsScalar(node *Node) bool { return node != nil && node.Kind == KindScalar }
 
-// IsSeq is upstream's isSeq.
-func IsSeq(node *Node) bool { return node != nil && node.Kind == KindSeq }
+// IsSequence is upstream's isSeq.
+func IsSequence(node *Node) bool { return node != nil && node.Kind == KindSequence }
 
 // IsCollection is upstream's isCollection.
-func IsCollection(node *Node) bool { return IsMap(node) || IsSeq(node) }
+func IsCollection(node *Node) bool { return IsMap(node) || IsSequence(node) }
 
 // IsNode is upstream's isNode: anything but a pair.
 func IsNode(node *Node) bool { return node != nil && node.Kind != KindPair }

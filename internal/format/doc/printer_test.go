@@ -29,18 +29,18 @@ import (
 
 // spec is a doc in a form both languages can build. Only the fields a kind uses are set.
 type spec struct {
-	Kind     string  `json:"k"`
-	Text     string  `json:"v,omitempty"`
-	Children []*spec `json:"c,omitempty"`
-	Number   int     `json:"n,omitempty"`
-	Flag     bool    `json:"f,omitempty"`
-	ID       string  `json:"id,omitempty"`
-	Ref      int     `json:"r,omitempty"`
+	Kind      string  `json:"k"`
+	Text      string  `json:"v,omitempty"`
+	Children  []*spec `json:"c,omitempty"`
+	Number    int     `json:"n,omitempty"`
+	Flag      bool    `json:"f,omitempty"`
+	Id        string  `json:"id,omitempty"`
+	Reference int     `json:"r,omitempty"`
 }
 
 type specGenerator struct {
 	random   *rand.Rand
-	groupIDs []string
+	groupIds []string
 	shared   int
 	depth    int
 }
@@ -75,13 +75,13 @@ func (generator *specGenerator) line() *spec {
 	}[generator.random.Intn(5)]}
 }
 
-func (generator *specGenerator) groupID() string {
-	if len(generator.groupIDs) == 0 || generator.random.Intn(3) == 0 {
-		id := fmt.Sprintf("g%d", len(generator.groupIDs))
-		generator.groupIDs = append(generator.groupIDs, id)
+func (generator *specGenerator) groupId() string {
+	if len(generator.groupIds) == 0 || generator.random.Intn(3) == 0 {
+		id := fmt.Sprintf("g%d", len(generator.groupIds))
+		generator.groupIds = append(generator.groupIds, id)
 		return id
 	}
-	return generator.groupIDs[generator.random.Intn(len(generator.groupIDs))]
+	return generator.groupIds[generator.random.Intn(len(generator.groupIds))]
 }
 
 func (generator *specGenerator) node() *spec {
@@ -126,12 +126,12 @@ func (generator *specGenerator) node() *spec {
 	case 7, 8:
 		group := &spec{Kind: "group", Flag: generator.random.Intn(6) == 0, Children: []*spec{generator.node()}}
 		if generator.random.Intn(3) == 0 {
-			group.ID = generator.groupID()
+			group.Id = generator.groupId()
 		}
 		if generator.random.Intn(5) == 0 {
 			generator.shared++
-			group.Ref = generator.shared
-			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Ref: group.Ref}}}
+			group.Reference = generator.shared
+			return &spec{Kind: "concat", Children: []*spec{group, {Kind: "sharedGroup", Reference: group.Reference}}}
 		}
 		return group
 	case 9:
@@ -154,13 +154,13 @@ func (generator *specGenerator) node() *spec {
 	case 11:
 		ifBreak := &spec{Kind: "ifBreak", Children: []*spec{generator.node(), generator.node()}}
 		if generator.random.Intn(2) == 0 {
-			ifBreak.ID = generator.groupID()
+			ifBreak.Id = generator.groupId()
 		}
 		return ifBreak
 	case 12:
 		return &spec{
 			Kind:     "indentIfBreak",
-			ID:       generator.groupID(),
+			Id:       generator.groupId(),
 			Flag:     generator.random.Intn(2) == 0,
 			Children: []*spec{generator.node()},
 		}
@@ -180,14 +180,14 @@ func buildSpec(root *spec) Doc { return buildSpecAs(root, false) }
 
 // buildSpecAs is buildSpec, building each concat as a *Sequence of its parts when asSequences is set.
 func buildSpecAs(root *spec, asSequences bool) Doc {
-	ids := map[string]*GroupID{}
+	ids := map[string]*GroupId{}
 	groups := map[int]*Group{}
-	id := func(name string) *GroupID {
+	id := func(name string) *GroupId {
 		if name == "" {
 			return nil
 		}
 		if ids[name] == nil {
-			ids[name] = NewGroupID(name)
+			ids[name] = NewGroupId(name)
 		}
 		return ids[name]
 	}
@@ -229,21 +229,21 @@ func buildSpecAs(root *spec, asSequences bool) Doc {
 		case "dedentToRoot":
 			return DedentToRoot(build(node.Children[0]))
 		case "group":
-			group := NewGroup(build(node.Children[0]), GroupOptions{ID: id(node.ID), ShouldBreak: node.Flag})
-			if node.Ref != 0 {
-				groups[node.Ref] = group
+			group := NewGroup(build(node.Children[0]), GroupOptions{Id: id(node.Id), ShouldBreak: node.Flag})
+			if node.Reference != 0 {
+				groups[node.Reference] = group
 			}
 			return group
 		case "sharedGroup":
-			return groups[node.Ref]
+			return groups[node.Reference]
 		case "conditionalGroup":
 			return ConditionalGroup(children(node), GroupOptions{ShouldBreak: node.Flag})
 		case "fill":
 			return NewFill(children(node))
 		case "ifBreak":
-			return NewIfBreak(build(node.Children[0]), build(node.Children[1]), id(node.ID))
+			return NewIfBreak(build(node.Children[0]), build(node.Children[1]), id(node.Id))
 		case "indentIfBreak":
-			return NewIndentIfBreak(build(node.Children[0]), id(node.ID), node.Flag)
+			return NewIndentIfBreak(build(node.Children[0]), id(node.Id), node.Flag)
 		case "lineSuffix":
 			return NewLineSuffix(build(node.Children[0]))
 		case "lineSuffixBoundary":
@@ -313,7 +313,7 @@ type printCase struct {
 	Options map[string]any `json:"options"`
 }
 
-type printResultJSON struct {
+type printResultJson struct {
 	Formatted string `json:"formatted"`
 	Error     string `json:"error"`
 }
@@ -400,7 +400,7 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 	if runError := command.Run(); runError != nil {
 		test.Fatalf("node: %v\n%s", runError, stderr.String())
 	}
-	var upstream []printResultJSON
+	var upstream []printResultJson
 	if decodeError := json.Unmarshal(stdout.Bytes(), &upstream); decodeError != nil {
 		test.Fatal(decodeError)
 	}
@@ -421,12 +421,12 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 		if got != upstream[index].Formatted {
 			mismatches++
 			if mismatches <= 5 {
-				specJSON, _ := json.Marshal(testCase.Spec)
+				specJson, _ := json.Marshal(testCase.Spec)
 				test.Errorf(
 					"case %d (%+v)\nspec %s\nwant %q\ngot  %q",
 					index,
 					options[index],
-					specJSON,
+					specJson,
 					upstream[index].Formatted,
 					got,
 				)

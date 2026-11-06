@@ -22,14 +22,14 @@ import (
 // are swept on the next registration.
 var designSystemRecordings struct {
 	sync.Mutex
-	byProgram map[weak.Pointer[compiler.Program]][]*RecordingFS
+	byProgram map[weak.Pointer[compiler.Program]][]*RecordingFileSystem
 }
 
-func recordDesignSystemFs(program *compiler.Program, recorder *RecordingFS) {
+func recordDesignSystemFileSystem(program *compiler.Program, recorder *RecordingFileSystem) {
 	designSystemRecordings.Lock()
 	defer designSystemRecordings.Unlock()
 	if designSystemRecordings.byProgram == nil {
-		designSystemRecordings.byProgram = map[weak.Pointer[compiler.Program]][]*RecordingFS{}
+		designSystemRecordings.byProgram = map[weak.Pointer[compiler.Program]][]*RecordingFileSystem{}
 	}
 	for key := range designSystemRecordings.byProgram {
 		if key.Value() == nil {

@@ -40,8 +40,8 @@ type NoUnderscoreDangleOptions struct {
 	AllowAfterThisConstructor bool `json:"allowAfterThisConstructor"`
 	// EnforceInMethodNames turns the method-name arm on. Off by default.
 	EnforceInMethodNames bool `json:"enforceInMethodNames"`
-	// AllowFunctionParams permits an underscored parameter name. Defaults true.
-	AllowFunctionParams *bool `json:"allowFunctionParams"`
+	// AllowFunctionParameters permits an underscored parameter name. Defaults true.
+	AllowFunctionParameters *bool `json:"allowFunctionParams"`
 	// EnforceInClassFields turns the class-field arm on. Off by default.
 	EnforceInClassFields bool `json:"enforceInClassFields"`
 	// AllowInArrayDestructuring permits a name coined by an array pattern. Defaults true.
@@ -172,7 +172,7 @@ var NoUnderscoreDangle = rule.Rule[NoUnderscoreDangleOptions]{
 					}
 				}
 			}
-			if noUnderscoreDangleFlag(settings.AllowFunctionParams, true) {
+			if noUnderscoreDangleFlag(settings.AllowFunctionParameters, true) {
 				return
 			}
 			functionLike := node.FunctionLikeData()

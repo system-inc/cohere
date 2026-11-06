@@ -123,8 +123,8 @@ func Format(text string, prettierOptions formatoptions.Options) (string, error) 
 	return formatWithParser(text, prettierOptions, "css")
 }
 
-// FormatSCSS is Prettier's format for an SCSS file, the parser "scss".
-func FormatSCSS(text string, prettierOptions formatoptions.Options) (string, error) {
+// FormatScss is Prettier's format for an SCSS file, the parser "scss".
+func FormatScss(text string, prettierOptions formatoptions.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "scss")
 }
 
@@ -158,8 +158,8 @@ func PrintToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, er
 	return printToDocWithParser(text, prettierOptions, "css")
 }
 
-// PrintToDocSCSS is PrintToDoc for SCSS, the parser "scss".
-func PrintToDocSCSS(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
+// PrintToDocScss is PrintToDoc for SCSS, the parser "scss".
+func PrintToDocScss(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "scss")
 }
 

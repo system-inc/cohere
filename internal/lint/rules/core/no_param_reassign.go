@@ -23,11 +23,11 @@ func messageAssignmentToParameterProperty(name string) rule.Message {
 
 // NoParamReassignOptions configures whether property writes count and which names are excused.
 type NoParamReassignOptions struct {
-	// Props extends the rule from the parameter binding to properties reached through it. Off by
+	// Properties extends the rule from the parameter binding to properties reached through it. Off by
 	// default, and the default is what makes the two halves separable: reassigning the binding is
 	// always local and always a defect, while writing through it mutates the caller's object, which
 	// is sometimes exactly the intent.
-	Props bool `json:"props"`
+	Properties bool `json:"props"`
 
 	// IgnorePropertyModificationsFor is a list of parameter names whose property writes are excused,
 	// matched literally.
@@ -157,7 +157,7 @@ var NoParamReassign = rule.Rule[NoParamReassignOptions]{
 				}
 				if current.Kind == ast.KindIdentifier && !isOwnParameterBinding(current, anchors) {
 					if name, isAnchored := anchoredParameterName(ruleContext, current, anchors); isAnchored {
-						reportParameterUse(ruleContext, current, name, settings.Props, ignored)
+						reportParameterUse(ruleContext, current, name, settings.Properties, ignored)
 					}
 				}
 				current.ForEachChild(func(child *ast.Node) bool {

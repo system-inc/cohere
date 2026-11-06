@@ -530,8 +530,8 @@ const (
 	refsNullable
 	// refsGuard is the result of comparing a ref value against null, as in `if (r.current == null)`.
 	refsGuard
-	// refsRef is the ref object itself, the thing `useRef` returns.
-	refsRef
+	// refsReference is the ref object itself, the thing `useRef` returns.
+	refsReference
 	// refsRefValue is what came out of a ref, the `current` property. Reading one during render is
 	// the finding this rule is named for.
 	refsRefValue
@@ -610,7 +610,7 @@ func refsTypeEqual(left, right *refsAccessType) bool {
 		return true
 	case refsGuard:
 		return left.RefId == right.RefId && left.HasRefId == right.HasRefId
-	case refsRef:
+	case refsReference:
 		// Ref identity deliberately ignored. See the doc comment.
 		return true
 	case refsRefValue:
@@ -695,14 +695,14 @@ func refsJoinRefCarrying(left, right *refsAccessType, nextRefId func() int) *ref
 	if left.Kind == refsRefValue || right.Kind == refsRefValue {
 		return &refsAccessType{Kind: refsRefValue}
 	}
-	if left.Kind == refsRef && right.Kind == refsRef {
+	if left.Kind == refsReference && right.Kind == refsReference {
 		if left.HasRefId && right.HasRefId && left.RefId == right.RefId {
 			return left
 		}
-		return &refsAccessType{Kind: refsRef, RefId: nextRefId(), HasRefId: true}
+		return &refsAccessType{Kind: refsReference, RefId: nextRefId(), HasRefId: true}
 	}
-	if left.Kind == refsRef || right.Kind == refsRef {
-		return &refsAccessType{Kind: refsRef, RefId: nextRefId(), HasRefId: true}
+	if left.Kind == refsReference || right.Kind == refsReference {
+		return &refsAccessType{Kind: refsReference, RefId: nextRefId(), HasRefId: true}
 	}
 	// Both structures.
 	joined := &refsAccessType{Kind: refsStructure}
@@ -797,7 +797,7 @@ func refsMessageFor(kind refsFindingKind) rule.Message {
 			Id:          messageRefsUpdateId,
 			Description: "Cannot update ref during render. " + refsWhyRefsAreOutsideRender,
 		}
-	case refsFindingFunctionAccessesRef:
+	case refsFindingFunctionAccessesReference:
 		return rule.Message{
 			Id: messageRefsFunctionAccessesRefId,
 			Description: "This function accesses a ref value, and calling it during render reads " +

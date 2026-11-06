@@ -845,7 +845,7 @@ func immutabilitySeedParameters(
 	function *high_level_intermediate_representation.Function,
 	entry map[static_single_assignment.IdentifierId]immutabilityAbstractValue,
 ) {
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		entry[parameter.Identifier] = immutabilityAbstractValue{
 			Kind:    immutabilityFrozen,
 			Reasons: immutabilityReasonReactiveFunctionArgument,

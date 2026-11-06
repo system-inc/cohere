@@ -76,10 +76,10 @@ func printMappingItem(path *astPath, options *options, print printFunc) doc.Doc 
 		return doc.Concat{printedKey, spaceBeforeColon, doc.Text(": "), printedValue}
 	}
 
-	groupID := doc.NewGroupID("mappingKey")
+	groupId := doc.NewGroupId("mappingKey")
 	groupedKey := doc.NewGroup(doc.Concat{
 		doc.NewIfBreak(doc.Text("? "), nil, nil),
-		doc.NewGroup(alignWithSpaces(2, printedKey), doc.GroupOptions{ID: groupID}),
+		doc.NewGroup(alignWithSpaces(2, printedKey), doc.GroupOptions{Id: groupId}),
 	}, doc.GroupOptions{})
 
 	// Construct both explicit and implicit mapping values.
@@ -133,7 +133,7 @@ func printMappingItem(path *astPath, options *options, print printFunc) doc.Doc 
 	return doc.ConditionalGroup([]doc.Doc{
 		doc.Concat{
 			groupedKey,
-			doc.NewIfBreak(explicitMappingValue, implicitMappingValue, groupID),
+			doc.NewIfBreak(explicitMappingValue, implicitMappingValue, groupId),
 		},
 	}, doc.GroupOptions{})
 }

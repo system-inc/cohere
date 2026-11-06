@@ -18,19 +18,19 @@ type resolvePropsOptions struct {
 
 // props is resolveProps's result. A token field is nil for upstream's null.
 type props struct {
-	comma            *cst.Token
-	found            *cst.Token
-	spaceBefore      bool
-	comment          string
-	hasNewline       bool
-	anchor           *cst.Token
-	tag              *cst.Token
-	newlineAfterProp *cst.Token
-	end              int
-	start            int
+	comma                *cst.Token
+	found                *cst.Token
+	spaceBefore          bool
+	comment              string
+	hasNewline           bool
+	anchor               *cst.Token
+	tag                  *cst.Token
+	newlineAfterProperty *cst.Token
+	end                  int
+	start                int
 }
 
-func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
+func resolveProperties(tokens []*cst.Token, options resolvePropsOptions) props {
 	flow, indicator, next, onError := options.flow, options.indicator, options.next, options.onError
 	spaceBefore := false
 	atNewline := options.startOnNewline
@@ -180,16 +180,16 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 		start = end
 	}
 	return props{
-		comma:            comma,
-		found:            found,
-		spaceBefore:      spaceBefore,
-		comment:          comment,
-		hasNewline:       hasNewline,
-		anchor:           anchor,
-		tag:              tag,
-		newlineAfterProp: newlineAfterProperty,
-		end:              end,
-		start:            start,
+		comma:                comma,
+		found:                found,
+		spaceBefore:          spaceBefore,
+		comment:              comment,
+		hasNewline:           hasNewline,
+		anchor:               anchor,
+		tag:                  tag,
+		newlineAfterProperty: newlineAfterProperty,
+		end:                  end,
+		start:                start,
 	}
 }
 

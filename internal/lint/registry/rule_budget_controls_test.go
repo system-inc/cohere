@@ -46,7 +46,7 @@ func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 	if checkRuleBudgetError != nil ||
 		len(rows) != 1 ||
 		rows[0].NodesOffered != 1 ||
-		rows[0].TotalCPU() > 25*time.Millisecond {
+		rows[0].TotalCpu() > 25*time.Millisecond {
 		test.Fatalf("waiter was billed CPU or not run: %v %+v", checkRuleBudgetError, rows)
 	}
 	spinner := rule.Rule[rule.NoOptions]{

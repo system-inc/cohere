@@ -218,10 +218,10 @@ func TestExactlyTheRuledStylecheckChecksAreRegistered(test *testing.T) {
 	}
 }
 
-// TestNoDefaultOffSAOrSCheckIsRegistered holds the registry to staticcheck's own defaults for SA and S: a
+// TestNoDefaultOffSaOrSCheckIsRegistered holds the registry to staticcheck's own defaults for SA and S: a
 // check its documentation marks NonDefault stays off until it is ruled on. SA9003 is named, so the test
 // cannot pass by staticcheck marking nothing.
-func TestNoDefaultOffSAOrSCheckIsRegistered(test *testing.T) {
+func TestNoDefaultOffSaOrSCheckIsRegistered(test *testing.T) {
 	test.Parallel()
 	nonDefault := []string{}
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {

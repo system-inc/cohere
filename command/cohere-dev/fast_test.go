@@ -55,12 +55,12 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 			if entry.wallSeconds <= 0 || entry.cpuSeconds <= 0 || entry.reason == "" {
 				test.Fatalf("%s is listed without its measured wall, CPU or reason", entry.pattern)
 			}
-			if entry.cpuSeconds <= fastBudgetCPUSeconds {
+			if entry.cpuSeconds <= fastBudgetCpuSeconds {
 				test.Fatalf(
 					"%s is recorded at %.1fs of CPU, at or under the fast budget of %.0fs, so it belongs in the fast tier",
 					entry.pattern,
 					entry.cpuSeconds,
-					float64(fastBudgetCPUSeconds),
+					float64(fastBudgetCpuSeconds),
 				)
 			}
 			if entry.reads.Name != "" {
@@ -68,8 +68,8 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 			}
 			wall, cpu := measureTests(test, root, entry.pattern, nil)
 			if entry.skippedBy != "" {
-				fastWall, fastCPU := measureTests(test, root, entry.pattern, []string{entry.skippedBy + "=1"})
-				wall, cpu = wall-fastWall, cpu-fastCPU
+				fastWall, fastCpu := measureTests(test, root, entry.pattern, []string{entry.skippedBy + "=1"})
+				wall, cpu = wall-fastWall, cpu-fastCpu
 			}
 			test.Logf(
 				"%s: %.1fs wall, %.1fs CPU now (recorded %.1fs, %.1fs)",
@@ -79,14 +79,14 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 				entry.wallSeconds,
 				entry.cpuSeconds,
 			)
-			if cpu <= fastEvictionCPUSeconds {
+			if cpu <= fastEvictionCpuSeconds {
 				test.Errorf(
 					"%s costs %.1fs of CPU alone (%.1fs of wall), at or under the eviction bar of %.0fs of CPU, so "+
 						"it belongs back in the fast tier: remove it from landingGateOnly",
 					entry.pattern,
 					cpu,
 					wall,
-					float64(fastEvictionCPUSeconds),
+					float64(fastEvictionCpuSeconds),
 				)
 			}
 		})

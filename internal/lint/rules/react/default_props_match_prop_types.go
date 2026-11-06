@@ -137,13 +137,13 @@ type defaultPropEntry struct {
 // exit because both objects can be declared in separate statements and either one can be the
 // spread that disqualifies the component.
 type componentPropDeclarations struct {
-	propTypes           map[string]propTypeEntry
-	propTypeOrder       []string
-	sawPropTypes        bool
-	propTypesUnresolved bool
-	defaults            []defaultPropEntry
-	sawDefaults         bool
-	defaultsUnresolved  bool
+	propTypes               map[string]propTypeEntry
+	propertyTypeOrder       []string
+	sawPropTypes            bool
+	propertyTypesUnresolved bool
+	defaults                []defaultPropEntry
+	sawDefaults             bool
+	defaultsUnresolved      bool
 }
 
 // checkDefaultPropsAgainstPropTypes runs the whole analysis for one file.
@@ -240,7 +240,7 @@ func checkDefaultPropsAgainstPropTypes(
 						case "propTypes":
 							addSinglePropType(declarationsFor(owner), member.Text(), binary.Right)
 						case "defaultProps", "getDefaultProps":
-							addSingleDefaultProp(declarationsFor(owner), member.Text(), node)
+							addSingleDefaultProperty(declarationsFor(owner), member.Text(), node)
 						}
 					}
 				}
@@ -326,7 +326,7 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 	if object == nil {
 		// A propTypes assigned from anything we cannot resolve to an object is a partial view,
 		// which is the same situation a spread creates.
-		declarations.propTypesUnresolved = true
+		declarations.propertyTypesUnresolved = true
 		return
 	}
 
@@ -353,7 +353,7 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 			continue
 		}
 		if _, already := declarations.propTypes[text]; !already {
-			declarations.propTypeOrder = append(declarations.propTypeOrder, text)
+			declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, text)
 		}
 		declarations.propTypes[text] = propTypeEntry{
 			isRequired: propTypeIsRequired(property),
@@ -416,7 +416,7 @@ func reportMismatchedDefaults(
 	if !declarations.sawDefaults || declarations.defaultsUnresolved {
 		return
 	}
-	if declarations.propTypesUnresolved {
+	if declarations.propertyTypesUnresolved {
 		return
 	}
 	if !declarations.sawPropTypes || len(declarations.propTypes) == 0 {
@@ -514,18 +514,18 @@ func enclosingObjectOwnerName(member *ast.Node) string {
 func addSinglePropType(declarations *componentPropDeclarations, name string, value *ast.Node) {
 	declarations.sawPropTypes = true
 	if _, already := declarations.propTypes[name]; !already {
-		declarations.propTypeOrder = append(declarations.propTypeOrder, name)
+		declarations.propertyTypeOrder = append(declarations.propertyTypeOrder, name)
 	}
 	declarations.propTypes[name] = propTypeEntry{isRequired: expressionIsRequired(value)}
 }
 
-// addSingleDefaultProp folds a `C.defaultProps.foo = ...` assignment into a component's record.
+// addSingleDefaultProperty folds a `C.defaultProps.foo = ...` assignment into a component's record.
 //
 // The node reported on is the whole assignment statement, because there is no property node to
 // point at: the default is written as a statement rather than as a member of an object literal.
 //
 // Mutates: declarations gains the default, as a `defaultProps` member would add it
-func addSingleDefaultProp(declarations *componentPropDeclarations, name string, assignment *ast.Node) {
+func addSingleDefaultProperty(declarations *componentPropDeclarations, name string, assignment *ast.Node) {
 	declarations.sawDefaults = true
 	declarations.defaults = append(declarations.defaults,
 		defaultPropEntry{node: assignment, name: name})

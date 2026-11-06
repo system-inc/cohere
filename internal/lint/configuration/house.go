@@ -133,10 +133,11 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 		return nil, fmt.Errorf("resolving the config directory for %s: %w", path, absolutePathError)
 	}
 	var ownLayers []configLayer
-	if _, err := os.Stat(path); err == nil {
-		ownLayers, err = readConfigLayers(path, nil)
-		if err != nil {
-			return nil, err
+	if _, statError := os.Stat(path); statError == nil {
+		var readConfigurationLayersError error
+		ownLayers, readConfigurationLayersError = readConfigLayers(path, nil)
+		if readConfigurationLayersError != nil {
+			return nil, readConfigurationLayersError
 		}
 	}
 

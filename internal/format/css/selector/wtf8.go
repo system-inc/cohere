@@ -22,8 +22,8 @@ import (
 	"github.com/system-inc/cohere/internal/format/estree"
 )
 
-// unitsToWTF8 writes UTF-16 units as WTF-8: pairs as their character, lone surrogates as themselves.
-func unitsToWTF8(units []uint16) string {
+// unitsToWtf8 writes UTF-16 units as WTF-8: pairs as their character, lone surrogates as themselves.
+func unitsToWtf8(units []uint16) string {
 	buffer := make([]byte, 0, len(units))
 	for index := 0; index < len(units); index++ {
 		unit := rune(units[index])

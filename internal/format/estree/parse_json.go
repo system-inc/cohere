@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// ParseJSON is Prettier's json parsers, src/language-json/parse/json.js: Babel's parseExpression over
+// ParseJson is Prettier's json parsers, src/language-json/parse/json.js: Babel's parseExpression over
 // the text, checked by assertJsonNode, wrapped in a JsonRoot. allowComments false is json-stringify,
 // which refuses a comment.
 //
@@ -31,12 +31,12 @@ import (
 //
 // Every refusal is marked printing.Syntax, so the format phase skips a file that is not JSON rather
 // than reporting a broken formatter.
-func ParseJSON(text string, allowComments bool) (*Node, []*Node, error) {
-	root, comments, parseJSONError := parseJSON(text, allowComments)
-	return root, comments, printing.Syntax(parseJSONError)
+func ParseJson(text string, allowComments bool) (*Node, []*Node, error) {
+	root, comments, parseJsonError := parseJson(text, allowComments)
+	return root, comments, printing.Syntax(parseJsonError)
 }
 
-func parseJSON(text string, allowComments bool) (*Node, []*Node, error) {
+func parseJson(text string, allowComments bool) (*Node, []*Node, error) {
 	reader := &jsonReader{text: text}
 	reader.skipTrivia()
 	if reader.position >= len(text) {

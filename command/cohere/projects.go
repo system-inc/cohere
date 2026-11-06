@@ -75,9 +75,9 @@ func checkDiscoveredProjects(
 	lintConfigFileName string,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
-	patterns, err := rootIgnorePatterns(root)
-	if err != nil {
-		return 0, false, err
+	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
+	if rootIgnorePatternsError != nil {
+		return 0, false, rootIgnorePatternsError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
@@ -92,12 +92,13 @@ func checkDiscoveredProjects(
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, err := discoverProjects(root, patterns)
-	if err != nil {
-		return 0, false, err
+	found, discoverProjectsError := discoverProjects(root, patterns)
+	if discoverProjectsError != nil {
+		return 0, false, discoverProjectsError
 	}
-	if found.Ownership, err = resolveOwnership(&found); err != nil {
-		return 0, false, err
+	var resolveOwnershipError error
+	if found.Ownership, resolveOwnershipError = resolveOwnership(&found); resolveOwnershipError != nil {
+		return 0, false, resolveOwnershipError
 	}
 	// Before the one-project check, so a package and the dependency its run checks are the one project they
 	// are, and run here as `cohere --directory` on the package would.
@@ -258,7 +259,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// failures is where this run's own failure lines go: with the report in the human views, and on stderr
 	// under `--json`, whose stdout is records only.
 	failures := out
-	if activeOutput.Mode == outputJSON {
+	if activeOutput.Mode == outputJson {
 		failures = streams.Errors
 	}
 	executable, executableError := os.Executable()
@@ -315,7 +316,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children,
-				activeOutput.Mode == outputJSON)
+				activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -383,7 +384,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.UnclaimedSwift = found.UnclaimedSwift
-	if activeOutput.Mode != outputJSON {
+	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
 	}
 	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the

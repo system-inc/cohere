@@ -164,13 +164,13 @@ func describe(node *Node) map[string]any {
 		description["identifier"] = node.Identifier
 		optional("label", node.Label)
 		optional("title", node.Title)
-		description["url"] = node.URL
+		description["url"] = node.Url
 	case "link":
 		optional("title", node.Title)
-		description["url"] = node.URL
+		description["url"] = node.Url
 	case "image":
 		optional("title", node.Title)
-		description["url"] = node.URL
+		description["url"] = node.Url
 		optional("alt", node.Alt)
 	case "linkReference":
 		description["identifier"] = node.Identifier

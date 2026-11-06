@@ -75,7 +75,7 @@ func parseFloat(text []uint16) float64 {
 	if index < len(text) && (text[index] == '+' || text[index] == '-') {
 		index++
 	}
-	if hasPrefixASCII(text[index:], "Infinity") {
+	if hasPrefixAscii(text[index:], "Infinity") {
 		if text[start] == '-' {
 			return negativeInfinity()
 		}
@@ -116,8 +116,8 @@ func parseFloat(text []uint16) float64 {
 	return value
 }
 
-func hasPrefixASCII(text []uint16, prefix string) bool {
-	return len(text) >= len(prefix) && equalsASCII(text[:len(prefix)], prefix)
+func hasPrefixAscii(text []uint16, prefix string) bool {
+	return len(text) >= len(prefix) && equalsAscii(text[:len(prefix)], prefix)
 }
 
 // number is the global `Number(text)` for a string of digits with perhaps a dot: the empty string is 0.

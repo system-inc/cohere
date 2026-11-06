@@ -905,7 +905,7 @@ func classValuesOf(matched matchedNodes, origin ClassLiteralOrigin) classValues 
 func concatenationEdges(node *ast.Node) classValueEdges {
 	edges := classValueEdges{}
 	for child, parent := node, esParent(node); parent != nil; child, parent = parent, esParent(parent) {
-		if operator, isBinary := isESBinaryExpression(parent); !isBinary || operator != ast.KindPlusToken {
+		if operator, isBinary := isEsBinaryExpression(parent); !isBinary || operator != ast.KindPlusToken {
 			continue
 		}
 		binary := parent.AsBinaryExpression()

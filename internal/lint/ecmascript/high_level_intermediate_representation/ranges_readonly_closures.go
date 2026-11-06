@@ -120,7 +120,7 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 	return true
 }
 
-func refDerivedValues(function *Function) map[static_single_assignment.IdentifierId]bool {
+func referenceDerivedValues(function *Function) map[static_single_assignment.IdentifierId]bool {
 	refs := useRefResultValues(function)
 	for {
 		changed := false

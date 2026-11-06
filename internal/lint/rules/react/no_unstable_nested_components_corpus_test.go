@@ -395,7 +395,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
           );
         }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 23",
@@ -406,7 +406,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
           });
         }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 24",
@@ -417,7 +417,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
           )
         }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 25",
@@ -473,7 +473,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
         )
       }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 28",
@@ -491,7 +491,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
         )
       }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 29",
@@ -629,7 +629,7 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
           return <Table rows={rows} />;
         }
       `,
-			options: &NoUnstableNestedComponentsOptions{AllowAsProps: true},
+			options: &NoUnstableNestedComponentsOptions{AllowAsProperties: true},
 		},
 		{
 			name: "upstream valid 39",

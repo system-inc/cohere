@@ -31,8 +31,8 @@ const (
 	refsFindingPassedToFunction
 	// refsFindingUpdate is writing `ref.current` during render.
 	refsFindingUpdate
-	// refsFindingFunctionAccessesRef is calling a function whose body reads a ref.
-	refsFindingFunctionAccessesRef
+	// refsFindingFunctionAccessesReference is calling a function whose body reads a ref.
+	refsFindingFunctionAccessesReference
 	// refsFindingDidNotConverge is the invariant: the sweep was still moving after ten rounds.
 	refsFindingDidNotConverge
 )
@@ -83,10 +83,10 @@ type refsEnvironment struct {
 	// unify. See `get`.
 	// accessNodes is the member-expression node a ref value came from, so a finding underlines the
 	// whole access rather than only the object identifier.
-	accessNodes   map[static_single_assignment.IdentifierId]*ast.Node
-	declarations  map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
-	byDeclaration map[static_single_assignment.DeclarationId]*refsAccessType
-	refIdSeed     int
+	accessNodes     map[static_single_assignment.IdentifierId]*ast.Node
+	declarations    map[static_single_assignment.IdentifierId]static_single_assignment.DeclarationId
+	byDeclaration   map[static_single_assignment.DeclarationId]*refsAccessType
+	referenceIdSeed int
 }
 
 func newRefsEnvironment() *refsEnvironment {
@@ -104,8 +104,8 @@ func newRefsEnvironment() *refsEnvironment {
 // nextRefId mints a fresh ref identity. Every call site of this is a place the convergence equality
 // must not look, which is why it is funnelled through one method.
 func (environment *refsEnvironment) nextRefId() int {
-	environment.refIdSeed++
-	return environment.refIdSeed
+	environment.referenceIdSeed++
+	return environment.referenceIdSeed
 }
 
 // operandId resolves an identifier through the temporaries side map.
@@ -435,7 +435,7 @@ func refsRunOneRound(
 
 	// Parameters are seeded from their declared type. A parameter that is a ref by type or by name
 	// enters as one, which is how `function Component({ref})` reports with no `useRef` in sight.
-	for _, parameter := range function.Params {
+	for _, parameter := range function.Parameters {
 		env.set(parameter.Identifier, refsSeedType(ruleContext, function, parameter.Identifier, env))
 	}
 
@@ -565,7 +565,7 @@ func refsSeedType(
 	env *refsEnvironment,
 ) *refsAccessType {
 	if refsIsRefBinding(ruleContext, function, env, id) {
-		return &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true}
+		return &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true}
 	}
 	return &refsAccessType{Kind: refsNone}
 }
@@ -585,7 +585,7 @@ func refsApplyDeclaredType(
 		return
 	}
 	current := env.get(id)
-	if current != nil && current.Kind == refsRef {
+	if current != nil && current.Kind == refsReference {
 		return
 	}
 	// A value already known to be a function is never widened into a ref by the name test. The
@@ -600,7 +600,7 @@ func refsApplyDeclaredType(
 	if current != nil && current.Kind == refsStructure && current.Function != nil {
 		return
 	}
-	env.set(id, &refsAccessType{Kind: refsRef, RefId: env.nextRefId(), HasRefId: true})
+	env.set(id, &refsAccessType{Kind: refsReference, RefId: env.nextRefId(), HasRefId: true})
 }
 
 // refsCheckDirectValueAccess reports only a bare ref value, not a function that reads one.
@@ -663,7 +663,7 @@ func refsCheckPassedToFunction(
 	}
 	resolved := refsDestructure(current)
 	switch {
-	case resolved.Kind == refsRef || resolved.Kind == refsRefValue:
+	case resolved.Kind == refsReference || resolved.Kind == refsRefValue:
 		return append(findings, refsFinding{Kind: refsFindingPassedToFunction, Value: id, HasValue: true})
 	case resolved.Kind == refsStructure && resolved.Function != nil && resolved.Function.ReadRefEffect:
 		return append(findings, refsFinding{Kind: refsFindingPassedToFunction, Value: id, HasValue: true})
@@ -683,7 +683,7 @@ func refsCheckUpdate(
 		return findings
 	}
 	resolved := refsDestructure(current)
-	if resolved.Kind == refsRef || resolved.Kind == refsRefValue {
+	if resolved.Kind == refsReference || resolved.Kind == refsRefValue {
 		return append(findings, refsFinding{Kind: refsFindingUpdate, Value: id, HasValue: true, Node: node})
 	}
 	return findings
@@ -898,7 +898,7 @@ func refsTransfer(
 			// test that caught this exemption when it was written one step too wide.
 			isRefObject := false
 			if current := env.get(place.Identifier); current != nil {
-				isRefObject = refsDestructure(current).Kind == refsRef
+				isRefObject = refsDestructure(current).Kind == refsReference
 			}
 			if !isRefObject || !refsAggregateIsExempt(ruleContext, function, env, instruction) {
 				collected = refsCheckDirectValueAccess(env, place.Identifier, collected)
@@ -994,11 +994,11 @@ func refsTransfer(
 	return collected
 }
 
-// refsCallResultIsRef asks the checker what a call yields, through the call's own syntax.
+// refsCallResultIsReference asks the checker what a call yields, through the call's own syntax.
 //
 // `refsIsRefBinding` reaches the checker through `Identifier.Node`, which a call's temporary lvalue
 // does not have. This asks the same question of the call expression instead.
-func refsCallResultIsRef(
+func refsCallResultIsReference(
 	ruleContext rule.Context,
 	instruction *high_level_intermediate_representation.Instruction,
 ) bool {
@@ -1068,21 +1068,21 @@ func refsAggregateIsExempt(
 			if candidate == nil || candidate.Id <= instruction.Id {
 				continue
 			}
-			var args []high_level_intermediate_representation.Argument
+			var arguments []high_level_intermediate_representation.Argument
 			switch call := candidate.Value.(type) {
 			case *high_level_intermediate_representation.CallExpression:
-				args = call.Args
+				arguments = call.Arguments
 			case *high_level_intermediate_representation.MethodCall:
-				args = call.Args
+				arguments = call.Arguments
 			default:
 				continue
 			}
-			for _, argument := range args {
+			for _, argument := range arguments {
 				if env.operandId(argument.Place.Identifier) != env.operandId(aggregate) {
 					continue
 				}
 				if refsIsRefBinding(ruleContext, function, env, candidate.LValue.Identifier) ||
-					refsCallResultIsRef(ruleContext, candidate) {
+					refsCallResultIsReference(ruleContext, candidate) {
 					return true
 				}
 				calleeName := ""
@@ -1140,7 +1140,7 @@ func refsPropertyLoadTransfer(
 		env.set(target, objectType)
 	case objectType != nil && objectType.Kind == refsStructure && objectType.Value != nil:
 		env.set(target, objectType.Value)
-	case objectType != nil && objectType.Kind == refsRef:
+	case objectType != nil && objectType.Kind == refsReference:
 		if instruction.Node != nil {
 			env.accessNodes[target] = instruction.Node
 		}
@@ -1202,7 +1202,7 @@ func refsNestedFunctionTransfer(
 	// nothing is nil, nothing panics, and every message-id fixture that does not involve a nested
 	// closure stays green.
 	innerEnvironment := newRefsEnvironment()
-	innerEnvironment.refIdSeed = env.refIdSeed
+	innerEnvironment.referenceIdSeed = env.referenceIdSeed
 
 	// A captured value must be translated into the inner function's identifier space before the
 	// inner sweep can see it. `Function.Context` is the capture edge that performs the translation:
@@ -1229,7 +1229,7 @@ func refsNestedFunctionTransfer(
 	innerFindings := refsRunOneRound(ruleContext, inner, innerEnvironment)
 	// Ref identity is minted from a single counter so two functions cannot collide on an id; the
 	// seed travels back out rather than the whole environment.
-	env.refIdSeed = innerEnvironment.refIdSeed
+	env.referenceIdSeed = innerEnvironment.referenceIdSeed
 	functionType := &refsFunctionType{ReturnType: &refsAccessType{Kind: refsNone}}
 	if len(innerFindings) == 0 {
 		if returned := innerEnvironment.get(refsReturnedValue(inner)); returned != nil {
@@ -1346,7 +1346,7 @@ func refsCallTransfer(
 			didError = true
 			collected = append(
 				collected,
-				refsFinding{Kind: refsFindingFunctionAccessesRef, Value: callee, HasValue: true},
+				refsFinding{Kind: refsFindingFunctionAccessesReference, Value: callee, HasValue: true},
 			)
 		}
 	}
@@ -1360,7 +1360,7 @@ func refsCallTransfer(
 		// Measured on Kirk's tree: without this the eight `mergeReferences([inner, ref])` sites all
 		// report, and upstream is silent on that exact input.
 		isRefResult := refsIsRefBinding(ruleContext, function, env, target) ||
-			refsCallResultIsRef(ruleContext, instruction)
+			refsCallResultIsReference(ruleContext, instruction)
 		hookName := env.nameOf(function, callee)
 		isHook := refsIsHookName(hookName)
 		// `useState`, `useReducer` and `useMemo` are not exempt, because each runs the argument it
@@ -1431,7 +1431,9 @@ func refsStoreTransfer(
 ) []refsFinding {
 	collected := findings
 	foundSafe := false
-	if target := env.get(object); target != nil && target.Kind == refsRef && target.HasRefId && computedKey == nil {
+	if target := env.get(
+		object,
+	); target != nil && target.Kind == refsReference && target.HasRefId && computedKey == nil {
 		for index, safe := range *safeBlocks {
 			if safe.RefId == target.RefId {
 				*safeBlocks = append((*safeBlocks)[:index], (*safeBlocks)[index+1:]...)

@@ -103,7 +103,7 @@ const selected = props.flag ? nested : null;
 const unrelated = props.value;
 return {reference, copied, current, nested, selected, unrelated};
 }`)
-	refs := refDerivedValues(function)
+	refs := referenceDerivedValues(function)
 	active := map[static_single_assignment.IdentifierId]bool{}
 	for _, instruction := range function.Instructions {
 		if instruction != nil {

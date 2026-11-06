@@ -137,7 +137,7 @@ var formatCases = []formatCase{
 func formatFor(fileName string) func(string, string, formatoptions.Options) (string, error) {
 	switch {
 	case strings.HasSuffix(fileName, ".json"):
-		return FormatJSON
+		return FormatJson
 	case strings.HasSuffix(fileName, ".js"):
 		return func(fileName string, text string, options formatoptions.Options) (string, error) {
 			return FormatJavaScript(fileName, text, options, nil)

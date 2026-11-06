@@ -180,22 +180,22 @@ func constraintContext(workspace string, environment []string) (*build.Context, 
 			workspace, runError, strings.TrimSpace(standardError.String()))
 	}
 	var values struct {
-		GOOS       string
-		GOARCH     string
+		Goos       string `json:"GOOS"`
+		Goarch     string `json:"GOARCH"`
 		CgoEnabled string `json:"CGO_ENABLED"`
-		GOFLAGS    string
+		Goflags    string `json:"GOFLAGS"`
 	}
 	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
 		return nil, fmt.Errorf("reading the build target with go env in %s: %w", workspace, decodeError)
 	}
-	if values.GOOS == "" || values.GOARCH == "" {
+	if values.Goos == "" || values.Goarch == "" {
 		return nil, fmt.Errorf("reading the build target with go env in %s: no GOOS or GOARCH in %q", workspace, output)
 	}
 	buildContext := build.Default
-	buildContext.GOOS = values.GOOS
-	buildContext.GOARCH = values.GOARCH
+	buildContext.GOOS = values.Goos
+	buildContext.GOARCH = values.Goarch
 	buildContext.CgoEnabled = values.CgoEnabled == "1"
-	buildContext.BuildTags = tagsOf(values.GOFLAGS)
+	buildContext.BuildTags = tagsOf(values.Goflags)
 	return &buildContext, nil
 }
 
