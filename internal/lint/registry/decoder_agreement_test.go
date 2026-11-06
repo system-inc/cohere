@@ -1,9 +1,16 @@
 package registry
 
 import (
+	"bufio"
+	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/docsdata/capture"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -180,5 +187,86 @@ func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T
 	)
 	if rule.OptionsReads.Load() == before {
 		test.Fatal("the control did not move the counter on a class, so the counter is not counting")
+	}
+}
+
+// optionsReachUnderCaptureChild marks the child process TestTheOptionsReachCounterHoldsUnderDocsCapture starts.
+// Unset, TestOptionsReachUnderCaptureHelper skips, so neither an ordinary run nor the docs capture's own run of
+// this package records the control rule.
+const optionsReachUnderCaptureChild = "COHERE_OPTIONS_REACH_UNDER_CAPTURE_CHILD"
+
+// TestOptionsReachUnderCaptureHelper records one asserted case of the control in the child process, so the
+// parent can tell from the capture directory that capture was on there. The counter test records nothing,
+// since it asserts through the counter rather than an Expect, so its passing alone would not show it.
+// Not parallel: in the child it runs beside the counter test, which asserts the process-wide counter does not
+// move, so a counted read here at the same moment would fail that test for this helper's reason.
+func TestOptionsReachUnderCaptureHelper(test *testing.T) {
+	if os.Getenv(optionsReachUnderCaptureChild) == "" {
+		test.Skip("run by TestTheOptionsReachCounterHoldsUnderDocsCapture")
+	}
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+		test,
+		optionsReachControl,
+		"/repository/source/Probe.tsx",
+		"export const value = 1;\n",
+		optionsReachControlOptions{},
+	))
+}
+
+// The reach counter test passes with the docs capture on. The capture records the options each case ran
+// with, and when it read them through the counted Read the control moved the counter on a source with no
+// class, so regenerating the docs with -capture failed this package. capture.Directory reads the environment
+// once per process, so capture cannot be switched on inside this one: the test binary is run again as a
+// child with COHERE_DOCS_CAPTURE set, running only the counter test and the helper that proves capture on.
+func TestTheOptionsReachCounterHoldsUnderDocsCapture(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	child := exec.Command(
+		os.Args[0],
+		"-test.run=^(TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions|TestOptionsReachUnderCaptureHelper)$",
+		"-test.v",
+	)
+	child.Env = append(os.Environ(), capture.Variable+"="+directory, optionsReachUnderCaptureChild+"=1")
+	output, runError := child.CombinedOutput()
+	if runError != nil {
+		test.Fatalf("the counter test failed with the docs capture on: %v\n%s", runError, output)
+	}
+	// Exit 0 also follows a pattern that matched nothing, so the counter test must be seen to have passed.
+	if !strings.Contains(string(output), "--- PASS: TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions") {
+		test.Fatalf("the child never ran the counter test:\n%s", output)
+	}
+
+	paths, globError := filepath.Glob(filepath.Join(directory, "*"))
+	if globError != nil {
+		test.Fatal(globError)
+	}
+	recorded := 0
+	for _, path := range paths {
+		file, openError := os.Open(path)
+		if openError != nil {
+			test.Fatal(openError)
+		}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			var record capture.Record
+			if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
+				test.Fatalf("%s: %v", path, decodeError)
+			}
+			if record.Rule == optionsReachControl.Name {
+				recorded++
+			}
+		}
+		if scanError := scanner.Err(); scanError != nil {
+			test.Fatalf("%s: %v", path, scanError)
+		}
+		if closeError := file.Close(); closeError != nil {
+			test.Fatalf("%s: %v", path, closeError)
+		}
+	}
+	// Without a record the child ran with capture off, and its passing says nothing about capture.
+	if recorded == 0 {
+		test.Fatalf("the child recorded no case of the control in %s, so capture was not on there:\n%s",
+			directory, output)
 	}
 }
