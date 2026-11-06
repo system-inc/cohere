@@ -91,7 +91,9 @@ first-parent line gains that one commit per landing, and the branch's own histor
 included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
 detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and
 when one happens mid-gate, land merges onto it and gates again. A merge that conflicts is refused with its
-files named, and the worktree is left as it was. On a loaded morning a branch gated green eight times
+files named, and the worktree is left as it was. Every landing runs main's own land: when the worktree's
+`command/cohere-dev` differs from main's, land says so and runs main's from the main checkout, against the
+worktree (#8wpk5tp), so a worktree on older code can't land the old way. On a loaded morning a branch gated green eight times
 without landing, and every one of those gates compiled a merge that never existed again.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
