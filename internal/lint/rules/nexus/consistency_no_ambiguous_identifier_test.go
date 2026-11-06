@@ -18,16 +18,33 @@ func TestConsistencyNoAmbiguousIdentifierFires(test *testing.T) {
 		wantIds    []string
 	}{
 		{"catch parameter", "try {\n    run();\n} catch (e) {\n    report();\n}\n", []string{"noAmbiguousE"}},
-		{"bare underscore", "const _ = 1;\n", []string{"noUnderscore"}},
 		{"single letter", "const n = 1;\n", []string{"noSingleLetter"}},
 		{"a outside a comparator", "const a = 1;\n", []string{"noSingleLetter"}},
 		{"b outside a comparator", "const b = 1;\n", []string{"noSingleLetter"}},
-		// The reference and the parameter are both identifiers, so both report.
+		// A name is judged where it is declared, once. Its reads are the same defect again, so a
+		// name used three times is still one finding (am01, am06).
 		{
 			"e used in a body",
 			"try {\n    run();\n} catch (e) {\n    report(e);\n}\n",
-			[]string{"noAmbiguousE", "noAmbiguousE"},
+			[]string{"noAmbiguousE"},
 		},
+		{"a letter read twice", "export function twice(): number {\n    const n = 1;\n    return n + n;\n}\n",
+			[]string{"noSingleLetter"}},
+		{"a parameter", "export function double(n: number): number {\n    return n * 2;\n}\n",
+			[]string{"noSingleLetter"}},
+		{"a destructured binding", "const { n } = load();\nuse(n);\n", []string{"noSingleLetter"}},
+		{"a destructured rename", "const { count: n } = load();\nuse(n);\n", []string{"noSingleLetter"}},
+		{"a function", "function f() {}\nf();\n", []string{"noSingleLetter"}},
+		{"a class property", "class Thing {\n    n = 1;\n}\n", []string{"noSingleLetter"}},
+		{"a method", "class Thing {\n    m() {}\n}\n", []string{"noSingleLetter"}},
+		{"an enum member", "enum Kind {\n    k,\n}\n", []string{"noSingleLetter"}},
+		// A shorthand property reads the binding into a key spelled the same, and in an assignment
+		// pattern writes one. Either way the binding is declared, and judged, elsewhere.
+		{"a shorthand property", "const n = 1;\nconst value = { n };\n", []string{"noSingleLetter"}},
+		{"a shorthand assignment pattern", "let n = 1;\n({ n } = load());\n", []string{"noSingleLetter"}},
+		// A label binds no symbol, so TypeScript does not count it as a declaration. The labeled
+		// statement is still where the name is chosen, and `continue` is its read.
+		{"a label", "l: for (const value of values) {\n    continue l;\n}\n", []string{"noSingleLetter"}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -55,6 +72,15 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(test *testing.T) {
 			"sort comparator as a function expression",
 			"const sorted = items.sort(function (a, b) {\n    return a - b;\n});\n",
 		},
+		// The bare `_` is the discard, the language's spelling for a value deliberately not named, so
+		// it names nothing a reader has to track (am02).
+		{"the bare underscore", "const _ = 1;\n"},
+		{"the bare underscore as a parameter", "export const indexes = values.map((_, index) => index);\n"},
+		// A read of a name declared elsewhere: the declaration is not in this file to judge.
+		{"a read of a global", "export const total = use(n);\n"},
+		{"a write to a global", "export function reset() {\n    n = 1;\n}\n"},
+		{"a read of an imported name", "import { e } from 'x';\ne();\n"},
+
 		// These are names somebody else chose, not bindings this file has to track.
 		{"a property read", "const value = thing.e;\n"},
 		{"a property read of a", "const value = thing.a;\n"},
@@ -112,13 +138,21 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(test *testing.T) {
 			"event",
 		},
 		{"a bare arrow is unclear", "const start = (e) => run();\n", "context unclear", "event"},
+		// The advice derives from the declaration. A read inside the catch body was judged on its
+		// own once, found no catch above it, and called the same `e` an unclear event (am06).
+		{
+			"a catch-bound e read in its body is one error",
+			"try {\n    run();\n} catch (e) {\n    return String(e);\n}\n",
+			"appears to be an error",
+			"error",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, ConsistencyNoAmbiguousIdentifier, ambiguousFile, testCase.sourceText)
-			if len(result.Diagnostics) == 0 {
-				test.Fatalf("expected a finding, got none")
+			if len(result.Diagnostics) != 1 {
+				test.Fatalf("expected one finding, at the declaration, got %d", len(result.Diagnostics))
 			}
 			description := result.Diagnostics[0].Message.Description
 			if !strings.Contains(description, testCase.wantHint) {
@@ -197,18 +231,22 @@ func TestConsistencyNoAmbiguousIdentifierForeignNames(test *testing.T) {
 // declaration is a property declaration that no member check protects. The abbreviation rule judges
 // it and records a named production defect as its evidence: a class declared `maximumBackoff` while
 // reading `this.maximumBackoff`. This rule exempted it, and now does not.
+//
+// The class's `e` is judged once, at its declaration. The `this.e` read is not reported, because no
+// read is, not because the name is foreign.
 func TestConsistencyNoAmbiguousIdentifierJudgesThisProperty(test *testing.T) {
 	test.Parallel()
 
 	const sourceText = "class C { e = 1; m() { return this.e; } }"
 	result := rule_testing.Run(test, ConsistencyNoAmbiguousIdentifier, "p.ts", sourceText)
-	reads := 0
+	var starts []int
 	for _, diagnostic := range result.Diagnostics {
 		if sourceText[diagnostic.Range.Pos():diagnostic.Range.End()] == "e" {
-			reads++
+			starts = append(starts, diagnostic.Range.Pos())
 		}
 	}
-	if reads == 0 {
-		test.Error("a property read off `this` was exempted; the class owns that property")
+	declaration := strings.Index(sourceText, "e = 1")
+	if len(starts) != 1 || starts[0] != declaration {
+		test.Errorf("expected the class's `e` once, at its declaration (offset %d), got %v", declaration, starts)
 	}
 }

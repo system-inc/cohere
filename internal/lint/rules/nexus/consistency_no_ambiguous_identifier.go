@@ -42,10 +42,6 @@ var (
 		"nexus/consistency-no-ambiguous-identifier",
 		"noSingleLetter",
 	)
-	consistencyNoAmbiguousIdentifierUnderscoreText = policy.MessageOf(
-		"nexus/consistency-no-ambiguous-identifier",
-		"noUnderscore",
-	)
 )
 
 func messageNoAmbiguousE(context policy.MessageOption, suggestedName string) rule.Message {
@@ -65,21 +61,23 @@ func messageNoSingleLetter(name string) rule.Message {
 	}
 }
 
-func messageNoUnderscore() rule.Message {
-	return rule.Message{
-		Id:          consistencyNoAmbiguousIdentifierUnderscoreText.Id,
-		Description: consistencyNoAmbiguousIdentifierUnderscoreText.Render(nil),
-	}
-}
-
-// ConsistencyNoAmbiguousIdentifier bans single-letter identifiers and the bare underscore.
+// ConsistencyNoAmbiguousIdentifier bans single-letter names, judged where they are declared.
 //
 //	valid:   catch (error) { }
 //	valid:   const x = 1
 //	valid:   items.sort((a, b) => a - b)
+//	valid:   values.map((_, index) => index)
 //	invalid: catch (e) { }
 //	invalid: const n = 1
-//	invalid: const _ = 1
+//
+// A name is reported once, at its declaration, and never at its reads. The declaration is where the
+// name was chosen and the only place a rename starts, so a finding at every read repeated one defect
+// as many times as the name was used (`const n = 1; return n + n` was three findings), and gave a
+// catch-bound `e` two different pieces of advice: an error at the catch, an unclear context at the
+// read (#rb0ewgm, cases am01 and am06 in `conformance/textrules`).
+//
+// The bare `_` is not judged. It is the discard, a value deliberately left unnamed: Go and Swift make
+// it one by grammar, and TypeScript spells it the same way by convention (am02).
 //
 // The exemptions carry the judgment. Coordinates keep x, y, and z, where the single letter is the
 // conventional spelling. A sort comparator keeps a and b, because that is the shape everyone reads
@@ -103,9 +101,15 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 			ast.KindIdentifier: func(node *ast.Node) {
 				name := node.Text()
 
-				// Only single lowercase letters and the bare underscore are in scope. An uppercase
-				// single letter is a type parameter (T, K, V, R, E) and is left alone.
-				if name != "_" && !singleLowercaseLetter.MatchString(name) {
+				// Only single lowercase letters are in scope. An uppercase single letter is a type
+				// parameter (T, K, V, R, E) and is left alone, and the bare `_` is the discard, which
+				// names nothing for a reader to track.
+				if !singleLowercaseLetter.MatchString(name) {
+					return
+				}
+
+				// Judged where it is declared, and only there: its reads are the same defect again.
+				if !isAmbiguousDeclarationName(node) {
 					return
 				}
 
@@ -127,10 +131,6 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 					return
 				}
 
-				if name == "_" {
-					ruleContext.ReportNode(node, messageNoUnderscore())
-					return
-				}
 				if alwaysAllowedSingleLetters[name] {
 					return
 				}
@@ -148,6 +148,28 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 			},
 		}
 	},
+}
+
+// isAmbiguousDeclarationName reports whether an identifier is where its name is declared, rather than a
+// read or a write of a name declared elsewhere.
+//
+// TypeScript's own answer is the base, the name of a declaration node, which covers every binding:
+// variables, parameters, destructured elements, functions, classes, members, enum members. It is
+// adjusted in two places, both by the shape of the syntax:
+//
+//	{ n }        a shorthand property, which TypeScript counts as declaring the key; for the binding
+//	             `n` it is a read, or a write in `({ n } = value)`, and `n` is declared elsewhere
+//	n: for ...   a label, which TypeScript does not count because it binds no symbol; the labeled
+//	             statement is where it is chosen, and `break n` and `continue n` are its reads
+func isAmbiguousDeclarationName(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	if parent.Kind == ast.KindShorthandPropertyAssignment {
+		return false
+	}
+	return ast.IsLabelOfLabeledStatement(node) || ast.IsDeclarationName(node)
 }
 
 // isInsideSortComparator reports whether an identifier sits in a function passed as the first
