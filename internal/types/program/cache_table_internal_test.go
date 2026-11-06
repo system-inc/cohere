@@ -112,6 +112,70 @@ func TestCacheTableRefusesAnotherFormat(test *testing.T) {
 	}
 }
 
+// formatFifteenStoredDiagnostic is a stored type diagnostic as format 15 encoded it, before its offset read
+// Start and its arguments MessageArguments. gob matches fields by name, so this shape decoded by the current
+// one would leave both at their zero value without an error.
+type formatFifteenStoredDiagnostic struct {
+	//cohere:ignore consistency-no-abbreviated-identifier gob reads the name, and format 15 wrote this one
+	Pos, End   int
+	Code       int32
+	MessageKey string
+	//cohere:ignore consistency-no-abbreviated-identifier gob reads the name, and format 15 wrote this one
+	MessageArgs []string
+}
+
+// formatFifteenTypesSection is the types section as format 15 encoded it, around its diagnostics.
+type formatFifteenTypesSection struct {
+	Version int
+	Entries map[string]formatFifteenTypesEntry
+}
+
+// formatFifteenTypesEntry is one file's diagnostics as format 15 encoded them.
+type formatFifteenTypesEntry struct {
+	Diagnostics []formatFifteenStoredDiagnostic
+}
+
+// TestCacheTableRebuildsATypesSectionOfFormatFifteen: a table written before the stored diagnostic's fields
+// were spelled out is discarded on its version, never read into a diagnostic at offset zero with no
+// arguments, and the section written in its place reads back whole.
+func TestCacheTableRebuildsATypesSectionOfFormatFifteen(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	formatFifteenHeader := currentHeader(cacheTableTypesSection)
+	formatFifteenHeader.Version = 15
+	writeRaw(test, directory, cacheTableFile(cacheTableTypesSection), encodeRaw(test, formatFifteenHeader,
+		&formatFifteenTypesSection{
+			Version: typesSectionVersion,
+			Entries: map[string]formatFifteenTypesEntry{
+				"/a.ts": {Diagnostics: []formatFifteenStoredDiagnostic{
+					{Pos: 7, End: 9, Code: 2322, MessageKey: "key", MessageArgs: []string{"string"}},
+				}},
+			},
+		}))
+	sections := CacheTableSections{Types: true}
+	discarded, readFormatFifteenError := ReadCacheTable(directory, internalTestIdentity, sections, PathAnchor{})
+	if !errors.Is(readFormatFifteenError, ErrCacheTableUnreadable) || discarded.Types != nil {
+		test.Fatalf("a format 15 types section was read: section %v, error %v", discarded.Types, readFormatFifteenError)
+	}
+
+	rebuilt := &TypesSection{Version: typesSectionVersion, Entries: map[string]TypesEntry{
+		"/a.ts": {Diagnostics: []StoredDiagnostic{
+			{Start: 7, End: 9, Code: 2322, MessageKey: "key", MessageArguments: []string{"string"}},
+		}},
+	}}
+	writeError := WriteCacheTable(directory, &CacheTable{Types: rebuilt}, internalTestIdentity, sections, PathAnchor{})
+	if writeError != nil {
+		test.Fatal(writeError)
+	}
+	read, readRebuiltError := ReadCacheTable(directory, internalTestIdentity, sections, PathAnchor{})
+	if readRebuiltError != nil {
+		test.Fatal(readRebuiltError)
+	}
+	if !reflect.DeepEqual(read.Types, rebuilt) {
+		test.Fatalf("the rebuilt types section read back as %+v, written as %+v", read.Types, rebuilt)
+	}
+}
+
 // TestCacheTableRefusesAListIndexPastItsTable pins the one check gob cannot make for us. The rule lists
 // are interned by hand, and an index trusted past its table would hand an entry another file's rules.
 func TestCacheTableRefusesAListIndexPastItsTable(test *testing.T) {
@@ -296,6 +360,7 @@ var pinnedCacheTableShapes = map[int]string{
 	13: "92cec94e75987f5af469a8fe4e611c4e95ee9d56a41ad9003db764354922a60c",
 	14: "5c81e8d748ea0cf87759a0e7de3d205cbc70a6ab930d09b7a827d34e2dd9eb4b",
 	15: "5b2612f8b8bd8ec1aefe9b94d18dd81bf2a05115282a3c2e80edc8b6fe40abd5",
+	16: "f63ccb50b6678d64a2e10aac7265ffa0d4711bbde7839a073e86015b41cf3dc9",
 }
 
 func TestCacheTableShapeIsPinnedToItsVersion(test *testing.T) {

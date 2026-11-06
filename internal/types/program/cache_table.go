@@ -108,6 +108,9 @@ type FormatEntry struct {
 // half is enforced by TestCacheTableShapeIsPinnedToItsVersion; the meaning half is the reason each
 // section also keeps its own version.
 //
+// 16: a stored type diagnostic names its offset Start and its arguments MessageArguments, as findings entries
+// spell them.
+//
 // 15: findings entries carry whether their file has directives, and the findings those directives withheld.
 //
 // 14: findings entries carry derived rules and their fingerprint (#kdee854).
@@ -139,7 +142,7 @@ type FormatEntry struct {
 // design system's key.
 //
 // 2: findings entries carry shape-keyed rules and their fingerprint, and the table holds Signatures.
-const cacheTableVersion = 15
+const cacheTableVersion = 16
 
 // cacheTableMagic opens every file of the table, so a file that is not one is refused on its first field.
 const cacheTableMagic = "cohere cache table"

@@ -11,11 +11,11 @@ import (
 // stores one: location, code, category, message key and arguments or external text, chain and related
 // information. NoFile marks a part the compiler gave no file.
 type StoredDiagnostic struct {
-	Pos, End           int
+	Start, End         int
 	Code               int32
 	Category           int64
 	MessageKey         string
-	MessageArgs        []string
+	MessageArguments   []string
 	Source             string
 	MessageText        string
 	ReportsUnnecessary bool
@@ -48,11 +48,11 @@ func (stored StoredDiagnostic) diagnostic(sourceFile *ast.SourceFile) *ast.Diagn
 	reflect.ValueOf(&category).Elem().SetInt(stored.Category)
 	diagnostic := ast.NewDiagnosticFromSerialized(
 		file,
-		core.NewTextRange(stored.Pos, stored.End),
+		core.NewTextRange(stored.Start, stored.End),
 		stored.Code,
 		category,
 		key,
-		stored.MessageArgs,
+		stored.MessageArguments,
 		chain,
 		related,
 		stored.ReportsUnnecessary,
