@@ -34,7 +34,7 @@ func ExcludedByConstraints(directory string, environment []string, files []strin
 	if len(files) == 0 {
 		return nil, nil
 	}
-	fullEnvironment, environmentError := goEnvironment(workspace, environment)
+	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
 	if environmentError != nil {
 		return nil, environmentError
 	}
@@ -49,11 +49,11 @@ func ExcludedByConstraints(directory string, environment []string, files []strin
 // excludedAndUnseen is what the load left out of the workspace. The root packages' ignored files inside
 // workspace are excluded as go list reported them; a pattern can name a package outside the workspace, whose
 // files are not the workspace's to name. Then each census file no package in the graph holds is read against
-// the constraints: one they leave out is excluded too, and one they would build is unseen, since nothing
-// type-checked it. Each file comes back once, sorted, and go env runs only when there is a file to read for.
+// the constraints of buildContext: one they leave out is excluded too, and one they would build is unseen, since
+// nothing type-checked it. Each file comes back once, sorted.
 func excludedAndUnseen(
 	workspace string,
-	environment []string,
+	buildContext *build.Context,
 	roots []*packages.Package,
 	census []string,
 ) ([]Excluded, []string, error) {
@@ -82,11 +82,6 @@ func excludedAndUnseen(
 	}
 	if len(ignored)+len(unheld) == 0 {
 		return nil, nil, nil
-	}
-
-	buildContext, contextError := constraintContext(workspace, environment)
-	if contextError != nil {
-		return nil, nil, contextError
 	}
 	excluded, unseen, matchError := matchConstraints(buildContext, unheld)
 	if matchError != nil {

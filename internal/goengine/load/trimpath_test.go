@@ -2,11 +2,25 @@ package load
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
+
+// requireCgo skips test, with the reason, where the toolchain has no cgo: go reports `CGO_ENABLED` 0 when it finds
+// no C compiler, and only the load through go/packages, which translates cgo with one, needs it.
+func requireCgo(test *testing.T) {
+	test.Helper()
+	output, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
+	if goEnvironmentError != nil {
+		test.Fatalf("reading CGO_ENABLED with go env: %v", goEnvironmentError)
+	}
+	if enabled := strings.TrimSpace(string(output)); enabled != "1" {
+		test.Skipf("the toolchain here has no cgo (go env CGO_ENABLED is %q), and the cgo tool needs it", enabled)
+	}
+}
 
 // cgoPackageFiles is one cgo package, the same bytes in every directory it is written to, so go can serve a
 // second load the cgo translation it cached for the first.
@@ -17,11 +31,16 @@ var cgoPackageFiles = map[string]string{
 }
 
 // A cgo package's compiled files are go's translation of its raw files, and their `//line` directives are
-// what every position in the package, and cgocall's reading of the raw file, resolves to. Loaded twice from
-// two directories under `GOFLAGS=-trimpath`, as the pool runs every go command, each load's positions must
-// name its own directory's native.go, one that exists, and never the other's.
+// what every position in the package, and cgocall's reading of the raw file, resolves to, when the project's own
+// cgo sends the load through go/packages. Loaded twice from two directories under `GOFLAGS=-trimpath`, as the
+// pool runs every go command, each load's positions must name its own directory's native.go, one that exists,
+// and never the other's.
+//
+// It needs cgo, so it skips where the toolchain has none; Loom's runner, which refuses the go list -compiled that
+// go/packages runs, cannot reach it at all.
 func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 	test.Parallel()
+	requireCgo(test)
 
 	for _, directory := range []string{test.TempDir(), test.TempDir()} {
 		for name, contents := range cgoPackageFiles {
@@ -60,11 +79,15 @@ func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 	}
 }
 
-// Every spelling of -trimpath leaves `GOFLAGS`, every other flag stays in order, and -trimpath=false comes
-// last, so the value is never empty: an empty one would hand go the go env file's flags, which on this machine
-// hold -trimpath.
-func TestGoEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
+// Every spelling of -trimpath leaves the translated load's `GOFLAGS`, every other flag stays in order, and
+// -trimpath=false comes last, so the value is never empty: an empty one would hand go the go env file's flags,
+// which on this machine hold -trimpath.
+//
+// It is the translated load's, so it runs only where that load can, with cgo; Loom's runner cannot reach it, and
+// refuses the go env it runs under the spellings `--trimpath` and `-trimpathy` besides.
+func TestTranslatedEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 	test.Parallel()
+	requireCgo(test)
 
 	directory := test.TempDir()
 	for given, want := range map[string]string{
@@ -77,7 +100,7 @@ func TestGoEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 		test.Run(given, func(test *testing.T) {
 			test.Parallel()
 
-			environment, environmentError := goEnvironment(directory, []string{given})
+			environment, environmentError := translatedEnvironment(directory, []string{given})
 			if environmentError != nil {
 				test.Fatal(environmentError)
 			}

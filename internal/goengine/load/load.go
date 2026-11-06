@@ -1,7 +1,16 @@
-// Package load is the Go engine's one type-checked read of a workspace: go/packages with every package and
-// dependency loaded from source, as checker.Analyze requires, test variants included. What the load could not
-// list, parse or type-check is the engine's types phase, so every such error comes back as a diagnostic, and a
-// file the build constraints left out, which no rule will see, comes back named rather than silently missed.
+// Package load is the Go engine's one type-checked read of a workspace: every package and dependency parsed and
+// type-checked from source, as checker.Analyze requires, test variants included, and returned as go/packages
+// would have returned them. What the load could not list, parse or type-check is the engine's types phase, so
+// every such error comes back as a diagnostic, and a file the build constraints left out, which no rule will see,
+// comes back named rather than silently missed.
+//
+// The only go commands it runs are `go env` and `go list -deps -json -e`, which read and never build, so it runs
+// where a runner of prebuilt tests answers only those, as Loom's does. go/packages cannot: it always asks go list
+// for -compiled, -test, -export and -pgo, and compiling is what such a runner refuses. So the test variants go
+// test would build are built here (graph.go), and no cgo tool runs: a dependency's cgo file is type-checked as
+// written, with package "C" faked (withheld_errors.go and cgo_reach.go say what that costs). A project with cgo
+// files of its own is checked as written, always: its load goes through go/packages, whose cgo tool translates
+// them (translated.go), and so does not run where go may not build.
 //
 // It takes and returns plain values; the engine turns them into contract records.
 package load
@@ -9,6 +18,8 @@ package load
 import (
 	"bytes"
 	"fmt"
+	"go/build"
+	"go/types"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +52,18 @@ type Loaded struct {
 	// PackagesLoaded counts every package in the graph, dependencies and test variants included.
 	PackagesLoaded int
 
+	// WithheldInDependencyCgo are the type errors no diagnostic reports because they are in a dependency the cgo
+	// tool would translate and reach its cgo files (see Withheld), one per file, sorted by file, and never nil.
+	WithheldInDependencyCgo []Withheld
+
+	// WithheldDependencyCgoBodies counts the functions of dependencies whose bodies reach their cgo files, which
+	// the analyzers were given without their bodies (see withholdCgoBodies).
+	WithheldDependencyCgoBodies int
+
+	// CgoTranslated is set when a package of the project has cgo files, so the load went through go/packages and
+	// the cgo tool translated every cgo file, rather than from source (see translated).
+	CgoTranslated bool
+
 	// PackagesInWorkspace counts Packages.
 	PackagesInWorkspace int
 
@@ -56,32 +79,52 @@ type Loaded struct {
 // files: each comes back held by a package, in Excluded, or in Unseen. It returns an error only when
 // nothing could be loaded at all; what the packages themselves get wrong is Loaded.Diagnostics.
 func Packages(directory string, patterns []string, environment []string, census []string) (*Loaded, error) {
+	return loadWorkspace(directory, patterns, environment, census, true)
+}
+
+// loadWorkspace is Packages. With translateOwnCgo unset it loads from source even a project with cgo files of its
+// own, which only the tests ask for, to judge the load from source on such a package.
+func loadWorkspace(
+	directory string,
+	patterns []string,
+	environment []string,
+	census []string,
+	translateOwnCgo bool,
+) (*Loaded, error) {
 	started := time.Now()
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
-	fullEnvironment, environmentError := goEnvironment(workspace, environment)
+	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
 	if environmentError != nil {
 		return nil, environmentError
 	}
-	roots, loadError := packages.Load(&packages.Config{
-		// ForTest is what tells a test variant from the package it tests without reading the opaque ID.
-		Mode:  packages.LoadAllSyntax | packages.NeedForTest,
-		Tests: true,
-		Dir:   workspace,
-		Env:   fullEnvironment,
-	}, patterns...)
+	buildContext, contextError := constraintContext(workspace, fullEnvironment)
+	if contextError != nil {
+		return nil, contextError
+	}
+	listed, listError := list(workspace, fullEnvironment, patterns)
+	if listError != nil {
+		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
+	}
+	var roots []*packages.Package
+	var loaded *Loaded
+	var loadError error
+	if translateOwnCgo && hasOwnCgo(listed, workspace) {
+		roots, loaded, loadError = translated(workspace, patterns, environment)
+	} else {
+		roots, loaded, loadError = fromSource(workspace, listed, buildContext)
+	}
 	if loadError != nil {
-		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, loadError)
+		return nil, loadError
 	}
 
-	loaded := &Loaded{Packages: analyzed(roots)}
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })
 	loaded.FilesTypeChecked = filesTypeChecked(workspace, loaded.Packages)
-	excluded, unseen, excludedError := excludedAndUnseen(workspace, fullEnvironment, roots, census)
+	excluded, unseen, excludedError := excludedAndUnseen(workspace, buildContext, roots, census)
 	if excludedError != nil {
 		return nil, excludedError
 	}
@@ -90,8 +133,67 @@ func Packages(directory string, patterns []string, environment []string, census 
 	return loaded, nil
 }
 
+// hasOwnCgo reports whether a listed package inside workspace has cgo files, which go list lists only when cgo is
+// on for the target.
+func hasOwnCgo(listed *listing, workspace string) bool {
+	for _, listedPackage := range listed.packages {
+		if len(listedPackage.CgoFiles) > 0 && inside(workspace, listedPackage.Directory+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
+// fromSource parses and type-checks the listing's graph from source, and returns its roots and what the load
+// knows of them before the diagnostics and the counts. The functions of dependencies that reach their cgo files
+// lose their bodies only once every package is type-checked.
+func fromSource(
+	workspace string,
+	listed *listing,
+	buildContext *build.Context,
+) ([]*packages.Package, *Loaded, error) {
+	sizes := types.SizesFor("gc", buildContext.GOARCH)
+	if sizes == nil {
+		return nil, nil, fmt.Errorf("loading %s: go/types knows no sizes for GOARCH %s", workspace,
+			buildContext.GOARCH)
+	}
+	built := newGraph(listed, workspace)
+	withheld := newWithheldErrors()
+	typeChecker := newLoader(built, sizes, withheld)
+	reachable := typeChecker.connect()
+	typeChecker.load(reachable)
+
+	roots := make([]*packages.Package, 0, len(built.roots))
+	for _, root := range built.roots {
+		roots = append(roots, root.loaded)
+	}
+	return roots, &Loaded{
+		Packages:                    analyzedOfGraph(built),
+		WithheldInDependencyCgo:     withheld.sorted(),
+		WithheldDependencyCgoBodies: withholdCgoBodies(typeChecker.fileSet, reachable),
+	}, nil
+}
+
+// analyzedOfGraph is the roots of the load from source to analyze, as analyzed chooses them from go/packages'
+// roots, in the graph's order: each package with tests as "p [p.test]", which holds every file of p, in place of p,
+// so no file of p is analyzed and reported twice; each external test package, "p_test [p.test]"; and each package
+// with no in-package tests as itself. A package go test builds again for another's tests, "q [p.test]", is no
+// root: it is q, analyzed already.
+func analyzedOfGraph(built *graph) []*packages.Package {
+	var chosen []*packages.Package
+	for _, root := range built.roots {
+		withTests := built.nodes[root.loaded.ID+" ["+root.loaded.ID+".test]"]
+		if root.loaded.ForTest == "" && withTests != nil {
+			continue
+		}
+		chosen = append(chosen, root.loaded)
+	}
+	return chosen
+}
+
 // filesTypeChecked counts the distinct .go files inside workspace that the analyzed packages hold. It reads
-// GoFiles, the files as written, since a cgo package's CompiledGoFiles are generated files in the build cache.
+// GoFiles, the files as written, since a translated cgo package's CompiledGoFiles are generated files in the build
+// cache.
 func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) int {
 	seen := map[string]bool{}
 	for _, analyzedPackage := range analyzedPackages {
@@ -104,14 +206,37 @@ func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) in
 	return len(seen)
 }
 
-// goEnvironment is the whole environment every go command here runs with in workspace: the current one, then
-// environment, then `GOFLAGS` as go reads it there (from the environment, or the go env file when that is
-// empty) with every `-trimpath` taken out and `-trimpath=false` put last. Analysis needs real source paths:
-// under -trimpath go keys a cgo package's translation without its directory, so a load is served the
-// translation cached for the same bytes in another directory, whose `//line` paths name that directory's files,
-// gone once it is, and cgocall, which reads the raw file those paths name, fails. The value is never empty,
-// since an empty `GOFLAGS` would hand go the go env file's flags, -trimpath among them.
-func goEnvironment(workspace string, environment []string) ([]string, error) {
+// sourceEnvironment is the whole environment every go command of the load from source runs with in workspace:
+// `GOFLAGS` as go reads it there (see withGoFlags), every flag kept, with -pgo=off last, as go/packages lists: a
+// command with a default.pgo profile would otherwise have go list print a second variant of every package the
+// command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
+func sourceEnvironment(workspace string, environment []string) ([]string, error) {
+	return withGoFlags(workspace, environment, func(flags []string) []string { return append(flags, "-pgo=off") })
+}
+
+// translatedEnvironment is the whole environment go/packages runs with in workspace when it translates the
+// project's cgo files: `GOFLAGS` as go reads it there (see withGoFlags) with every `-trimpath` taken out and
+// `-trimpath=false` put last. Analysis needs real source paths: under -trimpath go keys a cgo package's
+// translation without its directory, so a load is served the translation cached for the same bytes in another
+// directory, whose `//line` paths name that directory's files, gone once it is, and cgocall, which reads the raw
+// file those paths name, fails. The value is never empty, since an empty `GOFLAGS` would hand go the go env file's
+// flags, -trimpath among them.
+func translatedEnvironment(workspace string, environment []string) ([]string, error) {
+	return withGoFlags(workspace, environment, func(flags []string) []string {
+		kept := []string{}
+		for _, flag := range flags {
+			name, _, _ := strings.Cut(strings.TrimLeft(flag, "-"), "=")
+			if name != "trimpath" {
+				kept = append(kept, flag)
+			}
+		}
+		return append(kept, "-trimpath=false")
+	})
+}
+
+// withGoFlags is the current environment, then environment, then `GOFLAGS` as go reads it in workspace (from the
+// environment, or the go env file when that is empty), its flags rewritten by rewrite.
+func withGoFlags(workspace string, environment []string, rewrite func([]string) []string) ([]string, error) {
 	given := append(os.Environ(), environment...)
 	command := exec.Command("go", "env", "GOFLAGS")
 	command.Dir = workspace
@@ -123,21 +248,19 @@ func goEnvironment(workspace string, environment []string) ([]string, error) {
 		return nil, fmt.Errorf("reading GOFLAGS with go env in %s: %w: %s",
 			workspace, runError, strings.TrimSpace(standardError.String()))
 	}
-	kept := []string{}
-	for _, flag := range strings.Fields(string(output)) {
-		name, _, _ := strings.Cut(strings.TrimLeft(flag, "-"), "=")
-		if name != "trimpath" {
-			kept = append(kept, flag)
-		}
-	}
-	kept = append(kept, "-trimpath=false")
 	result := []string{}
 	for _, variable := range given {
 		if !strings.HasPrefix(variable, "GOFLAGS=") {
 			result = append(result, variable)
 		}
 	}
-	return append(result, "GOFLAGS="+strings.Join(kept, " ")), nil
+	return append(result, "GOFLAGS="+strings.Join(rewrite(strings.Fields(string(output))), " ")), nil
+}
+
+// exists reports whether file can be read about.
+func exists(file string) bool {
+	_, statError := os.Stat(file)
+	return statError == nil
 }
 
 // inside reports whether path is in workspace or below it.

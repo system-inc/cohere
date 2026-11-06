@@ -3,11 +3,16 @@ package load
 import (
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
+
+	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/goengine/check/checker"
 )
 
 // fixtureFiles are the modules the tests load. clean has a package with in-package and external tests, whose
@@ -73,9 +78,11 @@ var fixtures struct {
 // TestMain removes the fixtures once every test is done with them.
 func TestMain(tests *testing.M) {
 	code := tests.Run()
-	if fixtures.root != "" {
-		// Ignored: a temporary directory left behind fails nothing.
-		_ = os.RemoveAll(fixtures.root)
+	for _, root := range []string{fixtures.root, cgoFixtures.root} {
+		if root != "" {
+			// Ignored: a temporary directory left behind fails nothing.
+			_ = os.RemoveAll(root)
+		}
 	}
 	os.Exit(code)
 }
@@ -320,5 +327,42 @@ func TestTheCountsDescribeTheLoad(test *testing.T) {
 	}
 	if fixtures.clean.Elapsed <= 0 {
 		test.Errorf("want the elapsed time, got %s", fixtures.clean.Elapsed)
+	}
+}
+
+// Each analyzed package carries its module, as go/packages' NeedModule gave it, so a rule that reads pass.Module, as
+// the utils-folder rule does, reads the module the package is in, the one beside it a pattern names included.
+func TestAnAnalyzerReadsEachPackagesModule(test *testing.T) {
+	test.Parallel()
+
+	loadedFixtures(test)
+	var lock sync.Mutex
+	modules := map[string]string{}
+	reader := &analysis.Analyzer{
+		Name: "modulereader",
+		Doc:  "modulereader records each package's module path.",
+		Run: func(pass *analysis.Pass) (any, error) {
+			lock.Lock()
+			defer lock.Unlock()
+			if pass.Module != nil {
+				modules[pass.Pkg.Path()] = pass.Module.Path
+			}
+			return nil, nil
+		},
+	}
+	_, analyzeError := checker.Analyze([]*analysis.Analyzer{reader}, fixtures.clean.Packages, nil)
+	if analyzeError != nil {
+		test.Fatal(analyzeError)
+	}
+	want := map[string]string{
+		"example.com/clean/p":      "example.com/clean",
+		"example.com/clean/p_test": "example.com/clean",
+		"example.com/clean/plain":  "example.com/clean",
+		"example.com/clean/q":      "example.com/clean",
+		"example.com/clean/tagged": "example.com/clean",
+		"example.com/outside":      "example.com/outside",
+	}
+	if !maps.Equal(modules, want) {
+		test.Fatalf("want the modules\n%v\ngot\n%v", want, modules)
 	}
 }
