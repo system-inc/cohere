@@ -63,14 +63,13 @@ func getTypeAnnotationFirstToken(path *Path) string {
 	if
 	// TypeScript
 	path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			current, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			current, _ := value.Node()
 			return current.Is("TSTypeAnnotation")
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			current, _ := value.(Node)
-			key, _ := name.(string)
-			return (key == "returnType" || key == "typeAnnotation") &&
+		func(value PathValue, name string, _ int, _ bool) bool {
+			current, _ := value.Node()
+			return (name == "returnType" || name == "typeAnnotation") &&
 				(current.Is("TSFunctionType") || current.Is("TSConstructorType"))
 		},
 	) {
@@ -80,14 +79,13 @@ func getTypeAnnotationFirstToken(path *Path) string {
 	if
 	// TypeScript
 	path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			current, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			current, _ := value.Node()
 			return current.Is("TSTypeAnnotation")
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			current, _ := value.(Node)
-			key, _ := name.(string)
-			return key == "typeAnnotation" &&
+		func(value PathValue, name string, _ int, _ bool) bool {
+			current, _ := value.Node()
+			return name == "typeAnnotation" &&
 				(current.Is("TSJSDocNullableType") ||
 					current.Is("TSJSDocNonNullableType") ||
 					current.Is("TSTypePredicate"))

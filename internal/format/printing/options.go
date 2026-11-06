@@ -1,13 +1,13 @@
 package printing
 
 // Options is upstream's options object as the core and printers read it.
-type Options[N Node[N]] struct {
-	Printer      *Printer[N]
+type Options[N Node[N], S any, A any] struct {
+	Printer      *Printer[N, S, A]
 	OriginalText string
 
-	// Settings is the language's own options (formatoptions.Options for every printer today), carried as a
-	// value the language type-asserts, so this package does not import the oracle engine's package.
-	Settings any
+	// Settings is the language's own per-print state, the resolved options and whatever its printer keeps
+	// beside them, typed by the language so this package does not import the oracle engine's package.
+	Settings S
 
 	// EmbeddedLanguageFormatting is upstream's option: "auto" (the default) or "off".
 	EmbeddedLanguageFormatting string
@@ -29,7 +29,7 @@ type Options[N Node[N]] struct {
 }
 
 // MarkPrinted records a comment as printed outside printComments, upstream's printedComments.add.
-func (options *Options[N]) MarkPrinted(comment N) {
+func (options *Options[N, S, A]) MarkPrinted(comment N) {
 	if options.printedComments == nil {
 		options.printedComments = map[N]bool{}
 	}

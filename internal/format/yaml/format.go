@@ -15,6 +15,28 @@ import (
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
 
+// nodeArenas hold the node memory of YAML formats that have finished, for the next to reuse (#93dpede):
+// markdown's front matter formats a tree like this for nearly every file. A pool, because files are
+// formatted on several goroutines at once and each Get is that caller's alone.
+var nodeArenas = sync.Pool{New: func() any {
+	return &arena.Arena[unist.Node]{Poison: unist.Node{NodeType: "released", Value: "released"}}
+}}
+
+// acquireNodes takes a node arena from nodeArenas, that caller's alone until releaseNodes puts it back.
+func acquireNodes() *arena.Arena[unist.Node] {
+	nodes, isNodeArena := nodeArenas.Get().(*arena.Arena[unist.Node])
+	if !isNodeArena {
+		// Invariant: the pool holds only what its New makes and releaseNodes puts back, both node arenas.
+		panic("yaml: nodeArenas held a value that is not a node arena")
+	}
+	return nodes
+}
+
+func releaseNodes(nodes *arena.Arena[unist.Node]) {
+	nodes.Reset()
+	nodeArenas.Put(nodes)
+}
+
 // Format is Prettier's format for a .yaml or .yml file: a file that is empty or only whitespace formats
 // to "" without being parsed, and the rest is parsed and printed. text comes as native.Formatter hands
 // it over, with no byte order mark and \n line endings. fileName is upstream's options.filepath, which the printer
@@ -38,7 +60,7 @@ func formatWithProseWrap(
 	if trim(text) == "" {
 		return "", nil
 	}
-	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
+	nodes := acquireNodes()
 	defer releaseNodes(nodes)
 	root, parseError := parse(text, nodes)
 	if parseError != nil {
@@ -53,7 +75,7 @@ func formatWithProseWrap(
 // ends in its trailing hardline, which the caller strips (doc.StripTrailingHardline) as upstream's
 // textToDoc does. A text that does not parse fails with an error printing.IsSyntax recognizes.
 func FormatDoc(text string, options formatoptions.Options, textToDoc printing.TextToDoc) (doc.Doc, error) {
-	nodes := nodeArenas.Get().(*arena.Arena[unist.Node])
+	nodes := acquireNodes()
 	defer releaseNodes(nodes)
 	root, parseError := parse(text, nodes)
 	if parseError != nil {
@@ -61,18 +83,6 @@ func FormatDoc(text string, options formatoptions.Options, textToDoc printing.Te
 	}
 	// The doc holds only text, no node, so the tree is released once it is built.
 	return printDocFile("", root, text, options, "preserve", textToDoc, nodes.Len())
-}
-
-// nodeArenas hold the node memory of YAML formats that have finished, for the next to reuse (#93dpede):
-// markdown's front matter formats a tree like this for nearly every file. A pool, because files are
-// formatted on several goroutines at once and each Get is that caller's alone.
-var nodeArenas = sync.Pool{New: func() any {
-	return &arena.Arena[unist.Node]{Poison: unist.Node{NodeType: "released", Value: "released"}}
-}}
-
-func releaseNodes(nodes *arena.Arena[unist.Node]) {
-	nodes.Reset()
-	nodeArenas.Put(nodes)
 }
 
 // parse is parser-yaml.js's parse: yaml-unist-parser's parse with { uniqueKeys: false }, and root.comments

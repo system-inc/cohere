@@ -59,17 +59,18 @@ var markdownPerturbations = []markdownPerturbation{
 var tableCellPadding = regexp.MustCompile(`[ \t]*\|[ \t]*`)
 
 func perturbMarkdown(text string) string {
+	perturbed := text
 	for _, perturbation := range markdownPerturbations {
 		if perturbation.rows {
-			text = perturbation.pattern.ReplaceAllStringFunc(text, func(row string) string {
+			perturbed = perturbation.pattern.ReplaceAllStringFunc(perturbed, func(row string) string {
 				return tableCellPadding.ReplaceAllString(row, "|")
 			})
 			continue
 		}
-		text = perturbation.pattern.ReplaceAllString(text, perturbation.replacement)
+		perturbed = perturbation.pattern.ReplaceAllString(perturbed, perturbation.replacement)
 	}
 	// Trailing spaces on every third line, which Prettier strips outside hard breaks.
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(perturbed, "\n")
 	for index := range lines {
 		if index%3 == 2 && strings.TrimSpace(lines[index]) != "" {
 			lines[index] += " "
@@ -100,7 +101,10 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory to expand %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -161,6 +165,9 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 // markdown then matches, the miss belongs to those languages' missing printers. A native printer is kept
 // rather than replaced because it knows its host, as the oracle run standalone does not (a lone JSX
 // element in a tsx fence keeps no semicolon only when the printer knows its parent is markdown).
+//
+// Mutates: fellBack gains each parser the oracle stood in for, which the caller reads after the format
+// to name the languages a miss belongs to.
 func standInEmbeds(
 	options formatoptions.Options,
 	engine *prettier.Engine,
@@ -290,7 +297,8 @@ func TestPerturbedMarkdownCorpus(test *testing.T) {
 
 	identical, measured, oracleFailures := 0, 0, 0
 	attributed := map[string]int{}
-	var unattributed, misses []string
+	var unattributed []string
+	var misses []string
 	for result := range outcomes {
 		if result.oracleFailed {
 			oracleFailures++

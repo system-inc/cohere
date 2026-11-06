@@ -169,7 +169,7 @@ func printArrowFunctionSignature(path *Path, options *Options, print PrintFunc, 
 	}
 
 	if shouldPrintParamsWithoutParens(path, options) {
-		parts = append(parts, print([]any{"params", 0}, nil))
+		parts = append(parts, callElement(path, func(*Path) Doc { return print("", nil) }, 0, "params"))
 	} else {
 		shouldExpandParameters := arguments.expandLastArgument || arguments.expandFirstArgument
 		returnTypeDoc := printReturnType(path, print)

@@ -127,10 +127,9 @@ func printEmbedUnsupported(language string) embedPrint {
 
 // predicate adapts a (node, key) test to the print core's path.match predicate.
 func predicate(test func(node Node, name string) bool) printing.Predicate[Node] {
-	return func(value any, name any, _ int, _ bool) bool {
-		current, _ := value.(Node)
-		key, _ := name.(string)
-		return current != nil && test(current, key)
+	return func(value PathValue, name string, _ int, _ bool) bool {
+		current, _ := value.Node()
+		return current != nil && test(current, name)
 	}
 }
 

@@ -47,6 +47,7 @@ func main() {
 
 	generated, generateError := generate()
 	if generateError != nil {
+		// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 		fmt.Fprintln(os.Stderr, generateError)
 		os.Exit(1)
 	}
@@ -54,10 +55,12 @@ func main() {
 	if *check {
 		committed, readError := os.ReadFile(*output)
 		if readError != nil {
+			// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 			fmt.Fprintln(os.Stderr, readError)
 			os.Exit(1)
 		}
 		if !bytes.Equal(committed, generated) {
+			// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 			fmt.Fprintf(os.Stderr, "%s is stale: regenerate it\n", *output)
 			os.Exit(1)
 		}
@@ -65,6 +68,7 @@ func main() {
 	}
 
 	if writeError := os.WriteFile(*output, generated, 0o644); writeError != nil {
+		// Ignored: the exit status 1 that follows reports the failure even if this write to stderr is lost.
 		fmt.Fprintln(os.Stderr, writeError)
 		os.Exit(1)
 	}
@@ -139,8 +143,12 @@ func generate() ([]byte, error) {
 // unitRanges asks a regex about every UTF-16 code unit, as micromark's regexCheck does with
 // String.fromCharCode, and compresses the answers into inclusive ranges.
 func unitRanges(runtime *goja.Runtime, pattern string, flags string) ([][2]int, error) {
-	runtime.Set("__pattern", pattern)
-	runtime.Set("__flags", flags)
+	if setError := runtime.Set("__pattern", pattern); setError != nil {
+		return nil, fmt.Errorf("setting the pattern in the runtime: %w", setError)
+	}
+	if setError := runtime.Set("__flags", flags); setError != nil {
+		return nil, fmt.Errorf("setting the flags in the runtime: %w", setError)
+	}
 	value, runStringError := runtime.RunString(`
 		(function () {
 			const regex = new RegExp(__pattern, __flags);

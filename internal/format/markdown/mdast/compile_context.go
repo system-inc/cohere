@@ -34,6 +34,9 @@ func (context *compileContext) point(point micromark.Point) Point {
 	return Point{Line: point.Line, Column: point.Column, Offset: context.offsets[point.Offset]}
 }
 
+// enter is upstream's enter: node becomes the top's last child and the new top, and token is opened.
+//
+// Mutates: node it is given its start position here, as upstream's enter sets node.position.
 func (context *compileContext) enter(
 	node *Node,
 	token *micromark.Token,
@@ -54,6 +57,8 @@ func (context *compileContext) exit(
 	context.stack = context.stack[:len(context.stack)-1]
 
 	if len(context.tokenStack) == 0 {
+		// Invariant: micromark's events are balanced, every exit after its enter, and each handler table
+		// pairs an opener with the closer of its type, so a token is open whenever one closes.
 		panic(fmt.Sprintf("Cannot close `%s`: it’s not open", token.Type))
 	}
 	open := context.tokenStack[len(context.tokenStack)-1]

@@ -42,6 +42,8 @@ func (run *attempt) handleListOfConstructs(list []*Construct) State {
 
 	if len(list) == 0 {
 		if run.bogusState == nil {
+			// Invariant: the only attempts in this package that pass no bogus state name a single construct,
+			// which becomes a one-item list, so an empty list always comes with a bogus state.
 			panic("micromark: expected `bogusState` to be given")
 		}
 		return run.bogusState
@@ -84,6 +86,8 @@ func (run *attempt) startPending(code Code) State {
 
 func (run *attempt) succeed(code Code) State {
 	if code != run.context.expectedCode {
+		// Invariant: a construct returns ok or nok with the code its state was handed, as upstream's
+		// development build asserts, so a mismatch is a porting bug, never something the input can cause.
 		panic("micromark: expected code")
 	}
 	run.context.consumed = true
@@ -93,6 +97,8 @@ func (run *attempt) succeed(code Code) State {
 
 func (run *attempt) fail(code Code) State {
 	if code != run.context.expectedCode {
+		// Invariant: a construct returns ok or nok with the code its state was handed, as upstream's
+		// development build asserts, so a mismatch is a porting bug, never something the input can cause.
 		panic("micromark: expected code")
 	}
 	run.context.consumed = true

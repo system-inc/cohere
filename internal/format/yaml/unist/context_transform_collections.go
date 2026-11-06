@@ -387,12 +387,13 @@ func (context *context) transformAstPair(
 	// `valueContent || additionalValueData.range ? createMappingValue(...) : null`
 	var mappingValue *Node
 	if valueContent != nil || valueRange != nil {
-		var start, end int
+		var start int
 		if valueRange != nil {
 			start = valueRange[0]
 		} else {
 			start = context.position(valueContent).start.offset
 		}
+		var end int
 		if valueContent != nil {
 			end = context.position(valueContent).end.offset
 		} else {

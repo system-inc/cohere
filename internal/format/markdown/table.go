@@ -14,15 +14,15 @@ type tableCell struct {
 	width int
 }
 
-func printTable(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printTable(path *astPath, options *options, print printFunc) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	layout := doc.Options{PrintWidth: settings.printWidth, TabWidth: settings.tabWidth, UseTabs: settings.useTabs}
 
 	var columnMaxWidths []int
-	contents := printing.Map(path, func(path *astPath, _ int, _ any) []tableCell {
-		return printing.Map(path, func(path *astPath, columnIndex int, _ any) tableCell {
-			text := doc.Print(print(nil, nil), layout)
+	contents := printing.Map(path, func(path *astPath, _ int) []tableCell {
+		return printing.Map(path, func(path *astPath, columnIndex int) tableCell {
+			text := doc.Print(print("", nil), layout)
 			width := doc.StringWidth(text)
 			for len(columnMaxWidths) <= columnIndex {
 				columnMaxWidths = append(columnMaxWidths, 3) // minimum width = 3 (---, :--, :-:, --:)

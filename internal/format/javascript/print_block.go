@@ -100,7 +100,7 @@ func printStatementSequence(path *Path, options *Options, print PrintFunc, prope
 		if statement.Is("EmptyStatement") {
 			return
 		}
-		parts = append(parts, print(nil, nil))
+		parts = append(parts, print("", nil))
 		if statement != lastStatement {
 			parts = append(parts, hardline)
 			if isNextLineEmptyAfter(statement, options) {

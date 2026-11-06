@@ -20,8 +20,6 @@
 package javascript
 
 import (
-	"fmt"
-
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/formatoptions"
@@ -32,13 +30,16 @@ import (
 type Node = *estree.Node
 
 // Path is upstream's AstPath over ESTree nodes.
-type Path = printing.AstPath[*estree.Node]
+type Path = printing.AstPath[*estree.Node, *settings]
+
+// PathValue is a value on the path, what a path.match predicate is given.
+type PathValue = printing.Value[*estree.Node]
 
 // Options is upstream's options object for one format: the printer, the original text, the comments.
-type Options = printing.Options[*estree.Node]
+type Options = printing.Options[*estree.Node, *settings, printArguments]
 
 // PrintFunc is upstream's print(selector, args).
-type PrintFunc = printing.PrintFunc
+type PrintFunc = printing.PrintFunc[printArguments]
 
 // Doc is a document.
 type Doc = doc.Doc
@@ -75,27 +76,15 @@ type settings struct {
 
 // settingsOf is the per-format state carried in options.Settings.
 func settingsOf(options *Options) *settings {
-	formatSettings, isSettings := options.Settings.(*settings)
-	if !isSettings {
-		// Invariant: every Options this package prints with is built with a *settings, in printer.go's format
-		// and in isLoneShortArgument's stand-in for upstream's `{ printWidth }`.
-		panic(fmt.Sprintf("javascript: options.Settings is a %T, not a *settings", options.Settings))
-	}
-	return formatSettings
+	return options.Settings
 }
 
-// printArguments are upstream's `args` to print: an object a parent passes to shape a child's print.
-// A nil *printArguments is passed to the core as an untyped nil, because the core caches only when
-// args is nil and a typed nil in an interface is not.
+// printArguments are upstream's `args` to print: an object a parent passes to shape a child's print. A
+// print given none is cached; one given any is not, as upstream's.
 type printArguments struct {
 	expandFirstArgument bool
 	expandLastArgument  bool
 	assignmentLayout    string
-}
-
-func argumentsOf(arguments any) *printArguments {
-	typed, _ := arguments.(*printArguments)
-	return typed
 }
 
 // node is path.node.
@@ -139,8 +128,7 @@ func indexOf(path *Path) int {
 
 // siblingsOf is path.siblings as nodes, nil outside an array.
 func siblingsOf(path *Path) []Node {
-	siblings, _ := path.Siblings().([]Node)
-	return siblings
+	return path.Siblings()
 }
 
 // nextOf is path.next.
@@ -156,8 +144,29 @@ func previousOf(path *Path) Node {
 }
 
 // call is path.call(callback, ...names).
-func call[R any](path *Path, callback func(*Path) R, names ...any) R {
+func call[R any](path *Path, callback func(*Path) R, names ...string) R {
 	return printing.Call(path, callback, names...)
+}
+
+// callElement is path.call(callback, ...names, index), for the paths that end in an index.
+func callElement[R any](path *Path, callback func(*Path) R, index int, names ...string) R {
+	return printing.CallElement(path, callback, index, names...)
+}
+
+// pathSelector is upstream's array selector for path.call and print, in the two shapes a printer gives
+// one: a property name, or a property name and then an element of the list there.
+type pathSelector struct {
+	property    string
+	index       int
+	endsInIndex bool
+}
+
+// callSelector is path.call(callback, ...selector).
+func callSelector[R any](path *Path, callback func(*Path) R, selector pathSelector) R {
+	if selector.endsInIndex {
+		return callElement(path, callback, selector.index, selector.property)
+	}
+	return call(path, callback, selector.property)
 }
 
 // callParent is path.callParent(callback, count).
@@ -166,18 +175,18 @@ func callParent[R any](path *Path, callback func(*Path) R, count int) R {
 }
 
 // each is path.each(callback, ...names).
-func each(path *Path, callback func(path *Path, index int), names ...any) {
-	path.Each(func(path *Path, index int, _ any) { callback(path, index) }, names...)
+func each(path *Path, callback func(path *Path, index int), names ...string) {
+	path.Each(callback, names...)
 }
 
 // mapPath is path.map(callback, ...names).
-func mapPath[R any](path *Path, callback func(path *Path, index int) R, names ...any) []R {
-	return printing.Map(path, func(path *Path, index int, _ any) R { return callback(path, index) }, names...)
+func mapPath[R any](path *Path, callback func(path *Path, index int) R, names ...string) []R {
+	return printing.Map(path, callback, names...)
 }
 
 // printAll is path.map(print, ...names).
-func printAll(path *Path, print PrintFunc, names ...any) []Doc {
-	return mapPath(path, func(*Path, int) Doc { return print(nil, nil) }, names...)
+func printAll(path *Path, print PrintFunc, names ...string) []Doc {
+	return mapPath(path, func(*Path, int) Doc { return print("", nil) }, names...)
 }
 
 // originalText is options.originalText.

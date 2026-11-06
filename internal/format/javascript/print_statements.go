@@ -209,7 +209,7 @@ func printSwitchStatement(path *Path, options *Options, print PrintFunc) Doc {
 			if !path.IsLast() && isNextLineEmptyAfter(node(path), options) {
 				blank = hardline
 			}
-			return concatIn(path, print(nil, nil), blank)
+			return concatIn(path, print("", nil), blank)
 		}, "cases")
 		cases = indentIn(path, concatIn(path, hardline, join(hardline, printed)))
 	} else {
@@ -278,7 +278,7 @@ func shouldPrintLeadingHardline(node Node, options *Options) bool {
 func printClause(path *Path, options *Options, print PrintFunc, property string) Doc {
 	return call(path, func(path *Path) Doc {
 		current := node(path)
-		printed := print(nil, nil)
+		printed := print("", nil)
 		if current.Is("EmptyStatement") {
 			if hasComment(current, commentLeading, nil) {
 				return concatIn(path, doc.Text(" "), printed)

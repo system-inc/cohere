@@ -251,8 +251,8 @@ func needsParentheses(path *Path, options *Options) bool {
 
 	case "TSFunctionType":
 		if path.Match(
-			func(value any, _ any, _ int, _ bool) bool {
-				node, _ := value.(Node)
+			func(value PathValue, _ string, _ int, _ bool) bool {
+				node, _ := value.Node()
 				return node.Is("TSFunctionType")
 			},
 			keyIsType("typeAnnotation", "TSTypeAnnotation"),
@@ -447,8 +447,8 @@ func needsParentheses(path *Path, options *Options) bool {
 		}
 
 		if key == "expressions" && parent.Is("SequenceExpression") &&
-			path.Match(nil, nil, func(value any, name any, _ int, _ bool) bool {
-				node, _ := value.(Node)
+			path.Match(nil, nil, func(value PathValue, name string, _ int, _ bool) bool {
+				node, _ := value.Node()
 				return (name == "init" || name == "update") && node.Is("ForStatement")
 			}) {
 			return false
@@ -623,8 +623,8 @@ func needsParentheses(path *Path, options *Options) bool {
 // keyIsType is the path.match predicate upstream writes inline as
 // `(node, key) => key === name && node.type === type`.
 func keyIsType(name string, nodeType string) printing.Predicate[Node] {
-	return func(value any, key any, _ int, _ bool) bool {
-		node, _ := value.(Node)
+	return func(value PathValue, key string, _ int, _ bool) bool {
+		node, _ := value.Node()
 		return key == name && node.Is(nodeType)
 	}
 }

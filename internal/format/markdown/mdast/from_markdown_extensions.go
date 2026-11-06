@@ -311,8 +311,11 @@ func wikiLinkFromMarkdown() extension {
 				node.Value = context.sliceSerialize(token)
 				node.ValueNull = false
 			},
-			"wikiLinkAlias": func(*compileContext, *micromark.Token) {},
-			"wikiLink":      func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
+			"wikiLinkAlias": func(*compileContext, *micromark.Token) {
+				// Upstream keeps the alias in data for HTML, which this port does not keep, and the fork's
+				// divider never matches, so no alias token is ever made.
+			},
+			"wikiLink": func(context *compileContext, token *micromark.Token) { context.exit(token, nil) },
 		},
 	}
 }

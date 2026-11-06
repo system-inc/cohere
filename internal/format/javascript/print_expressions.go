@@ -17,7 +17,7 @@ import (
 // set in our configurations, so its branch is not taken.
 func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) Doc {
 	current := node(path)
-	argumentDoc := print(nil, nil)
+	argumentDoc := print("", nil)
 	if returnArgumentHasLeadingComment(current, options) {
 		return concatIn(
 			path,
@@ -130,9 +130,9 @@ func printSequenceExpression(path *Path, options *Options, print PrintFunc) Doc 
 		var parts []Doc
 		each(path, func(path *Path, _ int) {
 			if path.IsFirst() {
-				parts = append(parts, print(nil, nil))
+				parts = append(parts, print("", nil))
 			} else {
-				parts = append(parts, doc.Text(","), indentIn(path, concatIn(path, line, print(nil, nil))))
+				parts = append(parts, doc.Text(","), indentIn(path, concatIn(path, line, print("", nil))))
 			}
 		}, "expressions")
 		return groupIn(path, concatIn(path, parts...))

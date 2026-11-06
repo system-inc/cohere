@@ -440,16 +440,14 @@ func (lexer *Lexer) parseDocument() string {
 }
 
 func (lexer *Lexer) parseFlowCollection() string {
-	var nl, sp int
 	indent := -1
 	for {
-		nl = lexer.pushNewline()
+		nl := lexer.pushNewline()
+		sp := 0
 		if nl > 0 {
 			sp = lexer.pushSpaces(false)
 			indent = sp
 			lexer.indentValue = sp
-		} else {
-			sp = 0
 		}
 		sp += lexer.pushSpaces(true)
 		if nl+sp <= 0 {
@@ -605,8 +603,10 @@ func (lexer *Lexer) parseBlockScalar() string {
 	nl := lexer.position - 1 // may be -1 if this.pos === 0
 	indent := 0
 	var character int
-loop:
-	for index := lexer.position; ; index++ {
+	// pastIndentation ends the walk at the first character that is neither indentation nor a line break,
+	// where upstream breaks out of its labeled loop.
+	pastIndentation := false
+	for index := lexer.position; !pastIndentation; index++ {
 		character = characterAt(lexer.buffer, index)
 		if character == -1 {
 			break
@@ -626,9 +626,9 @@ loop:
 				continue
 			}
 			// fallthrough
-			break loop
+			pastIndentation = true
 		default:
-			break loop
+			pastIndentation = true
 		}
 	}
 	if character == -1 && !lexer.atEnd {
@@ -781,17 +781,17 @@ func (lexer *Lexer) pushToIndex(index int, allowEmpty bool) int {
 
 func (lexer *Lexer) pushIndicators() int {
 	count := 0
-loop:
+	// A `continue` inside the switch reaches this for, as upstream's labeled continue does.
 	for {
 		switch lexer.characterAt(0) {
 		case '!':
 			count += lexer.pushTag()
 			count += lexer.pushSpaces(true)
-			continue loop
+			continue
 		case '&':
 			count += lexer.pushUntil(isNotAnchorCharacter)
 			count += lexer.pushSpaces(true)
-			continue loop
+			continue
 		case '-', // this is an error
 			'?', // this is an error outside flow collections
 			':':
@@ -805,10 +805,10 @@ loop:
 				}
 				count += lexer.pushCount(1)
 				count += lexer.pushSpaces(true)
-				continue loop
+				continue
 			}
 		}
-		break loop
+		break
 	}
 	return count
 }

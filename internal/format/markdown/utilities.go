@@ -215,6 +215,7 @@ func splitKeepingSeparators(text string, isSeparator func(rune) bool) []string {
 // appendSplitOnCjk appends token.split(new RegExp(`(${CJK_REGEXP.source})`, "u")) to parts: pieces
 // alternate with the CJK matches, each one CJK character and an optional variation selector after it.
 func appendSplitOnCjk(parts []string, token string) []string {
+	appended := parts
 	start := 0
 	index := 0
 	for index < len(token) {
@@ -231,10 +232,10 @@ func appendSplitOnCjk(parts []string, token string) []string {
 				index += nextSize
 			}
 		}
-		parts = append(parts, token[start:matchStart], token[matchStart:index])
+		appended = append(appended, token[start:matchStart], token[matchStart:index])
 		start = index
 	}
-	return append(parts, token[start:])
+	return append(appended, token[start:])
 }
 
 var orderedListItemPattern = regexp.MustCompile(`^[` + javaScriptSpace + `]*(\d+)(\.|\))([` + javaScriptSpace + `]*)`)
@@ -254,8 +255,12 @@ func getOrderedListItemInfo(orderListItem *Node, originalText string) orderedLis
 
 	match := orderedListItemPattern.FindStringSubmatch(text)
 	if match == nil {
+		// Invariant: an ordered list item's source opens with its digits and its `.` or `)`, which is what
+		// made the parser read it as one, so the pattern always finds them.
 		panic("markdown: an ordered list item without a number")
 	}
+	// Ignored: the pattern matched only digits, so the one error is a range error, and ParseFloat then
+	// returns infinity, as JavaScript's Number does for the same digits.
 	number, _ := strconv.ParseFloat(match[1], 64)
 	return orderedListItemInfo{number: int(number), leadingSpaces: match[3]}
 }

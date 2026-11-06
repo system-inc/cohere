@@ -23,7 +23,7 @@ import (
 
 // postcssPrinter is the printer object as the core normalizes it (src/main/parser-and-printer.js): print
 // answers front matter itself, and both visitor-key functions give front matter none.
-var postcssPrinter = &printing.Printer[*estree.Node]{
+var postcssPrinter = &printing.Printer[*estree.Node, printSettings, printing.NoArguments]{
 	Print:            genericPrint,
 	LocStart:         locStart,
 	LocEnd:           locEnd,
@@ -61,13 +61,13 @@ var supportedEmbedFrontMatterLanguages = map[string]bool{"yaml": true, "toml": t
 func embed(
 	path *astPath,
 	_ *printerOptions,
-) func(printing.TextToDoc, printing.PrintFunc, *astPath, *printerOptions) (doc.Doc, error) {
+) func(printing.TextToDoc, printFunc, *astPath, *printerOptions) (doc.Doc, error) {
 	node := currentNode(path)
 	if !isFrontMatter(node) || !supportedEmbedFrontMatterLanguages[node.String("language")] {
 		return nil
 	}
 
-	return func(textToDoc printing.TextToDoc, _ printing.PrintFunc, _ *astPath, _ *printerOptions) (doc.Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ printFunc, _ *astPath, _ *printerOptions) (doc.Doc, error) {
 		language := node.String("language")
 		value := trim(node.String("value"))
 
@@ -114,13 +114,7 @@ func parserOf(options *printerOptions) string {
 
 // printSettingsOf is the printSettings a format carries in options.Settings.
 func printSettingsOf(options *printerOptions) printSettings {
-	settings, isPrintSettings := options.Settings.(printSettings)
-	if !isPrintSettings {
-		// Invariant: printToDoc is the only place a css printerOptions is built, and it always sets
-		// Settings to a printSettings; Format and PrintToDoc recover the panic into an error.
-		panic(fmt.Sprintf("css: options.Settings is %T, not printSettings", options.Settings))
-	}
-	return settings
+	return options.Settings
 }
 
 // Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and

@@ -5,7 +5,9 @@ package micromark
 var labelStartImage = &Construct{Name: "labelStartImage", Tokenize: tokenizeLabelStartImage}
 
 func tokenizeLabelStartImage(self *Self, effects *Effects, ok State, nok State) State {
-	var start, open, after State
+	var start State
+	var open State
+	var after State
 
 	start = func(code Code) State {
 		effects.Enter(TypeLabelImage, nil)

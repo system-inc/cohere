@@ -114,8 +114,11 @@ func toyProgram(random *rand.Rand) (*toyNode, []*toyNode, string) {
 	return program, source.comments, source.text.String()
 }
 
-func toyPrinter() *Printer[*toyNode] {
-	printer := &Printer[*toyNode]{}
+// toySettings is the toy language's per-print state, which it has none of.
+type toySettings struct{}
+
+func toyPrinter() *Printer[*toyNode, toySettings, NoArguments] {
+	printer := &Printer[*toyNode, toySettings, NoArguments]{}
 	printer.LocStart = func(node *toyNode) int { return node.From }
 	printer.LocEnd = func(node *toyNode) int { return node.To }
 	printer.VisitorKeys = func(node *toyNode) []string {
@@ -138,20 +141,28 @@ func toyPrinter() *Printer[*toyNode] {
 	// inside a list dangles on that list. Without one, a mutation that misclassified end-of-line comments
 	// survived, because default attachment sends both placements to the same node; the JavaScript
 	// handlers branch on placement, so the toy has to as well.
-	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode]) bool {
+	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode, toySettings, NoArguments]) bool {
 		if context.HasEnclosing && context.Enclosing.Kind == "List" && context.Comment.Kind == "Block" {
 			AddDanglingComment(context.Enclosing, context.Comment, "")
 			return true
 		}
 		return false
 	}
-	printer.PrintComment = func(path *AstPath[*toyNode], options *Options[*toyNode]) doc.Doc {
+	printer.PrintComment = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+	) doc.Doc {
 		comment, _ := path.Node()
 		return doc.Text(options.OriginalText[comment.From:comment.To])
 	}
-	printer.Print = func(path *AstPath[*toyNode], options *Options[*toyNode], print PrintFunc, _ any) doc.Doc {
+	printer.Print = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+		print PrintFunc[NoArguments],
+		_ *NoArguments,
+	) doc.Doc {
 		node, _ := path.Node()
-		children := Map(path, func(*AstPath[*toyNode], int, any) doc.Doc { return print(nil, nil) }, "children")
+		children := Map(path, func(*AstPath[*toyNode, toySettings], int) doc.Doc { return print("", nil) }, "children")
 		switch node.Kind {
 		case "Program":
 			return doc.Concat{
@@ -257,15 +268,15 @@ type toyCase struct {
 }
 
 type toyResult struct {
-	Formatted string  `json:"formatted"`
-	Attached  [][]any `json:"attached"`
-	Error     string  `json:"error"`
+	Formatted string       `json:"formatted"`
+	Attached  []attachment `json:"attached"`
+	Error     string       `json:"error"`
 }
 
-func attachedSummary(root *toyNode) [][]any {
+func attachedSummary(root *toyNode) []attachment {
 	// Empty, not nil: a nil slice encodes as null and upstream's empty array as [], and every comment-free
 	// program read as a mismatch until this said so.
-	attached := [][]any{}
+	attached := []attachment{}
 	var walk func(*toyNode)
 	walk = func(node *toyNode) {
 		for _, comment := range node.Comments {
@@ -275,7 +286,12 @@ func attachedSummary(root *toyNode) [][]any {
 			} else if comment.Trailing {
 				kind = "trailing"
 			}
-			attached = append(attached, []any{float64(comment.From), kind, node.Kind, float64(node.From)})
+			attached = append(attached, attachment{
+				CommentStart: comment.From,
+				Kind:         kind,
+				NodeType:     node.Kind,
+				NodeStart:    node.From,
+			})
 		}
 		if node.Label != nil {
 			walk(node.Label)
@@ -286,22 +302,11 @@ func attachedSummary(root *toyNode) [][]any {
 	}
 	walk(root)
 	for left := 1; left < len(attached); left++ {
-		for right := left; right > 0 && attachedStart(attached[right]) < attachedStart(attached[right-1]); right-- {
+		for right := left; right > 0 && attached[right].CommentStart < attached[right-1].CommentStart; right-- {
 			attached[right], attached[right-1] = attached[right-1], attached[right]
 		}
 	}
 	return attached
-}
-
-// attachedStart is the comment offset that opens an attachedSummary entry.
-func attachedStart(entry []any) float64 {
-	start, isNumber := entry[0].(float64)
-	if !isNumber {
-		// Invariant: attachedSummary's walk is the only writer of entries, and it opens each with
-		// float64(comment.From), the number JSON gives upstream's side.
-		panic(fmt.Sprintf("printing: an attached entry opens with a %T, not a float64", entry[0]))
-	}
-	return start
 }
 
 // TestCoreAgreesWithUpstream is the differential. Off unless COHERE_PRETTIER_FORK names the fork.
@@ -351,7 +356,7 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 			}
 			continue
 		}
-		options := &Options[*toyNode]{
+		options := &Options[*toyNode, toySettings, NoArguments]{
 			Printer:                    toyPrinter(),
 			OriginalText:               testCase.Text,
 			EmbeddedLanguageFormatting: "off",

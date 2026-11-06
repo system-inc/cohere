@@ -70,7 +70,7 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 	var separatorParts []Doc
 	parts := mapPath(path, func(path *Path, _ int) Doc {
-		result := concatIn(path, append(append([]Doc{}, separatorParts...), print(nil, nil))...)
+		result := concatIn(path, append(append([]Doc{}, separatorParts...), print("", nil))...)
 		separatorParts = []Doc{doc.Text(","), line}
 		if isNextLineEmptyAfter(node(path), options) {
 			separatorParts = append(separatorParts, hardline)
@@ -111,8 +111,8 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 	// to create another group so that the object breaks before the return
 	// type
 	if path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return matched.Is("ObjectPattern") && len(matched.List("decorators")) == 0
 		},
 		shouldHugTheOnlyParameterPredicate,
@@ -120,14 +120,14 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 		(isObjectType(current) &&
 			(path.Match(
 				nil,
-				func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
-				func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
+				func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
+				func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
 				shouldHugTheOnlyParameterPredicate,
 			) ||
 				path.Match(
 					nil,
-					func(value any, name any, _ int, _ bool) bool {
-						matched, _ := value.(Node)
+					func(value PathValue, name string, _ int, _ bool) bool {
+						matched, _ := value.Node()
 						return matched.Is("FunctionTypeParam") && name == "typeAnnotation"
 					},
 					shouldHugTheOnlyParameterPredicate,
@@ -136,12 +136,12 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 		// for adding a group if needed
 		(!shouldBreak &&
 			path.Match(
-				func(value any, _ any, _ int, _ bool) bool {
-					matched, _ := value.(Node)
+				func(value PathValue, _ string, _ int, _ bool) bool {
+					matched, _ := value.Node()
 					return matched.Is("ObjectPattern")
 				},
-				func(value any, _ any, _ int, _ bool) bool {
-					matched, _ := value.(Node)
+				func(value PathValue, _ string, _ int, _ bool) bool {
+					matched, _ := value.Node()
 					return matched.Is("AssignmentExpression") || matched.Is("VariableDeclarator")
 				},
 			)) {
@@ -153,10 +153,9 @@ func printObject(path *Path, options *Options, print PrintFunc) Doc {
 
 // shouldHugTheOnlyParameterPredicate adapts upstream's shouldHugTheOnlyParameter(node, name), which
 // upstream passes to path.match directly, to a Match predicate.
-func shouldHugTheOnlyParameterPredicate(value any, name any, _ int, _ bool) bool {
-	matched, _ := value.(Node)
-	key, _ := name.(string)
-	return shouldHugTheOnlyParameter(matched, key)
+func shouldHugTheOnlyParameterPredicate(value PathValue, name string, _ int, _ bool) bool {
+	matched, _ := value.Node()
+	return shouldHugTheOnlyParameter(matched, name)
 }
 
 // someNode is upstream's Array.prototype.some over a node list.

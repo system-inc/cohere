@@ -4,19 +4,18 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/printing"
 )
 
 // src/language-markdown/print/heading.js.
 
-func printAtxHeading(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printAtxHeading(path *astPath, options *options, print printFunc) doc.Doc {
 	return doc.Concat{
 		doc.Text(strings.Repeat("#", currentNode(path).Depth) + " "),
 		printChildren(path, options, print, nil),
 	}
 }
 
-func printSetextHeading(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printSetextHeading(path *astPath, options *options, print printFunc) doc.Doc {
 	originalText := options.OriginalText
 	end := currentNode(path).Position.End.Offset
 	lineStart := strings.LastIndex(originalText[:max(end, 0)], "\n") + 1
@@ -30,7 +29,7 @@ func printSetextHeading(path *astPath, options *options, print printing.PrintFun
 	return doc.Concat{printChildren(path, options, print, nil), doc.Hardline, doc.Text(underline)}
 }
 
-func printHeading(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printHeading(path *astPath, options *options, print printFunc) doc.Doc {
 	if isSetextHeading(currentNode(path)) {
 		return printSetextHeading(path, options, print)
 	}

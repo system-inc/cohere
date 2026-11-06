@@ -174,7 +174,7 @@ func printBinaryishExpressions(
 
 	// Simply print the node normally.
 	if !isBinaryish(current) {
-		return []Doc{groupIn(path, print(nil, nil))}
+		return []Doc{groupIn(path, print("", nil))}
 	}
 
 	var parts []Doc

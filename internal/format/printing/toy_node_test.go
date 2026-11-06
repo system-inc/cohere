@@ -11,20 +11,18 @@ type toyNode struct {
 }
 
 func (node *toyNode) Type() string { return node.Kind }
-
-func (node *toyNode) Field(name string) any {
+func (node *toyNode) Field(name string) Value[*toyNode] {
 	switch name {
 	case "children":
-		return node.Children
+		return ListValue(node.Children)
 	case "label":
 		if node.Label == nil {
-			return nil
+			return Value[*toyNode]{}
 		}
-		return node.Label
+		return NodeValue(node.Label)
 	case "comments":
-		return node.Comments
+		return ListValue(node.Comments)
 	}
-	return nil
+	return Value[*toyNode]{}
 }
-
 func (node *toyNode) CommentData() *CommentFields[*toyNode] { return &node.CommentFields }

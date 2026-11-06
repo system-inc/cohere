@@ -39,7 +39,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	if isReactHookCallWithDepsArray(arguments) {
 		parts := []Doc{doc.Text("(")}
 		iterateCallArgumentsPath(path, func(path *Path, index int) {
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 			if index != lastArgIndex {
 				parts = append(parts, doc.Text(", "))
 			}
@@ -52,7 +52,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 	var printedArguments []Doc
 	iterateCallArgumentsPath(path, func(path *Path, index int) {
 		argument := node(path)
-		argumentDoc := print(nil, nil)
+		argumentDoc := print("", nil)
 
 		if index == lastArgIndex {
 			// do nothing
@@ -102,6 +102,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			}
 		}
 		firstArgument, bailedOut := printCatchingArgExpansionBailout(
+			path,
 			print,
 			getCallArgumentSelector(current, 0),
 			&printArguments{expandFirstArgument: true},
@@ -154,6 +155,7 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 			}
 		}
 		lastArgument, bailedOut := printCatchingArgExpansionBailout(
+			path,
 			print,
 			getCallArgumentSelector(current, -1),
 			&printArguments{expandLastArgument: true},
@@ -214,10 +216,12 @@ func printCallArguments(path *Path, options *Options, print PrintFunc) Doc {
 //
 // as a function: Go has no try/catch, so the deferred recover takes the place of the catch. The
 // second result is true where upstream caught ArgExpansionBailout; any other panic is re-raised, as
-// upstream rethrows.
+// upstream rethrows. The selector ends in an index for a call's argument, so it is printed through
+// callSelector, the Call that mainPrint runs for an array selector.
 func printCatchingArgExpansionBailout(
+	path *Path,
 	print PrintFunc,
-	selector []any,
+	selector pathSelector,
 	arguments *printArguments,
 ) (printed Doc, bailedOut bool) {
 	defer func() {
@@ -230,10 +234,10 @@ func printCatchingArgExpansionBailout(
 			panic(caught)
 		}
 	}()
-	return print(selector, arguments), false
+	return callSelector(path, func(*Path) Doc { return print("", arguments) }, selector), false
 }
 
-// couldExpandArgument is upstream's couldExpandArg. Upstream's arrowChainRecursion defaults to false; Go
+// couldExpandArgument is upstream's couldExpandArgument. Upstream's arrowChainRecursion defaults to false; Go
 // has no default parameters, so callers pass it.
 func couldExpandArgument(argument Node, arrowChainRecursion bool) bool {
 	if isObjectExpression(argument) &&

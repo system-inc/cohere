@@ -56,20 +56,20 @@ func printTypeParameters(path *Path, options *Options, print PrintFunc, paramete
 	isParameterInTestCall := isTestCall(grandparentOf(path), nil)
 
 	isArrowFunctionVariable := path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return !(len(node.List(parametersKey)) == 1 && isObjectType(node.List(parametersKey)[0]))
 		},
 		nil,
-		func(_ any, name any, _ int, _ bool) bool {
+		func(_ PathValue, name string, _ int, _ bool) bool {
 			return name == "typeAnnotation"
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return node.Is("Identifier")
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return isArrowFunctionVariableDeclarator(node)
 		},
 	)

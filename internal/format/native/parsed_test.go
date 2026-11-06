@@ -113,6 +113,8 @@ func typeScriptFilesUnder(roots []string) []string {
 	}
 	var files []string
 	for _, root := range roots {
+		// Ignored: the walk skips every path it cannot read and returns only nil or SkipDir, so WalkDir has no
+		// error left to report, and a root that is missing contributes no files.
 		filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil {
 				return nil

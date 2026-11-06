@@ -53,18 +53,18 @@ func iterateCallArgumentsPath(path *Path, iteratee func(path *Path, index int)) 
 
 // getCallArgumentSelector is upstream's getCallArgumentSelector: the print selector of the argument
 // at index, negative from the end. Upstream's RangeError is a panic.
-func getCallArgumentSelector(node Node, index int) []any {
+func getCallArgumentSelector(node Node, index int) pathSelector {
 	if node.Is("ImportExpression", "TSImportType") {
 		lastIndex := -1
 		if node.Truthy("options") {
 			lastIndex = -2
 		}
 		if index == 0 || index == lastIndex {
-			return []any{"source"}
+			return pathSelector{property: "source"}
 		}
 
 		if node.Truthy("options") && (index == 1 || index == -1) {
-			return []any{"options"}
+			return pathSelector{property: "options"}
 		}
 
 		// Invariant: printCallArguments, the only caller, asks for index 0 or -1, both answered above.
@@ -73,7 +73,7 @@ func getCallArgumentSelector(node Node, index int) []any {
 
 	if node.Is("TSExternalModuleReference") {
 		if index == 0 || index == -1 {
-			return []any{"expression"}
+			return pathSelector{property: "expression"}
 		}
 	} else {
 		argumentIndex := index
@@ -81,7 +81,7 @@ func getCallArgumentSelector(node Node, index int) []any {
 			argumentIndex = len(node.List("arguments")) + index
 		}
 		if argumentIndex >= 0 && argumentIndex < len(node.List("arguments")) {
-			return []any{"arguments", argumentIndex}
+			return pathSelector{property: "arguments", index: argumentIndex, endsInIndex: true}
 		}
 	}
 

@@ -438,7 +438,7 @@ func printJsxChildren(
 				pushLine(whitespace)
 			}
 		} else {
-			printedChild := print(nil, nil)
+			printedChild := print("", nil)
 			push(printedChild)
 
 			directlyFollowedByMeaningfulText := next != nil && isMeaningfulJsxText(next)

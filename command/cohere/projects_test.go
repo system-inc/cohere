@@ -430,7 +430,8 @@ func TestSwiftACoveredPackageHoldsIsNoGap(test *testing.T) {
 	}
 	engine, _ := coveringSwiftEngine(test, "checked=\"\\\"$root\\\"\"\n"+
 		"case \"$root\" in */A) checked=\"$checked,\\\"$root/../B\\\"\";; esac\n"+
-		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
+		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
+		"\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
 		"exit 0")
 
 	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
@@ -731,9 +732,11 @@ func xcodeSwiftEngine(test *testing.T, rootStream string) (string, string) {
 		"done\n"+
 		"if [ -n \"$covering\" ]; then\n"+
 		"  checked=\"\\\"$root\\\"\"\n"+
-		"  if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then checked=\"$checked,\\\"$root/Libraries/Lib\\\"\"; fi\n"+
+		"  if [ -f \"$root/Libraries/Lib/Package.swift\" ]; then "+
+		"checked=\"$checked,\\\"$root/Libraries/Lib\\\"\"; fi\n"+
 		"  head -1 '"+provenance+"'\n"+
-		"  echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
+		"  echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
+		"\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
 		"  exit 0\n"+
 		"fi\n"+
 		"yield=''; if [ -n \"$COHERE_PROJECT_YIELD\" ]; then yield=$(cat \"$COHERE_PROJECT_YIELD\"); fi\n"+
@@ -846,10 +849,16 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		}
 		var relatives []string
 		for _, yielded := range yield.Directories {
-			relative, _ := filepath.Rel(resolvedRoot, resolvedPath(yielded))
+			relative, relativeError := filepath.Rel(resolvedRoot, resolvedPath(yielded))
+			if relativeError != nil {
+				test.Fatalf("the yielded %q is not under the root: %v", yielded, relativeError)
+			}
 			relatives = append(relatives, filepath.ToSlash(relative))
 		}
-		label, _ := filepath.Rel(resolvedRoot, directory)
+		label, labelError := filepath.Rel(resolvedRoot, directory)
+		if labelError != nil {
+			test.Fatalf("the logged directory %q is not under the root: %v", directory, labelError)
+		}
 		yields[filepath.ToSlash(label)] = relatives
 	}
 	want := map[string][]string{".": {"CapturePhone", "Tools/Sim"}, "CapturePhone": nil, "Tools/Sim": nil}

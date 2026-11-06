@@ -186,10 +186,10 @@ func printModuleSpecifiers(path *Path, options *Options, print PrintFunc) Doc {
 				specifierType == "ExportDefaultSpecifier" ||
 				specifierType == "ImportNamespaceSpecifier" ||
 				specifierType == "ImportDefaultSpecifier" {
-				standaloneSpecifiers = append(standaloneSpecifiers, print(nil, nil))
+				standaloneSpecifiers = append(standaloneSpecifiers, print("", nil))
 			} else if specifierType == "ExportSpecifier" ||
 				specifierType == "ImportSpecifier" {
-				groupedSpecifiers = append(groupedSpecifiers, print(nil, nil))
+				groupedSpecifiers = append(groupedSpecifiers, print("", nil))
 			} else {
 				// Upstream throws UnexpectedNodeError(node, "specifier").
 				// Invariant: the parser builds no specifier but the six named above, as Prettier's printer assumes.

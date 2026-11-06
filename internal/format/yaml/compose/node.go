@@ -59,9 +59,9 @@ type Node struct {
 	Format string
 	// MinFractionDigits is set by the float tags for a value written with trailing zeros, 1.50.
 	MinFractionDigits int
-	// ScalarValue is a Scalar's resolved value: nil (null), bool, float64, string (WTF-8), MergeKey,
-	// Date or Binary.
-	ScalarValue any
+	// ScalarValue is a Scalar's resolved value: nil (null), a ScalarBoolean, ScalarNumber, ScalarString
+	// (WTF-8), *MergeKey, Date or Binary.
+	ScalarValue ScalarValue
 }
 
 // HasSource is whether the node has a source: every alias, and every scalar composeScalar made.

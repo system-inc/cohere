@@ -90,6 +90,8 @@ func newGfmTableRun() *gfmTableRun {
 // Upstream walks `events` but reads points from, and applies the edit map to, `context.events`, then returns
 // `events`. The flow tokenizer passes `context.events` itself and no flow construct resolves all before the
 // table, so they are one array and the return is the edited list; here that is the new context.Events.
+//
+// Mutates: context its Events take the edited list, as upstream's edit map splices `context.events` in place
 func resolveGfmTable(events []Event, context *TokenizeContext) []Event {
 	index := -1
 	inFirstCellAwaitingPipe := true
@@ -224,6 +226,8 @@ func resolveGfmTable(events []Event, context *TokenizeContext) []Event {
 }
 
 // flushGfmTableCell is upstream's flushCell: generate a cell. A rowEnd of -1 is upstream's undefined.
+//
+// Mutates: previousCell its end is set where this cell starts, closing it, as upstream's flushCell does
 func flushGfmTableCell(
 	editMap *gfmTableEditMap,
 	context *TokenizeContext,
@@ -265,13 +269,13 @@ func flushGfmTableCell(
 	//           ^^^^-- this cell
 	// ```
 	now := gfmTablePoint(context.Events, cellRange[1])
-	previousCell = &Token{
+	thisCell := &Token{
 		Type:  groupName,
 		Start: now,
 		// Note: correct end is set later.
 		End: now,
 	}
-	editMap.add(cellRange[1], 0, []Event{{Enter: true, Token: previousCell, Context: context}})
+	editMap.add(cellRange[1], 0, []Event{{Enter: true, Token: thisCell, Context: context}})
 
 	// Insert text start at first data start and end at last data end, and
 	// remove events between.
@@ -319,15 +323,18 @@ func flushGfmTableCell(
 	//               ^^^^^^-- this cell (the last one contains two “between” parts)
 	// ```
 	if rowEnd != -1 {
-		previousCell.End = gfmTablePoint(context.Events, rowEnd)
-		editMap.add(rowEnd, 0, []Event{{Enter: false, Token: previousCell, Context: context}})
-		previousCell = nil
+		thisCell.End = gfmTablePoint(context.Events, rowEnd)
+		editMap.add(rowEnd, 0, []Event{{Enter: false, Token: thisCell, Context: context}})
+		thisCell = nil
 	}
 
-	return previousCell
+	return thisCell
 }
 
 // flushGfmTableEnd is upstream's flushTableEnd: generate table end (and table body end).
+//
+// Mutates: table its end is set here, as upstream's flushTableEnd sets `end` on the token the resolver holds
+// Mutates: tableBody its end is set here too, when there is a body, for the same reason
 func flushGfmTableEnd(editMap *gfmTableEditMap, context *TokenizeContext, index int, table *Token, tableBody *Token) {
 	var exits []Event
 	related := gfmTablePoint(context.Events, index)
@@ -356,18 +363,20 @@ func gfmTablePoint(events []Event, index int) Point {
 // gfmTableAlign is micromark-extension-gfm-table/lib/infer.js: figure out the alignment of a GFM table from
 // its enter event, one of "left", "right", "center" or "none" per column.
 func gfmTableAlign(events []Event, index int) []string {
+	// eventIndex walks forward from the table's enter event.
+	eventIndex := index
 	inDelimiterRow := false
 	align := []string{}
 
-	for index < len(events) {
-		event := events[index]
+	for eventIndex < len(events) {
+		event := events[eventIndex]
 
 		if inDelimiterRow {
 			if event.Enter {
 				// Start of alignment value: set a new column.
 				// To do: `markdown-rs` uses `tableDelimiterCellValue`.
 				if event.Token.Type == typeTableContent {
-					if events[index+1].Token.Type == typeTableDelimiterMarker {
+					if events[eventIndex+1].Token.Type == typeTableDelimiterMarker {
 						align = append(align, "left")
 					} else {
 						align = append(align, "none")
@@ -377,7 +386,7 @@ func gfmTableAlign(events []Event, index int) []string {
 				// Exits:
 				// End of alignment value: change the column.
 				// To do: `markdown-rs` uses `tableDelimiterCellValue`.
-				if events[index-1].Token.Type == typeTableDelimiterMarker {
+				if events[eventIndex-1].Token.Type == typeTableDelimiterMarker {
 					alignIndex := len(align) - 1
 
 					if align[alignIndex] == "left" {
@@ -394,7 +403,7 @@ func gfmTableAlign(events []Event, index int) []string {
 			inDelimiterRow = true
 		}
 
-		index++
+		eventIndex++
 	}
 
 	return align

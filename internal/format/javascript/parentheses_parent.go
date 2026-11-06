@@ -143,10 +143,10 @@ func shouldWrapFunctionForExportDefault(
 		return false
 	}
 
-	return call(
+	return callSelector(
 		path,
 		func(path *Path) bool { return shouldWrapFunctionForExportDefault(path, options, needsParentheses) },
-		getLeftSidePathName(current)...,
+		getLeftSidePathName(current),
 	)
 }
 

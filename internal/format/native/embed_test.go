@@ -57,7 +57,7 @@ func TestEmbeddedCodeMatchesTheFork(test *testing.T) {
 // or prints them as written.
 const graphqlTemplatesSource = `import gql from 'graphql-tag';
 
-const fragment = gql` + "`" + `fragment   UserFields on User{id name  email profile{avatar(size:LARGE) bio}}` + "`" + `;
+const fragment = gql` + "`fragment   UserFields on User{id name  email profile{avatar(size:LARGE) bio}}`" + `;
 
 export const Query = gql` + "`" + `
   # leading comment
@@ -74,7 +74,9 @@ export const Query = gql` + "`" + `
   ${fragment}
 ` + "`" + `;
 
-const mutation = graphql` + "`" + `mutation($input:CreatePostInput!){createPost(input:$input){post{id}errors{field message}}}` + "`" + `;
+const mutation = graphql` +
+	"`mutation($input:CreatePostInput!){createPost(input:$input){post{id}errors{field message}}}`" +
+	`;
 
 const marked = /* GraphQL */ ` + "`" + `
   query { viewer { login } }
@@ -86,7 +88,7 @@ const onlyComments = gql` + "`" + `
   # and another
 ` + "`" + `;
 
-const blank = gql` + "`" + `   ` + "`" + `;
+const blank = gql` + "`   `" + `;
 `
 
 // cssTemplatesSource is unformatted CSS in styled-components and css templates, with expressions in
@@ -98,15 +100,18 @@ const Button = styled.button` + "`" + `
 color:red;background:${(properties) => properties.background};
   ${Icon}:hover{opacity:.5}
   &:hover , &:focus{ color : blue }
-  ${(properties) => properties.disabled && css` + "`" + `opacity:0.4;cursor:not-allowed` + "`" + `}
+  ${(properties) => properties.disabled && css` + "`opacity:0.4;cursor:not-allowed`" + `}
   margin-${direction}:4px;
   // an scss line comment
   @media (max-width:${breakpoint}px){padding:0 ${spacing}px}
 ` + "`" + `;
 
-const Title = styled(Heading).attrs({ level: 2 })` + "`" + `font-size:2EM;line-height:1.50;transition:opacity .2s ease-in-out,transform .2s ease-in-out,color .2s ease-in-out,background-color .2s ease-in-out` + "`" + `;
+const Title = styled(Heading).attrs({ level: 2 })` +
+	"`font-size:2EM;line-height:1.50;transition:opacity .2s ease-in-out,transform .2s ease-in-out," +
+	"color .2s ease-in-out,background-color .2s ease-in-out`" +
+	`;
 
-const empty = css` + "`" + `  ` + "`" + `;
+const empty = css` + "`  `" + `;
 `
 
 // TestCssTemplatesMatchTheFork is the css embed's acceptance fixture: styled-components and css

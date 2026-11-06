@@ -30,15 +30,21 @@ const (
 // distinct.
 type MergeKey struct{ _ byte }
 
+func (*MergeKey) scalarValue() {}
+
 // Date is the value the timestamp tag resolves to: upstream's Date, as its time value in milliseconds,
 // NaN for an invalid date.
 type Date float64
 
+func (Date) scalarValue() {}
+
 // Binary is the value the binary tag resolves to: upstream's Buffer.
 type Binary []byte
 
+func (Binary) scalarValue() {}
+
 // newScalar is `new Scalar(value)`.
-func newScalar(value any) *Node {
+func newScalar(value ScalarValue) *Node {
 	return &Node{Kind: KindScalar, Class: "Scalar", ScalarValue: value}
 }
 
@@ -71,6 +77,8 @@ func collectionNode(class string) Node {
 	case "YAMLOMap":
 		return Node{Kind: KindSequence, Class: class, Items: []*Node{}, Tag: omapTagName}
 	}
+	// Invariant: class is a literal in this package or a tag's NodeClass, and the four tags that set
+	// one (map, seq, omap and set) name exactly the four classes above.
 	panic("compose: unknown collection class " + class)
 }
 

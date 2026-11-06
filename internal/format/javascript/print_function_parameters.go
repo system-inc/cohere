@@ -78,7 +78,7 @@ func printFunctionParameters(
 		if isLastParameter && functionNode.Truthy("rest") {
 			printed = append(printed, doc.Text("..."))
 		}
-		printed = append(printed, print(nil, nil))
+		printed = append(printed, print("", nil))
 		if isLastParameter {
 			return
 		}
@@ -255,13 +255,13 @@ func shouldGroupFunctionParameters(functionNode Node, returnTypeDoc Doc) bool {
 // isDecoratedFunction is upstream's isDecoratedFunction.
 func isDecoratedFunction(path *Path) bool {
 	return path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return node.Is("ArrowFunctionExpression") &&
 				node.Child("body").Is("BlockStatement")
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, name string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			if node.Is("CallExpression") &&
 				name == "arguments" &&
 				len(node.List("arguments")) == 1 &&
@@ -275,8 +275,8 @@ func isDecoratedFunction(path *Path) bool {
 			}
 			return false
 		},
-		func(value any, name any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, name string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return (node.Is("VariableDeclarator") && name == "init") ||
 				(node.Is("ExportDefaultDeclaration") && name == "declaration") ||
 				(node.Is("TSExportAssignment") && name == "expression") ||
@@ -288,8 +288,8 @@ func isDecoratedFunction(path *Path) bool {
 					node.Child("left").Child("property").Is("Identifier") &&
 					node.Child("left").Child("property").String("name") == "exports")
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			node, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			node, _ := value.Node()
 			return !node.Is("VariableDeclaration") ||
 				(node.String("kind") == "const" && len(node.List("declarations")) == 1)
 		},

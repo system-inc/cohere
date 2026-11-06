@@ -27,10 +27,6 @@ type Schema struct {
 	Tags []*Tag
 }
 
-// Upstream's `schema[MAP]`, `schema[SCALAR]` and `schema[SEQ]` are the common map, string and seq tags,
-// whatever the schema.
-func (schema *Schema) scalarTag() *Tag { return stringTag }
-
 // schemaOptions is the part of upstream's Schema constructor options composing sets.
 type schemaOptions struct {
 	merge            bool
@@ -63,18 +59,6 @@ func coreKnownTags() map[string]*Tag {
 		"tag:yaml.org,2002:set":       setTag,
 		"tag:yaml.org,2002:timestamp": timestampTag,
 	}
-}
-
-// schemaTags is tags.js's schemas map, for the two schemas a Document picks: core for YAML 1.2 and
-// yaml-1.1 for YAML 1.1.
-func schemaTags(name string) []*Tag {
-	switch name {
-	case "core":
-		return coreSchema
-	case "yaml-1.1":
-		return yaml11Schema
-	}
-	panic("compose: unknown schema " + name)
 }
 
 // getTags is upstream's for no customTags: a fresh copy of the schema's list, with the merge tag
@@ -144,17 +128,21 @@ var seqTag = &Tag{
 var stringTag = &Tag{
 	Default: defaultTrue,
 	Tag:     stringTagName,
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return unitsToString(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarString(unitsToString(value)), nil
 	},
 }
+
+// Upstream's `schema[MAP]`, `schema[SCALAR]` and `schema[SEQ]` are the common map, string and seq tags,
+// whatever the schema.
+func (schema *Schema) scalarTag() *Tag { return stringTag }
 
 var nullTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:null",
 	Test:    regexp.MustCompile(`^(?:~|[Nn]ull|NULL)?$`),
-	resolveScalar: func([]uint16, func(string), *Options) (any, error) {
-		return newScalar(nil), nil
+	resolveScalar: func([]uint16, func(string), *Options) (*Node, ScalarValue, error) {
+		return newScalar(nil), nil, nil
 	},
 }
 
@@ -164,9 +152,9 @@ var boolTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:bool",
 	Test:    regexp.MustCompile(`^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
 		first := characterAt(value, 0)
-		return newScalar(first == 't' || first == 'T'), nil
+		return newScalar(ScalarBoolean(first == 't' || first == 'T')), nil, nil
 	},
 }
 
@@ -181,8 +169,8 @@ var coreIntOctTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "OCT",
 	Test:    regexp.MustCompile(`^0o[0-7]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return coreIntResolve(value, 2, 8), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(coreIntResolve(value, 2, 8)), nil
 	},
 }
 
@@ -190,8 +178,8 @@ var coreIntTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:int",
 	Test:    regexp.MustCompile(`^[-+]?[0-9]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return coreIntResolve(value, 0, 10), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(coreIntResolve(value, 0, 10)), nil
 	},
 }
 
@@ -200,21 +188,21 @@ var coreIntHexTag = &Tag{
 	Tag:     "tag:yaml.org,2002:int",
 	Format:  "HEX",
 	Test:    regexp.MustCompile(`^0x[0-9a-fA-F]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return coreIntResolve(value, 2, 16), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(coreIntResolve(value, 2, 16)), nil
 	},
 }
 
 // floatNaNResolve is floatNaN's resolve, the same in both schemas.
-func floatNaNResolve(value []uint16, _ func(string), _ *Options) (any, error) {
+func floatNaNResolve(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
 	last := slice(value, -3, len(value))
 	if len(last) == 3 && toLowerAscii(last) == "nan" {
-		return nan(), nil
+		return nil, ScalarNumber(nan()), nil
 	}
 	if characterAt(value, 0) == '-' {
-		return negativeInfinity(), nil
+		return nil, ScalarNumber(negativeInfinity()), nil
 	}
-	return positiveInfinity(), nil
+	return nil, ScalarNumber(positiveInfinity()), nil
 }
 
 // toLowerAscii is `text.toLowerCase()` for text whose comparison is against an ASCII literal: any
@@ -241,8 +229,8 @@ var coreFloatExpTag = &Tag{
 	Tag:     "tag:yaml.org,2002:float",
 	Format:  "EXP",
 	Test:    regexp.MustCompile(`^[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)[eE][-+]?[0-9]+$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		return parseFloat(value), nil
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		return nil, ScalarNumber(parseFloat(value)), nil
 	},
 }
 
@@ -250,13 +238,13 @@ var coreFloatTag = &Tag{
 	Default: defaultTrue,
 	Tag:     "tag:yaml.org,2002:float",
 	Test:    regexp.MustCompile(`^[-+]?(?:\.[0-9]+|[0-9]+\.[0-9]*)$`),
-	resolveScalar: func(value []uint16, _ func(string), _ *Options) (any, error) {
-		node := newScalar(parseFloat(value))
+	resolveScalar: func(value []uint16, _ func(string), _ *Options) (*Node, ScalarValue, error) {
+		node := newScalar(ScalarNumber(parseFloat(value)))
 		dot := indexOfUnit(value, '.')
 		if dot != -1 && characterAt(value, len(value)-1) == '0' {
 			node.MinFractionDigits = len(value) - dot - 1
 		}
-		return node, nil
+		return node, nil, nil
 	},
 }
 
@@ -281,4 +269,18 @@ var coreSchema = []*Tag{
 	coreFloatNaNTag,
 	coreFloatExpTag,
 	coreFloatTag,
+}
+
+// schemaTags is tags.js's schemas map, for the two schemas a Document picks: core for YAML 1.2 and
+// yaml-1.1 for YAML 1.1.
+func schemaTags(name string) []*Tag {
+	switch name {
+	case "core":
+		return coreSchema
+	case "yaml-1.1":
+		return yaml11Schema
+	}
+	// Invariant: setSchema names only "core" or "yaml-1.1", and newSchema reads an unnamed schema as
+	// "core", so getTags never asks for another.
+	panic("compose: unknown schema " + name)
 }

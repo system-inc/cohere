@@ -38,7 +38,7 @@ func printUnionType(path *Path, options *Options, print PrintFunc, arguments *pr
 		} else {
 			bar = concatIn(path, line, doc.Text("| "))
 		}
-		typeDoc := print(nil, nil)
+		typeDoc := print("", nil)
 		if hasComment(node(path), commentLeading, nil) {
 			return concatIn(path, bar, align(2, printing.PrintComments(path, typeDoc, options, nil)))
 		}
@@ -97,7 +97,7 @@ func shouldIndentUnionType(path *Path) bool {
 func printIntersectionType(path *Path, options *Options, print PrintFunc) Doc {
 	wasIndented := false
 	return groupIn(path, doc.Concat(mapPath(path, func(path *Path, index int) Doc {
-		printed := print(nil, nil)
+		printed := print("", nil)
 		if path.IsFirst() {
 			return printed
 		}

@@ -12,7 +12,7 @@ import (
 // commentContext is upstream's CommentContext: the comment, its preceding, enclosing and following
 // nodes, the text, the options, the ast, whether it is the last comment, and its placement
 // ("ownLine" | "endOfLine" | "remaining"). An absent node is nil.
-type commentContext = printing.CommentContext[*estree.Node]
+type commentContext = printing.CommentContext[*estree.Node, *settings, printArguments]
 
 // commentHandler is one of upstream's handlers. Upstream's handlers that fall off the end return
 // undefined, which `.some` reads as false; here they return false.

@@ -122,6 +122,6 @@ func expressionNeedsAsiProtection(path *Path, options *Options) bool {
 	if !hasNakedLeftSide(current) {
 		return false
 	}
-	return call(path, func(path *Path) bool { return expressionNeedsAsiProtection(path, options) },
-		getLeftSidePathName(current)...)
+	return callSelector(path, func(path *Path) bool { return expressionNeedsAsiProtection(path, options) },
+		getLeftSidePathName(current))
 }

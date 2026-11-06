@@ -48,7 +48,7 @@ func inferParserForLanguage(languageName string) string {
 	return ""
 }
 
-type embedPrint = func(printing.TextToDoc, printing.PrintFunc, *astPath, *options) (doc.Doc, error)
+type embedPrint = func(printing.TextToDoc, printFunc, *astPath, *options) (doc.Doc, error)
 
 func embed(path *astPath, _ *options) embedPrint {
 	node := currentNode(path)
@@ -80,7 +80,7 @@ func embed(path *astPath, _ *options) embedPrint {
 		return nil
 	}
 
-	return func(textToDoc printing.TextToDoc, _ printing.PrintFunc, _ *astPath, _ *options) (doc.Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ printFunc, _ *astPath, _ *options) (doc.Doc, error) {
 		// Upstream overrides the filepath for ts, typescript and tsx, so the trailing comma of type
 		// parameters follows the right extension. TextToDoc here takes a parser; the native side maps
 		// these languages to the matching file name.
@@ -124,7 +124,7 @@ func embedFrontMatter(node *Node) embedPrint {
 		return nil
 	}
 
-	return func(textToDoc printing.TextToDoc, _ printing.PrintFunc, _ *astPath, _ *options) (doc.Doc, error) {
+	return func(textToDoc printing.TextToDoc, _ printFunc, _ *astPath, _ *options) (doc.Doc, error) {
 		value := strings.Trim(frontMatter.Value, javaScriptSpaceText)
 
 		var embedded doc.Doc = doc.Text("")
@@ -166,8 +166,9 @@ func embedFrontMatter(node *Node) embedPrint {
 // block's inferred parser (or a ts/tsx file name, as embed passes it) and yaml or toml front matter with
 // content, in document order. A report uses it to attribute a difference to a missing printer by name.
 func EmbeddedParsers(text string) []string {
-	text = strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
-	ast, parseMarkdownError := mdast.ParseMarkdown(text, nil)
+	normalizedText := strings.ReplaceAll(
+		strings.ReplaceAll(strings.TrimPrefix(text, "\ufeff"), "\r\n", "\n"), "\r", "\n")
+	ast, parseMarkdownError := mdast.ParseMarkdown(normalizedText, nil)
 	if parseMarkdownError != nil {
 		return nil
 	}

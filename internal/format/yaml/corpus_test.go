@@ -123,7 +123,10 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 		root := strings.TrimSpace(pending[0])
 		pending = pending[1:]
 		if strings.HasPrefix(root, "~/") {
-			home, _ := os.UserHomeDir()
+			home, homeError := os.UserHomeDir()
+			if homeError != nil {
+				test.Fatalf("finding the home directory for %s: %v", root, homeError)
+			}
 			root = filepath.Join(home, root[2:])
 		}
 		if root == "" || seen[root] {
@@ -231,7 +234,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		// The YAML files.
 		candidate := yamlCandidate{options: options, texts: map[string]string{}, trees: map[string]parsed{}}
 		fullStack := yamlCandidate{options: options, fullStack: true}
-		var texts, yamlFiles []string
+		var texts []string
+		var yamlFiles []string
 		for _, path := range corpus.yamlFiles {
 			source, readError := os.ReadFile(path)
 			if readError != nil {
@@ -281,7 +285,8 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			values:       map[string]string{},
 			trees:        map[string]parsed{},
 		}
-		var frontMatterFiles, values []string
+		var frontMatterFiles []string
+		var values []string
 		for _, path := range corpus.markdownFiles {
 			source, readError := os.ReadFile(path)
 			if readError != nil {
