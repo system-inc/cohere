@@ -23,7 +23,8 @@ func containsSameValueZero(values []any, value any) bool {
 	for _, each := range values {
 		switch typed := value.(type) {
 		case float64:
-			if e, isNumber := each.(float64); isNumber && (e == typed || math.IsNaN(e) && math.IsNaN(typed)) {
+			if eachNumber, isNumber := each.(float64); isNumber &&
+				(eachNumber == typed || math.IsNaN(eachNumber) && math.IsNaN(typed)) {
 				return true
 			}
 		case Date, Binary:
@@ -74,27 +75,27 @@ func numberToString(value float64) string {
 		sign = "-"
 		value = -value
 	}
-	// d.dddde±x: the digits without the dot, and n, the decimal point's position after the first.
+	// d.dddde±x: the digits without the dot, and pointPosition, the decimal point's position after the first.
 	formatted := strconv.FormatFloat(value, 'e', -1, 64)
 	mantissa, exponentText, _ := strings.Cut(formatted, "e")
 	digits := strings.Replace(mantissa, ".", "", 1)
 	exponent, _ := strconv.Atoi(exponentText)
-	n := exponent + 1
-	k := len(digits)
+	pointPosition := exponent + 1
+	digitCount := len(digits)
 	switch {
-	case k <= n && n <= 21:
-		return sign + digits + strings.Repeat("0", n-k)
-	case 0 < n && n <= 21:
-		return sign + digits[:n] + "." + digits[n:]
-	case -6 < n && n <= 0:
-		return sign + "0." + strings.Repeat("0", -n) + digits
+	case digitCount <= pointPosition && pointPosition <= 21:
+		return sign + digits + strings.Repeat("0", pointPosition-digitCount)
+	case 0 < pointPosition && pointPosition <= 21:
+		return sign + digits[:pointPosition] + "." + digits[pointPosition:]
+	case -6 < pointPosition && pointPosition <= 0:
+		return sign + "0." + strings.Repeat("0", -pointPosition) + digits
 	}
 	exponentSign := "+"
-	if n-1 < 0 {
+	if pointPosition-1 < 0 {
 		exponentSign = "-"
 	}
-	exponentDigits := strconv.Itoa(int(math.Abs(float64(n - 1))))
-	if k == 1 {
+	exponentDigits := strconv.Itoa(int(math.Abs(float64(pointPosition - 1))))
+	if digitCount == 1 {
 		return sign + digits + "e" + exponentSign + exponentDigits
 	}
 	return sign + digits[:1] + "." + digits[1:] + "e" + exponentSign + exponentDigits

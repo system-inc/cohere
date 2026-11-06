@@ -637,12 +637,12 @@ func refsFunctionEqual(left, right *refsFunctionType) bool {
 // reaches the same value), and two different guards also collapse. Everything that survives to the
 // bottom is a ref-carrying element, where a mismatch mints a fresh ref id. That mint is exactly the
 // thing `refsTypeEqual` must not look at.
-func refsJoin(a, b *refsAccessType, nextRefId func() int) *refsAccessType {
-	left := a
+func refsJoin(leftElement, rightElement *refsAccessType, nextRefId func() int) *refsAccessType {
+	left := leftElement
 	if left == nil {
 		left = &refsAccessType{Kind: refsNone}
 	}
-	right := b
+	right := rightElement
 	if right == nil {
 		right = &refsAccessType{Kind: refsNone}
 	}

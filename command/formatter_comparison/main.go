@@ -35,15 +35,15 @@ func main() {
 	}
 
 	var files []string
-	var err error
+	var listError error
 	if *fileList != "" {
-		files, err = readList(*root, *fileList, *limit)
+		files, listError = readList(*root, *fileList, *limit)
 	} else {
-		files, err = collect(*root, *limit)
+		files, listError = collect(*root, *limit)
 	}
-	if err != nil {
+	if listError != nil {
 		// Ignored: the exit code below says the run failed even when standard error cannot.
-		fmt.Fprintf(os.Stderr, "formatdiff: %v\n", err)
+		fmt.Fprintf(os.Stderr, "formatdiff: %v\n", listError)
 		os.Exit(1)
 	}
 	if len(files) == 0 {

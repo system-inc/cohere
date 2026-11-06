@@ -193,8 +193,8 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 		}
 	}
 	select {
-	case err := <-writerError:
-		test.Fatalf("writing: %v", err)
+	case writeError := <-writerError:
+		test.Fatalf("writing: %v", writeError)
 	default:
 	}
 	if reads < writes/2 {

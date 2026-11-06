@@ -445,7 +445,7 @@ func lineColumnToIndex(lineColumn map[string]any, text string) int {
 	line, _ := numberIn(lineColumn, "line")
 	column, _ := numberIn(lineColumn, "column")
 	index := 0
-	for i := 0; i < line-1; i++ {
+	for skipped := 0; skipped < line-1; skipped++ {
 		index = indexFrom(text, "\n", index) + 1
 	}
 	for column > 0 && index < len(text) {

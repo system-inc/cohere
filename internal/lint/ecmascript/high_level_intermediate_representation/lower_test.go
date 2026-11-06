@@ -256,10 +256,10 @@ func TestLowerTryFinallyWithoutCatch(test *testing.T) {
 }
 
 // TestLowerLoop covers the second named shape.
-func TestLowerLoop(t *testing.T) {
-	t.Parallel()
+func TestLowerLoop(test *testing.T) {
+	test.Parallel()
 
-	function := lowerSource(t, `
+	function := lowerSource(test, `
 		function f(items: number[]) {
 			let total = 0;
 			for (let index = 0; index < items.length; index++) {
@@ -271,8 +271,8 @@ func TestLowerLoop(t *testing.T) {
 			return total;
 		}
 	`)
-	checkInvariants(t, function)
-	requireInstruction(t, function, "For init=")
+	checkInvariants(test, function)
+	requireInstruction(test, function, "For init=")
 
 	// A loop must have a back edge: the block holding the test is reachable from inside the body.
 	// Without one, every downstream analysis treats the loop as straight-line code.
@@ -283,17 +283,17 @@ func TestLowerLoop(t *testing.T) {
 			continue
 		}
 		found = true
-		test, ok := function.Block(forStatement.Test)
+		testBlock, ok := function.Block(forStatement.Test)
 		if !ok {
-			t.Fatal("the for test block does not exist")
+			test.Fatal("the for test block does not exist")
 		}
-		if len(test.Predecessors) < 2 {
-			t.Errorf("the for test has %d predecessors, want at least 2 (the init and the back edge)",
-				len(test.Predecessors))
+		if len(testBlock.Predecessors) < 2 {
+			test.Errorf("the for test has %d predecessors, want at least 2 (the init and the back edge)",
+				len(testBlock.Predecessors))
 		}
 	}
 	if !found {
-		t.Error("no For terminal was produced")
+		test.Error("no For terminal was produced")
 	}
 }
 

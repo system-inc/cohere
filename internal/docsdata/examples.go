@@ -167,17 +167,17 @@ func shortest(candidates []capture.Record) *Example {
 		return nil
 	}
 	sort.Slice(candidates, func(left, right int) bool {
-		a, b := candidates[left], candidates[right]
-		if (a.OtherFiles > 0) != (b.OtherFiles > 0) {
-			return a.OtherFiles == 0
+		leftCandidate, rightCandidate := candidates[left], candidates[right]
+		if (leftCandidate.OtherFiles > 0) != (rightCandidate.OtherFiles > 0) {
+			return leftCandidate.OtherFiles == 0
 		}
-		if len(a.Source) != len(b.Source) {
-			return len(a.Source) < len(b.Source)
+		if len(leftCandidate.Source) != len(rightCandidate.Source) {
+			return len(leftCandidate.Source) < len(rightCandidate.Source)
 		}
-		if a.Source != b.Source {
-			return a.Source < b.Source
+		if leftCandidate.Source != rightCandidate.Source {
+			return leftCandidate.Source < rightCandidate.Source
 		}
-		return a.File < b.File
+		return leftCandidate.File < rightCandidate.File
 	})
 	best := candidates[0]
 	return &Example{

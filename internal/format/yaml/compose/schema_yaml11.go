@@ -123,9 +123,9 @@ var yaml11FloatTag = &Tag{
 		node := newScalar(parseFloat(removeUnderscores(value)))
 		dot := indexOfUnit(value, '.')
 		if dot != -1 {
-			f := removeUnderscores(substring(value, dot+1, len(value)))
-			if characterAt(f, len(f)-1) == '0' {
-				node.MinFractionDigits = len(f)
+			fraction := removeUnderscores(substring(value, dot+1, len(value)))
+			if characterAt(fraction, len(fraction)-1) == '0' {
+				node.MinFractionDigits = len(fraction)
 			}
 		}
 		return node, nil
@@ -175,10 +175,10 @@ func nodeBase64Decode(text []uint16) Binary {
 
 	// nbytes Base64DecodeFast.
 	available := min(destinationLength, decodedSize)
-	maxK := available / 3 * 3
-	maxI := len(text) / 4 * 4
+	destinationLimit := available / 3 * 3
+	textLimit := len(text) / 4 * 4
 	index := 0
-	for index < maxI && len(destination) < maxK {
+	for index < textLimit && len(destination) < destinationLimit {
 		quad := [4]byte{
 			unbase64(text[index]),
 			unbase64(text[index+1]),
@@ -191,7 +191,7 @@ func nodeBase64Decode(text []uint16) Binary {
 			if !proceed {
 				return Binary(destination)
 			}
-			maxI = index + (len(text)-index)/4*4
+			textLimit = index + (len(text)-index)/4*4
 		} else {
 			destination = append(destination,
 				quad[0]<<2|quad[1]>>4, quad[1]<<4|quad[2]>>2, quad[2]<<6|quad[3])
@@ -475,11 +475,11 @@ func timestampResolve(value []uint16) (any, error) {
 	date := dateUtc(year, month-1, day, hour, minute, second, millisec)
 	tz := match[8]
 	if tz != "" && tz != "Z" {
-		d := parseSexagesimal(asciiUnits(tz))
-		if math.Abs(d) < 30 {
-			d *= 60
+		offset := parseSexagesimal(asciiUnits(tz))
+		if math.Abs(offset) < 30 {
+			offset *= 60
 		}
-		date -= 60000 * d
+		date -= 60000 * offset
 	}
 	return Date(timeClip(date)), nil
 }
@@ -505,13 +505,13 @@ func dateUtc(year, month, day, hour, minute, second, millisecond float64) float6
 		year = 1900 + yearInteger
 	}
 	// MakeDay.
-	y, m, dt := math.Trunc(year), math.Trunc(month), math.Trunc(day)
-	ym := y + math.Floor(m/12)
-	mn := math.Mod(m, 12)
-	if mn < 0 {
-		mn += 12
+	wholeYear, wholeMonth, wholeDay := math.Trunc(year), math.Trunc(month), math.Trunc(day)
+	yearAfterMonths := wholeYear + math.Floor(wholeMonth/12)
+	monthInYear := math.Mod(wholeMonth, 12)
+	if monthInYear < 0 {
+		monthInYear += 12
 	}
-	days := daysFromCivil(int64(ym), int64(mn)+1, 1) + dt - 1
+	days := daysFromCivil(int64(yearAfterMonths), int64(monthInYear)+1, 1) + wholeDay - 1
 	// MakeTime.
 	time := math.Trunc(hour)*3600000 + math.Trunc(minute)*60000 + math.Trunc(second)*1000 + math.Trunc(millisecond)
 	return timeClip(days*86400000 + time)

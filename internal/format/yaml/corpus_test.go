@@ -65,18 +65,18 @@ func (candidate frontMatterCandidate) Handles(fileName string) bool {
 func (candidate frontMatterCandidate) Format(fileName string, _ string) (string, error) {
 	frontMatter := candidate.frontMatters[fileName]
 	var embedded doc.Doc
-	var err error
+	var formatError error
 	if candidate.fullStack {
-		embedded, err = FormatDoc(candidate.values[fileName], candidate.options, nil)
+		embedded, formatError = FormatDoc(candidate.values[fileName], candidate.options, nil)
 	} else {
 		tree := candidate.trees[fileName]
 		if tree.err != "" {
 			return "", fmt.Errorf("the parser failed: %s", tree.err)
 		}
-		embedded, err = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
+		embedded, formatError = PrintDoc(tree.root, candidate.values[fileName], candidate.options, nil)
 	}
-	if err != nil {
-		return "", err
+	if formatError != nil {
+		return "", formatError
 	}
 	explicitLanguage := ""
 	if frontMatter.ExplicitLanguage != nil {

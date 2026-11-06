@@ -276,7 +276,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 		}
 		return nodes, nil
 	}
-	var err error
+	var keywordError error
 	switch key {
 	case "type":
 		switch typed := value.(type) {
@@ -315,11 +315,11 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 		}
 		compiled.properties = make(map[string]*node, len(entries))
 		for name, entry := range entries {
-			if compiled.properties[name], err = compiler.compile(
+			if compiled.properties[name], keywordError = compiler.compile(
 				entry,
 				pointer+"/properties/"+escapePointer(name),
-			); err != nil {
-				return err
+			); keywordError != nil {
+				return keywordError
 			}
 		}
 	case "patternProperties":
@@ -354,7 +354,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 			compiled.noAdditional = !bool(allowed)
 			return nil
 		}
-		compiled.additionalProperties, err = child(key, value)
+		compiled.additionalProperties, keywordError = child(key, value)
 	case "required":
 		list, isList := value.(JsonArray)
 		if !isList {
@@ -373,21 +373,21 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 			compiled.tupleItems, childrenError = children(key, value)
 			return childrenError
 		}
-		compiled.items, err = child(key, value)
+		compiled.items, keywordError = child(key, value)
 	case "additionalItems":
 		if allowed, isBool := value.(JsonBoolean); isBool {
 			compiled.noAdditionalItems = !bool(allowed)
 			return nil
 		}
-		compiled.additionalItems, err = child(key, value)
+		compiled.additionalItems, keywordError = child(key, value)
 	case "minItems":
-		compiled.minItems, err = count(value)
+		compiled.minItems, keywordError = count(value)
 	case "maxItems":
-		compiled.maxItems, err = count(value)
+		compiled.maxItems, keywordError = count(value)
 	case "minLength":
-		compiled.minLength, err = count(value)
+		compiled.minLength, keywordError = count(value)
 	case "maxLength":
-		compiled.maxLength, err = count(value)
+		compiled.maxLength, keywordError = count(value)
 	case "uniqueItems":
 		unique, isBool := value.(JsonBoolean)
 		if !isBool {
@@ -395,25 +395,25 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 		}
 		compiled.uniqueItems = bool(unique)
 	case "minimum":
-		compiled.minimum, err = number(value)
+		compiled.minimum, keywordError = number(value)
 	case "maximum":
-		compiled.maximum, err = number(value)
+		compiled.maximum, keywordError = number(value)
 	case "pattern":
 		source, isString := value.(JsonString)
 		if !isString {
 			return fmt.Errorf("pattern must be a string")
 		}
 		// ajv 6 compiles a pattern as `new RegExp(pattern)`, with no flags.
-		compiled.pattern, err = esregexp.Compile(string(source), "")
+		compiled.pattern, keywordError = esregexp.Compile(string(source), "")
 		compiled.patternSource = string(source)
 	case "anyOf":
-		compiled.anyOf, err = children(key, value)
+		compiled.anyOf, keywordError = children(key, value)
 	case "oneOf":
-		compiled.oneOf, err = children(key, value)
+		compiled.oneOf, keywordError = children(key, value)
 	case "allOf":
-		compiled.allOf, err = children(key, value)
+		compiled.allOf, keywordError = children(key, value)
 	case "not":
-		compiled.not, err = child(key, value)
+		compiled.not, keywordError = child(key, value)
 	case "$ref":
 		reference, isString := value.(JsonString)
 		if !isString {
@@ -426,7 +426,7 @@ func (compiler *compiler) keyword(compiled *node, key string, value JsonValue, p
 			return fmt.Errorf("keyword %q is outside the subset this package implements", key)
 		}
 	}
-	return err
+	return keywordError
 }
 
 // resolveReferences checks that every $ref lands on a schema in the same document. A $ref is followed at

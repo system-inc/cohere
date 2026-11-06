@@ -181,15 +181,15 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 			previous = tokens.buffer[len(tokens.buffer)-1].value
 			tokens.buffer = tokens.buffer[:len(tokens.buffer)-1]
 		}
-		n := tokens.charCodeAt(position + 1)
+		nextCode := tokens.charCodeAt(position + 1)
 		if previous == "url" &&
-			n != singleQuote &&
-			n != doubleQuote &&
-			n != space &&
-			n != newline &&
-			n != tab &&
-			n != feed &&
-			n != carriageReturn {
+			nextCode != singleQuote &&
+			nextCode != doubleQuote &&
+			nextCode != space &&
+			nextCode != newline &&
+			nextCode != tab &&
+			nextCode != feed &&
+			nextCode != carriageReturn {
 			next = position
 			for {
 				escaped := false

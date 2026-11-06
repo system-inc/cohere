@@ -298,17 +298,17 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 	finished := make(chan error, 1)
 	go func() { finished <- second.Wait() }()
 	select {
-	case err := <-finished:
-		test.Fatalf("the second run finished while the table's lock was held (%v):\n%s", err, output.String())
+	case waitError := <-finished:
+		test.Fatalf("the second run finished while the table's lock was held (%v):\n%s", waitError, output.String())
 	case <-time.After(1500 * time.Millisecond):
 	}
 	if unlockError := syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); unlockError != nil {
 		test.Fatalf("releasing the table's lock: %v", unlockError)
 	}
 	select {
-	case err := <-finished:
-		if err != nil {
-			test.Fatalf("the second run failed: %v\n%s", err, output.String())
+	case waitError := <-finished:
+		if waitError != nil {
+			test.Fatalf("the second run failed: %v\n%s", waitError, output.String())
 		}
 	case <-time.After(30 * time.Second):
 		test.Fatal("the second run did not finish after the lock was released")

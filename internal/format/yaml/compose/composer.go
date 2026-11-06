@@ -15,18 +15,18 @@ type onErrorFunc func(source any, code string, message string, warning bool)
 // getErrorPosition is upstream's: an offset is one character, a token is its source (or one character for a
 // token without one).
 func getErrorPosition(source any) [2]int {
-	switch src := source.(type) {
+	switch typed := source.(type) {
 	case int:
-		return [2]int{src, src + 1}
+		return [2]int{typed, typed + 1}
 	case [2]int:
-		return src
+		return typed
 	case []int:
-		return [2]int{src[0], src[1]}
+		return [2]int{typed[0], typed[1]}
 	case *cst.Token:
-		if src.HasSource() {
-			return [2]int{src.Offset, src.Offset + len(src.Source)}
+		if typed.HasSource() {
+			return [2]int{typed.Offset, typed.Offset + len(typed.Source)}
 		}
-		return [2]int{src.Offset, src.Offset + 1}
+		return [2]int{typed.Offset, typed.Offset + 1}
 	}
 	panic("compose: no error position for this source")
 }

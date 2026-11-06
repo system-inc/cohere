@@ -230,11 +230,11 @@ func TestDestructureEffectsNameEveryBinding(test *testing.T) {
 // defaults on, while a first-line `:false` pragma disables it. The distinction matters because a
 // later unknown call is allowed to conditionally mutate an ordinary value but not a value whose
 // identity a live manual memo has frozen.
-func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
-	t.Parallel()
+func TestManualMemoMarkersFreezeTheirOperands(test *testing.T) {
+	test.Parallel()
 
-	test := func(source string, wantFreeze bool) {
-		function, _ := effectsFor(t, source)
+	checkFreezes := func(source string, wantFreeze bool) {
+		function, _ := effectsFor(test, source)
 		value := function.Parameters[0]
 		finish := &Instruction{
 			LValue: Place{Identifier: function.NewIdentifier("", nil, 0).Id},
@@ -262,12 +262,12 @@ func TestManualMemoMarkersFreezeTheirOperands(t *testing.T) {
 			wantCount = 2
 		}
 		if freezeCount != wantCount {
-			t.Fatalf("manual memo Freeze effects = %d, want %d", freezeCount, wantCount)
+			test.Fatalf("manual memo Freeze effects = %d, want %d", freezeCount, wantCount)
 		}
 	}
 
-	test(`function f(value: object) { return value; }`, true)
-	test(`// @enablePreserveExistingMemoizationGuarantees:false
+	checkFreezes(`function f(value: object) { return value; }`, true)
+	checkFreezes(`// @enablePreserveExistingMemoizationGuarantees:false
 function f(value: object) { return value; }`, false)
 }
 

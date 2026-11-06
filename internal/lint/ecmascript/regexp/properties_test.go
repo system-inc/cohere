@@ -160,8 +160,8 @@ func TestUnicodePropertiesNode(test *testing.T) {
 			if !answer.Accepted {
 				test.Fatal("table admits a property Node rejects")
 			}
-			n, why := compareProperty(answer.Name, probes[index].Points, answer.Bits)
-			checks += n
+			checked, why := compareProperty(answer.Name, probes[index].Points, answer.Bits)
+			checks += checked
 			if why != "" {
 				test.Fatal(why)
 			}

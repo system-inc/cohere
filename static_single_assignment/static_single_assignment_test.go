@@ -229,54 +229,58 @@ func TestDiamondPlacesOnePhiAtTheJoin(test *testing.T) {
 
 // TestLoopPhiTakesTheBackEdge: i is written before a loop and in its body, so the header merges the
 // entry's value with the back edge's, an incomplete phi filled when the body is sealed.
-func TestLoopPhiTakesTheBackEdge(t *testing.T) {
-	t.Parallel()
+func TestLoopPhiTakesTheBackEdge(test *testing.T) {
+	test.Parallel()
 	function := newTestFunction()
 	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
 	function.entry = entry.id
 	function.define(entry, "i")
-	test := function.use(header, "i")
+	headerRead := function.use(header, "i")
 	function.define(body, "i")
 	after := function.use(exit, "i")
 	goTo(entry, header)
 	goTo(header, body, exit)
 	goTo(body, header)
 
-	construct(t, function)
+	construct(test, function)
 
 	if len(header.phis) != 1 {
-		t.Fatalf("header has %d phis, want 1", len(header.phis))
+		test.Fatalf("header has %d phis, want 1", len(header.phis))
 	}
 	phi := header.phis[0]
 	if got := phi.Operands.At(body.id).id; got != body.instructions[0].defines[0].id {
-		t.Errorf("the back edge's operand is $%d, want the body's write $%d", got, body.instructions[0].defines[0].id)
+		test.Errorf(
+			"the back edge's operand is $%d, want the body's write $%d",
+			got,
+			body.instructions[0].defines[0].id,
+		)
 	}
-	if test.uses[0].id != phi.Place.id || after.uses[0].id != phi.Place.id {
-		t.Errorf("reads in and after the loop don't name the header's phi")
+	if headerRead.uses[0].id != phi.Place.id || after.uses[0].id != phi.Place.id {
+		test.Errorf("reads in and after the loop don't name the header's phi")
 	}
 }
 
 // TestLoopThatNeverWritesLeavesNoPhi: the header's incomplete phi takes the entry's value and its own
 // result, which is redundant, and elimination removes it and rewrites its reads.
-func TestLoopThatNeverWritesLeavesNoPhi(t *testing.T) {
-	t.Parallel()
+func TestLoopThatNeverWritesLeavesNoPhi(test *testing.T) {
+	test.Parallel()
 	function := newTestFunction()
 	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
 	function.entry = entry.id
 	function.define(entry, "i")
-	test := function.use(header, "i")
+	headerRead := function.use(header, "i")
 	function.use(body, "i")
 	goTo(entry, header)
 	goTo(header, body, exit)
 	goTo(body, header)
 
-	construct(t, function)
+	construct(test, function)
 
 	if len(header.phis) != 0 {
-		t.Fatalf("header kept %d phis, want none", len(header.phis))
+		test.Fatalf("header kept %d phis, want none", len(header.phis))
 	}
-	if want := entry.instructions[0].defines[0].id; test.uses[0].id != want {
-		t.Errorf("the loop's read names $%d, want the entry's write $%d", test.uses[0].id, want)
+	if want := entry.instructions[0].defines[0].id; headerRead.uses[0].id != want {
+		test.Errorf("the loop's read names $%d, want the entry's write $%d", headerRead.uses[0].id, want)
 	}
 }
 
@@ -452,33 +456,34 @@ func TestDominanceIsTheEntrysAndTheJoins(test *testing.T) {
 	}
 }
 
-// TestDominanceFollowsRealEdgesPastAFallthrough: a structural fallthrough reaches d before the back edge
-// does, so reverse postorder puts d ahead of every real predecessor it has. Every path to d runs a, b
-// and c, so all three dominate it. Over the block slice, dominance said only the entry and a did
-// (#6v4a54x, Adamic's generated-631).
+// TestDominanceFollowsRealEdgesPastAFallthrough: a structural fallthrough reaches blockD before the back
+// edge does, so reverse postorder puts blockD ahead of every real predecessor it has. Every path to blockD
+// runs blockA, blockB and blockC, so all three dominate it. Over the block slice, dominance said only the
+// entry and blockA did (#6v4a54x, Adamic's generated-631).
 func TestDominanceFollowsRealEdgesPastAFallthrough(test *testing.T) {
 	test.Parallel()
 	function := newTestFunction()
-	entry, a, b, c, d := function.block(), function.block(), function.block(), function.block(), function.block()
+	entry, blockA, blockB := function.block(), function.block(), function.block()
+	blockC, blockD := function.block(), function.block()
 	function.entry = entry.id
-	goTo(entry, a)
-	a.edges = []testEdge{{to: d.id, kind: ssa.Fallthrough}, {to: b.id, kind: ssa.Real}}
-	goTo(b, a, c)
-	goTo(c, d)
-	goTo(d, d, b)
+	goTo(entry, blockA)
+	blockA.edges = []testEdge{{to: blockD.id, kind: ssa.Fallthrough}, {to: blockB.id, kind: ssa.Real}}
+	goTo(blockB, blockA, blockC)
+	goTo(blockC, blockD)
+	goTo(blockD, blockD, blockB)
 	finalize(function)
 
 	var order []ssa.BlockId
 	for _, block := range function.blocks {
 		order = append(order, block.id)
 	}
-	if !slices.Equal(order, []ssa.BlockId{entry.id, a.id, d.id, b.id, c.id}) {
-		test.Fatalf("the block order is %v; the test needs d ahead of its real predecessors", order)
+	if !slices.Equal(order, []ssa.BlockId{entry.id, blockA.id, blockD.id, blockB.id, blockC.id}) {
+		test.Fatalf("the block order is %v; the test needs blockD ahead of its real predecessors", order)
 	}
 	dominance := ssa.ComputeDominance(testGraph{}, function)
-	for _, dominator := range []*testBlock{entry, a, b, c, d} {
-		if !dominance.Dominates(dominator.id, d.id) {
-			test.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, d.id)
+	for _, dominator := range []*testBlock{entry, blockA, blockB, blockC, blockD} {
+		if !dominance.Dominates(dominator.id, blockD.id) {
+			test.Errorf("bb%d doesn't dominate bb%d, which every path reaches through it", dominator.id, blockD.id)
 		}
 	}
 }
@@ -653,18 +658,18 @@ func describeTestGraph(function *testFunction) string {
 }
 
 // TestAnEntryWithPredecessorsIsReportedAndRefused: an edge into the entry breaks Graph.Entry's rule.
-// VerifyStaticSingleAssignment says so, and Construct refuses with a panic that names the block. Without the refusal,
-// the read of x in c, which nothing defines, looks back through b, a and the entry, each with one sealed
-// predecessor, and around again until the stack runs out.
+// VerifyStaticSingleAssignment says so, and Construct refuses with a panic that names the block. Without the
+// refusal, the read of x in blockC, which nothing defines, looks back through blockB, blockA and the entry, each
+// with one sealed predecessor, and around again until the stack runs out.
 func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	test.Parallel()
 	function := newTestFunction()
-	entry, a, b, c := function.block(), function.block(), function.block(), function.block()
+	entry, blockA, blockB, blockC := function.block(), function.block(), function.block(), function.block()
 	function.entry = entry.id
-	function.use(c, "x")
-	goTo(entry, a)
-	goTo(a, b)
-	goTo(b, entry, c)
+	function.use(blockC, "x")
+	goTo(entry, blockA)
+	goTo(blockA, blockB)
+	goTo(blockB, entry, blockC)
 	finalize(function)
 
 	violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
@@ -684,7 +689,7 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	if want := fmt.Sprintf(
 		"the entry block bb%d has predecessors [%d]",
 		entry.id,
-		b.id,
+		blockB.id,
 	); !strings.Contains(refusal, want) {
 		test.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
 	}

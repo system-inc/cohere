@@ -304,9 +304,9 @@ func unionKeys[Value any](left map[string]Value, right map[string]Value) map[str
 }
 
 func firstError(errors ...error) error {
-	for _, err := range errors {
-		if err != nil {
-			return err
+	for _, candidate := range errors {
+		if candidate != nil {
+			return candidate
 		}
 	}
 	return nil

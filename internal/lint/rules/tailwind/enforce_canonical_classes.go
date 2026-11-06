@@ -333,9 +333,9 @@ func mergeOnce(
 		parsed = append(parsed, parts)
 	}
 
-	for i := 0; i < len(parsed); i++ {
-		for j := i + 1; j < len(parsed); j++ {
-			left, right := parsed[i], parsed[j]
+	for leftIndex := 0; leftIndex < len(parsed); leftIndex++ {
+		for rightIndex := leftIndex + 1; rightIndex < len(parsed); rightIndex++ {
+			left, right := parsed[leftIndex], parsed[rightIndex]
 
 			// Everything except the root must already agree. This is the precondition the whole
 			// rule rests on, and relaxing it reports `px-4 py-2` and `px-4 sm:py-4`, both correct.

@@ -85,15 +85,15 @@ func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 	for _, key := range keys {
 		test.Logf("  dropped %3d findings: %s", dropped[key], key)
 	}
-	for _, k := range func() []string {
-		var o []string
-		for k := range observedIds {
-			o = append(o, k)
+	for _, messageId := range func() []string {
+		var sortedIds []string
+		for observedId := range observedIds {
+			sortedIds = append(sortedIds, observedId)
 		}
-		sort.Strings(o)
-		return o
+		sort.Strings(sortedIds)
+		return sortedIds
 	}() {
-		test.Logf("  OBSERVED %s x%d", k, observedIds[k])
+		test.Logf("  OBSERVED %s x%d", messageId, observedIds[messageId])
 	}
 	test.Logf("%d raw findings observed; %d distinct message ids dropped by the join", seen, len(keys))
 

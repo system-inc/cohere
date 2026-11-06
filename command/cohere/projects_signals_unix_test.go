@@ -66,15 +66,19 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	// than ending them, also exits as terminated, but only once the compile finishes.
 	waited := make(chan error, 1)
 	go func() { waited <- run.Wait() }()
-	var err error
+	var waitError error
 	select {
-	case err = <-waited:
+	case waitError = <-waited:
 	case <-time.After(time.Minute):
 		test.Fatal("a minute after the terminate the run was still waiting on its children")
 	}
 	var exited *exec.ExitError
-	if !errors.As(err, &exited) || exited.ExitCode() != 128+int(syscall.SIGTERM) {
-		test.Errorf("a terminated run ended with %v, want exit %d, the terminate's", err, 128+int(syscall.SIGTERM))
+	if !errors.As(waitError, &exited) || exited.ExitCode() != 128+int(syscall.SIGTERM) {
+		test.Errorf(
+			"a terminated run ended with %v, want exit %d, the terminate's",
+			waitError,
+			128+int(syscall.SIGTERM),
+		)
 	}
 
 	// The engine and its compiler are gone, or going: each was signaled before the run ended, so allow

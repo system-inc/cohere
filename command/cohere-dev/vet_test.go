@@ -73,28 +73,28 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 // cohere-dev test vets with every check the gate's go vet runs, not go test's curated subset, so the edit
 // loop fails where the gate would: 130 unkeyed literals passed cohere-dev test and failed plain go vet
 // (#kr2yp54). A caller's own -vet is kept.
-func TestCohereDevTestVetsWithEveryCheck(t *testing.T) {
-	t.Parallel()
-	wrapper := filepath.Join(t.TempDir(), "cohere-dev")
+func TestCohereDevTestVetsWithEveryCheck(test *testing.T) {
+	test.Parallel()
+	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
-		t.Fatalf("building: %v\n%s", outputError, output)
+		test.Fatalf("building: %v\n%s", outputError, output)
 	}
-	module := t.TempDir()
-	writeFiles(t, module, unkeyedLiteral)
-	home := privatePool(t)
-	test := func(arguments ...string) (string, error) {
+	module := test.TempDir()
+	writeFiles(test, module, unkeyedLiteral)
+	home := privatePool(test)
+	runTest := func(arguments ...string) (string, error) {
 		command := exec.Command(wrapper, append([]string{"test"}, arguments...)...)
 		command.Dir = module
 		command.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, "GOWORK=off")
 		output, outputError := command.CombinedOutput()
 		return string(output), outputError
 	}
-	if output, testError := test(
+	if output, testError := runTest(
 		"./user",
 	); testError == nil || !strings.Contains(output, "struct literal uses unkeyed fields") {
-		t.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", testError, output)
+		test.Errorf("cohere-dev test passed an unkeyed literal that go vet reports (%v):\n%s", testError, output)
 	}
-	if output, testError := test("-vet=off", "./user"); testError != nil {
-		t.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", testError, output)
+	if output, testError := runTest("-vet=off", "./user"); testError != nil {
+		test.Errorf("cohere-dev test did not keep the caller's -vet=off (%v):\n%s", testError, output)
 	}
 }

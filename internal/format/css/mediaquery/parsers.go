@@ -194,9 +194,9 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 	node := resetNode()
 
 	// Go walks runes where JavaScript walks units: the whitespace tests need the whole character.
-	for i := 0; i < len(text); {
-		decoded, size := utf8.DecodeRuneInString(text[i:])
-		character := text[i : i+size]
+	for offset := 0; offset < len(text); {
+		decoded, size := utf8.DecodeRuneInString(text[offset:])
+		character := text[offset : offset+size]
 		// If not yet entered any element
 		if !insideSomeValue {
 			if isWhitespace(decoded) {
@@ -211,7 +211,7 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 					localLevel++
 				}
 				node.value = character
-				node.sourceIndex = index + i
+				node.sourceIndex = index + offset
 				insideSomeValue = true
 			}
 		} else {
@@ -233,7 +233,7 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 		// If exited all parens/curlies and the next symbol
 		if insideSomeValue &&
 			localLevel == 0 &&
-			(character == ")" || i+size == len(text) || startsWithWhitespace(text[i+size:])) {
+			(character == ")" || offset+size == len(text) || startsWithWhitespace(text[offset+size:])) {
 			if node.value == "not" || node.value == "only" || node.value == "and" {
 				node.nodeType = "keyword"
 			}
@@ -257,7 +257,7 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 			insideSomeValue = false
 		}
 
-		i += size
+		offset += size
 	}
 
 	// Now process the result array - to specify undefined types of the nodes

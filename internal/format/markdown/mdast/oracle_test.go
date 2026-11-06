@@ -67,11 +67,11 @@ func (oracle *treeOracle) load() {
 // parse returns upstream's tree as generic JSON, with `data` (hast hints for HTML output) dropped.
 func (oracle *treeOracle) parse(text string) (any, error) {
 	var serialized string
-	var err error
+	var serializeError error
 	if oracle.golden == nil {
-		serialized, err = oracle.serialize(text)
+		serialized, serializeError = oracle.serialize(text)
 	} else {
-		serialized, err = oracle.golden.Answer(oracletest.Key("tree", text), func() (string, error) {
+		serialized, serializeError = oracle.golden.Answer(oracletest.Key("tree", text), func() (string, error) {
 			oracle.once.Do(oracle.load)
 			if oracle.err != nil {
 				return "", oracle.err
@@ -79,8 +79,8 @@ func (oracle *treeOracle) parse(text string) (any, error) {
 			return oracle.serialize(text)
 		})
 	}
-	if err != nil {
-		return nil, err
+	if serializeError != nil {
+		return nil, serializeError
 	}
 	var tree any
 	if decodeError := json.Unmarshal([]byte(serialized), &tree); decodeError != nil {

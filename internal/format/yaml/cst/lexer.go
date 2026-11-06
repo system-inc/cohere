@@ -210,8 +210,8 @@ func (lexer *Lexer) atLineEnd() bool {
 	return false
 }
 
-func (lexer *Lexer) charAt(n int) int {
-	return characterAt(lexer.buffer, lexer.position+n)
+func (lexer *Lexer) charAt(offset int) int {
+	return characterAt(lexer.buffer, lexer.position+offset)
 }
 
 func (lexer *Lexer) continueScalar(offset int) int {
@@ -263,8 +263,8 @@ func (lexer *Lexer) getLine() ([]uint16, bool) {
 	return substring(lexer.buffer, lexer.position, end), true
 }
 
-func (lexer *Lexer) hasChars(n int) bool {
-	return lexer.position+n <= len(lexer.buffer)
+func (lexer *Lexer) hasChars(count int) bool {
+	return lexer.position+count <= len(lexer.buffer)
 }
 
 // setNext returns upstream's null, the state that ends the lex loop.
@@ -276,8 +276,8 @@ func (lexer *Lexer) setNext(state string) string {
 	return ""
 }
 
-func (lexer *Lexer) peek(n int) []uint16 {
-	return substr(lexer.buffer, lexer.position, n)
+func (lexer *Lexer) peek(count int) []uint16 {
+	return substr(lexer.buffer, lexer.position, count)
 }
 
 func (lexer *Lexer) parseNext(next string) string {
@@ -356,12 +356,12 @@ func (lexer *Lexer) parseLineStart() string {
 		if !lexer.atEnd && !lexer.hasChars(4) {
 			return lexer.setNext("line-start")
 		}
-		s := lexer.peek(3)
-		if (equals(s, "---") || equals(s, "...")) && isEmpty(lexer.charAt(3)) {
+		marker := lexer.peek(3)
+		if (equals(marker, "---") || equals(marker, "...")) && isEmpty(lexer.charAt(3)) {
 			lexer.pushCount(3)
 			lexer.indentValue = 0
 			lexer.indentNext = 0
-			if equals(s, "---") {
+			if equals(marker, "---") {
 				return "doc"
 			}
 			return "stream"
@@ -405,10 +405,10 @@ func (lexer *Lexer) parseDocument() string {
 	if !ok {
 		return lexer.setNext("doc")
 	}
-	n := lexer.pushIndicators()
-	switch characterAt(line, n) {
+	pushed := lexer.pushIndicators()
+	switch characterAt(line, pushed) {
 	case '#':
-		lexer.pushCount(len(line) - n)
+		lexer.pushCount(len(line) - pushed)
 		fallthrough
 	case -1:
 		lexer.pushNewline()
@@ -428,9 +428,9 @@ func (lexer *Lexer) parseDocument() string {
 	case '"', '\'':
 		return lexer.parseQuotedScalar()
 	case '|', '>':
-		n += lexer.parseBlockScalarHeader()
-		n += lexer.pushSpaces(true)
-		lexer.pushCount(len(line) - n)
+		pushed += lexer.parseBlockScalarHeader()
+		pushed += lexer.pushSpaces(true)
+		lexer.pushCount(len(line) - pushed)
 		lexer.pushNewline()
 		return lexer.parseBlockScalar()
 	default:
@@ -767,11 +767,11 @@ func (lexer *Lexer) pushCount(count int) int {
 }
 
 func (lexer *Lexer) pushToIndex(index int, allowEmpty bool) int {
-	s := slice(lexer.buffer, lexer.position, index)
-	if len(s) > 0 {
-		lexer.emit(s)
-		lexer.position += len(s)
-		return len(s)
+	text := slice(lexer.buffer, lexer.position, index)
+	if len(text) > 0 {
+		lexer.emit(text)
+		lexer.position += len(text)
+		return len(text)
 	} else if allowEmpty {
 		lexer.emit([]uint16{})
 	}
@@ -863,12 +863,12 @@ func (lexer *Lexer) pushSpaces(allowTabs bool) int {
 			break
 		}
 	}
-	n := index - lexer.position
-	if n > 0 {
-		lexer.emit(substr(lexer.buffer, lexer.position, n))
+	spaces := index - lexer.position
+	if spaces > 0 {
+		lexer.emit(substr(lexer.buffer, lexer.position, spaces))
 		lexer.position = index
 	}
-	return n
+	return spaces
 }
 
 func (lexer *Lexer) pushUntil(test func(character int) bool) int {

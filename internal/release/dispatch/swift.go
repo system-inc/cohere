@@ -206,8 +206,8 @@ func runBuildToolUntil(command *exec.Cmd, signals <-chan os.Signal) error {
 	go func() { done <- command.Wait() }()
 
 	select {
-	case err := <-done:
-		return err
+	case waitError := <-done:
+		return waitError
 	case received := <-signals:
 		signalGroup(command, syscall.SIGTERM)
 		select {
