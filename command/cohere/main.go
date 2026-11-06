@@ -1621,15 +1621,15 @@ func configureLint(
 	// everything with nothing configured produces output indistinguishable from a clean run, and
 	// that exact confusion is what this tool exists to make impossible.
 	var lintConfiguration *configuration.Config
-	var err error
+	var loadError error
 	if ahead != nil {
 		<-ahead.done
-		lintConfiguration, err = ahead.config, ahead.loadError
+		lintConfiguration, loadError = ahead.config, ahead.loadError
 	} else {
-		lintConfiguration, err = loadLintConfig(graph, location)
+		lintConfiguration, loadError = loadLintConfig(graph, location)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("loading the lint config: %w", err)
+	if loadError != nil {
+		return nil, fmt.Errorf("loading the lint config: %w", loadError)
 	}
 	// The project's own file, which discovery may not have read: a run naming a directory, a tsconfig or a
 	// path discovers nothing. A file the command line named is the Swift engine's to read wherever it sits

@@ -326,18 +326,18 @@ func applyProposedFixes(
 
 	results := make([]edit.FileResult, 0, len(fileNames))
 	for index, fileName := range fileNames {
-		fileResult, err := attempts[index].result, attempts[index].err
+		fileResult, processError := attempts[index].result, attempts[index].err
 		if !attempts[index].done {
 			// Again for each file this loop formats, since a file before it may have failed and said so.
 			streams.Show(streams.Errors)
-			fileResult, err = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
+			fileResult, processError = watchedFile(os.Stderr, slowFixNotice, fileName, func() (edit.FileResult, error) {
 				return process(fileName, propose(fileName, serially), transform, maximumPasses)
 			})
 		}
-		if err != nil {
+		if processError != nil {
 			// One file failing must not abandon the rest. The failure is reported rather than
 			// swallowed, and the tree is left in a state where every other fix still landed.
-			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(err))
+			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(processError))
 			showWarning()
 
 			// A failure is its own category rather than a flavor of "did not converge". The two send a
@@ -821,9 +821,9 @@ func speculateFormatOn(
 					return refuseToRelint("", "")
 				}
 				var result edit.FileResult
-				var err error
+				var checkError error
 				if tree := programs.unchangedTreeOf(fileName); tree != nil {
-					result, err = edit.CheckTextSeeded(
+					result, checkError = edit.CheckTextSeeded(
 						fileName,
 						tree.Text(),
 						tree,
@@ -832,7 +832,7 @@ func speculateFormatOn(
 						maximumPasses,
 					)
 				} else {
-					result, err = edit.CheckFileSeeded(
+					result, checkError = edit.CheckFileSeeded(
 						fileName,
 						programs.boundTreeOf(fileName),
 						unproposed,
@@ -844,11 +844,11 @@ func speculateFormatOn(
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
 				// the printer changed comes back changed rather than refused, and keeping it would report a
 				// rewrite that this check, which writes nothing, never made.
-				if errors.Is(err, errorRelintRefused) || err == nil && result.Changed {
+				if errors.Is(checkError, errorRelintRefused) || checkError == nil && result.Changed {
 					continue
 				}
 				mutex.Lock()
-				speculation.attempts[fileName] = formatAttempt{result: result, err: err, done: true}
+				speculation.attempts[fileName] = formatAttempt{result: result, err: checkError, done: true}
 				speculation.read[fileName] = result.Text
 				mutex.Unlock()
 			}
