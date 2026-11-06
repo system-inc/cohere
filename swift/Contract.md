@@ -79,6 +79,18 @@ the run, prints a sentence on stderr naming both versions, and exits 2. The firs
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
 there too, because the record and the flag are two independent ways for the versions to disagree.
 
+The front door asks the toolchain once per process tree and hands the answers down, so an engine need not ask
+again (#nkk91tv). Each is optional, and an engine that finds one missing, or unusable, asks for itself:
+
+- `COHERE_SWIFT_VERSION_OUTPUT` is what `swift --version` printed, unchanged. The engine reads its
+  `swiftlang-` token exactly as from its own call, and ignores a value without one.
+- `COHERE_SWIFT_EXECUTABLE` is the `swift` that `xcrun --find swift` names. The engine uses it only when it
+  is an absolute path to an executable file.
+
+Both feed the engine's cache keys, so the front door never passes on a value it did not ask for or receive
+from the cohere process that started it: a cohere run from a shell drops any it inherits and asks fresh
+(command/cohere/swift_toolchain.go).
+
 ## Records
 
 Every record has `kind`. Fields not listed are not part of the contract and the front door ignores
