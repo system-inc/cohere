@@ -13,6 +13,10 @@
 // Which lines are a code block is judged by internal/shouting's mask, as the shouting rule judges them, so the two
 // rules never disagree about one: a block opens after a blank comment line or at the group's start, and an indented
 // line straight after prose is a paragraph continuation, as in CommonMark, and is read.
+//
+// The judgment past Go's own grammar, the words, the whole-word test and the masks, is internal/warningcomment's,
+// which the TypeScript rule nexus/consistency-no-warning-comment reads too, so the two engines report the same
+// words. This package hands it each comment group with the directives set aside, and places each word it returns.
 package consistency_no_warning_comment
 
 import (
@@ -20,13 +24,11 @@ import (
 	"go/token"
 	"regexp"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
-	"github.com/system-inc/cohere/internal/shouting"
+	"github.com/system-inc/cohere/internal/warningcomment"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -47,19 +49,10 @@ var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Ana
 
 var warningCommentMessage = policy.MessageOf(Name, "warningComment")
 
-var (
-	// directive is go/doc's own definition of a directive comment, from go.dev/doc/comment: a line starting
-	// //line, //extern or //export and a space, or a tool's //name:directive with no space after the slashes. Its
-	// arguments are the tool's words, not a task. The name is lowercase, so `//TODO:` is no directive and is read.
-	directive = regexp.MustCompile(`^//(line |extern |export |[a-z0-9]+:[a-z0-9])`)
-
-	// inlineBackticks is a span of code in a comment, which may wrap onto the next line of the group.
-	inlineBackticks = regexp.MustCompile("`[^`]*`")
-
-	// warningWord finds the candidates. Whether one is a whole word is isWholeWord's to say, since Go's \b knows only
-	// ASCII and would read ÜTODO as holding the word.
-	warningWord = regexp.MustCompile(`TODO|FIXME|XXX`)
-)
+// directive is go/doc's own definition of a directive comment, from go.dev/doc/comment: a line starting //line,
+// //extern or //export and a space, or a tool's //name:directive with no space after the slashes. Its arguments are
+// the tool's words, not a task. The name is lowercase, so `//TODO:` is no directive and is read.
+var directive = regexp.MustCompile(`^//(line |extern |export |[a-z0-9]+:[a-z0-9])`)
 
 func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
@@ -71,89 +64,29 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// commentSpan is where one comment's body sits in its group's joined text. cut is how many bytes of the comment's
-// text the body lost from its front, the slashes and the space after them, so an offset in the body plus cut is the
-// same byte's offset in the comment's text.
-type commentSpan struct {
-	comment *ast.Comment
-	start   int
-	end     int
-	cut     int
-}
-
-// judgeGroup reports every warning word in group outside a code block and backticks. The group's comment bodies are
-// joined as one text before they are masked, so a code block opens only after a blank comment line, and a backtick
-// pair a doc comment wraps across two of its // lines still hides the word inside it, as the shouting rule reads a
-// group.
+// judgeGroup reports every warning word in group, outside a code block and backticks, as internal/warningcomment
+// finds them. Go's directives are set aside first, since go/doc leaves a directive out of the comment's text, so it
+// is neither read nor a line between its neighbours.
 func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGroup) {
-	var joined strings.Builder
-	spans := []commentSpan{}
+	read := []*ast.Comment{}
+	texts := []string{}
 	for _, comment := range group.List {
-		// go/doc leaves a directive out of the comment's text, so it is neither read nor a line between its
-		// neighbours.
 		if directive.MatchString(comment.Text) {
 			continue
 		}
-		if len(spans) > 0 {
-			joined.WriteByte('\n')
-		}
-		// The body is what the code block mask measures indentation in, the text after the slashes and one space.
-		body := shouting.GoCommentBody(comment.Text)
-		start := joined.Len()
-		joined.WriteString(body)
-		spans = append(spans, commentSpan{
-			comment: comment,
-			start:   start,
-			end:     joined.Len(),
-			cut:     len(comment.Text) - len(body),
+		read = append(read, comment)
+		texts = append(texts, comment.Text)
+	}
+	for _, word := range warningcomment.WordsIn(texts) {
+		comment := read[word.Comment]
+		position := positionOf(pass, tokenFile, comment, word.Start)
+		pass.Report(analysis.Diagnostic{
+			Pos:      position,
+			End:      position + token.Pos(word.End-word.Start),
+			Category: warningCommentMessage.Id,
+			Message:  warningCommentMessage.Render(map[string]string{"word": comment.Text[word.Start:word.End]}),
 		})
 	}
-	text := joined.String()
-	// Most comments hold none of the words, so they skip the masking.
-	if !warningWord.MatchString(text) {
-		return
-	}
-	// Code blocks are masked before backticks, in the order the shouting rule masks them, so a backtick inside a code
-	// block opens no span over the prose after it. Each byte of a span becomes one space and each newline stays, so
-	// every offset still points into the source.
-	masked := inlineBackticks.ReplaceAllStringFunc(shouting.MaskIndentedCodeBlocks(text), func(match string) string {
-		blanked := []byte(match)
-		for index, character := range blanked {
-			if character != '\n' {
-				blanked[index] = ' '
-			}
-		}
-		return string(blanked)
-	})
-	for _, span := range spans {
-		for _, location := range warningWord.FindAllStringIndex(masked[span.start:span.end], -1) {
-			start, end := span.cut+location[0], span.cut+location[1]
-			if !isWholeWord(span.comment.Text, start, end) {
-				continue
-			}
-			word := span.comment.Text[start:end]
-			position := positionOf(pass, tokenFile, span.comment, start)
-			pass.Report(analysis.Diagnostic{
-				Pos:      position,
-				End:      position + token.Pos(len(word)),
-				Category: warningCommentMessage.Id,
-				Message:  warningCommentMessage.Render(map[string]string{"word": word}),
-			})
-		}
-	}
-}
-
-// isWholeWord is whether text[start:end] stands alone: no letter, digit or underscore of any script touches it on
-// either side, so `TODOS`, `TODO_LIST`, `XXXX`, `0xXXX` and `ÜTODO` are other words.
-func isWholeWord(text string, start int, end int) bool {
-	before, _ := utf8.DecodeLastRuneInString(text[:start])
-	after, _ := utf8.DecodeRuneInString(text[end:])
-	return !isWordCharacter(before) && !isWordCharacter(after)
-}
-
-// isWordCharacter is a rune that continues a word. An empty side decodes to utf8.RuneError, which is none.
-func isWordCharacter(character rune) bool {
-	return character == '_' || unicode.IsLetter(character) || unicode.IsDigit(character)
 }
 
 // positionOf is the position of the byte at offset in comment.Text. The scanner drops each carriage return from a

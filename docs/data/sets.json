@@ -947,6 +947,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -1561,14 +1565,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -2412,6 +2409,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -3022,14 +3023,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -3931,6 +3925,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -4164,14 +4162,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -5216,6 +5207,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-constant-casing",
                 "severity": "error"
             },
@@ -5849,14 +5844,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -6884,6 +6872,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-constant-casing",
                 "severity": "error",
                 "options": [
@@ -7548,14 +7540,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -8554,6 +8539,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -9164,14 +9153,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",
@@ -9998,6 +9980,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-warning-comment",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-matching-return-type",
                 "severity": "error"
             },
@@ -10608,14 +10594,7 @@
             },
             {
                 "name": "no-warning-comments",
-                "severity": "error",
-                "options": [
-                    {
-                        "decoration": [
-                            "*"
-                        ]
-                    }
-                ]
+                "severity": "off"
             },
             {
                 "name": "no-with",

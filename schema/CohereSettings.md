@@ -212,7 +212,7 @@ A rule's value is a severity, or `[severity, ...options]` for a rule that takes 
 
 ## Rules
 
-cohere implements 497 rules. `cohere --rules` lists them for your project's language, and
+cohere implements 498 rules. `cohere --rules` lists them for your project's language, and
 `cohere --rules-enabled` lists the ones your settings turn on. A name cohere does not implement is accepted:
 it records a decision about a rule, and is reported as unported rather than refused.
 
@@ -587,7 +587,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 
 </details>
 
-<details><summary><code>nexus</code>, 52 rules</summary>
+<details><summary><code>nexus</code>, 53 rules</summary>
 
 - `nexus/boundary-no-internal-import`
 - `nexus/boundary-no-nexus-outside-import`
@@ -610,6 +610,7 @@ it records a decision about a rule, and is reported as unported rather than refu
 - `nexus/consistency-no-single-line-jsdoc`
 - `nexus/consistency-no-stuttering-name`
 - `nexus/consistency-no-utils-folder`
+- `nexus/consistency-no-warning-comment`
 - `nexus/consistency-require-constant-casing`
 - `nexus/consistency-require-matching-return-type`
 - `nexus/consistency-require-type-suffix`

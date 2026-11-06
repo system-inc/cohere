@@ -34,7 +34,7 @@
         "swift": "cohere-swift/consistency-no-utils-folder"
     },
     "warning-comments": {
-        "typescript": "no-warning-comments",
+        "typescript": "nexus/consistency-no-warning-comment",
         "go": "cohere-go/consistency-no-warning-comment",
         "swift": "cohere-swift/todo"
     }

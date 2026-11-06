@@ -54,6 +54,12 @@ var allowedRuleImports = map[string]bool{
 	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
 	// 2.57 to 2.76s.
 	"github.com/system-inc/cohere/internal/sqltext": true,
+	// The warning-comment judgment nexus/consistency-no-warning-comment and its Go engine twin share: the words, the
+	// whole-word test and the masks (#jmx59gd). It imports only the standard library and internal/shouting, a leaf
+	// on this list, so it is a leaf by its imports, and it changes only when the shared judgment does. Measured on
+	// 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
+	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
+	"github.com/system-inc/cohere/internal/warningcomment": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.
