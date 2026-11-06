@@ -2,12 +2,12 @@ package consistency_no_long_file_test
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
 	"github.com/system-inc/cohere/policy"
 )
@@ -63,25 +63,42 @@ func TestLimitRefusesWhatIsNotALineCount(test *testing.T) {
 	}
 }
 
-// The max option may only make the rule stricter, so 2,001 is refused with an error naming the option and the value,
-// which the engine prints as the run's refusal, while 1,500 and the house limit itself are taken and read back.
-func TestLimitRefusesALooserLimit(test *testing.T) {
+// With max set to 3,000, a file of 2,100 lines, past the house limit, is clean and its neighbour of 3,001 is flagged
+// at its 3,001st, so a looser limit is taken and moves the finding with it as a stricter one does. Whether the
+// settings give a reason for it is the engine's check, not this rule's.
+func TestAnalyzerWithALooserLimit(test *testing.T) {
 	test.Parallel()
-	looser := consistency_no_long_file.NewAnalyzer()
-	setError := looser.Flags.Set("max", "2001")
-	if setError == nil {
-		test.Fatal("setting the limit to 2001 was accepted")
+	analyzer := consistency_no_long_file.NewAnalyzer()
+	if setError := analyzer.Flags.Set("max", "3000"); setError != nil {
+		test.Fatal(setError)
 	}
-	if !strings.Contains(setError.Error(), "max option of 2001 lines") {
-		test.Errorf("the refusal does not name the option and the value: %v", setError)
-	}
-	for _, text := range []string{"1500", "2000"} {
-		stricter := consistency_no_long_file.NewAnalyzer()
-		if setError := stricter.Flags.Set("max", text); setError != nil {
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), analyzer, "looser")
+}
+
+// The max option takes a looser limit as it takes a stricter one, and its value says by its own type which it is: a
+// limit above the house's 2,000 loosens and names the house limit, and the house limit itself and anything below it
+// does not, so the engine asks for a departure for 2,001 and 3,000 alone.
+func TestLimitSaysWhetherItLoosens(test *testing.T) {
+	test.Parallel()
+	for text, wantLoosens := range map[string]bool{"1": false, "1500": false, "2000": false, "2001": true,
+		"3000": true} {
+		analyzer := consistency_no_long_file.NewAnalyzer()
+		if setError := analyzer.Flags.Set("max", text); setError != nil {
 			test.Fatalf("setting the limit to %s was refused: %v", text, setError)
 		}
-		if read := stricter.Flags.Lookup("max").Value.String(); read != text {
+		value := analyzer.Flags.Lookup("max").Value
+		if read := value.String(); read != text {
 			test.Errorf("the limit set to %s reads back as %s", text, read)
+		}
+		loosening, isLoosening := value.(rule.Loosening)
+		if !isLoosening {
+			test.Fatalf("the max option's value is %T, which does not say whether it loosens", value)
+		}
+		if loosening.Loosens() != wantLoosens {
+			test.Errorf("a limit of %s loosens %t, want %t", text, loosening.Loosens(), wantLoosens)
+		}
+		if house := loosening.HouseValue(); house != "2000" {
+			test.Errorf("the house value reads %s, want 2000", house)
 		}
 	}
 }

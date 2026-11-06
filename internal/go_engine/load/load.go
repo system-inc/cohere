@@ -66,9 +66,25 @@ type Loaded struct {
 	// values (see withholdCgoDeclarations).
 	WithheldDependencyCgoDeclarations int
 
+	// Withheld is, by package, what the load withheld of it, its own errors and declarations, for a package the
+	// findings cache saves; a package it restored has what it had when it was checked.
+	Withheld map[*packages.Package]PackageWithheld
+
+	// FilesParsed counts the files the load parsed, and PackagesFromExportData the packages whose types it read
+	// from the findings cache's export data rather than checking them; both are 0 on the go/packages load, which
+	// counts neither.
+	FilesParsed            int
+	PackagesFromExportData int
+
 	// CgoTranslated is set when a package of the project has cgo files, so the load went through go/packages and
 	// the cgo tool translated every cgo file, rather than from source (see translated).
 	CgoTranslated bool
+
+	// CgoTranslatedPackages counts the packages whose cgo files the cgo tool translated, and CgoTranslationElapsed is
+	// how long the go/packages load that ran it took. cgo's preprocessing is the one thing the engine has go build,
+	// so every run says how much there was: both are 0 on the load from source, which runs no cgo tool.
+	CgoTranslatedPackages int
+	CgoTranslationElapsed time.Duration
 
 	// PackagesInWorkspace counts Packages.
 	PackagesInWorkspace int
@@ -88,17 +104,30 @@ type Loaded struct {
 // files: each comes back held by a package, in Excluded, or in Unseen. It returns an error only when
 // nothing could be loaded at all; what the packages themselves get wrong is Loaded.Diagnostics.
 func Packages(directory string, patterns []string, environment []string, census []string) (*Loaded, error) {
-	return loadWorkspace(directory, patterns, environment, census, true)
+	return loadWorkspace(directory, patterns, environment, census, true, nil)
 }
 
-// loadWorkspace is Packages. With translateOwnCgo unset it loads from source even a project with cgo files of its
-// own, which only the tests ask for, to judge the load from source on such a package.
+// PackagesRestoring is Packages with the findings cache: the load from source parses and type-checks none of the
+// packages restorer holds (see Restorer).
+func PackagesRestoring(
+	directory string,
+	patterns []string,
+	environment []string,
+	census []string,
+	restorer Restorer,
+) (*Loaded, error) {
+	return loadWorkspace(directory, patterns, environment, census, true, restorer)
+}
+
+// loadWorkspace is PackagesRestoring. With translateOwnCgo unset it loads from source even a project with cgo files
+// of its own, which only the tests ask for, to judge the load from source on such a package.
 func loadWorkspace(
 	directory string,
 	patterns []string,
 	environment []string,
 	census []string,
 	translateOwnCgo bool,
+	restorer Restorer,
 ) (*Loaded, error) {
 	started := time.Now()
 	workspace, absoluteError := filepath.Abs(directory)
@@ -121,9 +150,14 @@ func loadWorkspace(
 	var loaded *Loaded
 	var loadError error
 	if translateOwnCgo && hasOwnCgo(listed, workspace) {
-		roots, loaded, loadError = translated(workspace, patterns, environment)
+		translationStarted := time.Now()
+		roots, loaded, loadError = translated(workspace, patterns, environment, restorer)
+		if loadError == nil {
+			loaded.CgoTranslationElapsed = time.Since(translationStarted)
+			loaded.CgoTranslatedPackages = withCgoFiles(listed)
+		}
 	} else {
-		roots, loaded, loadError = fromSource(workspace, listed, buildContext)
+		roots, loaded, loadError = fromSource(workspace, listed, buildContext, restorer)
 	}
 	if loadError != nil {
 		return nil, loadError
@@ -144,6 +178,18 @@ func loadWorkspace(
 	return loaded, nil
 }
 
+// withCgoFiles counts the listed packages with cgo files, each of which the cgo tool translates on the go/packages
+// load, the project's and its dependencies' alike.
+func withCgoFiles(listed *listing) int {
+	count := 0
+	for _, listedPackage := range listed.packages {
+		if len(listedPackage.CgoFiles) > 0 {
+			count++
+		}
+	}
+	return count
+}
+
 // hasOwnCgo reports whether a listed package inside workspace has cgo files, which go list lists only when cgo is
 // on for the target.
 func hasOwnCgo(listed *listing, workspace string) bool {
@@ -162,6 +208,7 @@ func fromSource(
 	workspace string,
 	listed *listing,
 	buildContext *build.Context,
+	restorer Restorer,
 ) ([]*packages.Package, *Loaded, error) {
 	sizes := types.SizesFor("gc", buildContext.GOARCH)
 	if sizes == nil {
@@ -172,16 +219,38 @@ func fromSource(
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld)
 	reachable := typeChecker.connect()
+	analyzedPackages := analyzedOfGraph(built)
+	if restorer != nil {
+		typeChecker.restored = restorer.Restore(LoaderSource, loadedOf(reachable), analyzedPackages)
+	}
 	typeChecker.load(reachable)
 
 	roots := make([]*packages.Package, 0, len(built.roots))
 	for _, root := range built.roots {
 		roots = append(roots, root.loaded)
 	}
+	declarations := withholdCgoDeclarations(typeChecker.fileSet, reachable)
+	byPackage := map[*packages.Package]PackageWithheld{}
+	distinct := map[string]bool{}
+	for _, current := range reachable {
+		owned := PackageWithheld{Errors: withheld.ownedBy(current.loaded), Declarations: declarations[current.loaded]}
+		if restored, held := typeChecker.restored[current.loaded]; held {
+			owned.Declarations = restored.Withheld.Declarations
+		}
+		for _, position := range owned.Declarations {
+			distinct[position] = true
+		}
+		if len(owned.Errors)+len(owned.Declarations) > 0 {
+			byPackage[current.loaded] = owned
+		}
+	}
 	return roots, &Loaded{
-		Packages:                          analyzedOfGraph(built),
+		Packages:                          analyzedPackages,
 		WithheldInDependencyCgo:           withheld.sorted(),
-		WithheldDependencyCgoDeclarations: withholdCgoDeclarations(typeChecker.fileSet, reachable),
+		WithheldDependencyCgoDeclarations: len(distinct),
+		Withheld:                          byPackage,
+		FilesParsed:                       int(typeChecker.filesParsed.Load()),
+		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
 	}, nil
 }
 

@@ -1,6 +1,7 @@
 package check
 
 import (
+	"path/filepath"
 	"reflect"
 	"slices"
 	"sync/atomic"
@@ -10,6 +11,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -67,7 +69,7 @@ func testCaching(test *testing.T, rules []rule.Rule) *Caching {
 // runCached runs rules over analyzed with caching, failing the test if the run could not start.
 func runCached(test *testing.T, analyzed []*packages.Package, caching *Caching, rules []rule.Rule) *Result {
 	test.Helper()
-	result, runError := Run(analyzed, rules, Options{Cache: caching})
+	result, runError := Run(analyzed, rules, Options{Cache: NewCacheSession(caching, rules)})
 	if runError != nil {
 		test.Fatalf("running %d rules: %v", len(rules), runError)
 	}
@@ -80,6 +82,19 @@ func withoutTimesOrCache(result *Result) Result {
 	compared := *result
 	compared.Elapsed, compared.Cache = 0, CacheCounts{}
 	return compared
+}
+
+// ownLoad is a load of the fixtures' module, or of its generated module, that is the test's own. A run that restores
+// a package it analyzes, while a package that missed imports it, lets go of the restored package's syntax, as of any
+// package Analyze is not given, so a run with the cache never reads the load every other test shares.
+func ownLoad(test *testing.T, module string) []*packages.Package {
+	test.Helper()
+	root := loadedFixtures(test)
+	loaded, loadError := load.Packages(filepath.Join(root, module), []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil {
+		test.Fatalf("loading the fixtures again: %v", loadError)
+	}
+	return loaded.Packages
 }
 
 // fixturePackage is the analyzed package of the fixtures at path.
@@ -97,7 +112,9 @@ func fixturePackage(test *testing.T, path string) *packages.Package {
 // keyOf is the key caching gives the fixtures' package at path.
 func keyOf(test *testing.T, caching *Caching, path string) cache.Key {
 	test.Helper()
-	keys, keysError := cache.Keys(fixtures.loaded.Packages, caching.Context, nil)
+	keyContext := caching.Context
+	keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+load.LoaderSource)
+	keys, keysError := cache.Keys(fixtures.loaded.Packages, keyContext, nil)
 	if keysError != nil {
 		test.Fatalf("computing the fixtures' keys: %v", keysError)
 	}
@@ -115,21 +132,21 @@ func TestAWarmRunGivesTheColdRunsResultAndRunsNothing(test *testing.T) {
 
 	loadedFixtures(test)
 	for _, warmCase := range []struct {
-		name     string
-		analyzed func() []*packages.Package
-		rules    func(counts *runCounts) []rule.Rule
+		name   string
+		module string
+		rules  func(counts *runCounts) []rule.Rule
 	}{
 		{
-			name:     "findings and facts",
-			analyzed: func() []*packages.Package { return fixtures.loaded.Packages },
+			name:   "findings and facts",
+			module: ".",
 			rules: func(counts *runCounts) []rule.Rule {
 				return []rule.Rule{countedRule("countedFindings", counts), houseRule(targetAnalyzer), packageClauseRule,
 					houseRule(markedAnalyzer)}
 			},
 		},
 		{
-			name:     "withheld as generated",
-			analyzed: func() []*packages.Package { return fixtures.generated.Packages },
+			name:   "withheld as generated",
+			module: "generated",
 			rules: func(counts *runCounts) []rule.Rule {
 				return []rule.Rule{countedRule("countedGenerated", counts), houseRule(targetAnalyzer)}
 			},
@@ -141,8 +158,9 @@ func TestAWarmRunGivesTheColdRunsResultAndRunsNothing(test *testing.T) {
 			counts := &runCounts{}
 			rules := warmCase.rules(counts)
 			caching := testCaching(test, rules)
-			cold := runCached(test, warmCase.analyzed(), caching, rules)
-			packageCount := len(warmCase.analyzed())
+			analyzed := ownLoad(test, warmCase.module)
+			cold := runCached(test, analyzed, caching, rules)
+			packageCount := len(analyzed)
 			wantCold := CacheCounts{On: true, Missed: packageCount, Written: packageCount}
 			if !reflect.DeepEqual(cold.Cache, wantCold) {
 				test.Fatalf("want the cold run's cache %+v, got %+v", wantCold, cold.Cache)
@@ -153,7 +171,7 @@ func TestAWarmRunGivesTheColdRunsResultAndRunsNothing(test *testing.T) {
 					coldRuns, coldPrerequisiteRuns)
 			}
 
-			warm := runCached(test, warmCase.analyzed(), caching, rules)
+			warm := runCached(test, analyzed, caching, rules)
 			if wantWarm := (CacheCounts{On: true, Hit: packageCount}); !reflect.DeepEqual(warm.Cache, wantWarm) {
 				test.Fatalf("want the warm run's cache %+v, got %+v", wantWarm, warm.Cache)
 			}
@@ -180,14 +198,15 @@ func TestARestoredFactReachesAnImporterThatMissed(test *testing.T) {
 	counts := &runCounts{}
 	rules := []rule.Rule{houseRule(markedAnalyzer), countedRule("countedFacts", counts)}
 	caching := testCaching(test, rules)
-	cold := runCached(test, fixtures.loaded.Packages, caching, rules)
+	analyzed := ownLoad(test, ".")
+	cold := runCached(test, analyzed, caching, rules)
 	userKey := keyOf(test, caching, "example.com/fixture/user")
 	if putError := caching.Store.Put(userKey, []byte("corrupt")); putError != nil {
 		test.Fatalf("corrupting user's entry: %v", putError)
 	}
 	coldRuns := counts.rule.Load()
 
-	warm := runCached(test, fixtures.loaded.Packages, caching, rules)
+	warm := runCached(test, analyzed, caching, rules)
 	if wantWarm := (CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1}); !reflect.DeepEqual(warm.Cache, wantWarm) {
 		test.Fatalf("want base hit and user missed and written again, got %+v", warm.Cache)
 	}
@@ -216,7 +235,8 @@ func TestACorruptEntryIsAMiss(test *testing.T) {
 	counts := &runCounts{}
 	rules := []rule.Rule{countedRule("countedCorrupt", counts), houseRule(markedAnalyzer)}
 	caching := testCaching(test, rules)
-	cold := runCached(test, fixtures.loaded.Packages, caching, rules)
+	analyzed := ownLoad(test, ".")
+	cold := runCached(test, analyzed, caching, rules)
 	baseKey := keyOf(test, caching, "example.com/fixture/base")
 	written, stored := caching.Store.Get(baseKey)
 	if !stored {
@@ -229,7 +249,7 @@ func TestACorruptEntryIsAMiss(test *testing.T) {
 	}
 	coldRuns := counts.rule.Load()
 
-	warm := runCached(test, fixtures.loaded.Packages, caching, rules)
+	warm := runCached(test, analyzed, caching, rules)
 	if wantWarm := (CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1}); !reflect.DeepEqual(warm.Cache, wantWarm) {
 		test.Fatalf("want user hit and base missed and written again, got %+v", warm.Cache)
 	}
@@ -252,7 +272,8 @@ func TestAnActionErrorLeavesNoEntry(test *testing.T) {
 	loadedFixtures(test)
 	rules := []rule.Rule{houseRule(markedAnalyzer), houseRule(erroringAnalyzer)}
 	caching := testCaching(test, rules)
-	cold := runCached(test, fixtures.loaded.Packages, caching, rules)
+	analyzed := ownLoad(test, ".")
+	cold := runCached(test, analyzed, caching, rules)
 	if wantCold := (CacheCounts{On: true, Missed: 2}); !reflect.DeepEqual(cold.Cache, wantCold) {
 		test.Fatalf("want both packages missed and none written, got %+v", cold.Cache)
 	}
@@ -261,7 +282,7 @@ func TestAnActionErrorLeavesNoEntry(test *testing.T) {
 			test.Errorf("want no entry for %s, whose erroring action did not finish", path)
 		}
 	}
-	warm := runCached(test, fixtures.loaded.Packages, caching, rules)
+	warm := runCached(test, analyzed, caching, rules)
 	if len(warm.Crashes) != 2 || !reflect.DeepEqual(withoutTimesOrCache(warm), withoutTimesOrCache(cold)) {
 		test.Fatalf("want the same two crashes again, got\n%+v\ncold\n%+v", warm, cold)
 	}

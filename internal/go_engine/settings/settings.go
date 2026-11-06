@@ -7,6 +7,16 @@
 // whose optional second element is the rule's options object, the shape the Swift and TypeScript configs
 // use. Severities and options only.
 //
+// Beside rules, the block may hold departures, a reason for each rule the project sets looser than the house does:
+//
+//	{ "go": {
+//		"rules": { "cohere-go/consistency-no-long-file": ["error", {"max": 3000}] },
+//		"departures": { "cohere-go/consistency-no-long-file": "Our parser tables are one generated unit." }
+//	} }
+//
+// Which options loosen a rule is the rule's to say, so this layer holds a departure to naming a known rule with a
+// reason that isn't blank, and the engine refuses a loosening option without one, and one that loosens nothing.
+//
 // When the root has no config, every house rule runs at error. That is not the permissive default the
 // TypeScript loader refuses, because every rule runs, and the note says so on every run, so a missing
 // config never reads as a configured clean tree. A config that exists and cannot be read is an error, never
@@ -59,6 +69,10 @@ type Settings struct {
 	// Rules holds every known rule: what the config says, or error with no options for a rule it does not
 	// mention.
 	Rules map[string]RuleSetting
+
+	// Departures maps a rule to the reason the project gives for setting it looser than the house does, from the
+	// go block's departures, and is empty when it gives none.
+	Departures map[string]string
 
 	// Note is empty when a go block was read. Otherwise it is the sentence the lint record carries as
 	// `configNote`, naming the defaults in force and where a config would go.
@@ -150,14 +164,15 @@ func parse(contents []byte, path string, knownRules []string) (Settings, error) 
 	}
 	var unknownKeys []string
 	for key := range block {
-		if key != "rules" {
+		if key != "rules" && key != "departures" {
 			unknownKeys = append(unknownKeys, fmt.Sprintf("%q", key))
 		}
 	}
 	if len(unknownKeys) > 0 {
 		sort.Strings(unknownKeys)
 		return Settings{}, fmt.Errorf("reading %s: the go block declares %s, which the Go engine does not read, so "+
-			"the key would configure nothing. The go block takes \"rules\"", path, strings.Join(unknownKeys, ", "))
+			"the key would configure nothing. The go block takes \"rules\" and \"departures\"", path,
+			strings.Join(unknownKeys, ", "))
 	}
 	rawRules, hasRules := block["rules"]
 	if !hasRules {
@@ -191,7 +206,52 @@ func parse(contents []byte, path string, knownRules []string) (Settings, error) 
 		}
 		settings.Rules[name] = setting
 	}
+
+	rawDepartures, hasDepartures := block["departures"]
+	if !hasDepartures {
+		return settings, nil
+	}
+	departures, departuresError := parseDepartures(rawDepartures, known)
+	if departuresError != nil {
+		return Settings{}, fmt.Errorf("reading %s: %w", path, departuresError)
+	}
+	settings.Departures = departures
 	return settings, nil
+}
+
+// parseDepartures reads the go block's departures, each a known rule and the reason the project loosens it. A
+// departure for a rule the engine does not know would exempt nothing while the file looked reasoned, and a blank
+// reason is a departure that says nothing, so both are refused. Whether the rule's options loosen anything is the
+// engine's to check, since only the rule knows.
+func parseDepartures(value json.RawMessage, known map[string]bool) (map[string]string, error) {
+	departures, isObject := decodeObject(value)
+	if !isObject {
+		return nil, fmt.Errorf("the go block's departures is %s, which is not an object of each rule's reason", value)
+	}
+	// Sorted, so a file with two bad departures names the same one on every run.
+	names := make([]string, 0, len(departures))
+	for name := range departures {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	reasons := make(map[string]string, len(departures))
+	for _, name := range names {
+		if !known[name] {
+			return nil, fmt.Errorf("the go block's departures name %q, which is not a rule the Go engine knows, so "+
+				"the departure would exempt nothing", name)
+		}
+		var reason string
+		if jsonKind(departures[name]) != '"' || json.Unmarshal(departures[name], &reason) != nil {
+			return nil, fmt.Errorf("the departure for %q is %s, which is not a reason written as a string", name,
+				departures[name])
+		}
+		if strings.TrimSpace(reason) == "" {
+			return nil, fmt.Errorf("the departure for %q gives a blank reason, and a departure must say why the "+
+				"project loosens the rule", name)
+		}
+		reasons[name] = reason
+	}
+	return reasons, nil
 }
 
 // parseRuleSetting reads a rule's value: a bare severity, or `[severity]`, or `[severity, {options}]`.

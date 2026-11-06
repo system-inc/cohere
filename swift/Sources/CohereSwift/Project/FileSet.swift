@@ -89,7 +89,9 @@ public struct FileSet: Equatable, Sendable {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
-            let visible = Set(ignoreRules.visibleFiles(under: resolvedRoot))
+            let visible = Set(
+                ignoreRules.visibleFiles(under: resolvedRoot, skipping: Self.buildScratches(of: package))
+            )
             for path in visible.sorted()
             where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
                 let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
@@ -106,6 +108,44 @@ public struct FileSet: Equatable, Sendable {
             ? "not a git repository, so every file a target compiles was treated as ours"
             : ""
         return FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
+    }
+
+    /*
+     The build scratches under each package's root that the walk for files no target compiles never enters, as
+     absolute paths with symlinks resolved, the way the walk spells them. Each is told by structure, never by a
+     directory's name:
+
+     - the engine's own scratch, `Pipeline.scratchPath(for:)`, which the engine itself writes. A repository
+       whose `.gitignore` does not list `.cache` otherwise had every run after the first build name the build's
+       generated sources as Swift files nothing checked (ahraos-macos, 2026-11-06: six under `DerivedSources`)
+       and walk some 9,800 entries of the scratch for them;
+     - SwiftPM's own default scratch, the root's `.build`, only when it holds the cache directory tag SwiftPM
+       writes into every scratch (`CACHEDIR.TAG`, with the signature the tag's specification fixes), so a
+       `.build` that SwiftPM did not make is walked as before.
+     */
+    static func buildScratches(of package: PackageModel) -> Set<String> {
+        var scratches: Set<String> = []
+        for member in package.allPackages {
+            let root = member.root.resolvingSymlinksInPath()
+            scratches.insert(Pipeline.scratchPath(for: root).standardizedFileURL.path)
+            let swiftPackageScratch = root.appendingPathComponent(".build", isDirectory: true)
+            if Self.isTaggedCache(swiftPackageScratch) {
+                scratches.insert(swiftPackageScratch.standardizedFileURL.path)
+            }
+        }
+        return scratches
+    }
+
+    /* The first line every cache directory tag begins with, from its specification (bford.info/cachedir). */
+    static let cacheDirectoryTagSignature = "Signature: 8a477f597d28d172789f06886806bc55"
+
+    /* Whether a directory holds a cache directory tag: a `CACHEDIR.TAG` that begins with the signature. */
+    static func isTaggedCache(_ directory: URL) -> Bool {
+        guard let contents = FileManager.default.contents(atPath: directory.appendingPathComponent("CACHEDIR.TAG").path)
+        else {
+            return false
+        }
+        return contents.starts(with: Data(cacheDirectoryTagSignature.utf8))
     }
 
     /*

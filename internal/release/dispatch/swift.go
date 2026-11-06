@@ -53,9 +53,12 @@ var buildSwiftProduct = buildSwiftProductWithSwiftPm
 // instead, which is what a gate gets: see resolveCommittedSwiftEngine. The contract is the one the
 // caller speaks, used only to ask a freshly built committed engine for its provenance.
 //
+// versionOutput is what `swift --version` printed, as SwiftVersionOutput returns it. The caller asks, once per
+// process tree, since every project's run and every engine needs the same answer (#nkk91tv).
+//
 // The returned boolean reports whether a build ran.
-func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool, error) {
-	toolchain, swiftToolchainError := swiftToolchain()
+func ResolveSwiftEngine(paths Paths, commit string, contract int, versionOutput string) (string, bool, error) {
+	toolchain, swiftToolchainError := swiftToolchain(versionOutput)
 	if swiftToolchainError != nil {
 		return "", false, swiftToolchainError
 	}
@@ -84,12 +87,13 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 	return binaryPath, true, nil
 }
 
-// swiftToolchain identifies the installed Swift toolchain, as `swift --version` states it.
+// SwiftVersionOutput asks the installed Swift toolchain who it is, and returns what `swift --version` printed,
+// unchanged.
 //
 // A missing toolchain is an error naming the command that failed, never a fallback. Without one the
 // engine cannot be built and could not read the compiler's diagnostics if it were, so there is no
 // engine to fall back to: only a run that checks nothing.
-func swiftToolchain() (string, error) {
+func SwiftVersionOutput() (string, error) {
 	output, outputError := exec.Command("swift", "--version").Output()
 	if outputError != nil {
 		return "", fmt.Errorf(
@@ -97,7 +101,13 @@ func swiftToolchain() (string, error) {
 			outputError,
 		)
 	}
-	identity := strings.Join(strings.Fields(string(output)), " ")
+	return string(output), nil
+}
+
+// swiftToolchain identifies the installed Swift toolchain from what `swift --version` printed, its words
+// joined by single spaces, so the same toolchain reads the same however its output was carried.
+func swiftToolchain(versionOutput string) (string, error) {
+	identity := strings.Join(strings.Fields(versionOutput), " ")
 	if identity == "" {
 		return "", fmt.Errorf(
 			"`swift --version` printed nothing, so the toolchain the Swift engine would link against is unknown",

@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
-	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -162,9 +161,8 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(activeOutput.Mode == outputVerbose)
-	binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(
+	binaryPath, _, resolveSwiftEngineBinaryError := resolvedSwiftEngineBinary(
 		projectLocation{Root: directories[0], Engine: engineSwift},
-		release.Current(),
 	)
 	dispatch.Report.Clear()
 	if resolveSwiftEngineBinaryError != nil {

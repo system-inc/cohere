@@ -12,7 +12,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
-	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -20,12 +19,7 @@ import (
 // lintCache is the per-package findings cache the lint phase reads and writes, at the root's `.cache/cohere/go`,
 // beside the front door's own cache in `.cache/cohere`. It is nil under `--no-cache`, which reads and writes none,
 // and with an error when what every key shares cannot be read, which the run says on stderr and runs without it.
-func lintCache(
-	request invocation,
-	workspace project.Workspace,
-	loaded *load.Loaded,
-	enabled []rule.Rule,
-) (*check.Caching, error) {
+func lintCache(request invocation, workspace project.Workspace, enabled []rule.Rule) (*check.Caching, error) {
 	if request.switches["no-cache"] {
 		return nil, nil
 	}
@@ -33,7 +27,7 @@ func lintCache(
 	if identityError != nil {
 		return nil, fmt.Errorf("identifying the engine: %w", identityError)
 	}
-	build, buildError := cacheBuild(workspace.Root, workspace.Environment(), loaded.CgoTranslated)
+	build, buildError := cacheBuild(workspace.Root, workspace.Environment())
 	if buildError != nil {
 		return nil, buildError
 	}
@@ -57,9 +51,9 @@ var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
 
 // cacheBuild is the build context every key shares, in a fixed order: what go env reports in root for the target,
 // cgo, the flags with their build tags, the toolchain and its experiments, then the process's own variables an
-// analyzer reads, then which loader ran. A cgo project is loaded through go/packages with its cgo translated, which
-// gives its packages other files than the load from source does.
-func cacheBuild(root string, environment []string, cgoTranslated bool) ([]string, error) {
+// analyzer reads. The cache session adds which loader ran, which only the load knows: a cgo project is loaded through
+// go/packages with its cgo translated, which gives its packages other files than the load from source does.
+func cacheBuild(root string, environment []string) ([]string, error) {
 	names := []string{"GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOVERSION", "GOEXPERIMENT"}
 	command := exec.Command("go", append([]string{"env", "-json"}, names...)...)
 	command.Dir = root
@@ -75,7 +69,7 @@ func cacheBuild(root string, environment []string, cgoTranslated bool) ([]string
 	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
 		return nil, fmt.Errorf("reading the build context with go env in %s: %w", root, decodeError)
 	}
-	build := make([]string, 0, len(names)+len(processEnvironment)+1)
+	build := make([]string, 0, len(names)+len(processEnvironment))
 	for _, name := range names {
 		build = append(build, name+"="+values[name])
 	}
@@ -87,11 +81,7 @@ func cacheBuild(root string, environment []string, cgoTranslated bool) ([]string
 		}
 		build = append(build, "process "+name+"="+value)
 	}
-	loader := "source"
-	if cgoTranslated {
-		loader = "cgo-translated"
-	}
-	return append(build, "loader="+loader), nil
+	return build, nil
 }
 
 // cacheRuleSet is each enabled rule as its name, then its analyzer's options as they were resolved from the

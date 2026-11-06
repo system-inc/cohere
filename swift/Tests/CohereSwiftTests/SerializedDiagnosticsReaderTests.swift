@@ -72,6 +72,21 @@ struct SerializedDiagnosticsReaderTests {
         #expect(try !Self.reader().read(record).contains { $0.severity != nil })
     }
 
+    /* A caller's `xcrun --find swift` answer is taken only when it names an executable file; anything else and the engine asks. */
+    @Test func aGivenSwiftIsTakenOnlyWhenItIsAnExecutable() throws {
+        let variable = SerializedDiagnosticsReader.swiftExecutableVariable
+        let asked = try ProcessRunner().run("xcrun", ["--find", "swift"], in: URL(fileURLWithPath: "/"))
+        let printed = String(decoding: asked.standardOutput, as: UTF8.self)
+        #expect(
+            SerializedDiagnosticsReader.swiftExecutableGiven([variable: printed])
+                == printed.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        #expect(SerializedDiagnosticsReader.swiftExecutableGiven([:]) == nil)
+        #expect(SerializedDiagnosticsReader.swiftExecutableGiven([variable: ""]) == nil)
+        #expect(SerializedDiagnosticsReader.swiftExecutableGiven([variable: "swift"]) == nil)
+        #expect(SerializedDiagnosticsReader.swiftExecutableGiven([variable: "/nowhere/bin/swift"]) == nil)
+    }
+
     @Test func notesAreNotFindings() {
         #expect(SerializedDiagnosticsReader.severity(1) == nil)
         #expect(SerializedDiagnosticsReader.severity(2) == .warning)

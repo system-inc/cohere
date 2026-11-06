@@ -11,6 +11,10 @@
 // or schema.generated.go, gets no finding whatever its length or header: the name is the house's mark of a file a
 // generator writes, and its size is the generator's to keep, not a reader's to split. The engine's separate drop of a
 // file go/ast.IsGenerated accepts still applies on top of this.
+//
+// The max option moves the limit either way, as every engine's long-file rule takes it (#phdc7aa). A stricter limit
+// is a project's own business. A looser one departs from the ruling, so the engine runs it only where the settings'
+// go block states a departure for this rule with a reason, and refuses the run where they don't.
 package consistency_no_long_file
 
 import (
@@ -48,14 +52,17 @@ func NewAnalyzer() *analysis.Analyzer {
 		Doc: "Flags a file of more than 2,000 lines once, from the start of its 2,001st line to its end. Every " +
 			"line counts, comments and blank lines included, and a final newline ends the last line rather than " +
 			"adding one, so a file of 2,000 lines ending in a newline is not over. A file whose base name matches " +
-			"*.generated.* is exempt. The max option sets a stricter limit, and a looser one is refused.",
+			"*.generated.* is exempt. The max option sets a stricter limit or a looser one, and a looser one " +
+			"runs only beside a departure in the settings that says why.",
 		Run: run,
 	}
-	// A repository may hold its files to fewer lines than the house does, so the limit is the max option. It may only
-	// make the rule stricter: the house limit is a ruling, not a default to raise. Its value is refused below one or
-	// above the house limit when it is set, so a bad setting fails the run's configuration rather than this rule.
+	// A repository may hold its files to fewer lines than the house does, or to more, so the limit is the max option.
+	// A looser limit departs from a ruling, so the engine runs it only where the settings state a departure with a
+	// reason, which it learns from the value's Loosens. The value is refused below one when it is set, so a bad
+	// setting fails the run's configuration rather than this rule.
 	limit := lineLimit(defaultLimit)
-	analyzer.Flags.Var(&limit, maximumOption, "the most lines a file may hold, from 1 to 2000")
+	analyzer.Flags.Var(&limit, maximumOption, "the most lines a file may hold, 1 or more; above 2000 needs a "+
+		"departure stating why")
 	return analyzer
 }
 

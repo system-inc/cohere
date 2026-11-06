@@ -1,6 +1,7 @@
 package load
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -13,7 +14,9 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
+	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -34,6 +37,13 @@ type loader struct {
 	parsed     map[string]*parsedFile
 
 	withheld *withheldErrors
+
+	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
+	restored map[*packages.Package]*Restored
+
+	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
+	filesParsed    atomic.Int64
+	fromExportData atomic.Int64
 }
 
 // parsedFile is one file's parse, ready once done is closed.
@@ -108,11 +118,43 @@ func identifiersOf(stack []*node) string {
 	return "[" + strings.Join(identifiers, " ") + "]"
 }
 
-// load type-checks every reachable package. Each starts parsing at once and type-checks when its imports are
-// done; the graph is acyclic, so none waits forever.
+// load type-checks every reachable package the findings cache does not hold. Each starts parsing at once and
+// type-checks when its imports are done; the graph is acyclic, so none waits forever. A package the cache holds is
+// never parsed: its types are read from its export data once its imports are done, when a package checked here
+// imports it, directly or through other packages the cache holds, and are never read otherwise (see needed).
 func (loader *loader) load(reachable []*node) {
+	needed := loader.needed(reachable)
 	var group sync.WaitGroup
 	for _, current := range reachable {
+		if restored, held := loader.restored[current.loaded]; held {
+			loader.withheld.restore(current.loaded, restored.Withheld.Errors)
+			current.loaded.Fset = loader.fileSet
+			current.loaded.TypesSizes = loader.sizes
+			if !needed[current] {
+				close(current.done)
+				continue
+			}
+			group.Add(1)
+			go func() {
+				defer group.Done()
+				defer close(current.done)
+				for _, imported := range current.loaded.Imports {
+					<-loader.graph.nodes[imported.ID].done
+				}
+				loader.slots <- struct{}{}
+				readError := loader.readExportData(current, restored)
+				<-loader.slots
+				if readError == nil {
+					return
+				}
+				// Export data that does not read is a package checked from source after all, its imports done.
+				syntax, parseErrors := loader.parseFiles(current.loaded.CompiledGoFiles)
+				loader.slots <- struct{}{}
+				loader.check(current, syntax, parseErrors)
+				<-loader.slots
+			}()
+			continue
+		}
 		group.Add(1)
 		go func() {
 			defer group.Done()
@@ -127,6 +169,74 @@ func (loader *loader) load(reachable []*node) {
 		}()
 	}
 	group.Wait()
+}
+
+// needed is the packages whose types the load sets: each it checks from source, and each the cache holds that one
+// of those imports, directly or through other packages the cache holds.
+func (loader *loader) needed(reachable []*node) map[*node]bool {
+	needed := map[*node]bool{}
+	var need func(current *node)
+	need = func(current *node) {
+		if needed[current] {
+			return
+		}
+		needed[current] = true
+		for _, imported := range current.loaded.Imports {
+			need(loader.graph.nodes[imported.ID])
+		}
+	}
+	for _, current := range reachable {
+		if _, held := loader.restored[current.loaded]; !held {
+			need(current)
+		}
+	}
+	return needed
+}
+
+// readExportData sets a package's types from the export data the findings cache holds, against the types its
+// imports already have: every package its export data names is among its imports, transitively, and is put in the
+// importer's map first, so each object is the one that package declares, and every package of the run has exactly
+// one *types.Package. The package's own imports are set to the ones its type check had, in its order, since export
+// data names every package it reaches.
+//
+// Mutates: current its package gains its types
+func (loader *loader) readExportData(current *node, restored *Restored) error {
+	loaded := current.loaded
+	if loaded.PkgPath == "unsafe" {
+		loaded.Types = types.Unsafe
+		return nil
+	}
+	imports := map[string]*types.Package{}
+	var collect func(importer *packages.Package)
+	collect = func(importer *packages.Package) {
+		for _, imported := range importer.Imports {
+			if _, collected := imports[imported.PkgPath]; collected || imported.Types == nil {
+				continue
+			}
+			imports[imported.PkgPath] = imported.Types
+			collect(imported)
+		}
+	}
+	collect(loaded)
+	own := types.NewPackage(loaded.PkgPath, loaded.Name)
+	imports[loaded.PkgPath] = own
+	read, readError := gcexportdata.Read(bytes.NewReader(restored.ExportData), loader.fileSet, imports, loaded.PkgPath)
+	if readError != nil {
+		return fmt.Errorf("reading the export data of %s: %w", loaded.ID, readError)
+	}
+	ownImports := make([]*types.Package, 0, len(restored.Imports))
+	for _, path := range restored.Imports {
+		imported, found := imports[path]
+		if !found {
+			return fmt.Errorf("reading the export data of %s: it imports %s, which none of its imports is", loaded.ID,
+				path)
+		}
+		ownImports = append(ownImports, imported)
+	}
+	read.SetImports(ownImports)
+	loaded.Types = read
+	loader.fromExportData.Add(1)
+	return nil
 }
 
 // parseFiles parses each of files, each file once however many packages hold it, and returns the syntax of those
@@ -168,6 +278,7 @@ func (loader *loader) parseFiles(files []string) ([]*ast.File, []error) {
 
 // parseFile reads and parses one file in the mode go/packages parses in.
 func (loader *loader) parseFile(file string) (*ast.File, error) {
+	loader.filesParsed.Add(1)
 	contents, readError := os.ReadFile(file)
 	if readError != nil {
 		return nil, readError
@@ -233,7 +344,7 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 		reach := newCgoReach(loader.fileSet, loaded, current.listed)
 		for _, typeError := range judged {
 			if reach.errorReaches(syntax, typeError.Pos) {
-				loader.withheld.add(loaded.PkgPath, typeError.Fset.Position(typeError.Pos), typeError.Msg)
+				loader.withheld.add(loaded, typeError.Fset.Position(typeError.Pos), typeError.Msg)
 				continue
 			}
 			loader.appendError(current, typeError)

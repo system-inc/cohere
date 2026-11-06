@@ -1,5 +1,6 @@
 import Foundation
 import IndexStoreShim
+import Synchronization
 
 /*
  The index store every debug `swift build` writes beside its products (`<scratch>/out/v5`), or an xcodebuild under
@@ -17,7 +18,8 @@ import IndexStoreShim
 
  `@safe` though it holds the store and the library's C functions: they are private, bound in `init` and called
  only in the readers at the bottom of this class, and every string the library lends there is copied into Swift
- before the reader that lent it is disposed.
+ before the reader that lent it is disposed. Each reader opens its own unit or record file and touches nothing
+ but what `init` bound, so several threads may read at once; the caches are filled on one thread.
  */
 @safe final class IndexStore {
     /* The library or the store could not be opened. */
@@ -164,6 +166,12 @@ import IndexStoreShim
 
     /* Every unit in the store, read once, on first use. */
     private var cachedUnits: [Unit]?
+    /*
+     Each file's own records, built once from `cachedUnits` on first use, so a run asking for every file builds it
+     once rather than once a file. It holds no file's modification date: which record is fresh is still asked of
+     the file as it stands, each time `freshRecord(atPath:modified:)` is asked.
+     */
+    private var cachedRecords: [String: [(record: String, written: Date)]]?
 
     init(libraryPath: String, storePath: URL) throws {
         guard let handle = unsafe dlopen(libraryPath, RTLD_NOW | RTLD_LOCAL) else {
@@ -291,15 +299,49 @@ import IndexStoreShim
         }
     }
 
-    /* Every name in the file and what it resolves to, or nil when no unit newer than the file describes it. */
-    func symbols(of file: URL) -> FileSymbols? {
-        let path = file.resolvingSymlinksInPath().path
-        let sourceModified =
-            (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture
-        guard
-            let newest = records()[path]?.filter({ $0.written >= sourceModified }).max(by: { $0.written < $1.written })
-        else { return nil }
-        guard let recorded = occurrences(inRecord: newest.record) else { return nil }
+    /*
+     Each file's names and what they resolve to, from the first of the stores, in their order, holding a unit newer
+     than the file that describes it; nil for a file none of them can vouch for. Each file's path and modification
+     date are asked once, for every store. Which records may answer is asked on this thread, where the stores fill
+     their caches; the records are then read side by side, since a record's reader touches only what `init` bound,
+     the way indexstore-db reads records concurrently (swiftlang/indexstore-db#300).
+     */
+    static func symbols(of files: [URL], in stores: [IndexStore]) -> [FileSymbols?] {
+        /*
+         Shared with the reading threads, which only call `symbols(inRecord:)` on these stores: it reads no cache and
+         nothing but the `let`s `init` bound, and each record's reader is its own. The caches are filled here, first.
+         */
+        nonisolated(unsafe) let candidates = files.map { file in
+            let path = file.resolvingSymlinksInPath().path
+            let modified =
+                (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                ?? .distantFuture
+            return stores.compactMap { store in
+                store.freshRecord(atPath: path, modified: modified).map { (store: store, record: $0) }
+            }
+        }
+        let found = Mutex<[FileSymbols?]>(Array(repeating: nil, count: files.count))
+        DispatchQueue.concurrentPerform(iterations: files.count) { index in
+            /* A record that cannot be read leaves the file to the next store's, as a store with no fresh unit does. */
+            guard
+                let symbols = unsafe candidates[index].lazy.compactMap({ $0.store.symbols(inRecord: $0.record) }).first
+            else { return }
+            found.withLock { $0[index] = symbols }
+        }
+        return found.withLock { $0 }
+    }
+
+    /*
+     The record that describes the file at this resolved path as it stands: the newest of the file's own that a
+     unit written no earlier than `modified` names. An older unit describes text that is no longer there.
+     */
+    private func freshRecord(atPath path: String, modified: Date) -> String? {
+        records()[path]?.filter { $0.written >= modified }.max { $0.written < $1.written }?.record
+    }
+
+    /* Every name one record holds and what it resolves to, or nil when the record cannot be read. */
+    private func symbols(inRecord record: String) -> FileSymbols? {
+        guard let recorded = occurrences(inRecord: record) else { return nil }
         return FileSymbols(
             recorded.map { occurrence in
                 FileSymbols.Occurrence(
@@ -350,12 +392,20 @@ import IndexStoreShim
         return newest
     }
 
-    /* Each file's records, by resolved path, with when the unit naming them was written. */
+    /*
+     Each file's records, by resolved path, with when the unit naming them was written, in the order the units were
+     listed. Built once per store: Presence warm (#nkk91tv) rebuilt it for every file the typed rules read, 2.8 of
+     the lint phase's 6.8 seconds.
+     */
     private func records() -> [String: [(record: String, written: Date)]] {
+        if let cachedRecords {
+            return cachedRecords
+        }
         var byFile: [String: [(record: String, written: Date)]] = [:]
         for unit in units() where !unit.mainFile.isEmpty {
             byFile[unit.mainFile, default: []].append(contentsOf: unit.ownRecords.map { ($0, unit.written) })
         }
+        cachedRecords = byFile
         return byFile
     }
 
@@ -364,31 +414,79 @@ import IndexStoreShim
      versioned SDK it links to, so each SDK root is resolved once and every path under it is written through that.
      */
     final class SDKRoots {
+        private static let marker = Array(".sdk/".utf8)
+
         private var resolved: [String: String] = [:]
 
         func canonical(_ path: String) -> String {
-            guard let range = path.range(of: ".sdk/") else { return path }
-            let root = String(path[..<range.upperBound])
+            guard let rootEnd = Self.rootEnd(in: path) else { return path }
+            let root = String(path[..<rootEnd])
             if resolved[root] == nil {
                 resolved[root] = URL(fileURLWithPath: root).resolvingSymlinksInPath().path + "/"
             }
-            return (resolved[root] ?? root) + path[range.upperBound...]
+            return (resolved[root] ?? root) + path[rootEnd...]
+        }
+
+        /*
+         Where the first `.sdk/` in the path ends, found byte by byte. Foundation's `range(of:)` compares as text,
+         and filling Presence's units asks this of every file a Clang module read: 291 samples of the 840 the fill
+         took (#nkk91tv), where this scan takes a twelfth of the time. On a mismatch the match restarts at the
+         byte itself only when it is the marker's `.`, since no shorter part of `.sdk/` begins it again.
+         */
+        static func rootEnd(in path: String) -> String.Index? {
+            let bytes = path.utf8
+            var matched = 0
+            var index = bytes.startIndex
+            while index != bytes.endIndex {
+                let byte = bytes[index]
+                bytes.formIndex(after: &index)
+                if byte == marker[matched] {
+                    matched += 1
+                    if matched == marker.count {
+                        return index
+                    }
+                }
+                else {
+                    matched = byte == marker[0] ? 1 : 0
+                }
+            }
+            return nil
         }
     }
 
-    /* Every unit in the store, read once. Measured on Presence: 2,531 units, listed in 9ms. */
+    /*
+     Every unit in the store, read once. Measured on Presence: 2,531 units, listed in 9ms. Each unit's file is read
+     side by side, its reader touching only what `init` bound, since opening and reading them one at a time was most
+     of the 840 samples the fill took there (#nkk91tv); the units are then built in the order the store listed
+     them, on this thread, where the SDK roots are resolved.
+     */
     func units() -> [Unit] {
         if let cachedUnits {
             return cachedUnits
         }
         let unitsDirectory = storePath.appendingPathComponent("v5/units", isDirectory: true)
+        let names = unitNames()
+        let readings = Mutex<[(reading: UnitReading, mainFile: String, written: Date)?]>(
+            Array(repeating: nil, count: names.count)
+        )
+        /*
+         Shared with the reading threads, which only call `readUnit(named:)`: it reads no cache and nothing but the
+         `let`s `init` bound, and each unit's reader is its own. The cache is written below, on this thread.
+         */
+        nonisolated(unsafe) let store = self
+        DispatchQueue.concurrentPerform(iterations: names.count) { index in
+            guard let reading = unsafe store.readUnit(named: names[index]) else { return }
+            let mainFile =
+                reading.mainFile.isEmpty ? "" : URL(fileURLWithPath: reading.mainFile).resolvingSymlinksInPath().path
+            let written =
+                (try? unitsDirectory.appendingPathComponent(names[index])
+                    .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            readings.withLock { $0[index] = (reading, mainFile, written) }
+        }
         var units: [Unit] = []
         let sdkRoots = SDKRoots()
-        for name in unitNames() {
-            guard let reading = readUnit(named: name) else { continue }
-            let written =
-                (try? unitsDirectory.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey])
-                    .contentModificationDate) ?? .distantPast
+        for (name, read) in zip(names, readings.withLock { $0 }) {
+            guard let (reading, mainFile, written) = read else { continue }
             var imported: [String] = []
             var own: [String] = []
             var all: [String] = []
@@ -414,8 +512,7 @@ import IndexStoreShim
             units.append(
                 Unit(
                     name: name,
-                    mainFile: reading.mainFile.isEmpty
-                        ? "" : URL(fileURLWithPath: reading.mainFile).resolvingSymlinksInPath().path,
+                    mainFile: mainFile,
                     module: reading.module,
                     outputFile: reading.outputFile,
                     isSystem: reading.isSystem,
