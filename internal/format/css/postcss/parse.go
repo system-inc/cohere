@@ -90,6 +90,11 @@ func toEstree(each *node, in *input) *estree.Node {
 				pair["scss"] = estree.String(typed.scss)
 			}
 			raws[key] = pair
+		default:
+			// Invariant: rawEntry's three kinds above are every type that implements it, and the parsers store
+			// only non-nil ones, so a kind added without an arm here fails loudly instead of leaving its raw out;
+			// Parse recovers the panic into an error.
+			panic(fmt.Sprintf("postcss: raws.%s is a %T, which toEstree has no arm for", key, entry))
 		}
 	}
 	result := estree.New(each.nodeType, start, end, []estree.Property{{Key: "raws", Value: raws}})
