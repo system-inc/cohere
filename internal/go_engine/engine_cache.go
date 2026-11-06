@@ -38,7 +38,8 @@ func lintCache(
 		return nil, buildError
 	}
 	return &check.Caching{
-		Store: cache.Open(workspace.Root),
+		Store:       cache.Open(workspace.Root),
+		ExtraInputs: newStaticcheckConfigurationInputs().inputs,
 		Context: cache.Context{
 			FormatVersion:  check.CacheFormatVersion,
 			EngineIdentity: identity,
@@ -48,10 +49,16 @@ func lintCache(
 	}, nil
 }
 
+// processEnvironment are the engine process's own variables an analyzer reads, each named in the build context
+// whether it is set or not. asmdecl and framepointer read the target from go/build's build.Default, which comes from
+// the process's `GOOS` and `GOARCH`, not from go env, so the two can differ. staticcheck's TOML parser, which reads
+// staticcheck.conf, reads `BURNTSUSHI_TOML_110`.
+var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
+
 // cacheBuild is the build context every key shares, in a fixed order: what go env reports in root for the target,
-// cgo, the flags with their build tags, the toolchain and its experiments, then which loader ran. A cgo project is
-// loaded through go/packages with its cgo translated, which gives its packages other files than the load from
-// source does.
+// cgo, the flags with their build tags, the toolchain and its experiments, then the process's own variables an
+// analyzer reads, then which loader ran. A cgo project is loaded through go/packages with its cgo translated, which
+// gives its packages other files than the load from source does.
 func cacheBuild(root string, environment []string, cgoTranslated bool) ([]string, error) {
 	names := []string{"GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOVERSION", "GOEXPERIMENT"}
 	command := exec.Command("go", append([]string{"env", "-json"}, names...)...)
@@ -68,9 +75,17 @@ func cacheBuild(root string, environment []string, cgoTranslated bool) ([]string
 	if decodeError := json.Unmarshal(output, &values); decodeError != nil {
 		return nil, fmt.Errorf("reading the build context with go env in %s: %w", root, decodeError)
 	}
-	build := make([]string, 0, len(names)+1)
+	build := make([]string, 0, len(names)+len(processEnvironment)+1)
 	for _, name := range names {
 		build = append(build, name+"="+values[name])
+	}
+	for _, name := range processEnvironment {
+		value, set := os.LookupEnv(name)
+		if !set {
+			build = append(build, "process "+name+" unset")
+			continue
+		}
+		build = append(build, "process "+name+"="+value)
 	}
 	loader := "source"
 	if cgoTranslated {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -28,15 +29,16 @@ type cachedRun struct {
 	counts        contract.LintCache
 }
 
-// runCachedEngine runs the engine over root, in process, and fails the test unless it exits with the vet-finding case's
-// exit 1 and writes a lint record.
+// runCachedEngine runs the engine over root, in process, and fails the test unless it exits with a summary, 0 or 1,
+// says nothing on stderr and writes a lint record.
 func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := run(arguments, &standardOutput, &standardError, rules.All()); exitCode != exitFindings {
-		test.Fatalf("exit %d, want %d; stderr:\n%s", exitCode, exitFindings, standardError.String())
+	if exitCode := run(arguments, &standardOutput, &standardError, rules.All()); exitCode != exitClean &&
+		exitCode != exitFindings {
+		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
 	if standardError.Len() > 0 {
 		test.Fatalf("want nothing on stderr, got:\n%s", standardError.String())
@@ -148,5 +150,77 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 	runCachedEngine(test, fresh, "--no-cache")
 	if _, statError := os.Stat(filepath.Join(fresh, ".cache", "cohere", "go")); !os.IsNotExist(statError) {
 		test.Fatalf("want no store made under --no-cache, got %v", statError)
+	}
+}
+
+// A staticcheck.conf in a directory above a package is among the package's inputs, since staticcheck's config
+// analyzer reads every one from the package's directory up: planting one that allows the fixture's dot import
+// misses the package and drops ST1001's finding, and removing it again brings the finding back, each run writing
+// what a run under `--no-cache` writes. Were the file outside the key, the run after planting it would restore the
+// finding it no longer has.
+func TestAStaticcheckConfAboveAPackageIsInItsKey(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "staticcheck-conf"))
+	configuration := filepath.Join(root, "staticcheck.conf")
+	for _, state := range []struct {
+		name     string
+		contents string
+		reported bool
+	}{
+		{name: "no staticcheck.conf", reported: true},
+		{name: "one allowing the dot import", contents: "dot_import_whitelist = [\"strings\"]\n"},
+		{name: "it removed again", reported: true},
+	} {
+		if state.contents == "" {
+			if removeError := os.Remove(configuration); removeError != nil && !os.IsNotExist(removeError) {
+				test.Fatalf("%s: removing %s: %v", state.name, configuration, removeError)
+			}
+		} else if writeError := os.WriteFile(configuration, []byte(state.contents), 0o644); writeError != nil {
+			test.Fatalf("%s: writing %s: %v", state.name, configuration, writeError)
+		}
+		cached := runCachedEngine(test, root)
+		uncached := runCachedEngine(test, root, "--no-cache")
+		if cached.withoutCounts != uncached.withoutCounts {
+			test.Fatalf("%s: cached\n%s\nunder --no-cache\n%s", state.name, cached.withoutCounts,
+				uncached.withoutCounts)
+		}
+		if reported := strings.Contains(cached.stream, `"rule":"cohere-go/ST1001"`); reported != state.reported {
+			test.Fatalf("%s: want ST1001 reported %t, got %t in\n%s", state.name, state.reported, reported,
+				cached.stream)
+		}
+	}
+}
+
+// The build context names the process's own `GOOS`, `GOARCH` and `BURNTSUSHI_TOML_110`, set or unset, apart from what
+// go env reports, since asmdecl and framepointer read the target from the process and staticcheck's TOML parser reads
+// the last: a run under another value keys every package apart.
+//
+// Not parallel: it sets the process's own `GOARCH` and `BURNTSUSHI_TOML_110`, which every test in the process reads.
+func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T) {
+	root, absoluteError := filepath.Abs(filepath.Join("testdata", "vet-finding"))
+	if absoluteError != nil {
+		test.Fatalf("resolving the fixture: %v", absoluteError)
+	}
+	test.Setenv("GOARCH", "arm64")
+	test.Setenv("BURNTSUSHI_TOML_110", "1")
+	set, setError := cacheBuild(root, nil, false)
+	if setError != nil {
+		test.Fatalf("reading the build context: %v", setError)
+	}
+	for _, expected := range []string{"process GOARCH=arm64", "process BURNTSUSHI_TOML_110=1"} {
+		if !slices.Contains(set, expected) {
+			test.Errorf("want %q in %q", expected, set)
+		}
+	}
+	if unsetError := os.Unsetenv("BURNTSUSHI_TOML_110"); unsetError != nil {
+		test.Fatalf("unsetting BURNTSUSHI_TOML_110: %v", unsetError)
+	}
+	unset, unsetBuildError := cacheBuild(root, nil, false)
+	if unsetBuildError != nil {
+		test.Fatalf("reading the build context: %v", unsetBuildError)
+	}
+	if !slices.Contains(unset, "process BURNTSUSHI_TOML_110 unset") {
+		test.Errorf("want BURNTSUSHI_TOML_110 named unset in %q", unset)
 	}
 }
