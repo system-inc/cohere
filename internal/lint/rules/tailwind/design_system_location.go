@@ -54,22 +54,22 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 		}
 		if len(raw) > 0 {
 			if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
-				return decoded, fmt.Errorf("decoding %T: %w", decoded, unmarshalOptionsError)
+				return decoded, fmt.Errorf("reading its options: %w", unmarshalOptionsError)
 			}
 			var own map[string]json.RawMessage
 			if decodeError := json.Unmarshal(raw, &own); decodeError != nil {
-				return decoded, fmt.Errorf("decoding %T: %w", decoded, decodeError)
+				return decoded, fmt.Errorf("reading its options: %w", decodeError)
 			}
 			maps.Copy(merged, own)
 		}
 		if len(merged) > 0 {
 			encoded, encodeError := json.Marshal(merged)
 			if encodeError != nil {
-				return decoded, fmt.Errorf("merging settings into %T: %w", decoded, encodeError)
+				return decoded, fmt.Errorf("merging the settings into its options: %w", encodeError)
 			}
 			decoded = *new(Options)
 			if unmarshalOptionsError := rule.UnmarshalOptions(encoded, &decoded); unmarshalOptionsError != nil {
-				return decoded, fmt.Errorf("decoding %T with settings merged: %w", decoded, unmarshalOptionsError)
+				return decoded, fmt.Errorf("reading its options with the settings merged: %w", unmarshalOptionsError)
 			}
 		}
 		anchor := base.ConfigDirectory
@@ -80,7 +80,7 @@ func decodeTailwindOptionsAt[Options any, Settled interface {
 		// Checked and compiled here, once per configuration selection, rather than by the rule on every
 		// file.
 		if compileClassLiteralsError := Settled(&decoded).compileClassLiterals(); compileClassLiteralsError != nil {
-			return decoded, fmt.Errorf("decoding %T: %w", decoded, compileClassLiteralsError)
+			return decoded, fmt.Errorf("reading its options: %w", compileClassLiteralsError)
 		}
 		return decoded, nil
 	}
