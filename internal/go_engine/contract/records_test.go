@@ -327,6 +327,11 @@ func populatedRecords() []Record {
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
+		InputsRecord{
+			Files:       []string{"/project/a.go", "/project/go.mod"},
+			Directories: []string{"/project"},
+			Absent:      []string{"/go.work"},
+		},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
 	}
 }
@@ -416,6 +421,7 @@ func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 		KindLint:       func() Record { return &LintRecord{} },
 		KindPhase:      func() Record { return &PhaseRecord{} },
 		KindRule:       func() Record { return &RuleRecord{} },
+		KindInputs:     func() Record { return &InputsRecord{} },
 		KindSummary:    func() Record { return &SummaryRecord{} },
 	}
 	fixtures, globError := filepath.Glob(contractFixtures)
@@ -529,5 +535,62 @@ func TestTypesRecordWritesNoWithheldFilesAsAnEmptyList(test *testing.T) {
 	}
 	if !strings.Contains(output.String(), `"withheldInDependencyCgo":[]`) {
 		test.Errorf("an empty types record wrote %s, want %s in it", output.String(), `"withheldInDependencyCgo":[]`)
+	}
+}
+
+// TestInputsRecordWritesEmptyListsAsLists keeps an unset list from encoding as null, which would read as "not
+// recorded" rather than "nothing read".
+func TestInputsRecordWritesEmptyListsAsLists(test *testing.T) {
+	test.Parallel()
+	var output bytes.Buffer
+	writer := NewWriter(&output)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, InputsRecord{}} {
+		if writeError := writer.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	for _, field := range []string{`"files":[]`, `"directories":[]`, `"absent":[]`} {
+		if !strings.Contains(output.String(), field) {
+			test.Errorf("an empty inputs record wrote %s, want %s in it", output.String(), field)
+		}
+	}
+}
+
+// TestInputsRecordRoundTrips decodes a written inputs record and writes it again, so the front door, which decodes
+// the line into its own type, reads back every path the engine declared, in order.
+func TestInputsRecordRoundTrips(test *testing.T) {
+	test.Parallel()
+	written := InputsRecord{
+		Files:       []string{"/goroot/VERSION", "/project/a.go", "/project/go.mod"},
+		Directories: []string{"/project", "/project/nested"},
+		Absent:      []string{"/go.work", "/project/go.sum"},
+	}
+	var first bytes.Buffer
+	writer := NewWriter(&first)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, written} {
+		if writeError := writer.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	lines := strings.Split(strings.TrimSuffix(first.String(), "\n"), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[1], `{"kind":"inputs",`) {
+		test.Fatalf("want a provenance line and an inputs line, got:\n%s", first.String())
+	}
+	var decoded InputsRecord
+	if decodeError := json.Unmarshal([]byte(lines[1]), &decoded); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if !reflect.DeepEqual(decoded, written) {
+		test.Errorf("decoded %+v, want %+v", decoded, written)
+	}
+	var second bytes.Buffer
+	rewriter := NewWriter(&second)
+	for _, record := range []Record{ProvenanceRecord{Contract: Version}, decoded} {
+		if writeError := rewriter.Write(record); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if second.String() != first.String() {
+		test.Errorf("the decoded record wrote\n%s\nwant\n%s", second.String(), first.String())
 	}
 }

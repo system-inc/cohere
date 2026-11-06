@@ -83,6 +83,7 @@ func newNode(listedPackage *listedPackage, id string, workspace string) *node {
 		OtherFiles: absolute(directory, listedPackage.CFiles, listedPackage.CxxFiles, listedPackage.MFiles,
 			listedPackage.HFiles, listedPackage.FFiles, listedPackage.SFiles, listedPackage.SwigFiles,
 			listedPackage.SwigCxxFiles, listedPackage.SysoFiles),
+		EmbedFiles:   absolute(directory, listedPackage.EmbedFiles),
 		IgnoredFiles: absolute(directory, listedPackage.IgnoredGoFiles, listedPackage.IgnoredOtherFiles),
 		Module:       listedPackage.Module,
 	}
@@ -175,6 +176,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 	if len(root.TestGoFiles) > 0 || root.Name == "main" {
 		withTests := *root
 		withTests.GoFiles = slices.Concat(root.GoFiles, root.TestGoFiles)
+		withTests.EmbedFiles = slices.Concat(root.EmbedFiles, root.TestEmbedFiles)
 		inPackage = newNode(&withTests, path+suffix, workspace)
 		inPackage.loaded.ForTest = path
 		for written, resolved := range resolvedImports(root, root.TestImports) {
@@ -245,6 +247,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 			Directory:  root.Directory,
 			Module:     root.Module,
 			GoFiles:    root.XTestGoFiles,
+			EmbedFiles: root.XTestEmbedFiles,
 			ImportMap:  root.ImportMap,
 		}
 		externalNode := newNode(external, path+"_test"+suffix, workspace)

@@ -78,6 +78,9 @@ type Loaded struct {
 
 	// Elapsed is how long the whole load took.
 	Elapsed time.Duration
+
+	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
+	Inputs Inputs
 }
 
 // Packages loads the packages the patterns name from directory, with the current environment plus
@@ -106,7 +109,7 @@ func loadWorkspace(
 	if environmentError != nil {
 		return nil, environmentError
 	}
-	buildContext, contextError := constraintContext(workspace, fullEnvironment)
+	buildContext, reported, contextError := constraintContext(workspace, fullEnvironment)
 	if contextError != nil {
 		return nil, contextError
 	}
@@ -136,6 +139,7 @@ func loadWorkspace(
 		return nil, excludedError
 	}
 	loaded.Excluded, loaded.Unseen = excluded, unseen
+	loaded.Inputs = collectInputs(workspace, reported, roots, census)
 	loaded.Elapsed = time.Since(started)
 	return loaded, nil
 }

@@ -34,6 +34,8 @@ const (
 	KindPhase Kind = "phase"
 	// KindRule is one rule, under `--rules` and `--rules-enabled`.
 	KindRule Kind = "rule"
+	// KindInputs names what a check run read, just before its summary, for the front door's replay.
+	KindInputs Kind = "inputs"
 	// KindSummary closes every checking stream.
 	KindSummary Kind = "summary"
 )

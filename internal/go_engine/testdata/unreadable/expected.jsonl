@@ -9,4 +9,5 @@
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":0,"detail":""}
 {"kind":"phase","name":"lint","outcome":"notReached","elapsedMilliseconds":0,"detail":"types bailed: 2 type errors, so lint findings against wrong semantics would be noise"}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
+{"kind":"inputs","files":["/project/.git/info/exclude","/project/clean.go","/project/clean_test.go","/project/go.mod"],"directories":["/project"],"absent":["/project/.gitignore","/project/CohereSettings.json","/project/go.sum","/project/go.work","/project/vendor/modules.txt"]}
 {"kind":"summary","findings":2,"complete":false,"exitCode":1}
