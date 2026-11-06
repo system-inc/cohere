@@ -1,0 +1,16 @@
+{
+    "why": "us08: `O_RDONLY_MODE` is not the upstream spelling of `O_RDONLY`, so it mirrors nothing and is reported",
+    "expect": [
+        {
+            "covers": "O_RDONLY_MODE",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

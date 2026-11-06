@@ -103,12 +103,31 @@ public struct RuleConfiguration: Equatable, Sendable {
                 note: "config: \(path) has no swift block, so every house rule ran at error",
             )
         }
-        guard let rules = (swiftBlock as? [String: Any])?["rules"] as? [String: Any] else {
+        guard let block = swiftBlock as? [String: Any] else {
+            throw ReadFailure(path: path, reason: "the swift block is not an object")
+        }
+        /* A key the engine does not read configures nothing while looking chosen, a typo for `rules` above all, so it is refused by name. */
+        if let unread = block.keys.filter({ $0 != "rules" }).min() {
+            throw ReadFailure(
+                path: path,
+                reason:
+                    "the swift block's \"\(unread)\" is not read by cohere-swift, whose block holds only rules; remove it",
+            )
+        }
+        guard let rules = block["rules"] as? [String: Any] else {
             throw ReadFailure(path: path, reason: "the swift block has no rules object")
         }
+        let known = Set(RuleRegistry.allNames)
         var severities: [String: Severity] = [:]
         var options: [String: [String: Int]] = [:]
         for (name, value) in rules {
+            /* A misspelled or retired rule name would leave the rule it meant at its default without a word. */
+            guard known.contains(name) else {
+                throw ReadFailure(
+                    path: path,
+                    reason: "\(name) is not a rule cohere-swift has (cohere --rules lists them); correct or remove it",
+                )
+            }
             if let array = value as? [Any], array.count > 1 {
                 options[name] = try ruleOptions(of: name, array: array, path: path)
             }

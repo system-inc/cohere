@@ -1,0 +1,11 @@
+{
+    "why": "wc12: `TODO2` is one word, since digits are word characters, and is clean",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

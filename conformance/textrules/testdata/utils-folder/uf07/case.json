@@ -1,0 +1,14 @@
+{
+    "why": "uf07: lowercased and with leading underscores removed, `_Utils` is banned. Go has no form: the go tool ignores a directory whose name starts with `_`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "upper/_Utils/uf07",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

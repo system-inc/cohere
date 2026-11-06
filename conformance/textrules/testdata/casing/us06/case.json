@@ -1,0 +1,16 @@
+{
+    "why": "us06: values are lowerCamel, so a local value with a leading capital is reported at its declaration",
+    "expect": [
+        {
+            "covers": "MaxSize",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

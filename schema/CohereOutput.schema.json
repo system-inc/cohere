@@ -57,6 +57,7 @@
                 "kind": { "const": "summary" },
                 "schemaVersion": { "const": 1, "description": "Raised by any change a reader could notice; a new optional field does not raise it." },
                 "label": { "type": "string", "description": "The project's path, in a repository with several projects." },
+                "error": { "type": "string", "description": "Why the run stopped before it could judge anything, such as a tsconfig that does not load, in the words the human view prints. Present only then, and the verdict is fail." },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },
                 "graphSeconds": { "type": "number", "description": "Reading, parsing and binding the program; zero when no graph was built." },

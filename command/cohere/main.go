@@ -56,6 +56,7 @@ func main() {
 		// The chain is lowercase clauses until here, the one place a person reads it, where it becomes a
 		// sentence (see package sentence).
 		fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(runError))
+		writeFailedRunSummary(streams.Output, runError)
 		exitProcess(1)
 	}
 	finishRunCache(0)

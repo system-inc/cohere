@@ -180,7 +180,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 		printInvocation(out, "%s\n",
 			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJson:
-		printInvocation(out, "%s", jsonLine(summaryAsJson(summary)))
+		printInvocation(out, "%s", summaryJsonLine(summaryAsJson(summary)))
 	default:
 		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
