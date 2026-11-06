@@ -202,6 +202,16 @@ type runGaps struct {
 	// them, less those the runs of the Swift projects below it account for (#ybspptb). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
+	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
+	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
+	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
+	// counted, with its package and how many errors it held, so a reader can find what went unsaid.
+	WithheldInDependencyCgo []withheldCgoFile `json:"withheldInDependencyCgo,omitempty"`
+	// WithheldDependencyCgoDeclarations counts the declarations of dependencies with cgo files that every rule
+	// was given without their bodies or initial values, since no cgo tool ran. A gap, not a failure, as the
+	// files above are. Counted and not named because the engine counts them and names none: they are spread
+	// over whole packages, and the count is what says the rules saw less of those dependencies than all of it.
+	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
 }
 
 // uncheckedSwiftFile is one Swift file of a run's gap: the file as the engine names it, and the engine's reason
@@ -209,6 +219,15 @@ type runGaps struct {
 type uncheckedSwiftFile struct {
 	File   string `json:"file"`
 	Reason string `json:"reason"`
+}
+
+// withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,
+// the file as the engine names it, and how many errors it held. The same fields the Go engine's types record
+// writes (internal/goengine/contract.WithheldFile), so the record decodes into it and `--json` writes it as is.
+type withheldCgoFile struct {
+	Package string `json:"package"`
+	File    string `json:"file"`
+	Errors  int    `json:"errors"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings

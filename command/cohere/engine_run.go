@@ -140,6 +140,12 @@ type engineTypesRecord struct {
 	Files               int      `json:"files"`
 	ElapsedMilliseconds int      `json:"elapsedMilliseconds"`
 	FilesWithoutRecord  []string `json:"filesWithoutRecord"`
+	// WithheldInDependencyCgo and WithheldDependencyCgoDeclarations are the Go engine's, additive within contract
+	// 3: what a run withheld because no cgo tool ran, the type errors in a dependency's cgo files by file, and
+	// the count of dependency declarations given without bodies or initial values. A Swift engine sends neither,
+	// which decodes as none.
+	WithheldInDependencyCgo           []withheldCgoFile `json:"withheldInDependencyCgo"`
+	WithheldDependencyCgoDeclarations int               `json:"withheldDependencyCgoDeclarations"`
 }
 
 type engineLintRecord struct {
@@ -252,6 +258,12 @@ type engineRun struct {
 	filesWithoutRecord int
 	crashes            int
 	unreadable         []engineUnreadableRecord
+
+	// What the types records say a Go run withheld because no cgo tool ran, already printed as notes and held
+	// for the summary's gaps. Neither makes the run incomplete: what was withheld is a dependency's, not the
+	// project's to fix.
+	withheldInDependencyCgo           []withheldCgoFile
+	withheldDependencyCgoDeclarations int
 
 	excludedPrinted bool
 
@@ -734,8 +746,51 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+
+	// Said, so a run that withheld what no cgo tool could settle never reads like one with nothing to withhold:
+	// counted under the types line, then each file by name, since a withheld file nobody can find is half said.
+	if withheld := withheldCgoSentence(
+		record.WithheldInDependencyCgo,
+		record.WithheldDependencyCgoDeclarations,
+	); withheld != "" {
+		fmt.Fprintf(accountOutput(run.out), "  types: %s\n", withheld)
+	}
+	for _, file := range record.WithheldInDependencyCgo {
+		fmt.Fprintf(accountOutput(run.out), "  types: withheld %s in %s (package %s)\n",
+			counted(file.Errors, "type error", "type errors"), file.File, file.Package)
+	}
+	run.withheldInDependencyCgo = append(run.withheldInDependencyCgo, record.WithheldInDependencyCgo...)
+	run.withheldDependencyCgoDeclarations += record.WithheldDependencyCgoDeclarations
 	streams.Show(run.out)
 	return nil
+}
+
+// withheldCgoSentence counts what a Go run withheld because no cgo tool ran, in one clause, or is empty when it
+// withheld nothing: the type errors and the files they are in, then the declarations given without bodies or
+// initial values, each said only when there are some.
+func withheldCgoSentence(files []withheldCgoFile, declarations int) string {
+	typeErrors := 0
+	for _, file := range files {
+		typeErrors += file.Errors
+	}
+	const reason = ", since no cgo tool ran"
+	switch {
+	case len(files) > 0 && declarations > 0:
+		return fmt.Sprintf("withheld %s in %s of dependencies with cgo, and %s given without bodies or initial values",
+			counted(typeErrors, "type error", "type errors"), counted(len(files), "file", "files"),
+			counted(declarations, "of their declarations was", "of their declarations were")) + reason
+	case len(files) > 0:
+		return fmt.Sprintf("withheld %s in %s of dependencies with cgo",
+			counted(typeErrors, "type error", "type errors"), counted(len(files), "file", "files")) + reason
+	case declarations > 0:
+		verb := "were"
+		if declarations == 1 {
+			verb = "was"
+		}
+		return fmt.Sprintf("%s of dependencies with cgo %s given without bodies or initial values",
+			counted(declarations, "declaration", "declarations"), verb) + reason
+	}
+	return ""
 }
 
 func (run *engineRun) acceptLint(record *engineLintRecord) error {
@@ -1044,6 +1099,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 			activeSummary.Gaps.Unread = run.language.theEngine() + " fell short without saying where"
 		}
 	}
+	// Whatever the run's completeness, which they never move: the engine calls a run that withheld them complete.
+	activeSummary.Gaps.WithheldInDependencyCgo = run.withheldInDependencyCgo
+	activeSummary.Gaps.WithheldDependencyCgoDeclarations = run.withheldDependencyCgoDeclarations
 
 	expectedExit := 0
 	if run.findings > 0 || !*record.Complete {
