@@ -133,6 +133,14 @@
     },
     {
         "engine": "typescript",
+        "family": "shouting",
+        "case": "sh15",
+        "kind": "span",
+        "task": "34fejeq",
+        "reason": "covers the whole comment line `// This is REALLY important.` rather than the shouted word"
+    },
+    {
+        "engine": "typescript",
         "family": "utils-folder",
         "case": "uf02",
         "kind": "verdict",
