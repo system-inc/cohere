@@ -32,8 +32,8 @@ func lowerTypedFunctions(test *testing.T, name string, code string) []*Function 
 						test.Fatal("the harness produced no type checker, so this test would prove nothing")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := Lower(function, ruleContext.TypeChecker); fn != nil {
-							lowered = append(lowered, fn)
+						if loweredFunction := Lower(function, ruleContext.TypeChecker); loweredFunction != nil {
+							lowered = append(lowered, loweredFunction)
 						}
 					})
 				},

@@ -643,11 +643,11 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 								// so that we'll handle it in the same way as a non-rest
 								// 'param: MaybeVoidFunction'
 								subjectType = checker.Checker_getTypeArguments(ruleContext.TypeChecker, subjectType)[0]
-								for i := index; i < len(node.Arguments()); i++ {
+								for argumentIndex := index; argumentIndex < len(node.Arguments()); argumentIndex++ {
 									checkThenableOrVoidArgument(
 										node,
 										subjectType,
-										i,
+										argumentIndex,
 										&thenableReturnIndices,
 										&voidReturnIndices,
 									)
@@ -656,11 +656,12 @@ var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 								// Check each type in the tuple - for example, [boolean, () => void] would
 								// add the index of the second tuple parameter to 'voidReturnIndices'
 								typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, subjectType)
-								for i := index; i < len(node.Arguments()) && i-index < len(typeArguments); i++ {
+								for argumentIndex := index; argumentIndex < len(node.Arguments()) &&
+									argumentIndex-index < len(typeArguments); argumentIndex++ {
 									checkThenableOrVoidArgument(
 										node,
-										typeArguments[i-index],
-										i,
+										typeArguments[argumentIndex-index],
+										argumentIndex,
 										&thenableReturnIndices,
 										&voidReturnIndices,
 									)

@@ -75,12 +75,12 @@ func classOfName(
 func TestDisjointSetMatchesReact(test *testing.T) {
 	test.Parallel()
 
-	const a static_single_assignment.IdentifierId = 1
-	const b static_single_assignment.IdentifierId = 2
-	const c static_single_assignment.IdentifierId = 3
-	const d static_single_assignment.IdentifierId = 4
-	const e static_single_assignment.IdentifierId = 5
-	const f static_single_assignment.IdentifierId = 6
+	const itemA static_single_assignment.IdentifierId = 1
+	const itemB static_single_assignment.IdentifierId = 2
+	const itemC static_single_assignment.IdentifierId = 3
+	const itemD static_single_assignment.IdentifierId = 4
+	const itemE static_single_assignment.IdentifierId = 5
+	const itemF static_single_assignment.IdentifierId = 6
 
 	tests := []struct {
 		name     string
@@ -90,92 +90,105 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 	}{
 		{
 			name:     "chain",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {c, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemB, itemC}, {itemC, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
 			},
 		},
 		{
 			name:     "two established classes merge",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {a, c}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemC, itemD}, {itemA, itemC}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
 			},
 		},
 		{
 			name:     "singleton",
-			unions:   [][]static_single_assignment.IdentifierId{{a}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{itemA: itemA},
 		},
 		{
 			name:     "repeated union is idempotent",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, b}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemA, itemB}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				itemA: itemA,
+				itemB: itemA,
+			},
 		},
 		{
 			// The first element is already a non-root member of a class, so the root the union
 			// adopts under is not the element passed first.
 			name:     "first element is not a root",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {b, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemC, itemD}, {itemB, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
 			},
 		},
 		{
-			name:     "three way merge",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b, c}, {d, e, f}, {c, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
+			name: "three way merge",
+			unions: [][]static_single_assignment.IdentifierId{
+				{itemA, itemB, itemC},
+				{itemD, itemE, itemF},
+				{itemC, itemD},
+			},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD, itemE, itemF}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
-				e: a,
-				f: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+				itemE: itemA,
+				itemF: itemA,
 			},
 		},
 		{
 			name:     "self union",
-			unions:   [][]static_single_assignment.IdentifierId{{a, a}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemA}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA}},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{itemA: itemA},
 		},
 		{
-			name:     "two chains merged at their tails",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {d, e}, {e, f}, {a, f}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
+			name: "two chains merged at their tails",
+			unions: [][]static_single_assignment.IdentifierId{
+				{itemA, itemB},
+				{itemB, itemC},
+				{itemD, itemE},
+				{itemE, itemF},
+				{itemA, itemF},
+			},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD, itemE, itemF}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
-				e: a,
-				f: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
+				itemE: itemA,
+				itemF: itemA,
 			},
 		},
 		{
 			name:     "star",
-			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, c}, {a, d}},
-			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
+			unions:   [][]static_single_assignment.IdentifierId{{itemA, itemB}, {itemA, itemC}, {itemA, itemD}},
+			wantSets: [][]static_single_assignment.IdentifierId{{itemA, itemB, itemC, itemD}},
 			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
-				a: a,
-				b: a,
-				c: a,
-				d: a,
+				itemA: itemA,
+				itemB: itemA,
+				itemC: itemA,
+				itemD: itemA,
 			},
 		},
 	}
@@ -1123,13 +1136,13 @@ export function shuffle(limit: number) {
 		if len(got) != len(baseline) {
 			test.Fatalf("run %d produced %d classes, baseline had %d", run, len(got), len(baseline))
 		}
-		for i := range baseline {
-			if len(got[i]) != len(baseline[i]) {
-				test.Fatalf("run %d class %d is %v, baseline %v", run, i, got[i], baseline[i])
+		for class := range baseline {
+			if len(got[class]) != len(baseline[class]) {
+				test.Fatalf("run %d class %d is %v, baseline %v", run, class, got[class], baseline[class])
 			}
-			for j := range baseline[i] {
-				if got[i][j] != baseline[i][j] {
-					test.Fatalf("run %d class %d is %v, baseline %v", run, i, got[i], baseline[i])
+			for member := range baseline[class] {
+				if got[class][member] != baseline[class][member] {
+					test.Fatalf("run %d class %d is %v, baseline %v", run, class, got[class], baseline[class])
 				}
 			}
 		}

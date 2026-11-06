@@ -75,8 +75,8 @@ func TestPostDominatorFrontiersMatchTheChainWalk(test *testing.T) {
 				} else {
 					corpusCompared++
 				}
-				r := &reactivity{function: function}
-				got := r.postDominatorFrontiers()
+				reactive := &reactivity{function: function}
+				got := reactive.postDominatorFrontiers()
 				want := chainWalkFrontiers(function)
 				if !reflect.DeepEqual(got, want) {
 					test.Errorf("%s, %q: the frontiers are\n  %v\nand the chain walk says\n  %v", name, function.Name,

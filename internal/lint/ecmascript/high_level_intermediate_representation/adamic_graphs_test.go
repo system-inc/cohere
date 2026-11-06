@@ -160,8 +160,8 @@ func lowerReactCompilerFixture(
 						test.Fatal("the harness produced no type checker, so every reference would lower as a global")
 					}
 					forEachFunctionLike(node, func(function *ast.Node) {
-						if fn := lower(ruleContext, function); fn != nil {
-							lowered = append(lowered, fn)
+						if loweredFunction := lower(ruleContext, function); loweredFunction != nil {
+							lowered = append(lowered, loweredFunction)
 						}
 					})
 				},

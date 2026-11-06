@@ -278,12 +278,12 @@ func TestSsaAcrossEveryControlFlowConstruct(test *testing.T) {
 			}
 			Construct(function)
 			var each func(*Function)
-			each = func(f *Function) {
-				for _, violation := range VerifySsa(f) {
+			each = func(lowered *Function) {
+				for _, violation := range VerifySsa(lowered) {
 					test.Errorf("violation: %s", violation.Detail)
 				}
-				for _, n := range f.Functions {
-					each(n)
+				for _, nested := range lowered.Functions {
+					each(nested)
 				}
 			}
 			each(function)

@@ -242,12 +242,12 @@ func TestIterateRegexCharacterClassesEscapeBoundaries(test *testing.T) {
 func TestIterateRegexCharacterClassesMalformed(test *testing.T) {
 	test.Parallel()
 	// Unterminated class at EOF
-	for _, p := range []string{"[abc", "[", `[\`, `\`} {
-		ok := IterateRegexCharacterClasses(p, RegexFlags{}, func(start, end int) {
+	for _, pattern := range []string{"[abc", "[", `[\`, `\`} {
+		ok := IterateRegexCharacterClasses(pattern, RegexFlags{}, func(start, end int) {
 			// Only the verdict is asked about here, not the classes found.
 		})
 		if ok {
-			test.Errorf("expected ok=false for %q", p)
+			test.Errorf("expected ok=false for %q", pattern)
 		}
 	}
 }
