@@ -3,8 +3,7 @@ package correctness_require_wrapped_error_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_wrapped_error"
 	"github.com/system-inc/cohere/policy"
 )

@@ -3,8 +3,7 @@ package consistency_no_any_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_no_any"
 	"github.com/system-inc/cohere/policy"
 )

@@ -3,7 +3,7 @@ package rules
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 )
 
 // TestUnusedReportFindsTheUnusedFunctionAndNotTheUsedOne runs the U1000 adapter over a fixture holding one

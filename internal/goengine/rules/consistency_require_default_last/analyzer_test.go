@@ -3,8 +3,7 @@ package consistency_require_default_last_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_default_last"
 	"github.com/system-inc/cohere/policy"
 )

@@ -3,8 +3,7 @@ package security_no_interpolated_shell_command_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/policy"
 )

@@ -3,8 +3,7 @@ package correctness_no_write_only_collection_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_write_only_collection"
 	"github.com/system-inc/cohere/policy"
 )

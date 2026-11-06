@@ -3,8 +3,7 @@ package consistency_require_one_type_per_file_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/consistency_require_one_type_per_file"
 	"github.com/system-inc/cohere/policy"
 )

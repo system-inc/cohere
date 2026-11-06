@@ -3,8 +3,7 @@ package correctness_no_process_exit_after_output_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_no_process_exit_after_output"
 	"github.com/system-inc/cohere/policy"
 )

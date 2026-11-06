@@ -3,8 +3,7 @@ package correctness_require_checked_assertion_test
 import (
 	"testing"
 
-	"golang.org/x/tools/go/analysis/analysistest"
-
+	"github.com/system-inc/cohere/internal/goengine/check/analysistest"
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_checked_assertion"
 	"github.com/system-inc/cohere/policy"
 )
