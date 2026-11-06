@@ -32,13 +32,23 @@ struct FileLengthTests {
         #expect(Self.findings(Self.source(lines: FileLength.maximumLines)).isEmpty)
     }
 
-    @Test func aFileOnePastTheLimitIsReportedOnceAtTheTop() throws {
+    /* The finding covers the excess: from the first line past the limit to the end of the file, here after its last line break. */
+    @Test func aFileOnePastTheLimitIsReportedOnceOverItsExcess() throws {
         let findings = Self.findings(Self.source(lines: FileLength.maximumLines + 1))
         #expect(findings.count == 1)
         let finding = try #require(findings.first)
-        #expect("\(finding.line):\(finding.column)-\(finding.endLine ?? 0):\(finding.endColumn ?? 0)" == "1:1-1:1")
+        #expect(
+            "\(finding.line):\(finding.column)-\(finding.endLine ?? 0):\(finding.endColumn ?? 0)" == "2001:1-2002:1"
+        )
         #expect(finding.messageId == "tooManyLines")
         #expect(finding.message.hasPrefix("This file is 2001 lines, over the 2000 a file may hold."))
+    }
+
+    /* A lone carriage return ends a line in Swift's grammar, as a line feed and a carriage return and line feed do. */
+    @Test func everyLineBreakSwiftReadsCountsOnce() {
+        #expect(FileLength.lineCount(of: "a\rb\r\nc\nd") == 4)
+        #expect(FileLength.lineCount(of: "a\r") == 1)
+        #expect(FileLength.lineCount(of: "") == 0)
     }
 
     /* The limit is 2,000, the number Kirk chose; a change to it should be a decision, not a drift. */

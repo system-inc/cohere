@@ -76,6 +76,8 @@ struct RuleMapping: Sendable {
             incumbent: .swiftFormat,
             incumbentRule: "AlwaysUseLowerCamelCase",
             rules: ["cohere-swift/always-use-lower-camel-case"],
+            /* The house's type casing is beside swift-format's rule, which judges values only, so it is not compared. */
+            messageIds: ["alwaysUseLowerCamelCase"],
         ),
         RuleMapping(
             incumbent: .swiftLint,

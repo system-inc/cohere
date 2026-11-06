@@ -1,0 +1,16 @@
+{
+    "why": "wc13: multibyte text before the word, so an engine slicing by character rather than by byte misses the span",
+    "expect": [
+        {
+            "covers": "TODO",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

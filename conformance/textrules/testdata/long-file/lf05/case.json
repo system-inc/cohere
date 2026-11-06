@@ -1,0 +1,17 @@
+{
+    "why": "lf05: `max` sets a stricter limit, so 21 lines under a limit of 10 are reported from line 11",
+    "expect": [
+        {
+            "linesFrom": 11
+        }
+    ],
+    "options": {
+        "max": 10
+    },
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

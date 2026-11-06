@@ -1,0 +1,15 @@
+{
+    "why": "uf03: a folder's name is judged lowercased, so `Utils` is banned",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "upper/Utils/uf03",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

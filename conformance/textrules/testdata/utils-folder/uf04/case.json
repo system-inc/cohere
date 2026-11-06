@@ -1,0 +1,14 @@
+{
+    "why": "uf04: a folder's name is judged with leading underscores removed, so `_utils` is banned. Go has no form: the go tool ignores a directory whose name starts with `_`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "_utils/uf04",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

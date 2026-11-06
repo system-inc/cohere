@@ -1,0 +1,16 @@
+{
+    "why": "ab01: an abbreviated name is reported once, at its declaration, and its reads are not",
+    "expect": [
+        {
+            "covers": "msg",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

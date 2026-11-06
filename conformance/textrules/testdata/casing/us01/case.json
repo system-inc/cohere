@@ -1,0 +1,17 @@
+{
+    "why": "us01: the control, a screaming-snake local value is reported at its declaration",
+    "control": true,
+    "expect": [
+        {
+            "covers": "MAX_SIZE",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

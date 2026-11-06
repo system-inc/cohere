@@ -1,0 +1,16 @@
+{
+    "why": "wc03: `XXX` is a warning word like `TODO` and `FIXME`",
+    "expect": [
+        {
+            "covers": "XXX",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

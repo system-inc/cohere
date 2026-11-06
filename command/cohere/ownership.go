@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -33,6 +34,11 @@ import (
 //     lint it nor report its diagnostics. A project left with no file of its own is not run.
 //   - Formatting goes by directory: a project's format walk leaves out the directories of the projects
 //     below it, whose own runs format them, so two runs never write one file.
+//   - A tsconfig that cannot be read still claims the files under its directory, by that rule, though what
+//     it includes is unknown. An enclosing tsconfig would otherwise judge them in its own program, where
+//     their imports and options are not theirs, and every type-aware rule floods: 85,000 findings in each of
+//     two copies of a project whose base was missing, at ahra's root (#0xg4y8w). Its own run fails naming
+//     the load error, which is the verdict those files get.
 //
 // One TypeScript project reads nothing: there is nothing to share, and the run keeps the cost it had.
 
@@ -51,6 +57,10 @@ type ownership struct {
 	// no entry.
 	Yields map[string]projectYield
 
+	// Unloaded are projects whose tsconfig could not be read, by label, each with how many files other
+	// tsconfigs include that it claimed by directory: no run judges them, and its own fails naming why.
+	Unloaded map[string]int
+
 	// SharedDirectory are projects whose directory an earlier project's run already keeps its cache in, by
 	// label. They run with the cache off: one cache table per directory, and two programs over one table
 	// would replay each other's records.
@@ -63,7 +73,11 @@ type ownership struct {
 //
 // Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveOwnership(found *discovery) (ownership, error) {
-	decided := ownership{Yields: map[string]projectYield{}, SharedDirectory: map[string]bool{}}
+	decided := ownership{
+		Yields:          map[string]projectYield{},
+		Unloaded:        map[string]int{},
+		SharedDirectory: map[string]bool{},
+	}
 	typeScript := 0
 	for _, project := range found.Projects {
 		if project.Engine == engineTypeScript {
@@ -145,12 +159,34 @@ func resolveOwnership(found *discovery) (ownership, error) {
 			includers[fileName] = append(includers[fileName], index)
 		}
 	}
+	// A tsconfig that cannot be read includes, as far as anyone can tell, every file under its directory.
+	// See Ownership.
+	var unloaded []int
+	for index, project := range found.Projects {
+		if read, isRead := reads[found.configurationPath(
+			project,
+		)]; project.Engine == engineTypeScript && isRead && read.readError != nil {
+			unloaded = append(unloaded, index)
+		}
+	}
+	for fileName, indexes := range includers {
+		directory := slashDirectoryOf(*found, fileName)
+		for _, index := range unloaded {
+			if holdsDirectory(found.Projects[index].Directory, directory) {
+				indexes = append(indexes, index)
+			}
+		}
+		includers[fileName] = indexes
+	}
 	yielded := make([][]string, len(found.Projects))
 	for fileName, indexes := range includers {
 		if len(indexes) < 2 {
 			continue
 		}
 		owner := nearestIncluder(*found, fileName, indexes)
+		if slices.Contains(unloaded, owner) {
+			decided.Unloaded[projectLabel(found.Projects[owner])]++
+		}
 		for _, index := range indexes {
 			if index != owner {
 				yielded[index] = append(yielded[index], fileName)
@@ -251,7 +287,7 @@ func nearestIncluder(found discovery, fileName string, indexes []int) int {
 	owner, ownerHolds, ownerShared := indexes[0], false, -1
 	for _, index := range indexes {
 		directory := found.Projects[index].Directory
-		holds := directory == "." || fileDirectory == directory || isBelow(fileDirectory, directory)
+		holds := holdsDirectory(directory, fileDirectory)
 		shared := sharedSegments(fileDirectory, directory)
 		switch {
 		case holds && !ownerHolds, holds == ownerHolds && shared > ownerShared:
@@ -259,6 +295,25 @@ func nearestIncluder(found discovery, fileName string, indexes []int) int {
 		}
 	}
 	return owner
+}
+
+// slashDirectoryOf is a file's directory, slash-separated and relative to the root, or "" when the file
+// lies outside it.
+func slashDirectoryOf(found discovery, fileName string) string {
+	relative, relativePathError := filepath.Rel(found.Root, fileName)
+	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return ""
+	}
+	return path.Dir(filepath.ToSlash(relative))
+}
+
+// holdsDirectory reports whether a project's slash directory is another slash directory or lies above it,
+// the root holding every directory in the repository and "", one outside it, held by none.
+func holdsDirectory(project string, directory string) bool {
+	if directory == "" {
+		return false
+	}
+	return project == "." || directory == project || isBelow(directory, project)
 }
 
 // isBelow reports whether one slash directory, relative to the root, is strictly inside another.

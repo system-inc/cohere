@@ -1,0 +1,17 @@
+{
+    "why": "wc01: the control, a `TODO` opening a line comment is reported, on the word",
+    "control": true,
+    "expect": [
+        {
+            "covers": "TODO",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

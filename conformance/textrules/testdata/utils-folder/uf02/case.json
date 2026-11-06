@@ -1,0 +1,15 @@
+{
+    "why": "uf02: `util` is banned like `utils`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "util/uf02",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

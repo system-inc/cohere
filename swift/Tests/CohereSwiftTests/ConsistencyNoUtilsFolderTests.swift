@@ -61,13 +61,23 @@ struct ConsistencyNoUtilsFolderTests {
             "/project/Tests/Fixture/_Utils/Thing.swift",
             ["1:1-1:1 noUnderscoreUtils Folder name \"_Utils\" is not allowed. Use \"_Utilities\" instead."],
         ),
-        /* Both spellings on one path: one finding each, the underscore first, as the Go rule reports them. */
+        /* Both spellings on one path: one finding, for the outermost, since the finding is once per file (the corpus verdict). */
         (
             "/project/Sources/Fixture/_utils/utils/Thing.swift",
-            [
-                "1:1-1:1 noUnderscoreUtils Folder name \"_utils\" is not allowed. Use \"_utilities\" instead.",
-                "1:1-1:1 noUtils Folder name \"utils\" is not allowed. Use \"utilities\" instead.",
-            ],
+            ["1:1-1:1 noUnderscoreUtils Folder name \"_utils\" is not allowed. Use \"_utilities\" instead."],
+        ),
+        /* `util` is banned like `utils`, and every casing is judged lowercased (uf02, uf03). */
+        (
+            "/project/Sources/Fixture/util/Thing.swift",
+            ["1:1-1:1 noUtils Folder name \"util\" is not allowed. Use \"utilities\" instead."],
+        ),
+        (
+            "/project/Sources/Fixture/__Util/Thing.swift",
+            ["1:1-1:1 noUnderscoreUtils Folder name \"__Util\" is not allowed. Use \"__Utilities\" instead."],
+        ),
+        (
+            "/project/Sources/Fixture/UTILS/Thing.swift",
+            ["1:1-1:1 noUtils Folder name \"UTILS\" is not allowed. Use \"UTILITIES\" instead."],
         ),
         /* The same spelling twice is one finding: the file is misplaced once. */
         (
@@ -101,12 +111,9 @@ struct ConsistencyNoUtilsFolderTests {
         "/project/Sources/Fixture/myutils/Thing.swift",
         "/project/Sources/Fixture/MyUtils/Thing.swift",
         "/project/Sources/Fixture/StringUtils/Thing.swift",
-        /* Not the abbreviation the Go rule bans, so not banned here. */
+        /* Not the abbreviation, so not banned. */
         "/project/Sources/Fixture/Helpers/Thing.swift",
         "/project/Sources/Fixture/Utility/Thing.swift",
-        "/project/Sources/Fixture/util/Thing.swift",
-        /* A casing no convention produces is left alone rather than guessed at. */
-        "/project/Sources/Fixture/UTILS/Thing.swift",
         /* A file named Utils is not a folder named utils. */
         "/project/Sources/Fixture/Utils.swift",
         "/project/Sources/Fixture/utils.swift",
