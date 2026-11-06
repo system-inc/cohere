@@ -3,9 +3,12 @@ package nexus
 import (
 	"strings"
 	"unicode"
+
+	"github.com/system-inc/cohere/policy"
 )
 
-// The casing predicates and converters for consistency-require-constant-casing.
+// The casing predicates and converters for consistency-require-constant-casing, and the UpperCamelCase
+// reading it shares with consistency-require-identifier-casing, so a listed brand is one judgment in both.
 //
 // These are deliberately not the toPascalCase and toCamelCase already in this package. Those serve
 // consistency-no-screaming-snake-case, where every word arrives all-uppercase and lowercasing a part
@@ -103,6 +106,35 @@ func constantNameToPascalCase(name string) string {
 		builder.WriteString(raiseFirstCharacter(word))
 	}
 	return builder.String()
+}
+
+// isUpperCamelCaseName reports a name both casing rules read as UpperCamelCase: one opening on a capital, or on a
+// brand policy/Brands.json lists, spelled exactly as listed, with nothing after it or an UpperCamelCase
+// rest. The rest opens on its capital, never on an underscore, which the converter's own predicate would
+// skip, so `iMessage_Thing` is not read as `iMessageThing`.
+func isUpperCamelCaseName(name string) bool {
+	if isPascalCase(name) {
+		return true
+	}
+	brand, opensOnBrand := policy.Brands.LeadingBrand(name)
+	if !opensOnBrand {
+		return false
+	}
+	rest := strings.TrimPrefix(name, brand)
+	return rest == "" || (!strings.HasPrefix(rest, "_") && isPascalCase(rest))
+}
+
+// upperCamelCaseSuggestion is the UpperCamelCase form the advice names. A name opening on a listed brand
+// keeps the brand as its owner spells it, so `iMessagecommandLineInterface` is told
+// `iMessageCommandLineInterface` rather than to respell the brand, and any other name is the converter's.
+func upperCamelCaseSuggestion(name string) string {
+	if brand, opensOnBrand := policy.Brands.LeadingBrand(name); opensOnBrand {
+		rest := strings.TrimLeft(strings.TrimPrefix(name, brand), "_")
+		if suggestion := brand + constantNameToPascalCase(rest); isUpperCamelCaseName(suggestion) {
+			return suggestion
+		}
+	}
+	return constantNameToPascalCase(name)
 }
 
 // constantNameToCamelCase is the mirror: the first word starts lowercase, every later one is raised.

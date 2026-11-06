@@ -156,6 +156,19 @@ func TestConsistencyRequireIdentifierCasingFires(test *testing.T) {
 			"export function Order_List() { return <ul />; }\n",
 			[]string{"Order_List"},
 		},
+		// A listed brand opens an UpperCamelCase name only before an UpperCamelCase rest, and only spelled
+		// exactly as its owner spells it (us13 is the lowercase opening no brand explains).
+		{
+			"a lowercase-led type that is no brand",
+			"export interface fooThing {}\n",
+			[]string{"fooThing"},
+		},
+		{
+			"a brand before a rest that is not UpperCamelCase",
+			"export class iMessagecommandLineInterface {}\nexport class iMessage_Thing {}\n",
+			[]string{"iMessagecommandLineInterface", "iMessage_Thing"},
+		},
+		{"a brand spelled otherwise", "export class imessageThing {}\n", []string{"imessageThing"}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -181,6 +194,12 @@ func TestConsistencyRequireIdentifierCasingStaysSilent(test *testing.T) {
 		{
 			"camel values and upper camel types",
 			"export interface OrderLine { unitPrice: number }\nexport function sum(firstValue: number) { let runningTotal = firstValue; return runningTotal; }\n",
+		},
+		// policy/Brands.json's brands open a type as their owners spell them (us12), alone or before an
+		// UpperCamelCase rest, and a brand inside a name is ordinary UpperCamelCase.
+		{
+			"types opening on a listed brand",
+			"export class iMessageCommandLineInterface {}\nexport interface iMessage {}\nexport type SendIMessage = { text: string };\n",
 		},
 		// A module's own constant is consistency-require-constant-casing's, whose casing there signals reach.
 		{
@@ -403,6 +422,19 @@ func TestConsistencyRequireIdentifierCasingAdvice(test *testing.T) {
 			"export function Order_List() { return <ul />; }\n",
 			"requireUpperCamelCaseCapital",
 			`The component "Order_List" keeps its capital`,
+		},
+		// The advice keeps a listed brand as its owner spells it, rather than telling the reader to respell it.
+		{
+			"a type opening on a brand",
+			"export class iMessagecommandLineInterface {}\n",
+			"requireUpperCamelCaseType",
+			`The class "iMessagecommandLineInterface" is a type, so spell it in UpperCamelCase: "iMessageCommandLineInterface".`,
+		},
+		{
+			"a type opening on a brand and an underscore",
+			"export interface iMessage_thing {}\n",
+			"requireUpperCamelCaseType",
+			`The interface "iMessage_thing" is a type, so spell it in UpperCamelCase: "iMessageThing".`,
 		},
 	}
 	for _, testCase := range cases {

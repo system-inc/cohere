@@ -40,6 +40,12 @@ func TestConsistencyRequireConstantCasingFires(test *testing.T) {
 			"class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n",
 			"requireCamelCaseInstance",
 		},
+		// A brand counts only spelled exactly as policy/Brands.json lists it.
+		{
+			"exported brand spelled otherwise", constantCasingFile,
+			"export const imessageClient = 'x';\n",
+			"requirePascalCaseExported",
+		},
 
 		// Kind beats reach: a function stays camelCase even where PascalCase would be right for data.
 		{
@@ -136,6 +142,8 @@ func TestConsistencyRequireConstantCasingStaysSilent(test *testing.T) {
 	}{
 		// The three clauses, satisfied.
 		{"PascalCase export", constantCasingFile, "export const OrderColumns = [1, 2];\n"},
+		// A brand policy/Brands.json lists opens a PascalCase name as its owner spells it.
+		{"exported brand", constantCasingFile, "export const iMessageClient = 'x';\n"},
 		{"camelCase local", constantCasingFile, "const orderColumns = [1, 2];\n"},
 		{
 			"camelCase exported function", constantCasingFile,
@@ -405,6 +413,8 @@ func TestConsistencyRequireConstantCasingSuggestionText(test *testing.T) {
 		{"leading underscore survives", "const _order_columns = [1];\n", "_orderColumns"},
 		{"internal boundaries survive", "export const numberAbsentPlaceholder = '-';\n", "NumberAbsentPlaceholder"},
 		{"internal boundaries survive, lowered", "const OrderColumns = [1];\n", "orderColumns"},
+		// A listed brand keeps its owner's spelling in the advice.
+		{"a listed brand is kept, exported", "export const iMessage_client = 'x';\n", "iMessageClient"},
 	}
 
 	for _, testCase := range cases {

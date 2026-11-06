@@ -217,6 +217,20 @@ struct NamingRuleTests {
         #expect(Data(PolicyAbbreviations.file.utf8) == onDisk, "run go run ./policy/tools/generate")
     }
 
+    /*
+     The compiled-in brands are cohere's `policy/Brands.json`, byte for byte, for the casing rules to read as
+     the TypeScript rule does. A brand added to the file and not regenerated fails here.
+     */
+    @Test func theCompiledInBrandsArePolicysFile() throws {
+        let policyFile = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("policy/Brands.json")
+        let onDisk = try Data(contentsOf: policyFile)
+        #expect(!onDisk.isEmpty)
+        #expect(Data(PolicyBrands.file.utf8) == onDisk, "run go run ./policy/tools/generate")
+    }
+
     @Test func declaredNamesAreJudgedAndReferencesAreNot() throws {
         let source = """
             struct Config {

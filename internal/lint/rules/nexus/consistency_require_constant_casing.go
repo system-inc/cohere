@@ -116,7 +116,9 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // consistency-require-identifier-casing.
 //
 // Three clauses. An exported constant holding a value is PascalCase; a file-local one is camelCase;
-// and a constant holding a class instance or a function is camelCase whatever its reach.
+// and a constant holding a class instance or a function is camelCase whatever its reach. PascalCase is
+// read as consistency-require-identifier-casing reads UpperCamelCase, so a name may open with a brand
+// policy/Brands.json lists, spelled as its owner spells it: `export const iMessageClient` is exported data.
 //
 // The third clause is where casing stops meaning reach and starts meaning kind. PascalCase is the
 // older, louder signal for "this is a type", so a PascalCase name on an instance reads as its class
@@ -317,7 +319,7 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 				}
 
 				if exported {
-					if isPascalCase(declaredName) || frameworkConstantNames[declaredName] {
+					if isUpperCamelCaseName(declaredName) || frameworkConstantNames[declaredName] {
 						return
 					}
 					if isCamelCase(declaredName) &&
@@ -326,12 +328,12 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 							exportedNames...,
 						) {
 						ruleContext.ReportNode(name, messageDropUnimportedExport(
-							declaredName, constantNameToPascalCase(declaredName),
+							declaredName, upperCamelCaseSuggestion(declaredName),
 						))
 						return
 					}
 					ruleContext.ReportNode(name, messageRequirePascalCaseExported(
-						declaredName, constantNameToPascalCase(declaredName),
+						declaredName, upperCamelCaseSuggestion(declaredName),
 					))
 					return
 				}

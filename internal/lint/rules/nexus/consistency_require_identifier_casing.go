@@ -58,6 +58,11 @@ func messageIdentifierCasing(
 // and methods. Types are classes, interfaces, type aliases and enums. A name is judged once, where it is
 // declared, and its reads are not reported again.
 //
+// A name judged as UpperCamelCase may open with a brand policy/Brands.json lists, spelled exactly as its
+// owner spells it, followed by nothing or by an UpperCamelCase rest: `iMessageCommandLineInterface` passes,
+// and `iMessagecommandLineInterface` is told `iMessageCommandLineInterface`. It is vocabulary, as the
+// shouting and abbreviation lists are, and the file states the bar a brand meets to join it.
+//
 // Each shape has one owner, so no name is judged twice by rules that could disagree. A `const` of the
 // module or of a namespace body belongs to consistency-require-constant-casing, whose casing there
 // signals reach, and a SCREAMING_SNAKE_CASE `const` at any scope to consistency-no-screaming-snake-case, which
@@ -293,11 +298,11 @@ func judgeIdentifierCasingType(ruleContext rule.Context, node *ast.Node) {
 		declaration = "enum"
 	}
 	text := name.Text()
-	if !isJudgedCasing(text) || isPascalCase(text) {
+	if !isJudgedCasing(text) || isUpperCamelCaseName(text) {
 		return
 	}
-	suggestion := constantNameToPascalCase(text)
-	if !isPascalCase(suggestion) {
+	suggestion := upperCamelCaseSuggestion(text)
+	if !isUpperCamelCaseName(suggestion) {
 		return
 	}
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingTypeText, declaration, text, suggestion))
@@ -345,11 +350,11 @@ func judgeIdentifierCasingValue(
 // component is told the form JSX can still read.
 func judgeIdentifierCasingCapital(ruleContext rule.Context, name *ast.Node, declaration string) {
 	text := strings.TrimPrefix(name.Text(), "#")
-	if isPascalCase(text) {
+	if isUpperCamelCaseName(text) {
 		return
 	}
-	suggestion := constantNameToPascalCase(text)
-	if !isPascalCase(suggestion) {
+	suggestion := upperCamelCaseSuggestion(text)
+	if !isUpperCamelCaseName(suggestion) {
 		return
 	}
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingCapitalText, declaration, text, suggestion))
