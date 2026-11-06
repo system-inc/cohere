@@ -245,6 +245,12 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	}
 	withheld := make([]contract.WithheldFile, 0, len(loaded.WithheldInDependencyCgo))
 	for _, each := range loaded.WithheldInDependencyCgo {
+		if each.Errors < 1 {
+			// Invariant: load's withheldErrors makes an entry only by counting an error it withheld, so a file with
+			// none is a bug in the load, and written it would read as a file withheld for nothing. A panic ends the
+			// stream before its summary, which the front door reports as an engine that checked nothing.
+			panic(fmt.Sprintf("goengine: %s is withheld with %d type errors", each.File, each.Errors))
+		}
 		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
 	}
 	// The build text says which load ran: from source, or through go/packages for a project with cgo of its own.

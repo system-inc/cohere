@@ -99,3 +99,32 @@ func TestWithheldDependencyCgoErrorsAreOnTheTypesRecord(test *testing.T) {
 		test.Errorf("a withheld error was written as a finding; stream:\n%s", output.String())
 	}
 }
+
+// A withheld file is written only with the errors it was withheld for: one counted with none is a load bug, and the
+// types phase refuses to write it rather than name a file withheld for nothing.
+func TestAWithheldDependencyCgoFileWithNoErrorsIsRefused(test *testing.T) {
+	test.Parallel()
+	loaded := &load.Loaded{
+		WithheldInDependencyCgo: []load.Withheld{{Package: "net", File: "/goroot/src/net/cgo_unix.go", Errors: 0}},
+	}
+	var output bytes.Buffer
+	engine := &pipeline{
+		request:       invocation{switches: map[string]bool{}},
+		described:     &describedProject{inScopeSet: map[string]bool{}, contents: map[string][]byte{}},
+		writer:        contract.NewWriter(&output),
+		standardError: io.Discard,
+	}
+	engine.write(provenanceRecord())
+	defer func() {
+		recovered := recover()
+		message, isString := recovered.(string)
+		if !isString || !strings.Contains(message, "cgo_unix.go is withheld with 0 type errors") {
+			test.Errorf("runTypes recovered %#v, want a panic naming the file withheld with 0 type errors", recovered)
+		}
+		if strings.Contains(output.String(), `"kind":"types"`) {
+			test.Errorf("a types record was written for a file withheld with no errors; stream:\n%s", output.String())
+		}
+	}()
+
+	engine.runTypes(loaded, nil)
+}
