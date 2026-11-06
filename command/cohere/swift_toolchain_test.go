@@ -33,8 +33,8 @@ func fakeToolchain(test *testing.T, answering bool) (string, string) {
 		"xcrun": "echo \"xcrun $*\" >> '" + log + "'\necho '" + filepath.Join(directory, "swift") + "'",
 	}
 	for name, body := range scripts {
-		script := []byte("#!/bin/sh\n" + body + "\n")
-		if writeError := os.WriteFile(filepath.Join(directory, name), script, 0o755); writeError != nil {
+		script := filepath.Join(directory, name)
+		if writeError := os.WriteFile(script, []byte("#!/bin/sh\n"+body+"\n"), 0o755); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
@@ -54,11 +54,8 @@ func runWithToolchain(
 	test.Helper()
 	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
-	command.Env = append(
-		os.Environ(),
-		"PATH="+toolchain+string(os.PathListSeparator)+os.Getenv("PATH"),
-		"COHERE_VERDICT_FD=",
-	)
+	searchPath := "PATH=" + toolchain + string(os.PathListSeparator) + os.Getenv("PATH")
+	command.Env = append(os.Environ(), searchPath, "COHERE_VERDICT_FD=")
 	command.Env = append(command.Env, extra...)
 	var output bytes.Buffer
 	command.Stdout, command.Stderr = &output, &output
@@ -95,9 +92,9 @@ func TestAProcessTreeAsksTheSwiftToolchainOnce(test *testing.T) {
 		coverageAnswerThrough(root, root, filepath.Join(contractDirectory(test), "Clean.jsonl")),
 	)
 	seen := filepath.Join(test.TempDir(), "seen")
-	engine := fakeSwiftEngine(test, "printf '%s|%s\\n' "+
-		"\"$(printf '%s' \"$COHERE_SWIFT_VERSION_OUTPUT\" | tr '\\n' ' ')\" "+
-		"\"$COHERE_SWIFT_EXECUTABLE\" >> '"+seen+"'\nexec '"+covering+"' \"$@\"")
+	engine := fakeSwiftEngine(test,
+		"printf '%s|%s\\n' \"$(printf '%s' \"$COHERE_SWIFT_VERSION_OUTPUT\" | tr '\\n' ' ')\" "+
+			"\"$COHERE_SWIFT_EXECUTABLE\" >> '"+seen+"'\nexec '"+covering+"' \"$@\"")
 	toolchain, log := fakeToolchain(test, true)
 
 	output, _ := runWithToolchain(test, binary, root, toolchain, []string{
@@ -155,8 +152,7 @@ func TestARunTrustsAnInheritedSwiftEngineOnlyFromItsParent(test *testing.T) {
 			if trust.trusted {
 				if exitCode != 0 || !ran || readLogFile(test, asked) != "" {
 					test.Errorf("a run did not take the engine and toolchain its parent resolved "+
-						"(exit %d, engine ran %t, asked %q):\n%s",
-						exitCode, ran, readLogFile(test, asked), output)
+						"(exit %d, engine ran %t, asked %q):\n%s", exitCode, ran, readLogFile(test, asked), output)
 				}
 				return
 			}

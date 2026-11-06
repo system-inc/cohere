@@ -14,8 +14,13 @@ public struct ProcessRunner: Sendable {
         public var exitCode: Int32
         public var standardOutput: Data
         public var standardError: String
+        /*
+         The signal that ended the process, or nil when it exited by itself. Foundation reports a signal's number as the
+         exit code too, so only this tells a compiler that crashed with signal 11 from one that exited with status 11.
+         */
+        public var terminatingSignal: Int32?
 
-        public var succeeded: Bool { exitCode == 0 }
+        public var succeeded: Bool { exitCode == 0 && terminatingSignal == nil }
     }
 
     /* Why a tool could not be run at all, as distinct from running and failing. */
@@ -60,7 +65,12 @@ public struct ProcessRunner: Sendable {
          */
         let output = try Data(contentsOf: outputFile)
         let errorText = String(decoding: try Data(contentsOf: errorFile), as: UTF8.self)
-        return Result(exitCode: process.terminationStatus, standardOutput: output, standardError: errorText)
+        return Result(
+            exitCode: process.terminationStatus,
+            standardOutput: output,
+            standardError: errorText,
+            terminatingSignal: process.terminationReason == .uncaughtSignal ? process.terminationStatus : nil,
+        )
     }
 
     private func removeTemporaryFile(_ url: URL) {

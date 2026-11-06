@@ -533,7 +533,8 @@ public struct ConcurrencyNoLostUpdate: FileRule {
             }
             var visited: Set<[Int]> = []
             var answer = false
-            search: while !queue.isEmpty {
+            /* An answer ends the search: the path that found it stops, and the loop tests `answer` before taking another. */
+            while !answer, !queue.isEmpty {
                 let position = queue.removeFirst()
                 var suspended = position.suspended
                 var stopped = false
@@ -555,13 +556,13 @@ public struct ConcurrencyNoLostUpdate: FileRule {
                         case .declarationStart(let id):
                             if anchor == .declaration(id), suspended {
                                 answer = true
-                                break search
+                                stopped = true
                             }
                         case .write(let node):
                             if anchor == .write(node.id) {
                                 if suspended {
                                     answer = true
-                                    break search
+                                    stopped = true
                                 }
                             }
                             else if writes(node, target: target) {

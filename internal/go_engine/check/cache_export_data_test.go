@@ -26,7 +26,8 @@ type sessionRun struct {
 func runWithSession(test *testing.T, directory string, caching *Caching, rules []rule.Rule) sessionRun {
 	test.Helper()
 	session := NewCacheSession(caching, rules)
-	loaded, loadError := load.PackagesRestoring(directory, []string{"./..."}, []string{"GOWORK=off"}, nil, session)
+	loaded, loadError := load.PackagesCached(directory, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		load.Caching{Restorer: session, Listings: session})
 	if loadError != nil {
 		test.Fatalf("loading %s: %v", directory, loadError)
 	}
@@ -67,9 +68,11 @@ func TestAHitIsNeverParsedAndAMissTypeChecksAgainstItsExportData(test *testing.T
 	}
 
 	warm := runWithSession(test, root, caching, rules)
-	if warm.loaded.FilesParsed != 0 || warm.loaded.PackagesFromExportData != 0 || warm.result.Cache.Hit != 2 {
-		test.Fatalf("want nothing parsed or read warm, got %d parsed, %d read, %+v", warm.loaded.FilesParsed,
-			warm.loaded.PackagesFromExportData, warm.result.Cache)
+	if warm.loaded.FilesParsed != 0 || warm.loaded.PackagesFromExportData != 0 || warm.result.Cache.Hit != 2 ||
+		warm.session.exportDataReads.Load() != 0 {
+		test.Fatalf("want nothing parsed or read warm, got %d parsed, %d read from %d stored, %+v",
+			warm.loaded.FilesParsed, warm.loaded.PackagesFromExportData, warm.session.exportDataReads.Load(),
+			warm.result.Cache)
 	}
 	if !reflect.DeepEqual(withoutTimesOrCache(warm.result), withoutTimesOrCache(cold.result)) {
 		test.Fatalf("warm\n%+v\ncold\n%+v", withoutTimesOrCache(warm.result), withoutTimesOrCache(cold.result))
@@ -80,9 +83,11 @@ func TestAHitIsNeverParsedAndAMissTypeChecksAgainstItsExportData(test *testing.T
 		test.Fatalf("corrupting user's entry: %v", putError)
 	}
 	edited := runWithSession(test, root, caching, rules)
-	if edited.loaded.FilesParsed != 1 || edited.loaded.PackagesFromExportData != 1 {
-		test.Fatalf("want user alone parsed and base read from export data, got %d parsed and %d read",
-			edited.loaded.FilesParsed, edited.loaded.PackagesFromExportData)
+	if edited.loaded.FilesParsed != 1 || edited.loaded.PackagesFromExportData != 1 ||
+		edited.session.exportDataReads.Load() != 1 {
+		test.Fatalf("want user alone parsed and base alone read from export data, got %d parsed and %d read from %d "+
+			"stored", edited.loaded.FilesParsed, edited.loaded.PackagesFromExportData,
+			edited.session.exportDataReads.Load())
 	}
 	if !reflect.DeepEqual(withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result)) {
 		test.Fatalf("edited\n%+v\ncold\n%+v", withoutTimesOrCache(edited.result), withoutTimesOrCache(cold.result))
@@ -248,7 +253,7 @@ func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
 	if !held {
 		test.Fatalf("want plain base written by the first run")
 	}
-	restored, decodeError := decodeEntry(first.session.known, plainBase(first.session), stored)
+	restored, decodeError := decodeEntry(first.session.known, plainBase(first.session), stored, nil)
 	if decodeError != nil || covers(restored, first.session.known.facts) {
 		test.Fatalf("want plain base stored without facts, got %v", decodeError)
 	}

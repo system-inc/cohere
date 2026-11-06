@@ -358,3 +358,50 @@ func TestManyFilesComeBackInTheOrderGiven(test *testing.T) {
 		requireContents(test, fixturePath(fmt.Sprintf("many/file%02d.go", index)), manySources[index%len(manySources)])
 	}
 }
+
+// A file gofmt left as it was, or skipped as generated, is known by its bytes: a later run with the verdicts answers
+// it without formatting it, and the same Result comes back. A file whose bytes change is formatted again, so an edit
+// that unformats it is reported, never answered from what was known of the file before.
+func TestKnownFilesAnswerTheSameBytesAndOnlyThem(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	clean := filepath.Join(directory, "clean.go")
+	generated := filepath.Join(directory, "generated.go")
+	edited := filepath.Join(directory, "edited.go")
+	// Each file's bytes are its own, since a run that meets the same bytes twice knows the second already.
+	for file, source := range map[string]string{clean: formattedSource, generated: generatedSource,
+		edited: reformattedSource} {
+		if writeError := os.WriteFile(file, []byte(source), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", file, writeError)
+		}
+	}
+	files := []string{clean, generated, edited}
+	first := DecodeKnownFiles(nil)
+	learned := Run(files, Options{Known: first})
+	if learned.Known != 0 || len(learned.Generated) != 1 || len(learned.Changed) != 0 {
+		test.Fatalf("want nothing known yet, the generated file skipped and nothing changed, got %+v", learned)
+	}
+	encoded, encodeError := first.Encode()
+	if encodeError != nil {
+		test.Fatalf("encoding the verdicts: %v", encodeError)
+	}
+
+	answered := Run(files, Options{Known: DecodeKnownFiles(encoded)})
+	if answered.Known != 3 {
+		test.Fatalf("want every file known by its bytes, got %+v", answered)
+	}
+	answered.Known = 0
+	if !reflect.DeepEqual(answered, learned) {
+		test.Fatalf("known\n%+v\nformatted\n%+v", answered, learned)
+	}
+
+	if writeError := os.WriteFile(edited, []byte(unformattedSource), 0o644); writeError != nil {
+		test.Fatalf("unformatting %s: %v", edited, writeError)
+	}
+	afterEdit := Run(files, Options{Known: DecodeKnownFiles(encoded)})
+	want := []ChangedFile{{File: edited, FirstDifferingLine: 5}}
+	if afterEdit.Known != 2 || !reflect.DeepEqual(afterEdit.Changed, want) {
+		test.Fatalf("want the edited file formatted again and reported at line 5, got %+v", afterEdit)
+	}
+}

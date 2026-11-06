@@ -29,7 +29,7 @@ type Options struct {
 
 	// Cache is the per-package findings cache the run reads and writes, or nil for a run that does neither, as
 	// under `--no-cache`. The findings are the same either way. The load is given it first (see
-	// load.PackagesRestoring), so the packages it holds were never parsed; a session no load was given opens here,
+	// load.PackagesCached), so the packages it holds were never parsed; a session no load was given opens here,
 	// over packages the load checked whole.
 	Cache *CacheSession
 

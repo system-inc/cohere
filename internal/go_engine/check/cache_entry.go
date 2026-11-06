@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/objectpath"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/copied"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -22,7 +24,7 @@ import (
 // CacheFormatVersion is the version of the cache entry's format, which the engine hashes into every key as the
 // cache's own, so an entry written in another format is never read. It changes whenever cacheEntry or anything it
 // holds changes shape, Finding included.
-const CacheFormatVersion = "go-engine-cache-2"
+const CacheFormatVersion = "go-engine-cache-3"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or types export data cannot carry, so it
 // gets no entry, and is counted.
@@ -31,17 +33,17 @@ var errorUnstorable = errors.New("what the entry cannot hold")
 // cacheEntry is one package as the cache holds it, gob-encoded: by slot, what each analyzer that a later run could
 // ask for reported and exported on the package, and what the load needs to give the package's types without
 // parsing it. An analyzer's slot is its rule's name, or for an analyzer no rule runs, its name and its fact types
-// (see newCacheAnalyzers).
+// (see newCacheAnalyzers). The package's export data is beside it, under exportDataKey, since it is most of a
+// package's bytes and the load reads it only for a package something that missed imports.
 type cacheEntry struct {
 	// Version is CacheFormatVersion as it was when the entry was written, read back as a check on the key's.
 	Version string
 
 	Analyzers map[string]storedAnalysis
 
-	// ExportData, Imports and Withheld are the load's, as load.Restored names them.
-	ExportData []byte
-	Imports    []string
-	Withheld   load.PackageWithheld
+	// Imports and Withheld are the load's, as load.Restored names them.
+	Imports  []string
+	Withheld load.PackageWithheld
 
 	// Files are the package's files as the rules were given them, for a package Analyze was given, whose walk the
 	// lint record counts and whose generated and copied files withhold a house rule's findings.
@@ -112,8 +114,9 @@ func factTypeName(factType reflect.Type) string {
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
 // error, its types, what the load withheld of it, and, for a package Analyze was given, its files' walk, and how many
-// facts it left out because their object has no objectpath. It returns errorUnstorable, wrapped, when gob refuses a
-// fact the package exported or its types cannot be written as export data.
+// facts it left out because their object has no objectpath, with its export data beside it. It returns
+// errorUnstorable, wrapped, when gob refuses a fact the package exported or its types cannot be written as export
+// data.
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -121,8 +124,7 @@ func encodeEntry(
 	actions []*checker.Action,
 	withheld load.PackageWithheld,
 	files []storedFile,
-) ([]byte, int, error) {
-	dropped := 0
+) (entryBytes []byte, exportData []byte, dropped int, encodeError error) {
 	entry := cacheEntry{
 		Version:   CacheFormatVersion,
 		Analyzers: map[string]storedAnalysis{},
@@ -158,15 +160,15 @@ func encodeEntry(
 			}
 			fact, factError := encodeFact(objectFact.Fact)
 			if factError != nil {
-				return nil, 0, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name, objectFact.Object,
-					factError)
+				return nil, nil, 0, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name,
+					objectFact.Object, factError)
 			}
 			stored.ObjectFacts = append(stored.ObjectFacts, storedObjectFact{Path: path, Fact: fact})
 		}
 		for _, packageFact := range packageFacts {
 			fact, factError := encodeFact(packageFact.Fact)
 			if factError != nil {
-				return nil, 0, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
+				return nil, nil, 0, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
 			}
 			stored.PackageFacts = append(stored.PackageFacts, fact)
 		}
@@ -174,19 +176,24 @@ func encodeEntry(
 	}
 	exportData, exportError := writeExportData(saved)
 	if exportError != nil {
-		return nil, 0, exportError
+		return nil, nil, 0, exportError
 	}
-	entry.ExportData = exportData
 	if saved.Types != nil {
 		for _, imported := range saved.Types.Imports() {
 			entry.Imports = append(entry.Imports, imported.Path())
 		}
 	}
 	var encoded bytes.Buffer
-	if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
-		return nil, 0, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, encodeError)
+	if gobError := gob.NewEncoder(&encoded).Encode(entry); gobError != nil {
+		return nil, nil, 0, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, gobError)
 	}
-	return encoded.Bytes(), dropped, nil
+	return encoded.Bytes(), exportData, dropped, nil
+}
+
+// exportDataKey is where the store keeps the export data of the package whose entry is under key, beside the entry
+// and apart from every other key.
+func exportDataKey(key cache.Key) cache.Key {
+	return sha256.Sum256(append([]byte("export data "), key[:]...))
 }
 
 // writeExportData is a package's types as gcexportdata writes them, nothing for unsafe, whose types are the type
@@ -242,11 +249,16 @@ func encodeFact(fact analysis.Fact) (storedFact, error) {
 	return storedFact{Type: factTypeName(reflect.TypeOf(fact)), Encoded: encoded.Bytes()}, nil
 }
 
-// decodeEntry is a package's entry decoded whole, or an error, which is a miss: an entry in another format, one with
-// no export data for a package that has types of its own, a fact of a type its analyzer does not learn, or bytes
-// gob refuses. Which analyzers the entry must hold is the session's to judge (see covers), since it depends on what
-// else misses.
-func decodeEntry(known *cacheAnalyzers, restoring *packages.Package, contents []byte) (*restoredPackage, error) {
+// decodeEntry is a package's entry decoded whole, or an error, which is a miss: an entry in another format, a fact
+// of a type its analyzer does not learn, or bytes gob refuses. Which analyzers the entry must hold is the session's
+// to judge (see covers), since it depends on what else misses. Its export data is read by readExportData, only when
+// the load asks for it.
+func decodeEntry(
+	known *cacheAnalyzers,
+	restoring *packages.Package,
+	contents []byte,
+	readExportData func() ([]byte, error),
+) (*restoredPackage, error) {
 	var entry cacheEntry
 	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
 		return nil, fmt.Errorf("decoding the entry of %s: %w", restoring.ID, decodeError)
@@ -255,13 +267,14 @@ func decodeEntry(known *cacheAnalyzers, restoring *packages.Package, contents []
 		return nil, fmt.Errorf("reading the entry of %s: it is in format %q, not %q", restoring.ID, entry.Version,
 			CacheFormatVersion)
 	}
-	if len(entry.ExportData) == 0 && restoring.PkgPath != "unsafe" {
-		return nil, fmt.Errorf("reading the entry of %s: it holds no export data", restoring.ID)
-	}
 	restored := &restoredPackage{
 		analyses: map[*analysis.Analyzer]restoredAnalysis{},
-		types:    &load.Restored{ExportData: entry.ExportData, Imports: entry.Imports, Withheld: entry.Withheld},
-		files:    entry.Files,
+		types: &load.Restored{
+			ReadExportData: readExportData,
+			Imports:        entry.Imports,
+			Withheld:       entry.Withheld,
+		},
+		files: entry.Files,
 	}
 	for analyzer, slot := range known.slots {
 		stored, held := entry.Analyzers[slot]

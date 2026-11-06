@@ -76,16 +76,19 @@ func (engine *pipeline) run() int {
 		engine.incomplete = true
 	}
 
+	needsTypes := engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint)
+	if needsTypes {
+		engine.session = engine.cacheSession()
+	}
 	engine.runFix()
 	var loaded *load.Loaded
 	var loadError error
 	// The load runs once, after the fix phase so it reads the formatted tree, whenever a phase needs types.
-	if engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint) {
-		engine.session = engine.cacheSession()
+	if needsTypes {
 		workspace := engine.described.workspace
 		if engine.session != nil {
-			loaded, loadError = load.PackagesRestoring(workspace.Root, workspace.Patterns(), workspace.Environment(),
-				engine.described.readableOurs, engine.session)
+			loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
+				engine.described.readableOurs, load.Caching{Restorer: engine.session, Listings: engine.session})
 		} else {
 			loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
 				engine.described.readableOurs)
@@ -185,9 +188,13 @@ func (engine *pipeline) runFix() {
 	}
 
 	severity, reported := engine.severityOf(ruleRequireFormatting)
+	known := engine.knownFiles()
 	result := format.Run(candidates, format.Options{
-		Write: !engine.request.switches["no-fix"], SingleThreaded: engine.request.switches["single-threaded"],
+		Write:          !engine.request.switches["no-fix"],
+		SingleThreaded: engine.request.switches["single-threaded"],
+		Known:          known,
 	})
+	engine.keepKnownFiles(known)
 	for _, changed := range result.Changed {
 		if changed.Written {
 			record.FilesRewritten++
@@ -224,6 +231,33 @@ func (engine *pipeline) runFix() {
 	}
 	engine.write(record)
 	engine.phase(contract.PhaseFix, contract.OutcomeRan, time.Since(started), "")
+}
+
+// knownFilesLabel names gofmt's verdicts among what the findings cache keeps.
+const knownFilesLabel = "gofmt verdicts"
+
+// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache.
+func (engine *pipeline) knownFiles() *format.KnownFiles {
+	if engine.session == nil {
+		return nil
+	}
+	encoded, _ := engine.session.Kept(engine.session.KeyFor(knownFilesLabel))
+	return format.DecodeKnownFiles(encoded)
+}
+
+// keepKnownFiles keeps gofmt's verdicts for the next run.
+func (engine *pipeline) keepKnownFiles(known *format.KnownFiles) {
+	if known == nil {
+		return
+	}
+	encoded, encodeError := known.Encode()
+	if encodeError == nil {
+		encodeError = engine.session.Keep(engine.session.KeyFor(knownFilesLabel), encoded)
+	}
+	if encodeError != nil {
+		engine.note("the findings cache could not keep gofmt's verdicts, so the next run formats every file: %v",
+			encodeError)
+	}
 }
 
 // reread reads a file the fix phase just rewrote, so the suppression comments lint reads are on the lines the

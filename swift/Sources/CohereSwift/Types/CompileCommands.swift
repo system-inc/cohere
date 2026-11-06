@@ -159,8 +159,9 @@ struct CompileCommands {
 
     /*
      Flags only the driver understands, or that make sourcekitd write files: batching, incremental state,
-     outputs, the explicit-module build and its caches. sourcekitd builds its modules implicitly, so the
-     explicit module cache (the second `-module-cache-path`) is dropped and the first, implicit one kept.
+     outputs, the explicit-module build and its caches. The explicit module cache (the second
+     `-module-cache-path`) is dropped and the first, implicit one kept, which a compile the build left no
+     module map for still builds its modules into (`explicitModuleArguments`).
      */
     private static let flagsDropped: Set<String> = [
         "-c", "-enable-batch-mode", "-incremental", "-save-temps", "-color-diagnostics", "-explicit-module-build",
@@ -179,6 +180,7 @@ struct CompileCommands {
         var files: [String] = []
         var moduleName = ""
         var keptModuleCache = false
+        var outputFileMap: String?
         var remaining = driver[...]
         while let argument = remaining.popFirst() {
             if flagsDropped.contains(argument)
@@ -187,6 +189,9 @@ struct CompileCommands {
                 continue
             }
             if flagsDroppedWithValue.contains(argument) {
+                if argument == "-output-file-map" {
+                    outputFileMap = remaining.first
+                }
                 remaining = remaining.dropFirst()
                 continue
             }
@@ -231,12 +236,113 @@ struct CompileCommands {
                 description: "a Swift compile in the build's task store names no module, so its record format has moved"
             )
         }
+        if driver.contains("-explicit-module-build"), let outputFileMap {
+            arguments.append(
+                contentsOf: explicitModuleArguments(
+                    moduleName: moduleName,
+                    objectsDirectory: URL(fileURLWithPath: outputFileMap).deletingLastPathComponent(),
+                    arguments: arguments,
+                )
+            )
+        }
         return Command(
             moduleName: moduleName,
             arguments: arguments,
             files: files,
             testable: driver.contains("-entry-point-function-name"),
         )
+    }
+
+    /*
+     The modules the build already compiled for this module's files, handed to sourcekitd so it loads them
+     instead of building its own: the explicit module map the build's dependency scan wrote beside the
+     compile's outputs, implicit modules turned off, and the Clang target the build compiled every Clang
+     module for. Empty, which leaves sourcekitd building its modules implicitly, whenever any of that cannot
+     be read as the build left it.
+
+     Measured on ahraos-presence: the first check in a scratch sourcekitd had never used took 12.2s, 217 Clang
+     modules and 74 Swift modules built into the implicit cache, against 1.7s once they were there. The build's
+     own Clang modules in that cache sit under other hashes, because sourcekitd forces Clang options of its own,
+     so it never shares them. Given this map instead, a cold check of a cohere file took 0.29s against 2.1s
+     and wrote nothing, with the same error and warning at the same places when both were planted.
+
+     The map is `<Module>-dependencies-<N>.json` in the directory of the compile's output file map, the newest when
+     there are several: the number is not the build's order (on ahraos-macos, a `-2` written at 11:08 beside a `-1`
+     rewritten at 11:34, the same content), and the newest is the one the last build wrote. Every module it names
+     must exist, or the map describes a build that is gone. The Clang target is the driver's, which sets every
+     Clang dependency's to the SDK's version rather than the deployment target (swift-driver #1274, and #2172 for
+     `DefaultDeploymentTarget`): without it, every PCM refused to load with "compiled for the target
+     'arm64-apple-macosx27.2.0' but the current translation unit is being compiled for target
+     'arm64-apple-macosx15.0.0'". Only macOS is aligned this way here: another platform's versions are remapped
+     (Mac Catalyst's from macOS's) by rules this reader would have to copy, so it keeps implicit modules. A target
+     this computes wrongly fails loudly, never quietly: the standard library's Clang module is the first every
+     Swift file loads, so sourcekitd refuses the request ("Loading the standard library failed").
+     */
+    static func explicitModuleArguments(moduleName: String, objectsDirectory: URL, arguments: [String]) -> [String] {
+        let manager = FileManager.default
+        let prefix = "\(moduleName)-dependencies-"
+        guard
+            let candidates = try? manager.contentsOfDirectory(
+                at: objectsDirectory,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+            )
+        else { return [] }
+        /* Named under the directory as the build spelled it, as every other path in the command is. */
+        let maps = candidates.filter { $0.lastPathComponent.hasPrefix(prefix) && $0.pathExtension == "json" }.map {
+            objectsDirectory.appendingPathComponent($0.lastPathComponent)
+        }
+        func modified(_ map: URL) -> Date {
+            (try? map.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+        }
+        guard let map = maps.max(by: { modified($0) < modified($1) }),
+            let data = try? Data(contentsOf: map),
+            let entries = try? JSONDecoder().decode([ExplicitModule].self, from: data),
+            !entries.isEmpty,
+            entries.allSatisfy({ entry in entry.paths.allSatisfy { manager.fileExists(atPath: $0) } }),
+            let clangTarget = sdkAlignedClangTarget(arguments: arguments)
+        else { return [] }
+        return [
+            "-Xfrontend", "-disable-implicit-swift-modules", "-Xfrontend", "-explicit-swift-module-map-file",
+            "-Xfrontend", map.path, "-Xcc", "-fno-implicit-modules", "-Xcc", "-fno-implicit-module-maps",
+            "-Xfrontend", "-clang-target", "-Xfrontend", clangTarget,
+        ]
+    }
+
+    /* One module of an explicit module map: a Swift module's file, or a Clang module's PCM and the module map it was built from. */
+    private struct ExplicitModule: Decodable {
+        var modulePath: String?
+        var clangModulePath: String?
+        var clangModuleMapPath: String?
+
+        var paths: [String] { [modulePath, clangModulePath, clangModuleMapPath].compactMap(\.self) }
+    }
+
+    private struct SDKSettings: Decodable {
+        var version: String
+        var defaultDeploymentTarget: String?
+
+        enum CodingKeys: String, CodingKey {
+            case version = "Version"
+            case defaultDeploymentTarget = "DefaultDeploymentTarget"
+        }
+    }
+
+    /*
+     `-target`'s macOS triple with the SDK's version in place of the deployment target, `arm64-apple-macos15.0`
+     under MacOSX27.2.sdk becoming `arm64-apple-macos27.2`, or nil for any other platform or an SDK whose
+     settings cannot be read.
+     */
+    static func sdkAlignedClangTarget(arguments: [String]) -> String? {
+        func value(after flag: String) -> String? {
+            arguments.firstIndex(of: flag).flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
+        }
+        guard let target = value(after: "-target"), let sdk = value(after: "-sdk"),
+            let range = target.range(of: #"-apple-macosx?[0-9.]+$"#, options: .regularExpression),
+            let data = try? Data(contentsOf: URL(fileURLWithPath: sdk).appendingPathComponent("SDKSettings.json")),
+            let settings = try? JSONDecoder().decode(SDKSettings.self, from: data)
+        else { return nil }
+        let system = target[range].prefix { !$0.isNumber }
+        return "\(target[..<range.lowerBound])\(system)\(settings.defaultDeploymentTarget ?? settings.version)"
     }
 
     private static func deduplicated(_ commands: [Command]) -> [Command] {
