@@ -33,7 +33,7 @@ func TestLandRefusesTheRuleCpuBudgetBeforeTests(test *testing.T) {
 printf '%s\n' "$*" >> '` + log + `'
 if [ "$1" = vet ]; then exit 0; fi
 case "$*" in
- *TestRegisteredRuleCPUBudget*)
+ *` + ruleCpuTest + `*)
   echo "rule CPU coverage: rules run=1 registered=1 corpus nodes=1 files=1 wall=1ms"
   if [ ! -f '` + marker + `' ]; then
    echo "rule CPU budget exceeded: planted-rule 501ms > 500ms"
@@ -67,7 +67,7 @@ exit 0
 	lines := strings.Split(strings.TrimSpace(string(commands)), "\n")
 	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(
 		lines[1],
-		"-count=1 -timeout=30s -run=^TestRegisteredRuleCPUBudget$ -v ./internal/lint/registry",
+		"-count=1 -timeout=30s -run=^"+ruleCpuTest+"$ -v ./internal/lint/registry",
 	) {
 		test.Fatalf(
 			"commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests",
@@ -93,7 +93,7 @@ func TestCohereHasTheRuleCpuCheckTheGateRuns(test *testing.T) {
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	if !strings.Contains(string(source), "func TestRegisteredRuleCPUBudget(test *testing.T)") {
+	if !strings.Contains(string(source), "func "+ruleCpuTest+"(test *testing.T)") {
 		test.Fatal("the gate's named test is missing")
 	}
 }
