@@ -85,8 +85,11 @@ nothing more is held back: its packages and `t.Parallel` tests use the whole sha
 Work lands on main through `go run ./command/cohere-dev land`, run in the worktree being landed, with
 its work committed (#fz6xejy). It takes the machine's one land lock in arrival order and holds it from
 merge to fast-forward. It makes one merge commit of the worktree's head onto current main, first parent
-main and second the head, checks the worktree out at it, gates that tree (`go vet ./...` and the whole
-module's tests, through a pool token), and moves main to it, checkout and all (#4v9pmef). Main's
+main and second the head, checks the worktree out at it, gates that tree through a pool token, and moves
+main to it, checkout and all (#4v9pmef). The gate runs `go vet`, the rule CPU budget, the whole module's
+tests, the docs data check, and last cohere itself on the tree (#06g3f7x): it builds cohere at that tree and
+refuses the landing unless a bare `cohere --no-fix` there reads 0 findings, 0 type errors and no gap, every
+engine, printing what it found. Main's
 first-parent line gains that one commit per landing, and the branch's own history, its merges of main
 included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
 detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and

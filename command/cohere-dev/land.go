@@ -33,6 +33,7 @@ const landAttempts = 3
 
 // land lands the commit the working directory's worktree is at onto main, and returns its exit code.
 func land(arguments []string) int {
+	takeHandedWorktree()
 	options, parseLandingOptionsError := parseLandingOptions(arguments)
 	if parseLandingOptionsError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", parseLandingOptionsError)
@@ -435,7 +436,8 @@ func checkoutOfMain(worktree string) (string, error) {
 
 // gate runs the landing gate on the worktree through a pool token: go vet, then the rule CPU budget
 // (checkRuleCpu), then the tests of every module go.work names outside a submodule, each in one go
-// invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData). With its
+// invocation (workspace.go), saying which it covered, then the docs data check (checkDocsData), then cohere on
+// the tree itself (checkCohere). With its
 // exit code it returns the line a landing commit carries about it, which says what ran and for how long.
 func gate(worktree string, commit string) (int, string) {
 	covered, readGatedWorkspaceError := readGatedWorkspace(worktree)
@@ -499,6 +501,17 @@ func gate(worktree string, commit string) (int, string) {
 		code, checked = checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 		if checked {
 			ran = append(ran, "the docs data")
+		}
+		if code != 0 {
+			return code
+		}
+		code, checked = checkCohere(
+			worktree,
+			func() []string { return gateEnvironment(step("building cohere")) },
+			func() []string { return gateEnvironment(step("cohere on the tree")) },
+		)
+		if checked {
+			ran = append(ran, "cohere on the tree, 0 findings and no gaps")
 		}
 		return code
 	})
