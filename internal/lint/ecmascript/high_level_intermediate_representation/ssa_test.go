@@ -90,7 +90,7 @@ func TestSsaMatchesReactSpecFixtures(test *testing.T) {
 }
 
 // Deliberately corrupt a correct SSA function four different ways and confirm
-// VerifySSA reports each one. A checker that has never been shown to fail is
+// VerifySsa reports each one. A checker that has never been shown to fail is
 // not evidence that the property holds.
 func TestSsaVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Parallel()

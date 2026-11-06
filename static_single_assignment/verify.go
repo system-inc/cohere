@@ -34,37 +34,40 @@ package static_single_assignment
 
 import "fmt"
 
-// SSAViolationKind is which invariant a violation breaks: one of the two single assignment states, or
-// the precondition Construct rests on.
-type SSAViolationKind uint8
+// StaticSingleAssignmentViolationKind is which invariant a violation breaks: one of the two single assignment states,
+// or the precondition Construct rests on.
+type StaticSingleAssignmentViolationKind uint8
 
 const (
-	// SSAViolationMultipleDefinitions is a value written more than once.
-	SSAViolationMultipleDefinitions SSAViolationKind = iota
-	// SSAViolationUseNotDominated is a use the definition does not dominate.
-	SSAViolationUseNotDominated
-	// SSAViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules out
-	// and Construct refuses.
-	SSAViolationEntryHasPredecessors
+	// StaticSingleAssignmentViolationMultipleDefinitions is a value written more than once.
+	StaticSingleAssignmentViolationMultipleDefinitions StaticSingleAssignmentViolationKind = iota
+	// StaticSingleAssignmentViolationUseNotDominated is a use the definition does not dominate.
+	StaticSingleAssignmentViolationUseNotDominated
+	// StaticSingleAssignmentViolationEntryHasPredecessors is an entry block some edge enters, which Graph.Entry rules
+	// out and Construct refuses.
+	StaticSingleAssignmentViolationEntryHasPredecessors
 )
 
-// VerifySSA checks that a function is in single static assignment form and returns every violation.
+// VerifyStaticSingleAssignment checks that a function is in single static assignment form and returns every violation.
 //
 // An empty result means the property holds. It does not mean the function was worth checking: a
 // function whose variable references all lowered to globals has almost nothing to check and passes
-// trivially. `CollectSSAStats` is how a caller tells a real pass from a vacuous one.
+// trivially. `CollectStaticSingleAssignmentStatistics` is how a caller tells a real pass from a vacuous one.
 //
 // Nested functions are not descended into; call it per function.
-func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) []SSAViolation {
+func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+) []StaticSingleAssignmentViolation {
 	blocks := graph.Blocks(function)
 	if len(blocks) == 0 {
 		return nil
 	}
 
-	var violations []SSAViolation
+	var violations []StaticSingleAssignmentViolation
 	if entry, predecessors, entered := entryPredecessors(graph, function); entered {
-		violations = append(violations, SSAViolation{
-			Kind:  SSAViolationEntryHasPredecessors,
+		violations = append(violations, StaticSingleAssignmentViolation{
+			Kind:  StaticSingleAssignmentViolationEntryHasPredecessors,
 			Block: entry,
 			Detail: fmt.Sprintf("the entry block bb%d has predecessors %v, and no edge may enter it",
 				entry, predecessors),
@@ -79,8 +82,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 
 	recordDefinition := func(id IdentifierId, blockId BlockId, position int) {
 		if previous, exists := definedIn[id]; exists {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationMultipleDefinitions,
+			violations = append(violations, StaticSingleAssignmentViolation{
+				Kind:       StaticSingleAssignmentViolationMultipleDefinitions,
 				Identifier: id,
 				Block:      blockId,
 				Detail: fmt.Sprintf("value %s is defined in bb%d and again in bb%d",
@@ -157,8 +160,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 		}
 		if definitionBlock == useBlock {
 			if definedAt[id] > usePosition {
-				violations = append(violations, SSAViolation{
-					Kind:       SSAViolationUseNotDominated,
+				violations = append(violations, StaticSingleAssignmentViolation{
+					Kind:       StaticSingleAssignmentViolationUseNotDominated,
 					Identifier: id,
 					Block:      useBlock,
 					Detail: fmt.Sprintf("%s in bb%d reads %s before it is defined in the same block",
@@ -168,8 +171,8 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 			return
 		}
 		if !dominance.Dominates(definitionBlock, useBlock) {
-			violations = append(violations, SSAViolation{
-				Kind:       SSAViolationUseNotDominated,
+			violations = append(violations, StaticSingleAssignmentViolation{
+				Kind:       StaticSingleAssignmentViolationUseNotDominated,
 				Identifier: id,
 				Block:      useBlock,
 				Detail: fmt.Sprintf("%s in bb%d reads %s defined in bb%d, which does not dominate bb%d",
@@ -214,13 +217,13 @@ func VerifySSA[G Graph[F, B, P], F any, B comparable, P any](graph G, function F
 	return violations
 }
 
-// SSAStats counts what a verification actually had to look at.
+// StaticSingleAssignmentStatistics counts what a verification actually had to look at.
 //
 // This exists because an empty violation list is exactly what a vacuous check returns. A function
-// with no phis and no renamed values passes `VerifySSA` perfectly while proving nothing, and that
-// is the failure mode this whole package has been bitten by twice. A caller reporting a clean run
-// should report these numbers alongside it.
-type SSAStats struct {
+// with no phis and no renamed values passes `VerifyStaticSingleAssignment` perfectly while proving
+// nothing, and that is the failure mode this whole package has been bitten by twice. A caller
+// reporting a clean run should report these numbers alongside it.
+type StaticSingleAssignmentStatistics struct {
 	// Phis is how many merge points were placed.
 	Phis int
 	// NamedValues is how many defined values carry a source name rather than being a temporary.
@@ -230,9 +233,12 @@ type SSAStats struct {
 	Uses int
 }
 
-// CollectSSAStats measures one function.
-func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) SSAStats {
-	var stats SSAStats
+// CollectStaticSingleAssignmentStatistics measures one function.
+func CollectStaticSingleAssignmentStatistics[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+) StaticSingleAssignmentStatistics {
+	var statistics StaticSingleAssignmentStatistics
 	seen := map[IdentifierId]bool{}
 	note := func(place P) {
 		id := graph.IdentifierOf(place)
@@ -241,7 +247,7 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 		}
 		seen[id] = true
 		if graph.Named(function, id) {
-			stats.NamedValues++
+			statistics.NamedValues++
 		}
 	}
 	instruction := func(place *P, role Role) {
@@ -249,16 +255,16 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 			note(*place)
 			return
 		}
-		stats.Uses++
+		statistics.Uses++
 	}
 	terminal := func(place *P, role Role) {
 		if role != Define {
-			stats.Uses++
+			statistics.Uses++
 		}
 	}
 	for _, block := range graph.Blocks(function) {
 		phis := graph.Phis(block)
-		stats.Phis += len(phis)
+		statistics.Phis += len(phis)
 		for _, phi := range phis {
 			note(phi.Place)
 		}
@@ -268,7 +274,7 @@ func CollectSSAStats[G Graph[F, B, P], F any, B comparable, P any](graph G, func
 		}
 		graph.EachTerminalPlace(block, terminal)
 	}
-	return stats
+	return statistics
 }
 
 // ComputeDominance runs Cooper-Harvey-Kennedy over the function's blocks.

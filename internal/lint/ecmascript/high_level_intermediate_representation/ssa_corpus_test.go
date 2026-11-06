@@ -89,7 +89,7 @@ func TestSsaOverRealCodebase(test *testing.T) {
 										test.Errorf("%s: %s", filepath.Base(path), violation.Detail)
 									}
 									switch violation.Kind {
-									case static_single_assignment.SSAViolationMultipleDefinitions:
+									case static_single_assignment.StaticSingleAssignmentViolationMultipleDefinitions:
 										kinds["multiple-definitions"]++
 									default:
 										kinds["use-not-dominated"]++

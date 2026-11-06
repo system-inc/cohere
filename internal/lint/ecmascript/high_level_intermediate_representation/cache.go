@@ -29,7 +29,7 @@ import (
 // Construct over the same graph moved it from 1 phi and 5 named values to 2 phis and 6 named
 // values.
 //
-// The dangerous part is that the doubly-constructed graph is still well-formed: `VerifySSA`
+// The dangerous part is that the doubly-constructed graph is still well-formed: `VerifySsa`
 // reports zero violations on it. So a cache that handed out a raw lowering and let each of the
 // three callers run its own Construct would have given the second and third caller a graph carrying
 // phis that correspond to no branch in the source, with no verifier, no panic, and no test

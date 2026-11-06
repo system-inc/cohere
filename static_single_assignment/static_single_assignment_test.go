@@ -173,7 +173,7 @@ func construct(test *testing.T, function *testFunction) {
 	test.Helper()
 	finalize(function)
 	ssa.Construct(testGraph{}, function)
-	if violations := ssa.VerifySSA(testGraph{}, function); len(violations) != 0 {
+	if violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function); len(violations) != 0 {
 		test.Fatalf("not in single assignment form: %v", violations)
 	}
 }
@@ -419,12 +419,13 @@ func TestVerifierCatchesAnUndominatedUse(test *testing.T) {
 	goTo(entry, left, right)
 	finalize(function)
 
-	violations := ssa.VerifySSA(testGraph{}, function)
-	if len(violations) != 1 || violations[0].Kind != ssa.SSAViolationUseNotDominated {
+	violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
+	if len(violations) != 1 || violations[0].Kind != ssa.StaticSingleAssignmentViolationUseNotDominated {
 		test.Fatalf("violations are %v, want one undominated use", violations)
 	}
-	if stats := ssa.CollectSSAStats(testGraph{}, function); stats.Uses != 1 || stats.NamedValues != 1 {
-		test.Errorf("stats are %+v, want one use and one named value", stats)
+	statistics := ssa.CollectStaticSingleAssignmentStatistics(testGraph{}, function)
+	if statistics.Uses != 1 || statistics.NamedValues != 1 {
+		test.Errorf("statistics are %+v, want one use and one named value", statistics)
 	}
 }
 
@@ -652,8 +653,8 @@ func describeTestGraph(function *testFunction) string {
 }
 
 // TestAnEntryWithPredecessorsIsReportedAndRefused: an edge into the entry breaks Graph.Entry's rule.
-// VerifySSA says so, and Construct refuses with a panic that names the block. Without the refusal, the
-// read of x in c, which nothing defines, looks back through b, a and the entry, each with one sealed
+// VerifyStaticSingleAssignment says so, and Construct refuses with a panic that names the block. Without the refusal,
+// the read of x in c, which nothing defines, looks back through b, a and the entry, each with one sealed
 // predecessor, and around again until the stack runs out.
 func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	test.Parallel()
@@ -666,9 +667,9 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	goTo(b, entry, c)
 	finalize(function)
 
-	violations := ssa.VerifySSA(testGraph{}, function)
+	violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
 	if len(violations) == 0 ||
-		violations[0].Kind != ssa.SSAViolationEntryHasPredecessors ||
+		violations[0].Kind != ssa.StaticSingleAssignmentViolationEntryHasPredecessors ||
 		violations[0].Block != entry.id {
 		test.Fatalf("violations are %v, want the entry's predecessors first", violations)
 	}

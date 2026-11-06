@@ -87,7 +87,7 @@ const (
 // and its function. The passes hold no IR type; every read and write of one goes through here.
 type Graph[F any, B comparable, P any] interface {
 	// Entry is the block control begins at. No edge enters it, so it has no predecessors: Construct's
-	// lookup ends there, refuses a function whose entry breaks this, and VerifySSA reports one.
+	// lookup ends there, refuses a function whose entry breaks this, and VerifyStaticSingleAssignment reports one.
 	Entry(function F) BlockId
 	// BlockBound is one past the largest block id the function has handed out or holds.
 	BlockBound(function F) int

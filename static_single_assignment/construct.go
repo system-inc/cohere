@@ -13,7 +13,7 @@
 // a lookup actually crosses a join with disagreeing predecessors, which means it never places one
 // that redundancy elimination would immediately remove, and it needs no dominance frontier at all.
 //
-// Dominance is still what correctness is stated against - see `VerifySSA` - but it is computed
+// Dominance is still what correctness is stated against - see `VerifyStaticSingleAssignment` - but it is computed
 // there, over this graph, for checking rather than for construction.
 //
 // # The one property everything rests on
@@ -52,7 +52,7 @@ import "fmt"
 // Graph.Entry rules out. Its lookup walks back through predecessors until it finds a definition or a
 // block with none, and an entry on a cycle of blocks with one predecessor each gives it neither: before
 // this check, that was a stack overflow in valueAt. Neither IR builds such a function; one that did has
-// a bug in its adapter or its lowering, and the panic names it. VerifySSA reports the same thing
+// a bug in its adapter or its lowering, and the panic names it. VerifyStaticSingleAssignment reports the same thing
 // without constructing.
 func Construct[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) {
 	if entry, predecessors, entered := entryPredecessors(graph, function); entered {

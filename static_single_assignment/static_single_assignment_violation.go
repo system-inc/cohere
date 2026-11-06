@@ -1,9 +1,9 @@
 package static_single_assignment
 
-// SSAViolation is one broken invariant.
-type SSAViolation struct {
+// StaticSingleAssignmentViolation is one broken invariant.
+type StaticSingleAssignmentViolation struct {
 	// Kind is which invariant broke.
-	Kind SSAViolationKind
+	Kind StaticSingleAssignmentViolationKind
 	// Identifier is the value involved.
 	Identifier IdentifierId
 	// Block is where the violating use or duplicate definition sits.
@@ -12,4 +12,4 @@ type SSAViolation struct {
 	Detail string
 }
 
-func (violation SSAViolation) String() string { return violation.Detail }
+func (violation StaticSingleAssignmentViolation) String() string { return violation.Detail }
