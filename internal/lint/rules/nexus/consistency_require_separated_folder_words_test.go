@@ -69,6 +69,8 @@ func TestConsistencyRequireSeparatedFolderWordsStaysSilent(test *testing.T) {
 		"/project/source/format_options/Thing.ts",
 		"/project/source/net-worth/by-payee/Thing.ts",
 		"/project/source/cachedvfs/Thing.ts",
+		"/project/source/automations/Thing.ts",
+		"/project/source/marketing-webhooks/Thing.ts",
 		"/project/source/social-media-v2/Thing.ts",
 		"/project/app/_components/Thing.tsx",
 		// App Router folders, told by their punctuation. Each holds a part that runs together between two

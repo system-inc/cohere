@@ -1,0 +1,11 @@
+{
+    "why": "fw15: `hotfixes` is `hotfix` and `es`, a plural the lists lack, so it is one word and clean",
+    "expect": [],
+    "options": {},
+    "path": "hotfixes/fw15",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

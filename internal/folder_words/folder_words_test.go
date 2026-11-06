@@ -73,6 +73,13 @@ func TestSeparated(test *testing.T) {
 		{"_formatoptions", "_format_options"},
 		{"FormatOptions", "format_options"},
 		{"formatoptions_test", "format_options_test"},
+		// A plural of a word is one word, though the lists lack it, and only a whole part is read so: a name whose
+		// last word is plural still runs its words together.
+		{"automations", ""},
+		{"webhooks", ""},
+		{"hotfixes", ""},
+		{"text_automations", ""},
+		{"webhookhandlers", "webhook_handlers"},
 		// Words a split would break.
 		{"workspace", ""},
 		{"charset", ""},

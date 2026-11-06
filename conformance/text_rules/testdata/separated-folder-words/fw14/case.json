@@ -1,0 +1,11 @@
+{
+    "why": "fw14: `automations` is the plural of `automation`, a word, and cspell's lists hold the word and not the plural, so it is one word and clean, never split as `automat_ions`",
+    "expect": [],
+    "options": {},
+    "path": "automations/fw14",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

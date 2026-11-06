@@ -77,7 +77,7 @@ func normalizedBrands(vocabulary policy.BrandVocabulary) map[string]bool {
 // name the lists cannot read (vfs, cachedvfs) rather than words run together. A word of three letters or more would
 // come out of fewestPieces whole too, as its own one piece, so the word check first is the short way to the common
 // answer, one search rather than one for every piece a split tries, and the answer for a word of one or two letters,
-// which is no piece.
+// which is no piece. A part that is a plural of a word is kept whole too (isPlural).
 func Separated(name string, spelling Spelling) (string, bool) {
 	parts, separators := splitParts(strings.ToLower(name), spelling.Separators)
 	joiner := spelling.Joiner
@@ -89,7 +89,7 @@ func Separated(name string, spelling Spelling) (string, bool) {
 	}
 	runTogether := false
 	for index, part := range parts {
-		if part == "" || isWord(part) {
+		if part == "" || isWord(part) || isPlural(part) {
 			continue
 		}
 		if pieces := fewestPieces(part); len(pieces) >= 2 {
@@ -126,6 +126,20 @@ func splitParts(name string, separators string) ([]string, []string) {
 // isWord reports whether text is in the lists or is a brand, at any length.
 func isWord(text string) bool {
 	return brandWords[text] || policy.KnownWords().Has(text)
+}
+
+// isPlural reports whether text is a word with `s` or `es` after it. cspell's en_US holds the inflections its source
+// lists, and its source gives some words no plural: it holds automation and not automations, webhook and not
+// webhooks (#narw7aq). A folder named for what it holds is most often a plural, so without this a plural the lists
+// lack splits into whatever pieces it can, automat_ions. Only a whole part is read this way, never a piece of a
+// split, so a name that runs words together, jsonlines, still splits as it did, and the suffix is never a word of
+// its own.
+func isPlural(text string) bool {
+	if stem, cut := strings.CutSuffix(text, "es"); cut && isWord(stem) {
+		return true
+	}
+	stem, cut := strings.CutSuffix(text, "s")
+	return cut && isWord(stem)
 }
 
 // isPiece reports whether text may be one piece of a split: one of twoLetterWords, or a word of minimumPieceLength
