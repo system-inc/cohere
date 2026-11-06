@@ -335,6 +335,42 @@
             ]
         },
         {
+            "reason": "File formats, software and datasets the apps name, general vocabulary like `HTTP` (#97t3z3t, judged by @system_cohere_swift under @system_cohere's ruling on #y8whqbe): the `WAV` audio and `VRMA` VRM animation formats; `LUT`, a lookup table; `XYZ`, the coordinate order and the CIE color space; `ACK`, an acknowledgement; the `XNNPACK` inference library and `OBS` Studio; `COCO`, Microsoft's Common Objects in Context dataset (Lin et al., ECCV 2014); `CHI`, the ACM conference.",
+            "tokens": [
+                "ACK",
+                "CHI",
+                "COCO",
+                "LUT",
+                "OBS",
+                "VRMA",
+                "WAV",
+                "XNNPACK",
+                "XYZ"
+            ]
+        },
+        {
+            "reason": "Anatomy's names for the finger joints, which hand-pose landmarks are named after: `PIP` and `DIP`, the proximal and distal interphalangeal joints (#97t3z3t).",
+            "tokens": [
+                "DIP",
+                "PIP"
+            ]
+        },
+        {
+            "reason": "Networking, security, systems and color names, general vocabulary like `HTTP` (#d1senw3, judged by @system_cohere_swift under @system_cohere's ruling on #y8whqbe): `SAN` and `SNI`, a certificate's subject alternative name and TLS's server name indication; `MITM`, a man in the middle; `SOCKS`, the proxy protocol; `SPI`, Apple's system programming interface; `ARC`, automatic reference counting; `UTI`, Apple's uniform type identifier; `COW`, copy-on-write; `SIP`, Unicode's supplementary ideographic plane; `LAB`, the CIE color space.",
+            "tokens": [
+                "ARC",
+                "COW",
+                "LAB",
+                "MITM",
+                "SAN",
+                "SIP",
+                "SNI",
+                "SOCKS",
+                "SPI",
+                "UTI"
+            ]
+        },
+        {
             "reason": "File and environment names, the one group that is not acronyms: every one is a pronounceable English word, which is why the vowel test reads them as shouting and why they are named rather than inferred. Backticks are the wrong repair, since a file named mid-sentence is the subject being discussed, not a literal to match character for character. `PATH` passes the same noun test; the home directory, shell and terminal variables are left out because a sentence reads those for their value rather than naming them as a thing.",
             "tokens": [
                 "AGENTS",
