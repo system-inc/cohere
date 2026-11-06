@@ -1,14 +1,15 @@
 {
-    "why": "fw04: a brand-led folder is still judged: the brand `iMessage`, lowercased, is one piece of the split, so `imessagebridge` is reported as `imessage_bridge`, never passed for leading with a brand. Go form only: Go reports at the package clause, which a covers span names, and TypeScript and Swift have no clause, so their finding would be the file's start, which a case can't write beside Go's covers span",
+    "why": "fw04: a brand-led folder is still judged: the brand `iMessage`, lowercased, is one piece of the split, so `imessagebridge` is reported as `imessage_bridge`, never passed for leading with a brand",
     "expect": [
         {
-            "covers": "package imessagebridge",
-            "occurrence": 1
+            "fileStart": true
         }
     ],
     "options": {},
     "path": "imessagebridge/fw04",
     "languages": [
-        "go"
+        "typescript",
+        "go",
+        "swift"
     ]
 }

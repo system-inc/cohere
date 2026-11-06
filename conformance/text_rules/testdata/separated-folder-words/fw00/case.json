@@ -1,15 +1,16 @@
 {
-    "why": "fw00: the control, a folder `goengine` runs `go` and `engine` together and is reported once, over its package clause from `package` to the end of the name. Go form only: Go reports at the package clause, which a covers span names, and TypeScript and Swift have no clause, so their finding would be the file's start, which a case can't write beside Go's covers span",
+    "why": "fw00: the control, a folder `goengine` runs `go` and `engine` together and is reported once, at the file's start, where every engine's folder finding sits",
     "control": true,
     "expect": [
         {
-            "covers": "package goengine",
-            "occurrence": 1
+            "fileStart": true
         }
     ],
     "options": {},
     "path": "goengine/fw00",
     "languages": [
-        "go"
+        "typescript",
+        "go",
+        "swift"
     ]
 }
