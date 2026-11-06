@@ -1,0 +1,28 @@
+{
+    "why": "am05: call 3, no numeric-kernel exemption: a numeric function's `s`, `t` and local `d` are reported at their declarations",
+    "expect": [
+        {
+            "covers": "s",
+            "occurrence": 1
+        },
+        {
+            "covers": "t",
+            "occurrence": {
+                "typescript": 3,
+                "go": 1,
+                "swift": 1
+            }
+        },
+        {
+            "covers": "d",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

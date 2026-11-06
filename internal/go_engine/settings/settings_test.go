@@ -44,6 +44,10 @@ var fileFixtures = map[string]string{
 		}}
 	}`,
 	"empty-rules": `{"go": {"rules": {}}}`,
+	"departures": `{"go": {
+		"rules": {"` + parallelRule + `": ["error", {"limit": 3}]},
+		"departures": {"` + parallelRule + `": "Our suites share one database."}
+	}}`,
 
 	"go-format":          `{"go": {"format": {}, "rules": {}}}`,
 	"go-other-key":       `{"go": {"rules": {}, "severity": "error", "extends": "x"}}`,
@@ -64,6 +68,14 @@ var fileFixtures = map[string]string{
 	"top-level-array":    `[{"go": {"rules": {}}}]`,
 	"top-level-null":     `null`,
 	"malformed":          `{"go": {"rules": {}}`,
+
+	"departures-not-object":  `{"go": {"rules": {}, "departures": ["` + parallelRule + `"]}}`,
+	"departures-null":        `{"go": {"rules": {}, "departures": null}}`,
+	"departure-blank-reason": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": " \t "}}}`,
+	"departure-empty-reason": `{"go": {"rules": {}, "departures": {"` + parallelRule + `": ""}}}`,
+	"departure-not-string":   `{"go": {"rules": {}, "departures": {"` + parallelRule + `": 2}}}`,
+	"departure-unknown-rule": `{"go": {"rules": {},
+		"departures": {"cohere-go/performance-require-paralel-test": "x"}}}`,
 }
 
 func TestMain(suite *testing.M) {
@@ -263,6 +275,29 @@ func TestEveryAcceptedShapeLoads(test *testing.T) {
 	}
 }
 
+// TestADeparturesObjectLoads: each departure's reason reaches the settings as written, keyed by its rule, and a
+// file that gives none carries none.
+func TestADeparturesObjectLoads(test *testing.T) {
+	test.Parallel()
+	loaded, loadError := Load(fixtureRoot, filePath("departures"), knownRules)
+	if loadError != nil {
+		test.Fatalf("loading a departures object: %v", loadError)
+	}
+	if len(loaded.Departures) != 1 || loaded.Departures[parallelRule] != "Our suites share one database." {
+		test.Errorf("departures read as %v, want %s's reason alone", loaded.Departures, parallelRule)
+	}
+	if loaded.Rules[parallelRule].Severity != SeverityError {
+		test.Errorf("%s is %+v, want error beside its departure", parallelRule, loaded.Rules[parallelRule])
+	}
+	none, noneError := Load(fixtureRoot, filePath("every-shape"), knownRules)
+	if noneError != nil {
+		test.Fatalf("loading a file with no departures: %v", noneError)
+	}
+	if len(none.Departures) != 0 {
+		test.Errorf("a file with no departures read as %v", none.Departures)
+	}
+}
+
 // TestTheSeveritySpellingsAreTheLoaders: the schema offers SeveritySpellings, so each must load and a
 // spelling outside them, the TypeScript loader's extra ones and a capitalized one among them, must not.
 func TestTheSeveritySpellingsAreTheLoaders(test *testing.T) {
@@ -302,6 +337,13 @@ func TestEveryBadShapeIsRefusedByName(test *testing.T) {
 		"top-level-array":    {"the top level is not an object"},
 		"top-level-null":     {"the top level is not an object"},
 		"malformed":          {"unexpected end of JSON input"},
+
+		"departures-not-object":  {"departures is", "not an object"},
+		"departures-null":        {"departures is null", "not an object"},
+		"departure-unknown-rule": {`"cohere-go/performance-require-paralel-test"`, "not a rule the Go engine knows"},
+		"departure-blank-reason": {parallelRule, "blank reason"},
+		"departure-empty-reason": {parallelRule, "blank reason"},
+		"departure-not-string":   {parallelRule, "is 2", "not a reason written as a string"},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

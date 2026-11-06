@@ -1677,8 +1677,16 @@
         },
         "go": {
             "additionalProperties": false,
-            "description": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at error and every run says so. A rule name the engine does not know, any key besides rules, and a format key are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.",
+            "description": "Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, exactly as written) or [severity, options] with one options object. Its departures state why a rule is loosened past the house: an option looser than the house's value, as a cohere-go/consistency-no-long-file max above 2,000, runs only beside a departure for its rule with a reason, and a departure for a rule whose options loosen nothing is refused. With no go block, every Go rule runs at error and every run says so. A rule name the engine does not know, any key besides rules and departures, and a format key are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.",
             "properties": {
+                "departures": {
+                    "additionalProperties": {
+                        "pattern": "[^\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+                        "type": "string"
+                    },
+                    "description": "For each cohere-go/<rule> whose options loosen it past the house's value, why, in a sentence. The engine refuses a loosening option with no departure, and a departure for a rule whose options loosen nothing.",
+                    "type": "object"
+                },
                 "rules": {
                     "additionalProperties": {
                         "description": "A severity, or [severity, options] with one options object.",

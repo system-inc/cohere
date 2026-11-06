@@ -1,0 +1,28 @@
+{
+    "why": "am03: call 3, no comparator exemption: a sort comparator's `a` and `b` are reported at their declarations, as any single letter is",
+    "expect": [
+        {
+            "covers": "a",
+            "occurrence": {
+                "typescript": 3,
+                "go": 6,
+                "swift": 3
+            }
+        },
+        {
+            "covers": "b",
+            "occurrence": {
+                "typescript": 4,
+                "go": 2,
+                "swift": 3
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
