@@ -36,12 +36,12 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 		absent[path] = true
 	}
 	fileOrAbsent := func(path string) {
-		path = filepath.Clean(path)
-		if _, statError := os.Lstat(path); statError == nil {
-			files[path] = true
+		cleaned := filepath.Clean(path)
+		if _, statError := os.Lstat(cleaned); statError == nil {
+			files[cleaned] = true
 			return
 		}
-		absent[path] = true
+		absent[cleaned] = true
 	}
 
 	root := engine.described.workspace.Root

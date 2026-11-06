@@ -137,7 +137,11 @@ func TestInputsHoldEveryFileTheLoadListed(test *testing.T) {
 	packages.Visit(inputsFixture.loaded.Roots, nil, func(visited *packages.Package) {
 		value := reflect.ValueOf(visited).Elem()
 		for _, list := range lists {
-			for _, file := range value.FieldByName(list).Interface().([]string) {
+			files, isFileList := value.FieldByName(list).Interface().([]string)
+			if !isFileList {
+				test.Fatalf("packages.Package's %s is not a list of files", list)
+			}
+			for _, file := range files {
 				listed[list] = true
 				if !named[filepath.Clean(file)] {
 					test.Errorf("%s lists %s in %s, and the inputs do not name it", visited.ID, file, list)
@@ -250,7 +254,7 @@ func TestInputsOfAnUnchangedTreeAreTheSameEveryLoad(test *testing.T) {
 }
 
 // The toolchain named is the one that ran, from the root go env reported in the load's environment: with `GOTOOLCHAIN`
-// switching to one a go.mod asks for, that is a toolchain in the module cache, not PATH's go, so its go, VERSION and
+// switching to one a go.mod asks for, that is a toolchain in the module cache, not PATH's go, so its go, `VERSION` and
 // go.env are named whatever PATH holds, and the build cache's files never are.
 func TestInputsNameTheToolchainThatRan(test *testing.T) {
 	test.Parallel()

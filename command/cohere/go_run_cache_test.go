@@ -104,8 +104,8 @@ func TestEngineRunKeepsTheGoInputsRecord(test *testing.T) {
 
 // TestGoRunCacheFactsMoveWithWhatALoadReads: every fact a Go load depends on that is no file moves the run's key,
 // and a variable no load reads, or the same environment in another order, leaves it where it was. A key that
-// stayed put under a moved fact would replay a verdict about another build: GOFLAGS' tags, the target, cgo and the
-// toolchain each decide which files go loads.
+// stayed put under a moved fact would replay a verdict about another build: the tags of `GOFLAGS`, the target, cgo
+// and the toolchain each decide which files go loads.
 func TestGoRunCacheFactsMoveWithWhatALoadReads(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
@@ -213,8 +213,11 @@ func TestGoRunCacheFactsMoveWithWhatALoadReads(test *testing.T) {
 func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 	test.Parallel()
 	ended := func(complete bool, exitCode int) *engineRun {
-		findings := exitCode
-		return &engineRun{summary: &engineSummaryRecord{Findings: &findings, Complete: &complete, ExitCode: &exitCode}}
+		summary := engineSummaryRecord{
+			Findings: new(int), Complete: new(bool), ExitCode: new(int),
+		}
+		*summary.Findings, *summary.Complete, *summary.ExitCode = exitCode, complete, exitCode
+		return &engineRun{summary: &summary}
 	}
 	rewrote := ended(true, 0)
 	rewrote.filesRewritten = 2

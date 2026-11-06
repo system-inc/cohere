@@ -102,7 +102,7 @@ func (fixture *goReplayFixture) variable(name string) string {
 	return ""
 }
 
-// goStandInRoot is a GOROOT of the test's own: every entry of the real one linked, but VERSION and go.env, which
+// goStandInRoot is a `GOROOT` of the test's own: every entry of the real one linked, but `VERSION` and go.env, which
 // are copies a scenario may rewrite without touching the toolchain every other test runs.
 func goStandInRoot(test *testing.T) string {
 	test.Helper()
@@ -149,13 +149,15 @@ type goReplayRun struct {
 // cached run is held against.
 func (fixture *goReplayFixture) run(cached bool, arguments ...string) goReplayRun {
 	fixture.test.Helper()
+	commandLine := slices.Clone(arguments)
 	if !cached {
-		arguments = append(slices.Clone(arguments), "--no-cache")
+		commandLine = append(commandLine, "--no-cache")
 	}
-	command := exec.Command(fixture.binary, arguments...)
+	command := exec.Command(fixture.binary, commandLine...)
 	command.Dir = fixture.root
 	command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), fixture.environment...)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout, command.Stderr = &stdout, &stderr
 	runError := command.Run()
 	var exitError *exec.ExitError
@@ -180,6 +182,12 @@ func (fixture *goReplayFixture) establishHit(arguments ...string) {
 	}
 }
 
+// goReplayFooter is the footer a `--verbose` replay renders of its own, which says it was replayed.
+var goReplayFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`)
+
+// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached.
+var goEveryFileCachedFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)$`)
+
 // isGoReplay reports a run the cache answered, by what the run itself says: the framing on its first line and the
 // footer saying so under `--verbose`, the summary's `cache.replayed` under `--json`, and in the default view a
 // footer that checked no file and found every one cached, which only a replay prints for a Go run. A replay never
@@ -188,12 +196,6 @@ func isGoReplay(run goReplayRun) bool {
 	return strings.HasPrefix(run.stdout, "cached: ") || goReplayFooter.MatchString(run.stdout) ||
 		strings.Contains(run.stdout, `"replayed":true`) || goEveryFileCachedFooter.MatchString(run.stdout)
 }
-
-// goReplayFooter is the footer a `--verbose` replay renders of its own, which says it was replayed.
-var goReplayFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`)
-
-// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached.
-var goEveryFileCachedFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)$`)
 
 // goKeepLines is output without each line starting with one of drop.
 func goKeepLines(output string, drop ...string) string {
@@ -252,9 +254,9 @@ func goNormalized(output string) string {
 
 // goSummaryVerdict is a `--json` run's summary line without what is the invocation's: its time, its phases and
 // their times, what the cache did, and what it checked fresh against what the cache answered for.
-func goSummaryVerdict(test *testing.T, output string) map[string]any {
+func goSummaryVerdict(test *testing.T, output string) map[string]json.RawMessage {
 	test.Helper()
-	var summary map[string]any
+	var summary map[string]json.RawMessage
 	if decodeError := json.Unmarshal([]byte(summaryJsonOf(test, output)), &summary); decodeError != nil {
 		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, output)
 	}
@@ -343,10 +345,11 @@ func TestAGoReplayIsTheColdRunsVerdict(test *testing.T) {
 	}
 }
 
-// jsonText is a value as JSON, its keys sorted, so two decoded summaries compare as text.
-func jsonText(test *testing.T, value any) string {
+// jsonText is a summary as JSON again, its keys sorted, so two decoded summaries compare as text. Each value is the
+// bytes one encoder wrote, so equal values are equal bytes.
+func jsonText(test *testing.T, summary map[string]json.RawMessage) string {
 	test.Helper()
-	encoded, encodeError := json.Marshal(value)
+	encoded, encodeError := json.Marshal(summary)
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
@@ -439,8 +442,9 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			fixture.setVariable("GOOS", target)
 		}},
 		{"CGO_ENABLED changed", nil, func(fixture *goReplayFixture) { fixture.setVariable("CGO_ENABLED", "1") }},
-		// The toolchain that ran, as the engine names it: a GOROOT of the fixture's own, its tree the real one's by
-		// links and its VERSION and go.env copies, so the VERSION a toolchain's update rewrites can be rewritten here.
+		// The toolchain that ran, as the engine names it: a `GOROOT` of the fixture's own, its tree the real one's by
+		// links and its `VERSION` and go.env copies, so the `VERSION` a toolchain's update rewrites can be rewritten
+		// here.
 		// `GOROOT` is set before the hit and never changes, so only the recorded file can tell.
 		{"the toolchain's VERSION rewritten", func(fixture *goReplayFixture) {
 			fixture.setVariable("GOROOT", goStandInRoot(fixture.test))
@@ -504,7 +508,7 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 	}
 }
 
-// goHostIsLinux reports whether the tests run on Linux, so the GOOS scenario names a target other than the host.
+// goHostIsLinux reports whether the tests run on Linux, so the `GOOS` scenario names a target other than the host.
 func goHostIsLinux() bool {
 	output, outputError := exec.Command("go", "env", "GOHOSTOS").Output()
 	return outputError == nil && strings.TrimSpace(string(output)) == "linux"
@@ -686,5 +690,75 @@ func TestAGoRunThatWritesIsNeverRecorded(test *testing.T) {
 	if goNormalized(next.stdout) != goNormalized(cold.stdout) || next.exitCode != cold.exitCode {
 		test.Fatalf("the run after the rewrite differs from a cold run:\n--- next\n%s\n--- cold\n%s",
 			next.stdout, cold.stdout)
+	}
+}
+
+// TestEveryProjectOfAMixedRootReplays: at a root holding a Go module and a TypeScript project, each checked by a
+// child of the run (`cohere --directory <project> ...`, see runProject), the second run replays both children, the
+// Go one without starting its engine. Before discovery's children were admitted every one of them ran cold, cohere's
+// own root among them, since `--directory` admits no run.
+func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		".gitignore": ".cache/\nnode_modules/\n",
+		// Each project's own too: the note a project whose ignore files do not cover .cache prints is not the subject.
+		"service/.gitignore": ".cache/\n",
+		"web/.gitignore":     ".cache/\n",
+		"service/go.mod":     "module example.com/service\n\ngo 1.27\n",
+		"service/go.sum":     "",
+		"service/a.go":       goReplaySource("service", "Greet"),
+		"web/tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext",` +
+			`"moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},` +
+			`"include":["source"]}`,
+		"web/CohereSettings.json": `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off",` +
+			`"@typescript-eslint/no-inferrable-types":"off","no-debugger":"error"}}`,
+		"web/package.json":            `{"name":"fixture","private":true,"type":"module"}`,
+		"web/source/a.ts":             "export const a: number = 1;\n",
+		"service/CohereSettings.json": `{"go":{"rules":{}}}`,
+	})
+	run := func() string {
+		test.Helper()
+		command := exec.Command(binary, "--no-fix", "--no-format", "--verbose")
+		command.Dir = root
+		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=")
+		output, runError := command.CombinedOutput()
+		var exitError *exec.ExitError
+		if runError != nil && !errors.As(runError, &exitError) {
+			test.Fatalf("running cohere: %v\n%s", runError, output)
+		}
+		return string(output)
+	}
+	// Each project's section, by the engine its heading names, from the merged report.
+	sections := func(output string) map[string]string {
+		found := map[string]string{}
+		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|TypeScript)\) ==\n`)
+		bounds := heading.FindAllStringSubmatchIndex(output, -1)
+		for index, bound := range bounds {
+			end := len(output)
+			if index+1 < len(bounds) {
+				end = bounds[index+1][0]
+			}
+			found[output[bound[4]:bound[5]]] = output[bound[1]:end]
+		}
+		return found
+	}
+
+	first := run()
+	if len(sections(first)) != 2 {
+		test.Fatalf("the root was not checked as two projects:\n%s", first)
+	}
+	second := sections(run())
+	for _, engine := range []string{"Go", "TypeScript"} {
+		section, found := second[engine]
+		if !found {
+			test.Fatalf("no %s section in the second run:\n%v", engine, second)
+		}
+		if !strings.HasPrefix(section, "cached: ") {
+			test.Errorf("the %s project ran again rather than replaying:\n%s", engine, section)
+		}
+	}
+	if regexp.MustCompile(`(?m)^module described in `).MatchString(second["Go"]) {
+		test.Errorf("the Go project's engine ran on the second run:\n%s", second["Go"])
 	}
 }

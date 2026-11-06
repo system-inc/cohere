@@ -1,15 +1,12 @@
 package load
 
 import (
-	"io/fs"
 	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
 
-	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -30,7 +27,7 @@ type Inputs struct {
 	// Directories are the directories whose listing decides which packages or files exist: every directory under a
 	// module root, or a local replacement's, that `./...` could reach, and each package directory and embedded
 	// directory among them. A directory outside them, of the standard library or the module cache, is the
-	// toolchain's or a pinned version's, which VERSION, go.mod and go.sum stand for. None is above a module root, nor
+	// toolchain's or a pinned version's, which `VERSION`, go.mod and go.sum stand for. None is above a module root, nor
 	// in the build cache, nor a directory whose name starts with `.` or below one, such as the root's `.cache`: the
 	// run, or the front door around it, writes there, and a listing that moves on every run would never replay.
 	Directories []string
@@ -52,17 +49,10 @@ type reportedEnvironment struct {
 	goFlags         []string
 }
 
-// inputSet gathers the paths of Inputs, each once.
-type inputSet struct {
-	files       map[string]bool
-	directories map[string]bool
-	absent      map[string]bool
-}
-
 // collectInputs is what a load read: every file of every package in the graph, the standard library's and the module
 // cache's included; the census, which the load reads for build constraints; every module's go.mod and each module
 // root's go.sum and vendor/modules.txt; the go.work in use and its go.work.sum, or, with none in use, a go.work above
-// each module root as absent; PATH's go executable, and the go, VERSION and go.env of the toolchain that ran; the go
+// each module root as absent; PATH's go executable, and the go, `VERSION` and go.env of the toolchain that ran; the go
 // env file; a go.mod or overlay `GOFLAGS` names; and the directories Inputs.Directories says. A path that could not be
 // read about is still named, so the front door, which cannot read it either, counts it as moved.
 //
@@ -153,125 +143,6 @@ func collectInputs(
 	}
 }
 
-// addModule names a package's module's go.mod, and its replacement's, and keeps a main module's directory as a module
-// root and a replacement by a local directory, which has no version to pin it, as one to walk too. The standard
-// library's packages have no module.
-//
-// Mutates: set gains the go.mod files; moduleRoots gains a main module's directory; localReplacements gains a local
-// replacement's directory
-func (set *inputSet) addModule(
-	module *packages.Module,
-	moduleRoots map[string]bool,
-	localReplacements map[string]bool,
-) {
-	if module == nil {
-		return
-	}
-	if module.GoMod != "" {
-		set.files[filepath.Clean(module.GoMod)] = true
-	}
-	if module.Replace != nil && module.Replace.GoMod != "" {
-		set.files[filepath.Clean(module.Replace.GoMod)] = true
-	}
-	if module.Replace != nil && module.Replace.Version == "" && module.Replace.Dir != "" {
-		localReplacements[filepath.Clean(module.Replace.Dir)] = true
-	}
-	if module.Main && module.Dir != "" {
-		moduleRoots[filepath.Clean(module.Dir)] = true
-	}
-}
-
-// addWorkspaceFile names the go.work in use, its go.work.sum and the modules it uses as module roots. With none in
-// use and `GOWORK` not `off`, go looked for one from the workspace upward, and from each module root it was told of,
-// so a go.work in any directory above them is absent, since one appearing would change the load.
-//
-// Mutates: set gains the go.work and its sum, or their absences; moduleRoots gains the modules the go.work uses
-func (set *inputSet) addWorkspaceFile(workspace string, workspaceFile string, moduleRoots map[string]bool) {
-	switch workspaceFile {
-	case "off":
-		return
-	case "":
-		starts := append([]string{workspace}, slices.Sorted(maps.Keys(moduleRoots))...)
-		for _, start := range starts {
-			for directory := filepath.Clean(start); ; directory = filepath.Dir(directory) {
-				set.absent[filepath.Join(directory, "go.work")] = true
-				if filepath.Dir(directory) == directory {
-					break
-				}
-			}
-		}
-		return
-	}
-	workspaceFile = filepath.Clean(workspaceFile)
-	set.files[workspaceFile] = true
-	set.addFileOrAbsent(workspaceFile + ".sum")
-	contents, readError := os.ReadFile(workspaceFile)
-	if readError != nil {
-		// Named already: a go.work nobody can read is one the front door counts as moved.
-		return
-	}
-	work, parseError := modfile.ParseWork(workspaceFile, contents, nil)
-	if parseError != nil {
-		// Named already, and go refused the same file, so the load reported what it made of it.
-		return
-	}
-	for _, use := range work.Use {
-		directory := filepath.FromSlash(use.Path)
-		if !filepath.IsAbs(directory) {
-			directory = filepath.Join(filepath.Dir(workspaceFile), directory)
-		}
-		moduleRoots[filepath.Clean(directory)] = true
-	}
-}
-
-// addGoFlagFiles names the files a flag of `GOFLAGS` has go read in place of the usual ones: `-modfile`'s go.mod and
-// its go.sum, and `-overlay`'s file. A relative path is go's, from the workspace.
-//
-// Mutates: set gains each file the flags name
-func (set *inputSet) addGoFlagFiles(workspace string, goFlags []string) {
-	for _, flag := range goFlags {
-		name, value, hasValue := strings.Cut(strings.TrimLeft(flag, "-"), "=")
-		if !hasValue || value == "" || (name != "modfile" && name != "overlay") {
-			continue
-		}
-		if !filepath.IsAbs(value) {
-			value = filepath.Join(workspace, value)
-		}
-		set.addFileOrAbsent(value)
-		if name == "modfile" {
-			set.addFileOrAbsent(strings.TrimSuffix(value, ".mod") + ".sum")
-		}
-	}
-}
-
-// addReachableDirectories names every directory under a module root that a `./...` pattern could reach, walked as go
-// walks one: never into a directory whose name starts with `.` or `_`, nor testdata, nor below a directory with a
-// go.mod of its own, which is named, since a go.mod leaving it would make its packages the module's. More is named
-// than go matches (a vendor tree, a directory a go.mod `ignore` directive names), which only costs a miss.
-//
-// Mutates: set gains each directory reached
-func (set *inputSet) addReachableDirectories(root string) {
-	// Ignored: the walk's callback returns no error, so neither does the walk.
-	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
-		if pathError != nil || !entry.IsDir() {
-			// A directory that cannot be read was named when the walk reached it, and the front door, which cannot
-			// list it either, counts it as moved.
-			return nil
-		}
-		if path != root {
-			name := entry.Name()
-			if name == "testdata" || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
-				return filepath.SkipDir
-			}
-		}
-		set.directories[filepath.Clean(path)] = true
-		if path != root && exists(filepath.Join(path, "go.mod")) {
-			return filepath.SkipDir
-		}
-		return nil
-	})
-}
-
 // listable reports whether a directory's listing may be an input: a walked root or inside one, above no module root,
 // which a replacement by a parent directory would be, and outside the build cache, which `GOCACHE` can put inside a
 // module and go writes during the run. The walk never enters a directory whose name starts with `.`, so the root's
@@ -286,16 +157,4 @@ func listable(directory string, moduleRoots map[string]bool, walked []string, bu
 		return false
 	}
 	return slices.ContainsFunc(walked, func(root string) bool { return directory == root || inside(root, directory) })
-}
-
-// addFileOrAbsent names path as a file when it exists and as absent when it does not.
-//
-// Mutates: set gains path in one list or the other
-func (set *inputSet) addFileOrAbsent(path string) {
-	path = filepath.Clean(path)
-	if exists(path) {
-		set.files[path] = true
-		return
-	}
-	set.absent[path] = true
 }

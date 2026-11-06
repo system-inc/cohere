@@ -38,13 +38,17 @@ func beginGoRunCache(location projectLocation) {
 	}
 }
 
+// goKeyedVariables are the variables a Go run's key takes by name, beside every `GO*` and `CGO_*` one. See
+// goRunCacheFacts for why each is there.
+var goKeyedVariables = []string{"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110"}
+
 // goRunCacheFacts is what a Go run's verdict depends on that is no file the engine reads, each a fact in the run's
 // key. Computed with no subprocess, since a replay pays for them and `go env` alone costs more than the replay may.
 //
 // The engine's name, so a root that holds a tsconfig too never replays one engine's run as the other's. The root
 // resolved and the settings file the engine reads, as a TypeScript run keys them. Whether the output is colored,
 // since a recording made for a terminal carries escape codes a replay into a pipe must not print. Every variable
-// whose name starts with GO or CGO_, by name and value, sorted: `GOFLAGS` (its `-tags` among it), `GOOS`,
+// whose name starts with `GO` or `CGO_`, by name and value, sorted: `GOFLAGS` (its `-tags` among it), `GOOS`,
 // `GOARCH`, `CGO_ENABLED`, `GOWORK`, `GOENV`, `GOTOOLCHAIN` and the rest each change what `go list` loads, and
 // one the go command reads that nobody listed here is still covered. `HOME` and `XDG_CONFIG_HOME`, since the go
 // command finds its own settings file, its default `GOPATH` and with it the module cache under them. `CC`, `CXX`
@@ -80,10 +84,6 @@ func goRunCacheFacts(
 	}
 	return facts
 }
-
-// goKeyedVariables are the variables a Go run's key takes by name, beside every `GO*` and `CGO_*` one. See
-// goRunCacheFacts for why each is there.
-var goKeyedVariables = []string{"HOME", "XDG_CONFIG_HOME", "CC", "CXX", "PKG_CONFIG", "BURNTSUSHI_TOML_110"}
 
 // goOnPath is the `go` PATH finds, absolute, and where its links lead, or a word saying there is none. A go the
 // loader cannot find fails the load, and a run that failed is never recorded, so the word only has to differ from
