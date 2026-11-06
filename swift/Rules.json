@@ -51,6 +51,11 @@
     "typeAware": true
   },
   {
+    "name": "cohere-swift/consistency-no-label",
+    "origin": "house",
+    "typeAware": false
+  },
+  {
     "name": "cohere-swift/consistency-no-print",
     "origin": "house",
     "typeAware": false

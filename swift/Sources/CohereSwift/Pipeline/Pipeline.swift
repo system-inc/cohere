@@ -169,9 +169,25 @@ public struct Pipeline {
                 )
             }
         }
+        /* The casing rule's brands, by the same reasoning: with none, every type opening on a listed brand would be reported. */
+        var brandVocabulary = BrandVocabulary()
+        if configuration.severity(of: SwiftFormatRule.lowerCamelCaseRuleName) != .off
+            && (options.proposeFixes || options.runLint)
+        {
+            do {
+                brandVocabulary = try BrandVocabulary.compiledIn()
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the casing rule's compiled-in brands (policy/Brands.json) could not be loaded, so nothing was checked: \(error)"
+                )
+            }
+        }
         let fileRules = RuleRegistry.fileRules(
             vocabulary: vocabulary,
             shoutingVocabulary: shoutingVocabulary,
+            brandVocabulary: brandVocabulary,
             configuration: configuration,
         )
 

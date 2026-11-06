@@ -18,7 +18,8 @@ import SwiftSyntax
  corpus (#4b337jk, family `casing`), where every engine gives one verdict:
  - Types are UpperCamelCase with no `_` (us03). swift-format judges values only, so the house walks the type
    declarations itself (`TypeNames`) and reports a type with its own message, which keeps its findings apart
-   from swift-format's in the parity harness.
+   from swift-format's in the parity harness. A type may open with a brand policy/Brands.json lists, spelled as its
+   owner spells it (us12, `iMessageThing`), read from the run's `BrandVocabulary` as TypeScript reads the file.
  - A value that mirrors an external name spelled exactly as that name's owner spells it is not ours to rename,
    so swift-format's finding on it is dropped (us07, `mirrorsTheNameItReads`). Decided by the declaration's
    structure, never by a list of names.
@@ -66,20 +67,28 @@ public struct SwiftFormatRule: FileRule {
         self.houseFindings = houseFindings
     }
 
-    public static let requireLowerCamelCase = SwiftFormatRule(
-        name: "cohere-swift/always-use-lower-camel-case",
-        origin: .swiftFormat,
-        upstreamName: "AlwaysUseLowerCamelCase",
-        incumbentRule: "AlwaysUseLowerCamelCase",
-        message: { swiftFormatFinding in
-            RuleMessages.AlwaysUseLowerCamelCase.alwaysUseLowerCamelCase(swiftFormatFinding: swiftFormatFinding)
-        },
-        failure: { incumbentRule, error in
-            RuleMessages.AlwaysUseLowerCamelCase.incumbentFailed(incumbentRule: incumbentRule, error: error)
-        },
-        spelledElsewhere: { name in SwiftFormatRule.mirrorsTheNameItReads(name) },
-        houseFindings: { file, rule in SwiftFormatRule.TypeNames.findings(in: file, rule: rule) },
-    )
+    /* swift-format's casing rule, which `requireLowerCamelCase` wraps, named once for the pass that runs it. */
+    static let lowerCamelCaseIncumbent = "AlwaysUseLowerCamelCase"
+    /* The casing rule's name, which a run's settings may turn off, and then no brand is read. */
+    static let lowerCamelCaseRuleName = "cohere-swift/always-use-lower-camel-case"
+
+    /* The casing rule, judging type names with the run's brands, which are never a list of its own. */
+    public static func requireLowerCamelCase(brands: BrandVocabulary) -> SwiftFormatRule {
+        SwiftFormatRule(
+            name: lowerCamelCaseRuleName,
+            origin: .swiftFormat,
+            upstreamName: lowerCamelCaseIncumbent,
+            incumbentRule: lowerCamelCaseIncumbent,
+            message: { swiftFormatFinding in
+                RuleMessages.AlwaysUseLowerCamelCase.alwaysUseLowerCamelCase(swiftFormatFinding: swiftFormatFinding)
+            },
+            failure: { incumbentRule, error in
+                RuleMessages.AlwaysUseLowerCamelCase.incumbentFailed(incumbentRule: incumbentRule, error: error)
+            },
+            spelledElsewhere: { name in SwiftFormatRule.mirrorsTheNameItReads(name) },
+            houseFindings: { file, rule in SwiftFormatRule.TypeNames.findings(in: file, rule: rule, brands: brands) },
+        )
+    }
 
     public static let noLeadingUnderscores = SwiftFormatRule(
         name: "cohere-swift/no-leading-underscores",
@@ -102,7 +111,7 @@ public struct SwiftFormatRule: FileRule {
     )
 
     /* Every incumbent rule this wrapper runs, so one swift-format pass answers for all of them. */
-    static let incumbentRules = [requireLowerCamelCase.incumbentRule, noLeadingUnderscores.incumbentRule]
+    static let incumbentRules = [lowerCamelCaseIncumbent, noLeadingUnderscores.incumbentRule]
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {
         let reported: SwiftFormatPass.Outcome
@@ -233,15 +242,20 @@ public struct SwiftFormatRule: FileRule {
      protocol, type alias, associated type and generic parameter each declare one. A leading `_` is
      `no-leading-underscores`'s finding, as it is for a value, and the first letter is judged in ASCII, as
      swift-format judges a value's. A macro is not a type, and an extension declares no name.
+
+     A name opening with a listed brand, spelled exactly as listed, is UpperCamelCase when nothing follows the brand
+     or the rest opens on an uppercase letter and holds no `_`: TypeScript's `isUpperCamelCaseName`, so
+     `iMessageThing` passes, and `iMessagething`, `iMessage_Thing` and `imessageThing` do not.
      */
     final class TypeNames: SyntaxVisitor {
         private(set) var declared: [(declaration: String, name: TokenSyntax)] = []
 
-        static func findings(in file: ParsedFile, rule: String) -> [FindingRecord] {
+        static func findings(in file: ParsedFile, rule: String, brands: BrandVocabulary) -> [FindingRecord] {
             let visitor = TypeNames(viewMode: .sourceAccurate)
             visitor.walk(file.tree)
             return visitor.declared.compactMap { declared in
-                guard case .identifier(let text) = declared.name.tokenKind, isNotUpperCamelCase(text) else {
+                guard case .identifier(let text) = declared.name.tokenKind, isNotUpperCamelCase(text, brands: brands)
+                else {
                     return nil
                 }
                 return file.finding(
@@ -255,10 +269,14 @@ public struct SwiftFormatRule: FileRule {
             }
         }
 
-        /* An `_` after the first character, or a lowercase first letter. */
-        static func isNotUpperCamelCase(_ text: String) -> Bool {
+        /* An `_` after the first character, or a lowercase first letter that opens no listed brand before an UpperCamelCase rest. */
+        static func isNotUpperCamelCase(_ text: String, brands: BrandVocabulary) -> Bool {
             guard let first = text.unicodeScalars.first else { return false }
-            return text.dropFirst().contains("_") || ("a"..."z").contains(first)
+            guard text.dropFirst().contains("_") || ("a"..."z").contains(first) else { return false }
+            guard let brand = brands.leadingBrand(of: text) else { return true }
+            let rest = text.dropFirst(brand.count)
+            guard let restFirst = rest.first else { return false }
+            return !restFirst.isUppercase || rest.contains("_")
         }
 
         private func declare(_ declaration: String, _ name: TokenSyntax) {

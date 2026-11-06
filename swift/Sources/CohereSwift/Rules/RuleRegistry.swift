@@ -4,13 +4,14 @@
  */
 public enum RuleRegistry {
     /*
-     Every file rule, built from what a run loads: the abbreviation and shouting vocabularies, which the pipeline reads
+     Every file rule, built from what a run loads: the abbreviation, shouting and brand vocabularies, which the pipeline reads
      before anything is checked, so a vocabulary that is missing refuses the run instead of leaving its rule judging
      wrongly; and the options the project's settings give the rules that read one (`RuleConfiguration.optionsRead`).
      */
     public static func fileRules(
         vocabulary: AbbreviationVocabulary,
         shoutingVocabulary: ShoutingVocabulary,
+        brandVocabulary: BrandVocabulary,
         configuration: RuleConfiguration = RuleConfiguration(severities: [:], note: ""),
     ) -> [any FileRule] {
         [
@@ -41,12 +42,13 @@ public enum RuleRegistry {
             ConsistencyNoStutteringName(),
             ConsistencyNoUtilsFolder(),
             ConsistencyNoBareThrow(),
+            ConsistencyNoLabel(),
             ConsistencyNoPropertyAlias(),
             ConsistencyNoHandRolledDelay(),
             ConcurrencyNoLostUpdate(),
             ConsistencyNoBooleanOutcome(),
             CorrectnessNoUnclearedRaceTimeout(),
-            SwiftFormatRule.requireLowerCamelCase,
+            SwiftFormatRule.requireLowerCamelCase(brands: brandVocabulary),
             SwiftFormatRule.noLeadingUnderscores,
         ]
     }
@@ -82,7 +84,12 @@ public enum RuleRegistry {
     /* Sorted, so two binaries' lists can be compared with `diff`. */
     public static var allNames: [String] {
         /* Names only, so no vocabulary is read: `--rules` answers without one. */
-        (fileRules(vocabulary: AbbreviationVocabulary(), shoutingVocabulary: ShoutingVocabulary()).map(\.name)
+        (fileRules(
+            vocabulary: AbbreviationVocabulary(),
+            shoutingVocabulary: ShoutingVocabulary(),
+            brandVocabulary: BrandVocabulary(),
+        )
+        .map(\.name)
             + typedRules.map(\.name) + packageRules.map(\.name))
             .sorted()
     }

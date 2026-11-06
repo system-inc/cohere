@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "8d46e6ac620f698cdf75c8d4ba873ec5b1325a630a764ed1c69d1a9d35379b89"
+    static let sourceDigest = "4a8dd092ed4ee6c50354e15787899021d7c4744aaf3876c52186e55e168ed0f4"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -32,6 +32,7 @@ enum RuleMessages {
         "ConsistencyNoHandRolledDelay.handRolledDelayDoCatch",
         "ConsistencyNoIsoStringDateCut.isoDateWithoutTimeZone",
         "ConsistencyNoIsoStringDateCut.isoStringCutToDate",
+        "ConsistencyNoLabel.label",
         "ConsistencyNoPrint.consistencyNoConsole",
         "ConsistencyNoPropertyAlias.noPropertyAlias",
         "ConsistencyNoShouting.shoutingInComment",
@@ -266,6 +267,17 @@ enum RuleMessages {
                 id: "isoStringCutToDate",
                 text:
                     #"This cuts an ISO 8601 timestamp down to its date part. ISO 8601 formatting is UTC unless it is given a time zone, so the cut is the UTC calendar day whether or not that was the day meant, and in Utah the UTC day turns over at 5 pm in winter and 6 pm in summer: an evening run gets tomorrow. Format the day itself and say the zone: Date.ISO8601FormatStyle(timeZone: .current).year().month().day() when the local day is meant, or timeZone: .gmt when the UTC day is."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-no-label */
+    enum ConsistencyNoLabel {
+        static func label(label: String) -> Message {
+            Message(
+                id: "label",
+                text:
+                    #"`\#(label)` is a label, and a jump to it lands where a reader is not looking: they have to find the label to know where execution goes next. When a `break` or `continue` names it to leave nested loops, move the loops into a function of its own and `return` from it, or let a named boolean the outer loop tests say when to stop."#,
             )
         }
     }

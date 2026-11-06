@@ -1,10 +1,17 @@
 {
   "rules": {
-    "Go": "cohere-go/consistency-no-label"
+    "Go": "cohere-go/consistency-no-label",
+    "Swift": "cohere-swift/consistency-no-label"
   },
   "messages": {
     "label": {
-      "text": "`{{label}}` is a label, and a jump to it lands where a reader is not looking: they have to find the label to know where execution goes next. When a `break` or `continue` names it to leave a loop, often a for around a select, move the loop into a function of its own and `return` from it. When a `goto` names it, a function that returns, or a named boolean the code tests, says the same thing in the open."
+      "text": "`{{label}}` is a label, and a jump to it lands where a reader is not looking: they have to find the label to know where execution goes next. [[repair]]",
+      "terms": {
+        "repair": {
+          "Go": "When a `break` or `continue` names it to leave a loop, often a for around a select, move the loop into a function of its own and `return` from it. When a `goto` names it, a function that returns, or a named boolean the code tests, says the same thing in the open.",
+          "Swift": "When a `break` or `continue` names it to leave nested loops, move the loops into a function of its own and `return` from it, or let a named boolean the outer loop tests say when to stop."
+        }
+      }
     }
   }
 }
