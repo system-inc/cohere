@@ -3,7 +3,9 @@ package go_engine
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -58,25 +60,28 @@ func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	return ran
 }
 
-// entriesIn is each entry in root's store by name, with its modification time, so a run that wrote or rewrote one
-// shows.
+// entriesIn is each entry in root's store by its path in the store, with its modification time, so a run that wrote
+// or rewrote one shows. The store keeps its entries in directories below its own.
 func entriesIn(test *testing.T, root string) map[string]string {
 	test.Helper()
 	directory := filepath.Join(root, ".cache", "cohere", "go")
-	listed, listError := os.ReadDir(directory)
-	if os.IsNotExist(listError) {
-		return map[string]string{}
-	}
-	if listError != nil {
-		test.Fatalf("listing %s: %v", directory, listError)
-	}
 	entries := map[string]string{}
-	for _, entry := range listed {
+	walkError := filepath.WalkDir(directory, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil {
+			return pathError
+		}
+		if entry.IsDir() {
+			return nil
+		}
 		information, informationError := entry.Info()
 		if informationError != nil {
-			test.Fatalf("reading %s: %v", entry.Name(), informationError)
+			return informationError
 		}
-		entries[entry.Name()] = information.ModTime().String()
+		entries[path] = information.ModTime().String()
+		return nil
+	})
+	if walkError != nil && !errors.Is(walkError, fs.ErrNotExist) {
+		test.Fatalf("listing %s: %v", directory, walkError)
 	}
 	return entries
 }

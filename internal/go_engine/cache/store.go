@@ -1,53 +1,73 @@
 package cache
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 )
 
-// This file stands in for hand A's store, as key.go says, and is replaced by hand A's when it lands.
-
-// Store is the directory of entries.
+// Store is the directory of entries, one file per key under a directory named for the key's first two hex
+// characters, so no one directory holds them all. Each file is the sha256 of the entry, then the entry: a file
+// cut short, or written over by something else, no longer matches its sum, and reads as a miss.
 type Store struct {
 	directory string
 }
 
-// Open is the store under root, `<root>/.cache/cohere/go`, created on the first Put.
+// Open is the store under root, at `<root>/.cache/cohere/go`, beside the TypeScript cache in `.cache/cohere`.
+// Nothing is made until the first Put.
 func Open(root string) *Store {
 	return &Store{directory: filepath.Join(root, ".cache", "cohere", "go")}
 }
 
-// Get is the entry stored under key. Any read error is a miss.
+// Get is the entry under key. Any failure to read it whole is a miss, never an error: the package is analyzed
+// again and the entry written over.
 func (store *Store) Get(key Key) ([]byte, bool) {
-	contents, readError := os.ReadFile(filepath.Join(store.directory, key.String()))
-	if readError != nil {
+	contents, readError := os.ReadFile(store.path(key))
+	if readError != nil || len(contents) < sha256.Size {
 		return nil, false
 	}
-	return contents, true
+	entry := contents[sha256.Size:]
+	sum := sha256.Sum256(entry)
+	if !bytes.Equal(contents[:sha256.Size], sum[:]) {
+		return nil, false
+	}
+	return entry, true
 }
 
-// Put stores entry under key: written to a temporary file, then renamed into place, so a reader never sees half.
+// Put keeps entry under key. It writes a temporary file beside the entry's and renames it into place, so a reader,
+// or another Put of the same key, sees a whole file or none.
 func (store *Store) Put(key Key, entry []byte) error {
-	if makeError := os.MkdirAll(store.directory, 0o755); makeError != nil {
-		return fmt.Errorf("creating %s: %w", store.directory, makeError)
+	path := store.path(key)
+	directory := filepath.Dir(path)
+	if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+		return fmt.Errorf("making the cache directory %s: %w", directory, makeError)
 	}
-	temporary, createError := os.CreateTemp(store.directory, key.String()+".*.tmp")
+	temporary, createError := os.CreateTemp(directory, filepath.Base(path)+".*.temporary")
 	if createError != nil {
-		return fmt.Errorf("creating an entry in %s: %w", store.directory, createError)
+		return fmt.Errorf("creating a temporary entry in %s: %w", directory, createError)
 	}
-	_, writeError := temporary.Write(entry)
+	sum := sha256.Sum256(entry)
+	_, writeSumError := temporary.Write(sum[:])
+	_, writeEntryError := temporary.Write(entry)
 	closeError := temporary.Close()
-	if writeError == nil {
-		writeError = closeError
-	}
-	if writeError == nil {
-		writeError = os.Rename(temporary.Name(), filepath.Join(store.directory, key.String()))
-	}
-	if writeError != nil {
-		// Ignored: the temporary file is the only thing left to undo, and the write error is what is returned.
+	if writeError := errors.Join(writeSumError, writeEntryError, closeError); writeError != nil {
+		// Ignored: the write already failed, and a temporary file left behind is never read as an entry.
 		_ = os.Remove(temporary.Name())
-		return fmt.Errorf("writing the entry %s: %w", key, writeError)
+		return fmt.Errorf("writing the entry %s: %w", temporary.Name(), writeError)
+	}
+	if renameError := os.Rename(temporary.Name(), path); renameError != nil {
+		// Ignored: the rename already failed, and a temporary file left behind is never read as an entry.
+		_ = os.Remove(temporary.Name())
+		return fmt.Errorf("renaming the entry into place at %s: %w", path, renameError)
 	}
 	return nil
+}
+
+// path is where key's entry lives: `ab/abcdef...`.
+func (store *Store) path(key Key) string {
+	name := key.String()
+	return filepath.Join(store.directory, name[:2], name)
 }
