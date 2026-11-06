@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -59,7 +59,7 @@ var NoEmptyCharacterClass = rule.Rule[rule.NoOptions]{
 				// have to be separated before either can be used. That split is shared rather than
 				// written here: it lands the same way for every regex rule, and a second copy of it
 				// is a second place for `/a\/b/g` to come apart wrongly.
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regex_syntax.PatternAndFlags(text)
 				if pattern == "" {
 					return
 				}
@@ -77,8 +77,8 @@ var NoEmptyCharacterClass = rule.Rule[rule.NoOptions]{
 				literalStart := node.End() - len(text)
 				patternStart := literalStart + 1
 
-				regexFlags := regexsyntax.ParseRegexFlags(flags)
-				regexsyntax.IterateRegexCharacterClasses(pattern, regexFlags, func(start, end int) {
+				regexFlags := regex_syntax.ParseRegexFlags(flags)
+				regex_syntax.IterateRegexCharacterClasses(pattern, regexFlags, func(start, end int) {
 					if !classIsEmpty(start, end) {
 						return
 					}

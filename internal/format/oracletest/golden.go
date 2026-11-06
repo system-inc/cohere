@@ -25,7 +25,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -200,7 +200,7 @@ func (golden *Golden) Answer(key string, compute func() (string, error)) (string
 
 // Engine answers as prettier.New(options) would, from the golden. The real engine is built only when
 // recording, and only once.
-func (golden *Golden) Engine(options formatoptions.Options) *Engine {
+func (golden *Golden) Engine(options format_options.Options) *Engine {
 	return &Engine{golden: golden, options: options}
 }
 

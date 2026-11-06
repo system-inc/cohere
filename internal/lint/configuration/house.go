@@ -35,7 +35,7 @@ const (
 )
 
 // HouseDetection is what the program showed about which house sets fit where, gathered by the command
-// (internal/lint/housesets) and handed to LoadHouse.
+// (internal/lint/house_sets) and handed to LoadHouse.
 type HouseDetection struct {
 	// ReactFiles and NextFiles are the absolute file names each per-file set applies to.
 	ReactFiles map[string]bool

@@ -7,7 +7,7 @@ import (
 )
 
 // What a settings file may say, exported for the JSON schema and the reference generated from it
-// (internal/settingsschema). The schema is read off these, never written beside them by hand: a key the
+// (internal/settings_schema). The schema is read off these, never written beside them by hand: a key the
 // loader learns and the schema lacks, or the reverse, is a test failure there rather than an editor
 // that underlines a valid file or completes an invalid one.
 

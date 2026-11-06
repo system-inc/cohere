@@ -13,7 +13,7 @@
 What the core `dot-notation` checks: a bracket access with a literal key that is a valid identifier
 reads better as a dot access, `a['b']` as `a.b`, and under `allowKeywords: false` a keyword after a
 dot must be bracketed. The judgment and the repairs are the core rule's, shared through
-`ecmascript/dotnotation`.
+`ecmascript/dot_notation`.
 
 What it adds is one question, asked before a computed access is reported, and only when one of the
 three typed options is on:

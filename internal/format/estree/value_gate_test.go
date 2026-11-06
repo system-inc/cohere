@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
-	"github.com/system-inc/cohere/internal/goengine/load"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // The gate holds format to one promise of the typed property values: an estree value never travels as an
@@ -65,8 +65,8 @@ func TestNoValueIsConvertedToAnEmptyInterface(test *testing.T) {
 func TestTheGateFindsEveryPlantedConversion(test *testing.T) {
 	test.Parallel()
 
-	loaded := loadForGate(test, ".", "./testdata/valuegate")
-	fixturePath := filepath.Join("testdata", "valuegate", "valuegate.go")
+	loaded := loadForGate(test, ".", "./testdata/value_gate")
+	fixturePath := filepath.Join("testdata", "value_gate", "valuegate.go")
 	contents, readError := os.ReadFile(fixturePath)
 	if readError != nil {
 		test.Fatal(readError)

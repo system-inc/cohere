@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -102,7 +102,7 @@ func fileNeedsRequestSuffix(fileName string) bool {
 	}
 
 	// An Adamic `.a` hook file is named as the `.ts` it is (#kwt1htp).
-	if stem, isTypeScript := strings.CutSuffix(sourcename.TreatedAs(base), ".ts"); isTypeScript {
+	if stem, isTypeScript := strings.CutSuffix(source_name.TreatedAs(base), ".ts"); isTypeScript {
 		return !strings.HasSuffix(stem, "Request")
 	}
 	if stem, isTsx := strings.CutSuffix(base, ".tsx"); isTsx {

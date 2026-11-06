@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/gitignore"
 )
 
@@ -17,13 +17,13 @@ import (
 // It holds no engines, because a native printer costs nothing to construct: only the run's Resolver,
 // which remembers each directory's options.
 type Resolving struct {
-	resolver *formatoptions.Resolver
+	resolver *format_options.Resolver
 }
 
 // NewResolving resolves startDirectory's options eagerly, so a config cohere refuses stops the run
 // before any phase does work rather than on the first file after fixes have begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
-	resolving := &Resolving{resolver: formatoptions.NewResolver()}
+	resolving := &Resolving{resolver: format_options.NewResolver()}
 	if _, resolveError := resolving.resolver.Resolve(startDirectory); resolveError != nil {
 		return nil, resolveError
 	}
@@ -37,14 +37,14 @@ func (resolving *Resolving) Handles(fileName string) bool {
 }
 
 // Enumerate walks a tree for the files a native printer handles.
-func (resolving *Resolving) Enumerate(root string) (formatfiles.Enumeration, error) {
-	return formatfiles.Enumerate(root, resolving.Handles)
+func (resolving *Resolving) Enumerate(root string) (format_files.Enumeration, error) {
+	return format_files.Enumerate(root, resolving.Handles)
 }
 
 // EnumerateListed is Enumerate reading directories from listing where it holds them. See
-// formatfiles.EnumerateListed.
-func (resolving *Resolving) EnumerateListed(root string, listing gitignore.Listing) (formatfiles.Enumeration, error) {
-	return formatfiles.EnumerateListed(root, resolving.Handles, listing)
+// format_files.EnumerateListed.
+func (resolving *Resolving) EnumerateListed(root string, listing gitignore.Listing) (format_files.Enumeration, error) {
+	return format_files.EnumerateListed(root, resolving.Handles, listing)
 }
 
 // Format formats one file with the options its own directory resolves to.

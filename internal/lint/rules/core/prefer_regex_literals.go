@@ -9,8 +9,8 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexpattern"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_pattern"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
@@ -345,7 +345,7 @@ func wrapsARegexLiteral(ruleContext rule.Context, arguments []*ast.Node) bool {
 
 func reportRedundantWrapping(ruleContext rule.Context, node *ast.Node, arguments []*ast.Node) {
 	literal := arguments[0]
-	literalPattern, literalFlags := regexsyntax.PatternAndFlags(literal.Text())
+	literalPattern, literalFlags := regex_syntax.PatternAndFlags(literal.Text())
 
 	if len(arguments) == 1 {
 		var suggestions []rule.Suggestion
@@ -555,7 +555,7 @@ func isRewritableCharacter(character rune) bool {
 // Upstream walks the parsed regex and rewrites each character node, which matters for a reason that
 // is not obvious: it means a control character reached through an identity escape, a backslash
 // directly before a real newline, collapses to the same two characters rather than becoming a
-// backslash followed by an escape. The walk here is `regexpattern.Walk`, which reports the same
+// backslash followed by an escape. The walk here is `regex_pattern.Walk`, which reports the same
 // character positions with the same structure, so the rewrite is the same rewrite over the same
 // units.
 func escapeForLiteral(pattern string, flags string) string {
@@ -566,7 +566,7 @@ func escapeForLiteral(pattern string, flags string) string {
 	}
 	var rewrites []rewrite
 
-	regexpattern.Walk(pattern, regexsyntax.ParseRegexFlags(flags), func(character regexpattern.Character) bool {
+	regex_pattern.Walk(pattern, regex_syntax.ParseRegexFlags(flags), func(character regex_pattern.Character) bool {
 		if character.Start < 0 || character.End > len(pattern) || character.Start >= character.End {
 			return true
 		}
@@ -835,7 +835,7 @@ func patternIsValid(pattern string, flags string) bool {
 	if pattern == "" {
 		return true
 	}
-	if !regexpattern.Walk(pattern, regexsyntax.ParseRegexFlags(flags), func(regexpattern.Character) bool {
+	if !regex_pattern.Walk(pattern, regex_syntax.ParseRegexFlags(flags), func(regex_pattern.Character) bool {
 		return true
 	}) {
 		return false
@@ -871,7 +871,7 @@ func flagsAreValid(flags string) bool {
 // own right, so the "nothing to repeat" case needs asking separately. Four of upstream's cases turn
 // on exactly that, `RegExp('+')` and its siblings.
 func quantifiersAndGroupsBalance(pattern string, flags string) bool {
-	parsedFlags := regexsyntax.ParseRegexFlags(flags)
+	parsedFlags := regex_syntax.ParseRegexFlags(flags)
 	depth := 0
 	previousWasRepeatable := false
 	for index := 0; index < len(pattern); {
@@ -884,7 +884,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 			// `RegExp('\\b')`: the length 2 was assigned as an index and the scan restarted at
 			// byte 2 on every pass. Caught by a fixture hanging rather than failing, which is the
 			// one failure mode a green suite cannot show you.
-			width, ok := regexsyntax.SkipPatternEscape(pattern, index, parsedFlags)
+			width, ok := regex_syntax.SkipPatternEscape(pattern, index, parsedFlags)
 			if !ok || width <= 0 {
 				return false
 			}
@@ -895,7 +895,7 @@ func quantifiersAndGroupsBalance(pattern string, flags string) bool {
 			// `ClassEnd` returns an absolute index just past the closing bracket, unlike
 			// `SkipPatternEscape` above. The non-advance guard is what keeps a helper returning its
 			// input from becoming another spin.
-			end, ok := regexsyntax.ClassEnd(pattern, index, parsedFlags)
+			end, ok := regex_syntax.ClassEnd(pattern, index, parsedFlags)
 			if !ok || end <= index {
 				return false
 			}

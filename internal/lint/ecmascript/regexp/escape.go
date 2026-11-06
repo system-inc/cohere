@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/unicodeproperties"
+	"github.com/system-inc/cohere/unicode_properties"
 )
 
 // escapeKind says what a backslash escape names, which is what decides how the
@@ -203,7 +203,7 @@ func decodePropertyEscape(source string, index int, size int, escaping escapeCon
 	// The name belongs to the escape: `\p{Script=Greek}`. Taking it along keeps
 	// the walk from reading the letters in it as text and widening them.
 	name := source[index+size+1 : index+size+end]
-	if _, ok := unicodeproperties.Lookup(name); !ok {
+	if _, ok := unicode_properties.Lookup(name); !ok {
 		return decodedEscape{}, fmt.Errorf("%w: unknown Unicode property %q", ErrUnsupportedSyntax, name)
 	}
 	return decodedEscape{

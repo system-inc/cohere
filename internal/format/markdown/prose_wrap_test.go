@@ -9,13 +9,13 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
-// whitespace.js reaches its CJK and Korean rules, and formatoptions.Options does not carry the option. So
+// whitespace.js reaches its CJK and Korean rules, and format_options.Options does not carry the option. So
 // these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
 // the port with the same setting.
 
@@ -51,7 +51,7 @@ func (oracle *proseWrapOracle) load() {
 
 // format is the recorded answer for text, keyed by everything formatLive passes the bundles: the text, the
 // file path, the parser, the options and the proseWrap.
-func (oracle *proseWrapOracle) format(text string, options formatoptions.Options, proseWrap string) (string, error) {
+func (oracle *proseWrapOracle) format(text string, options format_options.Options, proseWrap string) (string, error) {
 	key := oracletest.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
@@ -64,7 +64,7 @@ func (oracle *proseWrapOracle) format(text string, options formatoptions.Options
 
 func (oracle *proseWrapOracle) formatLive(
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
 	setError := errors.Join(

@@ -4,8 +4,8 @@
  *
  *     node internal/lint/tools/option_schemas/extract.mjs \
  *         --home <directory> [--home <directory> ...] \
- *         --schemas internal/lint/optionschema/schemas.json \
- *         --samples internal/lint/optionschema/testdata/samples.json
+ *         --schemas internal/lint/option_schema/schemas.json \
+ *         --samples internal/lint/option_schema/testdata/samples.json
  *
  * Each `--home` is a directory whose node_modules resolves some of the plugins. A package is taken from
  * the first home that has it, so ahra serves ESLint and every plugin but boundaries, which only

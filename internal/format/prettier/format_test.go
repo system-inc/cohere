@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // TestMain clears ForkPathVariable once for the package, so every engine a test builds loads the embedded
@@ -51,7 +51,7 @@ func TestMain(suite *testing.M) {
 // so a fork a developer's shell points at cannot stand in for them.
 func newTestEngine(test *testing.T) *Engine {
 	test.Helper()
-	engine, newPrettierError := New(formatoptions.Default())
+	engine, newPrettierError := New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatalf("building the engine from the embedded bundles: %v", newPrettierError)
 	}

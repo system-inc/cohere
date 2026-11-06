@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/gitignore"
 )
 
@@ -49,7 +49,7 @@ func writeRepositoryRoot(start string, projectRoot string) string {
 			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return cleanProjectRoot
 		}
-		if formatfiles.HasOwnRepository(directory) {
+		if format_files.HasOwnRepository(directory) {
 			return directory
 		}
 	}
@@ -64,7 +64,7 @@ func unwritableRepository(repositoryRoot string, fileName string) string {
 	if relativePathError != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 		return "the project outside " + repositoryRoot
 	}
-	if nested := formatfiles.NestedRepositoryContaining(repositoryRoot, fileName); nested != "" {
+	if nested := format_files.NestedRepositoryContaining(repositoryRoot, fileName); nested != "" {
 		return "nested repository " + nested
 	}
 	return ""
@@ -100,7 +100,7 @@ type nestedDriftCheck struct {
 	// caller prints to stderr. Both are handed back rather than acted on here, because the check runs
 	// beside the fix phase (see startNestedCheck) and neither the run cache nor stderr is the check's to
 	// touch from another goroutine.
-	Walks []formatfiles.Enumeration
+	Walks []format_files.Enumeration
 	Notes []string
 }
 
@@ -143,7 +143,7 @@ func prepareNestedCacheDirectories(root string) {
 		relative := pending[0]
 		pending = pending[1:]
 		repositoryRoot := filepath.Join(root, relative)
-		if !formatfiles.HasOwnRepository(repositoryRoot) {
+		if !format_files.HasOwnRepository(repositoryRoot) {
 			continue
 		}
 		if inner, declaredBelowError := declaredBelow(root, relative); declaredBelowError == nil {
@@ -189,7 +189,7 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 		relative := pending[0]
 		pending = pending[1:]
 		repositoryRoot := filepath.Join(root, relative)
-		if !formatfiles.HasOwnRepository(repositoryRoot) {
+		if !format_files.HasOwnRepository(repositoryRoot) {
 			// Declared and not checked out: there is nothing on disk to read.
 			continue
 		}

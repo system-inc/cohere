@@ -3,7 +3,7 @@ package native
 import (
 	"github.com/system-inc/cohere/internal/format/css"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -15,20 +15,20 @@ func init() {
 	RegisterDoc(".scss", func(
 		_ string,
 		text string,
-		options formatoptions.Options,
+		options format_options.Options,
 		_ string,
 		_ string,
 		_ printing.TextToDoc,
 	) (doc.Doc, error) {
 		return css.PrintToDocScss(text, options)
 	})
-	Register(".css", func(_ string, text string, options formatoptions.Options) (string, error) {
+	Register(".css", func(_ string, text string, options format_options.Options) (string, error) {
 		return css.Format(text, options)
 	})
 	RegisterDoc(".css", func(
 		_ string,
 		text string,
-		options formatoptions.Options,
+		options format_options.Options,
 		_ string,
 		_ string,
 		_ printing.TextToDoc,

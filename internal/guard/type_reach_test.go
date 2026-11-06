@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/gotypes"
+	"github.com/system-inc/cohere/internal/go_types"
 )
 
 // A rule claims TypeReach Shapes only where nothing it can run reads into an imported function's body, and
@@ -132,7 +132,7 @@ var shapeReaders = map[string]bool{
 func TestShapeReadersHandBackNoSyntax(test *testing.T) {
 	test.Parallel()
 
-	var rulePackage *gotypes.Package
+	var rulePackage *go_types.Package
 	for _, lintPackage := range lintPackages(test, guardOverlay(test)) {
 		if strings.HasSuffix(lintPackage.ImportPath, "/internal/lint/rule") {
 			rulePackage = lintPackage

@@ -5,7 +5,7 @@ import SwiftFormat
  The one way Swift is formatted: swift-format 604.0.0's own `Configuration`, built here in code, so no
  repository carries a `.swift-format` and no project chooses its own layout (#mg4dgjm, ruled 2026-10-03).
  It is TypeScript's model, where the Prettier options live in one block of the Nexus tier and every other
- place is refused (internal/format/formatoptions/resolve.go).
+ place is refused (internal/format/format_options/resolve.go).
 
  The values are the `.swift-format` both proving grounds carried, identical in each, plus the ruling's
  changes toward the TypeScript house: trailing commas always, one argument per line once a call breaks,

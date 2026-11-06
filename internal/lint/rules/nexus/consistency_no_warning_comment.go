@@ -8,7 +8,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/comments"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/warningcomment"
+	"github.com/system-inc/cohere/internal/warning_comment"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -26,7 +26,7 @@ var consistencyNoWarningCommentText = policy.MessageOf("nexus/consistency-no-war
 // A deferred task kept in a comment rots there: the code around it reads as finished to every reader not looking at
 // that line, and the task is done only if someone happens to edit the file. It belongs where tasks are tracked.
 //
-// The judgment is internal/warningcomment's, which the Go engine's cohere-go/consistency-no-warning-comment reads
+// The judgment is internal/warning_comment's, which the Go engine's cohere-go/consistency-no-warning-comment reads
 // too, so the two engines report the same words: in capitals, whole, anywhere in any comment, outside backticks and
 // code blocks, each finding on its word. ESLint's `no-warning-comments`, which this replaces in the style set, matched
 // case-insensitively and only at a comment's start, so it reported a lowercase todo and missed a word mid-sentence or
@@ -50,7 +50,7 @@ var ConsistencyNoWarningComment = rule.Rule[rule.NoOptions]{
 						// into the source, and a CRLF block comment's blank gutter line still reads as blank.
 						texts = append(texts, strings.ReplaceAll(comment.Text, "\r\n", " \n"))
 					}
-					for _, word := range warningcomment.WordsIn(texts) {
+					for _, word := range warning_comment.WordsIn(texts) {
 						comment := group[word.Comment]
 						ruleContext.ReportRange(
 							core.NewTextRange(comment.Range.Pos()+word.Start, comment.Range.Pos()+word.End),

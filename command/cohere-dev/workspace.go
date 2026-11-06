@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/goengine/project"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // The landing gate and the whole-module test run cover every module the repository builds, not only the
@@ -13,7 +13,7 @@ import (
 // directory with a go.mod of its own, so the TypeScript shims and static_single_assignment, each a module
 // so another repository can import it, were never vetted or tested by any gate.
 //
-// The list is go.work's use directives, read by internal/goengine/project, which the Go engine reads too.
+// The list is go.work's use directives, read by internal/go_engine/project, which the Go engine reads too.
 // A module inside a submodule is not gated: its tests are its upstream's. Everything gated runs in one go
 // invocation, so it shares the token's -p budget and Go's test cache, and the gate says what it covered.
 //

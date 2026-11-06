@@ -6,7 +6,7 @@ import Testing
 
 /*
  The Swift adapter of the text rules' conformance corpus (#4b337jk): one set of cases under the repository's
- `conformance/textrules/testdata`, one expected verdict each, which every engine's own suite must meet. The Go
+ `conformance/text_rules/testdata`, one expected verdict each, which every engine's own suite must meet. The Go
  loader validates the corpus's shape for both Go adapters; this reads the same files by walking up from its own
  path, as the policy tests do, and keeps its own copy of the ledger's checks, since only Swift can run Swift:
 
@@ -33,7 +33,7 @@ struct TextRulesConformanceTests {
     static let corpusRoot = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appendingPathComponent("conformance/textrules")
+        .appendingPathComponent("conformance/text_rules")
 
     static let engine = "swift"
 

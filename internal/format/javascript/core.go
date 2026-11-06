@@ -22,7 +22,7 @@ package javascript
 import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -47,7 +47,7 @@ type Doc = doc.Doc
 // settings is what upstream reads off `options` beyond the core's fields: the resolved Prettier
 // options, the file path, and the caches upstream keeps in WeakMaps keyed on nodes.
 type settings struct {
-	formatoptions.Options
+	format_options.Options
 	FilePath string
 
 	// docs is where this format's concatIn, groupIn and indentIn take their docs from, released with the

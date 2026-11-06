@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/system-inc/cohere/conformance/textrules"
+	"github.com/system-inc/cohere/conformance/text_rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -60,10 +60,10 @@ func loadTextRulesHouse(test *testing.T) textRulesHouse {
 // optionsFor resolves a rule for a case's own file, and decodes its options as the house gives them there,
 // with the case's own options laid over them key by key, through the registry's decoder, exactly as a lint
 // run decodes them. It reports false where the rule resolves off for the file, so the rule does not run.
-func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCase textrules.Case) (rule.Bound, bool) {
+func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCase text_rules.Case) (rule.Bound, bool) {
 	test.Helper()
 	resolved := house.loaded.Resolve(
-		filepath.Join(house.directory, filepath.FromSlash(testCase.FileName(textrules.EngineTypeScript))),
+		filepath.Join(house.directory, filepath.FromSlash(testCase.FileName(text_rules.EngineTypeScript))),
 	)
 	switch status, _ := resolved.StatusOf(ruleName); status {
 	case configuration.StatusUnconfigured:
@@ -109,9 +109,9 @@ func (house textRulesHouse) optionsFor(test *testing.T, ruleName string, testCas
 
 // textRulesRules are the registered rules a family names for TypeScript, in the order families.json lists
 // them.
-func textRulesRules(test *testing.T, corpus *textrules.Corpus, family string) []rule.Entry {
+func textRulesRules(test *testing.T, corpus *text_rules.Corpus, family string) []rule.Entry {
 	test.Helper()
-	entry, found := corpus.RuleFor(family, textrules.EngineTypeScript)
+	entry, found := corpus.RuleFor(family, text_rules.EngineTypeScript)
 	if !found {
 		test.Fatalf("the corpus has no family %s", family)
 	}
@@ -139,21 +139,21 @@ func textRulesRules(test *testing.T, corpus *textrules.Corpus, family string) []
 // for the case's file does not run, and finds nothing, as in a lint run.
 func runTextRulesCase(
 	test *testing.T,
-	corpus *textrules.Corpus,
+	corpus *text_rules.Corpus,
 	house textRulesHouse,
-	testCase textrules.Case,
-) []textrules.Range {
+	testCase text_rules.Case,
+) []text_rules.Range {
 	test.Helper()
-	fileName := testCase.AbsoluteFileName(textrules.EngineTypeScript)
-	found := []textrules.Range{}
+	fileName := testCase.AbsoluteFileName(text_rules.EngineTypeScript)
+	found := []text_rules.Range{}
 	for _, subject := range textRulesRules(test, corpus, testCase.Family) {
 		bound, runs := house.optionsFor(test, subject.Name, testCase)
 		if !runs {
 			continue
 		}
-		result := rule_testing.RunBound(test, bound, fileName, testCase.Sources[textrules.EngineTypeScript])
+		result := rule_testing.RunBound(test, bound, fileName, testCase.Sources[text_rules.EngineTypeScript])
 		for _, diagnostic := range result.Diagnostics {
-			found = append(found, textrules.Range{Start: diagnostic.Range.Pos(), End: diagnostic.Range.End()})
+			found = append(found, text_rules.Range{Start: diagnostic.Range.Pos(), End: diagnostic.Range.End()})
 		}
 	}
 	return found
@@ -165,12 +165,12 @@ func runTextRulesCase(
 func TestTextRulesConformanceTypeScript(test *testing.T) {
 	test.Parallel()
 
-	corpus, loadError := textrules.Load()
+	corpus, loadError := text_rules.Load()
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
 	house := loadTextRulesHouse(test)
-	cases := corpus.CasesFor(textrules.EngineTypeScript)
+	cases := corpus.CasesFor(text_rules.EngineTypeScript)
 	if len(cases) == 0 {
 		test.Fatal("the corpus has no TypeScript cases, so this adapter would be green over nothing")
 	}
@@ -187,9 +187,9 @@ func TestTextRulesConformanceTypeScript(test *testing.T) {
 		test.Run(testCase.Id(), func(test *testing.T) {
 			test.Parallel()
 			found := runTextRulesCase(test, corpus, house, testCase)
-			result := textrules.Compare(testCase, textrules.EngineTypeScript, found)
+			result := text_rules.Compare(testCase, text_rules.EngineTypeScript, found)
 			ran.Add(1)
-			if judgeError := corpus.Judge(textrules.EngineTypeScript, testCase, result); judgeError != nil {
+			if judgeError := corpus.Judge(text_rules.EngineTypeScript, testCase, result); judgeError != nil {
 				test.Error(judgeError)
 			}
 		})
@@ -205,15 +205,15 @@ const textRulesComparatorFamily = "warning-comments"
 func TestTextRulesConformanceTypeScriptComparatorCanFail(test *testing.T) {
 	test.Parallel()
 
-	corpus, loadError := textrules.Load()
+	corpus, loadError := text_rules.Load()
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
 	house := loadTextRulesHouse(test)
 	// The warning-comments control, whose comment holds the word `fix`, a misplacement every engine's
 	// finding there differs from.
-	var control textrules.Case
-	for _, testCase := range corpus.CasesFor(textrules.EngineTypeScript) {
+	var control text_rules.Case
+	for _, testCase := range corpus.CasesFor(text_rules.EngineTypeScript) {
 		if testCase.Control && testCase.Family == textRulesComparatorFamily {
 			control = testCase
 		}
@@ -225,28 +225,36 @@ func TestTextRulesConformanceTypeScriptComparatorCanFail(test *testing.T) {
 	if len(found) == 0 {
 		test.Fatalf("the rule reported nothing on the control %s", control.Id())
 	}
-	source := control.Sources[textrules.EngineTypeScript]
+	source := control.Sources[text_rules.EngineTypeScript]
 
 	asReported := control
 	asReported.Expect = nil
 	for _, finding := range found {
 		text := source[finding.Start:finding.End]
-		asReported.Expect = append(asReported.Expect, textrules.Span{Covers: &text, Occurrence: 1})
+		asReported.Expect = append(asReported.Expect, text_rules.Span{Covers: &text, Occurrence: 1})
 	}
-	if result := textrules.Compare(asReported, textrules.EngineTypeScript, found); !result.Passed() {
+	if result := text_rules.Compare(asReported, text_rules.EngineTypeScript, found); !result.Passed() {
 		test.Errorf("held to exactly what it reported, the control failed: %s", result.Detail)
 	}
 
 	clean := control
-	clean.Expect = []textrules.Span{}
-	if result := textrules.Compare(clean, textrules.EngineTypeScript, found); result.Failure != textrules.KindVerdict {
+	clean.Expect = []text_rules.Span{}
+	if result := text_rules.Compare(
+		clean,
+		text_rules.EngineTypeScript,
+		found,
+	); result.Failure != text_rules.KindVerdict {
 		test.Errorf("expecting the control clean was not a verdict failure (%q): %s", result.Failure, result.Detail)
 	}
 
 	wrongWord := "fix"
 	misplaced := control
-	misplaced.Expect = []textrules.Span{{Covers: &wrongWord, Occurrence: 1}}
-	if result := textrules.Compare(misplaced, textrules.EngineTypeScript, found); result.Failure != textrules.KindSpan {
+	misplaced.Expect = []text_rules.Span{{Covers: &wrongWord, Occurrence: 1}}
+	if result := text_rules.Compare(
+		misplaced,
+		text_rules.EngineTypeScript,
+		found,
+	); result.Failure != text_rules.KindSpan {
 		test.Errorf(
 			"expecting the control over %q was not a span failure (%q): %s",
 			wrongWord,

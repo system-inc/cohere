@@ -4,19 +4,19 @@ import (
 	"fmt"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/classmembers"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/class_members"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
 var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "no-dupe-class-members",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		// The collision judgment lives in `classmembers` rather than here, because
+		// The collision judgment lives in `class_members` rather than here, because
 		// `@typescript-eslint/no-dupe-class-members` needs the same answer and a rule package may
 		// not import another rule package. This rule owns the wording and the message id; the
 		// utility owns which members collide.
 		check := func(members *ast.NodeList) {
-			classmembers.ForEachDuplicate(members, func(name *ast.Node, key classmembers.Key) {
+			class_members.ForEachDuplicate(members, func(name *ast.Node, key class_members.Key) {
 				ruleContext.ReportNode(name, rule.Message{
 					Id: "noDupeClassMembers",
 					Description: fmt.Sprintf(

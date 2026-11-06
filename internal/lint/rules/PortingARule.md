@@ -645,10 +645,10 @@ The shared shelf is `internal/lint/ecmascript/` and `internal/lint/checking/` â€
 roughly a hundred non-test files across twenty packages. `ecmascript/` is subdivided
 by question:
 
-    binding      classmembers  comments   control_flow_graph   decorators
+    binding      class_members  comments   control_flow_graph   decorators
     high_level_intermediate_representation             imports  jsx
     literal      module        nextjs     property             react
-    reference    regexp        regexpattern             regexsyntax
+    reference    regexp        regex_pattern             regex_syntax
     scope        text
 
 `checking/` holds the type-checker-facing helpers: `builtins.go`, `checker.go`,
@@ -701,7 +701,7 @@ accepts `createClass` where upstream keys on `createReactClass` alone. Both live
 **A shelf function's doc comment is a claim, not a guarantee.** One agent found
 `RegexCharElement.IsLoneSurrogate` documented as the astral-expansion mechanism with
 **zero assignment sites**, validated against a control field that had three. Another
-measured that `regexpattern.Walk` skips set escapes and does not recurse into
+measured that `regex_pattern.Walk` skips set escapes and does not recurse into
 `v`-flag nested classes, contradicting what its name implies. **If a shelf function is
 load-bearing for your rule, probe it on your own corpus before building on it**, and
 report what you found either way. The shelf is younger than the rules it serves.
@@ -2455,7 +2455,7 @@ given two rules two chances to disagree about one question.
     helper in a sibling file, same package   just call it
     helper in ANOTHER rule package           lift the judgment into
                                              internal/lint/ecmascript/..., and have BOTH
-                                             rules call it, as classmembers did
+                                             rules call it, as class_members did
     logic that is genuinely one rule's       keep it in your file
 
 Before writing a helper, grep your own package. In `internal/lint/rules/react/` in

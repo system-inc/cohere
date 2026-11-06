@@ -256,7 +256,7 @@ with cgo off, which compiles only the few packages that use cgo differently, mea
 unused, and developing cohere filled the default cache far faster: on 2026-10-03 it regrew 223 GB in
 nine hours and filled the disk (#3sgjy0h), most of it `TestEveryReleaseTargetCompiles` building cohere
 for six platforms on every `go test ./...`, until `3dc6e70` made it type-check them instead.
-`internal/release/gocache` trims a cache of its least recently used entries once it is over a cap,
+`internal/release/go_cache` trims a cache of its least recently used entries once it is over a cap,
 down to three quarters of it. On any run, at most every ten minutes, the launcher starts a background
 copy of itself that trims the cache at 48 GB. The run pays one stat for that and never waits on the
 walk. What it removed is logged to `.cache/cohere/prune.log`.

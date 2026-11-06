@@ -14,7 +14,7 @@ import (
 // is bound by the kernel's file opens rather than the cores. Only the selectors, which ask which files an
 // override reaches, wait for the program, and they took about 2.5ms.
 //
-// A zero-config project's sets are detected from the program's files (housesets.Detect), so its config is read
+// A zero-config project's sets are detected from the program's files (house_sets.Detect), so its config is read
 // after the build, as it always was: startLintConfigAhead returns nil for it.
 type lintConfigAhead struct {
 	done chan struct{}

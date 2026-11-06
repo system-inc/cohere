@@ -12,8 +12,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -29,14 +29,14 @@ import (
 
 // markdownCandidate formats .md files with the port and refuses the rest.
 type markdownCandidate struct {
-	options   formatoptions.Options
+	options   format_options.Options
 	textToDoc printing.TextToDoc
 }
 
 // oracleTextToDoc formats embedded code with the embedded Prettier, standing in for native printers
 // that do not exist yet, so the embed plumbing (fences, front matter) is measured on its own. Set
 // COHERE_MARKDOWN_EMBED_ORACLE to use it.
-func oracleTextToDoc(test *testing.T, options formatoptions.Options) printing.TextToDoc {
+func oracleTextToDoc(test *testing.T, options format_options.Options) printing.TextToDoc {
 	if os.Getenv("COHERE_MARKDOWN_EMBED_ORACLE") == "" {
 		return nil
 	}
@@ -81,14 +81,14 @@ func dependsOnEmbed(text string) bool { return len(EmbeddedParsers(text)) > 0 }
 type markdownCorpus struct {
 	root    string
 	files   []string
-	options formatoptions.Options
+	options format_options.Options
 }
 
 // markdownCorpora enumerates the .md files of each root the way TestCorpora does: through the
 // engine's ignore layers, and into each nested repository as a corpus of its own, with its own config.
 func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 	test.Helper()
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -112,7 +112,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -121,7 +121,7 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 		}
 
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
@@ -138,8 +138,8 @@ func markdownCorpora(test *testing.T, roots string) []markdownCorpus {
 			}
 		}
 
-		resolution, resolveError := formatoptions.Resolve(root)
-		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := format_options.Resolve(root)
+		if errors.Is(resolveError, format_options.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
 			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)

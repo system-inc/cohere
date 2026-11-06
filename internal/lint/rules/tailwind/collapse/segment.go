@@ -4,9 +4,9 @@
 // only; the whitespace formatter in the same upstream file belongs to the printer, not to type
 // inference, and is not needed here).
 //
-// # Why not the regexsyntax bracket scanner
+// # Why not the regex_syntax bracket scanner
 //
-// `internal/utilities/ecmascript/regexsyntax` has ClassEnd and SkipPatternEscape, which also walk
+// `internal/lint/ecmascript/regex_syntax` has ClassEnd and SkipPatternEscape, which also walk
 // brackets, and they were read before this was written. They are the wrong primitives. They scan
 // JavaScript *regular-expression literal syntax*: they take RegexFlags, treat `[` as nesting only
 // under the v flag, understand `\q{...}`, and decode UTF-8 runes because a regex class can contain

@@ -10,13 +10,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-// The oracle for what prettier.Engine cannot be asked: proseWrap, which formatoptions.Options does not carry
+// The oracle for what prettier.Engine cannot be asked: proseWrap, which format_options.Options does not carry
 // and every corpus leaves at "preserve", and a file path the engine does not route (.prettierrc). These
 // run the same embedded bundles in their own runtime, with the option given.
 
@@ -53,7 +53,7 @@ func (oracle *optionsOracle) format(
 	text string,
 	filePath string,
 	parser string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
 	key := oracletest.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
@@ -70,7 +70,7 @@ func (oracle *optionsOracle) formatLive(
 	text string,
 	filePath string,
 	parser string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
 	setGlobalsError := errors.Join(
@@ -225,7 +225,7 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
 // back as a doc with its trailing newline stripped, as textToDoc strips the trailing hardline.
-func jsonTextToDoc(test *testing.T, oracle *optionsOracle, options formatoptions.Options) printing.TextToDoc {
+func jsonTextToDoc(test *testing.T, oracle *optionsOracle, options format_options.Options) printing.TextToDoc {
 	return func(text string, parser string) (doc.Doc, error) {
 		if parser != "json" {
 			test.Errorf("the YAML printer asked for parser %q", parser)
@@ -329,7 +329,7 @@ func TestPrettierRcEmbedsJson(test *testing.T) {
 func TestPrettierRcWithoutTextToDocPrintsYaml(test *testing.T) {
 	test.Parallel()
 	texts, _, trees := parseInputs(test, []string{`{"a":1}`})
-	actual, printFileError := PrintFile(".prettierrc", trees[0].root, texts[0], formatoptions.Default(), nil)
+	actual, printFileError := PrintFile(".prettierrc", trees[0].root, texts[0], format_options.Default(), nil)
 	if printFileError != nil {
 		test.Fatal(printFileError)
 	}

@@ -447,7 +447,7 @@ func swiftScratchDirectory(options Options) (string, error) {
 const SchemaDirectoryName = "schema"
 
 // SettingsSchemaFileNames are the JSON schemas the dispatcher package ships, one per settings tier.
-// They are generated from the loader (internal/settingsschema) and committed, and a test there fails when
+// They are generated from the loader (internal/settings_schema) and committed, and a test there fails when
 // they drift from it, so the release copies the committed files rather than generating its own.
 var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCohereSettings.schema.json"}
 
@@ -523,7 +523,7 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 // GoBuildCommand is the `go build` that produces cohere for one target.
 //
 // It is the single definition of how a target is compiled, shared by the release and by
-// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for
+// TestEveryReleaseTargetCompiles (internal/release/cross_compile), so a flag or an environment variable added here for
 // the release is one the test compiles with too. A test with its own copy would keep passing on the copy after
 // the release had changed.
 func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {

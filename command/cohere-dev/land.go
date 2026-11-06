@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/goengine/project"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -441,7 +441,7 @@ const ruleCpuCheck = "./internal/lint/registry/rule_budget_test.go"
 const ruleCpuTest = "TestRegisteredRuleCpuBudget"
 
 // docsDataGenerator is the repository's generator of the website's data, relative to its root.
-const docsDataGenerator = "./internal/docsdata/tools/generate"
+const docsDataGenerator = "./internal/docs_data/tools/generate"
 
 // checkRuleCpu runs uncached on each land attempt, before tests and fast-forward.
 // Repositories without this cohere-specific check say so, like the docs data check.

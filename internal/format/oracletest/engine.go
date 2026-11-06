@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // Engine is a prettier.Engine's Format, answered from a golden.
 type Engine struct {
 	golden      *Golden
-	options     formatoptions.Options
+	options     format_options.Options
 	once        sync.Once
 	engine      *prettier.Engine
 	engineError error

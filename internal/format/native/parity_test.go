@@ -3,7 +3,7 @@ package native
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracletest"
 )
 
@@ -39,7 +39,7 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 		}
 	}
 
-	options := formatoptions.Default()
+	options := format_options.Default()
 	oracle := oracletest.Open(test, test.Name()).Engine(options)
 	formatter := Formatter{Options: options}
 	compared, refusedByBoth := 0, 0

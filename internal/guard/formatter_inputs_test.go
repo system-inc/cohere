@@ -44,7 +44,7 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
 	}
 	for _, class := range []struct{ what, contains string }{
 		{"the printers", "github.com/system-inc/cohere/internal/format/native/"},
-		{"the options they resolve", "github.com/system-inc/cohere/internal/format/formatoptions/"},
+		{"the options they resolve", "github.com/system-inc/cohere/internal/format/format_options/"},
 		{"the parser they parse with", "github.com/microsoft/TypeScript/tsc/"},
 		{"the pass loop", dispatch.FormatterPassLoop},
 	} {

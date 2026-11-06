@@ -291,14 +291,14 @@ func TestPreferIncludesFiresOnUpstreamFailCases(test *testing.T) {
 
 // TestPreferIncludesReadsAPatternTheShelfCannot is the substrate fixture.
 //
-// The shelf's `regexpattern.Walk` is the obvious thing to build the regex half on and it cannot
+// The shelf's `regex_pattern.Walk` is the obvious thing to build the regex half on and it cannot
 // answer this rule's question. Measured by running it over these exact patterns: it renders `b.r`
 // as `b.r`, renders `^bar`, `bar$`, `(bar)` and `b(?:a)r` all as `bar`, and renders `foo|bar` as
 // `foobar`. A port built on it would rewrite `/^bar$/.test(a)` into `a.includes('bar')`, which is
 // wrong, and no imported fixture would catch it because upstream's corpus writes only three of
 // these shapes.
 //
-// So the reader is written on `regexsyntax` primitives instead, which is what the shelf's own doc
+// So the reader is written on `regex_syntax` primitives instead, which is what the shelf's own doc
 // says a caller wanting alternation should do. These rows are what proves it discriminates. Every
 // verdict is the installed 8.67.0 build's, measured over a real program.
 func TestPreferIncludesReadsAPatternTheShelfCannot(test *testing.T) {

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -615,7 +615,7 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 	if roots == "" {
 		test.Skip("set COHERE_YAML_CORPUS to measure; this is a measuring run, not a unit test")
 	}
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -642,7 +642,7 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 		seen[root] = true
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -651,7 +651,7 @@ func TestCorpusParseMatchesUpstream(test *testing.T) {
 		}
 
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}

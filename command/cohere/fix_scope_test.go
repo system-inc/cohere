@@ -237,7 +237,7 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(test *testing.T) {
 }
 
 // plantClone makes a directory look like a clone the way cohere looks: a `.git` directory, which is all
-// formatfiles.HasOwnRepository asks. No git runs, so the fixture holds where git is absent.
+// format_files.HasOwnRepository asks. No git runs, so the fixture holds where git is absent.
 func plantClone(test *testing.T, directory string) {
 	test.Helper()
 	writeTree(test, directory, map[string]string{".git/HEAD": "ref: refs/heads/main\n"})

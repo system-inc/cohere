@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
-	"github.com/system-inc/cohere/internal/lint/housesets"
+	"github.com/system-inc/cohere/internal/lint/house_sets"
 	"github.com/system-inc/cohere/internal/lint/rules/tailwind"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -35,7 +35,7 @@ func loadLintConfiguration(graph *program.Graph, location projectLocation) (*con
 	if absolutePathError != nil {
 		return nil, absolutePathError
 	}
-	detection := housesets.Detect(
+	detection := house_sets.Detect(
 		graph.ProjectFiles(),
 		location.Root,
 		graph.Program.Host().FS(),

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // TestResolvingFormatsEachFileWithItsOwnDirectorysOptions: two repositories with different configs,
@@ -14,7 +14,7 @@ import (
 // prevent, and the native engine must not reintroduce it at the switch.
 func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(test *testing.T) {
 	test.Parallel()
-	Register(".resolvingprobe", func(fileName string, text string, options formatoptions.Options) (string, error) {
+	Register(".resolvingprobe", func(fileName string, text string, options format_options.Options) (string, error) {
 		return strconv.Itoa(options.PrintWidth), nil
 	})
 	defer func() { mutex.Lock(); delete(printers, ".resolvingprobe"); mutex.Unlock() }()
@@ -65,7 +65,7 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(test *testing.T) {
 // by extension, rather than offering it and failing on it or dropping it without a word.
 func TestResolvingOffersOnlyWhatAPrinterHandles(test *testing.T) {
 	test.Parallel()
-	Register(".offeredprobe", func(fileName string, text string, options formatoptions.Options) (string, error) {
+	Register(".offeredprobe", func(fileName string, text string, options format_options.Options) (string, error) {
 		return text, nil
 	})
 	defer func() { mutex.Lock(); delete(printers, ".offeredprobe"); mutex.Unlock() }()

@@ -25,7 +25,7 @@ import (
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
@@ -582,7 +582,7 @@ func proposalsForText(
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: tspath.RootedFilePath(rooted),
 		PathKey:  tspath.PathKey(rooted),
-	}, text, core.GetScriptKindFromFileName(tspath.RootedFilePath(sourcename.TreatedAs(rooted))))
+	}, text, core.GetScriptKindFromFileName(tspath.RootedFilePath(source_name.TreatedAs(rooted))))
 	if sourceFile == nil {
 		return nil, fmt.Errorf("re-parsing %s produced nothing", fileName)
 	}

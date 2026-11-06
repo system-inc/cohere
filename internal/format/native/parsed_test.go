@@ -10,7 +10,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // parsedCorpusVariable names more roots for the proof below, separated by the path list separator: a real tree,
@@ -30,7 +30,7 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T
 	if extra := os.Getenv(parsedCorpusVariable); extra != "" {
 		roots = append(roots, filepath.SplitList(extra)...)
 	}
-	formatter := Formatter{Options: formatoptions.Default()}
+	formatter := Formatter{Options: format_options.Default()}
 	compared := 0
 	for _, fileName := range typeScriptFilesUnder(roots) {
 		contents, readError := os.ReadFile(fileName)

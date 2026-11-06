@@ -6,7 +6,7 @@ import SwiftSyntax
  priority and a place in a plan, not in a comment that is read only when someone happens to open the file.
 
  The Swift form of the house warning-comment rule, held by the text rules corpus to one verdict in every
- engine (#4b337jk, `conformance/textrules`, family `warning-comments`; #47s5j9h):
+ engine (#4b337jk, `conformance/text_rules`, family `warning-comments`; #47s5j9h):
    - the words in capitals only, since a lowercase "todo" is ordinary English (an app's to-do list);
    - each a whole word, where an ASCII letter, a digit or `_` continues it, so `TODO_LIST` and `TODO2` are
      names rather than markers;

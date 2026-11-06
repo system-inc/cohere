@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -63,7 +63,7 @@ func TestDumpDifferences(test *testing.T) {
 		}
 		directory = filepath.Join(base, "cohere", "prettier-oracle")
 	}
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -80,7 +80,7 @@ func TestDumpDifferences(test *testing.T) {
 
 		// Nested repositories regardless of root's own ignore lists, before anything can skip root, as
 		// TestCorpora finds them (#k6vebep).
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -88,8 +88,8 @@ func TestDumpDifferences(test *testing.T) {
 			pending = append(pending, filepath.Join(root, nested))
 		}
 
-		resolution, resolveError := formatoptions.Resolve(root)
-		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) {
+		resolution, resolveError := format_options.Resolve(root)
+		if errors.Is(resolveError, format_options.ErrPrettierConfigRemains) {
 			// A repository still carrying Prettier config, pinned to its own adoption (www-ahra-ai). The
 			// differential's TestCorpora refuses this for a named corpus; here it is named and skipped.
 			test.Logf("skipping %s, not yet adopted: %v", root, resolveError)
@@ -100,7 +100,7 @@ func TestDumpDifferences(test *testing.T) {
 		}
 
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}

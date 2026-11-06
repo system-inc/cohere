@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/oracletest"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -197,16 +197,16 @@ var formatCases = []formatCase{
 
 // formatOptionSets are the options every case runs under: ahra's defaults (printWidth 120, tabWidth 4,
 // singleQuote), printWidth 80 with Prettier's tabWidth 2, double quotes, and tabs.
-func formatOptionSets() map[string]formatoptions.Options {
-	narrow := formatoptions.Default()
+func formatOptionSets() map[string]format_options.Options {
+	narrow := format_options.Default()
 	narrow.PrintWidth = 80
 	narrow.TabWidth = 2
-	doubleQuotes := formatoptions.Default()
+	doubleQuotes := format_options.Default()
 	doubleQuotes.SingleQuote = false
-	tabs := formatoptions.Default()
+	tabs := format_options.Default()
 	tabs.UseTabs = true
-	return map[string]formatoptions.Options{
-		"defaults":          formatoptions.Default(),
+	return map[string]format_options.Options{
+		"defaults":          format_options.Default(),
 		"printWidth 80":     narrow,
 		"singleQuote false": doubleQuotes,
 		"useTabs":           tabs,
@@ -265,7 +265,7 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsError := Format(testCase.source, formatoptions.Default())
+			withDefaults, defaultsError := Format(testCase.source, format_options.Default())
 			withOptions, optionsError := Format(testCase.source, options)
 			if defaultsError == nil && optionsError == nil && withDefaults != withOptions {
 				changed = true
@@ -282,12 +282,12 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
+	oracle := oracletest.Open(test, test.Name()).Engine(format_options.Default())
 	for _, source := range []string{"a { color: red;\n", "a { color: \"unclosed; }\n", "}\n"} {
 		if _, formatError := oracle.Format("Probe.css", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, formatError := Format(source, formatoptions.Default()); formatError == nil {
+		if formatted, formatError := Format(source, format_options.Default()); formatError == nil {
 			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -296,7 +296,7 @@ func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 // PrintToDoc is the same doc without its trailing hardline, which an embedding printer lays out.
 func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
-	options := formatoptions.Default()
+	options := format_options.Default()
 	for _, testCase := range formatCases {
 		formatted, formatError := Format(testCase.source, options)
 		if formatError != nil {
@@ -652,7 +652,7 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 func TestFormatScssIsNotFormat(test *testing.T) {
 	test.Parallel()
 	// The oracle's answers, recorded (see oracletest), so no JavaScript runs here.
-	oracle := oracletest.Open(test, test.Name()).Engine(formatoptions.Default())
+	oracle := oracletest.Open(test, test.Name()).Engine(format_options.Default())
 	for _, source := range []string{
 		"a{\n// comment\ncolor:red;\n}",
 		"$map:(key1:value1,key2:value2);",
@@ -669,11 +669,11 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 				source,
 			)
 		}
-		actualScss, formatScssError := FormatScss(source, formatoptions.Default())
+		actualScss, formatScssError := FormatScss(source, format_options.Default())
 		if formatScssError != nil || actualScss != asScss {
 			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
 		}
-		actualCss, formatError := Format(source, formatoptions.Default())
+		actualCss, formatError := Format(source, format_options.Default())
 		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
 			test.Errorf(
 				"%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s",
@@ -690,7 +690,7 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 // PrintToDocSCSS is FormatSCSS's doc without its trailing hardline.
 func TestPrintToDocScssIsFormatScssWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
-	options := formatoptions.Default()
+	options := format_options.Default()
 	for _, testCase := range scssFormatCases {
 		formatted, formatScssError := FormatScss(testCase.source, options)
 		if formatScssError != nil {

@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
@@ -507,7 +507,7 @@ func declareLintConfigInputs(path string) {
 // .gitignore and info/exclude) are recorded present or absent. A content edit to a nested .gitignore moves
 // no directory's modification time, and info/exclude sits in .git/info, a directory the walk never lists.
 // The formatter's own identity needs no input: the run's key covers the running binary (see beginRunCache).
-func declareFormatWalk(enumeration formatfiles.Enumeration) {
+func declareFormatWalk(enumeration format_files.Enumeration) {
 	session := activeRunCache
 	if session == nil {
 		return
@@ -524,11 +524,11 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		filepath.Join(enumeration.Root, ".prettierignore"),
 	}
 	for _, directory := range enumeration.Directories {
-		read = append(read, filepath.Join(directory, formatoptions.SettingsFileName))
+		read = append(read, filepath.Join(directory, format_options.SettingsFileName))
 	}
 	// The settings the root itself resolves to can sit above it, in a directory the walk never listed, and so
 	// can the directories between: a settings file created in one of those would take over the options.
-	if resolution, resolveError := formatoptions.Resolve(
+	if resolution, resolveError := format_options.Resolve(
 		enumeration.Root,
 	); resolveError == nil && resolution.Source != "" {
 		read = append(read, resolution.Source)
@@ -545,7 +545,7 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 		if _, statError := os.Stat(path); statError != nil {
 			continue
 		}
-		if filepath.Base(path) == formatoptions.SettingsFileName {
+		if filepath.Base(path) == format_options.SettingsFileName {
 			session.extraFiles = append(session.extraFiles, configuration.SourcesOnDisk(lintConfigSources(path))...)
 			continue
 		}

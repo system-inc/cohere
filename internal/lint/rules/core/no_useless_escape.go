@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -77,7 +77,7 @@ type NoUselessEscapeOptions struct {
 // for a fix that writes the right character at the wrong offset, which here would eat the character
 // before the backslash and leave the backslash standing.
 //
-// # Why this does not use regexpattern.Walk
+// # Why this does not use regex_pattern.Walk
 //
 // The shelf holds a pattern walker and it is the wrong shape for this rule, in three ways that its
 // two shipped callers do not feel. It skips every escape that matches a set rather than a single
@@ -90,7 +90,7 @@ type NoUselessEscapeOptions struct {
 // That package's own doc anticipates this: a third caller wanting more structure should extend it
 // rather than find it half-built. Extending it would change the contract for `no-regex-spaces` and
 // `no-control-regex`, which is a larger change than this rule justifies, so the escape scan here is
-// built on the layer underneath instead. `regexsyntax.SkipPatternEscape` and `regexsyntax.ClassEnd`
+// built on the layer underneath instead. `regex_syntax.SkipPatternEscape` and `regex_syntax.ClassEnd`
 // are the primitives that answer where an escape ends and where a class ends, `v`-flag nesting and
 // multi-byte identity escapes included, and both are used rather than reimplemented.
 //
@@ -174,7 +174,7 @@ var NoUselessEscape = rule.Rule[NoUselessEscapeOptions]{
 
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regex_syntax.PatternAndFlags(text)
 				if pattern == "" {
 					return
 				}
@@ -183,7 +183,7 @@ var NoUselessEscape = rule.Rule[NoUselessEscapeOptions]{
 				// comment precedes the literal, which no suppressing directive can reach.
 				patternStart := node.End() - len(text) + 1
 
-				for _, escape := range uselessPatternEscapes(pattern, regexsyntax.ParseRegexFlags(flags)) {
+				for _, escape := range uselessPatternEscapes(pattern, regex_syntax.ParseRegexFlags(flags)) {
 					escaped, size := utf8.DecodeRuneInString(pattern[escape+1:])
 					if allowed[escaped] {
 						continue
@@ -393,11 +393,11 @@ type classSpan struct {
 
 // uselessPatternEscapes returns the offset of each backslash in a pattern whose escape does nothing.
 //
-// The scan is written here rather than on `regexpattern.Walk` for the reasons on the rule, and it is
+// The scan is written here rather than on `regex_pattern.Walk` for the reasons on the rule, and it is
 // built from the layer that walker uses: `SkipPatternEscape` says how far an escape reaches,
 // including a `\p{...}` property or a multi-byte identity escape like `\（`, and `ClassEnd` says
 // where a class stops, `v`-flag nesting included.
-func uselessPatternEscapes(pattern string, flags regexsyntax.RegexFlags) []int {
+func uselessPatternEscapes(pattern string, flags regex_syntax.RegexFlags) []int {
 	var offsets []int
 	scanEscapes(pattern, flags, nil, &offsets)
 	return offsets
@@ -411,7 +411,7 @@ func uselessPatternEscapes(pattern string, flags regexsyntax.RegexFlags) []int {
 // of an inner class, not of the outer one.
 //
 // Mutates: offsets the walk appends every useless escape it finds, so one slice gathers every nested class
-func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classSpan, offsets *[]int) {
+func scanEscapes(pattern string, flags regex_syntax.RegexFlags, enclosing *classSpan, offsets *[]int) {
 	end := len(pattern)
 	start := 0
 	if enclosing != nil {
@@ -425,7 +425,7 @@ func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classS
 	for index := start; index < end; {
 		switch pattern[index] {
 		case '\\':
-			step, ok := regexsyntax.SkipPatternEscape(pattern, index, flags)
+			step, ok := regex_syntax.SkipPatternEscape(pattern, index, flags)
 			if !ok {
 				return
 			}
@@ -435,7 +435,7 @@ func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classS
 			index += step
 
 		case '[':
-			classEnd, ok := regexsyntax.ClassEnd(pattern, index, flags)
+			classEnd, ok := regex_syntax.ClassEnd(pattern, index, flags)
 			if !ok {
 				return
 			}
@@ -454,7 +454,7 @@ func scanEscapes(pattern string, flags regexsyntax.RegexFlags, enclosing *classS
 }
 
 // isUselessPatternEscape decides one escape, given the class it sits in or nil for none.
-func isUselessPatternEscape(pattern string, index int, flags regexsyntax.RegexFlags, enclosing *classSpan) bool {
+func isUselessPatternEscape(pattern string, index int, flags regex_syntax.RegexFlags, enclosing *classSpan) bool {
 	if index+1 >= len(pattern) {
 		return false
 	}

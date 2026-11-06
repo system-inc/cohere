@@ -12,7 +12,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/ecmascript/property"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -438,7 +438,7 @@ var localeCodeStem = regexp.MustCompile(`^[a-z]{2,3}(?:[-_][A-Za-z0-9]+)*$`)
 func translationFileInformation(sourceFile *ast.SourceFile) (string, string, bool) {
 	// An Adamic `.a` translation file is read as the `.ts` it is (#kwt1htp).
 	fileName := imports.NormalizedFileName(sourceFile)
-	if !strings.HasSuffix(sourcename.TreatedAs(fileName), ".ts") {
+	if !strings.HasSuffix(source_name.TreatedAs(fileName), ".ts") {
 		return "", "", false
 	}
 
@@ -449,7 +449,7 @@ func translationFileInformation(sourceFile *ast.SourceFile) (string, string, boo
 	directory := fileName[:lastSlash]
 	baseName := fileName[lastSlash+1:]
 
-	localeCode := strings.TrimSuffix(sourcename.TreatedAs(baseName), ".ts")
+	localeCode := strings.TrimSuffix(source_name.TreatedAs(baseName), ".ts")
 	if localeCode == "en" || !localeCodeStem.MatchString(localeCode) {
 		return "", "", false
 	}
@@ -513,7 +513,7 @@ func localizationNoUntranslatedValueFingerprint(program rule.Program, _ rule.Giv
 		if lastSlash < 0 {
 			continue
 		}
-		if baseName := fileName[lastSlash+1:]; baseName != "en.ts" && baseName != "en"+sourcename.AdamicExtension {
+		if baseName := fileName[lastSlash+1:]; baseName != "en.ts" && baseName != "en"+source_name.AdamicExtension {
 			continue
 		}
 		if !isTranslationsDirectory(fileName[:lastSlash]) {
@@ -565,8 +565,8 @@ func englishSibling(program rule.Program, directory string, fileName string) (*a
 // englishSiblingBaseNames is the English table's base names in the order they are looked up: the
 // linted file's own extension first, then the other (#kwt1htp).
 func englishSiblingBaseNames(fileName string) []string {
-	if sourcename.IsAdamic(fileName) {
-		return []string{"en" + sourcename.AdamicExtension, "en.ts"}
+	if source_name.IsAdamic(fileName) {
+		return []string{"en" + source_name.AdamicExtension, "en.ts"}
 	}
-	return []string{"en.ts", "en" + sourcename.AdamicExtension}
+	return []string{"en.ts", "en" + source_name.AdamicExtension}
 }

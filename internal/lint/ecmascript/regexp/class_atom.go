@@ -3,14 +3,14 @@ package regexp
 import (
 	"slices"
 
-	"github.com/system-inc/cohere/unicodeproperties"
+	"github.com/system-inc/cohere/unicode_properties"
 )
 
 type classAtom struct {
 	kind   classAtomKind
 	lo, hi rune
 	text   string
-	ranges []unicodeproperties.Range
+	ranges []unicode_properties.Range
 }
 
 // covers reports whether the atom already names `character`, which is what decides
@@ -22,7 +22,7 @@ func (atom classAtom) covers(character rune) bool {
 	case classRange:
 		return character >= atom.lo && character <= atom.hi
 	case classSet:
-		_, ok := slices.BinarySearchFunc(atom.ranges, character, func(span unicodeproperties.Range, target rune) int {
+		_, ok := slices.BinarySearchFunc(atom.ranges, character, func(span unicode_properties.Range, target rune) int {
 			if span.Hi < target {
 				return -1
 			}
