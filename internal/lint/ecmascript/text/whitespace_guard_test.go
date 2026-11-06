@@ -37,10 +37,10 @@ var goWhitespaceFunctions = map[string][]string{
 var goWhitespaceUnswept = map[string]int{
 	// lint: a gap that is only trivia, or what TypeScript's JSDoc parser kept, which is the scanner's set
 	// (it also skips U+0085 and U+200B), neither Go's nor JavaScript's (#0pbc8mv).
-	"internal/lint/ecmascript/comments/comments.go":        1,
-	"internal/lint/ecmascript/dot_notation/dotnotation.go": 1,
-	"internal/lint/rules/typescript/no_deprecated.go":      1,
-	"internal/lint/rules/typescript/no_invalid_this.go":    1,
+	"internal/lint/ecmascript/comments/comments.go":         1,
+	"internal/lint/ecmascript/dot_notation/dot_notation.go": 1,
+	"internal/lint/rules/typescript/no_deprecated.go":       1,
+	"internal/lint/rules/typescript/no_invalid_this.go":     1,
 }
 
 // goWhitespaceSite is one unmarked reference to a Go whitespace function.

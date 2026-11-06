@@ -1,7 +1,7 @@
 package go_engine
 
 // The Go adapter of the text rules' conformance corpus (#4b337jk), beside the TypeScript one
-// (internal/lint/rules/textrules_conformance_test.go) and the Swift one. It lives in this package rather than in
+// (internal/lint/rules/text_rules_conformance_test.go) and the Swift one. It lives in this package rather than in
 // the rules tree because a case's settings and options must reach its rule the way a project's do, through
 // settings.Load and configureRules, which this package keeps unexported.
 //

@@ -20,8 +20,8 @@ func TestOfFindsTheSourceDirectoryFromEitherForm(test *testing.T) {
 	_, callerPath, _, _ := runtime.Caller(0)
 	for _, form := range []string{
 		callerPath,
-		filepath.Join(want, "tooldirectory_test.go"),
-		"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tool_directory/tooldirectory_test.go",
+		filepath.Join(want, "tool_directory_test.go"),
+		"github.com/system-inc/cohere/internal/lint/rules/tailwind/tools/tool_directory/tool_directory_test.go",
 	} {
 		got, toolDirectoryOfError := Of(form)
 		if toolDirectoryOfError != nil {
