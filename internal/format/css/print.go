@@ -319,7 +319,7 @@ func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *pr
 
 	case "value-colon":
 		previous, _ := path.Previous()
-		previousValue, previousValueIsString := previous.Get("value").(string)
+		previousValue, previousValueIsString := asString(previous.Get("value"))
 		var after doc.Doc = doc.LineDoc
 		// Don't add spaces on escaped colon `:`, e.g: grid-template-rows: [row-1-00\:00] auto;
 		if (previousValueIsString && strings.HasSuffix(previousValue, `\`)) ||
@@ -355,7 +355,7 @@ func printDeclaration(path *astPath, options *printerOptions, print printFunc) d
 	trimmedBetween := trim(rawBetween)
 	isColon := trimmedBetween == ":"
 	hasSpaceAfterColon := strings.HasSuffix(rawBetween, " ") && isColon
-	stringValue, valueIsString := node.Get("value").(string)
+	stringValue, valueIsString := asString(node.Get("value"))
 	isValueAllSpace := valueIsString && valueAllSpacePattern.MatchString(stringValue)
 	var value doc.Doc
 	if valueIsString {
@@ -459,7 +459,7 @@ func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Do
 
 	name := node.String("name")
 	parameters := node.Get("params")
-	stringParameters, parametersIsString := parameters.(string)
+	stringParameters, parametersIsString := asString(parameters)
 	isImportUnknownValueEndsWithSemiColon := name == "import" &&
 		node.Child("params").Type() == "value-unknown" &&
 		strings.HasSuffix(node.Child("params").String("value"), ";")
@@ -523,7 +523,7 @@ func printAtRule(path *astPath, options *printerOptions, print printFunc) doc.Do
 	var ending doc.Doc
 	if isPresent(node.Get("nodes")) {
 		var opening doc.Doc = doc.Text(" ")
-		_, selectorValueIsString := selector.Get("value").(string)
+		_, selectorValueIsString := asString(selector.Get("value"))
 		if isScssControlDirectiveNode(node, options) {
 			opening = doc.Text("")
 		} else if (selector != nil &&
@@ -602,9 +602,9 @@ func printNamespace(node *estree.Node) doc.Doc {
 	if !estree.IsTruthy(namespace) {
 		return doc.Text("")
 	}
-	if namespace == true {
+	if namespace == estree.Boolean(true) {
 		return doc.Text("|")
 	}
-	text, _ := namespace.(string)
+	text, _ := asString(namespace)
 	return doc.Concat{doc.Text(trim(text)), doc.Text("|")}
 }

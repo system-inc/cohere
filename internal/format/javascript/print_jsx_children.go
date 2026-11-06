@@ -99,10 +99,13 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	//
 	// Upstream's replacement node has no range; nothing reads one, since printJsxChildren never prints
 	// a JSXText, so the Go gives it an empty range at 0.
-	convertedChildren := make([]Node, len(current.List("children")))
+	convertedChildren := make(estree.Nodes, len(current.List("children")))
 	for index, child := range current.List("children") {
 		if isJsxWhitespaceExpression(child) {
-			convertedChildren[index] = estree.New("JSXText", 0, 0, "value", " ", "raw", " ")
+			convertedChildren[index] = estree.New("JSXText", 0, 0, []estree.Property{
+				{Key: "value", Value: estree.String(" ")},
+				{Key: "raw", Value: estree.String(" ")},
+			})
 		} else {
 			convertedChildren[index] = child
 		}

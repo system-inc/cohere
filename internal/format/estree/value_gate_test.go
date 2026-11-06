@@ -56,7 +56,7 @@ func TestNoValueIsConvertedToAnEmptyInterface(test *testing.T) {
 	}
 	test.Logf("scanned %d files in %d packages, tests included", files, len(loaded))
 	if !declared {
-		test.Log("estree declares no Value yet, so no package under internal/format can convert one")
+		test.Fatal("estree declares no Value, so the gate would pass finding nothing to look for")
 	}
 	for _, found := range valueConversions(loaded, estreePackagePath) {
 		test.Errorf("%s: %s", found.position, found.description)

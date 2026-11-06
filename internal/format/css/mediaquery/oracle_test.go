@@ -397,7 +397,7 @@ func dumpMediaQuery(parameters string) (any, error) {
 	return result, decodeError
 }
 
-func dumpMediaQueryValue(value any, offsets []int) any {
+func dumpMediaQueryValue(value estree.Value, offsets []int) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -413,7 +413,7 @@ func dumpMediaQueryValue(value any, offsets []int) any {
 			result[key] = dumpMediaQueryValue(typed.Get(key), offsets)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no library field holds"
 		}
@@ -422,14 +422,16 @@ func dumpMediaQueryValue(value any, offsets []int) any {
 			result[index] = dumpMediaQueryValue(child, offsets)
 		}
 		return result
-	case int:
-		// Only sourceIndex is an int: a byte offset here, a UTF-16 index there.
-		if typed < 0 || typed >= len(offsets) {
+	case estree.Integer:
+		// Only sourceIndex is an Integer: a byte offset here, a UTF-16 index there.
+		if typed < 0 || int(typed) >= len(offsets) {
 			return fmt.Sprintf("an offset %d outside the input", typed)
 		}
 		return offsets[typed]
-	case string, bool:
-		return typed
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}

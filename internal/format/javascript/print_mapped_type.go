@@ -10,10 +10,10 @@ import (
 // Flow's ObjectTypeMappedTypeProperty and are not ported.
 
 // printTypeScriptMappedTypeModifier is upstream's printTypeScriptMappedTypeModifier. The token is
-// `true`, "+" or "-" in the tree, so it arrives as the raw value.
-func printTypeScriptMappedTypeModifier(tokenNode any, keyword string) string {
-	if token, isString := tokenNode.(string); isString && (token == "+" || token == "-") {
-		return token + keyword
+// `true`, "+" or "-" in the tree, so it arrives as the property's value.
+func printTypeScriptMappedTypeModifier(tokenNode estree.Value, keyword string) string {
+	if token, isString := tokenNode.(estree.String); isString && (token == "+" || token == "-") {
+		return string(token) + keyword
 	}
 
 	return keyword

@@ -505,8 +505,8 @@ func handleUnionTypeComments(context *commentContext) bool {
 		context.Following
 	if isUnionType(enclosingNode) {
 		if isPrettierIgnoreComment(comment) {
-			followingNode.Set("prettierIgnore", true)
-			comment.Set("unignore", true)
+			followingNode.Set("prettierIgnore", estree.Boolean(true))
+			comment.Set("unignore", estree.Boolean(true))
 		}
 		if precedingNode != nil {
 			printing.AddTrailingComment(precedingNode, comment)
@@ -516,8 +516,8 @@ func handleUnionTypeComments(context *commentContext) bool {
 	}
 
 	if isUnionType(followingNode) && isPrettierIgnoreComment(comment) {
-		followingNode.List("types")[0].Set("prettierIgnore", true)
-		comment.Set("unignore", true)
+		followingNode.List("types")[0].Set("prettierIgnore", estree.Boolean(true))
+		comment.Set("unignore", estree.Boolean(true))
 	}
 
 	return false
@@ -530,8 +530,8 @@ func handleMatchOrPatternComments(context *commentContext) bool {
 		context.Following
 	if enclosingNode != nil && enclosingNode.Is("MatchOrPattern") {
 		if isPrettierIgnoreComment(comment) {
-			followingNode.Set("prettierIgnore", true)
-			comment.Set("unignore", true)
+			followingNode.Set("prettierIgnore", estree.Boolean(true))
+			comment.Set("unignore", estree.Boolean(true))
 		}
 		if precedingNode != nil {
 			printing.AddTrailingComment(precedingNode, comment)
@@ -543,8 +543,8 @@ func handleMatchOrPatternComments(context *commentContext) bool {
 	if followingNode != nil &&
 		followingNode.Is("MatchOrPattern") &&
 		isPrettierIgnoreComment(comment) {
-		followingNode.List("types")[0].Set("prettierIgnore", true)
-		comment.Set("unignore", true)
+		followingNode.List("types")[0].Set("prettierIgnore", estree.Boolean(true))
+		comment.Set("unignore", estree.Boolean(true))
 	}
 
 	return false
@@ -566,7 +566,7 @@ func handleOnlyComments(context *commentContext) bool {
 		context.IsLastComment
 	// With Flow the enclosingNode is undefined so use the AST instead.
 	// `ast?.body?.length === 0`: body must be present and an array.
-	if body, isList := ast.Get("body").([]Node); isList && len(body) == 0 {
+	if body, isList := ast.Get("body").(estree.Nodes); isList && len(body) == 0 {
 		if isLastComment {
 			printing.AddDanglingComment(ast, comment, "")
 		} else {

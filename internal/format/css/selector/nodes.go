@@ -29,52 +29,64 @@ const (
 	typeUniversal  = "universal"
 )
 
-// newSelectorNode is node.js's constructor followed by the subclass's: opts are the options object's
+// newSelectorNode is node.js's constructor followed by the subclass's: options are the options object's
 // keys and values in order.
-func newSelectorNode(nodeType string, options ...any) *estree.Node {
-	node := estree.New(nodeType, 0, 0, options...)
+func newSelectorNode(nodeType string, options []estree.Property) *estree.Node {
+	node := estree.New(nodeType, 0, 0, options)
 	// Prettier's parser never passes opts.spaces, so before and after are always the '' defaults.
-	node.Set("spaces", map[string]any{"before": "", "after": ""})
+	node.Set("spaces", estree.Record{"before": estree.String(""), "after": estree.String("")})
 	switch nodeType {
 	case typeRoot, typeSelector, typePseudo:
 		// container.js: if (!this.nodes) this.nodes = [].
 		if node.Get("nodes") == nil {
-			node.Set("nodes", []*estree.Node{})
+			node.Set("nodes", estree.Nodes{})
 		}
 	case typeNesting:
-		node.Set("value", "&")
+		node.Set("value", estree.String("&"))
 	case typeUniversal:
-		node.Set("value", "*")
+		node.Set("value", estree.String("*"))
 	case typeAttribute:
-		node.Set("raws", map[string]any{})
+		node.Set("raws", estree.Record{})
 	}
 	return node
 }
 
-// source is the {start: {line, column}, end: {line, column}} object the parser passes as opts.source.
-// Each is an int, except where splitWord reads past a space token: nil for undefined, or NaN.
-func source(startLine any, startColumn any, endLine any, endColumn any) map[string]any {
-	return map[string]any{
-		"start": map[string]any{"line": startLine, "column": startColumn},
-		"end":   map[string]any{"line": endLine, "column": endColumn},
+// source is the {start: {line, column}, end: {line, column}} object the parser passes as opts.source,
+// from a token's fields.
+func source(startLine int, startColumn int, endLine int, endColumn int) estree.Record {
+	return looseSource(estree.Integer(startLine), estree.Integer(startColumn), estree.Integer(endLine),
+		estree.Integer(endColumn))
+}
+
+// looseSource is source where splitWord or pseudo reads past a space token: each field an Integer, nil for
+// undefined, or NaN.
+func looseSource(
+	startLine estree.Value,
+	startColumn estree.Value,
+	endLine estree.Value,
+	endColumn estree.Value,
+) estree.Record {
+	return estree.Record{
+		"start": estree.Record{"line": startLine, "column": startColumn},
+		"end":   estree.Record{"line": endLine, "column": endColumn},
 	}
 }
 
 // sourceOf is node.source, mutated in place where the parser moves a start or an end.
-func sourceOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("source").(map[string]any)
+func sourceOf(node *estree.Node) estree.Record {
+	value, _ := node.Get("source").(estree.Record)
 	return value
 }
 
 // spacesOf is node.spaces.
-func spacesOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("spaces").(map[string]any)
+func spacesOf(node *estree.Node) estree.Record {
+	value, _ := node.Get("spaces").(estree.Record)
 	return value
 }
 
 // rawsOf is attribute.raws.
-func rawsOf(node *estree.Node) map[string]any {
-	value, _ := node.Get("raws").(map[string]any)
+func rawsOf(node *estree.Node) estree.Record {
+	value, _ := node.Get("raws").(estree.Record)
 	return value
 }
 

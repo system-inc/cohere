@@ -128,7 +128,7 @@ func isDetachedRulesetDeclarationNode(node *estree.Node) bool {
 	if !estree.IsTruthy(selector) {
 		return false
 	}
-	if text, isString := selector.(string); isString {
+	if text, isString := asString(selector); isString {
 		return detachedRulesetDeclarationPattern.MatchString(text)
 	}
 	selectorNode, _ := selector.(*estree.Node)
@@ -229,7 +229,7 @@ func hasParensAroundNode(node *estree.Node) bool {
 }
 
 func hasEmptyRawBefore(node *estree.Node) bool {
-	before, isString := rawsOf(node)["before"].(string)
+	before, isString := asString(rawsOf(node)["before"])
 	return isString && before == ""
 }
 
@@ -311,11 +311,11 @@ func isScssMapItemNode(path *astPath, options *printerOptions) bool {
 
 // arrayLength is value.length for a groups or nodes array, whichever element type it holds (a url()
 // argument the value parser cannot handle leaves a string among the groups), and 0 for anything else.
-func arrayLength(value any) int {
+func arrayLength(value estree.Value) int {
 	switch typed := value.(type) {
-	case []*estree.Node:
+	case estree.Nodes:
 		return len(typed)
-	case []any:
+	case estree.Values:
 		return len(typed)
 	}
 	return 0

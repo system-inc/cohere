@@ -76,11 +76,11 @@ func wellFormedTree(node *estree.Node) {
 	}
 }
 
-func wellFormedValue(value any) any {
+func wellFormedValue(value estree.Value) estree.Value {
 	switch typed := value.(type) {
-	case string:
-		return wellFormed(typed)
-	case map[string]any:
+	case estree.String:
+		return estree.String(wellFormed(string(typed)))
+	case estree.Record:
 		for key, each := range typed {
 			typed[key] = wellFormedValue(each)
 		}
@@ -88,7 +88,7 @@ func wellFormedValue(value any) any {
 	case *estree.Node:
 		wellFormedTree(typed)
 		return typed
-	case []*estree.Node:
+	case estree.Nodes:
 		for _, child := range typed {
 			wellFormedTree(child)
 		}

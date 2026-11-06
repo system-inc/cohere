@@ -16,16 +16,18 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 	if node.Kind == ast.KindMethodDeclaration {
 		asterisk = node.AsMethodDeclaration().AsteriskToken != nil
 	}
-	method := converter.createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
-		"async", hasModifier(ast.KindAsyncKeyword, node),
-		"body", converter.convertChild(body, nil),
-		"declare", false,
-		"expression", false,
-		"generator", asterisk,
-		"id", nil,
-		"params", noNodes,
-		"returnType", converter.returnType(node),
-		"typeParameters", converter.convertTypeParameters(node))
+	methodRange := [2]int{node.ParameterList().Pos() - 1, node.End()}
+	method := converter.createNodeWithRange(functionType, methodRange, []Property{
+		{"async", Boolean(hasModifier(ast.KindAsyncKeyword, node))},
+		{"body", converter.convertChild(body, nil)},
+		{"declare", Boolean(false)},
+		{"expression", Boolean(false)},
+		{"generator", Boolean(asterisk)},
+		{"id", nil},
+		{"params", noNodes},
+		{"returnType", converter.returnType(node)},
+		{"typeParameters", converter.convertTypeParameters(node)},
+	})
 	if typeParameters := method.Child("typeParameters"); typeParameters != nil {
 		fixParentLocation(method, typeParameters.Range)
 	}
@@ -33,14 +35,15 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 	var result *Node
 	if parent.Kind == ast.KindObjectLiteralExpression {
 		method.Set("params", converter.convertChildren(converter.parameterList(node), nil))
-		result = converter.createNode(node, "Property",
-			"computed", isComputedProperty(node.Name()),
-			"key", converter.convertChild(node.Name(), nil),
-			"kind", "init",
-			"method", node.Kind == ast.KindMethodDeclaration,
-			"optional", isOptional(node),
-			"shorthand", false,
-			"value", method)
+		result = converter.createNode(node, "Property", []Property{
+			{"computed", Boolean(isComputedProperty(node.Name()))},
+			{"key", converter.convertChild(node.Name(), nil)},
+			{"kind", String("init")},
+			{"method", Boolean(node.Kind == ast.KindMethodDeclaration)},
+			{"optional", Boolean(isOptional(node))},
+			{"shorthand", Boolean(false)},
+			{"value", method},
+		})
 	} else {
 		isAbstract := hasModifier(ast.KindAbstractKeyword, node)
 		method.Set("params", converter.convertParameters(converter.parameterList(node)))
@@ -48,26 +51,27 @@ func (converter *Converter) convertMethod(node *ast.Node, parent *ast.Node) *Nod
 		if isAbstract {
 			methodDefinitionType = "TSAbstractMethodDefinition"
 		}
-		result = converter.createNode(node, methodDefinitionType,
-			"accessibility", getTsNodeAccessibility(node),
-			"computed", isComputedProperty(node.Name()),
-			"decorators", converter.convertChildren(decorators(node), nil),
-			"key", converter.convertChild(node.Name(), nil),
-			"kind", "method",
-			"optional", isOptional(node),
-			"override", hasModifier(ast.KindOverrideKeyword, node),
-			"static", hasModifier(ast.KindStaticKeyword, node),
-			"value", method)
+		result = converter.createNode(node, methodDefinitionType, []Property{
+			{"accessibility", getTsNodeAccessibility(node)},
+			{"computed", Boolean(isComputedProperty(node.Name()))},
+			{"decorators", converter.convertChildren(decorators(node), nil)},
+			{"key", converter.convertChild(node.Name(), nil)},
+			{"kind", String("method")},
+			{"optional", Boolean(isOptional(node))},
+			{"override", Boolean(hasModifier(ast.KindOverrideKeyword, node))},
+			{"static", Boolean(hasModifier(ast.KindStaticKeyword, node))},
+			{"value", method},
+		})
 	}
 
 	switch {
 	case node.Kind == ast.KindGetAccessor:
-		result.Set("kind", "get")
+		result.Set("kind", String("get"))
 	case node.Kind == ast.KindSetAccessor:
-		result.Set("kind", "set")
+		result.Set("kind", String("set"))
 	case !result.Bool("static") && node.Name().Kind == ast.KindStringLiteral && node.Name().Text() == "constructor" &&
 		result.Type() != "Property":
-		result.Set("kind", "constructor")
+		result.Set("kind", String("constructor"))
 	}
 	return result
 }
@@ -87,25 +91,32 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 	if body == nil {
 		functionType = "TSEmptyBodyFunctionExpression"
 	}
-	constructor := converter.createNodeWithRange(functionType, [2]int{node.ParameterList().Pos() - 1, node.End()},
-		"async", false,
-		"body", converter.convertChild(body, nil),
-		"declare", false,
-		"expression", false,
-		"generator", false,
-		"id", nil,
-		"params", converter.convertParameters(converter.parameterList(node)),
-		"returnType", converter.returnType(node),
-		"typeParameters", converter.convertTypeParameters(node))
+	constructorRange := [2]int{node.ParameterList().Pos() - 1, node.End()}
+	constructor := converter.createNodeWithRange(functionType, constructorRange, []Property{
+		{"async", Boolean(false)},
+		{"body", converter.convertChild(body, nil)},
+		{"declare", Boolean(false)},
+		{"expression", Boolean(false)},
+		{"generator", Boolean(false)},
+		{"id", nil},
+		{"params", converter.convertParameters(converter.parameterList(node))},
+		{"returnType", converter.returnType(node)},
+		{"typeParameters", converter.convertTypeParameters(node)},
+	})
 	if typeParameters := constructor.Child("typeParameters"); typeParameters != nil {
 		fixParentLocation(constructor, typeParameters.Range)
 	}
 
 	var constructorKey *Node
 	if constructorToken.kind == ast.KindStringLiteral {
-		constructorKey = converter.createNodeWithRange("Literal", [2]int{constructorToken.start, constructorToken.end},
-			"raw", converter.text[constructorToken.start:constructorToken.end],
-			"value", "constructor")
+		constructorKey = converter.createNodeWithRange(
+			"Literal",
+			[2]int{constructorToken.start, constructorToken.end},
+			[]Property{
+				{"raw", String(converter.text[constructorToken.start:constructorToken.end])},
+				{"value", String("constructor")},
+			},
+		)
 	} else {
 		constructorKey = converter.identifierNode([2]int{constructorToken.start, constructorToken.end}, "constructor")
 	}
@@ -119,16 +130,17 @@ func (converter *Converter) convertConstructor(node *ast.Node) *Node {
 	if isStatic {
 		kind = "method"
 	}
-	return converter.createNode(node, methodType,
-		"accessibility", getTsNodeAccessibility(node),
-		"computed", false,
-		"decorators", noNodes,
-		"key", constructorKey,
-		"kind", kind,
-		"optional", false,
-		"override", false,
-		"static", isStatic,
-		"value", constructor)
+	return converter.createNode(node, methodType, []Property{
+		{"accessibility", getTsNodeAccessibility(node)},
+		{"computed", Boolean(false)},
+		{"decorators", noNodes},
+		{"key", constructorKey},
+		{"kind", String(kind)},
+		{"optional", Boolean(false)},
+		{"override", Boolean(false)},
+		{"static", Boolean(isStatic)},
+		{"value", constructor},
+	})
 }
 
 // convertBindingElement is upstream's BindingElement case.
@@ -137,20 +149,22 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 	if parent.Kind == ast.KindArrayBindingPattern {
 		arrayItem := converter.convertChild(node.Name(), parent)
 		if element.Initializer != nil {
-			return converter.createNode(node, "AssignmentPattern",
-				"decorators", noNodes,
-				"left", arrayItem,
-				"optional", false,
-				"right", converter.convertChild(element.Initializer, nil),
-				"typeAnnotation", nil)
+			return converter.createNode(node, "AssignmentPattern", []Property{
+				{"decorators", noNodes},
+				{"left", arrayItem},
+				{"optional", Boolean(false)},
+				{"right", converter.convertChild(element.Initializer, nil)},
+				{"typeAnnotation", nil},
+			})
 		}
 		if element.DotDotDotToken != nil {
-			return converter.createNode(node, "RestElement",
-				"argument", arrayItem,
-				"decorators", noNodes,
-				"optional", false,
-				"typeAnnotation", nil,
-				"value", nil)
+			return converter.createNode(node, "RestElement", []Property{
+				{"argument", arrayItem},
+				{"decorators", noNodes},
+				{"optional", Boolean(false)},
+				{"typeAnnotation", nil},
+				{"value", nil},
+			})
 		}
 		return arrayItem
 	}
@@ -161,40 +175,41 @@ func (converter *Converter) convertBindingElement(node *ast.Node, parent *ast.No
 		if argument == nil {
 			argument = node.Name()
 		}
-		result = converter.createNode(node, "RestElement",
-			"argument", converter.convertChild(argument, nil),
-			"decorators", noNodes,
-			"optional", false,
-			"typeAnnotation", nil,
-			"value", nil)
+		result = converter.createNode(node, "RestElement", []Property{
+			{"argument", converter.convertChild(argument, nil)},
+			{"decorators", noNodes},
+			{"optional", Boolean(false)},
+			{"typeAnnotation", nil},
+			{"value", nil},
+		})
 	} else {
 		key := element.PropertyName
 		if key == nil {
 			key = node.Name()
 		}
-		result = converter.createNode(node, "Property",
-			"computed", element.PropertyName != nil && element.PropertyName.Kind == ast.KindComputedPropertyName,
-			"key", converter.convertChild(key, nil),
-			"kind", "init",
-			"method", false,
-			"optional", false,
-			"shorthand", element.PropertyName == nil,
-			"value", converter.convertChild(node.Name(), nil))
+		result = converter.createNode(node, "Property", []Property{
+			{"computed", Boolean(
+				element.PropertyName != nil && element.PropertyName.Kind == ast.KindComputedPropertyName,
+			)},
+			{"key", converter.convertChild(key, nil)},
+			{"kind", String("init")},
+			{"method", Boolean(false)},
+			{"optional", Boolean(false)},
+			{"shorthand", Boolean(element.PropertyName == nil)},
+			{"value", converter.convertChild(node.Name(), nil)},
+		})
 	}
 	if element.Initializer != nil {
 		result.Set("value", converter.createNodeWithRange(
 			"AssignmentPattern",
 			[2]int{converter.getStart(node.Name()), element.Initializer.End()},
-			"decorators",
-			noNodes,
-			"left",
-			converter.convertChild(node.Name(), nil),
-			"optional",
-			false,
-			"right",
-			converter.convertChild(element.Initializer, nil),
-			"typeAnnotation",
-			nil,
+			[]Property{
+				{"decorators", noNodes},
+				{"left", converter.convertChild(node.Name(), nil)},
+				{"optional", Boolean(false)},
+				{"right", converter.convertChild(element.Initializer, nil)},
+				{"typeAnnotation", nil},
+			},
 		))
 	}
 	return result
@@ -207,28 +222,26 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 	var result *Node
 	switch {
 	case declaration.DotDotDotToken != nil:
-		parameter = converter.createNode(node, "RestElement",
-			"argument", converter.convertChild(node.Name(), nil),
-			"decorators", noNodes,
-			"optional", false,
-			"typeAnnotation", nil,
-			"value", nil)
+		parameter = converter.createNode(node, "RestElement", []Property{
+			{"argument", converter.convertChild(node.Name(), nil)},
+			{"decorators", noNodes},
+			{"optional", Boolean(false)},
+			{"typeAnnotation", nil},
+			{"value", nil},
+		})
 		result = parameter
 	case declaration.Initializer != nil:
 		parameter = converter.convertChild(node.Name(), nil)
 		result = converter.createNodeWithRange(
 			"AssignmentPattern",
 			[2]int{converter.getStart(node.Name()), declaration.Initializer.End()},
-			"decorators",
-			noNodes,
-			"left",
-			parameter,
-			"optional",
-			false,
-			"right",
-			converter.convertChild(declaration.Initializer, nil),
-			"typeAnnotation",
-			nil,
+			[]Property{
+				{"decorators", noNodes},
+				{"left", parameter},
+				{"optional", Boolean(false)},
+				{"right", converter.convertChild(declaration.Initializer, nil)},
+				{"typeAnnotation", nil},
+			},
 		)
 		if len(modifiers(node)) > 0 {
 			// AssignmentPattern should not contain modifiers in range
@@ -248,16 +261,17 @@ func (converter *Converter) convertParameter(node *ast.Node, parent *ast.Node) *
 		if declaration.QuestionToken.End() > parameter.Range[1] {
 			parameter.Range[1] = declaration.QuestionToken.End()
 		}
-		parameter.Set("optional", true)
+		parameter.Set("optional", Boolean(true))
 	}
 	if len(modifiers(node)) > 0 {
-		return converter.createNode(node, "TSParameterProperty",
-			"accessibility", getTsNodeAccessibility(node),
-			"decorators", noNodes,
-			"override", hasModifier(ast.KindOverrideKeyword, node),
-			"parameter", result,
-			"readonly", hasModifier(ast.KindReadonlyKeyword, node),
-			"static", hasModifier(ast.KindStaticKeyword, node))
+		return converter.createNode(node, "TSParameterProperty", []Property{
+			{"accessibility", getTsNodeAccessibility(node)},
+			{"decorators", noNodes},
+			{"override", Boolean(hasModifier(ast.KindOverrideKeyword, node))},
+			{"parameter", result},
+			{"readonly", Boolean(hasModifier(ast.KindReadonlyKeyword, node))},
+			{"static", Boolean(hasModifier(ast.KindStaticKeyword, node))},
+		})
 	}
 	return result
 }
@@ -297,17 +311,19 @@ func (converter *Converter) convertClass(node *ast.Node) *Node {
 	if extendsClause != nil && len(extendsClause.Types.Nodes) > 0 {
 		superClass = converter.convertChild(extendsClause.Types.Nodes[0].Expression(), nil)
 	}
-	result := converter.createNode(node, classType,
-		"abstract", hasModifier(ast.KindAbstractKeyword, node),
-		"body", converter.createNodeWithRange("ClassBody", [2]int{classLike.Members.Pos() - 1, node.End()},
-			"body", converter.convertChildren(members, nil)),
-		"declare", hasModifier(ast.KindDeclareKeyword, node),
-		"decorators", converter.convertChildren(decorators(node), nil),
-		"id", converter.convertChild(node.Name(), nil),
-		"implements", converter.convertChildren(implements, nil),
-		"superClass", superClass,
-		"superTypeArguments", nil,
-		"typeParameters", converter.convertTypeParameters(node))
+	result := converter.createNode(node, classType, []Property{
+		{"abstract", Boolean(hasModifier(ast.KindAbstractKeyword, node))},
+		{"body", converter.createNodeWithRange("ClassBody", [2]int{classLike.Members.Pos() - 1, node.End()}, []Property{
+			{"body", converter.convertChildren(members, nil)},
+		})},
+		{"declare", Boolean(hasModifier(ast.KindDeclareKeyword, node))},
+		{"decorators", converter.convertChildren(decorators(node), nil)},
+		{"id", converter.convertChild(node.Name(), nil)},
+		{"implements", converter.convertChildren(implements, nil)},
+		{"superClass", superClass},
+		{"superTypeArguments", nil},
+		{"typeParameters", converter.convertTypeParameters(node)},
+	})
 	if extendsClause != nil &&
 		len(extendsClause.Types.Nodes) > 0 &&
 		extendsClause.Types.Nodes[0].TypeArgumentList() != nil {
@@ -320,21 +336,22 @@ func (converter *Converter) convertClass(node *ast.Node) *Node {
 func (converter *Converter) convertImportDeclaration(node *ast.Node) *Node {
 	declaration := node.AsImportDeclaration()
 	phase := importClausePhase(declaration.ImportClause)
-	var phaseValue any
+	var phaseValue Value
 	if phase == "defer" {
-		phaseValue = "defer"
+		phaseValue = String("defer")
 	}
-	specifiers := []*Node{}
-	result := converter.createNode(node, "ImportDeclaration",
-		"attributes", converter.convertImportAttributes(declaration.Attributes),
-		"importKind", "value",
-		"phase", phaseValue,
-		"source", converter.convertChild(declaration.ModuleSpecifier, nil),
-		"specifiers", specifiers)
+	specifiers := Nodes{}
+	result := converter.createNode(node, "ImportDeclaration", []Property{
+		{"attributes", converter.convertImportAttributes(declaration.Attributes)},
+		{"importKind", String("value")},
+		{"phase", phaseValue},
+		{"source", converter.convertChild(declaration.ModuleSpecifier, nil)},
+		{"specifiers", specifiers},
+	})
 	if declaration.ImportClause != nil {
 		clause := declaration.ImportClause.AsImportClause()
 		if phase == "type" {
-			result.Set("importKind", "type")
+			result.Set("importKind", String("type"))
 		}
 		if declaration.ImportClause.Name() != nil {
 			specifiers = append(specifiers, converter.convertChild(declaration.ImportClause, nil))
@@ -382,18 +399,19 @@ func (converter *Converter) convertImportType(node *ast.Node) *Node {
 	var options *Node
 	if importType.Attributes != nil {
 		attributes := importType.Attributes.AsImportAttributes()
-		var properties []*Node
+		var properties Nodes
 		for _, attribute := range attributes.Attributes.Nodes {
-			properties = append(properties, converter.createNode(attribute, "Property",
-				"computed", false,
-				"key", converter.convertChild(attribute.Name(), nil),
-				"kind", "init",
-				"method", false,
-				"optional", false,
-				"shorthand", false,
-				"value", converter.convertChild(attribute.AsImportAttribute().Value, nil)))
+			properties = append(properties, converter.createNode(attribute, "Property", []Property{
+				{"computed", Boolean(false)},
+				{"key", converter.convertChild(attribute.Name(), nil)},
+				{"kind", String("init")},
+				{"method", Boolean(false)},
+				{"optional", Boolean(false)},
+				{"shorthand", Boolean(false)},
+				{"value", converter.convertChild(attribute.AsImportAttribute().Value, nil)},
+			}))
 		}
-		value := converter.createNode(importType.Attributes, "ObjectExpression", "properties", properties)
+		value := converter.createNode(importType.Attributes, "ObjectExpression", []Property{{"properties", properties}})
 		comma := converter.tokenAt(importType.Argument.End())
 		openBrace := converter.tokenAt(comma.end)
 		afterAttributes := converter.tokenAt(importType.Attributes.End())
@@ -409,29 +427,40 @@ func (converter *Converter) convertImportType(node *ast.Node) *Node {
 		options = converter.createNodeWithRange(
 			"ObjectExpression",
 			[2]int{openBrace.start, closeBrace.end},
-			"properties",
-			[]*Node{converter.createNodeWithRange("Property", [2]int{withOrAssert.start, importType.Attributes.End()},
-				"computed", false,
-				"key", converter.identifierNode([2]int{withOrAssert.start, withOrAssert.end}, withOrAssertName),
-				"kind", "init",
-				"method", false,
-				"optional", false,
-				"shorthand", false,
-				"value", value)},
+			[]Property{
+				{"properties", Nodes{converter.createNodeWithRange(
+					"Property",
+					[2]int{withOrAssert.start, importType.Attributes.End()},
+					[]Property{
+						{"computed", Boolean(false)},
+						{"key", converter.identifierNode(
+							[2]int{withOrAssert.start, withOrAssert.end},
+							withOrAssertName,
+						)},
+						{"kind", String("init")},
+						{"method", Boolean(false)},
+						{"optional", Boolean(false)},
+						{"shorthand", Boolean(false)},
+						{"value", value},
+					},
+				)}},
+			},
 		)
 	}
 
 	argument := converter.convertChild(importType.Argument, nil)
 	typeArguments := converter.convertTypeArguments(node)
-	result := converter.createNodeWithRange("TSImportType", nodeRange,
-		"options", options,
-		"qualifier", converter.convertChild(importType.Qualifier, nil),
-		"source", argument.Child("literal"),
-		"typeArguments", typeArguments)
+	result := converter.createNodeWithRange("TSImportType", nodeRange, []Property{
+		{"options", options},
+		{"qualifier", converter.convertChild(importType.Qualifier, nil)},
+		{"source", argument.Child("literal")},
+		{"typeArguments", typeArguments},
+	})
 	if importType.IsTypeOf {
-		return converter.createNode(node, "TSTypeQuery",
-			"exprName", result,
-			"typeArguments", nil)
+		return converter.createNode(node, "TSTypeQuery", []Property{
+			{"exprName", result},
+			{"typeArguments", nil},
+		})
 	}
 	return result
 }
@@ -441,23 +470,23 @@ func (converter *Converter) convertModuleDeclaration(node *ast.Node) *Node {
 	module := node.AsModuleDeclaration()
 	isDeclare := hasModifier(ast.KindDeclareKeyword, node)
 	isGlobal := module.Keyword == ast.KindGlobalKeyword
-	result := converter.createNode(node, "TSModuleDeclaration")
+	result := converter.createNode(node, "TSModuleDeclaration", nil)
 
 	switch {
 	case isGlobal:
 		result.Set("body", converter.convertChild(module.Body, nil))
-		result.Set("declare", false)
-		result.Set("global", false)
+		result.Set("declare", Boolean(false))
+		result.Set("global", Boolean(false))
 		result.Set("id", converter.convertChild(node.Name(), nil))
-		result.Set("kind", "global")
+		result.Set("kind", String("global"))
 	case node.Name().Kind == ast.KindStringLiteral:
 		body := converter.convertChild(module.Body, nil)
-		result.Set("kind", "module")
+		result.Set("kind", String("module"))
 		if body != nil {
 			result.Set("body", body)
 		}
-		result.Set("declare", false)
-		result.Set("global", false)
+		result.Set("declare", Boolean(false))
+		result.Set("global", Boolean(false))
 		result.Set("id", converter.convertChild(node.Name(), nil))
 	default:
 		innermost := node
@@ -469,24 +498,25 @@ func (converter *Converter) convertModuleDeclaration(node *ast.Node) *Node {
 			isDeclare = isDeclare || hasModifier(ast.KindDeclareKeyword, innermost)
 			nextName := innermost.Name()
 			right := converter.identifierNode([2]int{converter.getStart(nextName), nextName.End()}, nextName.Text())
-			name = converter.createNodeWithRange("TSQualifiedName", [2]int{name.Range[0], right.Range[1]},
-				"left", name,
-				"right", right)
+			name = converter.createNodeWithRange("TSQualifiedName", [2]int{name.Range[0], right.Range[1]}, []Property{
+				{"left", name},
+				{"right", right},
+			})
 		}
 		kind := "module"
 		if innermost.AsModuleDeclaration().Keyword == ast.KindNamespaceKeyword {
 			kind = "namespace"
 		}
 		result.Set("body", converter.convertChild(innermost.Body(), nil))
-		result.Set("declare", false)
-		result.Set("global", false)
+		result.Set("declare", Boolean(false))
+		result.Set("global", Boolean(false))
 		result.Set("id", name)
-		result.Set("kind", kind)
+		result.Set("kind", String(kind))
 	}
 
-	result.Set("declare", isDeclare)
+	result.Set("declare", Boolean(isDeclare))
 	if isGlobal {
-		result.Set("global", true)
+		result.Set("global", Boolean(true))
 	}
 	return converter.fixExports(node, result)
 }
@@ -496,7 +526,7 @@ func (converter *Converter) convertBinary(node *ast.Node) *Node {
 	binary := node.AsBinaryExpression()
 	operatorKind := binary.OperatorToken.Kind
 	if operatorKind == ast.KindCommaToken {
-		expressions := []*Node{}
+		expressions := Nodes{}
 		left := converter.convertChild(binary.Left, nil)
 		if left.Is("SequenceExpression") && binary.Left.Kind != ast.KindParenthesizedExpression {
 			expressions = append(expressions, left.List("expressions")...)
@@ -504,22 +534,24 @@ func (converter *Converter) convertBinary(node *ast.Node) *Node {
 			expressions = append(expressions, left)
 		}
 		expressions = append(expressions, converter.convertChild(binary.Right, nil))
-		return converter.createNode(node, "SequenceExpression", "expressions", expressions)
+		return converter.createNode(node, "SequenceExpression", []Property{{"expressions", expressions}})
 	}
 
 	expressionType, operator := binaryExpressionType(operatorKind)
 	if converter.allowPattern && expressionType == "AssignmentExpression" {
-		return converter.createNode(node, "AssignmentPattern",
-			"decorators", noNodes,
-			"left", converter.convertPattern(binary.Left, node),
-			"optional", false,
-			"right", converter.convertChild(binary.Right, nil),
-			"typeAnnotation", nil)
+		return converter.createNode(node, "AssignmentPattern", []Property{
+			{"decorators", noNodes},
+			{"left", converter.convertPattern(binary.Left, node)},
+			{"optional", Boolean(false)},
+			{"right", converter.convertChild(binary.Right, nil)},
+			{"typeAnnotation", nil},
+		})
 	}
-	return converter.createNode(node, expressionType,
-		"operator", operator,
-		"left", converter.converter(binary.Left, node, expressionType == "AssignmentExpression"),
-		"right", converter.convertChild(binary.Right, nil))
+	return converter.createNode(node, expressionType, []Property{
+		{"operator", String(operator)},
+		{"left", converter.converter(binary.Left, node, expressionType == "AssignmentExpression")},
+		{"right", converter.convertChild(binary.Right, nil)},
+	})
 }
 
 // binaryExpressionType is upstream's getBinaryExpressionType.

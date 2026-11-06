@@ -471,7 +471,7 @@ func dumpValues(text string, options Options) (any, error) {
 	return result, decodeError
 }
 
-func dumpValuesValue(value any, toUtf16 func(int) int) any {
+func dumpValuesValue(value estree.Value, toUtf16 func(int) int) any {
 	switch typed := value.(type) {
 	case nil:
 		return "<undefined>"
@@ -482,18 +482,18 @@ func dumpValuesValue(value any, toUtf16 func(int) int) any {
 		result := map[string]any{"type": typed.Type()}
 		for _, key := range typed.Keys() {
 			if key == "sourceIndex" {
-				index, isInt := typed.Get(key).(int)
+				index, isInt := typed.Get(key).(estree.Integer)
 				if !isInt {
 					result[key] = fmt.Sprintf("a sourceIndex of type %T", typed.Get(key))
 					continue
 				}
-				result[key] = toUtf16(index)
+				result[key] = toUtf16(int(index))
 				continue
 			}
 			result[key] = dumpValuesValue(typed.Get(key), toUtf16)
 		}
 		return result
-	case []*estree.Node:
+	case estree.Nodes:
 		if typed == nil {
 			return "a nil list, which no field of the library holds"
 		}
@@ -502,19 +502,23 @@ func dumpValuesValue(value any, toUtf16 func(int) int) any {
 			result[index] = dumpValuesValue(child, toUtf16)
 		}
 		return result
-	case map[string]any:
+	case estree.Record:
 		result := map[string]any{}
 		for key, each := range typed {
 			result[key] = dumpValuesValue(each, toUtf16)
 		}
 		return result
-	case float64:
-		if math.IsNaN(typed) {
+	case estree.Number:
+		if math.IsNaN(float64(typed)) {
 			return "NaN"
 		}
-		return typed
-	case string, bool, int:
-		return typed
+		return float64(typed)
+	case estree.String:
+		return string(typed)
+	case estree.Boolean:
+		return bool(typed)
+	case estree.Integer:
+		return int(typed)
 	default:
 		return fmt.Sprintf("an unexpected %T", typed)
 	}

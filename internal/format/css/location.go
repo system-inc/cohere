@@ -95,16 +95,16 @@ func calculateLocEnd(node *estree.Node, text string) (int, bool) {
 			return calculateLocEnd(nodes[len(nodes)-1], text)
 		}
 
-		if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
+		if name, isString := asString(node.Get("name")); node.Type() == "css-atrule" && isString {
 			raws := rawsIn(node)
-			afterName, _ := raws["afterName"].(string)
-			parameters, _ := raws["params"].(string)
+			afterName, _ := asString(raws["afterName"])
+			parameters, _ := asString(raws["params"])
 			return calculateLocStart(node, text) + 1 + len(name) + len(afterName) + len(parameters), true
 		}
 	}
 
 	if sourceIndex, isNumber := numberProperty(node, "sourceIndex"); isNumber {
-		if value, isString := node.Get("value").(string); isString {
+		if value, isString := asString(node.Get("value")); isString {
 			return sourceIndex + len(value), true
 		}
 	}
@@ -124,17 +124,17 @@ func calculateNodeLoc(node *estree.Node, text string, rootOffset int, isRootOfTe
 
 	if isRootOfText && hasStringType(node) {
 		source = ensureSource(node)
-		source["startOffset"] = rootOffset
-		source["endOffset"] = rootOffset + len(text)
+		source["startOffset"] = estree.Integer(rootOffset)
+		source["endOffset"] = estree.Integer(rootOffset + len(text))
 	} else if hasStartOffset && hasEndOffset {
 		// Already calculated while walking another view of the same nested tree.
 	} else if source != nil || hasSourceIndex {
 		// The source exists before calculateLocEnd runs, which decides between its branches on it.
 		source = ensureSource(node)
 		maximumEndOffset := rootOffset + len(text)
-		source["startOffset"] = min(calculateLocStart(node, text)+rootOffset, maximumEndOffset)
+		source["startOffset"] = estree.Integer(min(calculateLocStart(node, text)+rootOffset, maximumEndOffset))
 		if endOffset, isNumber := calculateLocEnd(node, text); isNumber {
-			source["endOffset"] = min(endOffset+rootOffset, maximumEndOffset)
+			source["endOffset"] = estree.Integer(min(endOffset+rootOffset, maximumEndOffset))
 		} else {
 			source["endOffset"] = nil
 		}
@@ -187,16 +187,16 @@ func getNestedLoc(parentNode *estree.Node, node *estree.Node, rootOffset int) (s
 
 func getValueRootOffset(node *estree.Node) int {
 	result, _ := numberIn(sourceOf(node), "startOffset")
-	if property, isString := node.Get("prop").(string); isString {
+	if property, isString := asString(node.Get("prop")); isString {
 		result += len(property)
 	}
 
-	if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
-		afterName, _ := rawsIn(node)["afterName"].(string)
+	if name, isString := asString(node.Get("name")); node.Type() == "css-atrule" && isString {
+		afterName, _ := asString(rawsIn(node)["afterName"])
 		result += 1 + len(name) + len(leadingColonAndWhitespace(afterName))
 	}
 
-	if between, isString := rawsIn(node)["between"].(string); node.Type() != "css-atrule" && isString {
+	if between, isString := asString(rawsIn(node)["between"]); node.Type() != "css-atrule" && isString {
 		result += len(between)
 	}
 
@@ -206,8 +206,8 @@ func getValueRootOffset(node *estree.Node) int {
 func getAtRuleParamsRootOffset(node *estree.Node) int {
 	result, _ := numberIn(sourceOf(node), "startOffset")
 
-	if name, isString := node.Get("name").(string); node.Type() == "css-atrule" && isString {
-		afterName, _ := rawsIn(node)["afterName"].(string)
+	if name, isString := asString(node.Get("name")); node.Type() == "css-atrule" && isString {
+		afterName, _ := asString(rawsIn(node)["afterName"])
 		result += 1 + len(name) + len(leadingColonAndWhitespace(afterName))
 	}
 
@@ -224,7 +224,7 @@ func leadingColonAndWhitespace(afterName string) string {
 }
 
 func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string, bool) {
-	if selector, isString := rawsIn(selectorNode)["selector"].(string); isString {
+	if selector, isString := asString(rawsIn(selectorNode)["selector"]); isString {
 		return selector, true
 	}
 
@@ -235,25 +235,25 @@ func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string
 	parentRaws := rawsIn(parentNode)
 
 	if parentNode.Truthy("mixin") {
-		identifier, _ := parentRaws["identifier"].(string)
-		afterName, _ := parentRaws["afterName"].(string)
-		parameters, _ := parentRaws["params"].(string)
+		identifier, _ := asString(parentRaws["identifier"])
+		afterName, _ := asString(parentRaws["afterName"])
+		parameters, _ := asString(parentRaws["params"])
 		return identifier + parentNode.String("name") + afterName + parameters, true
 	}
 
-	if selector, isString := parentRaws["selector"].(string); isString {
+	if selector, isString := asString(parentRaws["selector"]); isString {
 		return selector, true
 	}
 
-	if parameters, isString := parentRaws["params"].(string); parentNode.Truthy("customSelector") && isString {
+	if parameters, isString := asString(parentRaws["params"]); parentNode.Truthy("customSelector") && isString {
 		return trim(sliceJavaScript(parameters, len(parentNode.String("customSelector")), len(parameters))), true
 	}
 
-	if parameters, isString := parentRaws["params"].(string); isString {
+	if parameters, isString := asString(parentRaws["params"]); isString {
 		return parameters, true
 	}
 
-	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {
+	if value, isString := asString(parentRaws["value"]); parentNode.Type() == "css-decl" && isString {
 		if parentNode.Truthy("extend") && strings.HasPrefix(value, "extend(") {
 			return sliceJavaScript(value, len("extend("), len(value)-1), true
 		}
@@ -271,7 +271,7 @@ func getSelectorRootOffset(
 	rootOffset int,
 ) int {
 	if sourceIndex, isNumber := numberProperty(selectorNode, "sourceIndex"); isNumber {
-		if _, isString := rawsIn(selectorNode)["selector"].(string); isString {
+		if _, isString := asString(rawsIn(selectorNode)["selector"]); isString {
 			return rootOffset + sourceIndex
 		}
 	}
@@ -284,15 +284,15 @@ func getSelectorRootOffset(
 
 	parentRaws := rawsIn(parentNode)
 
-	if selector, isString := parentRaws["selector"].(string); isString {
+	if selector, isString := asString(parentRaws["selector"]); isString {
 		return parentStartOffset + getStringOffset(selector, selectorText)
 	}
 
-	if parameters, isString := parentRaws["params"].(string); isString {
+	if parameters, isString := asString(parentRaws["params"]); isString {
 		return getAtRuleParamsRootOffset(parentNode) + getStringOffset(parameters, selectorText)
 	}
 
-	if value, isString := parentRaws["value"].(string); parentNode.Type() == "css-decl" && isString {
+	if value, isString := asString(parentRaws["value"]); parentNode.Type() == "css-decl" && isString {
 		return getValueRootOffset(parentNode) + getStringOffset(value, selectorText)
 	}
 
@@ -324,7 +324,7 @@ func fillLocFromChildren(node *estree.Node) {
 
 	found := false
 	startOffset, endOffset := 0, 0
-	var start, end any
+	var start, end estree.Value
 
 	for _, key := range node.Keys() {
 		if key == "source" || key == "raws" || key == "spaces" {
@@ -356,8 +356,8 @@ func fillLocFromChildren(node *estree.Node) {
 	if found {
 		source = ensureSource(node)
 		if !hasOffsets {
-			source["startOffset"] = startOffset
-			source["endOffset"] = endOffset
+			source["startOffset"] = estree.Integer(startOffset)
+			source["endOffset"] = estree.Integer(endOffset)
 		}
 		// `??=` writes the property even when the value it writes is undefined.
 		if source["start"] == nil {
@@ -381,9 +381,9 @@ func fillEmptyLocFromParent(node *estree.Node, parentNode *estree.Node) {
 		return
 	}
 
-	node.Set("source", map[string]any{
-		"startOffset": parentStartOffset,
-		"endOffset":   parentStartOffset,
+	node.Set("source", estree.Record{
+		"startOffset": estree.Integer(parentStartOffset),
+		"endOffset":   estree.Integer(parentStartOffset),
 		"start":       parentSource["start"],
 		"end":         parentSource["start"],
 	})
@@ -426,7 +426,7 @@ func locEnd(node *estree.Node) int {
 }
 
 // setRanges mirrors every node's startOffset and endOffset into its Range, once calculateLoc is done.
-func setRanges(value any) {
+func setRanges(value estree.Value) {
 	for _, node := range objectChildren(value) {
 		node.Range = [2]int{locStart(node), locEnd(node)}
 		for _, key := range node.Keys() {
@@ -441,7 +441,7 @@ func setRanges(value any) {
 // column. The column is in the library's UTF-16 units and is walked as such from the line's start; a
 // column past the end of the text adds its remainder one byte per unit, as upstream's sum would.
 // Upstream's `text.indexOf("\n", index) + 1` restarts at 0 when a line is missing, and so does this.
-func lineColumnToIndex(lineColumn map[string]any, text string) int {
+func lineColumnToIndex(lineColumn estree.Record, text string) int {
 	line, _ := numberIn(lineColumn, "line")
 	column, _ := numberIn(lineColumn, "column")
 	index := 0
