@@ -1,0 +1,4 @@
+# Words the folder-words rule reads that cspell's lists lack, merged into Words.txt by
+# policy/tools/generate_words/generate_words.mjs. One word a line, lowercase, sorted, each with a `#` reason naming what
+# the word is. A word joins only when a census shows the lists lack it, and the generator refuses one they hold.
+cgo # Go's tool for calling C, https://pkg.go.dev/cmd/cgo
