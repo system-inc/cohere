@@ -1,0 +1,11 @@
+{
+    "why": "fw05: `charset` is a single word in the lists, so it is clean though it splits as `char_set`",
+    "expect": [],
+    "options": {},
+    "path": "charset/fw05",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

@@ -1,0 +1,11 @@
+{
+    "why": "fw06: `workspace` is a single word in the lists, so it is clean though it splits as `work_space`",
+    "expect": [],
+    "options": {},
+    "path": "workspace/fw06",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

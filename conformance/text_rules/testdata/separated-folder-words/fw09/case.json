@@ -1,0 +1,11 @@
+{
+    "why": "fw09: `lowercase` is a single word in the lists, so it is clean though it splits as `lower_case`",
+    "expect": [],
+    "options": {},
+    "path": "lowercase/fw09",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

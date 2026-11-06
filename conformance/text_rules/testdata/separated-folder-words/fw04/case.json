@@ -1,0 +1,15 @@
+{
+    "why": "fw04: a brand-led folder is still judged: the brand `iMessage`, lowercased, is one piece of the split, so `imessagebridge` is reported as `imessage_bridge`, never passed for leading with a brand",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "imessagebridge/fw04",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
