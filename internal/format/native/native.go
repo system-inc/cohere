@@ -23,7 +23,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/arena"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -31,7 +31,7 @@ import (
 //
 // fileName is passed because a printer may need it: Prettier picks json-stringify for package.json by
 // name, not by extension.
-type Print func(fileName string, text string, options formatoptions.Options) (string, error)
+type Print func(fileName string, text string, options format_options.Options) (string, error)
 
 // PrintParsed is a Print that can take a tree of the text someone already parsed, rather than parsing it
 // again, and parses as Print does when the tree is nil or not the one it would build. Only the TypeScript
@@ -40,14 +40,14 @@ type PrintParsed func(
 	fileName string,
 	text string,
 	parsed *ast.SourceFile,
-	options formatoptions.Options,
+	options format_options.Options,
 ) (string, error)
 
 // PrintDoc is a printer's textToDoc (src/main/multiparser.js): the doc for text embedded in another
 // language's file, with the trailing hardline stripped, for the outer printer to lay out at its own
 // indentation. parser is the one the embedding asked for (a fence's language can pick json for a file
 // named anything), parentParser is the outer file's, and textToDoc formats what this text embeds in turn.
-type PrintDoc func(fileName string, text string, options formatoptions.Options, parser string, parentParser string,
+type PrintDoc func(fileName string, text string, options format_options.Options, parser string, parentParser string,
 	textToDoc printing.TextToDoc) (doc.Doc, error)
 
 var (
@@ -126,7 +126,7 @@ var embeddedParsers = map[string]string{
 // docs is the embedding format's slab, which may be nil: a raw doc entry's stripped doc is cleaned into
 // it, so it must outlive the outer format's layout of every doc it returns (#v6ksqg3). Nested embeds
 // share it, since their docs end up in the same outer doc.
-func TextToDoc(options formatoptions.Options, parentParser string, docs *arena.Slab[doc.Doc]) printing.TextToDoc {
+func TextToDoc(options format_options.Options, parentParser string, docs *arena.Slab[doc.Doc]) printing.TextToDoc {
 	return func(text string, parserOrFile string) (doc.Doc, error) {
 		fileName, parser := parserOrFile, parserOrFile
 		if strings.Contains(parserOrFile, ".") {

@@ -7,7 +7,7 @@ import (
 	"sort"
 
 	"github.com/system-inc/cohere/internal/types/program"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // adamicHeld is the program's Adamic `.a` files, cleaned to the form the format scope holds names in
@@ -19,7 +19,7 @@ func adamicHeld(graph *program.Graph) map[string]struct{} {
 		return held
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
-		if fileName := filepath.Clean(sourceFile.FileName().AsString()); sourcename.IsAdamic(fileName) {
+		if fileName := filepath.Clean(sourceFile.FileName().AsString()); source_name.IsAdamic(fileName) {
 			held[fileName] = struct{}{}
 		}
 	}
@@ -38,7 +38,7 @@ func adamicIncluded(configurationFileName string) (map[string]struct{}, error) {
 	}
 	held := map[string]struct{}{}
 	for _, fileName := range configuration.FileNames {
-		if sourcename.IsAdamic(fileName) {
+		if source_name.IsAdamic(fileName) {
 			held[fileName] = struct{}{}
 		}
 	}

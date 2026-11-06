@@ -2,19 +2,19 @@
     "sourceNotes": {
         "category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
         "fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
-        "language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), the Go engine's (internal/goengine/rules), swift/Rules.json for Swift",
+        "language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), the Go engine's (internal/go_engine/rules), swift/Rules.json for Swift",
         "messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
         "name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
         "namespace": "the registered name, before its last slash",
         "options": "the rule's registration: which decoder it carries and whether it requires options",
-        "origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json); for Go, the origin each rule declares (internal/goengine/rules)",
+        "origin": "for TypeScript, the registered namespace, and for a bare name the Go package that registers it; for Swift, the origin each rule declares (swift/Rules.json); for Go, the origin each rule declares (internal/go_engine/rules)",
         "sets": "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
         "swift": "swift/HouseRuleVerdicts.json",
         "typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, or for Go the TypeAware its registration declares",
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
-        "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/goengine/rules)"
+        "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_engine/rules)"
     },
-    "count": 783,
+    "count": 785,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -7052,6 +7052,14 @@
             "typeAware": true
         },
         {
+            "name": "cohere-go/consistency-require-separated-folder-words",
+            "language": "Go",
+            "namespace": "cohere-go",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
+        },
+        {
             "name": "cohere-go/copylocks",
             "language": "Go",
             "namespace": "cohere-go",
@@ -7563,6 +7571,17 @@
             "typeAware": false,
             "typeScriptRules": [
                 "nexus/consistency-no-property-alias"
+            ]
+        },
+        {
+            "name": "cohere-swift/consistency-no-shouting",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false,
+            "typeScriptRules": [
+                "nexus/consistency-no-shouting"
             ]
         },
         {
@@ -9345,7 +9364,8 @@
                 }
             ],
             "swift": {
-                "verdict": "Port"
+                "verdict": "Ported",
+                "swiftRule": "cohere-swift/consistency-no-shouting"
             }
         },
         {

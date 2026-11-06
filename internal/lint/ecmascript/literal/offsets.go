@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 )
 
 // CookedToRaw maps each byte offset in a cooked string onto its offset in the raw source.
@@ -116,13 +116,13 @@ func escapeWidthInStringLiteral(raw string, index int) int {
 			}
 			return 2
 		}
-		if index+5 < len(raw) && regexsyntax.AllHexDigits(raw[index+2:index+6]) {
+		if index+5 < len(raw) && regex_syntax.AllHexDigits(raw[index+2:index+6]) {
 			return 6
 		}
 		return 2
 	case 'x':
-		if index+3 < len(raw) && regexsyntax.IsHexDigit(raw[index+2]) &&
-			regexsyntax.IsHexDigit(raw[index+3]) {
+		if index+3 < len(raw) && regex_syntax.IsHexDigit(raw[index+2]) &&
+			regex_syntax.IsHexDigit(raw[index+3]) {
 			return 4
 		}
 		return 2

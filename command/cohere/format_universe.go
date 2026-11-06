@@ -1,6 +1,6 @@
 package main
 
-import "github.com/system-inc/cohere/internal/format/formatfiles"
+import "github.com/system-inc/cohere/internal/format/format_files"
 
 // formatUniverse is every file the default format scope is drawn from: what the formatter handles in
 // the repository the run writes, and nowhere else.
@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/format/formatfiles"
 // landed in repositories nobody running here was committing to.
 type formatUniverse struct {
 	// root is the repository's own walk; its nested repositories are named and not walked.
-	root formatfiles.Enumeration
+	root format_files.Enumeration
 
 	files []string
 }

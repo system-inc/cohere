@@ -11,8 +11,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/differential"
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/markdown/mdast"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -50,7 +50,7 @@ func frontMatterBlock(formatted string, endDelimiter string) string {
 // (src/main/front-matter/embed.js): the value trimmed, printed with parser yaml through textToDoc,
 // which strips the trailing hardline, between the delimiters.
 type frontMatterCandidate struct {
-	options formatoptions.Options
+	options format_options.Options
 	// fullStack embeds FormatDoc's doc, the Go parser's tree printed, instead of the loaded tree's.
 	fullStack    bool
 	frontMatters map[string]*mdast.FrontMatter
@@ -103,7 +103,7 @@ type yamlCorpus struct {
 	root          string
 	yamlFiles     []string
 	markdownFiles []string
-	options       formatoptions.Options
+	options       format_options.Options
 }
 
 // yamlCorpora enumerates each root the way TestCorpora does: through the engine's ignore layers, and
@@ -112,7 +112,7 @@ type yamlCorpus struct {
 // .build, which no repository formats and the oracle's goja runtime overflows its stack on.
 func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 	test.Helper()
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -136,7 +136,7 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 
 		// Nested repositories regardless of root's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path root never formats is still a corpus.
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -145,7 +145,7 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 		}
 
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", root, enumerateError)
 			continue
 		}
@@ -170,8 +170,8 @@ func yamlCorpora(test *testing.T, roots string) []yamlCorpus {
 
 		// Both sides format with the same options, so a config cohere refuses (one naming an option
 		// only JavaScript reads) measures the printer just as well under the defaults.
-		corpus.options = formatoptions.Default()
-		if resolution, resolveError := formatoptions.Resolve(root); resolveError != nil {
+		corpus.options = format_options.Default()
+		if resolution, resolveError := format_options.Resolve(root); resolveError != nil {
 			test.Logf("%s: formatting with the default options: %v", root, resolveError)
 		} else {
 			corpus.options = resolution.Options

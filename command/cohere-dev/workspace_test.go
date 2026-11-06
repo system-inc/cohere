@@ -12,7 +12,7 @@ import (
 
 // The gate refuses a go.mod go.work doesn't use, by path and with the use line to add, rather than leave it
 // ungated, which is how the shims went untested. Reading the workspace itself refuses nothing, since the Go
-// engine takes such a module for a project of its own (internal/goengine/project), so the refusal is the
+// engine takes such a module for a project of its own (internal/go_engine/project), so the refusal is the
 // gate's.
 func TestReadGatedWorkspaceRefusesAModuleGoWorkDoesNotUse(test *testing.T) {
 	test.Parallel()

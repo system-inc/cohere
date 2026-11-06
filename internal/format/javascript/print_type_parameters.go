@@ -6,7 +6,7 @@ import (
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
 	"github.com/system-inc/cohere/internal/format/printing"
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // print/type-parameters.js.
@@ -16,7 +16,7 @@ import (
 // Because, otherwise formatted result will be invalid as tsx.
 //
 // shouldForceTrailingComma is upstream's shouldForceTrailingComma. Upstream tests the path against
-// /\.ts$/; the name is read through sourcename.TreatedAs, so an Adamic `.a` file drops the comma as the
+// /\.ts$/; the name is read through source_name.TreatedAs, so an Adamic `.a` file drops the comma as the
 // same file named `.ts` does (#6mhafvb).
 func shouldForceTrailingComma(path *Path, options *Options, parametersKey string) bool {
 	current := node(path)
@@ -25,7 +25,7 @@ func shouldForceTrailingComma(path *Path, options *Options, parametersKey string
 		!current.List(parametersKey)[0].Truthy("constraint") &&
 		parentOf(path).Is("ArrowFunctionExpression") &&
 		!(settingsOf(options).FilePath != "" &&
-			strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
+			strings.HasSuffix(source_name.TreatedAs(settingsOf(options).FilePath), ".ts"))
 }
 
 /*

@@ -10,7 +10,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
 // wholeTreeScope is every file, for a deliberate normalization pass or a continuous-integration
@@ -51,7 +51,7 @@ func scopedTransform(inner edit.Transform, scope formatScope) edit.Transform {
 // accident. When the universe changes, this string has to be rewritten deliberately, so it names the
 // root, the ignore layers that removed anything, the nested repositories it refused, and the
 // declined extensions.
-func describeEnumeration(enumeration formatfiles.Enumeration, formattable int) string {
+func describeEnumeration(enumeration format_files.Enumeration, formattable int) string {
 	// One format string rather than two. An earlier version branched between a form that named the
 	// formattable count and one that did not, and the branch made the root unobservable: a mutation
 	// deleting the root from one string left the other correct, so no fixture could see it. Two

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
 // treeSnapshot reads every file under a root, so a run can be held to having written nothing at all:
@@ -22,7 +22,7 @@ func treeSnapshot(test *testing.T, root string) map[string]string {
 		if pathError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
 			if owner := filepath.Dir(
 				filepath.Dir(path),
-			); path == cacheDirectory(owner) && (owner == root || formatfiles.HasOwnRepository(owner)) {
+			); path == cacheDirectory(owner) && (owner == root || format_files.HasOwnRepository(owner)) {
 				return filepath.SkipDir
 			}
 		}

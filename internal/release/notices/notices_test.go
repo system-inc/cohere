@@ -140,8 +140,8 @@ func TestAModulesOwnThirdPartyCreditFollowsItsLicense(test *testing.T) {
 		directory string
 		fileName  string
 	}{
-		{directory: "longspelling", fileName: "LICENSE-THIRD-PARTY"},
-		{directory: "shortspelling", fileName: "THIRD-PARTY"},
+		{directory: "long_spelling", fileName: "LICENSE-THIRD-PARTY"},
+		{directory: "short_spelling", fileName: "THIRD-PARTY"},
 	}
 	for _, testCase := range cases {
 		directory := filepath.Join("testdata", testCase.directory)

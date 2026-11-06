@@ -23,10 +23,10 @@ import Foundation
    spellings would end and open Swift block comments.)
  - A file inside an excluded directory cannot be re-included: git never looks inside, so neither does this.
  - A directory holding its own `.git` is another repository and nothing inside it is listed, the boundary
-   Go's `formatfiles.HasOwnRepository` draws with the same check.
+   Go's `format_files.HasOwnRepository` draws with the same check.
  - `core.ignorecase` folds ASCII case, as git does on macOS's default filesystem.
 
- Go's `formatfiles.matchesIgnore` is a deliberate subset (no negation, no anchoring rule), sized for the
+ Go's `format_files.matchesIgnore` is a deliberate subset (no negation, no anchoring rule), sized for the
  format walk's pruning. This is all of git's rules, because here it replaces git's answer outright.
 
  Two differences from `git ls-files --cached`, by construction, because whether a file is tracked lives in

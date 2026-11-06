@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
@@ -59,7 +59,7 @@ func TestCorpora(test *testing.T) {
 	}
 	test.Logf("oracle cache %s, bundles %s from %s", directory, digest[:12], bundles.Origin)
 
-	enumerator, newPrettierError := prettier.New(formatoptions.Default())
+	enumerator, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -87,7 +87,7 @@ func TestCorpora(test *testing.T) {
 		// skip root: a repository under a path root never formats (ahra's projects/**) is still evidence
 		// for the printers, and dropping it shrank the corpus by about 1,950 files with every line still
 		// reading 100% (#k6vebep).
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(root)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(root)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", root, nestedRepositoriesBelowError)
 		}
@@ -101,8 +101,8 @@ func TestCorpora(test *testing.T) {
 		// A nested repository still carrying Prettier config is one pinned to its own adoption (www-ahra-ai,
 		// #j3nk2zk): measuring it would mean guessing its options, so it is named and skipped. A named
 		// corpus refusing is a migration that did not happen, and stops the run.
-		resolution, resolveError := formatoptions.Resolve(root)
-		if errors.Is(resolveError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+		resolution, resolveError := format_options.Resolve(root)
+		if errors.Is(resolveError, format_options.ErrPrettierConfigRemains) && !named[root] {
 			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, resolveError)
 			skipped = append(skipped, root)
 			continue
@@ -114,7 +114,7 @@ func TestCorpora(test *testing.T) {
 		// A leftover .prettierignore is Prettier config too, refused by the walk rather than the resolver,
 		// and skipped or fatal on the same terms.
 		enumeration, enumerateError := enumerator.Enumerate(root)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) && !named[root] {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) && !named[root] {
 			test.Logf("skipping %s, a nested repository not yet adopted: %v", root, enumerateError)
 			skipped = append(skipped, root)
 			continue
@@ -148,7 +148,7 @@ func TestCorpora(test *testing.T) {
 		len(measured), offeredTotal, strings.Join(measured, "\n  "), len(skipped), skipped)
 }
 
-func candidateFor(test *testing.T, name string, newOracle NewFormatter, options formatoptions.Options) NewFormatter {
+func candidateFor(test *testing.T, name string, newOracle NewFormatter, options format_options.Options) NewFormatter {
 	switch name {
 	case "native":
 		// The printers that replace Prettier. A file type with no printer yet is refused, so this reads
@@ -171,7 +171,7 @@ func candidateFor(test *testing.T, name string, newOracle NewFormatter, options 
 //
 // %+v names every field, so a field added to Options later joins the identity without anyone
 // remembering to add it here.
-func describeOptions(options formatoptions.Options) string {
+func describeOptions(options format_options.Options) string {
 	return fmt.Sprintf("%+v", options)
 }
 

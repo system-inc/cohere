@@ -50,6 +50,19 @@ func TestAbbreviationsFileHandsOutACopy(test *testing.T) {
 	}
 }
 
+// TestShoutingFileHandsOutACopy is TestAbbreviationsFileHandsOutACopy for the shouting vocabulary.
+func TestShoutingFileHandsOutACopy(test *testing.T) {
+	test.Parallel()
+	handedOut := ShoutingFile()
+	if len(handedOut) == 0 || !bytes.Equal(handedOut, shoutingFile) {
+		test.Fatalf("ShoutingFile is not the embedded file (%d bytes, embedded %d)", len(handedOut), len(shoutingFile))
+	}
+	handedOut[0] ^= 0xff
+	if !bytes.Equal(ShoutingFile(), shoutingFile) || handedOut[0] == shoutingFile[0] {
+		test.Errorf("a write into one caller's bytes reached the embedded file")
+	}
+}
+
 // TestSwiftSourceOutrunsTheText: the raw string's delimiter has more `#` than any run in the text, so a
 // `"""#` or a `\#` in a policy file stays text instead of ending the string or starting an escape.
 func TestSwiftSourceOutrunsTheText(test *testing.T) {

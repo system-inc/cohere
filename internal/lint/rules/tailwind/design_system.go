@@ -295,7 +295,7 @@ var tailwindEntryPointCandidates = []string{
 //
 // fileExists answers for files only, never directories. The design system asks the program's
 // filesystem, so the run cache records each probe; see loadDesignSystemForProgram. Exported for zero
-// config's detection of cohere:tailwind (internal/lint/housesets), which must find the same stylesheet
+// config's detection of cohere:tailwind (internal/lint/house_sets), which must find the same stylesheet
 // the rules then read, so there is one search rather than two that could disagree.
 func FindEntryPoint(projectRoot string, fileExists func(path string) bool) string {
 	for _, candidate := range tailwindEntryPointCandidates {

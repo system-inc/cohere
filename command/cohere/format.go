@@ -7,7 +7,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -50,7 +50,7 @@ type formatEngine interface {
 	// It belongs on the engine rather than in the pipeline because it is extension and ignore-file
 	// knowledge, the same knowledge Handles already encodes. The pipeline decides which of those
 	// files are in scope; the engine decides which files are formattable at all.
-	Enumerate(root string) (formatfiles.Enumeration, error)
+	Enumerate(root string) (format_files.Enumeration, error)
 
 	// OptionsFingerprint names the options a file formats with, so the format record can tell bytes
 	// formatted under one config from the same bytes under another. A config edit changes the
@@ -204,7 +204,7 @@ func configuredFormatter(enabled bool) (formatEngine, error) {
 		return nil, nil
 	}
 
-	// Resolving, not one formatter built from formatoptions.Default: each file formats with the config
+	// Resolving, not one formatter built from format_options.Default: each file formats with the config
 	// its own directory resolves to. Default is ahra's block, and running it over api-phi-health
 	// rewrote every multi-line JSX opening tag, because that repository sets bracketSameLine.
 	workingDirectory, workingDirectoryError := os.Getwd()

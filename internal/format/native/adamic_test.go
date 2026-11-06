@@ -3,7 +3,7 @@ package native
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // adamicSources are texts whose formatting depends on the file being TypeScript and not TSX: `<T,>`'s comma,
@@ -20,7 +20,7 @@ var adamicSources = []string{
 // differs on the comma, so the name is what decides and the test could have failed.
 func TestAnAdamicFileFormatsAsTypeScript(test *testing.T) {
 	test.Parallel()
-	formatter := Formatter{Options: formatoptions.Default()}
+	formatter := Formatter{Options: format_options.Default()}
 	if !formatter.Handles("Dog.a") {
 		test.Fatal("no printer is registered for .a")
 	}

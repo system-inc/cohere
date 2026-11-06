@@ -9,15 +9,15 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
 // astPath is upstream's AstPath over GraphQL nodes.
-type astPath = printing.AstPath[*estree.Node, formatoptions.Options]
+type astPath = printing.AstPath[*estree.Node, format_options.Options]
 
 // printerOptions is upstream's options object for one format.
-type printerOptions = printing.Options[*estree.Node, formatoptions.Options, printing.NoArguments]
+type printerOptions = printing.Options[*estree.Node, format_options.Options, printing.NoArguments]
 
 // printFunc is upstream's print(selector), which the GraphQL printer passes no args.
 type printFunc = printing.PrintFunc[printing.NoArguments]
@@ -28,7 +28,7 @@ func locEnd(nodeOrToken *estree.Node) int   { return nodeOrToken.Range[1] }
 
 // graphqlPrinter is printer-graphql.js's printer object. massageAstNode is test-only upstream and
 // insertPragma runs only under insertPragma, which cohere never sets, so neither is here.
-var graphqlPrinter = &printing.Printer[*estree.Node, formatoptions.Options, printing.NoArguments]{
+var graphqlPrinter = &printing.Printer[*estree.Node, format_options.Options, printing.NoArguments]{
 	Print:             genericPrint,
 	LocStart:          locStart,
 	LocEnd:            locEnd,
@@ -40,13 +40,13 @@ var graphqlPrinter = &printing.Printer[*estree.Node, formatoptions.Options, prin
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings. The printer reads
 // one of them, bracketSpacing (options.js).
-func settingsOf(options *printerOptions) formatoptions.Options {
+func settingsOf(options *printerOptions) format_options.Options {
 	return options.Settings
 }
 
 // Format is Prettier's format for a GraphQL file: parse, attach comments, print to a doc, lay it out.
 // Byte order marks and line endings are normalized by the caller, native.Formatter, for every printer.
-func Format(text string, prettierOptions formatoptions.Options) (formatted string, formatError error) {
+func Format(text string, prettierOptions format_options.Options) (formatted string, formatError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, formatError = "", fmt.Errorf("graphql: %v", recovered)
@@ -67,7 +67,7 @@ func Format(text string, prettierOptions formatoptions.Options) (formatted strin
 
 // PrintToDoc is upstream's textToDoc for GraphQL embedded in another language: the printed doc with its
 // trailing hardline stripped.
-func PrintToDoc(text string, prettierOptions formatoptions.Options) (document doc.Doc, printToDocError error) {
+func PrintToDoc(text string, prettierOptions format_options.Options) (document doc.Doc, printToDocError error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, printToDocError = nil, fmt.Errorf("graphql: %v", recovered)
@@ -82,7 +82,7 @@ func PrintToDoc(text string, prettierOptions formatoptions.Options) (document do
 }
 
 // printToDoc is parser-graphql.js's parse followed by printAstToDoc (src/main/ast-to-doc.js).
-func printToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
+func printToDoc(text string, prettierOptions format_options.Options) (doc.Doc, error) {
 	document, comments, parseError := Parse(text)
 	if parseError != nil {
 		return nil, parseError

@@ -21,7 +21,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/microsoft/TypeScript/tsc/shim/parser"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/docsdata/capture"
+	"github.com/system-inc/cohere/internal/docs_data/capture"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 

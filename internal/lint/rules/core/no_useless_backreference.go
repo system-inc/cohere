@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -48,7 +48,7 @@ var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, C
 // both corpora, correctly: a lookbehind matches right to left, so the group is reached before the
 // reference and has captured.
 //
-// # Why this is not built on regexpattern.Walk
+// # Why this is not built on regex_pattern.Walk
 //
 // `Walk` reports characters with a quantifier and class depth, and its own doc says a caller
 // wanting alternation or lookaround should extend it rather than find it half-built. This rule is
@@ -57,8 +57,8 @@ var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, C
 // `ClassDepth` without saying which class, and does not recurse into v-flag nested classes, so the
 // one thing it could have answered here is answered wrong for `new RegExp('[[]\\1](a)', 'v')`.
 //
-// So this scans with `regexsyntax.SkipPatternEscape` and `regexsyntax.ClassEnd`, the same two
-// primitives `regexpattern.CountCapturingGroups` is built on, and keeps a path of enclosing nodes.
+// So this scans with `regex_syntax.SkipPatternEscape` and `regex_syntax.ClassEnd`, the same two
+// primitives `regex_pattern.CountCapturingGroups` is built on, and keeps a path of enclosing nodes.
 // `ClassEnd` handles v-flag nesting and `\q{...}`, which is what makes the two class cases in the
 // corpus come out right without a second scanner.
 //
@@ -87,7 +87,7 @@ var NoUselessBackreference = rule.Rule[rule.NoOptions]{
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
-				pattern, flags := regexsyntax.PatternAndFlags(node.Text())
+				pattern, flags := regex_syntax.PatternAndFlags(node.Text())
 				if pattern == "" {
 					return
 				}
@@ -202,7 +202,7 @@ var (
 // reportUselessBackreferences scans one pattern and reports every backreference that cannot match, at
 // the node the pattern came from.
 func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, pattern string, flagsText string) {
-	flags := regexsyntax.ParseRegexFlags(flagsText)
+	flags := regex_syntax.ParseRegexFlags(flagsText)
 
 	structure, ok := scanRegexStructure(pattern, flags)
 	if !ok {
@@ -283,7 +283,7 @@ func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, patte
 // A named reference with no matching group is refused under every flag once the pattern declares
 // any named group at all, which is why `new RegExp('\\k<foo>(?<foo>a)\\k<bar>')` is clean with no
 // flags while `RegExp('\\1(a)\\k<foo>', 'u')` needs the `u` to be refused.
-func patternIsWellFormed(pattern string, structure regexStructure, groupCount int, flags regexsyntax.RegexFlags) bool {
+func patternIsWellFormed(pattern string, structure regexStructure, groupCount int, flags regex_syntax.RegexFlags) bool {
 	hasNamedGroup := false
 	for _, group := range structure.groups {
 		if group.name != "" {
@@ -323,17 +323,17 @@ func patternIsWellFormed(pattern string, structure regexStructure, groupCount in
 
 // hasUnmatchedQuantifierBrace reports whether the pattern holds a `{` that opens no valid
 // quantifier, which annex B reads as a literal brace and `u` mode refuses.
-func hasUnmatchedQuantifierBrace(pattern string, flags regexsyntax.RegexFlags) bool {
+func hasUnmatchedQuantifierBrace(pattern string, flags regex_syntax.RegexFlags) bool {
 	for index := 0; index < len(pattern); {
 		switch pattern[index] {
 		case '\\':
-			step, ok := regexsyntax.SkipPatternEscape(pattern, index, flags)
+			step, ok := regex_syntax.SkipPatternEscape(pattern, index, flags)
 			if !ok {
 				return true
 			}
 			index += step
 		case '[':
-			end, ok := regexsyntax.ClassEnd(pattern, index, flags)
+			end, ok := regex_syntax.ClassEnd(pattern, index, flags)
 			if !ok {
 				return true
 			}
@@ -465,7 +465,7 @@ func classifyBackreference(
 // scanRegexStructure reads a pattern into the groups, backreferences and enclosing paths the rule
 // needs. It returns false for a pattern it cannot make sense of, which is a syntax error the engine
 // has already refused and where a second opinion would be noise.
-func scanRegexStructure(pattern string, flags regexsyntax.RegexFlags) (regexStructure, bool) {
+func scanRegexStructure(pattern string, flags regex_syntax.RegexFlags) (regexStructure, bool) {
 	scanner := &regexStructureScanner{pattern: pattern, flags: flags}
 	if !scanner.run() {
 		return regexStructure{}, false

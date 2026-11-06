@@ -26,7 +26,7 @@ var allowedRuleImports = map[string]bool{
 	// How a source file's name reads to a TypeScript decision: an Adamic `.a` name as `.ts` (#6mhafvb).
 	// Every rule that decides on a name's `.ts` ending asks it (#kwt1htp), and a guard of its own holds
 	// them to it. It imports only `strings`, so it is a leaf itself and costs a rule edit nothing.
-	"github.com/system-inc/cohere/internal/types/sourcename": true,
+	"github.com/system-inc/cohere/internal/types/source_name": true,
 	// The ids, phis and single assignment the high-level IR and Adamic's flow graph share (#ejcnkja).
 	// It imports only the standard library, and every rule package that names it reached it through
 	// the high-level IR already, which is under the shelf's prefix, so naming it directly adds no
@@ -50,16 +50,16 @@ var allowedRuleImports = map[string]bool{
 	// imports only `strings`, and `go list -deps` names nothing past the standard library, so it is a leaf by its
 	// imports, and it changes only when the shared reading does. Measured on 2026-11-05, three warm rounds each of
 	// `go build ./internal/lint/registry` after a one-comment edit, under a load average of about 19 to 20 (31 over
-	// fifteen minutes): editing internal/sqltext rebuilds in 0.12 to 0.13s, and `go build -v` shows it is the only
+	// fifteen minutes): editing internal/sql_text rebuilds in 0.12 to 0.13s, and `go build -v` shows it is the only
 	// package rebuilt, since a comment leaves its export data unchanged; editing the nexus rule that imports it,
 	// 2.57 to 2.76s.
-	"github.com/system-inc/cohere/internal/sqltext": true,
+	"github.com/system-inc/cohere/internal/sql_text": true,
 	// The warning-comment judgment nexus/consistency-no-warning-comment and its Go engine twin share: the words, the
 	// whole-word test and the masks (#jmx59gd). It imports only the standard library and internal/shouting, a leaf
 	// on this list, so it is a leaf by its imports, and it changes only when the shared judgment does. Measured on
 	// 2026-11-06, three rounds of `go build ./internal/lint/registry` after a one-comment edit, under a load average
 	// of about 30: 0.20 to 0.25s, and `go build -v` shows it is the only package rebuilt.
-	"github.com/system-inc/cohere/internal/warningcomment": true,
+	"github.com/system-inc/cohere/internal/warning_comment": true,
 }
 
 // allowedRuleImportPrefixes are subtrees a rule package may depend on wholesale.

@@ -256,7 +256,7 @@ public struct ConsistencyNoAmbiguousIdentifier: FileRule {
     static let numericVectors: Set<String> = ["SIMD2", "SIMD3", "SIMD4", "SIMD8", "SIMD16", "SIMD32", "SIMD64"]
 
     /*
-     A number as a kernel holds one: a scalar, a SIMD vector of them, one of simd's own types (`simd_float3`,
+     A number as a kernel holds one: a scalar, a `SIMD` vector of them, one of simd's own types (`simd_float3`,
      `simd_quatf`, `simd_float4x4`, `matrix_float4x4`), an array or a tuple of those, or any of them `inout`.
      */
     static func isNumeric(_ type: TypeSyntax) -> Bool {

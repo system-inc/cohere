@@ -2,7 +2,7 @@ package native
 
 import (
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml"
 )
@@ -11,14 +11,14 @@ import (
 // internal/format/yaml. Its doc entry is what markdown's front matter embeds, stripped of the trailing
 // hardline as upstream's textToDoc strips it.
 func init() {
-	print := func(fileName string, text string, options formatoptions.Options) (string, error) {
+	print := func(fileName string, text string, options format_options.Options) (string, error) {
 		return yaml.Format(fileName, text, options, TextToDoc(options, "yaml", nil))
 	}
 	// The doc entry is raw: TextToDoc strips its trailing hardline, into the embedding format's slab.
 	printDoc := func(
 		_ string,
 		text string,
-		options formatoptions.Options,
+		options format_options.Options,
 		_ string,
 		_ string,
 		textToDoc printing.TextToDoc,

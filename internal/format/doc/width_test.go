@@ -14,8 +14,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/system-inc/cohere/internal/corpus"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -143,7 +143,7 @@ process.stdin.on("end", () => process.stdout.write(JSON.stringify(JSON.parse(dat
 // Mutates: seen gains every line collected, so the caller's next corpus skips the lines this one found.
 func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string {
 	test.Helper()
-	engine, newPrettierError := prettier.New(formatoptions.Default())
+	engine, newPrettierError := prettier.New(format_options.Default())
 	if newPrettierError != nil {
 		test.Fatal(newPrettierError)
 	}
@@ -156,7 +156,7 @@ func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string 
 		pending = pending[1:]
 		// Nested repositories regardless of current's own ignore lists, as the differential finds them
 		// (#k6vebep): a repository under a path current never formats is still a corpus.
-		nestedRepositories, nestedRepositoriesBelowError := formatfiles.NestedRepositoriesBelow(current)
+		nestedRepositories, nestedRepositoriesBelowError := format_files.NestedRepositoriesBelow(current)
 		if nestedRepositoriesBelowError != nil {
 			test.Fatalf("finding the repositories nested in %s: %v", current, nestedRepositoriesBelowError)
 		}
@@ -165,7 +165,7 @@ func nonAsciiLines(test *testing.T, root string, seen map[string]bool) []string 
 		}
 
 		enumeration, enumerateError := engine.Enumerate(current)
-		if errors.Is(enumerateError, formatoptions.ErrPrettierConfigRemains) {
+		if errors.Is(enumerateError, format_options.ErrPrettierConfigRemains) {
 			test.Logf("skipping %s, not yet adopted: %v", current, enumerateError)
 			continue
 		}

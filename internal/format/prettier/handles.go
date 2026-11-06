@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/system-inc/cohere/internal/types/sourcename"
+	"github.com/system-inc/cohere/internal/types/source_name"
 )
 
 // parserForExtension maps a file extension to the Prettier parser that handles it.
@@ -55,6 +55,6 @@ func parserFor(fileName string) (string, bool) {
 	if filepath.Base(fileName) == "package.json" {
 		return "json-stringify", true
 	}
-	parser, ok := parserForExtension[strings.ToLower(filepath.Ext(sourcename.TreatedAs(fileName)))]
+	parser, ok := parserForExtension[strings.ToLower(filepath.Ext(source_name.TreatedAs(fileName)))]
 	return parser, ok
 }

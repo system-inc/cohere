@@ -94,7 +94,7 @@ func goLanguage(container string) engineLanguage {
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
 		// The Go engine keeps no cache of its own: it loads the packages through the go command, whose build
-		// cache is go's (internal/goengine/load). A Go run refuses `--no-cache` today (goFlags), so this is
+		// cache is go's (internal/go_engine/load). A Go run refuses `--no-cache` today (goFlags), so this is
 		// said only once the flag reaches it.
 		CacheOffDetail: "the Go engine keeps no cache of its own, and the go command's build cache, which " +
 			"loading the packages reads and may fill, is go's to keep",

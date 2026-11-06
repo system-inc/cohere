@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -214,7 +214,7 @@ func correctnessNoTestOnGlobalRegexRegex(ruleContext rule.Context, receiver *ast
 func correctnessNoTestOnGlobalRegexFlags(ruleContext rule.Context, creation *ast.Node) (string, bool) {
 	switch creation.Kind {
 	case ast.KindRegularExpressionLiteral:
-		_, flags := regexsyntax.PatternAndFlags(creation.Text())
+		_, flags := regex_syntax.PatternAndFlags(creation.Text())
 		return flags, true
 	case ast.KindNewExpression:
 		newExpression := creation.AsNewExpression()

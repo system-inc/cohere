@@ -42,8 +42,14 @@ struct DescribeOutput: Decodable {
         }
     }
 
+    /* A platform the manifest names, as `describe` writes it: `{"name": "ios", "version": "18.0"}`. Absent when it names none. */
+    struct Platform: Decodable {
+        var name: String
+    }
+
     var name: String
     var targets: [Target]
     var products: [Product]?
     var dependencies: [Dependency]?
+    var platforms: [Platform]?
 }

@@ -585,7 +585,7 @@ func TestTheGateRefusesStaleDocsData(test *testing.T) {
 	}
 	write(map[string]string{
 		"go.mod": "module example.com/root\n\ngo 1.21\n",
-		"internal/docsdata/tools/generate/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
+		"internal/docs_data/tools/generate/main.go": "package main\n\nimport (\n\t\"fmt\"\n\t\"os\"\n)\n\n" +
 			"func main() {\n\tcontents, _ := os.ReadFile(\"docs/data/example.txt\")\n" +
 			"\tif string(contents) != \"fresh\\n\" {\n\t\tfmt.Println(\"stale: docs/data/example.txt\")\n\t\tos.Exit(1)\n\t}\n}\n",
 		"docs/data/example.txt": "stale\n",

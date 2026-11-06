@@ -4,21 +4,21 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/gotypes"
+	"github.com/system-inc/cohere/internal/go_types"
 )
 
 // ruleTypes is the export data of every package outside cohere that the option walks import: the standard
 // library, the TypeScript checker and its shims, the modules they need. The walks read cohere's own packages
 // from source and these from this product, which is built where building is allowed and never here: a walk
 // that compiled ran `go list -export`, which a runner of prebuilt tests refuses (#qnnnkbf).
-var ruleTypes = gotypes.Product{
+var ruleTypes = go_types.Product{
 	Name:      "lint rules",
 	Test:      "TestProduct_RuleTypes (internal/lint/registry)",
 	Directory: "../../..",
 	Patterns: []string{
 		"./internal/lint/rules/...",
-		"./internal/lint/registry/testdata/optiondecoding",
-		"./internal/lint/registry/testdata/optionreads",
+		"./internal/lint/registry/testdata/option_decoding",
+		"./internal/lint/registry/testdata/option_reads",
 	},
 }
 
@@ -39,13 +39,13 @@ var ruleExports = sync.OnceValues(ruleTypes.Find)
 
 // loadRules loads the packages matching patterns from moduleRoot with their syntax and types, and fails
 // the test on any error in any package read from source, naming each, so a walk never reads a partial tree.
-func loadRules(test *testing.T, moduleRoot string, patterns ...string) []*gotypes.Package {
+func loadRules(test *testing.T, moduleRoot string, patterns ...string) []*go_types.Package {
 	test.Helper()
 	exports, ruleExportsError := ruleExports()
 	if ruleExportsError != nil {
 		test.Fatal(ruleExportsError)
 	}
-	loaded, loadError := gotypes.Load(gotypes.Configuration{Directory: moduleRoot, Exports: exports}, patterns...)
+	loaded, loadError := go_types.Load(go_types.Configuration{Directory: moduleRoot, Exports: exports}, patterns...)
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}

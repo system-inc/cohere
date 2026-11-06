@@ -4,13 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 )
 
 // TestUnregisteredTypesAreRefused keeps an absent printer from reading as a perfect one.
 func TestUnregisteredTypesAreRefused(test *testing.T) {
 	test.Parallel()
-	formatter := Formatter{Options: formatoptions.Default()}
+	formatter := Formatter{Options: format_options.Default()}
 	if formatter.Handles("probe.unregistered") {
 		test.Fatal("Handles said yes to a type nothing registered")
 	}
@@ -22,12 +22,12 @@ func TestUnregisteredTypesAreRefused(test *testing.T) {
 // TestRegisteredPrinterReceivesTheOptions proves routing and that the resolved options reach the printer.
 func TestRegisteredPrinterReceivesTheOptions(test *testing.T) {
 	test.Parallel()
-	Register(".probe", func(fileName string, text string, options formatoptions.Options) (string, error) {
+	Register(".probe", func(fileName string, text string, options format_options.Options) (string, error) {
 		return strings.Repeat(" ", options.TabWidth) + text, nil
 	})
 	defer func() { mutex.Lock(); delete(printers, ".probe"); mutex.Unlock() }()
 
-	options := formatoptions.Default()
+	options := format_options.Default()
 	options.TabWidth = 3
 	formatted, formatError := Formatter{Options: options}.Format("A.PROBE", "x")
 	if formatError != nil {
@@ -41,7 +41,7 @@ func TestRegisteredPrinterReceivesTheOptions(test *testing.T) {
 // TestRegisteringTwicePanics: two printers for one type would make output depend on init order.
 func TestRegisteringTwicePanics(test *testing.T) {
 	test.Parallel()
-	print := func(string, string, formatoptions.Options) (string, error) { return "", nil }
+	print := func(string, string, format_options.Options) (string, error) { return "", nil }
 	Register(".twice", print)
 	defer func() { mutex.Lock(); delete(printers, ".twice"); mutex.Unlock() }()
 	defer func() {

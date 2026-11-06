@@ -74,7 +74,7 @@ func messageNoSingleLetter(name string) rule.Message {
 // name was chosen and the only place a rename starts, so a finding at every read repeated one defect
 // as many times as the name was used (`const n = 1; return n + n` was three findings), and gave a
 // catch-bound `e` two different pieces of advice: an error at the catch, an unclear context at the
-// read (#rb0ewgm, cases am01 and am06 in `conformance/textrules`).
+// read (#rb0ewgm, cases am01 and am06 in `conformance/text_rules`).
 //
 // The bare `_` is not judged. It is the discard, a value deliberately left unnamed: Go and Swift make
 // it one by grammar, and TypeScript spells it the same way by convention (am02).

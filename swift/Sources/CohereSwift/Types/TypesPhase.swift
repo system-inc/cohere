@@ -7,6 +7,9 @@ import Synchronization
  The compiler's own errors and warnings for every file we own, read from what the build recorded rather
  than from what it printed.
 
+ A package whose platforms leave out macOS is not built here: `swift build` builds for the macOS host, and would
+ judge its code against an SDK it never targets, so `XcodePackageTypesPhase` builds it for a platform it names.
+
  The build runs into the engine's cache (`--scratch-path`), never the project's `.build`. It builds test
  targets too, because their files are ours and a test that does not compile is a finding like any other.
  Then every serialized diagnostics file in each owned target's build directories is read, each diagnostic
@@ -67,7 +70,7 @@ struct TypesPhase {
     }
 
     /* The package roots and every path dependency, which together hold every file a build of them reads. */
-    private var inputRoots: [URL] {
+    static func inputRoots(of package: PackageModel) -> [URL] {
         let roots = package.allPackages.flatMap { [$0.root] + $0.pathDependencyRoots }
         var seen = Set<String>()
         return roots.filter { root in
@@ -77,12 +80,24 @@ struct TypesPhase {
     }
 
     func run() throws -> Result {
+        /* A package whose platforms leave out macOS is never judged against the host's SDK, which it does not target. */
+        if XcodePackageTypesPhase.leavesOutHost(package) {
+            return try XcodePackageTypesPhase(
+                package: package,
+                files: files,
+                scratchPath: scratchPath,
+                resolutionAllowed: resolutionAllowed,
+                toolchain: toolchain,
+                runner: runner,
+            )
+            .run()
+        }
         let start = Date()
         let snapshot =
             toolchain.hasPrefix("unknown")
             ? nil
             : BuildInputSnapshot.take(
-                roots: inputRoots,
+                roots: Self.inputRoots(of: package),
                 resolved: package.root.appendingPathComponent("Package.resolved"),
                 toolchain: toolchain,
                 arguments: builds.flatMap { arguments(for: $0, buildSystem: Self.swiftBuildArguments) },
@@ -377,16 +392,35 @@ struct TypesPhase {
 
     /* Every build directory belonging to a target we own files in, with that target's name: `<Target>-p.build`, `<Target>-t.build`, and the testable variants. */
     private func buildDirectories(under scratchPath: URL) throws -> [(String, URL)] {
+        try Self.buildDirectories(
+            in: intermediates(of: scratchPath),
+            configuration: "Debug",
+            package: package,
+            files: files,
+        )
+    }
+
+    /*
+     The same, under any build's intermediates and configuration folder: a SwiftPM build's `out/Intermediates.noindex`
+     and `Debug`, or a package's xcodebuild's `Build/Intermediates.noindex` and `Debug-iphoneos`, which name each
+     package's folder and each target's the same way (`XcodePackageTypesPhase`).
+     */
+    static func buildDirectories(
+        in intermediatesDirectory: URL,
+        configuration configurationName: String,
+        package: PackageModel,
+        files: [FileSet.OwnedFile],
+    ) throws -> [(String, URL)] {
         let targetNames = Set(files.map(\.targetName))
+        let productTargets = Self.productTargets(of: package)
         let manager = FileManager.default
-        let intermediatesDirectory = intermediates(of: scratchPath)
         guard manager.fileExists(atPath: intermediatesDirectory.path) else { return [] }
         var directories: [(String, URL)] = []
         for packageDirectory in try manager.contentsOfDirectory(
             at: intermediatesDirectory,
             includingPropertiesForKeys: nil,
         ) {
-            let configuration = packageDirectory.appendingPathComponent("Debug", isDirectory: true)
+            let configuration = packageDirectory.appendingPathComponent(configurationName, isDirectory: true)
             guard manager.fileExists(atPath: configuration.path) else { continue }
             for targetDirectory in try manager.contentsOfDirectory(at: configuration, includingPropertiesForKeys: nil) {
                 let name = targetDirectory.lastPathComponent
@@ -405,7 +439,7 @@ struct TypesPhase {
     }
 
     /* Every single-target product of every package this phase builds, to its target. */
-    private var productTargets: [String: String] {
+    private static func productTargets(of package: PackageModel) -> [String: String] {
         package.allPackages.reduce(into: [:]) { merged, member in
             merged.merge(member.productTargets) { first, _ in first }
         }

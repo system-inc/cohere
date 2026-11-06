@@ -59,7 +59,7 @@ require (
 	golang.org/x/mod v0.41.0
 	golang.org/x/sys v0.48.0
 
-	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/goengine/rule),
+	// The Go engine's analysis framework: every Go rule is a go/analysis analyzer (internal/go_engine/rule),
 	// so vet's own suite, analysistest and facts across packages work unchanged, and the engine loads with
 	// go/packages and runs the rules with go/analysis/checker. Tests use it too: the registry's
 	// option-decoding guard loads the rules tree with type information, because whether a decode is strict
@@ -67,7 +67,7 @@ require (
 	golang.org/x/tools v0.50.0
 
 	// staticcheck's SA, S, ST and U1000 checks, which the Go engine registers as rules under their own codes
-	// (internal/goengine/rules). They are go/analysis analyzers already, so they run in the engine's one
+	// (internal/go_engine/rules). They are go/analysis analyzers already, so they run in the engine's one
 	// load with no runner of staticcheck's own. Minimal version selection keeps our x/tools over the older
 	// one staticcheck asks for, and the registry's tests prove its analyzers validate against ours.
 	honnef.co/go/tools v0.8.1

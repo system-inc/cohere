@@ -1,0 +1,11 @@
+{
+    "why": "sh14: a run of `//` lines is one text, so a fence across them masks all it holds, a stray backtick included. Pairing backticks alone would join the fence's third with the stray one and read `STOP` after it",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

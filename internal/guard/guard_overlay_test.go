@@ -19,7 +19,7 @@ import (
 // guardOverlay is the overlay the guards here read the rule packages through: the one `GOFLAGS` names, as
 // file path to contents, or nil when `GOFLAGS` names none.
 //
-// The guards load the rule packages with internal/gotypes, which runs `go list` and then parses every
+// The guards load the rule packages with internal/go_types, which runs `go list` and then parses every
 // file itself, from disk. `go test -overlay x.json` reaches neither: the flag builds the test binary and
 // stops there, and nothing in the binary can see it (measured: no build setting records it, and the
 // environment is untouched). So a guard run that way checked the working tree while the command line

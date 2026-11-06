@@ -40,7 +40,7 @@ const fastTierVariable = "COHERE_FAST_TIER"
 //
 // CPU is steadier than wall, not load-invariant. A heavily parallel package's CPU inflates under contention:
 // command/cohere read 926 to 933s of CPU at load 105 to 166 against 49.4s at load about 10, and
-// crosscompile 36 to 41s against 26. Every change load made was upward, so a reading at low load is the
+// cross_compile 36 to 41s against 26. Every change load made was upward, so a reading at low load is the
 // low one.
 const fastBudgetCpuSeconds = 15
 
@@ -87,7 +87,7 @@ var landingGateOnly = []landingGateEntry{
 	},
 	{
 		// At load about 10.
-		pattern:     "./internal/release/crosscompile",
+		pattern:     "./internal/release/cross_compile",
 		wallSeconds: 2.4, cpuSeconds: 26.0,
 		reason: "it type-checks all of cohere for each of the six release targets",
 	},

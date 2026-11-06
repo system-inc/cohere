@@ -181,7 +181,7 @@ func skipWithoutTailwind(ruleContext rule.Context, candidateError error) bool {
 
 // ConfiguredEntryPoint is the stylesheet a named location resolves to, and the installed tailwindcss
 // it reads with, as upstream's getTailwindConfigPath resolves them. Exported for zero config's
-// detection of cohere:tailwind (internal/lint/housesets), so a project whose settings name its
+// detection of cohere:tailwind (internal/lint/house_sets), so a project whose settings name its
 // stylesheet is found by the same search its rules then make.
 func ConfiguredEntryPoint(
 	projectRoot string,

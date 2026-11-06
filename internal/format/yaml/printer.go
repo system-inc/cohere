@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/doc"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 	"github.com/system-inc/cohere/internal/format/yaml/unist"
 )
@@ -102,7 +102,12 @@ var yamlPrinter = &printing.Printer[*unist.Node, *settings, printing.NoArguments
 //
 // No file name is given, so the .prettierrc embed never applies, as upstream's without
 // options.filepath. PrintFile takes one.
-func Print(root *unist.Node, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func Print(
+	root *unist.Node,
+	text string,
+	options format_options.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return PrintFile("", root, text, options, textToDoc)
 }
 
@@ -112,7 +117,7 @@ func Print(root *unist.Node, text string, options formatoptions.Options, textToD
 func PrintDoc(
 	root *unist.Node,
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	textToDoc printing.TextToDoc,
 ) (doc.Doc, error) {
 	return PrintDocFile("", root, text, options, textToDoc)
@@ -124,7 +129,7 @@ func PrintFile(
 	fileName string,
 	root *unist.Node,
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	textToDoc printing.TextToDoc,
 ) (string, error) {
 	return printFile(fileName, root, text, options, "preserve", textToDoc, 0)
@@ -135,20 +140,20 @@ func PrintDocFile(
 	fileName string,
 	root *unist.Node,
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	textToDoc printing.TextToDoc,
 ) (doc.Doc, error) {
 	return printDocFile(fileName, root, text, options, "preserve", textToDoc, 0)
 }
 
-// printFile is PrintFile with proseWrap given. None of our repositories sets it, and formatoptions.Options
+// printFile is PrintFile with proseWrap given. None of our repositories sets it, and format_options.Options
 // does not carry it, so only the tests reach always and never. nodeCount is how many nodes the tree holds,
 // zero when unknown, for printing.Options.NodeCount.
 func printFile(
 	fileName string,
 	root *unist.Node,
 	text string,
-	prettierOptions formatoptions.Options,
+	prettierOptions format_options.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 	nodeCount int,
@@ -182,7 +187,7 @@ func printDocFile(
 	fileName string,
 	root *unist.Node,
 	text string,
-	prettierOptions formatoptions.Options,
+	prettierOptions format_options.Options,
 	proseWrap string,
 	textToDoc printing.TextToDoc,
 	nodeCount int,

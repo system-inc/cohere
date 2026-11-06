@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/scanner"
-	"github.com/system-inc/cohere/internal/docsdata/capture"
+	"github.com/system-inc/cohere/internal/docs_data/capture"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -14,7 +14,7 @@ import (
 // it can record the case. Nil unless COHERE_DOCS_CAPTURE is set, which is every ordinary run.
 //
 // The website's examples are the cases these tests assert, rather than examples written for the site,
-// so an example can only show what a passing test has shown (internal/docsdata).
+// so an example can only show what a passing test has shown (internal/docs_data).
 type capturedRun struct {
 	rule       string
 	file       string

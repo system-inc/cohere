@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
@@ -134,16 +134,16 @@ var formatCases = []formatCase{
 }
 
 // formatFor is the native entry point a file name reaches through internal/format/native.
-func formatFor(fileName string) func(string, string, formatoptions.Options) (string, error) {
+func formatFor(fileName string) func(string, string, format_options.Options) (string, error) {
 	switch {
 	case strings.HasSuffix(fileName, ".json"):
 		return FormatJson
 	case strings.HasSuffix(fileName, ".js"):
-		return func(fileName string, text string, options formatoptions.Options) (string, error) {
+		return func(fileName string, text string, options format_options.Options) (string, error) {
 			return FormatJavaScript(fileName, text, options, nil)
 		}
 	}
-	return func(fileName string, text string, options formatoptions.Options) (string, error) {
+	return func(fileName string, text string, options format_options.Options) (string, error) {
 		return Format(fileName, text, options, nil)
 	}
 }
@@ -155,7 +155,7 @@ func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
 	if _, formatJavaScriptError := FormatJavaScript(
 		"Probe.js",
 		"const result = a < b > (c);\n",
-		formatoptions.Default(),
+		format_options.Default(),
 		nil,
 	); formatJavaScriptError == nil {
 		test.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
@@ -163,7 +163,7 @@ func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
 	if _, formatJavaScriptError := FormatJavaScript(
 		"Probe.js",
 		"const result = a < b;\n",
-		formatoptions.Default(),
+		format_options.Default(),
 		nil,
 	); formatJavaScriptError != nil {
 		test.Fatalf("plain JavaScript was refused: %v", formatJavaScriptError)
@@ -172,9 +172,9 @@ func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
 
 func TestFormatMatchesTheFork(test *testing.T) {
 	test.Parallel()
-	sameLine := formatoptions.Default()
+	sameLine := format_options.Default()
 	sameLine.BracketSameLine = true
-	for _, options := range []formatoptions.Options{formatoptions.Default(), sameLine} {
+	for _, options := range []format_options.Options{format_options.Default(), sameLine} {
 		oracle, newPrettierError := prettier.New(options)
 		if newPrettierError != nil {
 			test.Fatal(newPrettierError)

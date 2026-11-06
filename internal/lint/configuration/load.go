@@ -209,7 +209,7 @@ func RulesFromPlugins(plugins []string, named map[string]RuleSetting) map[string
 //   - `plugins` are a union, and plugin defaults are computed once, over the merged rules.
 //   - `ignorePatterns` and `overrides` concatenate, the base's first, so a later block still wins.
 //     Every pattern resolves against Root: a house pattern is a shape like `**/*.test.ts`, not a path.
-//   - A base may carry `format`: its reader (internal/format/formatoptions) follows the chain, applying
+//   - A base may carry `format`: its reader (internal/format/format_options) follows the chain, applying
 //     each file's block over the one it extends. A base may not carry `settings`: they are read from
 //     the project's own file only, as ESLint reads them from the project's config, so a value there
 //     would be ignored silently.
@@ -835,14 +835,14 @@ var ignoredTopLevelKeys = map[string]string{
 		"while both tools run side by side.",
 
 	"format": "the formatter's options (printWidth, tabWidth and the rest), read by " +
-		"internal/format/formatoptions. They moved here from package.json's prettier block when cohere's " +
+		"internal/format/format_options. They moved here from package.json's prettier block when cohere's " +
 		"native printers replaced Prettier, so the linter leaves them alone on purpose: they are the " +
 		"formatter's, not a rule's.",
 
 	"output": "how a run prints, read by the command (command/cohere/output_settings.go) from the file cohere " +
 		"reads first. It decides nothing a rule does, so the linter leaves it alone on purpose.",
 
-	"go": "the Go engine's rules, read by internal/goengine/settings. A repository that holds both a tsconfig and " +
+	"go": "the Go engine's rules, read by internal/go_engine/settings. A repository that holds both a tsconfig and " +
 		"a go.mod keeps one CohereSettings.json for both engines, so the TypeScript linter leaves the key alone on " +
 		"purpose: its rules are the Go engine's, not this linter's.",
 

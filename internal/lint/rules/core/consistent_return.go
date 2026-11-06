@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/core"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/consistentreturn"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/consistent_return"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -133,11 +133,11 @@ var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A zero Hooks is the syntactic judgment with nothing added, which is what this
 				// rule is. The extension supplies the two type-driven ones.
-				consistentreturn.Judge(node,
-					consistentreturn.Settings{
+				consistent_return.Judge(node,
+					consistent_return.Settings{
 						TreatUndefinedAsUnspecified: settings.TreatUndefinedAsUnspecified,
 					},
-					consistentreturn.Hooks{},
+					consistent_return.Hooks{},
 					ConsistentReturnReporter(ruleContext),
 					ConsistentReturnDescribe)
 			},
@@ -150,8 +150,8 @@ var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 // Exported so the typescript extension builds an identical one rather than writing its own: the
 // three spans this rule computes are the part a second implementation would most easily get wrong,
 // and they are already measured against the installed build here.
-func ConsistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporter {
-	return consistentreturn.Reporter{
+func ConsistentReturnReporter(ruleContext rule.Context) consistent_return.Reporter {
+	return consistent_return.Reporter{
 		ReportNode: func(node *ast.Node, messageId string, description string) {
 			ruleContext.ReportNode(node, rule.Message{Id: messageId, Description: description})
 		},
@@ -170,15 +170,15 @@ func ConsistentReturnReporter(ruleContext rule.Context) consistentreturn.Reporte
 // per-return messages take a capitalised name, `missingReturn` takes a lower-case one, and the
 // Program case asserts "Program" against "program" in the same file so they cannot be collapsed.
 func ConsistentReturnDescribe(messageId string, name string) string {
-	if messageId == consistentreturn.MessageIdMissingReturn {
+	if messageId == consistent_return.MessageIdMissingReturn {
 		return fmt.Sprintf("Expected to return a value at the end of %s. %s",
 			name, messageConsistentReturnMissingReturn.Description)
 	}
 	description := messageConsistentReturnMissingReturnValue.Description
-	if messageId == consistentreturn.MessageIdUnexpectedReturnValue {
+	if messageId == consistent_return.MessageIdUnexpectedReturnValue {
 		description = messageConsistentReturnUnexpectedReturnValue.Description
 	}
-	return fmt.Sprintf("%s %s %s", name, consistentreturn.Verb(messageId), description)
+	return fmt.Sprintf("%s %s %s", name, consistent_return.Verb(messageId), description)
 }
 
 // consistentReturnIsGenerator says whether a function carries the `*`.

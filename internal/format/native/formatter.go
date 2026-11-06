@@ -5,13 +5,13 @@ import (
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
 // Formatter formats with the registered printers and one set of options.
 type Formatter struct {
-	Options formatoptions.Options
+	Options format_options.Options
 }
 
 // Handles reports whether a printer is registered for the file's type.
@@ -35,7 +35,7 @@ func (formatter Formatter) FormatParsed(fileName string, text string, parsed *as
 
 	// main/core.js's formatWithCursor, once for every language as upstream does it: the byte order mark
 	// comes off before parsing and goes back on after, and carriage returns become newlines. endOfLine
-	// is always "lf" (formatoptions.Resolve refuses anything else), so nothing converts them back.
+	// is always "lf" (format_options.Resolve refuses anything else), so nothing converts them back.
 	hasByteOrderMark := strings.HasPrefix(text, byteOrderMark)
 	normalizedText := strings.TrimPrefix(text, byteOrderMark)
 	if strings.Contains(normalizedText, "\r") {

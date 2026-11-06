@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
@@ -409,7 +409,7 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(test *testing.T) {
 	}
 	for _, pattern := range patterns {
 		for _, flagText := range []string{"", "u", "v"} {
-			structure, ok := scanRegexStructure(pattern, regexsyntax.ParseRegexFlags(flagText))
+			structure, ok := scanRegexStructure(pattern, regex_syntax.ParseRegexFlags(flagText))
 			if !ok {
 				continue
 			}

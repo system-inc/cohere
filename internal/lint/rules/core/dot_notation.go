@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/system-inc/cohere/internal/lint/ecmascript/dotnotation"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/dot_notation"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -37,7 +37,7 @@ type DotNotationOptions struct {
 //	invalid: a.true;   (with allowKeywords: false)
 //
 // Ported from `dot-notation` in ESLint, read from the clone at `lib/rules/dot-notation.js`. The
-// judgment and the repairs live in `ecmascript/dotnotation`, shared with
+// judgment and the repairs live in `ecmascript/dot_notation`, shared with
 // `@typescript-eslint/dot-notation`; this file is the option surface. Two
 // options, two messages, and `meta.fixable` is `"code"`, so the repair is part of the port.
 //
@@ -76,20 +76,20 @@ type DotNotationOptions struct {
 //
 // `5['prop']` must become `5 .prop` and not `5.prop`, because the second re-lexes as the numeric
 // literal `5.` followed by an identifier and stops parsing. Upstream inserts the space only when the
-// object is a plain decimal integer, which is `decimalInteger` in `ecmascript/dotnotation`;
+// object is a plain decimal integer, which is `decimalInteger` in `ecmascript/dot_notation`;
 // `5.000_000` and `0b1010_1010` and `01` all take the no-space branch. Ten corpus cases pin the two
 // branches against each other.
 var DotNotation = rule.Rule[DotNotationOptions]{
 	Name: "dot-notation",
 	Run: func(ruleContext rule.Context, options rule.Given[DotNotationOptions]) rule.Listeners {
-		settings := dotnotation.Settings{AllowKeywords: true}
+		settings := dot_notation.Settings{AllowKeywords: true}
 		if resolved, isDotNotationOptions := options.Read(); isDotNotationOptions {
 			if resolved.AllowKeywords != nil {
 				settings.AllowKeywords = *resolved.AllowKeywords
 			}
-			settings.AllowPattern = dotnotation.CompileAllowPattern(resolved.AllowPattern)
+			settings.AllowPattern = dot_notation.CompileAllowPattern(resolved.AllowPattern)
 		}
-		return dotnotation.Listeners(ruleContext, settings)
+		return dot_notation.Listeners(ruleContext, settings)
 	},
 }
 

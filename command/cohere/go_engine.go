@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/system-inc/cohere/internal/goengine"
+	"github.com/system-inc/cohere/internal/go_engine"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 )
@@ -28,7 +28,7 @@ const goEngineChildVariable = "COHERE_GO_ENGINE_CHILD"
 // line: the Go engine, given everything after the verb, writing contract 3 to standardOutput for the front
 // door that started it.
 func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
-	return goengine.Main(arguments, standardOutput, standardError)
+	return go_engine.Main(arguments, standardOutput, standardError)
 }
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded

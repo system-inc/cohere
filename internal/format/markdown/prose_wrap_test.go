@@ -9,20 +9,20 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/system-inc/cohere/internal/format/differential"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
-	"github.com/system-inc/cohere/internal/format/oracletest"
+	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/format/oracle_testing"
 	"github.com/system-inc/cohere/internal/format/prettier"
 )
 
 // The proseWrap oracle. Every corpus prints with proseWrap "preserve", where a line break returns before
-// whitespace.js reaches its CJK and Korean rules, and formatoptions.Options does not carry the option. So
+// whitespace.js reaches its CJK and Korean rules, and format_options.Options does not carry the option. So
 // these fixtures run the same bundles in their own runtime with proseWrap "always" and "never", against
 // the port with the same setting.
 
 // proseWrapOracle formats markdown with the embedded bundles and a proseWrap of its own. Its answers are
-// recorded (see oracletest), so the runtime is built only when they are recorded again.
+// recorded (see oracle_testing), so the runtime is built only when they are recorded again.
 type proseWrapOracle struct {
-	golden    *oracletest.Golden
+	golden    *oracle_testing.Golden
 	once      sync.Once
 	runtime   *goja.Runtime
 	loadError error
@@ -30,7 +30,7 @@ type proseWrapOracle struct {
 
 func newProseWrapOracle(test *testing.T) *proseWrapOracle {
 	test.Helper()
-	return &proseWrapOracle{golden: oracletest.Open(test, test.Name())}
+	return &proseWrapOracle{golden: oracle_testing.Open(test, test.Name())}
 }
 
 func (oracle *proseWrapOracle) load() {
@@ -51,8 +51,8 @@ func (oracle *proseWrapOracle) load() {
 
 // format is the recorded answer for text, keyed by everything formatLive passes the bundles: the text, the
 // file path, the parser, the options and the proseWrap.
-func (oracle *proseWrapOracle) format(text string, options formatoptions.Options, proseWrap string) (string, error) {
-	key := oracletest.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
+func (oracle *proseWrapOracle) format(text string, options format_options.Options, proseWrap string) (string, error) {
+	key := oracle_testing.Key("proseWrap", text, "fixture.md", "markdown", fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
 		if oracle.loadError != nil {
@@ -64,7 +64,7 @@ func (oracle *proseWrapOracle) format(text string, options formatoptions.Options
 
 func (oracle *proseWrapOracle) formatLive(
 	text string,
-	options formatoptions.Options,
+	options format_options.Options,
 	proseWrap string,
 ) (string, error) {
 	setError := errors.Join(

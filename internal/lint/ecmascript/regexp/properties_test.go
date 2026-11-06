@@ -11,7 +11,7 @@ import (
 	"testing"
 	"unicode"
 
-	"github.com/system-inc/cohere/unicodeproperties"
+	"github.com/system-inc/cohere/unicode_properties"
 )
 
 type inventoryRange struct{ Lo, Hi rune }
@@ -134,17 +134,17 @@ var acceptedPropertyNames string
 
 func TestUnicodePropertiesNode(test *testing.T) {
 	test.Parallel()
-	if unicode.Version != unicodeproperties.Version {
-		test.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicodeproperties.Version)
+	if unicode.Version != unicode_properties.Version {
+		test.Fatalf("Go Unicode %s; property tables %s", unicode.Version, unicode_properties.Version)
 	}
 	names := strings.Fields(acceptedPropertyNames)
-	if !slices.Equal(names, unicodeproperties.Names()) {
+	if !slices.Equal(names, unicode_properties.Names()) {
 		test.Fatal("generated names differ from the pinned Node-accepted inventory")
 	}
 
 	probes := []propertyProbe{}
 	for _, name := range names {
-		property, _ := unicodeproperties.Lookup(name)
+		property, _ := unicode_properties.Lookup(name)
 		rs := make([]inventoryRange, len(property.Ranges))
 		for index, span := range property.Ranges {
 			rs[index] = inventoryRange{span.Lo, span.Hi}
@@ -181,10 +181,10 @@ func TestUnicodePropertiesFresh(test *testing.T) {
 	command := exec.Command(
 		"go",
 		"run",
-		"../../../../unicodeproperties/internal/generate",
+		"../../../../unicode_properties/internal/generate",
 		"-check",
 		"-output",
-		"../../../../unicodeproperties/tables_generated.go",
+		"../../../../unicode_properties/tables_generated.go",
 	)
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {

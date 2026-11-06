@@ -9,7 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -100,7 +100,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 
 	var programs programOffer
 	programs.offer(graph)
-	formatter := native.Formatter{Options: formatoptions.Default()}
+	formatter := native.Formatter{Options: format_options.Default()}
 	transform := func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		return formatter.FormatParsed(fileName, text, parsed)
 	}

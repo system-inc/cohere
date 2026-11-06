@@ -9,7 +9,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
 // A scoped transform must format what is in scope and skip what is not, and the skip must carry the
@@ -228,8 +228,8 @@ func enumerationOf(
 	declined map[string]int,
 	nested []string,
 	ignored map[string]int,
-) formatfiles.Enumeration {
-	return formatfiles.Enumeration{
+) format_files.Enumeration {
+	return format_files.Enumeration{
 		Root:               root,
 		Walked:             walked,
 		Files:              files,
@@ -328,7 +328,7 @@ func TestIgnoreLayersAndNestedRepositoriesAreReported(test *testing.T) {
 	enumeration := enumerationOf(
 		"/repo", []string{"/repo/a.ts"}, 500, nil,
 		[]string{"libraries/structure", "projects/ahraos-macos"},
-		map[string]int{".gitignore": 400, formatfiles.HouseIgnoreLayer: 28, formatfiles.IgnorePatternsLayer: 0},
+		map[string]int{".gitignore": 400, format_files.HouseIgnoreLayer: 28, format_files.IgnorePatternsLayer: 0},
 	)
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
@@ -586,7 +586,7 @@ func TestNarrowToAppendsToTheScopesOwnWording(test *testing.T) {
 // source file is a stated skip rather than an absence.
 func TestTheScopeLineNamesSkippedSymbolicLinks(test *testing.T) {
 	test.Parallel()
-	description := describeEnumeration(formatfiles.Enumeration{
+	description := describeEnumeration(format_files.Enumeration{
 		Root:          "/project",
 		Walked:        4,
 		SymbolicLinks: 2,
@@ -596,7 +596,7 @@ func TestTheScopeLineNamesSkippedSymbolicLinks(test *testing.T) {
 		test.Fatalf("description %q does not name the skipped links", description)
 	}
 	if description := describeEnumeration(
-		formatfiles.Enumeration{Root: "/project", Walked: 1, Files: []string{"/project/a.ts"}},
+		format_files.Enumeration{Root: "/project", Walked: 1, Files: []string{"/project/a.ts"}},
 		1,
 	); strings.Contains(description, "symbolic") {
 		test.Fatalf("a walk with no links names them: %q", description)

@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/core"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/literal"
 	"github.com/system-inc/cohere/internal/lint/ecmascript/reference"
-	"github.com/system-inc/cohere/internal/lint/ecmascript/regexsyntax"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/regex_syntax"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -106,7 +106,7 @@ var messageMisleadingZeroWidthJoiner = rule.Message{
 // `v` adds a second thing: it gives a class internal structure. `\q{...}` matches a string as a
 // unit, a nested `[...]` is its own class, and `--` and `&&` are set operators. Each of those breaks
 // a run of characters in two, so `/[🇯[A]🇵]/v` is clean where `/[🇯🇵]/u` is not: the two indicators
-// are no longer adjacent. That break is what `regexsyntax.RegexCharBreaker` marks, and honoring it
+// are no longer adjacent. That break is what `regex_syntax.RegexCharBreaker` marks, and honoring it
 // is the difference between reproducing upstream and reporting four false positives its corpus
 // names.
 //
@@ -194,7 +194,7 @@ var NoMisleadingCharacterClass = rule.Rule[NoMisleadingCharacterClassOptions]{
 					return
 				}
 				text := node.Text()
-				pattern, flags := regexsyntax.PatternAndFlags(text)
+				pattern, flags := regex_syntax.PatternAndFlags(text)
 				if pattern == "" {
 					return
 				}
@@ -263,7 +263,7 @@ func checkRegExpConstructorCall(
 			return
 		}
 		text := patternNode.Text()
-		pattern, _ := regexsyntax.PatternAndFlags(text)
+		pattern, _ := regex_syntax.PatternAndFlags(text)
 		if pattern == "" {
 			return
 		}
@@ -421,7 +421,7 @@ func checkRegexPatternWithReporter(
 		return
 	}
 
-	flags := regexsyntax.ParseRegexFlags(flagsText)
+	flags := regex_syntax.ParseRegexFlags(flagsText)
 
 	// Under `u` or `v` a brace that opens no quantifier is a SyntaxError, so `RegExp('{ [Á]', 'u')`
 	// never runs and the class inside it cannot mislead anybody. Upstream declines it because its
@@ -444,8 +444,8 @@ func checkRegexPatternWithReporter(
 	// outright, and five of its clean cases are exactly this shape.
 	var found []pendingMisleadingFinding
 	classesParsed := true
-	walked := regexsyntax.IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
-		elements, _, ok := regexsyntax.ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
+	walked := regex_syntax.IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
+		elements, _, ok := regex_syntax.ParseRegexCharacterClassWithEnd(pattern, start, end, flags)
 		if !ok {
 			classesParsed = false
 			return
@@ -511,8 +511,8 @@ type misleadingCharacter struct {
 // no source of its own.
 func characterSequences(
 	pattern string,
-	elements []regexsyntax.RegexCharElement,
-	flags regexsyntax.RegexFlags,
+	elements []regex_syntax.RegexCharElement,
+	flags regex_syntax.RegexFlags,
 	source memberSource,
 ) [][]misleadingCharacter {
 	var sequences [][]misleadingCharacter
@@ -548,9 +548,9 @@ func characterSequences(
 
 	for _, element := range elements {
 		switch element.Kind {
-		case regexsyntax.RegexCharBreaker:
+		case regex_syntax.RegexCharBreaker:
 			flush()
-		case regexsyntax.RegexCharRange:
+		case regex_syntax.RegexCharRange:
 			// The minimum joins the run that was building and closes it; the maximum opens the next
 			// one. Reproducing that shape rather than dropping ranges is what makes
 			// `/[👍-￿]/` report exactly once.
@@ -576,8 +576,8 @@ func characterSequences(
 // returned for both rather than a guess.
 func rangeEndpointBounds(
 	pattern string,
-	element regexsyntax.RegexCharElement,
-	flags regexsyntax.RegexFlags,
+	element regex_syntax.RegexCharElement,
+	flags regex_syntax.RegexFlags,
 ) (int, int) {
 	start := element.Start
 	width := 0
@@ -589,7 +589,7 @@ func rangeEndpointBounds(
 		// `👍` under a unicode flag is two escapes the parser folded into one member.
 		width = 12
 	default:
-		width, _ = regexsyntax.SkipPatternEscape(pattern, start, flags)
+		width, _ = regex_syntax.SkipPatternEscape(pattern, start, flags)
 	}
 	minimumEnd := start + width
 	if width == 0 || minimumEnd >= element.End || pattern[minimumEnd] != '-' {
@@ -735,7 +735,7 @@ func unicodeFlagSuggestionForLiteral(node *ast.Node, text string, flags string) 
 	if strings.ContainsRune(flags, 'u') || strings.ContainsRune(flags, 'v') {
 		return nil
 	}
-	pattern, _ := regexsyntax.PatternAndFlags(text)
+	pattern, _ := regex_syntax.PatternAndFlags(text)
 	if patternMeaningChangesUnderUnicodeFlag(pattern) {
 		return nil
 	}
@@ -804,11 +804,11 @@ func patternMeaningChangesUnderUnicodeFlag(pattern string) bool {
 //
 // Only `{` is examined and a stray `}` is ignored, because the two are not symmetric in the grammar:
 // a lone closing brace is legal under the unicode flag while a lone opening brace is not.
-func patternHasLoneQuantifierBrace(pattern string, flags regexsyntax.RegexFlags) bool {
+func patternHasLoneQuantifierBrace(pattern string, flags regex_syntax.RegexFlags) bool {
 	for index := 0; index < len(pattern); {
 		switch pattern[index] {
 		case '\\':
-			step, ok := regexsyntax.SkipPatternEscape(pattern, index, flags)
+			step, ok := regex_syntax.SkipPatternEscape(pattern, index, flags)
 			if !ok {
 				return false
 			}
@@ -816,7 +816,7 @@ func patternHasLoneQuantifierBrace(pattern string, flags regexsyntax.RegexFlags)
 		case '[':
 			// A brace inside a class is a literal brace in every mode, so classes are stepped over
 			// whole rather than scanned.
-			end, ok := regexsyntax.ClassEnd(pattern, index, flags)
+			end, ok := regex_syntax.ClassEnd(pattern, index, flags)
 			if !ok {
 				return false
 			}

@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_files"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
@@ -22,7 +22,7 @@ import (
 type fakeEngine struct {
 	handled        []string
 	format         func(fileName string, text string) (string, error)
-	enumerate      func(root string) (formatfiles.Enumeration, error)
+	enumerate      func(root string) (format_files.Enumeration, error)
 	options        func(fileName string) (string, error)
 	askedFor       []string
 	enumeratedRoot string
@@ -45,12 +45,12 @@ func (engine *fakeEngine) Handles(fileName string) bool {
 //
 // It returns whatever the fixture set, including the account of what the walk removed, because the
 // numbers in that account are the thing under test rather than the walk itself.
-func (engine *fakeEngine) Enumerate(root string) (formatfiles.Enumeration, error) {
+func (engine *fakeEngine) Enumerate(root string) (format_files.Enumeration, error) {
 	engine.enumeratedRoot = root
 	if engine.enumerate != nil {
 		return engine.enumerate(root)
 	}
-	return formatfiles.Enumeration{Root: root}, nil
+	return format_files.Enumeration{Root: root}, nil
 }
 
 // OptionsFingerprint is one fixed configuration, unless the fixture says otherwise.
@@ -447,7 +447,7 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 	test.Parallel()
 	// ahra's options, named rather than resolved: resolving from this test's directory finds no
 	// config and prints at Prettier's default width, where this input settles in one pass.
-	printer := native.Formatter{Options: formatoptions.Default()}
+	printer := native.Formatter{Options: format_options.Default()}
 	engine := &fakeEngine{handled: []string{".ts"}, format: printer.Format}
 
 	// The premise: one pass really does not settle this input. Without it the case below would pass

@@ -16,7 +16,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/edit"
-	"github.com/system-inc/cohere/internal/format/formatfiles"
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/gitignore"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -323,7 +323,7 @@ type formatWalkAhead struct {
 	engine           formatEngine
 	root             string
 	done             chan struct{}
-	enumeration      formatfiles.Enumeration
+	enumeration      format_files.Enumeration
 	enumerationError error
 }
 
@@ -356,12 +356,12 @@ func startFormatWalkAhead(engine formatEngine, root string, listing gitignore.Li
 
 // listedEnumerator is an engine whose walk can read listings already read (native.Resolving).
 type listedEnumerator interface {
-	EnumerateListed(root string, listing gitignore.Listing) (formatfiles.Enumeration, error)
+	EnumerateListed(root string, listing gitignore.Listing) (format_files.Enumeration, error)
 }
 
 // enumerateFormatTree is engine.Enumerate(root), taken from the walk begun ahead when that walk was of the same
 // engine and root. A walk begun ahead is taken once; any other call walks the tree itself.
-func enumerateFormatTree(engine formatEngine, root string) (formatfiles.Enumeration, error) {
+func enumerateFormatTree(engine formatEngine, root string) (format_files.Enumeration, error) {
 	if ahead := aheadFormatWalk; ahead != nil && ahead.engine == engine && ahead.root == root {
 		aheadFormatWalk = nil
 		<-ahead.done

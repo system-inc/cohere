@@ -17,7 +17,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/formatoptions"
+	"github.com/system-inc/cohere/internal/format/format_options"
 	"github.com/system-inc/cohere/internal/format/printing"
 )
 
@@ -95,15 +95,15 @@ func embed(
 }
 
 // printSettings is what a format carries in options.Settings: the resolved Prettier options, and
-// options.parser, which formatoptions.Options does not hold since the file's language decides it.
+// options.parser, which format_options.Options does not hold since the file's language decides it.
 type printSettings struct {
-	formatoptions.Options
+	format_options.Options
 	// parser is options.parser: "css" or "scss".
 	parser string
 }
 
 // settingsOf is the resolved Prettier options a format carries in options.Settings.
-func settingsOf(options *printerOptions) formatoptions.Options {
+func settingsOf(options *printerOptions) format_options.Options {
 	return printSettingsOf(options).Options
 }
 
@@ -119,19 +119,19 @@ func printSettingsOf(options *printerOptions) printSettings {
 
 // Format is Prettier's format for a CSS file: parse, print to a doc, lay it out. Byte order marks and
 // line endings are normalized by the shared layer, not here.
-func Format(text string, prettierOptions formatoptions.Options) (string, error) {
+func Format(text string, prettierOptions format_options.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "css")
 }
 
 // FormatScss is Prettier's format for an SCSS file, the parser "scss".
-func FormatScss(text string, prettierOptions formatoptions.Options) (string, error) {
+func FormatScss(text string, prettierOptions format_options.Options) (string, error) {
 	return formatWithParser(text, prettierOptions, "scss")
 }
 
 // formatWithParser is Format under the parser named, "css" or "scss".
 func formatWithParser(
 	text string,
-	prettierOptions formatoptions.Options,
+	prettierOptions format_options.Options,
 	parser string,
 ) (formatted string, formatWithParserError error) {
 	defer func() {
@@ -154,19 +154,19 @@ func formatWithParser(
 
 // PrintToDoc is upstream's textToDoc for CSS embedded in another language: the printed doc with its
 // trailing hardline stripped.
-func PrintToDoc(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
+func PrintToDoc(text string, prettierOptions format_options.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "css")
 }
 
 // PrintToDocScss is PrintToDoc for SCSS, the parser "scss".
-func PrintToDocScss(text string, prettierOptions formatoptions.Options) (doc.Doc, error) {
+func PrintToDocScss(text string, prettierOptions format_options.Options) (doc.Doc, error) {
 	return printToDocWithParser(text, prettierOptions, "scss")
 }
 
 // printToDocWithParser is PrintToDoc under the parser named, "css" or "scss".
 func printToDocWithParser(
 	text string,
-	prettierOptions formatoptions.Options,
+	prettierOptions format_options.Options,
 	parser string,
 ) (document doc.Doc, printToDocWithParserError error) {
 	defer func() {
@@ -184,7 +184,7 @@ func printToDocWithParser(
 
 // printToDoc is parser-postcss.js's parseCss (or parseScss) followed by printAstToDoc
 // (src/main/ast-to-doc.js).
-func printToDoc(text string, prettierOptions formatoptions.Options, parser string) (doc.Doc, error) {
+func printToDoc(text string, prettierOptions format_options.Options, parser string) (doc.Doc, error) {
 	root, parseError := parseWithParserName(text, parser)
 	if parseError != nil {
 		if !printing.IsSyntax(parseError) {
