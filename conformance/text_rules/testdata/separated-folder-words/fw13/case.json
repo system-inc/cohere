@@ -1,0 +1,14 @@
+{
+    "why": "fw13: Go's package clause `package treebuilder` runs words together under a folder `clause` that does not, so the clause is reported, a Go fact. Go form only: no other language names a file's package in it",
+    "expect": [
+        {
+            "covers": "package treebuilder",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": "clause/fw13",
+    "languages": [
+        "go"
+    ]
+}

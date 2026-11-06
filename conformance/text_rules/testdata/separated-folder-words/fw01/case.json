@@ -1,0 +1,15 @@
+{
+    "why": "fw01: `formatoptions` runs two words together and is reported, asking for `format_options`",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "formatoptions/fw01",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

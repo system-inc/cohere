@@ -1,0 +1,15 @@
+{
+    "why": "fw02: each underscore-separated part is judged on its own, so `text_formatoptions` is reported for its second part though its first is already separated",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "text_formatoptions/fw02",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

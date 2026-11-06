@@ -43,10 +43,7 @@ func init() {
 			Rule:   ConsistencyNoScreamingSnakeCase,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoScreamingSnakeCaseOptions](),
 		},
-		rule.Registration[ConsistencyNoShoutingOptions]{
-			Rule:   ConsistencyNoShouting,
-			Decode: rule.DecodeOptionsInto[ConsistencyNoShoutingOptions](),
-		},
+		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoShouting},
 		rule.Registration[rule.NoOptions]{Rule: ConsistencyNoSingleLineJsDoc},
 		rule.Registration[ConsistencyNoStutteringNameOptions]{
 			Rule:   ConsistencyNoStutteringName,

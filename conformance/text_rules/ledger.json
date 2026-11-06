@@ -24,6 +24,52 @@
         "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
     },
     {
+        "engine": "typescript",
+        "family": "separated-folder-words",
+        "task": "narw7aq",
+        "reason": "TypeScript has no separated-folder-words rule"
+    },
+    {
+        "engine": "go",
+        "family": "separated-folder-words",
+        "case": "fw00",
+        "kind": "span",
+        "task": "vmgvqf4",
+        "reason": "the folder finding covers the package clause, from `package` to the end of the name, rather than sitting at the file's start"
+    },
+    {
+        "engine": "go",
+        "family": "separated-folder-words",
+        "case": "fw01",
+        "kind": "span",
+        "task": "vmgvqf4",
+        "reason": "the folder finding covers the package clause, from `package` to the end of the name, rather than sitting at the file's start"
+    },
+    {
+        "engine": "go",
+        "family": "separated-folder-words",
+        "case": "fw02",
+        "kind": "span",
+        "task": "vmgvqf4",
+        "reason": "the folder finding covers the package clause, from `package` to the end of the name, rather than sitting at the file's start"
+    },
+    {
+        "engine": "go",
+        "family": "separated-folder-words",
+        "case": "fw03",
+        "kind": "span",
+        "task": "vmgvqf4",
+        "reason": "the folder finding covers the package clause, from `package` to the end of the name, rather than sitting at the file's start"
+    },
+    {
+        "engine": "go",
+        "family": "separated-folder-words",
+        "case": "fw04",
+        "kind": "span",
+        "task": "vmgvqf4",
+        "reason": "the folder finding covers the package clause, from `package` to the end of the name, rather than sitting at the file's start"
+    },
+    {
         "engine": "swift",
         "family": "ambiguous-identifier",
         "case": "am03",
@@ -46,5 +92,11 @@
         "kind": "verdict",
         "task": "78b6gw0",
         "reason": "a numeric function's `s`, `t` and `d` are exempt as kernel letters, so none is reported"
+    },
+    {
+        "engine": "swift",
+        "family": "separated-folder-words",
+        "task": "2fnqe2h",
+        "reason": "Swift has no separated-folder-words rule"
     }
 ]

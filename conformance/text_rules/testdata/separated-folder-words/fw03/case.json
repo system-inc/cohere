@@ -1,0 +1,15 @@
+{
+    "why": "fw03: `jsonlines` runs `json` and `lines` together and is reported",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "jsonlines/fw03",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

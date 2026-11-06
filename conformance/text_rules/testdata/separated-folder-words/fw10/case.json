@@ -1,0 +1,11 @@
+{
+    "why": "fw10: `format_options` already separates its words, so it is clean",
+    "expect": [],
+    "options": {},
+    "path": "format_options/fw10",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

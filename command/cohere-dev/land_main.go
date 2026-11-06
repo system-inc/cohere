@@ -32,10 +32,23 @@ const landWorktreeVariable = "COHERE_DEV_LAND_WORKTREE"
 // test can run main's land without building cohere's whole module.
 const mainLandVariable = "COHERE_DEV_MAIN_LAND"
 
+// handedWorktree is the worktree main's land was handed, read once and taken out of the environment by
+// takeHandedWorktree, or empty for a land run where it lands.
+var handedWorktree string
+
+// takeHandedWorktree reads the worktree this land was handed and removes it from the environment, so nothing
+// land starts inherits it. The gate's tests did: under main's land, each test's own `cohere-dev land` read the
+// variable and took the real worktree being landed for its fixture's (#06g3f7x's first landing, 2026-11-06).
+func takeHandedWorktree() {
+	handedWorktree = os.Getenv(landWorktreeVariable)
+	// Ignored: Unsetenv fails only on a name with a zero byte or an equals sign, and this holds neither.
+	_ = os.Unsetenv(landWorktreeVariable)
+}
+
 // landWorktree is the worktree being landed: the one main's land was handed, or the one land runs in.
 func landWorktree() (string, error) {
-	if handed := os.Getenv(landWorktreeVariable); handed != "" {
-		return handed, nil
+	if handedWorktree != "" {
+		return handedWorktree, nil
 	}
 	return gitOutput("", "rev-parse", "--show-toplevel")
 }
@@ -44,7 +57,7 @@ func landWorktree() (string, error) {
 // the worktree's cohere-dev is main's, or the repository has no cohere-dev source at all, so there is no other
 // land to run.
 func runsMainsLand(worktree string) bool {
-	if os.Getenv(landWorktreeVariable) != "" {
+	if handedWorktree != "" {
 		return true
 	}
 	mains, gitOutputError := gitOutput(worktree, "rev-parse", "--verify", "--quiet", "main:"+landSource)

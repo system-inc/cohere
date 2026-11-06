@@ -1,0 +1,11 @@
+{
+    "why": "fw12: the project's root folder is never judged, so a file directly in a project checked out as `goengine` is clean. Go has no form: Go's root folder is its module path's last element, which the adapter fixes as `text_rules`, a name that passes either way, so a Go form would prove nothing; the rule's own module fixture holds Go's root",
+    "expect": [],
+    "options": {},
+    "path": "fw12",
+    "root": "/checkouts/goengine",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

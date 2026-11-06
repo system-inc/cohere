@@ -219,6 +219,46 @@ public struct Pipeline {
             )
         )
 
+        /*
+         Every ending of a run that described the project: what its verdict was read from, then the summary, so the
+         front door can replay the verdict while nothing named has moved (`RunInputs`). Taken as the run ends, so a
+         package a build first linked is named, and the front door refuses the record when anything named moved
+         after the run began.
+         */
+        func finish(complete: Bool) throws -> Int32 {
+            var linkedPackageRoots: [URL] = []
+            var pins: [URL] = []
+            if let xcodeProject {
+                let phase = XcodeTypesPhase(
+                    package: package,
+                    project: xcodeProject,
+                    files: fileSet.owned,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                linkedPackageRoots = phase.inputRoots
+                pins = RunInputs.pinsRead(by: phase)
+            }
+            try writer.write(
+                RunInputs.record(
+                    package: package,
+                    fileSet: fileSet,
+                    linkedPackageRoots: linkedPackageRoots,
+                    pins: pins,
+                    boundary: repositoryRoot(of: root),
+                    settingsFile: options.lintConfiguration
+                        ?? configurationRoot.appendingPathComponent(
+                            "CohereSettings.json"
+                        ),
+                    toolchainExecutable: (try? SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
+                        .map(RunInputs.toolchainExecutable(libraryPath:)),
+                )
+            )
+            return try writer.finish(complete: complete)
+        }
+
         var complete = true
 
         /* Parsing is the fix phase's first step: it is what the fixers and the formatter would rewrite. */
@@ -417,7 +457,7 @@ public struct Pipeline {
                 )
             )
             try writer.write(unusedPhase(notReached: reason))
-            return try writer.finish(complete: false)
+            return try finish(complete: false)
         }
 
         /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
@@ -504,7 +544,7 @@ public struct Pipeline {
                         "types bailed: \(typeErrors) type errors, and the index of a package that does not compile is not the package"
                 )
             )
-            return try writer.finish(complete: false)
+            return try finish(complete: false)
         }
 
         if !options.runLint {
@@ -589,7 +629,7 @@ public struct Pipeline {
         else {
             try writer.write(PhaseRecord(name: .unused, outcome: .skipped, detail: Self.unusedNotRequested))
         }
-        return try writer.finish(complete: complete)
+        return try finish(complete: complete)
     }
 
     static let unusedNotRequested = "not requested — this is a report, ask for it with --unused"

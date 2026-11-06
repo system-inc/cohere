@@ -236,7 +236,7 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 		{"a run whose fix phase rewrote files", rewrote, 0, "the fix phase rewrote 2 files"},
 	}
 	for _, testCase := range cases {
-		reason := goRunUnrecordable(testCase.run, testCase.exitCode)
+		reason := engineRunUnrecordable(testCase.run, testCase.exitCode)
 		wrong := reason != ""
 		if testCase.reason != "" {
 			wrong = !strings.Contains(reason, testCase.reason)
@@ -350,7 +350,7 @@ func TestGoInputsUnreplayableRefusesWhatWouldNeverReplay(test *testing.T) {
 		}, "a directory above the root"},
 	}
 	for _, testCase := range cases {
-		reason := goInputsUnreplayable(&testCase.inputs, roots)
+		reason := engineInputsUnreplayable("the Go engine", &testCase.inputs, roots, "")
 		wrong := reason != ""
 		if testCase.reason != "" {
 			wrong = !strings.Contains(reason, testCase.reason)

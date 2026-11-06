@@ -325,8 +325,9 @@ func run() error {
 		if runSwiftEngineError != nil {
 			return runSwiftEngineError
 		}
+		// Through the run cache, which records a Swift verdict (see beginSwiftRunCache), as a Go run's exit goes.
 		if exitCode != 0 {
-			exitProcess(exitCode)
+			finishRunCache(exitCode)
 		}
 		return nil
 	}

@@ -441,7 +441,7 @@ struct XcodeTypesPhase {
                 at: resolvedInBuild.deletingLastPathComponent(),
                 withIntermediateDirectories: true,
             )
-            try pins.write(to: resolvedInBuild, options: .atomic)
+            try Self.write(pins, unlessAlreadyAt: resolvedInBuild)
         }
         catch {
             /* Without them the build resolves, or under `--no-fix` says it could not; either way the run says what happened. */
@@ -518,10 +518,21 @@ struct XcodeTypesPhase {
     func keepResolved() {
         guard let pins = try? Data(contentsOf: resolvedInBundle) else { return }
         do {
-            try pins.write(to: keptResolved, options: .atomic)
+            try Self.write(pins, unlessAlreadyAt: keptResolved)
         }
         catch {
             /* Not kept, so the next run resolves again: slower, and still right. */
         }
+    }
+
+    /*
+     Pins written only when the file does not hold them already. The kept copy and the workspace's are inputs of the
+     run's record (`RunInputs.pinsRead`), and a write moves a file's change time and, atomic, its identity, whatever it
+     writes: a run that rewrote the same pins would be refused its record, and an Xcode root whose every run did so
+     would never replay again, with nothing saying why.
+     */
+    static func write(_ pins: Data, unlessAlreadyAt file: URL) throws {
+        guard (try? Data(contentsOf: file)) != pins else { return }
+        try pins.write(to: file, options: .atomic)
     }
 }

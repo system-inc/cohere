@@ -1,0 +1,16 @@
+{
+    "why": "fw00: the control, a folder `goengine` runs `go` and `engine` together and is reported once, at the file's start, where every engine's folder finding sits",
+    "control": true,
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "goengine/fw00",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

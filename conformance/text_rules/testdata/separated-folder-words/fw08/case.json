@@ -1,0 +1,11 @@
+{
+    "why": "fw08: `changelog` is a single word in the lists, so it is clean though it splits as `change_log`",
+    "expect": [],
+    "options": {},
+    "path": "changelog/fw08",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

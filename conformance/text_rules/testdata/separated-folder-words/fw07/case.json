@@ -1,0 +1,11 @@
+{
+    "why": "fw07: `gitignore` is a single word in the lists, so it is clean though it splits as `git_ignore`",
+    "expect": [],
+    "options": {},
+    "path": "gitignore/fw07",
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
