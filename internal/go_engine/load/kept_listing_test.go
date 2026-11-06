@@ -24,6 +24,14 @@ var listingFiles = map[string]string{
 	"project/base/embed.go": "package base\n\nimport \"embed\"\n\n// Static is the files base embeds.\n" +
 		"//\n//go:embed static/*\nvar Static embed.FS\n",
 	"project/base/static/first.txt": "first\n",
+	"project/embedded/embedded.go": "package embedded\n\nimport \"embed\"\n\n" +
+		"// Assets is the files in assets.\n//\n//go:embed assets/*\nvar Assets embed.FS\n\n" +
+		"// Flat is the files in testdata/flat, which go's walk for packages leaves out.\n//\n" +
+		"//go:embed testdata/flat/*\nvar Flat embed.FS\n\n" +
+		"// Deep is everything below testdata/deep.\n//\n//go:embed testdata/deep\nvar Deep embed.FS\n",
+	"project/embedded/assets/first.txt":              "first\n",
+	"project/embedded/testdata/flat/first.txt":       "first\n",
+	"project/embedded/testdata/deep/inner/first.txt": "first\n",
 	"project/user/user.go": "package user\n\nimport (\n\t\"example.com/listing/base\"\n" +
 		"\t\"example.com/outside/lib\"\n)\n\n// User calls Base and Lib.\n" +
 		"func User() int { return base.Base() + lib.Lib() }\n",
@@ -87,6 +95,9 @@ type listingEdit struct {
 	environment []string
 
 	kept bool
+
+	// embedded is a file the edited load must list among a package's EmbedFiles, when the edit adds one.
+	embedded string
 }
 
 // listingEdits are one edit of each kind go list reads, and one it does not.
@@ -114,6 +125,15 @@ var listingEdits = []listingEdit{
 	{name: "a package directory renamed", removed: []string{"project/user/user.go", "project/user"},
 		files: map[string]string{"project/client/user.go": listingFiles["project/user/user.go"]}},
 	{name: "an embed target added", files: map[string]string{"project/base/static/second.txt": "second\n"}},
+	{name: "an embed target added in a directory a pattern matches",
+		files:    map[string]string{"project/embedded/assets/second.txt": "second\n"},
+		embedded: "project/embedded/assets/second.txt"},
+	{name: "an embed target added in testdata, which go's walk leaves out",
+		files:    map[string]string{"project/embedded/testdata/flat/second.txt": "second\n"},
+		embedded: "project/embedded/testdata/flat/second.txt"},
+	{name: "an embed target added two directories down an embedded directory",
+		files:    map[string]string{"project/embedded/testdata/deep/inner/lower/second.txt": "second\n"},
+		embedded: "project/embedded/testdata/deep/inner/lower/second.txt"},
 	{name: "a replace changed", files: map[string]string{
 		"project/go.mod":         strings.Replace(listingFiles["project/go.mod"], "../outside", "../moved", 1),
 		"moved/go.mod":           listingFiles["outside/go.mod"],
@@ -172,6 +192,10 @@ func TestGoListsAnswerIsKeptUntilWhatItReadsMoves(test *testing.T) {
 			edited, kept := loadSummary(test, project, editedEnvironment, listings)
 			if kept != edit.kept {
 				test.Errorf("want the answer kept %t after the edit, got %t", edit.kept, kept)
+			}
+			if edit.embedded != "" && !strings.Contains(strings.Join(edited, "\n"),
+				filepath.Join(root, filepath.FromSlash(edit.embedded))) {
+				test.Errorf("want %s among the embedded files, got\n%s", edit.embedded, strings.Join(edited, "\n"))
 			}
 			fresh, _ := loadSummary(test, project, editedEnvironment, nil)
 			if strings.Join(edited, "\n") != strings.Join(fresh, "\n") {
