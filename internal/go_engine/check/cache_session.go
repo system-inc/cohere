@@ -181,6 +181,10 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 	}
 	dropped := false
 	for hit, restored := range session.hits {
+		// The second clause is reachable: a package the load reaches that nothing analyzes or imports, as plain p
+		// beside "p [p.test]" when nothing imports p, gets no action and is stored without facts. Once a root that
+		// missed imports it, a fact analyzer on that root runs on it, so it must miss and be analyzed again
+		// (TestAPackageStoredWithoutFactsMissesOnceARootImportsIt).
 		short := session.given[hit] && !covers(restored, session.known.rules) ||
 			askedForFacts[hit] && !covers(restored, session.known.facts)
 		if short {

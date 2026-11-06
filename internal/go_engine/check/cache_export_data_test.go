@@ -194,3 +194,87 @@ func TestAPackageWithALoadDiagnosticIsNeverSaved(test *testing.T) {
 			len(parsed), again.loaded.Diagnostics)
 	}
 }
+
+// unimportedFiles are a module whose package base declares Marked and has an in-package test, so the load analyzes
+// "base [base.test]" and loads plain base as a root it never analyzes, which nothing imports.
+var unimportedFiles = map[string]string{
+	"go.mod": "module example.com/unimported\n\ngo 1.24\n",
+	"base/base.go": "package base\n\n// Marked is the function markedAnalyzer exports a fact for.\n" +
+		"func Marked() int { return 1 }\n",
+	"base/base_test.go": "package base\n\nimport \"testing\"\n\n" +
+		"// TestMarked calls Marked.\nfunc TestMarked(test *testing.T) {\n\ttest.Parallel()\n\t_ = Marked()\n}\n",
+}
+
+// userFile is the root added in the second run, which imports plain base and calls Marked, so marked reports the
+// call only through the fact base exports.
+const userFile = "package user\n\nimport \"example.com/unimported/base\"\n\n" +
+	"// Use calls Marked from outside the package that marked it.\nfunc Use() int { return base.Marked() }\n"
+
+// writeFiles writes files into root.
+func writeFiles(test *testing.T, root string, files map[string]string) {
+	test.Helper()
+	for name, contents := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatalf("making the directory of %s: %v", name, makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", name, writeError)
+		}
+	}
+}
+
+// A package the load reaches that nothing analyzes or imports is stored without facts, since no fact analyzer ran
+// on it. Once a new root imports it, its facts are asked for, so it must miss: it is checked and analyzed again, the
+// root's finding that depends on its fact fires, and the Result is a run's without the cache over the same tree.
+func TestAPackageStoredWithoutFactsMissesOnceARootImportsIt(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	writeFiles(test, root, unimportedFiles)
+	rules := []rule.Rule{houseRule(markedAnalyzer)}
+	caching := testCaching(test, rules)
+	first := runWithSession(test, root, caching, rules)
+	plainBase := func(session *CacheSession) *packages.Package {
+		for keyed := range session.keys {
+			if keyed.ID == "example.com/unimported/base" {
+				return keyed
+			}
+		}
+		test.Fatalf("the load reached no plain base")
+		return nil
+	}
+	stored, held := caching.Store.Get(first.session.keys[plainBase(first.session)])
+	if !held {
+		test.Fatalf("want plain base written by the first run")
+	}
+	restored, decodeError := decodeEntry(first.session.known, plainBase(first.session), stored)
+	if decodeError != nil || covers(restored, first.session.known.facts) {
+		test.Fatalf("want plain base stored without facts, got %v", decodeError)
+	}
+
+	writeFiles(test, root, map[string]string{"user/user.go": userFile})
+	second := runWithSession(test, root, caching, rules)
+	if second.session.restored(plainBase(second.session)) {
+		test.Errorf("want plain base missed once user imports it, got a hit")
+	}
+	uncachedLoad, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil {
+		test.Fatalf("loading %s again: %v", root, loadError)
+	}
+	uncached, runError := Run(uncachedLoad.Packages, rules, Options{})
+	if runError != nil {
+		test.Fatalf("running without the cache: %v", runError)
+	}
+	if !reflect.DeepEqual(withoutTimesOrCache(second.result), withoutTimesOrCache(uncached)) {
+		test.Fatalf("cached\n%+v\nwithout the cache\n%+v", withoutTimesOrCache(second.result),
+			withoutTimesOrCache(uncached))
+	}
+	fired := false
+	for _, found := range second.result.Findings {
+		fired = fired || found.Message == "calls Marked, which base marked"
+	}
+	if !fired {
+		test.Fatalf("want user's call to Marked reported from base's fact, got %+v", second.result.Findings)
+	}
+}
