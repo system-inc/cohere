@@ -94,16 +94,17 @@ func Open(test testing.TB, name string) *Golden {
 func read(path string, digest string) (map[string]Answer, error) {
 	file, openError := os.Open(path)
 	if openError != nil {
-		return nil, fmt.Errorf("%s holds no recorded oracle answers (%v)", path, openError)
+		return nil, fmt.Errorf("%s holds no recorded oracle answers (%w)", path, openError)
 	}
+	// Ignored: the golden is only read, so a failed close loses nothing already decoded.
 	defer file.Close()
 	unzipped, gzipError := gzip.NewReader(file)
 	if gzipError != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, gzipError)
+		return nil, fmt.Errorf("%s is not a golden: %w", path, gzipError)
 	}
 	var contents record
 	if decodeError := json.NewDecoder(unzipped).Decode(&contents); decodeError != nil {
-		return nil, fmt.Errorf("%s is not a golden: %v", path, decodeError)
+		return nil, fmt.Errorf("%s is not a golden: %w", path, decodeError)
 	}
 	if contents.Digest != digest {
 		return nil, fmt.Errorf(
@@ -132,8 +133,17 @@ func (golden *Golden) write() {
 		golden.t.Errorf("recording %s: %v", golden.path, createError)
 		return
 	}
-	defer file.Close()
-	zipped, _ := gzip.NewWriterLevel(file, gzip.BestCompression)
+	// The close is checked, since a golden whose last bytes never landed would read as truncated next run.
+	defer func() {
+		if fileCloseError := file.Close(); fileCloseError != nil {
+			golden.t.Errorf("recording %s: %v", golden.path, fileCloseError)
+		}
+	}()
+	zipped, newWriterError := gzip.NewWriterLevel(file, gzip.BestCompression)
+	if newWriterError != nil {
+		golden.t.Errorf("recording %s: %v", golden.path, newWriterError)
+		return
+	}
 	encoder := json.NewEncoder(zipped)
 	encoder.SetIndent("", " ")
 	if encodeError := encoder.Encode(record{Digest: golden.digest, Answers: golden.answers}); encodeError != nil {

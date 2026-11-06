@@ -20,8 +20,12 @@ func writeGolden(test *testing.T, contents record) string {
 	if encodeError := json.NewEncoder(zipped).Encode(contents); encodeError != nil {
 		test.Fatal(encodeError)
 	}
-	zipped.Close()
-	file.Close()
+	if closeError := zipped.Close(); closeError != nil {
+		test.Fatal(closeError)
+	}
+	if closeError := file.Close(); closeError != nil {
+		test.Fatal(closeError)
+	}
 	return path
 }
 
@@ -57,7 +61,10 @@ func TestKeysDoNotRunTogether(test *testing.T) {
 	if Key("ab", "c") == Key("a", "bc") {
 		test.Fatal("two different inputs share a key")
 	}
-	if Key("a", "b") != Key("a", "b") {
+	// Two calls, so the comparison is of two keys computed apart rather than one expression with itself.
+	first := Key("a", "b")
+	second := Key("a", "b")
+	if first != second {
 		test.Fatal("one input has two keys")
 	}
 }
