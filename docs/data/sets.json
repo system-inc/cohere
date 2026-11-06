@@ -911,6 +911,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -1257,7 +1261,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -2373,6 +2377,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -2715,7 +2723,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -3889,6 +3897,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -4038,7 +4050,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -5171,6 +5183,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -5525,7 +5541,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -6840,6 +6856,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -7225,7 +7245,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -8511,6 +8531,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -8853,7 +8877,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",
@@ -9952,6 +9976,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-no-label",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-no-long-line-comment",
                 "severity": "error"
             },
@@ -10294,7 +10322,7 @@
             },
             {
                 "name": "no-labels",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "no-lone-blocks",

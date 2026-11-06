@@ -1,0 +1,24 @@
+{
+    "rule": "nexus/consistency-no-label",
+    "firing": {
+        "file": "/project/source/Thing.ts",
+        "source": "export function assign(): void {\n  marker: void 0\n}\n",
+        "findings": [
+            {
+                "line": 2,
+                "column": 3,
+                "endLine": 2,
+                "endColumn": 9,
+                "messageId": "label",
+                "message": "`marker` is a label, and a jump to it lands where a reader is not looking: they have to find the label to know where execution goes next. When a `break` or `continue` names it to leave a loop or a block, move that code into a function of its own and `return` from it, or test a named boolean the loop reads, so the exit says where it goes."
+            }
+        ]
+    },
+    "clean": {
+        "file": "/project/source/Thing.ts",
+        "source": "export const outer: number = 1\n"
+    },
+    "assertedMessageIds": [
+        "label"
+    ]
+}

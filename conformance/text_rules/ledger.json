@@ -24,22 +24,6 @@
         "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
     },
     {
-        "engine": "typescript",
-        "family": "labels",
-        "case": "lb00",
-        "kind": "span",
-        "task": "bwrr0nm",
-        "reason": "`no-labels` covers the whole labeled statement, the loop included, rather than the label"
-    },
-    {
-        "engine": "typescript",
-        "family": "labels",
-        "case": "lb01",
-        "kind": "verdict",
-        "task": "bwrr0nm",
-        "reason": "`no-labels` reports the `continue` and the `break` naming the label too, three findings for one label"
-    },
-    {
         "engine": "swift",
         "family": "ambiguous-identifier",
         "case": "am03",

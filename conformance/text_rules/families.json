@@ -26,7 +26,7 @@
         "swift": "cohere-swift/consistency-no-print"
     },
     "labels": {
-        "typescript": "no-labels",
+        "typescript": "nexus/consistency-no-label",
         "go": "cohere-go/consistency-no-label",
         "swift": "cohere-swift/consistency-no-label"
     },
