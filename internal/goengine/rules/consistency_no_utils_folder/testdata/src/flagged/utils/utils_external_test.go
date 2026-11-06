@@ -1,5 +1,7 @@
-// An external test package sits in the folder of the package it tests, which is reported on its own, so this file
-// carries no finding.
+// want `^Folder name "utils" is not allowed\. Use "utilities" instead\.$`
+
+// An external test package sits in the folder of the package it tests, and its file is judged by that folder,
+// though its import path ends in utils_test.
 package utils_test
 
 import (
