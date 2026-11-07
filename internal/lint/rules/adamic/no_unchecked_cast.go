@@ -12,6 +12,50 @@ import (
 // noUncheckedCastText is the rule's message, whose wording lives in `policy/messages/no-unchecked-cast.json`.
 var noUncheckedCastText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedCast")
 
+// noUncheckedCastUnderTscText is uncheckedCast when no runtime check is emitted, from the same file: the
+// default's last sentence, that Adamic checks a union downcast, is false on tsc and points at the wrong fix.
+var noUncheckedCastUnderTscText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedCastUnderTsc")
+
+// noUncheckedDowncastText is the message for a union downcast when no runtime check is emitted, from the same file.
+var noUncheckedDowncastText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedDowncast")
+
+// uncheckedCastText is the message for a cast nothing could check, chosen from the option here and nowhere
+// else: Adamic's names the union downcast it checks as the way out, and tsc's names a type guard instead.
+func uncheckedCastText(settings NoUncheckedCastOptions) policy.MessageHandle {
+	if settings.RuntimeChecksEmitted {
+		return noUncheckedCastText
+	}
+	return noUncheckedCastUnderTscText
+}
+
+// NoUncheckedCastOptions says whether the program's compiler backs a union downcast with a runtime check.
+type NoUncheckedCastOptions struct {
+	// RuntimeChecksEmitted is true for a program Adamic compiles, which checks a union downcast at runtime
+	// and panics when it fails, and false for one that runs on tsc, which emits nothing for a cast, so every
+	// union downcast is as unchecked as any other narrowing. True when absent: Adamic's meaning.
+	RuntimeChecksEmitted bool `json:"runtimeChecksEmitted"`
+}
+
+// DefaultNoUncheckedCastOptions is the rule's meaning with nothing configured: Adamic's, where a union
+// downcast is checked.
+func DefaultNoUncheckedCastOptions() NoUncheckedCastOptions {
+	return NoUncheckedCastOptions{RuntimeChecksEmitted: true}
+}
+
+// DecodeNoUncheckedCastOptions reads the rule's options over its defaults. Hand-rolled rather than
+// rule.DecodeOptionsInto, which would decode an absent runtimeChecksEmitted to false and turn a bare
+// severity into the strict reading.
+func DecodeNoUncheckedCastOptions(raw []byte) (NoUncheckedCastOptions, error) {
+	options := DefaultNoUncheckedCastOptions()
+	if len(raw) == 0 {
+		return options, nil
+	}
+	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &options); unmarshalOptionsError != nil {
+		return options, unmarshalOptionsError
+	}
+	return options, nil
+}
+
 // CheckedDowncastNote is the note a cast Adamic compiles to a runtime check records: counted under
 // --coverage, never a finding, so readiness does not fail on it.
 const CheckedDowncastNote = "checked downcast"
@@ -36,6 +80,15 @@ const CheckedDowncastNote = "checked downcast"
  *   by typeof, or by instanceof. Adamic compiles it to a check that panics (adamic docs/0.1.md, decision
  *   5), so it is no hole. It is counted as a note, CheckedDowncastNote, and not reported.
  *
+ * # runtimeChecksEmitted
+ *
+ * The checked downcast is checked only where a compiler emits the check. tsc emits none, so in a project
+ * that runs on tsc `value as string`, where value is `string | true`, is as unchecked as `load() as User`.
+ * With `runtimeChecksEmitted: false` the rule says so: every checked downcast is reported, with a message
+ * naming the type guard to write instead (#mdccedj). Measured on ahra, www-phi-health, api-phi-health and
+ * www-ahra-ai, typescript-eslint's no-unsafe-type-assertion reported 71 such sites this rule passed, and
+ * 28 of them were real bugs. Absent, it is true, and the rule reads as it always has.
+ *
  * Everything else is reported, `as unknown as T` and `as NonNullable<T>` included. A source typed `any`
  * is assignable to every target, so it is caught before the upcast test: the cast is the only claim the
  * value's type ever gets.
@@ -47,15 +100,28 @@ const CheckedDowncastNote = "checked downcast"
  *
  * The repair is where the value comes from, which the cast hides.
  */
-var NoUncheckedCast = rule.Rule[rule.NoOptions]{
+var NoUncheckedCast = rule.Rule[NoUncheckedCastOptions]{
 	Name:             "adamic/no-unchecked-cast",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUncheckedCastOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}
+		settings, configured := options.Read()
+		if !configured {
+			settings = DefaultNoUncheckedCastOptions()
+		}
 		typeChecker := ruleContext.TypeChecker
+		report := func(node *ast.Node, text policy.MessageHandle, source *checker.Type, target *checker.Type) {
+			ruleContext.ReportNode(node, rule.Message{
+				Id: text.Id,
+				Description: text.Render(map[string]string{
+					"source": typeChecker.TypeToString(source),
+					"target": typeChecker.TypeToString(target),
+				}),
+			})
+		}
 		judge := func(node *ast.Node) {
 			typeNode := node.Type()
 			if typeNode == nil || ast.IsConstTypeReference(typeNode) {
@@ -70,24 +136,35 @@ var NoUncheckedCast = rule.Rule[rule.NoOptions]{
 			// the upcast test would pass it: the cast is the only claim the value's type gets, and nothing
 			// checks it. The consumers showed `result.rows as RowType[]` on an `any[]` passing every rule.
 			if !type_checking.CanBeUnsafeAssignment(typeChecker, source) {
-				if checker.Checker_isTypeAssignableTo(typeChecker, source, target) {
+				// A fresh object literal's type carries its freshness, and tsc refuses a fresh literal with a key
+				// its target lacks, so `{ ...init, duplex: 'half' } as RequestInit` would read as no upcast.
+				// Dropping a key the target does not declare is width subtyping, which Adamic's relation
+				// accepts (adamic docs/rulings.md:14), so the literal is widened first, as typescript-eslint's
+				// no-unsafe-type-assertion widens it. A shared key of the wrong type still fails.
+				assignableSource := source
+				if type_checking.IsObjectType(source) &&
+					checker.Type_objectFlags(source)&checker.ObjectFlagsObjectLiteral != 0 {
+					assignableSource = checker.Checker_getWidenedType(typeChecker, source)
+				}
+				if checker.Checker_isTypeAssignableTo(typeChecker, assignableSource, target) {
 					return
 				}
 				if checkedDowncast(typeChecker, source, target) {
-					ruleContext.Note(CheckedDowncastNote)
+					if settings.RuntimeChecksEmitted {
+						ruleContext.Note(CheckedDowncastNote)
+						return
+					}
+					report(node, noUncheckedDowncastText, source, target)
 					return
 				}
 			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 ||
 				type_checking.IsTypeUnknownArrayType(target, typeChecker) {
+				// Only an any or unknown at the target's top passes: one held below it, as `BaseModule<any>[]`
+				// or `GraphQLObjectType<any, any, any>`, is still reported, since Adamic refuses explicit any at
+				// every position, type arguments included (adamic docs/rulings.md:39).
 				return
 			}
-			ruleContext.ReportNode(node, rule.Message{
-				Id: "uncheckedCast",
-				Description: noUncheckedCastText.Render(map[string]string{
-					"source": typeChecker.TypeToString(source),
-					"target": typeChecker.TypeToString(target),
-				}),
-			})
+			report(node, uncheckedCastText(settings), source, target)
 		}
 		return rule.Listeners{
 			ast.KindAsExpression:            judge,

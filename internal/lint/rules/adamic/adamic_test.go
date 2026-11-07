@@ -72,10 +72,22 @@ func writeAdamicSupport(test *testing.T) func(directory string) {
 }
 
 // runAdamic runs one rule over one fixture, Case.ts, under Adamic's options.
-func runAdamic(test *testing.T, subject rule.Rule[rule.NoOptions], source string) rule_testing.Result {
+func runAdamic[Options any](test *testing.T, subject rule.Rule[Options], source string) rule_testing.Result {
 	test.Helper()
 	return rule_testing.RunTypedFilesWithSetup(test, subject, map[string]string{"Case.ts": source}, "Case.ts",
 		writeAdamicSupport(test))
+}
+
+// runAdamicWithOptions is runAdamic for a rule configured with options.
+func runAdamicWithOptions[Options any](
+	test *testing.T,
+	subject rule.Rule[Options],
+	source string,
+	options Options,
+) rule_testing.Result {
+	test.Helper()
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, subject, map[string]string{"Case.ts": source},
+		"Case.ts", options, writeAdamicSupport(test))
 }
 
 // spans is the text each finding covers, in order, from the fixture as the harness wrote it.
@@ -140,7 +152,7 @@ func adamicPrograms(test *testing.T) map[string]string {
 
 // expectProgramsClean runs a rule over each of Adamic's programs and expects nothing: each is a program
 // Adamic 0.1 must compile, so a finding on one is a rule refusing real Adamic.
-func expectProgramsClean(test *testing.T, subject rule.Rule[rule.NoOptions]) {
+func expectProgramsClean[Options any](test *testing.T, subject rule.Rule[Options]) {
 	test.Helper()
 	programs := adamicPrograms(test)
 	for name := range programs {

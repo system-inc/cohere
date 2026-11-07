@@ -4371,7 +4371,10 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": ["uncheckedCast"],
+            "options": {
+                "elements": "one"
+            },
+            "messageIds": ["uncheckedCast", "uncheckedCastUnderTsc", "uncheckedDowncast"],
             "sets": [
                 {
                     "set": "cohere:adamic",

@@ -164,25 +164,12 @@ func reportTemplateVariantOrder(
 		sourceText = ruleContext.SourceFile.Text()
 	}
 
-	for _, segment := range segments {
-		tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
-		if !tokenized {
-			tokens = classTokensOf(segment.Text, 0)
+	for _, class := range TemplateClassesOf(sourceText, segments) {
+		sorted, needsReorder := sortedVariantSpelling(class.Text, system)
+		if !needsReorder {
+			continue
 		}
-		for _, token := range tokens {
-			if token.Separator {
-				continue
-			}
-			sorted, needsReorder := sortedVariantSpelling(token.Text, system)
-			if !needsReorder {
-				continue
-			}
-			findingRange := segment.Range
-			if tokenized {
-				findingRange = token.Range
-			}
-			ruleContext.ReportRange(findingRange, messageVariantOrder(token.Text, sorted))
-		}
+		ruleContext.ReportRange(class.Range, messageVariantOrder(class.Text, sorted))
 	}
 }
 

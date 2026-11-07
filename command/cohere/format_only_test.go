@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -220,5 +221,67 @@ func TestFormatOnlyBuildsNoGraph(test *testing.T) {
 		"Ugly.ts",
 	); code != 0 || readForTest(test, filepath.Join(root, "Ugly.ts")) != "export const ugly = 1;\n" {
 		test.Fatalf("with no graph, the writing run did not format the named file, exit %d:\n%s", code, output)
+	}
+}
+
+// TestANamedDirectoryNeverFormatsWhatTheIgnoreLayersKeepOut: a directory the caller names is a scope to walk, never a
+// reason to enter what the settings' ignorePatterns or .gitignore keep out (#wax4mdn). In every mode that
+// writes or reports, a misformatted file of each kind inside the named directory is left byte for byte as it was and
+// never reported, while the named directory's own misformatted file is formatted, or reported under --no-fix, which
+// is the control that the run looked. A file named by itself is the caller's own choice, and is formatted.
+func TestANamedDirectoryNeverFormatsWhatTheIgnoreLayersKeepOut(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	misformatted := "export const value   =   1\n"
+	formatted := "export const value = 1;\n"
+	kept := map[string]string{
+		"source/gaps/Gap.ts":        misformatted,
+		"source/gaps/oracle.json":   "{ \"a\":1 }\n",
+		"source/generated/Built.ts": misformatted,
+	}
+	for _, mode := range [][]string{{"--format-only"}, {"--fix"}, {}, {"--no-fix"}} {
+		test.Run(strings.Join(append([]string{"cohere"}, mode...), " "), func(test *testing.T) {
+			test.Parallel()
+			root := test.TempDir()
+			files := map[string]string{
+				"tsconfig.json":            fixScopeTsconfig,
+				"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\", \"ignorePatterns\": [\"source/gaps/**\"] }\n",
+				"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
+				".gitignore":               ".cache/\nsource/generated/\n",
+				"source/Kept.ts":           misformatted,
+			}
+			for name, contents := range kept {
+				files[name] = contents
+			}
+			writeTree(test, root, files)
+
+			output, _ := runCohere(test, binary, root, append(slices.Clone(mode), "source")...)
+			for name, contents := range kept {
+				if got := readForTest(test, filepath.Join(root, name)); got != contents {
+					test.Errorf("%s was rewritten to %q:\n%s", name, got, output)
+				}
+				if strings.Contains(output, filepath.Join(root, name)) {
+					test.Errorf("%s was reported:\n%s", name, output)
+				}
+			}
+			ownFile := readForTest(test, filepath.Join(root, "source/Kept.ts"))
+			if slices.Contains(mode, "--no-fix") {
+				if ownFile != misformatted || !strings.Contains(output, filepath.Join(root, "source/Kept.ts")) {
+					test.Errorf("--no-fix did not report the named directory's own file, or wrote it:\n%s", output)
+				}
+				return
+			}
+			if ownFile != formatted {
+				test.Errorf("the named directory's own file is %q, want it formatted:\n%s", ownFile, output)
+			}
+
+			named := filepath.Join("source", "gaps", "Gap.ts")
+			if output, code := runCohere(test, binary, root, append(slices.Clone(mode), named)...); code > 1 {
+				test.Fatalf("naming the ignored file exited %d:\n%s", code, output)
+			}
+			if got := readForTest(test, filepath.Join(root, named)); got != formatted {
+				test.Errorf("a file named by itself is %q, want it formatted as the caller asked", got)
+			}
+		})
 	}
 }

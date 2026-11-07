@@ -108,6 +108,18 @@ var EnforceConsistentImportantPosition = rule.Rule[EnforceConsistentImportantPos
 					ruleContext.ReportRange(literal.Range, messageImportantPosition(className, corrected))
 				}
 			}
+			// The static runs of a template with holes, each class judged as upstream judges it, a class
+			// glued to a hole included: `!flex${x}` reports. This rule offers no fix.
+			sourceText := ruleContext.SourceFile.Text()
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				for _, class := range TemplateClassesOf(sourceText, segments) {
+					corrected, isMisplaced := correctedImportantPosition(class.Text, position)
+					if !isMisplaced {
+						continue
+					}
+					ruleContext.ReportRange(class.Range, messageImportantPosition(class.Text, corrected))
+				}
+			}
 		}
 
 		listeners := rule.Listeners{}
