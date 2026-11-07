@@ -21,6 +21,7 @@ import (
 // generators included, since the generator emitting unformatted shims is a regression of the same kind.
 // Excluded are only what cohere does not own:
 //   - the TypeScript submodule, which is upstream's;
+//   - third_party, whose vendored copies are kept byte for byte as their authors released them (#j3bfnyt);
 //   - directories whose name begins with a dot, `.cache` among them, which holds snapshots and worktrees
 //     of other trees;
 //   - node_modules, which is npm's.
@@ -44,6 +45,7 @@ func TestEveryGoFileCohereOwnsIsGofmtClean(test *testing.T) {
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
+				path == filepath.Join(module, "third_party") ||
 				strings.HasPrefix(entry.Name(), ".") || entry.Name() == "node_modules") {
 				return filepath.SkipDir
 			}
