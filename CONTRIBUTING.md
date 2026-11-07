@@ -160,7 +160,8 @@ refused, and the refusal is listed with its reason. The passes:
   person, never given its first.
 - `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
-  same wrap, `internal/line_wrap`, on the long-line rule's findings), `type_split` (one type
+  same wrap, `internal/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
+  comment or taking a file past the long-file limit), `type_split` (one type
   with methods to a file, each file named for it), `folder_names` (a package folder moved with its clause, its
   import paths and every qualifier).
 

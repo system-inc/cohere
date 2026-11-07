@@ -63,36 +63,51 @@ type Result struct {
 }
 
 // Wrap rewraps every actionable long line of one Go source file, then proves the output equivalent. With
-// Options.CuredOnly it tries again without each line a try touched and left long, until no try leaves one, and leaves
-// the file as it was when a line it already left alone is touched again.
+// Options.CuredOnly it tries again without each line a try touched and left long, and with Options.KeepComments
+// without each line holding a comment a try changed, until no try leaves one, and leaves the file as it was when a
+// line it already left alone is touched again.
 func Wrap(source []byte, options Options) (Result, error) {
 	options.uncured = nil
 	for {
 		result, wrapError := wrapOnce(source, options)
-		if wrapError != nil || !options.CuredOnly || result.Rejected != nil || string(result.Output) == string(source) {
+		if wrapError != nil || !(options.CuredOnly || options.KeepComments) || result.Rejected != nil ||
+			string(result.Output) == string(source) {
 			return result, wrapError
 		}
 		original, parseSourceError := parseSource(source, options)
 		if parseSourceError != nil {
 			return Result{}, parseSourceError
 		}
-		uncured, uncuredError := original.uncuredSpans(result.Output)
-		if uncuredError != nil {
-			result.Output = source
-			result.Rejected = uncuredError
-			return result, nil
+		var leftAlone []keptSpan
+		if options.CuredOnly {
+			uncured, uncuredError := original.uncuredSpans(result.Output)
+			if uncuredError != nil {
+				result.Output = source
+				result.Rejected = uncuredError
+				return result, nil
+			}
+			leftAlone = append(leftAlone, uncured...)
 		}
-		if len(uncured) == 0 {
+		if options.KeepComments {
+			moved, movedError := original.movedComments(result.Output)
+			if movedError != nil {
+				result.Output = source
+				result.Rejected = movedError
+				return result, nil
+			}
+			leftAlone = append(leftAlone, moved...)
+		}
+		if len(leftAlone) == 0 {
 			return result, nil
 		}
 		// Each try leaves more lines alone, so the tries end. A line touched though it was left alone means a
 		// construct reached it this package cannot see, so nothing is kept.
-		for _, span := range uncured {
+		for _, span := range leftAlone {
 			if slices.Contains(options.uncured, span) {
 				return Result{Output: source, Before: result.Before, After: result.Before}, nil
 			}
 		}
-		options.uncured = append(options.uncured, uncured...)
+		options.uncured = append(options.uncured, leftAlone...)
 	}
 }
 
