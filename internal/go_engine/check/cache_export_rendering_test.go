@@ -64,6 +64,19 @@ var fieldOwners = map[string]string{
 	"example.com/second": "package second\n\nfunc New() struct{ count int } { return struct{ count int }{} }\n",
 }
 
+// instanceOwners are a generic named type and a generic alias, and two packages each with a function returning an
+// instance of each over a struct with an unexported field of the same name and type: the instances are two types,
+// since the field's package is part of the argument's identity, which TypeString writes bare.
+var instanceOwners = map[string]string{
+	"example.com/box": "package box\n\ntype Box[T any] struct{ V T }\n\ntype Pair[T any] = struct{ V T }\n",
+	"example.com/first": "package first\n\nimport \"example.com/box\"\n\n" +
+		"func New() box.Box[struct{ count int }] { return box.Box[struct{ count int }]{} }\n\n" +
+		"func NewPair() box.Pair[struct{ count int }] { return box.Pair[struct{ count int }]{} }\n",
+	"example.com/second": "package second\n\nimport \"example.com/box\"\n\n" +
+		"func New() box.Box[struct{ count int }] { return box.Box[struct{ count int }]{} }\n\n" +
+		"func NewPair() box.Pair[struct{ count int }] { return box.Pair[struct{ count int }]{} }\n",
+}
+
 // Each pair of packages differs in one thing an importer's type check can read, and their export digests differ:
 // every kind of declaration, exported or not, every part of a type TypeString writes, and what the rendering adds
 // beside it. A digest that stayed the same over one of these would restore an importer's analysis made against the
@@ -106,6 +119,14 @@ func TestTheExportRenderingTellsApartEveryChangeAnImporterCanRead(test *testing.
 			before:       "import \"example.com/first\"\n\nvar V = first.New()",
 			after:        "import \"example.com/second\"\n\nvar V = second.New()",
 			dependencies: fieldOwners},
+		{name: "an unexported field's package in a named type's type argument",
+			before:       "import \"example.com/first\"\n\nvar V = first.New()",
+			after:        "import \"example.com/second\"\n\nvar V = second.New()",
+			dependencies: instanceOwners},
+		{name: "an unexported field's package in a generic alias's type argument",
+			before:       "import \"example.com/first\"\n\nvar V = first.NewPair()",
+			after:        "import \"example.com/second\"\n\nvar V = second.NewPair()",
+			dependencies: instanceOwners},
 	} {
 		test.Run(differing.name, func(test *testing.T) {
 			test.Parallel()

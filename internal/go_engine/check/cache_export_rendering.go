@@ -138,9 +138,13 @@ func renderedTypeParameters(parameters *types.TypeParamList, written func(types.
 
 // unexportedOrigins is the package of every unexported field and interface method inside an unnamed type, in the
 // order a walk of it meets them, written after it: TypeString writes such a name bare, while the name's package is
-// part of the type's identity, so `struct{count int}` from two packages is two types. The walk stops at a named
-// type, an alias and a type parameter, which TypeString writes by its qualified name, its own declaration rendered
-// with its package. It is empty when the type holds no unexported name.
+// part of the type's identity, so `struct{count int}` from two packages is two types. The walk stops at the
+// declaration of a named type, an alias and a type parameter, which TypeString writes by its qualified name, the
+// declaration itself rendered with its package. It does not stop at an instance's type arguments: TypeString writes
+// `box.Box[struct{count int}]` with the argument bare, and the argument is part of the instance's identity, so an
+// instance over first's struct and one over second's are two types, the same for a named type and a generic alias.
+// A type parameter's constraint is walked where the parameter is declared, in a signature or a declaration's list.
+// It is empty when the type holds no unexported name.
 func unexportedOrigins(walked types.Type) string {
 	var origins []string
 	var walk func(walked types.Type)
@@ -196,6 +200,14 @@ func unexportedOrigins(walked types.Type) string {
 		case *types.Union:
 			for index := range composite.Len() {
 				walk(composite.Term(index).Type())
+			}
+		case *types.Named:
+			for argument := range composite.TypeArgs().Types() {
+				walk(argument)
+			}
+		case *types.Alias:
+			for argument := range composite.TypeArgs().Types() {
+				walk(argument)
 			}
 		}
 	}
