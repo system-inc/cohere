@@ -169,9 +169,13 @@ public struct Pipeline {
                 )
             }
         }
-        /* The casing rule's brands, by the same reasoning: with none, every type opening on a listed brand would be reported. */
+        /*
+         The brands, by the same reasoning, for the two rules that read them: with none, the casing rule would report
+         every type opening on a listed brand, and the folder rule would split a brand it should read as one word.
+         */
         var brandVocabulary = BrandVocabulary()
-        if configuration.severity(of: SwiftFormatRule.lowerCamelCaseRuleName) != .off
+        if (configuration.severity(of: SwiftFormatRule.lowerCamelCaseRuleName) != .off
+            || configuration.severity(of: ConsistencyRequireSeparatedFolderWords.ruleName) != .off)
             && (options.proposeFixes || options.runLint)
         {
             do {
@@ -184,10 +188,26 @@ public struct Pipeline {
                 )
             }
         }
+        /* The folder rule's words, by the same reasoning: with none, no folder would split, and every one would read as clean. */
+        var words = WordList()
+        if configuration.severity(of: ConsistencyRequireSeparatedFolderWords.ruleName) != .off
+            && (options.proposeFixes || options.runLint)
+        {
+            do {
+                words = try WordList.compiledIn()
+            }
+            catch {
+                throw RunFailure(
+                    description:
+                        "the folder rule's compiled-in words (policy/Words.txt) could not be loaded, so nothing was checked: \(error)"
+                )
+            }
+        }
         let fileRules = RuleRegistry.fileRules(
             vocabulary: vocabulary,
             shoutingVocabulary: shoutingVocabulary,
             brandVocabulary: brandVocabulary,
+            words: words,
             configuration: configuration,
         )
 

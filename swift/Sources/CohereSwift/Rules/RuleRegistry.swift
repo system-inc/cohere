@@ -4,14 +4,16 @@
  */
 public enum RuleRegistry {
     /*
-     Every file rule, built from what a run loads: the abbreviation, shouting and brand vocabularies, which the pipeline reads
-     before anything is checked, so a vocabulary that is missing refuses the run instead of leaving its rule judging
-     wrongly; and the options the project's settings give the rules that read one (`RuleConfiguration.optionsRead`).
+     Every file rule, built from what a run loads: the abbreviation, shouting and brand vocabularies and the word list,
+     which the pipeline reads before anything is checked, so a vocabulary that is missing refuses the run instead of
+     leaving its rule judging wrongly; and the options the project's settings give the rules that read one
+     (`RuleConfiguration.optionsRead`).
      */
     public static func fileRules(
         vocabulary: AbbreviationVocabulary,
         shoutingVocabulary: ShoutingVocabulary,
         brandVocabulary: BrandVocabulary,
+        words: WordList,
         configuration: RuleConfiguration = RuleConfiguration(severities: [:], note: ""),
     ) -> [any FileRule] {
         [
@@ -41,6 +43,7 @@ public enum RuleRegistry {
             ConsistencyNoAmbiguousIdentifier(),
             ConsistencyNoStutteringName(),
             ConsistencyNoUtilsFolder(),
+            ConsistencyRequireSeparatedFolderWords(words: words, brands: brandVocabulary),
             ConsistencyNoBareThrow(),
             ConsistencyNoLabel(),
             ConsistencyNoPropertyAlias(),
@@ -88,6 +91,7 @@ public enum RuleRegistry {
             vocabulary: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
             brandVocabulary: BrandVocabulary(),
+            words: WordList(),
         )
         .map(\.name)
             + typedRules.map(\.name) + packageRules.map(\.name))
