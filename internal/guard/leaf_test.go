@@ -143,7 +143,8 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	 * `registry` imports every registering package, so a deep import inside one is on the rebuild
 	 * path for all of them. A package that registers nothing is not.
 	 */
-	rulePackages := registeringPackages(test, listPackages(test, "./internal/lint/rules/..."))
+	listed, imports := listImports(test, "./internal/lint/rules/...")
+	rulePackages := registeringPackages(test, listed)
 	if len(rulePackages) == 0 {
 		// A check that found nothing to check passes for the wrong reason, which is the same shape
 		// as the defect it guards against.
@@ -151,7 +152,7 @@ func TestRulePackagesStayLeaves(test *testing.T) {
 	}
 
 	for _, rulePackage := range rulePackages {
-		for _, imported := range listImports(test, rulePackage) {
+		for _, imported := range imports[rulePackage] {
 			if !strings.HasPrefix(imported, "github.com/system-inc/cohere/") {
 				// Third-party and standard-library imports are not what this guards: the compiler
 				// shim is most of what a rule touches, and it is not ours to be deep in.
@@ -180,42 +181,34 @@ func hasAllowedPrefix(imported string) bool {
 	return false
 }
 
-// listPackages returns the import paths matching a pattern.
-func listPackages(test *testing.T, pattern string) []string {
+// listImports returns the import paths matching a pattern, in go list's order, and what each imports directly,
+// from one go list run from the module root.
+func listImports(test *testing.T, pattern string) ([]string, map[string][]string) {
 	test.Helper()
-	// go list reads the packages' sources in a process of its own, so Go's test cache keys on them, and on
-	// those of every package listImports then asks about, only through this (#4p82x8d).
-	build_inputs.Record(test, filepath.Join("..", ".."), pattern)
-	return runGoList(test, "-f", "{{.ImportPath}}", pattern)
-}
-
-// listImports returns everything a package imports directly.
-func listImports(test *testing.T, packagePath string) []string {
-	test.Helper()
-	return runGoList(test, "-f", `{{range .Imports}}{{.}}{{"\n"}}{{end}}`, packagePath)
-}
-
-// runGoList runs `go list` from the module root and returns its non-empty lines.
-func runGoList(test *testing.T, arguments ...string) []string {
-	test.Helper()
-
-	command := exec.Command("go", append([]string{"list"}, arguments...)...)
-	// Tests run in their own package directory, and the patterns here are written relative to the
-	// module root.
-	command.Dir = filepath.Join("..", "..")
-
+	// Tests run in their own package directory, and the pattern is written relative to the module root.
+	root := filepath.Join("..", "..")
+	// go list reads the packages' sources in a process of its own, so Go's test cache keys on them only through
+	// this (#4p82x8d).
+	build_inputs.Record(test, root, pattern)
+	command := exec.Command("go", "list", "-f", `{{.ImportPath}}{{range .Imports}} {{.}}{{end}}`, pattern)
+	command.Dir = root
+	var stderr strings.Builder
+	command.Stderr = &stderr
 	output, outputError := command.Output()
 	if outputError != nil {
-		test.Fatalf("go list %s: %v", strings.Join(arguments, " "), outputError)
+		test.Fatalf("go list %s: %v\n%s", pattern, outputError, stderr.String())
 	}
-
-	lines := []string{}
+	listed := []string{}
+	imports := map[string][]string{}
 	for _, line := range strings.Split(string(output), "\n") {
-		if trimmed := strings.TrimSpace(line); trimmed != "" {
-			lines = append(lines, trimmed)
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
 		}
+		listed = append(listed, fields[0])
+		imports[fields[0]] = fields[1:]
 	}
-	return lines
+	return listed, imports
 }
 
 // registeringPackages narrows a package list to those that actually register rules.

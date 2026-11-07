@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A released binary that quietly stops being stripped grows about 18 MB, measured at 43.1 against
@@ -160,7 +162,7 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(test *testing.T) {
 		path := filepath.Join(directory, "out-"+target.GoOperatingSystem)
 
 		command := exec.Command("go", "build", "-o", path, ".")
-		command.Dir = directory
+		command.Dir = build_inputs.OutsideModule(test, directory)
 		command.Env = append(os.Environ(),
 			"GOOS="+target.GoOperatingSystem,
 			"GOARCH="+target.GoArchitecture,

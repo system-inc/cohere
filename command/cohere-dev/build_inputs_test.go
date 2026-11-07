@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A test that builds a binary and judges it reruns after an edit only that binary reaches, under cohere-dev
@@ -52,7 +54,7 @@ func TestAnEditOnlyABuiltBinaryReachesMissesTheTestCache(test *testing.T) {
 	)
 	run := func() (string, bool) {
 		command := exec.Command("go", "test", "./check")
-		command.Dir = module
+		command.Dir = build_inputs.OutsideModule(test, module)
 		command.Env = environment
 		output, runError := command.CombinedOutput()
 		return string(output), runError == nil
