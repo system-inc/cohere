@@ -153,22 +153,54 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
         #expect(found == parts)
     }
 
-    /* The replacement writes each run-together part in its own style and leaves the rest of the name as written. */
+    /* A capitalized part, in a folder of both cases, has each piece capitalized and run together, the rest of the name as written. */
     @Test(arguments: [
         ("Formatoptions", "FormatOptions"),
         ("TextFormatoptions", "TextFormatOptions"),
         ("GoengineTests", "GoEngineTests"),
         ("Imessagebridge", "ImessageBridge"),
-        ("FORMATOPTIONS", "FORMAT_OPTIONS"),
-        ("JSONLINESReader", "JSON_LINESReader"),
-        ("formatoptions", "format_options"),
-        ("goengineTests", "go_engineTests"),
-        /* A lowercase folder that uses hyphens and no underscores is given hyphens. */
-        ("text-formatoptions", "text-format-options"),
-        ("text-formatoptions_v2", "text-format_options_v2"),
         ("Formatoptions2.Jsonlines", "FormatOptions2.JsonLines"),
     ])
-    func theReplacementKeepsEachPartsStyle(name: String, want: String) throws {
+    func aCapitalizedPartIsCapitalizedPieces(name: String, want: String) throws {
+        #expect(try Self.rule().separated(name) == want)
+    }
+
+    /* A lowercase part, in a folder of both cases, keeps its first piece as written and capitalizes the rest. */
+    @Test(arguments: [
+        ("goengineTests", "goEngineTests"),
+        ("jsonlinesReader", "jsonLinesReader"),
+        ("goengine_Tests", "goEngine_Tests"),
+    ])
+    func aLowercasePartInAMixedCaseFolderIsCamelCase(name: String, want: String) throws {
+        #expect(try Self.rule().separated(name) == want)
+    }
+
+    /* An all-capitals part, in a folder of both cases, is capitalized pieces run together, the house's PascalCase acronyms. */
+    @Test(arguments: [
+        ("JSONLINESReader", "JsonLinesReader"),
+        ("TextJSONLINES", "TextJsonLines"),
+    ])
+    func anAllCapitalsPartInAMixedCaseFolderIsPascalCase(name: String, want: String) throws {
+        #expect(try Self.rule().separated(name) == want)
+    }
+
+    /* A folder with no lowercase letter keeps capitals, joined by `_`. */
+    @Test(arguments: [
+        ("JSONLINES", "JSON_LINES"),
+        ("FORMATOPTIONS", "FORMAT_OPTIONS"),
+        ("TEXT_FORMATOPTIONS", "TEXT_FORMAT_OPTIONS"),
+    ])
+    func aFolderWithNoLowercaseLetterIsCapitalsJoinedByUnderscores(name: String, want: String) throws {
+        #expect(try Self.rule().separated(name) == want)
+    }
+
+    /* A folder with no capital joins with `_`, or with `-` where it uses hyphens and no underscores. */
+    @Test(arguments: [
+        ("formatoptions", "format_options"),
+        ("text-formatoptions", "text-format-options"),
+        ("text-formatoptions_v2", "text-format_options_v2"),
+    ])
+    func aFolderWithNoCapitalIsJoinedByItsSeparator(name: String, want: String) throws {
         #expect(try Self.rule().separated(name) == want)
     }
 

@@ -20,10 +20,14 @@ import Foundation
      each a word is the finding, with the fewest pieces Go's tie-break chooses. A part that splits no way is a name
      the lists cannot read (`vfs`, `cachedvfs`) rather than words run together, and passes.
 
- The replacement is the folder with each run-together part written as its pieces in that part's own style: a
- capitalized part with each piece capitalized (`Formatoptions` becomes `FormatOptions`), an all-capitals part with
- its pieces in capitals joined by `_`, and a lowercase part with its pieces joined by `_`, or by `-` where the folder
- already uses hyphens and no underscores. Everything else in the name stays as written.
+ The replacement is the folder with each run-together part written as its pieces, in the style the folder already
+ has. A folder with both capitals and lowercase letters is camel case, so its pieces are capitalized and run
+ together, with the house's acronyms in the same PascalCase (`AhraOs`, not `AhraOS`): a capitalized part becomes
+ `FormatOptions` from `Formatoptions`, an all-capitals one `JsonLinesReader` from `JSONLINESReader`, and a lowercase
+ one keeps its first piece as written, so `goengineTests` becomes `goEngineTests`. A folder with no lowercase letter
+ joins its pieces in capitals with `_` (`JSONLINES` becomes `JSON_LINES`), and a folder with no capital joins them
+ with `_`, or with `-` where it already uses hyphens and no underscores. Everything else in the name stays as
+ written.
 
  It reads only the path, as `consistency-no-utils-folder` does, and judges the same folders: those inside the
  package, from its root down (`ConsistencyNoUtilsFolder.foldersInsidePackage`). The root itself is the checkout's
@@ -90,6 +94,7 @@ public struct ConsistencyRequireSeparatedFolderWords: FileRule {
     func separated(_ folder: String) -> String? {
         let bytes = Array(folder.utf8)
         let separator = bytes.contains(UInt8(ascii: "-")) && !bytes.contains(UInt8(ascii: "_")) ? "-" : "_"
+        let mixedCase = bytes.contains(where: Self.isUppercase) && bytes.contains(where: Self.isLowercase)
         var replacement = ""
         var runTogether = false
         var written = 0
@@ -99,7 +104,7 @@ public struct ConsistencyRequireSeparatedFolderWords: FileRule {
                 continue
             }
             replacement += String(decoding: bytes[written..<part.lowerBound], as: UTF8.self)
-            replacement += Self.styled(pieces, like: bytes[part], separator: separator)
+            replacement += Self.styled(pieces, like: bytes[part], mixedCase: mixedCase, separator: separator)
             written = part.upperBound
             runTogether = true
         }
@@ -140,17 +145,26 @@ public struct ConsistencyRequireSeparatedFolderWords: FileRule {
     }
 
     /*
-     The pieces in the part's own style: capitals joined by `_` for an all-capitals part, each capitalized and
-     run together for a capitalized one, and as they are, joined by the folder's separator, for a lowercase one.
+     The pieces in the folder's style. In a folder with both capitals and lowercase letters, they are capitalized and
+     run together, an all-capitals part's included, except a lowercase part's first piece, which stays as written. In
+     a folder with no lowercase letter, an all-capitals part's pieces are capitals joined by `_`, and in one with no
+     capital, a lowercase part's are joined by the folder's separator.
      */
-    static func styled(_ pieces: [String], like part: ArraySlice<UInt8>, separator: String) -> String {
+    static func styled(
+        _ pieces: [String],
+        like part: ArraySlice<UInt8>,
+        mixedCase: Bool,
+        separator: String,
+    ) -> String {
+        let capitalized = pieces.map { $0.prefix(1).uppercased() + $0.dropFirst() }
         if part.allSatisfy(isUppercase) {
-            return pieces.map { $0.uppercased() }.joined(separator: "_")
+            return mixedCase ? capitalized.joined() : pieces.map { $0.uppercased() }.joined(separator: "_")
         }
         if let first = part.first, isUppercase(first) {
-            return pieces.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined()
+            return capitalized.joined()
         }
-        return pieces.joined(separator: separator)
+        return mixedCase
+            ? pieces.prefix(1).joined() + capitalized.dropFirst().joined() : pieces.joined(separator: separator)
     }
 
     /* Whether text is in the list or is a brand, at any length: Go's `isWord`. */

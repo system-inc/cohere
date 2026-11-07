@@ -11,7 +11,7 @@ enum PolicyWords {
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
         # From @cspell/dict-software-terms 5.2.2, under the MIT License:
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
-        # With the house's own words, 1 from policy/HouseWords.txt, each with its reason there.
+        # With the house's own words, 2 from policy/HouseWords.txt, each with its reason there.
         # The license texts are in policy/Words.NOTICE.
         a
         aa
@@ -110159,6 +110159,7 @@ enum PolicyWords {
         ragas
         ragbag
         ragbags
+        ragdoll
         rage
         raged
         rages
