@@ -50,13 +50,19 @@ func countedRule(name string, counts *runCounts) rule.Rule {
 // testCaching is a cache in a directory of the test's own, keyed for rules.
 func testCaching(test *testing.T, rules []rule.Rule) *Caching {
 	test.Helper()
+	return cachingAt(test.TempDir(), rules)
+}
+
+// cachingAt is a cache in directory, keyed for rules as testCaching keys one, so another process of the test binary
+// can read and write the same entries.
+func cachingAt(directory string, rules []rule.Rule) *Caching {
 	names := make([]string, 0, len(rules))
 	for _, keyed := range rules {
 		names = append(names, keyed.Name)
 	}
 	slices.Sort(names)
 	return &Caching{
-		Store: cache.Open(test.TempDir()),
+		Store: cache.Open(directory),
 		Context: cache.Context{
 			FormatVersion:  CacheFormatVersion,
 			EngineIdentity: "check tests",

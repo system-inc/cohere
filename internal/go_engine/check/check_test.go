@@ -53,8 +53,18 @@ var fixtures struct {
 	failure   error
 }
 
-// TestMain removes the fixtures once every test is done with them.
+// TestMain removes the fixtures once every test is done with them, or, when sessionChildVariable is set, runs the one
+// session it asks for in this process instead of the tests (see sessionInAnotherProcess).
 func TestMain(tests *testing.M) {
+	if request := os.Getenv(sessionChildVariable); request != "" {
+		if childError := runSessionChild(request); childError != nil {
+			// Ignored: the exit code already says the session did not run, and standard error is the last place to
+			// say why.
+			_, _ = fmt.Fprintln(os.Stderr, childError)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	code := tests.Run()
 	if fixtures.root != "" {
 		// Ignored: a temporary directory left behind fails nothing.
