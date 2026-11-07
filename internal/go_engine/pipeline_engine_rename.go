@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -552,6 +553,14 @@ func (engine *pipeline) prove(
 	// The rewrite is proven under every platform the plan read files under too, through the engine's own load for that
 	// platform (platformLoad), with no package that type-checked there before failing after and no mismatch. A
 	// failure there names the renames that reached that platform's files, or every rename when none did.
+	// held are the files a load that proved the rewrite type-checked: the host's, every one of which it checked with
+	// no error, and each platform's packages that type-check there.
+	held := map[string]bool{}
+	for _, root := range proof.Roots {
+		for _, file := range root.Syntax {
+			held[filepath.Clean(root.Fset.PositionFor(file.Pos(), false).Filename)] = true
+		}
+	}
 	for _, platform := range result.Platforms() {
 		reachedThere := func(reason string) map[[2]string]string {
 			named := map[[2]string]string{}
@@ -566,6 +575,18 @@ func (engine *pipeline) prove(
 		verification := global_rename.ProvePlatform(space, expectation, platform, next, options)
 		keepFirst(failures, mismatchedRenames(result, verification.Mismatches,
 			"the rewrite as "+platform.String()+" fails its proof: ", reachedThere))
+		maps.Copy(held, verification.Files)
+	}
+	// Every file the rewrite edits must be held by a load that proved it. A file no load type-checks, as a cgo file
+	// another platform builds is to loads that run with cgo off, can be edited only by the plan's text guard, and a
+	// rewrite no types read back is unproven, however sound its text.
+	for _, file := range slices.Sorted(maps.Keys(rewritten)) {
+		if held[filepath.Clean(file)] {
+			continue
+		}
+		relative := strings.TrimPrefix(file, engine.described.workspace.Root+string(filepath.Separator))
+		keepFirst(failures, renamesIn(result, file, "no load type-checked "+relative+", the host's or any "+
+			"platform's, so its rewrite is unproven", everyRename))
 	}
 	return rewriteProof{proof: proof, overlay: next, wrapped: wrapped, declined: declined, failures: failures}
 }

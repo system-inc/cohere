@@ -157,8 +157,10 @@ type Expectation struct {
 type Verification struct {
 	Compared   int
 	Mismatches []Mismatch
-	// Packages counts the root packages of the load compared, which only a platform's proof sets.
+	// Packages counts the root packages of the load compared, and Files holds every file they type-checked, by
+	// absolute path, which only a platform's proof sets: a file no proof holds was proven by none.
 	Packages int
+	Files    map[string]bool
 }
 
 // Apply rewrites the files the result's edits touch, proves the result before writing any of it, and writes only
@@ -392,6 +394,12 @@ func provePlatform(
 	verification.Compared = compared.Compared
 	verification.Mismatches = append(verification.Mismatches, compared.Mismatches...)
 	verification.Packages = len(afterLoad.Clean.Roots)
+	verification.Files = map[string]bool{}
+	for _, rootsPackage := range afterLoad.Clean.Roots {
+		for _, file := range rootsPackage.Syntax {
+			verification.Files[filepath.Clean(rootsPackage.Fset.PositionFor(file.Pos(), false).Filename)] = true
+		}
+	}
 	return verification, nil
 }
 

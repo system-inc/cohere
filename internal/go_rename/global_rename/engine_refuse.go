@@ -254,7 +254,7 @@ func (engine *engine) outsideRefusal(candidate *candidate, outside *outsideFiles
 	for _, file := range outside.files {
 		if samePackage(file) && file.spellings[candidate.NewName] > 0 {
 			return fmt.Sprintf(
-				"the new name appears in %s, a file of its own package that the load does not type-check",
+				"the new name appears in %s, a file of its own package that no load type-checks",
 				engine.relative(file.filename),
 			)
 		}
@@ -274,7 +274,7 @@ func (engine *engine) outsideRefusal(candidate *candidate, outside *outsideFiles
 		declarations := file.declarations[candidate.OldName]
 		if len(declarations) != file.spellings[candidate.OldName] {
 			return fmt.Sprintf(
-				"the name appears in %s, a file of its own package that the load does not type-check, other than as a declaration there",
+				"the name appears in %s, a file of its own package that no load type-checks, other than as a declaration there",
 				relative,
 			)
 		}

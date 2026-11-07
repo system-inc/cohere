@@ -372,6 +372,12 @@ var endToEndCases = []endToEndCase{
 		name: "rename-platforms-broken", fixture: "rename-platforms", exitCode: 1, prepare: breakUnderWindows,
 		verify: unchangedBut("rename-platforms", platformsWindowsFile),
 	},
+	// Every load runs with cgo off, so a cgo file only windows builds is type-checked by none, and no rename may edit
+	// it unproven: maxReads, which such a file reads, and maxBytes, which such a file declares as a twin, keep their
+	// names, each refused with why, and every file reads as its fixture.
+	{
+		name: "rename-cgo", exitCode: 1, verify: unchangedTree("rename-cgo"),
+	},
 	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
 	{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
