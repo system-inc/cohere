@@ -92,6 +92,9 @@
 #   --edit PATH          the file the edit run changes, relative to the project
 #                        (default modules/tasks/TasksSearchQuery.ts)
 #   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
+#   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
+#                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
+#                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
 #   --work DIR           where the copies live (default $TMPDIR/cohere-quiet-machine)
 #   --record             also write the run to bench/results as a record to commit
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
@@ -114,6 +117,7 @@ settle=60
 idle_seconds=60
 edit=modules/tasks/TasksSearchQuery.ts
 cohere=cohere
+generate=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 
@@ -128,6 +132,7 @@ while (( $# > 0 )); do
     --idle-seconds) idle_seconds=$2; shift 2 ;;
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
+    --generate) generate=$2; shift 2 ;;
     --work) work=$2; shift 2 ;;
     --record) record=true; shift ;;
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;
