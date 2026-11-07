@@ -1140,6 +1140,11 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // Judging `position` or `args` there by React's DOM table was 24 false positives in www-connected-app
 // (#ccs1c9c). So the answer is read from the declaration's file, by its package, and no element is named.
 //
+// The `react` package itself counts beside `@types/react`. React's types live in DefinitelyTyped today,
+// and the day React ships them in its own package, an answer naming only `@types/react` would stop
+// judging every element in silence. Augmentations live in other packages either way: r3f's is in
+// `@react-three/fiber`, though it writes `declare module 'react'`.
+//
 // An entry with no declarations at all is not React's either. react-three-fiber builds its entries with a
 // key-remapping mapped type over three.js's exports, `[K in keyof T & string as Uncapitalize<K>]`, and the
 // checker links no declaration to a remapped property, so `<mesh>` resolves to a symbol with none.
@@ -1156,7 +1161,7 @@ func noUnknownPropertyIsReactDomElement(ruleContext rule.Context, tagName *ast.N
 	if entry == nil {
 		return true
 	}
-	return rule.IsDeclaredInPackage(entry, "@types/react")
+	return rule.IsDeclaredInPackage(entry, "@types/react") || rule.IsDeclaredInPackage(entry, "react")
 }
 
 // NoUnknownProperty flags a JSX attribute React does not recognise on a DOM element.
@@ -1237,7 +1242,7 @@ func noUnknownPropertyIsReactDomElement(ruleContext rule.Context, tagName *ast.N
 //
 // Upstream reads syntax alone, so every lowercase tag is a DOM element to it, react-three-fiber's
 // `<mesh>` included. This port asks the checker which declaration supplies the element and judges only
-// those `@types/react` supplies (noUnknownPropertyIsReactDomElement). It asks only on the way to a
+// those `@types/react` or `react` supplies (noUnknownPropertyIsReactDomElement). It asks only on the way to a
 // finding, since every other path returns silently whatever the answer, so a clean file costs no query.
 // The checker is read for that one question, and only through the entry's file, which a shape covers.
 var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{

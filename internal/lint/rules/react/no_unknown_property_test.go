@@ -606,6 +606,20 @@ func noUnknownPropertyTypedFiles(subject string, others map[string]string) map[s
 	return files
 }
 
+// noUnknownPropertyReactOwnTypes is noUnknownPropertyReactTypes moved from `@types/react` into the `react`
+// package itself, as it would sit the day React ships its own types.
+func noUnknownPropertyReactOwnTypes(subject string) map[string]string {
+	files := map[string]string{"source/Scene.tsx": subject}
+	for name, contents := range noUnknownPropertyReactTypes {
+		if moved, isTypes := strings.CutPrefix(name, "node_modules/@types/react/"); isTypes {
+			name = "node_modules/react/" + moved
+			contents = strings.ReplaceAll(contents, `"name": "@types/react"`, `"name": "react"`)
+		}
+		files[name] = contents
+	}
+	return files
+}
+
 // TestNoUnknownPropertyJudgesOnlyReactsOwnElements runs the rule against a real type graph, where the
 // checker says which declaration supplies an intrinsic element (#ccs1c9c).
 //
@@ -671,6 +685,12 @@ export const icon = (
 );
 `, nil),
 			[]string{"unknownProp", "unknownPropWithStandardName", "invalidPropOnTag"},
+		},
+		{
+			// React's DOM types in the `react` package rather than `@types/react` are still React's.
+			"a div declared by the react package itself still reports",
+			noUnknownPropertyReactOwnTypes(`export const page = <div position="x" />;`),
+			[]string{"unknownProp"},
 		},
 		{
 			// The checker answers a tag `IntrinsicElements` does not list with no symbol, and the rule
