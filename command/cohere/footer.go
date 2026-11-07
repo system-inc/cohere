@@ -202,6 +202,10 @@ func uncheckedMarkers(summary runSummary) []string {
 			}
 		}
 	}
+	// A phase the run stopped before has no record, so no outcome above can say it.
+	for _, name := range gaps.PhasesNotRun {
+		markers = append(markers, fmt.Sprintf("⚠ %s %s did not run", phaseGlyphs[phaseName(name)], name))
+	}
 	if gaps.FormattingNotChecked {
 		markers = append(markers, "💅 formatting not checked")
 	}
@@ -216,6 +220,9 @@ func uncheckedMarkers(summary runSummary) []string {
 	}
 	if gaps.Unread != "" {
 		markers = append(markers, "⚠ "+gaps.Unread)
+	}
+	if gaps.NestedUnread != "" {
+		markers = append(markers, "⚠ nested repositories not read: "+gaps.NestedUnread)
 	}
 	if gaps.NestedUnchecked > 0 {
 		markers = append(
