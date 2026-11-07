@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/tools/go_codemods/global_rename"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/internal/go_rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
 // globalFixture declares one of each shape the advice rules read, by name.

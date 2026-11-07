@@ -1,0 +1,11 @@
+package store
+
+import "strings"
+
+// maxRows is how many rows a report holds. The rename and the long-line wrap both write this file in one run.
+const maxRows = 3
+
+// Report joins the report's parts into one line, a call too long for one line that the wrap breaks.
+func Report() string {
+	return strings.Join([]string{"the first part of the report", "the second part of the report", "the third part"}[:maxRows], ", ")
+}

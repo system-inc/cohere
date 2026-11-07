@@ -247,6 +247,36 @@ func TestGoRunUnrecordableKeepsAllButAVerdict(test *testing.T) {
 	}
 }
 
+// TestARenamingGoRunIsNeverRecorded: the stream the Go engine writes for a run that renamed across files, read from the
+// engine's own golden for that case, is accepted whole, and the run is declined for the record, since its fix phase
+// rewrote the tree it read. A rename writes after the load, so the guard must hold for the files it wrote too, which
+// the fix record counts with the formatter's.
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary.
+func TestARenamingGoRunIsNeverRecorded(test *testing.T) {
+	golden := filepath.Join("..", "..", "internal", "go_engine", "testdata", "rename-rewritten", "expected.jsonl")
+	contents, readError := os.ReadFile(golden)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	var out bytes.Buffer
+	run := newEngineRun(bufio.NewWriter(&out), engineModeCheck, goLanguage("module"), "", time.Now())
+	for line := range strings.Lines(string(contents)) {
+		if acceptError := run.accept([]byte(strings.TrimSuffix(line, "\n"))); acceptError != nil {
+			test.Fatalf("the renaming run's stream was refused: %v", acceptError)
+		}
+	}
+	exitCode, finishError := run.finish(1, "exited 1")
+	if finishError != nil || exitCode != 1 {
+		test.Fatalf("the renaming run finished %d, %v, want 1", exitCode, finishError)
+	}
+	if run.filesRewritten == 0 {
+		test.Fatal("the golden stream rewrote no file, so it is no renaming run")
+	}
+	if reason := engineRunUnrecordable(run, exitCode); !strings.Contains(reason, "the fix phase rewrote") {
+		test.Fatalf("a renaming run would be recorded: the reason is %q", reason)
+	}
+}
+
 // TestDeclareGoRunCacheInputsDeclaresTheEnginesAndTheFrontDoors: a verdict is declared with the engine's files,
 // directories and absent paths, and the settings file the front door handed the engine, present or absent. A run
 // whose engine wrote no inputs record is never declared, and one that is no verdict is declined.

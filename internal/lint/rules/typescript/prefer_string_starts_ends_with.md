@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-string-starts-ends-with`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **7** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **7**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -54,13 +54,12 @@ if(/^169\.254\./.test(ipAddress)) {
 
 **`modules/pensieve/PensieveSoulCommandLineInterface.ts:86`**
 
-```
+````
 if(/^```/.test(line)) {
-```
+````
 
 > Use 'String#startsWith' method instead
 
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

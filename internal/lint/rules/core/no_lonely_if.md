@@ -1,12 +1,12 @@
 # `no-lonely-if`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **16** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Maybe**     |
+| Violations in ahra     | **16**        |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ if(day % 5 === 0 || day === 1) {
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

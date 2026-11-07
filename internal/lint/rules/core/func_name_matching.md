@@ -1,12 +1,12 @@
 # `func-name-matching`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **178** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **178**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ request: async function fetchContacts(): Promise<ContactsResponseInterface> {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

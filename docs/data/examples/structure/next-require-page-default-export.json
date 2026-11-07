@@ -18,9 +18,5 @@
         "file": "/repository/app/account/page.ts",
         "source": "export function Settings() {\n    return null;\n}\n"
     },
-    "assertedMessageIds": [
-        "pageDefaultExportInline",
-        "pageDefaultExportNameSuffix",
-        "pageRequireDefaultExport"
-    ]
+    "assertedMessageIds": ["pageDefaultExportInline", "pageDefaultExportNameSuffix", "pageRequireDefaultExport"]
 }

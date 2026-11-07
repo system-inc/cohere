@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferRegexpExec.ts",
         "source": "declare const a: string;\na.match(/x/g);\n"
     },
-    "assertedMessageIds": [
-        "regExpExecOverStringMatch"
-    ],
+    "assertedMessageIds": ["regExpExecOverStringMatch"],
     "assertsFix": true
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/Accessors.ts",
         "source": "class Example {\n  set value() {}\n}\n"
     },
-    "assertedMessageIds": [
-        "mismatch"
-    ]
+    "assertedMessageIds": ["mismatch"]
 }

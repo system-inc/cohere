@@ -364,9 +364,7 @@ enum PolicyAbbreviations {
                     "segment": { "style": "advice" }
                 }
             ],
-            "allowedNames": [
-                { "name": "URLSearchParams", "reason": "A Web API, and not ours to rename." }
-            ],
+            "allowedNames": [{ "name": "URLSearchParams", "reason": "A Web API, and not ours to rename." }],
             "allowedSegments": [
                 {
                     "segment": "InnoDb",

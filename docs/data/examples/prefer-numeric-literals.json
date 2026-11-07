@@ -20,8 +20,6 @@
         "file": "file.ts",
         "source": "parseInt(1);\n"
     },
-    "assertedMessageIds": [
-        "useLiteral"
-    ],
+    "assertedMessageIds": ["useLiteral"],
     "assertsFix": true
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/LoopFunctions.ts",
         "source": "string = 'function a() {}';\n"
     },
-    "assertedMessageIds": [
-        "unsafeRefs"
-    ]
+    "assertedMessageIds": ["unsafeRefs"]
 }

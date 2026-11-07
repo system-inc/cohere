@@ -1,12 +1,12 @@
 # `react/jsx-no-literals`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1785** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | **1785**              |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ Overlaps a rule we already enforce in-house, so it would report the same defect 
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

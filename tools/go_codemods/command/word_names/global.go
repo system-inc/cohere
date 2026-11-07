@@ -13,16 +13,15 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
-	"github.com/system-inc/cohere/tools/go_codemods/global_rename"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -51,7 +50,7 @@ const (
 
 func runGlobal(root string, vocabularyPath string, skips []string, dryRun bool, renameOwnedSpellings bool,
 	libraries []string, options global_rename.Options) int {
-	vocabularyData, readError := os.ReadFile(vocabularyPath)
+	vocabularyData, readError := readVocabulary(vocabularyPath)
 	if readError != nil {
 		fmt.Fprintf(streams.Errors, "wordnames: reading the vocabulary: %v\n", readError)
 		return 1

@@ -16,7 +16,7 @@
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: wave1.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -96,24 +96,24 @@ const roots = [
 const probeSuffixes = ['', '-4', '-0', '-1', '-auto', '-none', '-[3px]', '-[var(--a)]', '-1/2', '/50', '-2.5', '-1.3'];
 
 const registryByRoot = new Map();
-for (const entry of designSystem.getClassList?.() ?? []) {
+for(const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
+    if(typeof name !== 'string') continue;
     const candidate = parseCandidate(designSystem, name);
-    if (!candidate || candidate.kind !== 'functional' || !candidate.root) continue;
-    if (!roots.includes(candidate.root)) continue;
+    if(!candidate || candidate.kind !== 'functional' || !candidate.root) continue;
+    if(!roots.includes(candidate.root)) continue;
     const list = registryByRoot.get(candidate.root) ?? [];
     list.push(name);
     registryByRoot.set(candidate.root, list);
 }
 
 const cases = [];
-for (const root of roots) {
+for(const root of roots) {
     const names = new Set(registryByRoot.get(root) ?? []);
-    for (const suffix of probeSuffixes) names.add(root + suffix);
-    for (const negative of ['-' + root + '-1', '-' + root + '-4']) names.add(negative);
+    for(const suffix of probeSuffixes) names.add(root + suffix);
+    for(const negative of ['-' + root + '-1', '-' + root + '-4']) names.add(negative);
 
-    for (const className of names) {
+    for(const className of names) {
         const candidate = parseCandidate(designSystem, className);
         const reading = readingOf(designSystem, className);
         cases.push({
@@ -128,22 +128,32 @@ for (const root of roots) {
 
 const answered = cases.filter((entry) => entry.reading !== null).length;
 const rejected = cases.length - answered;
-if (answered === 0) {
-    process.stderr.write('wave1.mjs: no case produced a reading, so a comparison against this fixture would pass by comparing nothing\n');
+if(answered === 0) {
+    process.stderr.write(
+        'wave1.mjs: no case produced a reading, so a comparison against this fixture would pass by comparing nothing\n',
+    );
     process.exit(4);
 }
-if (rejected === 0) {
-    process.stderr.write('wave1.mjs: no case was rejected, so the branches that must produce nothing are unexercised\n');
+if(rejected === 0) {
+    process.stderr.write(
+        'wave1.mjs: no case was rejected, so the branches that must produce nothing are unexercised\n',
+    );
     process.exit(4);
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    groundTruth: 'compileAstNodes propertySort, via readingOf',
-    rootCount: roots.length,
-    caseCount: cases.length,
-    answered,
-    rejected,
-    cases,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            groundTruth: 'compileAstNodes propertySort, via readingOf',
+            rootCount: roots.length,
+            caseCount: cases.length,
+            answered,
+            rejected,
+            cases,
+        },
+        null,
+        2,
+    ) + '\n',
+);

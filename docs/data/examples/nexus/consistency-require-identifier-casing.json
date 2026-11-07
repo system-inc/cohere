@@ -21,6 +21,7 @@
         "source": "export function OrderList() { return <ul />; }\n"
     },
     "assertedMessageIds": [
+        "noLeadingUnderscore",
         "requireLowerCamelCaseValue",
         "requireUpperCamelCaseCapital",
         "requireUpperCamelCaseType"

@@ -84,6 +84,7 @@ const (
 	GitignoreLayer      = ".gitignore"
 	HouseIgnoreLayer    = "format.ignore"
 	IgnorePatternsLayer = "ignorePatterns"
+	FixturesLayer       = "testdata"
 )
 
 // Enumerate walks a project root and returns the files handles accepts.
@@ -203,6 +204,14 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 			// unrequested. A formatter should not edit a repository nobody asked it to touch.
 			if relative != "." && hasOwnRepositoryListed(path, listing) {
 				enumeration.NestedRepositories = append(enumeration.NestedRepositories, relative)
+				return filepath.SkipDir
+			}
+
+			// Go's testdata holds fixtures, whose bytes are what a test reads: a fixture formatted is a fixture
+			// changed, and the tests around cohere's printers keep upstream's unformatted inputs there on purpose.
+			// Never entered, as discovery never enters it, and counted, so the skip shows (#4wjhppw).
+			if info.Name() == FixturesLayer {
+				enumeration.IgnoredByLayer[FixturesLayer]++
 				return filepath.SkipDir
 			}
 

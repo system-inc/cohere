@@ -19,8 +19,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const A = '';\n"
     },
-    "assertedMessageIds": [
-        "nonoctalDecimalEscape"
-    ],
+    "assertedMessageIds": ["nonoctalDecimalEscape"],
     "assertsSuggestion": true
 }

@@ -8,7 +8,5 @@
         "file": "/repository/source/ConsistencyRequirePaginationArgumentName.ts",
         "source": "@GraphQlArgument('bad') class C {}"
     },
-    "assertedMessageIds": [
-        "invalidName"
-    ]
+    "assertedMessageIds": ["invalidName"]
 }

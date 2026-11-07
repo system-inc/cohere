@@ -18,9 +18,5 @@
         "file": "/repository/source/components/Panel.tsx",
         "source": "declare function useAccountQuery(): unknown;\ndeclare function useWatch(): unknown;\ndeclare function useSprings(): unknown;\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "hookResultNamingBadSuffix",
-        "hookResultNamingGeneric",
-        "hookResultNamingMismatch"
-    ]
+    "assertedMessageIds": ["hookResultNamingBadSuffix", "hookResultNamingGeneric", "hookResultNamingMismatch"]
 }

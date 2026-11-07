@@ -36,7 +36,7 @@
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: enumerate.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -73,10 +73,10 @@ const staticNames = designSystem.utilities.keys('static').filter((name) => typeo
 function flattenDeclarations(nodes) {
     const declarations = [];
     const queue = [...nodes];
-    while (queue.length > 0) {
+    while(queue.length > 0) {
         const node = queue.shift();
-        if (!node) continue;
-        if (node.kind === 'declaration') {
+        if(!node) continue;
+        if(node.kind === 'declaration') {
             declarations.push({
                 property: node.property,
                 value: node.value ?? null,
@@ -88,8 +88,8 @@ function flattenDeclarations(nodes) {
         // Matching PropertySort: rules and at-rules are descended into, and nothing else is. The
         // `@property` bodies this deliberately skips are why `shadow-[--x]` prints 39 declarations
         // and reads `{order:[315,316], count:2}`.
-        if (node.kind === 'rule' || node.kind === 'at-rule') {
-            for (const child of node.nodes ?? []) queue.push(child);
+        if(node.kind === 'rule' || node.kind === 'at-rule') {
+            for(const child of node.nodes ?? []) queue.push(child);
         }
     }
     return declarations;
@@ -98,9 +98,9 @@ function flattenDeclarations(nodes) {
 const entries = [];
 const unresolved = [];
 
-for (const name of staticNames) {
+for(const name of staticNames) {
     const candidate = parseCandidate(designSystem, name);
-    if (!candidate || candidate.kind !== 'static') {
+    if(!candidate || candidate.kind !== 'static') {
         // Registered static but does not parse as one. Recorded rather than dropped: a name in the
         // registry that the parser reads differently is exactly the class of disagreement this port
         // exists to surface.
@@ -112,11 +112,11 @@ for (const name of staticNames) {
     try {
         nodes = designSystem.compileAstNodes(candidate);
     }
-    catch (error) {
+    catch(error) {
         unresolved.push({ name, reason: 'compileAstNodes threw: ' + String(error?.message ?? error).slice(0, 80) });
         continue;
     }
-    if (!nodes || nodes.length === 0) {
+    if(!nodes || nodes.length === 0) {
         unresolved.push({ name, reason: 'compiled to nothing' });
         continue;
     }
@@ -136,12 +136,18 @@ for (const name of staticNames) {
 
 entries.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    groundTruth: 'compileAstNodes (internal API), with readingOf as an independent check',
-    registeredStatics: staticNames.length,
-    emitted: entries.length,
-    unresolved,
-    statics: entries,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            groundTruth: 'compileAstNodes (internal API), with readingOf as an independent check',
+            registeredStatics: staticNames.length,
+            emitted: entries.length,
+            unresolved,
+            statics: entries,
+        },
+        null,
+        2,
+    ) + '\n',
+);

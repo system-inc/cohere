@@ -17,6 +17,9 @@ package flagged
 
 /** ALWAYS returns a copy */ // want `^"ALWAYS" in a comment`
 
+// A one-line block comment is read without its delimiters, so a word after multi-byte text still maps to its bytes.
+/* the café is NEVER warm */ // want `^"NEVER" in a comment`
+
 // An unclosed backtick masks nothing after it, so its want is double-quoted: a backtick pattern would close it.
 
 // `code and then NEVER do this // want "NEVER"

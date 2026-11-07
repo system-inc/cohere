@@ -10,7 +10,7 @@ const fs = require('node:fs');
 
 const file = process.argv[2];
 const contents = fs.readFileSync(file);
-if (contents.length === 0) {
+if(contents.length === 0) {
     process.stderr.write(file + ' is empty, so there is no byte to flip and nothing a check could refuse\n');
     process.exit(1);
 }

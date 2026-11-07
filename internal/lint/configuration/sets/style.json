@@ -48,10 +48,7 @@
         "no-useless-rename": "error",
         "strict": "error",
         "prefer-template": "error",
-        "object-shorthand": [
-            "error",
-            "properties"
-        ],
+        "object-shorthand": ["error", "properties"],
         "@typescript-eslint/consistent-type-definitions": "off",
         "@typescript-eslint/dot-notation": [
             "error",
@@ -173,10 +170,7 @@
         "nexus/consistency-no-boolean-outcome": "error",
         "@typescript-eslint/no-inferrable-types": "error",
         "@typescript-eslint/prefer-regexp-exec": "error",
-        "one-var": [
-            "error",
-            "never"
-        ],
+        "one-var": ["error", "never"],
         "prefer-arrow-callback": "off",
         "no-inline-comments": "off",
         "prefer-destructuring": "off",
@@ -235,9 +229,7 @@
     },
     "overrides": [
         {
-            "files": [
-                "**/*.generated.*"
-            ],
+            "files": ["**/*.generated.*"],
             "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
             "rules": {
                 "max-lines": "off"

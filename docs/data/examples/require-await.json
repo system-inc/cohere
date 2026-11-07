@@ -19,8 +19,6 @@
         "file": "/repository/source/RequireAwait.ts",
         "source": "await foo()"
     },
-    "assertedMessageIds": [
-        "missingAwait"
-    ],
+    "assertedMessageIds": ["missingAwait"],
     "assertsSuggestion": true
 }

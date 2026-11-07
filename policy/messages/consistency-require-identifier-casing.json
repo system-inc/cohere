@@ -1,19 +1,22 @@
 {
-  "rules": {
-    "TypeScript": "nexus/consistency-require-identifier-casing"
-  },
-  "phrases": {
-    "reasoning": "Values are spelled in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name marks a word boundary the camel case already marks."
-  },
-  "messages": {
-    "requireLowerCamelCaseValue": {
-      "text": "The {{declaration}} \"{{name}}\" is a value, so spell it in lowerCamelCase: \"{{suggestion}}\". <<reasoning>>"
+    "rules": {
+        "TypeScript": "nexus/consistency-require-identifier-casing"
     },
-    "requireUpperCamelCaseType": {
-      "text": "The {{declaration}} \"{{name}}\" is a type, so spell it in UpperCamelCase: \"{{suggestion}}\". <<reasoning>>"
+    "phrases": {
+        "reasoning": "Values are spelled in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name marks a word boundary the camel case already marks."
     },
-    "requireUpperCamelCaseCapital": {
-      "text": "The {{declaration}} \"{{name}}\" keeps its capital, as a component, a constructor or a decorator does, so spell it in UpperCamelCase: \"{{suggestion}}\". <<reasoning>>"
+    "messages": {
+        "requireLowerCamelCaseValue": {
+            "text": "The {{declaration}} \"{{name}}\" is a value, so spell it in lowerCamelCase: \"{{suggestion}}\". <<reasoning>>"
+        },
+        "requireUpperCamelCaseType": {
+            "text": "The {{declaration}} \"{{name}}\" is a type, so spell it in UpperCamelCase: \"{{suggestion}}\". <<reasoning>>"
+        },
+        "requireUpperCamelCaseCapital": {
+            "text": "The {{declaration}} \"{{name}}\" keeps its capital, as a component, a constructor or a decorator does, so spell it in UpperCamelCase: \"{{suggestion}}\". <<reasoning>>"
+        },
+        "noLeadingUnderscore": {
+            "text": "The {{declaration}} \"{{name}}\" opens with an underscore; spell it \"{{suggestion}}\". A leading underscore is a convention for private or for unused, and TypeScript says private with `#` or the `private` modifier, which the compiler checks. A name nothing reads is deleted, or written as the bare `_` where its position has to be held."
+        }
     }
-  }
 }

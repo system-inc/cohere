@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoTestOnGlobalRegex.ts",
         "source": "declare const lines: string[];\ndeclare const text: string;\ndeclare const position: number;\ndeclare function use(value: unknown): void;\nconst pattern = /todo/i;\nexport function matches(line: string) {\n    return pattern.test(line);\n}\n"
     },
-    "assertedMessageIds": [
-        "globalRegexTest"
-    ]
+    "assertedMessageIds": ["globalRegexTest"]
 }

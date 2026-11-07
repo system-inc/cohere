@@ -260,10 +260,8 @@ func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 // in a literal; that rule counts and deletes exactly the unglued repeats within a run, so this skips
 // exactly those. A run whose source is not its decoded value is reported at the run, without a fix.
 func reportTemplateDeprecations(ruleContext rule.Context, segments []ClassSegment) {
-	sourceText := ""
-	if ruleContext.SourceFile != nil {
-		sourceText = ruleContext.SourceFile.Text()
-	}
+	// The rule declines a file with no source before it listens, so the source is always here.
+	sourceText := ruleContext.SourceFile.Text()
 
 	seenInRun := map[string]bool{}
 	run := -1

@@ -19,8 +19,6 @@
         "file": "noArrayDelete.ts",
         "source": "delete console.log();\n"
     },
-    "assertedMessageIds": [
-        "noArrayDelete"
-    ],
+    "assertedMessageIds": ["noArrayDelete"],
     "assertsSuggestion": true
 }

@@ -34,7 +34,7 @@ import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
 
 const [, , packageRootArgument, corpusPathArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [corpus.json]\n');
     process.exit(2);
 }
@@ -64,15 +64,17 @@ const declaredNames = [
  * each name is tried on its own and the ones that fail to link are dropped.
  */
 const bindableNames = [];
-for (const name of declaredNames) {
+for(const name of declaredNames) {
     const probePath = NodePath.join(distributionDirectory, `zz_gen_probe_${name}.mjs`);
     NodeFileSystem.writeFileSync(probePath, `${bundleSource}\nexport{${name} as probe};\n`);
     try {
         await import(NodeUrl.pathToFileURL(probePath).href);
         bindableNames.push(name);
-    } catch {
+    }
+    catch {
         /* Not a top-level binding. */
-    } finally {
+    }
+    finally {
         NodeFileSystem.unlinkSync(probePath);
     }
 }
@@ -89,37 +91,39 @@ let parseExportName = null;
 try {
     const patched = await import(NodeUrl.pathToFileURL(patchedPath).href);
 
-    for (const exportName of Object.keys(patched)) {
+    for(const exportName of Object.keys(patched)) {
         const exported = patched[exportName];
-        if (typeof exported !== 'function') continue;
+        if(typeof exported !== 'function') continue;
 
         try {
             const simple = exported('.a{color:red}');
-            if (!Array.isArray(simple) || simple.length !== 1) continue;
-            if (simple[0]?.kind !== 'rule' || simple[0]?.selector !== '.a') continue;
+            if(!Array.isArray(simple) || simple.length !== 1) continue;
+            if(simple[0]?.kind !== 'rule' || simple[0]?.selector !== '.a') continue;
 
             // Separates the parser from the wrapper that yields a nested rule with a null body.
             const body = simple[0].nodes?.[0];
-            if (body?.kind !== 'declaration' || body.property !== 'color' || body.value !== 'red') continue;
+            if(body?.kind !== 'declaration' || body.property !== 'color' || body.value !== 'red') continue;
 
             // The custom-property branch keeps raw newlines; nothing else in the bundle does.
             const custom = exported(':root{--a: b,\n  c;}');
             const declaration = custom?.[0]?.nodes?.[0];
-            if (declaration?.kind !== 'declaration') continue;
-            if (typeof declaration.value !== 'string' || !declaration.value.includes('\n')) continue;
+            if(declaration?.kind !== 'declaration') continue;
+            if(typeof declaration.value !== 'string' || !declaration.value.includes('\n')) continue;
 
             parse = exported;
             parseExportName = exportName.replace(/^probe_/, '');
             break;
-        } catch {
+        }
+        catch {
             /* Not the parser. */
         }
     }
-} finally {
+}
+finally {
     NodeFileSystem.unlinkSync(patchedPath);
 }
 
-if (!parse) {
+if(!parse) {
     process.stderr.write('could not locate parse() in the bundle by identity\n');
     process.exit(1);
 }
@@ -129,7 +133,7 @@ if (!parse) {
  * fixtures read the same way. Source locations are dropped because the port does not carry them.
  */
 function serializeNode(node) {
-    switch (node.kind) {
+    switch(node.kind) {
         case 'rule':
             return { kind: 'rule', selector: node.selector, nodes: node.nodes.map(serializeNode) };
         case 'at-rule':
@@ -216,7 +220,10 @@ const syntheticCases = [
     ['nested parens', '.a { width: calc((1px + 2px) * 3); }'],
     ['supports at-rule', '@supports (display: grid) { .a { color: red; } }'],
     ['paren in at-rule params', '@custom-variant dark (&:where(.dark, .dark *));'],
-    ['custom variant with has', '@custom-variant dark (&:where(.d, .d *):not(:where(.l:not(:has(.d)), .l:not(:has(.d)) *)));'],
+    [
+        'custom variant with has',
+        '@custom-variant dark (&:where(.d, .d *):not(:where(.l:not(:has(.d)), .l:not(:has(.d)) *)));',
+    ],
 
     // !important.
     ['important', '.a { color: red !important; }'],
@@ -229,7 +236,10 @@ const syntheticCases = [
     ['custom property empty value', ':root { --a:; }'],
     ['custom property no semicolon', ':root { --a: b }'],
     ['custom property multiline', ':root {\n  --a: b,\n    c,\n    d;\n}'],
-    ['custom property keeps indentation', ':root {\n  --font-sans:\n        var(--f), -apple-system, "Segoe UI",\n        sans-serif;\n}'],
+    [
+        'custom property keeps indentation',
+        ':root {\n  --font-sans:\n        var(--f), -apple-system, "Segoe UI",\n        sans-serif;\n}',
+    ],
     ['custom property with semicolon in parens', ':root { --a: url(x;y); }'],
     ['custom property with braces', ':root { --a: { b: c }; }'],
     ['custom property with brackets', ':root { --a: [b;c]; }'],
@@ -251,7 +261,10 @@ const syntheticCases = [
     // @theme and @utility shapes, the ones this port exists to read.
     ['theme block', '@theme { --color-red-500: oklch(0.637 0.237 25.331); }'],
     ['theme inline', '@theme inline { --animate-x: x 1s; }'],
-    ['theme with keyframes', '@theme { --animate-spin: spin 1s linear infinite; @keyframes spin { to { transform: rotate(360deg); } } }'],
+    [
+        'theme with keyframes',
+        '@theme { --animate-spin: spin 1s linear infinite; @keyframes spin { to { transform: rotate(360deg); } } }',
+    ],
     ['utility static', '@utility scrollbar-hide { scrollbar-width: none; }'],
     ['utility functional', '@utility border--* { border-color: --value(--color- *); }'],
     ['utility negative', '@utility -zoom-in-* { --tw-enter-scale: calc(--value([integer]) * 1%); }'],
@@ -269,10 +282,11 @@ const syntheticCases = [
 const cases = [];
 const errorCases = [];
 
-for (const [name, input] of syntheticCases) {
+for(const [name, input] of syntheticCases) {
     try {
         cases.push({ name, source: 'synthetic', input, nodes: parse(input).map(serializeNode) });
-    } catch (error) {
+    }
+    catch(error) {
         errorCases.push({ name, source: 'synthetic', input, message: error.message });
     }
 }
@@ -292,11 +306,12 @@ const errorInputs = [
     ['custom property without value', '.a { --abc }'],
 ];
 
-for (const [name, input] of errorInputs) {
+for(const [name, input] of errorInputs) {
     try {
         const nodes = parse(input).map(serializeNode);
         errorCases.push({ name, source: 'synthetic-error', input, message: null, unexpectedlyParsed: nodes });
-    } catch (error) {
+    }
+    catch(error) {
         errorCases.push({ name, source: 'synthetic-error', input, message: error.message });
     }
 }
@@ -314,21 +329,21 @@ let utilityBlockCount = 0;
 let customVariantCount = 0;
 
 function countAtRules(nodes) {
-    for (const node of nodes) {
-        if (node.kind === 'at-rule') {
-            if (node.name === '@theme') {
-                for (const child of node.nodes) {
-                    if (child.kind === 'declaration' && child.property.startsWith('--')) themeEntryCount++;
+    for(const node of nodes) {
+        if(node.kind === 'at-rule') {
+            if(node.name === '@theme') {
+                for(const child of node.nodes) {
+                    if(child.kind === 'declaration' && child.property.startsWith('--')) themeEntryCount++;
                 }
             }
-            if (node.name === '@utility') utilityBlockCount++;
-            if (node.name === '@custom-variant') customVariantCount++;
+            if(node.name === '@utility') utilityBlockCount++;
+            if(node.name === '@custom-variant') customVariantCount++;
         }
-        if (node.nodes) countAtRules(node.nodes);
+        if(node.nodes) countAtRules(node.nodes);
     }
 }
 
-for (const entry of realFiles) {
+for(const entry of realFiles) {
     const content = NodeFileSystem.readFileSync(entry.path, 'utf8');
     const nodes = parse(content).map(serializeNode);
     countAtRules(nodes);

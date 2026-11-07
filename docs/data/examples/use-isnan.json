@@ -18,9 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "declare const value: number;\nexport const Ok = value + NaN;\n"
     },
-    "assertedMessageIds": [
-        "caseWithNaN",
-        "comparisonWithNaN",
-        "switchOnNaN"
-    ]
+    "assertedMessageIds": ["caseWithNaN", "comparisonWithNaN", "switchOnNaN"]
 }

@@ -1,7 +1,5 @@
 {
     "rule": "@typescript-eslint/no-inferrable-types",
-    "assertedMessageIds": [
-        "noInferrableType"
-    ],
+    "assertedMessageIds": ["noInferrableType"],
     "assertsFix": true
 }

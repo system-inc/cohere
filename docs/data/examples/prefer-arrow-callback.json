@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferArrowCallback.ts",
         "source": "foo(a => a);\n"
     },
-    "assertedMessageIds": [
-        "preferArrowCallback"
-    ],
+    "assertedMessageIds": ["preferArrowCallback"],
     "assertsFix": true
 }

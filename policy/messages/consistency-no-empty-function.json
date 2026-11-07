@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-empty-function"
-  },
-  "messages": {
-    "emptyFunction": {
-      "text": "This function's body is empty, and nothing inside it says why. A deliberate no-op, such as a method an interface asks for that this type has nothing to do in, reads exactly like work someone forgot to write, and only you know which it is. Say why in a comment inside the braces, where the next reader looks first, such as `{ /* Holds no resources, so there is nothing to release. */ }`. A doc comment above the function does not count: it tells a caller what the function is for, not why its body does nothing. If this is a test, give it something that can fail or delete it, because an empty test passes every run and proves nothing."
+    "rules": {
+        "Go": "cohere-go/consistency-no-empty-function"
+    },
+    "messages": {
+        "emptyFunction": {
+            "text": "This function's body is empty, and nothing inside it says why. A deliberate no-op, such as a method an interface asks for that this type has nothing to do in, reads exactly like work someone forgot to write, and only you know which it is. Say why in a comment inside the braces, where the next reader looks first, such as `{ /* Holds no resources, so there is nothing to release. */ }`. A doc comment above the function does not count: it tells a caller what the function is for, not why its body does nothing. If this is a test, give it something that can fail or delete it, because an empty test passes every run and proves nothing."
+        }
     }
-  }
 }

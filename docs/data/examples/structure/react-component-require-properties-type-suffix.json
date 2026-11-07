@@ -29,10 +29,6 @@
         "file": "/repository/app/x/page.tsx",
         "source": "export default function Page(properties: PageProps<'/x'>) { return null; }"
     },
-    "assertedMessageIds": [
-        "useComponentPropertyTypeSuffix",
-        "useInterfaceSuffix",
-        "useTypeAliasSuffix"
-    ],
+    "assertedMessageIds": ["useComponentPropertyTypeSuffix", "useInterfaceSuffix", "useTypeAliasSuffix"],
     "assertsFix": true
 }

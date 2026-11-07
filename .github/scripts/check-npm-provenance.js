@@ -32,7 +32,7 @@ function fail(message) {
 function npmModule(relativePath) {
     const npmRoot = path.join(childProcess.execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim(), 'npm');
     const file = path.join(npmRoot, 'node_modules', relativePath);
-    if (!fs.existsSync(file)) {
+    if(!fs.existsSync(file)) {
         fail(file + ' is not in this npm, so its provenance code has moved; find where generateProvenance lives now');
     }
     return require(file);
@@ -60,18 +60,19 @@ async function requireRefusals(verifyProvenance, subject, bundleFile, tarball) {
     contents[contents.length >> 1] ^= 0x01;
     fs.writeFileSync(tampered, contents);
     const tamperedSubject = { name: subject.name, digest: { sha512: sha512Hex(tampered) } };
-    if (tamperedSubject.digest.sha512 === subject.digest.sha512) {
+    if(tamperedSubject.digest.sha512 === subject.digest.sha512) {
         fail('flipping a byte did not change the tarball digest, so the tamper below would test nothing');
     }
 
     let refused = false;
     try {
         await verifyProvenance(tamperedSubject, bundleFile);
-    } catch (error) {
+    }
+    catch(error) {
         refused = true;
         console.log('ok   a tarball with one byte flipped is refused: ' + error.message);
     }
-    if (!refused) {
+    if(!refused) {
         fail('the provenance verified for a tarball with a flipped byte');
     }
 
@@ -85,11 +86,12 @@ async function requireRefusals(verifyProvenance, subject, bundleFile, tarball) {
     refused = false;
     try {
         await verifyProvenance(tamperedSubject, repointed);
-    } catch (error) {
+    }
+    catch(error) {
         refused = true;
         console.log('ok   a statement re-pointed at the tampered tarball is refused: ' + error.message);
     }
-    if (!refused) {
+    if(!refused) {
         fail('a statement edited to name the tampered tarball verified, so the signature is not being checked');
     }
 }
@@ -97,12 +99,21 @@ async function requireRefusals(verifyProvenance, subject, bundleFile, tarball) {
 async function main() {
     const staged = path.resolve(process.argv[2] || '');
     const dispatcher = path.join(staged, 'cohere');
-    if (!fs.existsSync(path.join(dispatcher, 'package.json'))) {
+    if(!fs.existsSync(path.join(dispatcher, 'package.json'))) {
         fail('no staged dispatcher at ' + dispatcher);
     }
-    for (const variable of ['GITHUB_ACTIONS', 'GITHUB_SERVER_URL', 'GITHUB_REPOSITORY', 'GITHUB_SHA', 'ACTIONS_ID_TOKEN_REQUEST_URL']) {
-        if (!process.env[variable]) {
-            fail(variable + ' is not set: provenance is signed with a GitHub Actions identity, in a job with id-token: write');
+    for(const variable of [
+        'GITHUB_ACTIONS',
+        'GITHUB_SERVER_URL',
+        'GITHUB_REPOSITORY',
+        'GITHUB_SHA',
+        'ACTIONS_ID_TOKEN_REQUEST_URL',
+    ]) {
+        if(!process.env[variable]) {
+            fail(
+                variable +
+                    ' is not set: provenance is signed with a GitHub Actions identity, in a job with id-token: write',
+            );
         }
     }
     const repository = process.env.GITHUB_SERVER_URL + '/' + process.env.GITHUB_REPOSITORY;
@@ -110,21 +121,32 @@ async function main() {
     // The registry refuses provenance from a repository other than the one a package names, so a
     // repository field that drifted would pass every check here and fail at the real publish.
     let packages = 0;
-    for (const entry of fs.readdirSync(staged, { withFileTypes: true })) {
+    for(const entry of fs.readdirSync(staged, { withFileTypes: true })) {
         const manifestFile = path.join(staged, entry.name, 'package.json');
-        if (!entry.isDirectory() || !fs.existsSync(manifestFile)) {
+        if(!entry.isDirectory() || !fs.existsSync(manifestFile)) {
             continue;
         }
         const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
-        if (manifest.repository?.url !== 'git+' + repository + '.git') {
-            fail(manifest.name + ' names its repository as ' + manifest.repository?.url + ', and this run is ' + repository + ', so the registry would refuse its provenance');
+        if(manifest.repository?.url !== 'git+' + repository + '.git') {
+            fail(
+                manifest.name +
+                    ' names its repository as ' +
+                    manifest.repository?.url +
+                    ', and this run is ' +
+                    repository +
+                    ', so the registry would refuse its provenance',
+            );
         }
         packages++;
     }
     console.log('ok   all ' + packages + ' staged packages name ' + repository);
 
     const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'provenance-'));
-    const packed = childProcess.execFileSync('npm', ['pack', '--silent', '--pack-destination', workspace, dispatcher], { encoding: 'utf8' }).trim().split('\n').pop();
+    const packed = childProcess
+        .execFileSync('npm', ['pack', '--silent', '--pack-destination', workspace, dispatcher], { encoding: 'utf8' })
+        .trim()
+        .split('\n')
+        .pop();
     const tarball = path.join(workspace, packed);
 
     const manifest = JSON.parse(fs.readFileSync(path.join(dispatcher, 'package.json'), 'utf8'));
@@ -143,19 +165,26 @@ async function main() {
 
     const definition = statementOf(bundle).predicate.buildDefinition;
     const commit = definition.resolvedDependencies[0].digest.gitCommit;
-    if (commit !== process.env.GITHUB_SHA) {
+    if(commit !== process.env.GITHUB_SHA) {
         fail('the provenance names commit ' + commit + ', and this run built ' + process.env.GITHUB_SHA);
     }
-    if (definition.externalParameters.workflow.repository !== repository) {
+    if(definition.externalParameters.workflow.repository !== repository) {
         fail('the provenance names ' + definition.externalParameters.workflow.repository + ', not ' + repository);
     }
-    console.log('ok   the provenance names ' + repository + ' at ' + commit + ', built by ' + definition.externalParameters.workflow.path);
+    console.log(
+        'ok   the provenance names ' +
+            repository +
+            ' at ' +
+            commit +
+            ', built by ' +
+            definition.externalParameters.workflow.path,
+    );
 
     await requireRefusals(verifyProvenance, subject, bundleFile, tarball);
 }
 
 module.exports = { requireRefusals, npmModule, sha512Hex };
 
-if (require.main === module) {
+if(require.main === module) {
     main().catch((error) => fail(error.stack || String(error)));
 }

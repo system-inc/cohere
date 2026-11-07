@@ -33,23 +33,23 @@ never something it silently ignores.
 
 ## Keys
 
-| Key | Type | In |
-| --- | --- | --- |
-| [`$schema`](#schema) | string | any settings file |
-| [`cohere`](#cohere) | string | any settings file |
-| [`departures`](#departures) | object of reasons | any settings file |
-| [`extends`](#extends) | string or array of strings | any settings file |
-| [`format`](#format) | object | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
-| [`go`](#go) | object | the file beside go.work or go.mod, or the one --lint-config names |
-| [`ignorePatterns`](#ignorepatterns) | array of strings | any settings file |
-| [`jsPlugins`](#jsplugins) | array | any settings file |
-| [`output`](#output) | object | the file cohere reads first |
-| [`overrides`](#overrides) | array of blocks | any settings file |
-| [`plugins`](#plugins) | array of strings | any settings file |
-| [`reasons`](#reasons) | object of reasons | any settings file |
-| [`rules`](#rules) | object of rule settings | any settings file |
-| [`settings`](#settings) | object | the file cohere reads first |
-| [`swift`](#swift) | object | the file beside a Swift project, or the one --lint-config names; never a file another extends |
+| Key                                 | Type                       | In                                                                                                     |
+| ----------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`$schema`](#schema)                | string                     | any settings file                                                                                      |
+| [`cohere`](#cohere)                 | string                     | any settings file                                                                                      |
+| [`departures`](#departures)         | object of reasons          | any settings file                                                                                      |
+| [`extends`](#extends)               | string or array of strings | any settings file                                                                                      |
+| [`format`](#format)                 | object                     | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
+| [`go`](#go)                         | object                     | the file beside go.work or go.mod, or the one --lint-config names                                      |
+| [`ignorePatterns`](#ignorepatterns) | array of strings           | any settings file                                                                                      |
+| [`jsPlugins`](#jsplugins)           | array                      | any settings file                                                                                      |
+| [`output`](#output)                 | object                     | the file cohere reads first                                                                            |
+| [`overrides`](#overrides)           | array of blocks            | any settings file                                                                                      |
+| [`plugins`](#plugins)               | array of strings           | any settings file                                                                                      |
+| [`reasons`](#reasons)               | object of reasons          | any settings file                                                                                      |
+| [`rules`](#rules)                   | object of rule settings    | any settings file                                                                                      |
+| [`settings`](#settings)             | object                     | the file cohere reads first                                                                            |
+| [`swift`](#swift)                   | object                     | the file beside a Swift project, or the one --lint-config names; never a file another extends          |
 
 ### `$schema`
 
@@ -89,19 +89,19 @@ The rule sets cohere carries: `cohere:adamic`, `cohere:next`, `cohere:react`, `c
 
 The formatter's options and the house ignore list. With no block anywhere in the chain, cohere formats with the house block cohere:typescript carries. Outside our tiers, the most derived settings file with a block decides, applied over Prettier's defaults, so {} means Prettier's defaults, and its ignore replaces the house list when it has one. In a chain extending a cohere:system-inc set, only the Nexus tier holds this block, and a format key in any other file is refused, naming the file. An option outside this list is refused rather than ignored.
 
-| Option | Type | Values |
-| --- | --- | --- |
-| `printWidth` | integer |  |
-| `tabWidth` | integer |  |
-| `useTabs` | boolean |  |
-| `semi` | boolean |  |
-| `singleQuote` | boolean |  |
-| `trailingComma` | string | `all`, `es5`, `none` |
-| `bracketSpacing` | boolean |  |
-| `bracketSameLine` | boolean |  |
-| `arrowParens` | string | `always`, `avoid` |
-| `endOfLine` | string | `lf` |
-| `ignore` | array of patterns |  |
+| Option            | Type              | Values               |
+| ----------------- | ----------------- | -------------------- |
+| `printWidth`      | integer           |                      |
+| `tabWidth`        | integer           |                      |
+| `useTabs`         | boolean           |                      |
+| `semi`            | boolean           |                      |
+| `singleQuote`     | boolean           |                      |
+| `trailingComma`   | string            | `all`, `es5`, `none` |
+| `bracketSpacing`  | boolean           |                      |
+| `bracketSameLine` | boolean           |                      |
+| `arrowParens`     | string            | `always`, `avoid`    |
+| `endOfLine`       | string            | `lf`                 |
+| `ignore`          | array of patterns |                      |
 
 - `printWidth`: The line width the printer wraps at.
 - `tabWidth`: Spaces per indentation level.
@@ -162,7 +162,11 @@ Each block takes:
 - `reason`: Why the block exists. cohere prints every reason on every run, so a block standing in for unfinished work stays visible until that work lands.
 
 ```json
-{ "overrides": [{ "files": ["**/*.test.ts"], "rules": { "no-console": "off" }, "reason": "Tests print their fixtures." }] }
+{
+    "overrides": [
+        { "files": ["**/*.test.ts"], "rules": { "no-console": "off" }, "reason": "Tests print their fixtures." }
+    ]
+}
 ```
 
 ### `plugins`
@@ -202,7 +206,15 @@ Per-plugin settings, read for better-tailwindcss: its rules read settings["bette
 The Swift engine's rules, read by cohere-swift itself: under rules, each Swift rule's severity, error, warning or off, or an array of one and, for a rule that reads options, an object of them, which may only make the rule stricter: cohere-swift/file-length reads max, at or below the house's 2,000 lines. An option a rule does not read is refused by name. A house rule the block does not name runs at error. The engine reads the block from the settings file beside a Swift project's root (its Package.swift, project.yml or .xcodeproj), or the file --lint-config names, and never follows extends, so a block in a file another extends, or beside no Swift project, is refused by name. Formatting is not configured here: Swift has one house format, and a format key in this block is refused.
 
 ```json
-{ "swift": { "rules": { "cohere-swift/force-unwrapping": "error", "cohere-swift/file-length": "warning", "cohere-swift/force-cast": "off" } } }
+{
+    "swift": {
+        "rules": {
+            "cohere-swift/force-unwrapping": "error",
+            "cohere-swift/file-length": "warning",
+            "cohere-swift/force-cast": "off"
+        }
+    }
+}
 ```
 
 ## Severities

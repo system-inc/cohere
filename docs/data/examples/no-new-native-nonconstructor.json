@@ -18,7 +18,5 @@
         "file": "/repository/source/Nonconstructor.ts",
         "source": "new foo(BigInt);\n"
     },
-    "assertedMessageIds": [
-        "noNewNativeNonconstructor"
-    ]
+    "assertedMessageIds": ["noNewNativeNonconstructor"]
 }

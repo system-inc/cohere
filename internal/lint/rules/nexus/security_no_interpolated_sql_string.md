@@ -1,14 +1,14 @@
 # `nexus/security-no-interpolated-sql-string`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at `error` once ahra's 33 findings are fixed. Register it `off` until then: six are real bugs, and the other 27 need a narrower type or a bound parameter each, a per-site call |
-| Findings | **ahra 33, www-phi-health 0, www-connected-app 0**; also **api-phi-health 14**, **api-connected-app 0** (measured 2026-10-02) |
-| Measured precision | 47 of 47 true: every finding is a `string`-typed value between the single quotes of a SQL string. 6 real bugs, 41 true-but-harmless (the value cannot carry a quote today, but its type says it could), 0 false |
-| Research count | 33 sites in 10 files (`#tevhg3f`, `research_js_catalogs.md` entry 3); cohere finds the same 33 sites in the same 10 files |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, to tell a `string` from a number or a literal union; without a checker the rule registers nothing |
+|                        |                                                                                                                                                                                                                 |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, at `error` once ahra's 33 findings are fixed. Register it `off` until then: six are real bugs, and the other 27 need a narrower type or a bound parameter each, a per-site call                        |
+| Findings               | **ahra 33, www-phi-health 0, www-connected-app 0**; also **api-phi-health 14**, **api-connected-app 0** (measured 2026-10-02)                                                                                   |
+| Measured precision     | 47 of 47 true: every finding is a `string`-typed value between the single quotes of a SQL string. 6 real bugs, 41 true-but-harmless (the value cannot carry a quote today, but its type says it could), 0 false |
+| Research count         | 33 sites in 10 files (`#tevhg3f`, `research_js_catalogs.md` entry 3); cohere finds the same 33 sites in the same 10 files                                                                                       |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                          |
+| Auto-fixable           | no                                                                                                                                                                                                              |
+| Needs type information | yes, to tell a `string` from a number or a literal union; without a checker the rule registers nothing                                                                                                          |
 
 ## What it checks
 
@@ -43,28 +43,28 @@ strings, not inside one. Where they differ, the rule is the exact one.
 
 **Real bugs (6)**
 
-| Site | Shape | Reading |
-|---|---|---|
-| `modules/apple/contacts/ContactsApi.ts:62` (×3) | `LIKE '%${word}%'`, one per name column | **Bug.** `word` is the user's search text; `O'Brien` ends the string, the query fails inside a `try`, and the search finds nothing |
+| Site                                               | Shape                                                                                    | Reading                                                                                                                            |
+| -------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `modules/apple/contacts/ContactsApi.ts:62` (×3)    | `LIKE '%${word}%'`, one per name column                                                  | **Bug.** `word` is the user's search text; `O'Brien` ends the string, the query fails inside a `try`, and the search finds nothing |
 | `modules/os/sensation/AhraOsTriggers.ts:1589` (×2) | `viewIdentifier = '${viewIdentifier}' OR ... LIKE '${viewIdentifier}?%'`, quotes doubled | **Bug.** The query runs on MySQL, where a trailing `\` escapes the closing quote. The identifier comes from a trigger's parameters |
-| `modules/phi/commerce/PhiCustomerApi.ts:282` | `emailAddress = '${escapedEmail}'`, quotes doubled | **Bug**, the same one: a PlanetScale (MySQL) query with only quotes doubled, on an email the operator types |
+| `modules/phi/commerce/PhiCustomerApi.ts:282`       | `emailAddress = '${escapedEmail}'`, quotes doubled                                       | **Bug**, the same one: a PlanetScale (MySQL) query with only quotes doubled, on an email the operator types                        |
 
 **True but harmless today (27 in ahra)**: the value is a `string` that cannot hold a quote as the code
 stands, and narrowing its type (or binding it) silences the finding.
 
-| Site | Value | Why it cannot hold a quote |
-|---|---|---|
-| `modules/apple/contacts/ContactsApi.ts:227` | `digits` | `phoneNumber.replace(/\D/g, '')` |
-| `modules/apple/imessage/iMessageApi.ts:749`, `:832`, `:1189` | the phone number, inside a Python script's SQL | `replace(/[^0-9+]/g, '')` |
-| `modules/phi/commerce/PhiCustomerApi.ts:298`, `:365` | `accountId` | read back from the `Account` row the previous query found |
-| `modules/data/DataTrimmedRowsDelete.ts:294` (×2), `:335` | `cutoff`, `ceiling` | timestamps the module computes |
-| `modules/data/DataTrimmedRowsDelete.ts:569`, `:596` | the table name, quotes doubled | MySQL, so the escape is incomplete, but the value is the operator's `--table` |
-| `modules/finance/connections/QuickBooksAdapter.ts:245`, `:277`, `:452` | `sinceDate` | a date string; QuickBooks queries take no parameters, so the fix is a date-shaped type |
-| `modules/finance/connections/QuickBooksAdapter.ts:330` | `accountType` | every caller passes a constant; the fix is a literal union |
-| `modules/google/ads/GoogleAdsKeywordApi.ts:127`, `GoogleAdsReportingApi.ts:52`, `:113`, `:159`, `:208` | `date` | a date string; GAQL takes no parameters |
-| `modules/ads/AdsRegistry.ts:186` | `mapUniversalToGoogleStatus(...)` | returns one of three constants, declared `string` |
-| `modules/ads/AdsRegistry.ts:255` (×2) | `start`, `end` | `resolveDateRange` dates |
-| `modules/planetscale/reports/i18n-conversion.ts:355` (×2), `:367` (×2) | `window.start`, `window.end` | dates from `addDays` |
+| Site                                                                                                   | Value                                          | Why it cannot hold a quote                                                             |
+| ------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `modules/apple/contacts/ContactsApi.ts:227`                                                            | `digits`                                       | `phoneNumber.replace(/\D/g, '')`                                                       |
+| `modules/apple/imessage/iMessageApi.ts:749`, `:832`, `:1189`                                           | the phone number, inside a Python script's SQL | `replace(/[^0-9+]/g, '')`                                                              |
+| `modules/phi/commerce/PhiCustomerApi.ts:298`, `:365`                                                   | `accountId`                                    | read back from the `Account` row the previous query found                              |
+| `modules/data/DataTrimmedRowsDelete.ts:294` (×2), `:335`                                               | `cutoff`, `ceiling`                            | timestamps the module computes                                                         |
+| `modules/data/DataTrimmedRowsDelete.ts:569`, `:596`                                                    | the table name, quotes doubled                 | MySQL, so the escape is incomplete, but the value is the operator's `--table`          |
+| `modules/finance/connections/QuickBooksAdapter.ts:245`, `:277`, `:452`                                 | `sinceDate`                                    | a date string; QuickBooks queries take no parameters, so the fix is a date-shaped type |
+| `modules/finance/connections/QuickBooksAdapter.ts:330`                                                 | `accountType`                                  | every caller passes a constant; the fix is a literal union                             |
+| `modules/google/ads/GoogleAdsKeywordApi.ts:127`, `GoogleAdsReportingApi.ts:52`, `:113`, `:159`, `:208` | `date`                                         | a date string; GAQL takes no parameters                                                |
+| `modules/ads/AdsRegistry.ts:186`                                                                       | `mapUniversalToGoogleStatus(...)`              | returns one of three constants, declared `string`                                      |
+| `modules/ads/AdsRegistry.ts:255` (×2)                                                                  | `start`, `end`                                 | `resolveDateRange` dates                                                               |
+| `modules/planetscale/reports/i18n-conversion.ts:355` (×2), `:367` (×2)                                 | `window.start`, `window.end`                   | dates from `addDays`                                                                   |
 
 **api-phi-health (14), true but harmless**:
 `workers/chat/internal/service/metrics/ChatMetricsRpcService.ts:70`, `:76`, `:84`, `:107`, `:115`,
@@ -80,7 +80,7 @@ interpolation in them.
 ## Declined, by decision
 
 - **Lowercase SQL.** Every lowercase keyword before `'${` in ahra is English (`delete refused:
-  '${name}' has ...`, `Could not update floor designation for '${accountName}'`).
+'${name}' has ...`, `Could not update floor designation for '${accountName}'`).
 - **Escaping functions by name.** `escapeSqlString(value)` is reported; only the visible
   backslash-and-quote `replace` chain is accepted. The doc comment gives the reasoning.
 - **A fixer.** The fix is a bound parameter, which spans the query and the driver call.
@@ -96,6 +96,7 @@ silent, which is how GAQL writes an enum. Only comparisons count: after `(`, `,`
 a table or column name.
 
 Measured on 2026-10-03 before the fixes: **ahra 25, www 0, api 0**, all 25 true.
+
 - 23 were GAQL ids typed `string` from the command line, across 7 files in `modules/google/ads`. They
   were fixed by typing the ids as numbers at the entry points (`#kx29bm3`, ahra 0269aa0).
 - 2 were `sqlLiteral(...)` in `modules/data/DataMirrorReconcile.ts`, a helper that doubled only the

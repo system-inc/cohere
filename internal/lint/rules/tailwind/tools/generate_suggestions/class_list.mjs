@@ -18,7 +18,7 @@ import NodeZlib from 'node:zlib';
 import { loadDesignSystem } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: class_list.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }

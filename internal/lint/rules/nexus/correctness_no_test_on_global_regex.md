@@ -1,12 +1,12 @@
 # `nexus/correctness-no-test-on-global-regex`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` once the one ahra site is fixed.** 1 finding, 1 true |
-| Findings | **ahra 1** (measured 2026-10-03) |
-| Measured precision | 1 of 1 true: a module-level `g` regex tested from a function, patched by hand with `lastIndex = 0` |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error` once the one ahra site is fixed.** 1 finding, 1 true                                               |
+| Findings               | **ahra 1** (measured 2026-10-03)                                                                                     |
+| Measured precision     | 1 of 1 true: a module-level `g` regex tested from a function, patched by hand with `lastIndex = 0`                   |
+| Plugin                 | cohere-native, `nexus`                                                                                               |
+| Auto-fixable           | no                                                                                                                   |
 | Needs type information | yes, to resolve the receiver to its declaration and `test` to RegExp's; without a checker the rule registers nothing |
 
 ## What it checks

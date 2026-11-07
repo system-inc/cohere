@@ -1,12 +1,12 @@
 # `react/hook-use-state`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **35** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Strong No**         |
+| Violations in ahra     | **35**                |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ const [initialChangeKey] = React.useState(properties.changeKey);
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

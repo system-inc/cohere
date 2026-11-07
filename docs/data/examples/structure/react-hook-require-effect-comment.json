@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Panel.tsx",
         "source": "import React from 'react';\ndeclare const route: string;\nexport function Panel() { return null; }\n"
     },
-    "assertedMessageIds": [
-        "missingEffectComment"
-    ]
+    "assertedMessageIds": ["missingEffectComment"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/NoUselessConcat.ts",
         "source": "'a' + 1"
     },
-    "assertedMessageIds": [
-        "unexpectedConcat"
-    ]
+    "assertedMessageIds": ["unexpectedConcat"]
 }

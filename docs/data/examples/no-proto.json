@@ -18,7 +18,5 @@
         "file": "/repository/source/Proto.ts",
         "source": "var __proto__ = null;"
     },
-    "assertedMessageIds": [
-        "unexpectedProto"
-    ]
+    "assertedMessageIds": ["unexpectedProto"]
 }

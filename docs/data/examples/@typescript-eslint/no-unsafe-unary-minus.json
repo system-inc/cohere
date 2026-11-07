@@ -18,7 +18,5 @@
         "file": "/repository/source/Negate.ts",
         "source": "+42;\n"
     },
-    "assertedMessageIds": [
-        "unaryMinus"
-    ]
+    "assertedMessageIds": ["unaryMinus"]
 }

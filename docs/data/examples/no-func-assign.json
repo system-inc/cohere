@@ -18,7 +18,5 @@
         "file": "/repository/source/FuncAssign.ts",
         "source": "function foo() {} foo();\n"
     },
-    "assertedMessageIds": [
-        "noFuncAssign"
-    ]
+    "assertedMessageIds": ["noFuncAssign"]
 }

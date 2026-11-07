@@ -20,9 +20,6 @@
         "file": "/repository/source/NoUnneededTernary.ts",
         "source": "f(x ? x : 1);"
     },
-    "assertedMessageIds": [
-        "unnecessaryConditionalAssignment",
-        "unnecessaryConditionalExpression"
-    ],
+    "assertedMessageIds": ["unnecessaryConditionalAssignment", "unnecessaryConditionalExpression"],
     "assertsFix": true
 }

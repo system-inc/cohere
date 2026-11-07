@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Foo = Bar.Foo;\n"
     },
-    "assertedMessageIds": [
-        "noPropertyAlias"
-    ]
+    "assertedMessageIds": ["noPropertyAlias"]
 }

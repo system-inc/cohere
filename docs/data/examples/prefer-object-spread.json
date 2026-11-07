@@ -20,9 +20,6 @@
         "file": "/repository/source/Spread.ts",
         "source": "Object.assign()\n"
     },
-    "assertedMessageIds": [
-        "useLiteralMessage",
-        "useSpreadMessage"
-    ],
+    "assertedMessageIds": ["useLiteralMessage", "useSpreadMessage"],
     "assertsFix": true
 }

@@ -19,8 +19,6 @@
         "file": "/repository/source/Coalescing.ts",
         "source": "foo ?? bar;\n"
     },
-    "assertedMessageIds": [
-        "noNonNullAssertedNullishCoalescing"
-    ],
+    "assertedMessageIds": ["noNonNullAssertedNullishCoalescing"],
     "assertsSuggestion": true
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/UnassignedVars.ts",
         "source": "let x;\n"
     },
-    "assertedMessageIds": [
-        "noUnassignedVars"
-    ]
+    "assertedMessageIds": ["noUnassignedVars"]
 }

@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "export const C = () => <Foo.img src=\"/test.png\" />;"
     },
-    "assertedMessageIds": [
-        "noImgElement"
-    ]
+    "assertedMessageIds": ["noImgElement"]
 }

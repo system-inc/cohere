@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 
 // testVocabularyPath is the dry-run tree's policy file, the one the command reads there. WORDNAMES_VOCABULARY

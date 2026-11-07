@@ -1,12 +1,12 @@
 # `@typescript-eslint/non-nullable-type-assertion-style`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **55** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **55**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ if(matching.length > 0) return matching[0] as number;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

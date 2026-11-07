@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-readonly`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **253** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **253**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ private queue: (() => void)[] = [];
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

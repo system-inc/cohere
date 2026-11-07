@@ -1,12 +1,12 @@
 # `react-hooks/memo-dependencies`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **21** |
-| Plugin | `react-hooks` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Yes**       |
+| Violations in ahra     | **21**        |
+| Plugin                 | `react-hooks` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -28,4 +28,3 @@ Missing useMemo/useCallback dependencies are stale-closure bugs, not a conventio
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

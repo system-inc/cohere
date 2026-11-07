@@ -9,6 +9,7 @@
 package correctness_require_invariant_reason
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -35,7 +36,8 @@ var Analyzer = &analysis.Analyzer{
 		"to a function or method named Must or Must followed by an upper-case letter outside package " +
 		"initialization: a package-level var initializer or an init function, and a function literal either calls " +
 		"on the spot. Files ending in _test.go are not judged.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -51,21 +53,24 @@ var mustOutsideInitializationMessage = policy.MessageOf(Name, "mustOutsideInitia
 const invariantMarker = "Invariant:"
 
 func run(pass *analysis.Pass) (any, error) {
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it: a test's panic and Must calls fail one test, not
 		// a running program, so test files are not judged.
 		if strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
-		judgePanics(pass, file)
+		judgePanics(pass, file, indexes.ForFile(file))
 		judgeMustCalls(pass, file)
 	}
 	return nil, nil
 }
 
 // judgePanics reports every builtin panic in file that is not a re-panic and whose comments give no reason.
-func judgePanics(pass *analysis.Pass, file *ast.File) {
-	comments := marker.NewIndex(pass.Fset, file)
+func judgePanics(pass *analysis.Pass, file *ast.File, comments *marker.Index) {
 	written := writtenVariables(pass, file)
 	ast.Inspect(file, func(node ast.Node) bool {
 		// Each function is judged on its own, so a recover in one never excuses a panic in a closure it holds.

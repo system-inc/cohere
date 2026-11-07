@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "const pair = [1, 2] as const;\n"
     },
-    "assertedMessageIds": [
-        "uncheckedCast"
-    ]
+    "assertedMessageIds": ["uncheckedCast", "uncheckedCastUnderTsc", "uncheckedDowncast"]
 }

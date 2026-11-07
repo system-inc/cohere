@@ -18,8 +18,5 @@
         "file": "switchExhaustiveness.ts",
         "source": "function foo(x: string[]) {\n  switch (x[0]) {\n    case 'hi':\n      break;\n  }\n}\n"
     },
-    "assertedMessageIds": [
-        "dangerousDefaultCase",
-        "switchIsNotExhaustive"
-    ]
+    "assertedMessageIds": ["dangerousDefaultCase", "switchIsNotExhaustive"]
 }

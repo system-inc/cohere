@@ -18,7 +18,5 @@
         "file": "clean.ts",
         "source": "x < 0;"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

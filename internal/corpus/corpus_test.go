@@ -216,14 +216,16 @@ func TestTheGeneratorsNameTheSameCorpora(test *testing.T) {
 	if !found || !closed {
 		test.Fatalf("%s has no `const corpusVariables = { ... };` table", path)
 	}
-	entry := regexp.MustCompile(`^    '([a-z][a-z0-9-]+)': '([A-Z_]+)',$`)
+	// A name is quoted only where it must be, a hyphenated one, since the house format the file is held to takes
+	// the quotes off the rest (#4wjhppw).
+	entry := regexp.MustCompile(`^    (?:'([a-z][a-z0-9]*-[a-z0-9-]+)'|([a-z][a-z0-9]*)): '([A-Z_]+)',$`)
 	got := map[string]string{}
 	for _, line := range strings.Split(table, "\n") {
 		match := entry.FindStringSubmatch(line)
 		if match == nil {
-			test.Fatalf("%s's table holds %q, which is not a `'name': 'VARIABLE',` line", path, line)
+			test.Fatalf("%s's table holds %q, which is not a `name: 'VARIABLE',` line", path, line)
 		}
-		got[match[1]] = match[2]
+		got[match[1]+match[2]] = match[3]
 	}
 	want := map[string]string{}
 	for _, corpus := range All {

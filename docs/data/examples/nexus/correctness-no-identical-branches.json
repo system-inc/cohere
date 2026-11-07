@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoIdenticalBranches.ts",
         "source": "export function run(ready: boolean) {\n    return ready ? -1 : +1;\n}\n"
     },
-    "assertedMessageIds": [
-        "identicalBranches"
-    ]
+    "assertedMessageIds": ["identicalBranches"]
 }

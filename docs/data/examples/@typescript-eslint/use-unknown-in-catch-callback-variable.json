@@ -19,10 +19,6 @@
         "file": "file.ts",
         "source": "Promise.resolve.then();\n"
     },
-    "assertedMessageIds": [
-        "useUnknown",
-        "useUnknownArrayDestructuringPattern",
-        "useUnknownObjectDestructuringPattern"
-    ],
+    "assertedMessageIds": ["useUnknown", "useUnknownArrayDestructuringPattern", "useUnknownObjectDestructuringPattern"],
     "assertsSuggestion": true
 }

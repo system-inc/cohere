@@ -18,7 +18,5 @@
         "file": "/repository/source/Container.ts",
         "source": "\nconst value = 1;\ndelete value;\n    "
     },
-    "assertedMessageIds": [
-        "dynamicDelete"
-    ]
+    "assertedMessageIds": ["dynamicDelete"]
 }

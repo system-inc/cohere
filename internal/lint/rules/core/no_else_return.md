@@ -1,12 +1,12 @@
 # `no-else-return`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **31** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Maybe**     |
+| Violations in ahra     | **31**        |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ else {
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

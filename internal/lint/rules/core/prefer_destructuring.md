@@ -1,12 +1,12 @@
 # `prefer-destructuring`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **789** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **789**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const registerProjectRegion = tasksDrag.registerProjectRegion;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

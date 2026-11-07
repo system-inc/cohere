@@ -18,7 +18,5 @@
         "file": "pages/index.tsx",
         "source": "import Script from \"next/script\";\nexport default function Index() {\n  return <Script />;\n}\n"
     },
-    "assertedMessageIds": [
-        "noBeforeInteractiveScriptOutsideDocument"
-    ]
+    "assertedMessageIds": ["noBeforeInteractiveScriptOutsideDocument"]
 }

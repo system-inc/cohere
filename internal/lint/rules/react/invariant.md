@@ -1,12 +1,12 @@
 # `react-hooks/invariant`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1** |
-| Plugin | `react-hooks` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **1**         |
+| Plugin                 | `react-hooks` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -23,9 +23,8 @@ Described as 'Internal invariants', it reports React Compiler internal assertion
 
 ## Violations
 
-1 in the tree. 
+1 in the tree.
 
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

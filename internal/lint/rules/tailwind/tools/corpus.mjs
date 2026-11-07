@@ -22,9 +22,9 @@ import * as NodeUrl from 'node:url';
  * by that package's TestTheGeneratorsNameTheSameCorpora.
  */
 const corpusVariables = {
-    'ahra': 'COHERE_CORPUS_AHRA',
-    'structure': 'COHERE_CORPUS_STRUCTURE',
-    'connected': 'COHERE_CORPUS_CONNECTED',
+    ahra: 'COHERE_CORPUS_AHRA',
+    structure: 'COHERE_CORPUS_STRUCTURE',
+    connected: 'COHERE_CORPUS_CONNECTED',
     'prettier-fork': 'COHERE_PRETTIER_FORK',
 };
 
@@ -34,18 +34,18 @@ const spellingPattern = /^([a-z][a-z0-9-]+):(.*)$/;
  * This repository's root: the nearest directory above this file whose go.mod declares the module, as
  * internal/corpus's RepositoryRoot finds it from a test's directory.
  */
-const repositoryRoot = (function () {
+const repositoryRoot = (function() {
     let directory = NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url));
-    for (;;) {
+    for(;;) {
         const goModPath = NodePath.join(directory, 'go.mod');
-        if (
+        if(
             NodeFileSystem.existsSync(goModPath) &&
             /^module github\.com\/system-inc\/cohere\s*$/m.test(NodeFileSystem.readFileSync(goModPath, 'utf8'))
         ) {
             return directory;
         }
         const parent = NodePath.dirname(directory);
-        if (parent === directory) {
+        if(parent === directory) {
             throw new Error(`no go.mod declaring github.com/system-inc/cohere above ${import.meta.url}`);
         }
         directory = parent;
@@ -58,7 +58,7 @@ const repositoryRoot = (function () {
  */
 function recordPath(path) {
     const inside = NodePath.relative(repositoryRoot, path);
-    if (inside === '' || inside.startsWith('..') || NodePath.isAbsolute(inside)) {
+    if(inside === '' || inside.startsWith('..') || NodePath.isAbsolute(inside)) {
         return path;
     }
     return inside.split(NodePath.sep).join('/');
@@ -69,16 +69,20 @@ function corporaFilePath() {
 }
 
 function corpusRoot(name, spelling) {
-    if (!Object.hasOwn(corpusVariables, name)) {
-        throw new Error(`${spelling} names the corpus "${name}", which is no corpus; the corpora are ${Object.keys(corpusVariables).join(', ')}`);
+    if(!Object.hasOwn(corpusVariables, name)) {
+        throw new Error(
+            `${spelling} names the corpus "${name}", which is no corpus; the corpora are ${Object.keys(corpusVariables).join(', ')}`,
+        );
     }
     const variable = corpusVariables[name];
-    if (process.env[variable]) {
+    if(process.env[variable]) {
         return NodePath.resolve(process.env[variable]);
     }
     const configPath = corporaFilePath();
-    const config = NodeFileSystem.existsSync(configPath) ? JSON.parse(NodeFileSystem.readFileSync(configPath, 'utf8')) : {};
-    if (!config[name]) {
+    const config = NodeFileSystem.existsSync(configPath)
+        ? JSON.parse(NodeFileSystem.readFileSync(configPath, 'utf8'))
+        : {};
+    if(!config[name]) {
         throw new Error(`${spelling} needs the ${name} corpus: set ${variable}, or name "${name}" in ${configPath}`);
     }
     return NodePath.resolve(config[name]);
@@ -91,7 +95,7 @@ function corpusRoot(name, spelling) {
  */
 export function locate(argument) {
     const match = spellingPattern.exec(argument);
-    if (!match) {
+    if(!match) {
         const path = NodePath.resolve(argument);
         return { path, recorded: recordPath(path) };
     }
@@ -105,12 +109,12 @@ export function locate(argument) {
  */
 export function recordBeside(argument, path) {
     const match = spellingPattern.exec(argument);
-    if (!match) {
+    if(!match) {
         return recordPath(path);
     }
     const [, name] = match;
     const inside = NodePath.relative(corpusRoot(name, argument), path);
-    if (inside.startsWith('..') || NodePath.isAbsolute(inside)) {
+    if(inside.startsWith('..') || NodePath.isAbsolute(inside)) {
         return recordPath(path);
     }
     return `${name}:${inside.split(NodePath.sep).join('/')}`;

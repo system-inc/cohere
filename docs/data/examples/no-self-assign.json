@@ -18,7 +18,5 @@
         "file": "/repository/source/Assign.ts",
         "source": "declare let a: any, b: any, c: any, i: number;\ndeclare const o: any;\ndeclare function f(): any;\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "selfAssignment"
-    ]
+    "assertedMessageIds": ["selfAssignment"]
 }

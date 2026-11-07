@@ -19,10 +19,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Value = {};\n"
     },
-    "assertedMessageIds": [
-        "noEmptyInterface",
-        "noEmptyInterfaceWithSuper",
-        "noEmptyObject"
-    ],
+    "assertedMessageIds": ["noEmptyInterface", "noEmptyInterfaceWithSuper", "noEmptyObject"],
     "assertsSuggestion": true
 }

@@ -1,12 +1,12 @@
 # `react/prefer-exact-props`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Yes**               |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -20,7 +20,6 @@ Stylistic, but the tree already satisfies it, so enabling costs nothing and prev
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
 
-
 ## Ported? No, and the reason is measured
 
 **Declined 2026-09-06.** Not ported, and the recommendation above should be read as superseded
@@ -31,14 +30,14 @@ clean tree: this rule is structurally unable to fire here.
 
 Upstream's corpus is 31 cases, 12 of them reporting. Partitioned mechanically rather than by eye:
 
-| | |
-|---|---|
+|                                                         |       |
+| ------------------------------------------------------- | ----- |
 | Reporting cases needing `settings.propWrapperFunctions` | **9** |
-| Reporting cases needing Flow's `ObjectTypeAnnotation` | **3** |
-| Overlap between the two | 0 |
-| **Remainder that would be reachable here** | **0** |
+| Reporting cases needing Flow's `ObjectTypeAnnotation`   | **3** |
+| Overlap between the two                                 | 0     |
+| **Remainder that would be reachable here**              | **0** |
 
-`propWrapperFunctions` is a *shared ESLint setting*, not a rule option: `meta.schema` is `[]`, and
+`propWrapperFunctions` is a _shared ESLint setting_, not a rule option: `meta.schema` is `[]`, and
 `exactWrappers` comes from `getExactPropWrapperFunctions(context)`, whose only source is
 `context.settings`. `rule.Context` carries a source file, a program, a checker, a report function
 and a file cache, and no path to settings. The `propTypes` message additionally requires that set to
@@ -48,7 +47,7 @@ The other three cases need Flow type annotations. `ObjectTypeAnnotation` does no
 vendored TypeScript AST at all; a grep of the shim finds zero occurrences against a control kind
 that is present.
 
-The control on the partition: 8 of the 19 *passing* cases also carry the setting, so the predicate
+The control on the partition: 8 of the 19 _passing_ cases also carry the setting, so the predicate
 that selected the 9 is discriminating rather than matching everything.
 
 ### This was already established here, independently, before this measurement

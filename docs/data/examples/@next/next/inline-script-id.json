@@ -18,7 +18,5 @@
         "file": "pages/index.tsx",
         "source": "import Script from 'next/script';\nexport default function TestPage() {\n  return (<Script></Script>)\n}\n"
     },
-    "assertedMessageIds": [
-        "inlineScriptId"
-    ]
+    "assertedMessageIds": ["inlineScriptId"]
 }

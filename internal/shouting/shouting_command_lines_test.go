@@ -39,6 +39,8 @@ func TestCommandLinesAreMaskedAndProseOnThemIsRead(test *testing.T) {
 		{"subcommands before a placeholder", "the skills render through\nahra os skills <username> NEVER", nil},
 		{"a file name argument", "it uploads with\npnpm tsx PhiSocialUpload.ts --dry-run NEVER", nil},
 		{"a prompt line always", "the prose goes on\n$ ahra run, which NEVER waits", nil},
+		{"an s c line always", "the prose goes on\ns c, which NEVER waits", nil},
+		{"an s c line with its letters spaced apart", "the prose goes on\ns   c --no-cache ALWAYS", nil},
 		{
 			"a table of commands set in under a sentence",
 			"/*\n *   Catalog family, read the catalog itself\n" +

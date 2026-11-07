@@ -26,7 +26,5 @@
         "file": "Subject.tsx",
         "source": "someGlobal = true;\n"
     },
-    "assertedMessageIds": [
-        "globalReassignment"
-    ]
+    "assertedMessageIds": ["globalReassignment"]
 }

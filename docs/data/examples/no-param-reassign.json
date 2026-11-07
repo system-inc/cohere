@@ -18,8 +18,5 @@
         "file": "/repository/source/ParamReassign.ts",
         "source": "function foo(a = 1) { }\n"
     },
-    "assertedMessageIds": [
-        "assignmentToFunctionParam",
-        "assignmentToFunctionParamProp"
-    ]
+    "assertedMessageIds": ["assignmentToFunctionParam", "assignmentToFunctionParamProp"]
 }

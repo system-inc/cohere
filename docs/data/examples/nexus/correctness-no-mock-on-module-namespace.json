@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoMockOnModuleNamespace.test.ts",
         "source": "import * as NodeOs from 'node:os';\nimport { mock } from 'node:test';\nmock.method(NodeOs, 'hostname');\n"
     },
-    "assertedMessageIds": [
-        "mockOnModuleNamespace"
-    ]
+    "assertedMessageIds": ["mockOnModuleNamespace"]
 }

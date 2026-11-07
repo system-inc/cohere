@@ -18,8 +18,5 @@
         "file": "/repository/app/api/report/route.ts",
         "source": "export const SET = 1;"
     },
-    "assertedMessageIds": [
-        "nearMissRouteExport",
-        "pagesRouterExport"
-    ]
+    "assertedMessageIds": ["nearMissRouteExport", "pagesRouterExport"]
 }

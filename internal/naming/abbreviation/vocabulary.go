@@ -102,6 +102,7 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 					Entry:     entry,
 					MessageId: MillisecondSuffix,
 					Values:    map[string]string{"name": name, "suggestion": suggestion},
+					Spellings: []string{suggestion},
 				}, true
 			}
 			continue
@@ -132,8 +133,9 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 			continue
 		}
 		advice := entry.Advice
+		var suggestions []string
 		if entry.Segment.Style != "advice" {
-			suggestions := expandedNames(entry, func(expansion string) string {
+			suggestions = expandedNames(entry, func(expansion string) string {
 				return replaceFirst(patterns.replace, name, Capitalize(expansion)+"${1}")
 			})
 			// Every expansion rewrites the same occurrence, so a rewrite that leaves the name as it was leaves
@@ -152,6 +154,7 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 				"word":   Capitalize(entry.Abbreviation),
 				"advice": advice,
 			},
+			Spellings: suggestions,
 		}, true
 	}
 

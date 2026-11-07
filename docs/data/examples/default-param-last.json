@@ -18,7 +18,5 @@
         "file": "/repository/source/Parameters.ts",
         "source": "function f() {}"
     },
-    "assertedMessageIds": [
-        "shouldBeLast"
-    ]
+    "assertedMessageIds": ["shouldBeLast"]
 }

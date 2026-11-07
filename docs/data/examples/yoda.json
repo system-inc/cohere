@@ -16,8 +16,6 @@
         ],
         "fixedSource": "f() > 0 in obj"
     },
-    "assertedMessageIds": [
-        "expected"
-    ],
+    "assertedMessageIds": ["expected"],
     "assertsFix": true
 }

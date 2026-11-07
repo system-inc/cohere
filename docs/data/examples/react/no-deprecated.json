@@ -18,7 +18,5 @@
         "file": "/repository/source/NoDeprecated.tsx",
         "source": "PropTypes"
     },
-    "assertedMessageIds": [
-        "deprecated"
-    ]
+    "assertedMessageIds": ["deprecated"]
 }

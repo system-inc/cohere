@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/testing-require-failure-path"
-  },
-  "messages": {
-    "cannotFail": {
-      "text": "This test cannot fail on a wrong result: nothing in it calls Error, Errorf, Fatal, Fatalf, Fail or FailNow on a *testing.T, and it hands the test to no helper that could. Only a crash in the code under it can fail it, so go test reports it as passing whatever result that code returns, and its silence reads as a proof it never gave. Check what it computes and report a mismatch with Errorf or Fatalf, or delete it if there is nothing to check."
+    "rules": {
+        "Go": "cohere-go/testing-require-failure-path"
+    },
+    "messages": {
+        "cannotFail": {
+            "text": "This test cannot fail on a wrong result: nothing in it calls Error, Errorf, Fatal, Fatalf, Fail or FailNow on a *testing.T, and it hands the test to no helper that could. Only a crash in the code under it can fail it, so go test reports it as passing whatever result that code returns, and its silence reads as a proof it never gave. Check what it computes and report a mismatch with Errorf or Fatalf, or delete it if there is nothing to check."
+        }
     }
-  }
 }

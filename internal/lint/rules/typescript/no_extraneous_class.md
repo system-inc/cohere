@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-extraneous-class`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **15** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **15**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ export class ConnectedCustomerApi {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

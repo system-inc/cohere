@@ -18,7 +18,5 @@
         "file": "/repository/source/Eval.ts",
         "source": "Eval(foo)\n"
     },
-    "assertedMessageIds": [
-        "noEval"
-    ]
+    "assertedMessageIds": ["noEval"]
 }

@@ -45,7 +45,7 @@ import * as NodePath from 'node:path';
 import { locate } from '../corpus.mjs';
 
 const [, , packageRootArgument, corpusPathArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [corpus.json]\n');
     process.exit(2);
 }
@@ -61,14 +61,16 @@ const bundle = await import(NodePath.join(packageRoot, 'dist', 'lib.mjs'));
  */
 function loadStylesheet(identifier, base) {
     let resolved;
-    if (identifier === 'tailwindcss') {
+    if(identifier === 'tailwindcss') {
         resolved = NodePath.join(packageRoot, 'index.css');
-    } else if (identifier.startsWith('tailwindcss/')) {
+    }
+    else if(identifier.startsWith('tailwindcss/')) {
         resolved = NodePath.join(packageRoot, identifier.slice('tailwindcss/'.length));
-    } else {
+    }
+    else {
         resolved = NodePath.resolve(base, identifier);
     }
-    if (!resolved.endsWith('.css')) resolved += '.css';
+    if(!resolved.endsWith('.css')) resolved += '.css';
     return {
         base: NodePath.dirname(resolved),
         content: NodeFileSystem.readFileSync(resolved, 'utf8'),
@@ -105,8 +107,8 @@ async function loadDesignSystem(css, base) {
  * wrapping an arbitrary, and flattening it would lose the inner kind that decides the comparison.
  */
 function describeVariant(variant) {
-    if (variant === null || variant === undefined) return null;
-    switch (variant.kind) {
+    if(variant === null || variant === undefined) return null;
+    switch(variant.kind) {
         case 'arbitrary':
             return { kind: 'arbitrary', selector: variant.selector, relative: variant.relative ?? false };
         case 'static':
@@ -116,13 +118,15 @@ function describeVariant(variant) {
                 kind: 'functional',
                 root: variant.root,
                 value: variant.value === null ? null : { kind: variant.value.kind, value: variant.value.value },
-                modifier: variant.modifier === null ? null : { kind: variant.modifier.kind, value: variant.modifier.value },
+                modifier:
+                    variant.modifier === null ? null : { kind: variant.modifier.kind, value: variant.modifier.value },
             };
         case 'compound':
             return {
                 kind: 'compound',
                 root: variant.root,
-                modifier: variant.modifier === null ? null : { kind: variant.modifier.kind, value: variant.modifier.value },
+                modifier:
+                    variant.modifier === null ? null : { kind: variant.modifier.kind, value: variant.modifier.value },
                 variant: describeVariant(variant.variant),
             };
         default:
@@ -142,7 +146,7 @@ function describeVariant(variant) {
  */
 function describeRegistry(designSystem) {
     const entries = [];
-    for (const [name, info] of designSystem.variants.entries()) {
+    for(const [name, info] of designSystem.variants.entries()) {
         entries.push({ name, order: info.order, kind: info.kind });
     }
     return {
@@ -161,15 +165,15 @@ function describeRegistry(designSystem) {
  */
 function describeVariantOrder(designSystem, variantStrings) {
     const parsed = [];
-    for (const variantString of variantStrings) {
+    for(const variantString of variantStrings) {
         const variant = designSystem.parseVariant(variantString);
         parsed.push({ raw: variantString, variant: describeVariant(variant) });
     }
 
     const order = designSystem.getVariantOrder();
     const positions = [];
-    for (const entry of parsed) {
-        if (entry.variant === null) {
+    for(const entry of parsed) {
+        if(entry.variant === null) {
             positions.push({ raw: entry.raw, variant: null, index: null });
             continue;
         }
@@ -202,9 +206,9 @@ function describeClassOrder(designSystem, classes) {
 
     const variantOrderMap = designSystem.getVariantOrder();
     const masks = [];
-    for (const className of classes) {
+    for(const className of classes) {
         const candidates = Array.from(designSystem.parseCandidate(className));
-        if (candidates.length === 0) {
+        if(candidates.length === 0) {
             masks.push({ className, mask: null, variants: null });
             continue;
         }
@@ -214,10 +218,10 @@ function describeClassOrder(designSystem, classes) {
         let mask = 0n;
         let resolvable = true;
         const described = [];
-        for (const variant of candidate.variants) {
+        for(const variant of candidate.variants) {
             const index = variantOrderMap.get(variant);
             described.push({ variant: describeVariant(variant), index: index === undefined ? null : index });
-            if (index === undefined) {
+            if(index === undefined) {
                 resolvable = false;
                 continue;
             }
@@ -251,8 +255,14 @@ function describeClassOrder(designSystem, classes) {
  */
 const syntheticClassLists = [
     { name: 'stacked-against-single', classes: ['dark:flex', 'group-hover:disabled:flex'] },
-    { name: 'stacked-between-singles', classes: ['dark:flex', 'group-hover:flex', 'group-hover:disabled:flex', 'hover:flex'] },
-    { name: 'depth-first-probe', classes: ['hover:flex', 'dark:hover:flex', 'dark:flex', 'focus:flex', 'dark:focus:flex'] },
+    {
+        name: 'stacked-between-singles',
+        classes: ['dark:flex', 'group-hover:flex', 'group-hover:disabled:flex', 'hover:flex'],
+    },
+    {
+        name: 'depth-first-probe',
+        classes: ['hover:flex', 'dark:hover:flex', 'dark:flex', 'focus:flex', 'dark:focus:flex'],
+    },
     { name: 'compound-inner-segment', classes: ['dark:placeholder:flex', 'dark:focus:flex'] },
     { name: 'bare-before-variant', classes: ['hover:px-8', 'px-4'] },
     { name: 'breakpoints-in-order', classes: ['sm:flex', 'md:flex', 'lg:flex', 'xl:flex', '2xl:flex'] },
@@ -360,7 +370,7 @@ const cases = [];
         registry: describeRegistry(designSystem),
     });
 
-    for (const syntheticCase of syntheticVariantOrderCases) {
+    for(const syntheticCase of syntheticVariantOrderCases) {
         const fresh = await loadDesignSystem('@import "tailwindcss";', '/');
         cases.push({
             name: `variant-order/${syntheticCase.name}`,
@@ -371,7 +381,7 @@ const cases = [];
         });
     }
 
-    for (const syntheticCase of syntheticClassLists) {
+    for(const syntheticCase of syntheticClassLists) {
         const fresh = await loadDesignSystem('@import "tailwindcss";', '/');
         cases.push({
             name: `class-order/${syntheticCase.name}`,
@@ -389,7 +399,7 @@ const cases = [];
  * The registry is what shows the order number a new name received; the class order is what shows
  * whether that number changed any observable ordering.
  */
-for (const customCase of customVariantStylesheets) {
+for(const customCase of customVariantStylesheets) {
     const registryDesignSystem = await loadDesignSystem(customCase.css, '/');
     const orderDesignSystem = await loadDesignSystem(customCase.css, '/');
     cases.push({
@@ -410,9 +420,9 @@ for (const customCase of customVariantStylesheets) {
  * reimplementing it in JavaScript would mean the fixture and the rule disagreed about what a class
  * literal is, which is a difference that would read as an ordering divergence.
  */
-if (corpusPathArgument) {
+if(corpusPathArgument) {
     const corpus = JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(corpusPathArgument), 'utf8'));
-    for (const entry of corpus) {
+    for(const entry of corpus) {
         // A corpus spelling is recorded as given, so the fixture reads the same on every machine.
         const entryLocated = locate(entry.path);
         const css = NodeFileSystem.readFileSync(entryLocated.path, 'utf8');
@@ -429,7 +439,7 @@ if (corpusPathArgument) {
 
         const classLists = entry.classLists ?? [];
         const captured = [];
-        for (let index = 0; index < classLists.length; index++) {
+        for(let index = 0; index < classLists.length; index++) {
             const fresh = await loadDesignSystem(css, base);
             captured.push({
                 name: `${entry.name}/list-${index}`,

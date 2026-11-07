@@ -20,8 +20,6 @@
         "file": "/repository/source/UnusedLabels.ts",
         "source": "A: break A;"
     },
-    "assertedMessageIds": [
-        "unusedLabel"
-    ],
+    "assertedMessageIds": ["unusedLabel"],
     "assertsFix": true
 }

@@ -18,7 +18,5 @@
         "file": "file.ts",
         "source": "function foo() {\n}"
     },
-    "assertedMessageIds": [
-        "top"
-    ]
+    "assertedMessageIds": ["top"]
 }

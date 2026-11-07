@@ -303,9 +303,11 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 
 // sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own:
 // marker reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a
-// sum type's variant whose methods only mark it, and served finds the types a file serves for the two rules that
-// count them.
-var sharedReaders = map[string]bool{"marker": true, "inert_value": true, "marker_type": true, "served": true}
+// sum type's variant whose methods only mark it, served finds the types a file serves for the two rules that count
+// them, and positions is the line table rules read a node's position from without the FileSet's lock.
+var sharedReaders = map[string]bool{
+	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true,
+}
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
 // testdata and the shared readers, is one house rule named for it, and House lists it. A rule package nobody

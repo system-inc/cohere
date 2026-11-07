@@ -18,8 +18,5 @@
         "file": "/repository/source/Load.ts",
         "source": "/// <reference lib=\"dom\" />\nexport async function load(url: string) {\n    const response = await strictClient.fetch(url);\n    return response.json();\n}\n"
     },
-    "assertedMessageIds": [
-        "bodyReadWithoutStatusCheck",
-        "responseDiscarded"
-    ]
+    "assertedMessageIds": ["bodyReadWithoutStatusCheck", "responseDiscarded"]
 }

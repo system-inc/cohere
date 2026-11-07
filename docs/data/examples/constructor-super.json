@@ -18,10 +18,5 @@
         "file": "/repository/source/Subject.js",
         "source": "class A { }"
     },
-    "assertedMessageIds": [
-        "badSuper",
-        "duplicate",
-        "missingAll",
-        "missingSome"
-    ]
+    "assertedMessageIds": ["badSuper", "duplicate", "missingAll", "missingSome"]
 }
