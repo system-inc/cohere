@@ -18,8 +18,5 @@
         "file": "/transition.tsx",
         "source": "// @validatePreserveExistingMemoizationGuarantees\nimport {useCallback, useTransition} from 'react';\n\nfunction useFoo() {\n  const [t, start] = useTransition();\n\n  return useCallback(() => {\n    start();\n  }, []);\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: useFoo,\n  params: [],\n};\n"
     },
-    "assertedMessageIds": [
-        "preserveManualMemoizationDependencyMutable",
-        "preserveManualMemoizationValueUnmemoized"
-    ]
+    "assertedMessageIds": ["preserveManualMemoizationDependencyMutable", "preserveManualMemoizationValueUnmemoized"]
 }

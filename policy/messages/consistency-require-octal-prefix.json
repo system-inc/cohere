@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-require-octal-prefix"
-  },
-  "messages": {
-    "legacyOctal": {
-      "text": "`{{literal}}` is octal only because it opens with a zero, and a reader who misses the zero reads it as the decimal number its digits spell. Write it `{{suggestion}}`, so the base is named where the number is, as `0x` and `0b` name theirs."
+    "rules": {
+        "Go": "cohere-go/consistency-require-octal-prefix"
+    },
+    "messages": {
+        "legacyOctal": {
+            "text": "`{{literal}}` is octal only because it opens with a zero, and a reader who misses the zero reads it as the decimal number its digits spell. Write it `{{suggestion}}`, so the base is named where the number is, as `0x` and `0b` name theirs."
+        }
     }
-  }
 }

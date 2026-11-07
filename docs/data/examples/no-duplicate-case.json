@@ -18,7 +18,5 @@
         "file": "file.ts",
         "source": "switch (a) {}"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

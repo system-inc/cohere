@@ -1,12 +1,12 @@
 # `nexus/correctness-no-global-listener-target-assertion`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`.** Zero findings today; it guards a shape each new component can write fresh |
-| Findings | **ahra 0** (measured 2026-10-03; research count 0, and 1 in `Code.tsx` before its fix) |
-| Measured precision | no findings to read |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`.** Zero findings today; it guards a shape each new component can write fresh                                                          |
+| Findings               | **ahra 0** (measured 2026-10-03; research count 0, and 1 in `Code.tsx` before its fix)                                                                  |
+| Measured precision     | no findings to read                                                                                                                                     |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                  |
+| Auto-fixable           | no                                                                                                                                                      |
 | Needs type information | yes, to resolve `document`, `window`, `addEventListener`, `Event.target` and the element types to lib.dom; without a checker the rule registers nothing |
 
 ## What it checks

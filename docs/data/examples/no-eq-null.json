@@ -18,7 +18,5 @@
         "file": "/repository/source/EqNull.ts",
         "source": "if (x < null) { }"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

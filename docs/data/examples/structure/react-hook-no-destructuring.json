@@ -18,7 +18,5 @@
         "file": "/repository/source/hooks/useThing.ts",
         "source": "declare function useQuery(): { data: unknown; error: unknown };\ndeclare function useState(): [unknown, (value: unknown) => void];\ndeclare function subscribe(handler: () => void): void;\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "noDestructuringInHook"
-    ]
+    "assertedMessageIds": ["noDestructuringInHook"]
 }

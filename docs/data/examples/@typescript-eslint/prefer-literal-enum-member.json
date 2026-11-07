@@ -8,8 +8,5 @@
         "file": "/repository/source/Flags.ts",
         "source": "\nenum ValidPlain {\n  A,\n}\n    "
     },
-    "assertedMessageIds": [
-        "notLiteral",
-        "notLiteralOrBitwiseExpression"
-    ]
+    "assertedMessageIds": ["notLiteral", "notLiteralOrBitwiseExpression"]
 }

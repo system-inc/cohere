@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoUnclearedRaceTimeout.ts",
         "source": "declare function generateImage(prompt: string): Promise<{ path: string }>;\ndeclare function work(): Promise<string>;\ndeclare function timeoutAfter(milliseconds: number): Promise<never>;\ndeclare function use(value: unknown): void;\ndeclare const milliseconds: number;\nexport async function load() {\n    return Promise.race([work(), timeoutAfter(milliseconds)]);\n}\n"
     },
-    "assertedMessageIds": [
-        "unclearedRaceTimeout"
-    ]
+    "assertedMessageIds": ["unclearedRaceTimeout"]
 }

@@ -18,7 +18,5 @@
         "file": "other.ts",
         "source": "foo.apply();"
     },
-    "assertedMessageIds": [
-        "preferSpread"
-    ]
+    "assertedMessageIds": ["preferSpread"]
 }

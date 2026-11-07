@@ -18,7 +18,5 @@
         "file": "/repository/source/Danger.tsx",
         "source": "<App dangerouslySetInnerHTML={{__html:''}} />;"
     },
-    "assertedMessageIds": [
-        "dangerousProp"
-    ]
+    "assertedMessageIds": ["dangerousProp"]
 }

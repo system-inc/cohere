@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "function isEven(value: number): boolean { return value % 2 === 0; }\n"
     },
-    "assertedMessageIds": [
-        "typePredicate"
-    ]
+    "assertedMessageIds": ["typePredicate"]
 }

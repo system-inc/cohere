@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "const f: () => void = () => 1; f();\n"
     },
-    "assertedMessageIds": [
-        "crossEnumNarrowing"
-    ]
+    "assertedMessageIds": ["crossEnumNarrowing"]
 }

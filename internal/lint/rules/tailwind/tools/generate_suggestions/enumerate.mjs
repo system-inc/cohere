@@ -49,7 +49,7 @@ function flagValue(name) {
 }
 
 const resolveRootArgument = flagValue('--resolve-root');
-if (!resolveRootArgument) {
+if(!resolveRootArgument) {
     process.stderr.write('usage: enumerate.mjs --resolve-root <dir>\n');
     process.exit(2);
 }
@@ -74,7 +74,12 @@ const namespaces = [
  * attributed to the key that causes it rather than to the set.
  */
 const conditionKeys = ['--spacing', '--shadow', '--inset-shadow', '--text-shadow'];
-const conditionValues = { '--spacing': '0.25rem', '--shadow': '0 0 1px red', '--inset-shadow': '0 0 1px red', '--text-shadow': '0 0 1px red' };
+const conditionValues = {
+    '--spacing': '0.25rem',
+    '--shadow': '0 0 1px red',
+    '--inset-shadow': '0 0 1px red',
+    '--text-shadow': '0 0 1px red',
+};
 
 /*
  * A condition key is a theme key like any other, so it leaks into the namespaces it sits under, as
@@ -83,7 +88,7 @@ const conditionValues = { '--spacing': '0.25rem', '--shadow': '0 0 1px red', '--
  */
 async function loadProbeSystem(presentConditionKeys) {
     const lines = namespaces.map((namespace, index) => `  ${namespace}-zzp${index}: 1px;`);
-    for (const key of presentConditionKeys) {
+    for(const key of presentConditionKeys) {
         lines.push(`  ${key}: ${conditionValues[key]};`);
     }
     const source = `@theme {\n${lines.join('\n')}\n}\n`;
@@ -96,13 +101,37 @@ async function loadProbeSystem(presentConditionKeys) {
 const everything = await loadProbeSystem(conditionKeys);
 const { tailwindVersion } = everything;
 const withoutEach = {};
-for (const key of conditionKeys) {
+for(const key of conditionKeys) {
     withoutEach[key] = await loadProbeSystem(conditionKeys.filter((other) => other !== key));
 }
 
 const suggestedFractions = [
-    '1/2', '1/3', '2/3', '1/4', '2/4', '3/4', '1/5', '2/5', '3/5', '4/5', '1/6', '2/6', '3/6', '4/6', '5/6',
-    '1/12', '2/12', '3/12', '4/12', '5/12', '6/12', '7/12', '8/12', '9/12', '10/12', '11/12',
+    '1/2',
+    '1/3',
+    '2/3',
+    '1/4',
+    '2/4',
+    '3/4',
+    '1/5',
+    '2/5',
+    '3/5',
+    '4/5',
+    '1/6',
+    '2/6',
+    '3/6',
+    '4/6',
+    '5/6',
+    '1/12',
+    '2/12',
+    '3/12',
+    '4/12',
+    '5/12',
+    '6/12',
+    '7/12',
+    '8/12',
+    '9/12',
+    '10/12',
+    '11/12',
 ];
 
 const problems = [];
@@ -116,29 +145,32 @@ function decode(system, root, list) {
     const recipe = { literals: [], namespaces: [], fractions: false, hasDefault: false };
     let values = list;
     const tail = values.slice(-suggestedFractions.length);
-    if (values.length >= suggestedFractions.length && tail.every((value, index) => value === suggestedFractions[index])) {
+    if(
+        values.length >= suggestedFractions.length &&
+        tail.every((value, index) => value === suggestedFractions[index])
+    ) {
         recipe.fractions = true;
         values = values.slice(0, -suggestedFractions.length);
     }
     // Probes first, so the namespaces this list draws on are known before a non-probe value is judged.
     const rest = [];
-    for (const value of values) {
-        if (value === null) {
+    for(const value of values) {
+        if(value === null) {
             recipe.hasDefault = true;
             continue;
         }
         const probe = /zzp(\d+)$/.exec(value);
-        if (!probe) {
+        if(!probe) {
             rest.push(value);
             continue;
         }
         const key = `${namespaces[Number(probe[1])]}-zzp${probe[1]}`;
-        if (!key.endsWith(`-${value}`)) {
+        if(!key.endsWith(`-${value}`)) {
             problems.push(`${root}: suggestion ${value} names a probe it cannot have come from`);
             continue;
         }
         const namespace = key.slice(0, key.length - value.length - 1);
-        if (!recipe.namespaces.includes(namespace)) recipe.namespaces.push(namespace);
+        if(!recipe.namespaces.includes(namespace)) recipe.namespaces.push(namespace);
     }
     /*
      * A value spelling a present condition key under one of this list's own namespaces is that key,
@@ -146,18 +178,20 @@ function decode(system, root, list) {
      * because a literal can spell the same word: `transition` offers `shadow` outright, and
      * `--inset-shadow` says nothing about a root that draws on no `--inset` keys.
      */
-    for (const value of rest) {
-        const leaked = recipe.namespaces.some((namespace) => system.presentConditionKeys.includes(`${namespace}-${value}`));
-        if (!leaked) recipe.literals.push(value);
+    for(const value of rest) {
+        const leaked = recipe.namespaces.some((namespace) =>
+            system.presentConditionKeys.includes(`${namespace}-${value}`),
+        );
+        if(!leaked) recipe.literals.push(value);
     }
     return recipe;
 }
 
 let defaultSpacingSuggestions = null;
 const functional = {};
-for (const root of everything.designSystem.utilities.keys('functional')) {
+for(const root of everything.designSystem.utilities.keys('functional')) {
     const groups = everything.designSystem.utilities.getCompletions(root);
-    if (groups.length === 0) continue;
+    if(groups.length === 0) continue;
     functional[root] = groups.map((group, groupIndex) => {
         // Compared against as found; the entry's own lists are the ones adjusted below.
         const values = decode(everything, root, group.values);
@@ -168,36 +202,36 @@ for (const root of everything.designSystem.utilities.keys('functional')) {
             modifiers: decode(everything, root, group.modifiers),
         };
 
-        for (const key of conditionKeys) {
+        for(const key of conditionKeys) {
             const other = withoutEach[key].designSystem.utilities.getCompletions(root)[groupIndex];
-            if (!other) {
+            if(!other) {
                 problems.push(`${root}: group ${groupIndex} disappears without ${key}`);
                 continue;
             }
             const otherValues = decode(withoutEach[key], root, other.values);
-            if (otherValues.hasDefault !== values.hasDefault) {
-                if (entry.values.defaultWhenThemeKey) problems.push(`${root}: default depends on two keys`);
+            if(otherValues.hasDefault !== values.hasDefault) {
+                if(entry.values.defaultWhenThemeKey) problems.push(`${root}: default depends on two keys`);
                 entry.values.defaultWhenThemeKey = key;
             }
-            if (otherValues.literals.length !== values.literals.length) {
-                if (key !== '--spacing') {
+            if(otherValues.literals.length !== values.literals.length) {
+                if(key !== '--spacing') {
                     problems.push(`${root}: literals depend on ${key}, which only --spacing is known to decide`);
                     continue;
                 }
                 // The spacing scale is appended to the literals the group always has.
                 const added = values.literals.slice(otherValues.literals.length);
-                if (otherValues.literals.some((value, index) => value !== values.literals[index])) {
+                if(otherValues.literals.some((value, index) => value !== values.literals[index])) {
                     problems.push(`${root}: the spacing scale is not a tail of the literals`);
                 }
-                if (defaultSpacingSuggestions === null) defaultSpacingSuggestions = added;
-                else if (JSON.stringify(defaultSpacingSuggestions) !== JSON.stringify(added)) {
+                if(defaultSpacingSuggestions === null) defaultSpacingSuggestions = added;
+                else if(JSON.stringify(defaultSpacingSuggestions) !== JSON.stringify(added)) {
                     problems.push(`${root}: a second spacing scale differs from the first`);
                 }
                 entry.values.literals = otherValues.literals;
                 entry.values.spacingScale = true;
             }
             const otherModifiers = decode(withoutEach[key], root, other.modifiers);
-            if (JSON.stringify(otherModifiers) !== JSON.stringify(modifiers)) {
+            if(JSON.stringify(otherModifiers) !== JSON.stringify(modifiers)) {
                 problems.push(`${root}: modifiers depend on ${key}`);
             }
         }
@@ -211,7 +245,10 @@ for (const root of everything.designSystem.utilities.keys('functional')) {
  * from the registry rather than from FrameworkStaticDeclarations, which leaves out the statics whose
  * body reads the theme, `transition-shadow` among them, since it holds only bodies every system agrees on.
  */
-const staticNames = everything.designSystem.utilities.keys('static').filter((name) => typeof name === 'string').sort();
+const staticNames = everything.designSystem.utilities
+    .keys('static')
+    .filter((name) => typeof name === 'string')
+    .sort();
 const statics = Object.fromEntries(
     staticNames.map((name) => [name, everything.designSystem.utilities.getCompletions(name).length > 0]),
 );
@@ -224,16 +261,16 @@ const statics = Object.fromEntries(
  */
 function holdsNesting(nodes) {
     return nodes.some((node) => {
-        if (node.kind === 'rule') return true;
-        if (node.kind === 'at-rule') return node.name !== '@property';
-        if (node.kind === 'at-root' || node.kind === 'context') return holdsNesting(node.nodes ?? []);
+        if(node.kind === 'rule') return true;
+        if(node.kind === 'at-rule') return node.name !== '@property';
+        if(node.kind === 'at-root' || node.kind === 'context') return holdsNesting(node.nodes ?? []);
         return false;
     });
 }
 const nestedStatics = staticNames
     .filter((name) => {
         const candidate = everything.designSystem.parseCandidate(name).find((parsed) => parsed.kind === 'static');
-        if (!candidate) return false;
+        if(!candidate) return false;
         return everything.designSystem.compileAstNodes(candidate).some(({ node }) => holdsNesting(node.nodes ?? []));
     })
     .sort();
@@ -247,30 +284,68 @@ const nestedStatics = staticNames
  * TestSignatureAgreesWithTailwind's bound check is there to catch on real themes.
  */
 const arbitraryProbes = [
-    '#000', 'red', 'var(--zz-probe)', '1px', '0', '50%', '1', '2.5', '1/2', '45deg', 'url(x)',
-    'linear-gradient(red,blue)', 'auto', 'center', 'cover', 'serif', 'small', 'larger', '1_2', 'none',
-    'thin', 'initial',
+    '#000',
+    'red',
+    'var(--zz-probe)',
+    '1px',
+    '0',
+    '50%',
+    '1',
+    '2.5',
+    '1/2',
+    '45deg',
+    'url(x)',
+    'linear-gradient(red,blue)',
+    'auto',
+    'center',
+    'cover',
+    'serif',
+    'small',
+    'larger',
+    '1_2',
+    'none',
+    'thin',
+    'initial',
 ];
 const dataTypes = [
-    'color', 'length', 'percentage', 'ratio', 'number', 'integer', 'url', 'position', 'bg-size', 'size',
-    'line-width', 'image', 'family-name', 'generic-name', 'absolute-size', 'relative-size', 'angle', 'vector',
+    'color',
+    'length',
+    'percentage',
+    'ratio',
+    'number',
+    'integer',
+    'url',
+    'position',
+    'bg-size',
+    'size',
+    'line-width',
+    'image',
+    'family-name',
+    'generic-name',
+    'absolute-size',
+    'relative-size',
+    'angle',
+    'vector',
 ];
 function signatureCaches() {
     const caches = [];
-    for (const options of [{ collapse: true, logicalToPhysical: true }, { collapse: false, logicalToPhysical: true }]) {
+    for(const options of [
+        { collapse: true, logicalToPhysical: true },
+        { collapse: false, logicalToPhysical: true },
+    ]) {
         everything.designSystem.canonicalizeCandidates(['bg-[#000]'], options);
         const features = (options.collapse ? 1 : 0) | (options.logicalToPhysical ? 2 : 0);
-        for (const symbol of Object.getOwnPropertySymbols(everything.designSystem.storage)) {
+        for(const symbol of Object.getOwnPropertySymbols(everything.designSystem.storage)) {
             const byOptions = everything.designSystem.storage[symbol];
-            if (!byOptions || typeof byOptions.entries !== 'function') continue;
-            for (const [key, inner] of byOptions.entries()) {
-                if (!key || typeof key !== 'object' || key.features !== features || !('rem' in key)) continue;
+            if(!byOptions || typeof byOptions.entries !== 'function') continue;
+            for(const [key, inner] of byOptions.entries()) {
+                if(!key || typeof key !== 'object' || key.features !== features || !('rem' in key)) continue;
                 const sample = inner?.entries?.().next().value;
-                if (sample && typeof sample[1] === 'string' && sample[1].startsWith('.x {')) caches.push(inner);
+                if(sample && typeof sample[1] === 'string' && sample[1].startsWith('.x {')) caches.push(inner);
             }
         }
     }
-    if (caches.length !== 2) {
+    if(caches.length !== 2) {
         process.stderr.write('enumerate.mjs: the two signature caches were not found\n');
         process.exit(1);
     }
@@ -278,10 +353,10 @@ function signatureCaches() {
 }
 const signatureCachesForProbes = signatureCaches();
 function propertiesOf(className, into) {
-    for (const cache of signatureCachesForProbes) {
+    for(const cache of signatureCachesForProbes) {
         const signature = cache.get(className);
-        if (typeof signature !== 'string') continue;
-        for (const match of signature.matchAll(/^\s*([^\s{}@][^:{}]*?): [^{\n]*;$/gm)) into.add(match[1]);
+        if(typeof signature !== 'string') continue;
+        for(const match of signature.matchAll(/^\s*([^\s{}@][^:{}]*?): [^{\n]*;$/gm)) into.add(match[1]);
     }
 }
 /*
@@ -293,34 +368,34 @@ function propertiesOf(className, into) {
 const isColourNamespace = (namespace) => namespace === '--color' || namespace.endsWith('-color');
 const colourKeywords = new Set(['current', 'inherit', 'transparent']);
 function namedValueIsColour(value) {
-    if (colourKeywords.has(value)) return true;
+    if(colourKeywords.has(value)) return true;
     const probe = /zzp(\d+)$/.exec(value);
-    if (!probe) return false;
+    if(!probe) return false;
     const key = `${namespaces[Number(probe[1])]}-zzp${probe[1]}`;
     return isColourNamespace(key.slice(0, key.length - value.length - 1));
 }
 const rootProperties = {};
-for (const root of everything.designSystem.utilities.keys('functional')) {
+for(const root of everything.designSystem.utilities.keys('functional')) {
     const buckets = { colour: new Set(), other: new Set(), arbitrary: new Set() };
     const groups = everything.designSystem.utilities.getCompletions(root.replace(/^-/, ''));
     const modifiers = new Set(['50', 'zz-probe', '[50%]', '[1px]']);
-    for (const group of groups) for (const modifier of group.modifiers) modifiers.add(modifier);
+    for(const group of groups) for(const modifier of group.modifiers) modifiers.add(modifier);
     const probeClass = (className, bucket) => {
         propertiesOf(className, bucket);
-        for (const modifier of modifiers) propertiesOf(`${className}/${modifier}`, bucket);
+        for(const modifier of modifiers) propertiesOf(`${className}/${modifier}`, bucket);
     };
     probeClass(root, buckets.other);
-    for (const group of groups) {
-        for (const value of group.values) {
-            if (value === null) continue;
+    for(const group of groups) {
+        for(const value of group.values) {
+            if(value === null) continue;
             probeClass(`${root}-${value}`, namedValueIsColour(value) ? buckets.colour : buckets.other);
         }
     }
-    for (const value of arbitraryProbes) {
+    for(const value of arbitraryProbes) {
         probeClass(`${root}-[${value}]`, buckets.arbitrary);
-        for (const dataType of dataTypes) probeClass(`${root}-[${dataType}:${value}]`, buckets.arbitrary);
+        for(const dataType of dataTypes) probeClass(`${root}-[${dataType}:${value}]`, buckets.arbitrary);
     }
-    if (buckets.colour.size + buckets.other.size + buckets.arbitrary.size > 0) {
+    if(buckets.colour.size + buckets.other.size + buckets.arbitrary.size > 0) {
         rootProperties[root] = {
             colour: [...buckets.colour].sort(),
             other: [...buckets.other].sort(),
@@ -329,7 +404,7 @@ for (const root of everything.designSystem.utilities.keys('functional')) {
     }
 }
 
-if (problems.length > 0) {
+if(problems.length > 0) {
     process.stderr.write(`enumerate.mjs: ${problems.length} problems\n${problems.join('\n')}\n`);
     process.exit(1);
 }

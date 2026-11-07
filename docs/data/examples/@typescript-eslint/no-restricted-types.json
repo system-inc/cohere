@@ -4,9 +4,7 @@
         "file": "/repository/source/Restricted.ts",
         "source": "let value: string;\n"
     },
-    "assertedMessageIds": [
-        "bannedTypeMessage"
-    ],
+    "assertedMessageIds": ["bannedTypeMessage"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

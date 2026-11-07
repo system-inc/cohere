@@ -18,8 +18,5 @@
         "file": "/repo/source/other/Thing.ts",
         "source": "const detail = import(somePath);\n"
     },
-    "assertedMessageIds": [
-        "aliasedInternal",
-        "outsideInternal"
-    ]
+    "assertedMessageIds": ["aliasedInternal", "outsideInternal"]
 }

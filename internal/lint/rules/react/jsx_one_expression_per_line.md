@@ -1,12 +1,12 @@
 # `react/jsx-one-expression-per-line`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Strong No**         |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | yes                   |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -19,4 +19,3 @@ Incompatible with ESLint 10: the rule calls an API this version removed, so it t
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

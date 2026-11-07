@@ -18,8 +18,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "// any"
     },
-    "assertedMessageIds": [
-        "unexpectedAny"
-    ],
+    "assertedMessageIds": ["unexpectedAny"],
     "assertsFix": true
 }

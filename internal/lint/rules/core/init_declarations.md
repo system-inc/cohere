@@ -1,12 +1,12 @@
 # `init-declarations`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **476** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **476**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,7 +63,6 @@ let x: number;
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-
 
 ## Ported? No, and the reason is measured
 

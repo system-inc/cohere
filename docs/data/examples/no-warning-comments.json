@@ -18,7 +18,5 @@
         "file": "/repository/source/NoWarningComments.ts",
         "source": "// HACK x"
     },
-    "assertedMessageIds": [
-        "unexpectedComment"
-    ]
+    "assertedMessageIds": ["unexpectedComment"]
 }

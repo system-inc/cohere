@@ -14,7 +14,5 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "propsNotSorted"
-    ]
+    "assertedMessageIds": ["propsNotSorted"]
 }

@@ -26,7 +26,5 @@
         "file": "/repository/source/WillUpdate.tsx",
         "source": "class Hello extends React.Component {\n  componentWillUpdate() { on(function() { this.setState({}); }); }\n}\n"
     },
-    "assertedMessageIds": [
-        "noSetStateInComponentWillUpdate"
-    ]
+    "assertedMessageIds": ["noSetStateInComponentWillUpdate"]
 }

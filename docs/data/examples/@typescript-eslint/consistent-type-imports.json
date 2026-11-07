@@ -18,11 +18,6 @@
         "file": "consistent_type_imports.tsx",
         "source": "import type { Foo } from 'foo';\nlet foo: Foo;\n"
     },
-    "assertedMessageIds": [
-        "avoidImportType",
-        "noImportTypeAnnotations",
-        "someImportsAreOnlyTypes",
-        "typeOverValue"
-    ],
+    "assertedMessageIds": ["avoidImportType", "noImportTypeAnnotations", "someImportsAreOnlyTypes", "typeOverValue"],
     "assertsFix": true
 }

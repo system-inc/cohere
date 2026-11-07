@@ -66,12 +66,14 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 // prints what discovery passed over and leaves the run to check it in this process.
 //
 // lintConfigFileName is the lint config the command line named, absolute, or empty: every project's run
-// gets it, since a path typed here would resolve against each project's directory there.
+// gets it, since a path typed here would resolve against each project's directory there. formats is whether
+// the run formats, which decides whether a root no TypeScript project holds gets its format project.
 func checkDiscoveredProjects(
 	location projectLocation,
 	locateError error,
 	workingDirectory string,
 	lintConfigFileName string,
+	formats bool,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
 	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
@@ -102,6 +104,11 @@ func checkDiscoveredProjects(
 	// Before the one-project check, so a package and the dependency its run checks are the one project they
 	// are, and run here as `cohere --directory` on the package would.
 	found.SwiftCoverage = resolveSwiftCoverage(&found)
+	// Only beside a project found, so a root with nothing to check still fails saying so, rather than
+	// formatting a README and reading green.
+	if formats && len(found.Projects) > 0 {
+		found.addRootFormatProject()
+	}
 	if len(found.Projects) == 0 {
 		// Nothing to check is a failure, never a green over nothing.
 		solutions := ""
@@ -202,8 +209,11 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		// A Swift project and a TypeScript project in one directory share a label, and what one yields is
 		// nothing to the other, so a Swift project's yield is its own.
 		yield := found.Ownership.Yields[label]
-		if project.Engine == engineSwift {
+		switch project.Engine {
+		case engineSwift:
 			yield = found.swiftYield(project)
+		case engineFormat:
+			yield = found.formatYield()
 		}
 		yieldFile, writeProjectYieldError := writeProjectYield(yield, yieldDirectory)
 		if writeProjectYieldError != nil {
@@ -469,7 +479,7 @@ func summaryLine(found discovery, runs []projectRun) string {
 		}
 	}
 	engines := []string{}
-	for _, engine := range []projectEngine{engineTypeScript, engineSwift, engineGo} {
+	for _, engine := range []projectEngine{engineTypeScript, engineSwift, engineGo, engineFormat} {
 		if counts[engine] > 0 {
 			engines = append(engines, fmt.Sprintf("%d %s", counts[engine], engine))
 		}

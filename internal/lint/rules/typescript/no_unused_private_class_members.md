@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unused-private-class-members`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **4** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong Yes**       |
+| Violations in ahra     | **4**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -67,4 +67,3 @@ private boundHandleInternetUnavailable: EventListener | null = null;
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

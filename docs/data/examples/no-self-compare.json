@@ -18,7 +18,5 @@
         "file": "/repository/source/SelfCompare.ts",
         "source": "y=x*x"
     },
-    "assertedMessageIds": [
-        "comparingToSelf"
-    ]
+    "assertedMessageIds": ["comparingToSelf"]
 }

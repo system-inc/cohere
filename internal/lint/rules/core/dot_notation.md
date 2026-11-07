@@ -1,12 +1,12 @@
 # `dot-notation`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **121** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **121**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ console.log(`  ${diff['key']}: ${diff['current']} → ${diff['desired']}`);
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

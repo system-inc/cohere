@@ -18,7 +18,5 @@
         "file": "/repository/source/VoidDomElements.tsx",
         "source": "<br></br>;"
     },
-    "assertedMessageIds": [
-        "voidDomElementsNoChildren"
-    ]
+    "assertedMessageIds": ["voidDomElementsNoChildren"]
 }

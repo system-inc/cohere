@@ -107,10 +107,7 @@
             "w-[123px]",
             "w-[256px]"
         ],
-        "bare values": [
-            "aspect-16/9",
-            "example-8"
-        ],
+        "bare values": ["aspect-16/9", "example-8"],
         "arbitrary variants": [
             "[&:focus]:flex",
             "[@media(scripting:_none)]:flex",

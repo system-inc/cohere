@@ -20,8 +20,6 @@
         "file": "/repository/source/SortVars.ts",
         "source": "var A, a"
     },
-    "assertedMessageIds": [
-        "sortVars"
-    ],
+    "assertedMessageIds": ["sortVars"],
     "assertsFix": true
 }

@@ -1,16 +1,16 @@
 {
-  "rules": {
-    "TypeScript": "adamic/no-unchecked-cast"
-  },
-  "messages": {
-    "uncheckedCast": {
-      "text": "'{{source}}' can't be cast to '{{target}}' here: nothing at runtime could confirm it, so the cast is trusted, not proven, and every use after it inherits the guess. Return or declare '{{target}}' where the value comes from, or build one from fields you have narrowed with typeof. A cast from a union to some of its members is allowed when a discriminant property, typeof or instanceof can tell them apart, since Adamic compiles that to a check."
+    "rules": {
+        "TypeScript": "adamic/no-unchecked-cast"
     },
-    "uncheckedCastUnderTsc": {
-      "text": "'{{source}}' can't be cast to '{{target}}' here: this program runs on tsc, which emits no runtime check behind a cast, so nothing confirms it, the cast is trusted, not proven, and every use after it inherits the guess. Return or declare '{{target}}' where the value comes from, or narrow it with a type guard, a typeof, instanceof or discriminant test the checker narrows on, and use the value inside it with no cast."
-    },
-    "uncheckedDowncast": {
-      "text": "'{{source}}' can't be cast to '{{target}}' here: this program runs on tsc, which emits no runtime check behind a cast, so nothing confirms the value is '{{target}}' and every use after it inherits the guess. Narrow it with a type guard instead, a typeof, instanceof or discriminant test the checker narrows on, as `if (typeof value === 'string')` or `if (shape.kind === 'Circle')`, and use the value inside it with no cast."
+    "messages": {
+        "uncheckedCast": {
+            "text": "'{{source}}' can't be cast to '{{target}}' here: nothing at runtime could confirm it, so the cast is trusted, not proven, and every use after it inherits the guess. Return or declare '{{target}}' where the value comes from, or build one from fields you have narrowed with typeof. A cast from a union to some of its members is allowed when a discriminant property, typeof or instanceof can tell them apart, since Adamic compiles that to a check."
+        },
+        "uncheckedCastUnderTsc": {
+            "text": "'{{source}}' can't be cast to '{{target}}' here: this program runs on tsc, which emits no runtime check behind a cast, so nothing confirms it, the cast is trusted, not proven, and every use after it inherits the guess. Return or declare '{{target}}' where the value comes from, or narrow it with a type guard, a typeof, instanceof or discriminant test the checker narrows on, and use the value inside it with no cast."
+        },
+        "uncheckedDowncast": {
+            "text": "'{{source}}' can't be cast to '{{target}}' here: this program runs on tsc, which emits no runtime check behind a cast, so nothing confirms the value is '{{target}}' and every use after it inherits the guess. Narrow it with a type guard instead, a typeof, instanceof or discriminant test the checker narrows on, as `if (typeof value === 'string')` or `if (shape.kind === 'Circle')`, and use the value inside it with no cast."
+        }
     }
-  }
 }

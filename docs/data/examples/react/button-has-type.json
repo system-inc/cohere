@@ -18,10 +18,5 @@
         "file": "/repository/source/ButtonHasType.tsx",
         "source": "const a = <button type=\"button\"/>;\n"
     },
-    "assertedMessageIds": [
-        "complexType",
-        "forbiddenValue",
-        "invalidValue",
-        "missingType"
-    ]
+    "assertedMessageIds": ["complexType", "forbiddenValue", "invalidValue", "missingType"]
 }

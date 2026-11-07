@@ -20,12 +20,7 @@
         "file": "logical.ts",
         "source": "if (a) a = b\n"
     },
-    "assertedMessageIds": [
-        "assignment",
-        "if",
-        "logical",
-        "unexpected"
-    ],
+    "assertedMessageIds": ["assignment", "if", "logical", "unexpected"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

@@ -26,9 +26,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingDescription"
-            ],
+            "messageIds": ["missingDescription"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -67,10 +65,7 @@
             "origin": "next",
             "upstreamName": "@next/next/google-font-display",
             "typeAware": false,
-            "messageIds": [
-                "googleFontDisplayMissing",
-                "googleFontDisplayNotRecommended"
-            ],
+            "messageIds": ["googleFontDisplayMissing", "googleFontDisplayNotRecommended"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -85,9 +80,7 @@
             "origin": "next",
             "upstreamName": "@next/next/google-font-preconnect",
             "typeAware": false,
-            "messageIds": [
-                "googleFontPreconnect"
-            ],
+            "messageIds": ["googleFontPreconnect"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -102,9 +95,7 @@
             "origin": "next",
             "upstreamName": "@next/next/inline-script-id",
             "typeAware": false,
-            "messageIds": [
-                "inlineScriptId"
-            ],
+            "messageIds": ["inlineScriptId"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -119,9 +110,7 @@
             "origin": "next",
             "upstreamName": "@next/next/next-script-for-ga",
             "typeAware": false,
-            "messageIds": [
-                "nextScriptForGa"
-            ],
+            "messageIds": ["nextScriptForGa"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -136,9 +125,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-assign-module-variable",
             "typeAware": false,
-            "messageIds": [
-                "noAssignModuleVariable"
-            ],
+            "messageIds": ["noAssignModuleVariable"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -153,9 +140,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-async-client-component",
             "typeAware": true,
-            "messageIds": [
-                "noAsyncClientComponent"
-            ],
+            "messageIds": ["noAsyncClientComponent"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -170,9 +155,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-before-interactive-script-outside-document",
             "typeAware": false,
-            "messageIds": [
-                "noBeforeInteractiveScriptOutsideDocument"
-            ],
+            "messageIds": ["noBeforeInteractiveScriptOutsideDocument"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -187,9 +170,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-css-tags",
             "typeAware": false,
-            "messageIds": [
-                "noCssTags"
-            ],
+            "messageIds": ["noCssTags"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -204,9 +185,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-document-import-in-page",
             "typeAware": false,
-            "messageIds": [
-                "noDocumentImportInPage"
-            ],
+            "messageIds": ["noDocumentImportInPage"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -221,9 +200,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-duplicate-head",
             "typeAware": true,
-            "messageIds": [
-                "noDuplicateHead"
-            ],
+            "messageIds": ["noDuplicateHead"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -238,9 +215,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-head-element",
             "typeAware": false,
-            "messageIds": [
-                "noHeadElement"
-            ],
+            "messageIds": ["noHeadElement"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -255,9 +230,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-head-import-in-document",
             "typeAware": false,
-            "messageIds": [
-                "noHeadImportInDocument"
-            ],
+            "messageIds": ["noHeadImportInDocument"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -276,9 +249,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "noHtmlLinkForPages"
-            ],
+            "messageIds": ["noHtmlLinkForPages"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -293,9 +264,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-img-element",
             "typeAware": false,
-            "messageIds": [
-                "noImgElement"
-            ],
+            "messageIds": ["noImgElement"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -310,9 +279,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-location-assign-relative-destination",
             "typeAware": false,
-            "messageIds": [
-                "noLocationAssign"
-            ],
+            "messageIds": ["noLocationAssign"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -327,10 +294,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-page-custom-font",
             "typeAware": false,
-            "messageIds": [
-                "noPageCustomFontNotInDocument",
-                "noPageCustomFontOutsideDefaultExport"
-            ],
+            "messageIds": ["noPageCustomFontNotInDocument", "noPageCustomFontOutsideDefaultExport"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -345,9 +309,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-script-component-in-head",
             "typeAware": true,
-            "messageIds": [
-                "noScriptComponentInHead"
-            ],
+            "messageIds": ["noScriptComponentInHead"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -362,9 +324,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-styled-jsx-in-document",
             "typeAware": false,
-            "messageIds": [
-                "noStyledJsxInDocument"
-            ],
+            "messageIds": ["noStyledJsxInDocument"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -379,9 +339,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-sync-scripts",
             "typeAware": false,
-            "messageIds": [
-                "noSyncScripts"
-            ],
+            "messageIds": ["noSyncScripts"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -396,9 +354,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-title-in-document-head",
             "typeAware": true,
-            "messageIds": [
-                "noTitleInDocumentHead"
-            ],
+            "messageIds": ["noTitleInDocumentHead"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -413,9 +369,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-typos",
             "typeAware": false,
-            "messageIds": [
-                "noTypos"
-            ],
+            "messageIds": ["noTypos"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -430,10 +384,7 @@
             "origin": "next",
             "upstreamName": "@next/next/no-unwanted-polyfillio",
             "typeAware": false,
-            "messageIds": [
-                "noUnwantedPolyfillioDuplicate",
-                "noUnwantedPolyfillioSecurity"
-            ],
+            "messageIds": ["noUnwantedPolyfillioDuplicate", "noUnwantedPolyfillioSecurity"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -448,9 +399,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/adjacent-overload-signatures",
             "typeAware": false,
-            "messageIds": [
-                "adjacentSignature"
-            ],
+            "messageIds": ["adjacentSignature"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -539,11 +488,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/await-thenable",
             "typeAware": true,
-            "messageIds": [
-                "await",
-                "awaitUsingOfNonAsyncDisposable",
-                "forAwaitOfNonAsyncIterable"
-            ],
+            "messageIds": ["await", "awaitUsingOfNonAsyncDisposable", "forAwaitOfNonAsyncIterable"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -627,9 +572,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/ban-tslint-comment",
             "typeAware": false,
-            "messageIds": [
-                "commentDetected"
-            ],
+            "messageIds": ["commentDetected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -672,10 +615,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferFieldStyle",
-                "preferGetterStyle"
-            ],
+            "messageIds": ["preferFieldStyle", "preferGetterStyle"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -718,10 +658,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferConstructor",
-                "preferTypeAnnotation"
-            ],
+            "messageIds": ["preferConstructor", "preferTypeAnnotation"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -764,10 +701,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferIndexSignature",
-                "preferRecord"
-            ],
+            "messageIds": ["preferIndexSignature", "preferRecord"],
             "fixKind": "both",
             "sets": [
                 {
@@ -810,11 +744,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingReturn",
-                "missingReturnValue",
-                "unexpectedReturnValue"
-            ]
+            "messageIds": ["missingReturn", "missingReturnValue", "unexpectedReturnValue"]
         },
         {
             "name": "@typescript-eslint/consistent-type-assertions",
@@ -875,10 +805,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "interfaceOverType",
-                "typeOverInterface"
-            ],
+            "messageIds": ["interfaceOverType", "typeOverInterface"],
             "fixKind": "fix"
         },
         {
@@ -891,11 +818,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "multipleExportsAreTypes",
-                "singleExportIsType",
-                "typeOverValue"
-            ],
+            "messageIds": ["multipleExportsAreTypes", "singleExportIsType", "typeOverValue"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -938,12 +861,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "avoidImportType",
-                "noImportTypeAnnotations",
-                "someImportsAreOnlyTypes",
-                "typeOverValue"
-            ],
+            "messageIds": ["avoidImportType", "noImportTypeAnnotations", "someImportsAreOnlyTypes", "typeOverValue"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -983,9 +901,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/default-param-last",
             "typeAware": false,
-            "messageIds": [
-                "shouldBeLast"
-            ],
+            "messageIds": ["shouldBeLast"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1027,10 +943,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "useBrackets",
-                "useDot"
-            ],
+            "messageIds": ["useBrackets", "useDot"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1073,10 +986,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "initialized",
-                "notInitialized"
-            ]
+            "messageIds": ["initialized", "notInitialized"]
         },
         {
             "name": "@typescript-eslint/method-signature-style",
@@ -1088,10 +998,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "errorMethod",
-                "errorProperty"
-            ],
+            "messageIds": ["errorMethod", "errorProperty"],
             "fixKind": "both",
             "sets": [
                 {
@@ -1131,9 +1038,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-array-constructor",
             "typeAware": true,
-            "messageIds": [
-                "noArrayConstructor"
-            ],
+            "messageIds": ["noArrayConstructor"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -1173,9 +1078,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-array-delete",
             "typeAware": true,
-            "messageIds": [
-                "noArrayDelete"
-            ],
+            "messageIds": ["noArrayDelete"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -1214,10 +1117,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "baseArrayJoin",
-                "baseToString"
-            ],
+            "messageIds": ["baseArrayJoin", "baseToString"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1252,11 +1152,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-confusing-non-null-assertion",
             "typeAware": false,
-            "messageIds": [
-                "confusingAssign",
-                "confusingEqual",
-                "confusingOperator"
-            ],
+            "messageIds": ["confusingAssign", "confusingEqual", "confusingOperator"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -1346,9 +1242,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "deprecatedWithReason"
-            ]
+            "messageIds": ["deprecatedWithReason"]
         },
         {
             "name": "@typescript-eslint/no-dupe-class-members",
@@ -1357,9 +1251,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-dupe-class-members",
             "typeAware": false,
-            "messageIds": [
-                "noDupeClassMembers"
-            ],
+            "messageIds": ["noDupeClassMembers"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1394,9 +1286,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-duplicate-enum-values",
             "typeAware": false,
-            "messageIds": [
-                "noDuplicateEnumValues"
-            ],
+            "messageIds": ["noDuplicateEnumValues"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1434,10 +1324,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "duplicate",
-                "unnecessary"
-            ],
+            "messageIds": ["duplicate", "unnecessary"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1477,9 +1364,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-dynamic-delete",
             "typeAware": false,
-            "messageIds": [
-                "dynamicDelete"
-            ]
+            "messageIds": ["dynamicDelete"]
         },
         {
             "name": "@typescript-eslint/no-empty-object-type",
@@ -1491,11 +1376,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noEmptyInterface",
-                "noEmptyInterfaceWithSuper",
-                "noEmptyObject"
-            ],
+            "messageIds": ["noEmptyInterface", "noEmptyInterfaceWithSuper", "noEmptyObject"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -1538,9 +1419,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedAny"
-            ],
+            "messageIds": ["unexpectedAny"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1580,9 +1459,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-extra-non-null-assertion",
             "typeAware": false,
-            "messageIds": [
-                "noExtraNonNullAssertion"
-            ],
+            "messageIds": ["noExtraNonNullAssertion"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1621,11 +1498,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "empty",
-                "onlyConstructor",
-                "onlyStatic"
-            ],
+            "messageIds": ["empty", "onlyConstructor", "onlyStatic"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1710,9 +1583,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-for-in-array",
             "typeAware": true,
-            "messageIds": [
-                "forInViolation"
-            ],
+            "messageIds": ["forInViolation"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1747,10 +1618,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-implied-eval",
             "typeAware": true,
-            "messageIds": [
-                "noFunctionConstructor",
-                "noImpliedEvalError"
-            ],
+            "messageIds": ["noFunctionConstructor", "noImpliedEvalError"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1785,9 +1653,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-import-type-side-effects",
             "typeAware": false,
-            "messageIds": [
-                "useTopLevelQualifier"
-            ],
+            "messageIds": ["useTopLevelQualifier"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1830,9 +1696,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noInferrableType"
-            ],
+            "messageIds": ["noInferrableType"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -1875,9 +1739,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedThis"
-            ],
+            "messageIds": ["unexpectedThis"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -1915,10 +1777,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "meaninglessVoidOnNonCall",
-                "meaninglessVoidOperator"
-            ],
+            "messageIds": ["meaninglessVoidOnNonCall", "meaninglessVoidOperator"],
             "fixKind": "both",
             "sets": [
                 {
@@ -1958,11 +1817,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-misused-new",
             "typeAware": false,
-            "messageIds": [
-                "classNew",
-                "interfaceConstruct",
-                "interfaceConstructor"
-            ],
+            "messageIds": ["classNew", "interfaceConstruct", "interfaceConstructor"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2092,9 +1947,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-mixed-enums",
             "typeAware": true,
-            "messageIds": [
-                "mixed"
-            ],
+            "messageIds": ["mixed"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2129,9 +1982,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
             "typeAware": true,
-            "messageIds": [
-                "noNonNullAssertedNullishCoalescing"
-            ],
+            "messageIds": ["noNonNullAssertedNullishCoalescing"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2167,9 +2018,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-non-null-asserted-optional-chain",
             "typeAware": false,
-            "messageIds": [
-                "noNonNullOptionalChain"
-            ],
+            "messageIds": ["noNonNullOptionalChain"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2205,9 +2054,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-non-null-assertion",
             "typeAware": false,
-            "messageIds": [
-                "noNonNull"
-            ],
+            "messageIds": ["noNonNull"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2250,10 +2097,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "redeclared",
-                "redeclaredAsBuiltin"
-            ],
+            "messageIds": ["redeclared", "redeclaredAsBuiltin"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2288,13 +2132,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-redundant-type-constituents",
             "typeAware": true,
-            "messageIds": [
-                "errorTypeOverrides",
-                "literalOverridden",
-                "overridden",
-                "overrides",
-                "primitiveOverridden"
-            ],
+            "messageIds": ["errorTypeOverrides", "literalOverridden", "overridden", "overrides", "primitiveOverridden"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2336,9 +2174,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noRequireImports"
-            ],
+            "messageIds": ["noRequireImports"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2376,9 +2212,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "bannedTypeMessage"
-            ],
+            "messageIds": ["bannedTypeMessage"],
             "fixKind": "both"
         },
         {
@@ -2391,11 +2225,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noEnumShadow",
-                "noShadow",
-                "noShadowGlobal"
-            ],
+            "messageIds": ["noEnumShadow", "noShadow", "noShadowGlobal"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2437,10 +2267,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "thisAssignment",
-                "thisDestructure"
-            ],
+            "messageIds": ["thisAssignment", "thisDestructure"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2524,9 +2351,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
             "typeAware": false,
-            "messageIds": [
-                "unnecessaryAssign"
-            ],
+            "messageIds": ["unnecessaryAssign"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2566,9 +2391,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unnecessary-qualifier",
             "typeAware": true,
-            "messageIds": [
-                "unnecessaryQualifier"
-            ],
+            "messageIds": ["unnecessaryQualifier"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -2608,9 +2431,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unnecessary-template-expression",
             "typeAware": true,
-            "messageIds": [
-                "noUnnecessaryTemplateExpression"
-            ],
+            "messageIds": ["noUnnecessaryTemplateExpression"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -2650,9 +2471,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unnecessary-type-constraint",
             "typeAware": false,
-            "messageIds": [
-                "noUnnecessaryTypeConstraint"
-            ],
+            "messageIds": ["noUnnecessaryTypeConstraint"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2692,9 +2511,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unnecessary-type-parameters",
             "typeAware": true,
-            "messageIds": [
-                "sole"
-            ],
+            "messageIds": ["sole"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -2734,12 +2551,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-argument",
             "typeAware": true,
-            "messageIds": [
-                "unsafeArgument",
-                "unsafeArraySpread",
-                "unsafeSpread",
-                "unsafeTupleSpread"
-            ],
+            "messageIds": ["unsafeArgument", "unsafeArraySpread", "unsafeSpread", "unsafeTupleSpread"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -2824,14 +2636,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-call",
             "typeAware": true,
-            "messageIds": [
-                "errorCall",
-                "errorNew",
-                "errorTemplateTag",
-                "unsafeCall",
-                "unsafeNew",
-                "unsafeTemplateTag"
-            ],
+            "messageIds": ["errorCall", "errorNew", "errorTemplateTag", "unsafeCall", "unsafeNew", "unsafeTemplateTag"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -2870,9 +2675,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-declaration-merging",
             "typeAware": true,
-            "messageIds": [
-                "unsafeMerging"
-            ],
+            "messageIds": ["unsafeMerging"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -2911,10 +2714,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-enum-comparison",
             "typeAware": true,
-            "messageIds": [
-                "mismatchedCase",
-                "mismatchedCondition"
-            ],
+            "messageIds": ["mismatchedCase", "mismatchedCondition"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -2949,9 +2749,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-function-type",
             "typeAware": false,
-            "messageIds": [
-                "bannedFunctionType"
-            ],
+            "messageIds": ["bannedFunctionType"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -3037,10 +2835,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-return",
             "typeAware": true,
-            "messageIds": [
-                "unsafeReturn",
-                "unsafeReturnAssignment"
-            ],
+            "messageIds": ["unsafeReturn", "unsafeReturnAssignment"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -3094,9 +2889,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unsafe-unary-minus",
             "typeAware": true,
-            "messageIds": [
-                "unaryMinus"
-            ],
+            "messageIds": ["unaryMinus"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3134,9 +2927,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unusedExpression"
-            ],
+            "messageIds": ["unusedExpression"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3171,9 +2962,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-unused-private-class-members",
             "typeAware": true,
-            "messageIds": [
-                "unusedPrivateClassMember"
-            ],
+            "messageIds": ["unusedPrivateClassMember"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3211,11 +3000,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noUnusedVars",
-                "usedIgnoredVar",
-                "usedOnlyAsType"
-            ],
+            "messageIds": ["noUnusedVars", "usedIgnoredVar", "usedOnlyAsType"],
             "fixKind": "both",
             "sets": [
                 {
@@ -3254,11 +3039,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferOptionalSyntax",
-                "uselessDefaultAssignment",
-                "uselessUndefined"
-            ],
+            "messageIds": ["preferOptionalSyntax", "uselessDefaultAssignment", "uselessUndefined"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3298,9 +3079,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-useless-empty-export",
             "typeAware": false,
-            "messageIds": [
-                "uselessEmptyExport"
-            ],
+            "messageIds": ["uselessEmptyExport"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3340,9 +3119,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/no-wrapper-object-types",
             "typeAware": false,
-            "messageIds": [
-                "bannedWrapperObjectType"
-            ],
+            "messageIds": ["bannedWrapperObjectType"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3378,9 +3155,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/non-nullable-type-assertion-style",
             "typeAware": true,
-            "messageIds": [
-                "preferNonNullAssertion"
-            ],
+            "messageIds": ["preferNonNullAssertion"],
             "fixKind": "fix"
         },
         {
@@ -3393,10 +3168,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "object",
-                "undef"
-            ],
+            "messageIds": ["object", "undef"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3431,9 +3203,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-as-const",
             "typeAware": false,
-            "messageIds": [
-                "preferAsConst"
-            ],
+            "messageIds": ["preferAsConst"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3473,9 +3243,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-enum-initializers",
             "typeAware": false,
-            "messageIds": [
-                "defineInitializer"
-            ],
+            "messageIds": ["defineInitializer"],
             "fixKind": "suggestion"
         },
         {
@@ -3485,9 +3253,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-find",
             "typeAware": true,
-            "messageIds": [
-                "preferFind"
-            ],
+            "messageIds": ["preferFind"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -3527,9 +3293,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-for-of",
             "typeAware": true,
-            "messageIds": [
-                "preferForOf"
-            ],
+            "messageIds": ["preferForOf"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3568,10 +3332,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-function-type",
             "typeAware": false,
-            "messageIds": [
-                "functionTypeOverCallableType",
-                "unexpectedThisOnFunctionOnlyInterface"
-            ],
+            "messageIds": ["functionTypeOverCallableType", "unexpectedThisOnFunctionOnlyInterface"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3611,10 +3372,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-includes",
             "typeAware": true,
-            "messageIds": [
-                "preferIncludes",
-                "preferStringIncludes"
-            ],
+            "messageIds": ["preferIncludes", "preferStringIncludes"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3657,10 +3415,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "notLiteral",
-                "notLiteralOrBitwiseExpression"
-            ]
+            "messageIds": ["notLiteral", "notLiteralOrBitwiseExpression"]
         },
         {
             "name": "@typescript-eslint/prefer-namespace-keyword",
@@ -3669,9 +3424,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-namespace-keyword",
             "typeAware": false,
-            "messageIds": [
-                "preferNamespaceKeyword"
-            ],
+            "messageIds": ["preferNamespaceKeyword"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3714,11 +3467,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferNullishOverAssignment",
-                "preferNullishOverOr",
-                "preferNullishOverTernary"
-            ],
+            "messageIds": ["preferNullishOverAssignment", "preferNullishOverOr", "preferNullishOverTernary"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -3761,9 +3510,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "rejectAnError"
-            ],
+            "messageIds": ["rejectAnError"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3798,9 +3545,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-reduce-type-parameter",
             "typeAware": true,
-            "messageIds": [
-                "preferTypeParameter"
-            ],
+            "messageIds": ["preferTypeParameter"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3840,9 +3585,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-regexp-exec",
             "typeAware": true,
-            "messageIds": [
-                "regExpExecOverStringMatch"
-            ],
+            "messageIds": ["regExpExecOverStringMatch"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3882,9 +3625,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/prefer-return-this-type",
             "typeAware": true,
-            "messageIds": [
-                "useThisType"
-            ],
+            "messageIds": ["useThisType"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -3924,9 +3665,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/related-getter-setter-pairs",
             "typeAware": true,
-            "messageIds": [
-                "mismatch"
-            ],
+            "messageIds": ["mismatch"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -3964,9 +3703,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "requireCompare"
-            ],
+            "messageIds": ["requireCompare"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4004,11 +3741,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "bigintAndNumber",
-                "invalid",
-                "mismatched"
-            ],
+            "messageIds": ["bigintAndNumber", "invalid", "mismatched"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4046,9 +3779,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidType"
-            ],
+            "messageIds": ["invalidType"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4086,11 +3817,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "disallowedPromiseAwait",
-                "nonPromiseAwait",
-                "requiredPromiseAwait"
-            ],
+            "messageIds": ["disallowedPromiseAwait", "nonPromiseAwait", "requiredPromiseAwait"],
             "fixKind": "both",
             "sets": [
                 {
@@ -4129,11 +3856,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "asyncFunc",
-                "nonVoidFunc",
-                "nonVoidReturn"
-            ],
+            "messageIds": ["asyncFunc", "nonVoidFunc", "nonVoidReturn"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4175,10 +3898,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "dangerousDefaultCase",
-                "switchIsNotExhaustive"
-            ],
+            "messageIds": ["dangerousDefaultCase", "switchIsNotExhaustive"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4216,9 +3936,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "tripleSlashReference"
-            ],
+            "messageIds": ["tripleSlashReference"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -4260,10 +3978,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unbound",
-                "unboundWithoutThisAnnotation"
-            ],
+            "messageIds": ["unbound", "unboundWithoutThisAnnotation"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4341,11 +4056,7 @@
             "origin": "typescript-eslint",
             "upstreamName": "@typescript-eslint/use-unknown-in-catch-callback-variable",
             "typeAware": true,
-            "messageIds": [
-                "useUnknown",
-                "useUnknownArrayDestructuringPattern",
-                "useUnknownObjectDestructuringPattern"
-            ],
+            "messageIds": ["useUnknown", "useUnknownArrayDestructuringPattern", "useUnknownObjectDestructuringPattern"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -4431,11 +4142,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "methodParameterNarrowed",
-                "mutableWidening",
-                "readonlyMadeWritable"
-            ],
+            "messageIds": ["methodParameterNarrowed", "mutableWidening", "readonlyMadeWritable"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4466,10 +4173,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "ambientDeclaration",
-                "ambientField"
-            ],
+            "messageIds": ["ambientDeclaration", "ambientField"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4500,9 +4204,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "crossEnumNarrowing"
-            ],
+            "messageIds": ["crossEnumNarrowing"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4541,9 +4243,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": false,
-            "messageIds": [
-                "definiteAssignment"
-            ],
+            "messageIds": ["definiteAssignment"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4574,9 +4274,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "indexedAccessWrite"
-            ],
+            "messageIds": ["indexedAccessWrite"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4611,9 +4309,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "optionalWidening"
-            ],
+            "messageIds": ["optionalWidening"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4644,9 +4340,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": false,
-            "messageIds": [
-                "typePredicate"
-            ],
+            "messageIds": ["typePredicate"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4680,11 +4374,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "uncheckedCast",
-                "uncheckedCastUnderTsc",
-                "uncheckedDowncast"
-            ],
+            "messageIds": ["uncheckedCast", "uncheckedCastUnderTsc", "uncheckedDowncast"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4715,9 +4405,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "voidWidening"
-            ],
+            "messageIds": ["voidWidening"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4748,10 +4436,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "notAnInstance",
-                "typeArgumentsDiffer"
-            ],
+            "messageIds": ["notAnInstance", "typeArgumentsDiffer"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4782,9 +4467,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": false,
-            "messageIds": [
-                "laterSpread"
-            ],
+            "messageIds": ["laterSpread"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4815,9 +4498,7 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
-            "messageIds": [
-                "unionWrite"
-            ],
+            "messageIds": ["unionWrite"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -4858,12 +4539,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "expectedAtEnd",
-                "expectedInside",
-                "expectedNoReturnValue",
-                "expectedReturnValue"
-            ],
+            "messageIds": ["expectedAtEnd", "expectedInside", "expectedNoReturnValue", "expectedReturnValue"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -4947,9 +4623,7 @@
             "origin": "house",
             "category": "boundary",
             "typeAware": false,
-            "messageIds": [
-                "boundaryNoGlobalContainer"
-            ],
+            "messageIds": ["boundaryNoGlobalContainer"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -4967,9 +4641,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "bareThrow"
-            ],
+            "messageIds": ["bareThrow"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -4988,9 +4660,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "consistencyNoConsole"
-            ],
+            "messageIds": ["consistencyNoConsole"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5009,9 +4679,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "consistencyNoHandBuiltDeclaredError"
-            ],
+            "messageIds": ["consistencyNoHandBuiltDeclaredError"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5029,9 +4697,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "invalidName"
-            ],
+            "messageIds": ["invalidName"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5071,9 +4737,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "mismatch"
-            ],
+            "messageIds": ["mismatch"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5091,10 +4755,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "mismatch",
-                "wrongBaseType"
-            ],
+            "messageIds": ["mismatch", "wrongBaseType"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5112,9 +4773,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "mismatch"
-            ],
+            "messageIds": ["mismatch"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5132,9 +4791,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "mustBeOptional"
-            ],
+            "messageIds": ["mustBeOptional"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5152,9 +4809,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": false,
-            "messageIds": [
-                "missingDeclare"
-            ],
+            "messageIds": ["missingDeclare"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5172,9 +4827,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "columnNullableButTypeNot"
-            ],
+            "messageIds": ["columnNullableButTypeNot"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5192,10 +4845,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "decoratorOptionalButTypeNot",
-                "typeOptionalButDecoratorNot"
-            ],
+            "messageIds": ["decoratorOptionalButTypeNot", "typeOptionalButDecoratorNot"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5213,9 +4863,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "missingArrayRule"
-            ],
+            "messageIds": ["missingArrayRule"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5233,10 +4881,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "optionalButTypeNot",
-                "typeOptionalButNoVerify"
-            ],
+            "messageIds": ["optionalButTypeNot", "typeOptionalButNoVerify"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5257,9 +4902,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingProtector"
-            ],
+            "messageIds": ["missingProtector"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -5281,10 +4924,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "canonicalCollapse",
-                "canonicalSingle"
-            ],
+            "messageIds": ["canonicalCollapse", "canonicalSingle"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -5304,9 +4944,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "inconsistentClassOrder"
-            ],
+            "messageIds": ["inconsistentClassOrder"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -5326,9 +4964,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "importantPosition"
-            ],
+            "messageIds": ["importantPosition"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5347,9 +4983,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "variableSyntax"
-            ],
+            "messageIds": ["variableSyntax"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5368,9 +5002,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "variantOrder"
-            ],
+            "messageIds": ["variantOrder"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5389,9 +5021,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "shorthandClasses"
-            ],
+            "messageIds": ["shorthandClasses"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5410,9 +5040,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "concatenatedClass"
-            ],
+            "messageIds": ["concatenatedClass"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5431,9 +5059,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "conflictingClasses"
-            ],
+            "messageIds": ["conflictingClasses"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5452,10 +5078,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "deprecatedClassIrreplaceable",
-                "deprecatedClassReplaceable"
-            ],
+            "messageIds": ["deprecatedClassIrreplaceable", "deprecatedClassReplaceable"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -5475,9 +5098,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "duplicateClass"
-            ],
+            "messageIds": ["duplicateClass"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -5497,9 +5118,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "unknownClass"
-            ],
+            "messageIds": ["unknownClass"],
             "sets": [
                 {
                     "set": "cohere:tailwind",
@@ -5518,9 +5137,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "unnecessaryWhitespace"
-            ],
+            "messageIds": ["unnecessaryWhitespace"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -5535,9 +5152,7 @@
             "origin": "core",
             "upstreamName": "block-scoped-var",
             "typeAware": true,
-            "messageIds": [
-                "outOfScope"
-            ],
+            "messageIds": ["outOfScope"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -5581,11 +5196,7 @@
                 "anchorsPaths": true,
                 "required": true
             },
-            "messageIds": [
-                "noPolicyAllows",
-                "policyDisallows",
-                "policyMessage"
-            ]
+            "messageIds": ["noPolicyAllows", "policyDisallows", "policyMessage"]
         },
         {
             "name": "class-methods-use-this",
@@ -5596,9 +5207,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingThis"
-            ]
+            "messageIds": ["missingThis"]
         },
         {
             "name": "cohere-go/S1000",
@@ -7467,9 +7076,7 @@
             "origin": "house",
             "category": "concurrency",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/concurrency-no-check-then-write"
-            ]
+            "typeScriptRules": ["nexus/concurrency-no-check-then-write"]
         },
         {
             "name": "cohere-swift/concurrency-no-lost-update",
@@ -7478,9 +7085,7 @@
             "origin": "house",
             "category": "concurrency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/concurrency-no-lost-update"
-            ]
+            "typeScriptRules": ["nexus/concurrency-no-lost-update"]
         },
         {
             "name": "cohere-swift/concurrency-require-escape-hatch-reason",
@@ -7497,9 +7102,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-abbreviated-identifier"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-abbreviated-identifier"]
         },
         {
             "name": "cohere-swift/consistency-no-ambiguous-identifier",
@@ -7508,9 +7111,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-ambiguous-identifier"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-ambiguous-identifier"]
         },
         {
             "name": "cohere-swift/consistency-no-bare-throw",
@@ -7519,9 +7120,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "base/consistency-no-bare-throw"
-            ]
+            "typeScriptRules": ["base/consistency-no-bare-throw"]
         },
         {
             "name": "cohere-swift/consistency-no-boolean-outcome",
@@ -7530,9 +7129,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-boolean-outcome"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-boolean-outcome"]
         },
         {
             "name": "cohere-swift/consistency-no-hand-rolled-delay",
@@ -7541,9 +7138,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-hand-rolled-delay"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-hand-rolled-delay"]
         },
         {
             "name": "cohere-swift/consistency-no-iso-string-date-cut",
@@ -7552,9 +7147,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/consistency-no-iso-string-date-cut"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-iso-string-date-cut"]
         },
         {
             "name": "cohere-swift/consistency-no-label",
@@ -7563,9 +7156,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-label"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-label"]
         },
         {
             "name": "cohere-swift/consistency-no-print",
@@ -7574,9 +7165,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "base/consistency-no-console"
-            ]
+            "typeScriptRules": ["base/consistency-no-console"]
         },
         {
             "name": "cohere-swift/consistency-no-property-alias",
@@ -7585,9 +7174,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-property-alias"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-property-alias"]
         },
         {
             "name": "cohere-swift/consistency-no-shouting",
@@ -7596,9 +7183,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-shouting"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-shouting"]
         },
         {
             "name": "cohere-swift/consistency-no-stuttering-name",
@@ -7607,9 +7192,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-stuttering-name"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-stuttering-name"]
         },
         {
             "name": "cohere-swift/consistency-no-utils-folder",
@@ -7618,9 +7201,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-utils-folder"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-utils-folder"]
         },
         {
             "name": "cohere-swift/consistency-require-matching-file-name",
@@ -7629,9 +7210,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "typeScriptRules": [
-                "structure/consistency-require-matching-file-name"
-            ]
+            "typeScriptRules": ["structure/consistency-require-matching-file-name"]
         },
         {
             "name": "cohere-swift/consistency-require-separated-folder-words",
@@ -7680,9 +7259,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/correctness-no-identical-branches"
-            ]
+            "typeScriptRules": ["nexus/correctness-no-identical-branches"]
         },
         {
             "name": "cohere-swift/correctness-no-uncleared-race-timeout",
@@ -7691,9 +7268,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/correctness-no-uncleared-race-timeout"
-            ]
+            "typeScriptRules": ["nexus/correctness-no-uncleared-race-timeout"]
         },
         {
             "name": "cohere-swift/correctness-no-write-only-collection",
@@ -7702,9 +7277,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/correctness-no-write-only-collection"
-            ]
+            "typeScriptRules": ["nexus/correctness-no-write-only-collection"]
         },
         {
             "name": "cohere-swift/correctness-require-response-status-check",
@@ -7713,9 +7286,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/correctness-require-response-status-check"
-            ]
+            "typeScriptRules": ["nexus/correctness-require-response-status-check"]
         },
         {
             "name": "cohere-swift/duplicate-conditions",
@@ -7780,9 +7351,7 @@
             "origin": "swiftlint",
             "upstreamName": "force_cast",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/correctness-no-nullish-stripping-assertion"
-            ]
+            "typeScriptRules": ["nexus/correctness-no-nullish-stripping-assertion"]
         },
         {
             "name": "cohere-swift/force-try",
@@ -7855,9 +7424,7 @@
             "origin": "house",
             "category": "performance",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/performance-no-independent-await-in-loop"
-            ]
+            "typeScriptRules": ["nexus/performance-no-independent-await-in-loop"]
         },
         {
             "name": "cohere-swift/private-over-fileprivate",
@@ -7890,9 +7457,7 @@
             "origin": "house",
             "category": "security",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/security-no-interpolated-shell-command"
-            ]
+            "typeScriptRules": ["nexus/security-no-interpolated-shell-command"]
         },
         {
             "name": "cohere-swift/security-no-interpolated-sql-string",
@@ -7901,9 +7466,7 @@
             "origin": "house",
             "category": "security",
             "typeAware": true,
-            "typeScriptRules": [
-                "nexus/security-no-interpolated-sql-string"
-            ]
+            "typeScriptRules": ["nexus/security-no-interpolated-sql-string"]
         },
         {
             "name": "cohere-swift/sorted-first-last",
@@ -7920,9 +7483,7 @@
             "origin": "swiftlint",
             "upstreamName": "todo",
             "typeAware": false,
-            "typeScriptRules": [
-                "nexus/consistency-no-warning-comment"
-            ]
+            "typeScriptRules": ["nexus/consistency-no-warning-comment"]
         },
         {
             "name": "cohere-swift/toolchain-require-strict-memory-safety",
@@ -7989,9 +7550,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "complex"
-            ]
+            "messageIds": ["complex"]
         },
         {
             "name": "consistent-return",
@@ -8002,11 +7561,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingReturn",
-                "missingReturnValue",
-                "unexpectedReturnValue"
-            ]
+            "messageIds": ["missingReturn", "missingReturnValue", "unexpectedReturnValue"]
         },
         {
             "name": "consistent-this",
@@ -8017,10 +7572,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "aliasNotAssignedToThis",
-                "unexpectedAlias"
-            ],
+            "messageIds": ["aliasNotAssignedToThis", "unexpectedAlias"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8058,12 +7610,7 @@
             "origin": "core",
             "upstreamName": "constructor-super",
             "typeAware": false,
-            "messageIds": [
-                "badSuper",
-                "duplicate",
-                "missingAll",
-                "missingSome"
-            ],
+            "messageIds": ["badSuper", "duplicate", "missingAll", "missingSome"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -8108,9 +7655,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "missingDefaultCase"
-            ]
+            "messageIds": ["missingDefaultCase"]
         },
         {
             "name": "default-case-last",
@@ -8118,9 +7663,7 @@
             "origin": "core",
             "upstreamName": "default-case-last",
             "typeAware": false,
-            "messageIds": [
-                "notLast"
-            ],
+            "messageIds": ["notLast"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8158,9 +7701,7 @@
             "origin": "core",
             "upstreamName": "default-param-last",
             "typeAware": false,
-            "messageIds": [
-                "shouldBeLast"
-            ],
+            "messageIds": ["shouldBeLast"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8201,10 +7742,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "useBrackets",
-                "useDot"
-            ],
+            "messageIds": ["useBrackets", "useDot"],
             "fixKind": "fix"
         },
         {
@@ -8216,9 +7754,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "both",
             "sets": [
                 {
@@ -8257,9 +7793,7 @@
             "origin": "core",
             "upstreamName": "for-direction",
             "typeAware": false,
-            "messageIds": [
-                "incorrectDirection"
-            ],
+            "messageIds": ["incorrectDirection"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8296,12 +7830,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "matchProperty",
-                "matchVariable",
-                "notMatchProperty",
-                "notMatchVariable"
-            ]
+            "messageIds": ["matchProperty", "matchVariable", "notMatchProperty", "notMatchVariable"]
         },
         {
             "name": "getter-return",
@@ -8312,10 +7841,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "expected",
-                "expectedAlways"
-            ],
+            "messageIds": ["expected", "expectedAlways"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -8360,10 +7886,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "invalidOrder",
-                "notGrouped"
-            ],
+            "messageIds": ["invalidOrder", "notGrouped"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8401,9 +7924,7 @@
             "origin": "core",
             "upstreamName": "guard-for-in",
             "typeAware": false,
-            "messageIds": [
-                "wrap"
-            ]
+            "messageIds": ["wrap"]
         },
         {
             "name": "id-denylist",
@@ -8414,10 +7935,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "restricted",
-                "restrictedPrivate"
-            ]
+            "messageIds": ["restricted", "restrictedPrivate"]
         },
         {
             "name": "id-length",
@@ -8428,12 +7946,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "tooLong",
-                "tooLongPrivate",
-                "tooShort",
-                "tooShortPrivate"
-            ]
+            "messageIds": ["tooLong", "tooLongPrivate", "tooShort", "tooShortPrivate"]
         },
         {
             "name": "id-match",
@@ -8444,10 +7957,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "notMatch",
-                "notMatchPrivate"
-            ]
+            "messageIds": ["notMatch", "notMatchPrivate"]
         },
         {
             "name": "logical-assignment-operators",
@@ -8458,12 +7968,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "assignment",
-                "if",
-                "logical",
-                "unexpected"
-            ],
+            "messageIds": ["assignment", "if", "logical", "unexpected"],
             "fixKind": "both",
             "sets": [
                 {
@@ -8505,9 +8010,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "maximumExceeded"
-            ],
+            "messageIds": ["maximumExceeded"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8548,9 +8051,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "tooDeeply"
-            ]
+            "messageIds": ["tooDeeply"]
         },
         {
             "name": "max-lines",
@@ -8561,9 +8062,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "exceed"
-            ],
+            "messageIds": ["exceed"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8604,9 +8103,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "exceed"
-            ],
+            "messageIds": ["exceed"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8645,10 +8142,7 @@
             "origin": "house",
             "category": "boundary",
             "typeAware": false,
-            "messageIds": [
-                "aliasedInternal",
-                "outsideInternal"
-            ],
+            "messageIds": ["aliasedInternal", "outsideInternal"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8690,9 +8184,7 @@
             "origin": "house",
             "category": "boundary",
             "typeAware": false,
-            "messageIds": [
-                "forbiddenOutsideImport"
-            ],
+            "messageIds": ["forbiddenOutsideImport"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -8718,9 +8210,7 @@
                 "elements": "one",
                 "required": true
             },
-            "messageIds": [
-                "forbiddenProjectImport"
-            ],
+            "messageIds": ["forbiddenProjectImport"],
             "swift": {
                 "verdict": "Compiler"
             }
@@ -8732,9 +8222,7 @@
             "origin": "house",
             "category": "concurrency",
             "typeAware": true,
-            "messageIds": [
-                "checkThenWrite"
-            ],
+            "messageIds": ["checkThenWrite"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8773,9 +8261,7 @@
             "origin": "house",
             "category": "concurrency",
             "typeAware": true,
-            "messageIds": [
-                "lostUpdate"
-            ],
+            "messageIds": ["lostUpdate"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8817,12 +8303,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "abbreviatedIdentifier",
-                "abbreviatedSuffix",
-                "abbreviatedWordSegment",
-                "millisecondSuffix"
-            ],
+            "messageIds": ["abbreviatedIdentifier", "abbreviatedSuffix", "abbreviatedWordSegment", "millisecondSuffix"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -8845,10 +8326,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "noAmbiguousE",
-                "noSingleLetter"
-            ],
+            "messageIds": ["noAmbiguousE", "noSingleLetter"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8894,9 +8372,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "booleanOutcome"
-            ],
+            "messageIds": ["booleanOutcome"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8939,9 +8415,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "noEnum"
-            ],
+            "messageIds": ["noEnum"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -8983,9 +8457,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "forIn"
-            ],
+            "messageIds": ["forIn"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9027,9 +8499,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "handRolledDelay"
-            ],
+            "messageIds": ["handRolledDelay"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9072,9 +8542,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "messageIds": [
-                "isoStringCutToDate"
-            ],
+            "messageIds": ["isoStringCutToDate"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9117,9 +8585,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "label"
-            ],
+            "messageIds": ["label"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9165,9 +8631,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "longLineComment"
-            ],
+            "messageIds": ["longLineComment"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9210,11 +8674,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "addEventListenerArrow",
-                "multilineArrow",
-                "reactHookArrow"
-            ],
+            "messageIds": ["addEventListenerArrow", "multilineArrow", "reactHookArrow"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9257,9 +8717,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "messageIds": [
-                "noPropertyAlias"
-            ],
+            "messageIds": ["noPropertyAlias"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9302,9 +8760,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "returnVoid"
-            ],
+            "messageIds": ["returnVoid"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9350,10 +8806,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noScreamingSnakeCaseExported",
-                "noScreamingSnakeCaseLocal"
-            ],
+            "messageIds": ["noScreamingSnakeCaseExported", "noScreamingSnakeCaseLocal"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9396,9 +8849,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "shoutingInComment"
-            ],
+            "messageIds": ["shoutingInComment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9441,9 +8892,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "useSimpleComment"
-            ],
+            "messageIds": ["useSimpleComment"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9489,9 +8938,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "stutteringName"
-            ],
+            "messageIds": ["stutteringName"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9538,10 +8985,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "noUnderscoreUtils",
-                "noUtils"
-            ],
+            "messageIds": ["noUnderscoreUtils", "noUtils"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9584,9 +9028,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "warningComment"
-            ],
+            "messageIds": ["warningComment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9661,11 +9103,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "messageIds": [
-                "requireLowerCamelCaseValue",
-                "requireUpperCamelCaseCapital",
-                "requireUpperCamelCaseType"
-            ],
+            "messageIds": ["requireLowerCamelCaseValue", "requireUpperCamelCaseCapital", "requireUpperCamelCaseType"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9689,10 +9127,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "messageIds": [
-                "bareReturnInValueFunction",
-                "undefinedReturnInVoidFunction"
-            ],
+            "messageIds": ["bareReturnInValueFunction", "undefinedReturnInVoidFunction"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -9739,9 +9174,7 @@
                 "elements": "one",
                 "anchorsPaths": true
             },
-            "messageIds": [
-                "runTogetherProjectFolder"
-            ],
+            "messageIds": ["runTogetherProjectFolder"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9783,11 +9216,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "noConstEnumSuffix",
-                "noInterfaceSuffix",
-                "noTypeAliasSuffix"
-            ],
+            "messageIds": ["noConstEnumSuffix", "noInterfaceSuffix", "noTypeAliasSuffix"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9829,9 +9258,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "callbackInParseTry"
-            ],
+            "messageIds": ["callbackInParseTry"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9955,9 +9382,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "outcomeDiscarded"
-            ],
+            "messageIds": ["outcomeDiscarded"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -9995,9 +9420,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "discardedPureResult"
-            ],
+            "messageIds": ["discardedPureResult"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10035,9 +9458,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "globalListenerTargetAssertion"
-            ],
+            "messageIds": ["globalListenerTargetAssertion"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10075,9 +9496,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "identicalBranches"
-            ],
+            "messageIds": ["identicalBranches"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10116,9 +9535,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "implicitReturn"
-            ],
+            "messageIds": ["implicitReturn"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10156,9 +9573,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "loadTimeReadInImportCycle"
-            ],
+            "messageIds": ["loadTimeReadInImportCycle"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10196,9 +9611,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "leakedNumberRender"
-            ],
+            "messageIds": ["leakedNumberRender"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10236,9 +9649,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": false,
-            "messageIds": [
-                "loadTimeImportMetaPath"
-            ],
+            "messageIds": ["loadTimeImportMetaPath"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10256,9 +9667,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "mockOnModuleNamespace"
-            ],
+            "messageIds": ["mockOnModuleNamespace"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10296,9 +9705,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "nullishStrippedByAssertion"
-            ],
+            "messageIds": ["nullishStrippedByAssertion"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10337,9 +9744,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "exitAfterOutput"
-            ],
+            "messageIds": ["exitAfterOutput"],
             "swift": {
                 "verdict": "NotApplicable"
             }
@@ -10351,9 +9756,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "globalRegexTest"
-            ],
+            "messageIds": ["globalRegexTest"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10391,9 +9794,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "unclearedRaceTimeout"
-            ],
+            "messageIds": ["unclearedRaceTimeout"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10432,9 +9833,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "writeOnlyCollection"
-            ],
+            "messageIds": ["writeOnlyCollection"],
             "swift": {
                 "verdict": "Ported",
                 "swiftRule": "cohere-swift/correctness-no-write-only-collection"
@@ -10447,9 +9846,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "exitBeforeBlockingStandardStreams"
-            ],
+            "messageIds": ["exitBeforeBlockingStandardStreams"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10487,9 +9884,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "childProcessWithoutErrorListener"
-            ],
+            "messageIds": ["childProcessWithoutErrorListener"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10527,10 +9922,7 @@
             "origin": "house",
             "category": "correctness",
             "typeAware": true,
-            "messageIds": [
-                "bodyReadWithoutStatusCheck",
-                "responseDiscarded"
-            ],
+            "messageIds": ["bodyReadWithoutStatusCheck", "responseDiscarded"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10600,11 +9992,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "requireAliasName",
-                "requireDefaultStyle",
-                "requireNamespaceStyle"
-            ],
+            "messageIds": ["requireAliasName", "requireDefaultStyle", "requireNamespaceStyle"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10646,11 +10034,7 @@
             "origin": "house",
             "category": "import",
             "typeAware": false,
-            "messageIds": [
-                "requireCorrectAlias",
-                "requireNamespaceImport",
-                "requireNodePrefix"
-            ],
+            "messageIds": ["requireCorrectAlias", "requireNamespaceImport", "requireNodePrefix"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -10698,10 +10082,7 @@
                 "anchorsPaths": true,
                 "required": true
             },
-            "messageIds": [
-                "useAlias",
-                "useAliasInStrictRoot"
-            ],
+            "messageIds": ["useAlias", "useAliasInStrictRoot"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -10761,9 +10142,7 @@
             "origin": "house",
             "category": "performance",
             "typeAware": true,
-            "messageIds": [
-                "independentAwaitInLoop"
-            ],
+            "messageIds": ["independentAwaitInLoop"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10802,9 +10181,7 @@
             "origin": "house",
             "category": "security",
             "typeAware": true,
-            "messageIds": [
-                "interpolatedShellCommand"
-            ],
+            "messageIds": ["interpolatedShellCommand"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10843,10 +10220,7 @@
             "origin": "house",
             "category": "security",
             "typeAware": true,
-            "messageIds": [
-                "interpolatedSqlString",
-                "interpolatedSqlValue"
-            ],
+            "messageIds": ["interpolatedSqlString", "interpolatedSqlValue"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10884,9 +10258,7 @@
             "origin": "core",
             "upstreamName": "no-alert",
             "typeAware": true,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10920,9 +10292,7 @@
             "origin": "core",
             "upstreamName": "no-async-promise-executor",
             "typeAware": false,
-            "messageIds": [
-                "noAsyncPromiseExecutor"
-            ],
+            "messageIds": ["noAsyncPromiseExecutor"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -10956,9 +10326,7 @@
             "origin": "core",
             "upstreamName": "no-await-in-loop",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedAwait"
-            ]
+            "messageIds": ["unexpectedAwait"]
         },
         {
             "name": "no-bitwise",
@@ -10969,9 +10337,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ]
+            "messageIds": ["unexpected"]
         },
         {
             "name": "no-caller",
@@ -10979,9 +10345,7 @@
             "origin": "core",
             "upstreamName": "no-caller",
             "typeAware": false,
-            "messageIds": [
-                "noCaller"
-            ],
+            "messageIds": ["noCaller"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -11023,9 +10387,7 @@
             "origin": "core",
             "upstreamName": "no-case-declarations",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -11060,9 +10422,7 @@
             "origin": "core",
             "upstreamName": "no-class-assign",
             "typeAware": true,
-            "messageIds": [
-                "noClassAssign"
-            ],
+            "messageIds": ["noClassAssign"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -11104,9 +10464,7 @@
             "origin": "core",
             "upstreamName": "no-compare-neg-zero",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11143,9 +10501,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "condAssign"
-            ],
+            "messageIds": ["condAssign"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11179,9 +10535,7 @@
             "origin": "core",
             "upstreamName": "no-const-assign",
             "typeAware": true,
-            "messageIds": [
-                "noConstAssign"
-            ],
+            "messageIds": ["noConstAssign"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -11269,9 +10623,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11305,9 +10657,7 @@
             "origin": "core",
             "upstreamName": "no-constructor-return",
             "typeAware": false,
-            "messageIds": [
-                "noConstructorReturn"
-            ],
+            "messageIds": ["noConstructorReturn"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11341,9 +10691,7 @@
             "origin": "core",
             "upstreamName": "no-continue",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ]
+            "messageIds": ["unexpected"]
         },
         {
             "name": "no-control-regex",
@@ -11351,9 +10699,7 @@
             "origin": "core",
             "upstreamName": "no-control-regex",
             "typeAware": false,
-            "messageIds": [
-                "noControlRegex"
-            ],
+            "messageIds": ["noControlRegex"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11387,9 +10733,7 @@
             "origin": "core",
             "upstreamName": "no-debugger",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedDebugger"
-            ],
+            "messageIds": ["unexpectedDebugger"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -11424,9 +10768,7 @@
             "origin": "core",
             "upstreamName": "no-delete-var",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedDeleteVar"
-            ],
+            "messageIds": ["unexpectedDeleteVar"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11460,9 +10802,7 @@
             "origin": "core",
             "upstreamName": "no-div-regex",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -11501,9 +10841,7 @@
             "origin": "core",
             "upstreamName": "no-dupe-class-members",
             "typeAware": false,
-            "messageIds": [
-                "noDupeClassMembers"
-            ],
+            "messageIds": ["noDupeClassMembers"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -11545,9 +10883,7 @@
             "origin": "core",
             "upstreamName": "no-dupe-else-if",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11581,9 +10917,7 @@
             "origin": "core",
             "upstreamName": "no-duplicate-case",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11620,9 +10954,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -11664,10 +10996,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedBlock",
-                "unexpectedSwitch"
-            ],
+            "messageIds": ["unexpectedBlock", "unexpectedSwitch"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11701,9 +11030,7 @@
             "origin": "core",
             "upstreamName": "no-empty-character-class",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedEmptyCharacterClass"
-            ],
+            "messageIds": ["unexpectedEmptyCharacterClass"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11740,9 +11067,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -11784,10 +11109,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedArray",
-                "unexpectedObject"
-            ],
+            "messageIds": ["unexpectedArray", "unexpectedObject"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11821,9 +11143,7 @@
             "origin": "core",
             "upstreamName": "no-empty-static-block",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedEmptyStaticBlock"
-            ],
+            "messageIds": ["unexpectedEmptyStaticBlock"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11857,9 +11177,7 @@
             "origin": "core",
             "upstreamName": "no-eq-null",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ]
+            "messageIds": ["unexpected"]
         },
         {
             "name": "no-eval",
@@ -11870,9 +11188,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noEval"
-            ],
+            "messageIds": ["noEval"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -11914,9 +11230,7 @@
             "origin": "core",
             "upstreamName": "no-ex-assign",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedExceptionAssignment"
-            ],
+            "messageIds": ["unexpectedExceptionAssignment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11953,9 +11267,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -11989,9 +11301,7 @@
             "origin": "core",
             "upstreamName": "no-extra-bind",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -12033,10 +11343,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "redundantBooleanCall",
-                "redundantDoubleNegation"
-            ],
+            "messageIds": ["redundantBooleanCall", "redundantDoubleNegation"],
             "fixKind": "both",
             "sets": [
                 {
@@ -12075,9 +11382,7 @@
             "origin": "core",
             "upstreamName": "no-extra-label",
             "typeAware": false,
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -12119,11 +11424,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "case",
-                "default",
-                "unusedFallthroughComment"
-            ],
+            "messageIds": ["case", "default", "unusedFallthroughComment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12157,9 +11458,7 @@
             "origin": "core",
             "upstreamName": "no-func-assign",
             "typeAware": true,
-            "messageIds": [
-                "noFuncAssign"
-            ],
+            "messageIds": ["noFuncAssign"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -12204,9 +11503,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noGlobalAssign"
-            ],
+            "messageIds": ["noGlobalAssign"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12243,9 +11540,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "implicitCoercion"
-            ],
+            "messageIds": ["implicitCoercion"],
             "fixKind": "both",
             "sets": [
                 {
@@ -12287,11 +11582,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "globalLexicalBinding",
-                "globalNonLexicalBinding",
-                "globalVariableLeak"
-            ],
+            "messageIds": ["globalLexicalBinding", "globalNonLexicalBinding", "globalVariableLeak"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -12305,10 +11596,7 @@
             "origin": "core",
             "upstreamName": "no-implied-eval",
             "typeAware": true,
-            "messageIds": [
-                "execScript",
-                "impliedEval"
-            ]
+            "messageIds": ["execScript", "impliedEval"]
         },
         {
             "name": "no-import-assign",
@@ -12316,9 +11604,7 @@
             "origin": "core",
             "upstreamName": "no-import-assign",
             "typeAware": true,
-            "messageIds": [
-                "noImportAssign"
-            ],
+            "messageIds": ["noImportAssign"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -12363,9 +11649,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedInlineComment"
-            ]
+            "messageIds": ["unexpectedInlineComment"]
         },
         {
             "name": "no-inner-declarations",
@@ -12376,9 +11660,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "moveDeclToRoot"
-            ],
+            "messageIds": ["moveDeclToRoot"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12419,9 +11701,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidRegexp"
-            ],
+            "messageIds": ["invalidRegexp"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12458,9 +11738,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedThis"
-            ]
+            "messageIds": ["unexpectedThis"]
         },
         {
             "name": "no-irregular-whitespace",
@@ -12471,9 +11749,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noIrregularWhitespace"
-            ],
+            "messageIds": ["noIrregularWhitespace"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12507,9 +11783,7 @@
             "origin": "core",
             "upstreamName": "no-iterator",
             "typeAware": false,
-            "messageIds": [
-                "noIterator"
-            ],
+            "messageIds": ["noIterator"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -12552,9 +11826,7 @@
             "origin": "core",
             "upstreamName": "no-label-var",
             "typeAware": true,
-            "messageIds": [
-                "identifierClashWithLabel"
-            ],
+            "messageIds": ["identifierClashWithLabel"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12595,11 +11867,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedLabel",
-                "unexpectedLabelInBreak",
-                "unexpectedLabelInContinue"
-            ]
+            "messageIds": ["unexpectedLabel", "unexpectedLabelInBreak", "unexpectedLabelInContinue"]
         },
         {
             "name": "no-lone-blocks",
@@ -12607,10 +11875,7 @@
             "origin": "core",
             "upstreamName": "no-lone-blocks",
             "typeAware": false,
-            "messageIds": [
-                "redundantBlock",
-                "redundantNestedBlock"
-            ],
+            "messageIds": ["redundantBlock", "redundantNestedBlock"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12648,9 +11913,7 @@
             "origin": "core",
             "upstreamName": "no-lonely-if",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedLonelyIf"
-            ],
+            "messageIds": ["unexpectedLonelyIf"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -12689,9 +11952,7 @@
             "origin": "core",
             "upstreamName": "no-loop-func",
             "typeAware": true,
-            "messageIds": [
-                "unsafeRefs"
-            ]
+            "messageIds": ["unsafeRefs"]
         },
         {
             "name": "no-loss-of-precision",
@@ -12699,9 +11960,7 @@
             "origin": "core",
             "upstreamName": "no-loss-of-precision",
             "typeAware": false,
-            "messageIds": [
-                "noLossOfPrecision"
-            ],
+            "messageIds": ["noLossOfPrecision"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12783,9 +12042,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedChain"
-            ],
+            "messageIds": ["unexpectedChain"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12823,9 +12080,7 @@
             "origin": "core",
             "upstreamName": "no-multi-str",
             "typeAware": false,
-            "messageIds": [
-                "multilineString"
-            ],
+            "messageIds": ["multilineString"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12863,9 +12118,7 @@
             "origin": "core",
             "upstreamName": "no-negated-condition",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedNegated"
-            ]
+            "messageIds": ["unexpectedNegated"]
         },
         {
             "name": "no-new",
@@ -12873,9 +12126,7 @@
             "origin": "core",
             "upstreamName": "no-new",
             "typeAware": false,
-            "messageIds": [
-                "noNewStatement"
-            ],
+            "messageIds": ["noNewStatement"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12913,9 +12164,7 @@
             "origin": "core",
             "upstreamName": "no-new-func",
             "typeAware": true,
-            "messageIds": [
-                "noFunctionConstructor"
-            ],
+            "messageIds": ["noFunctionConstructor"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -12949,9 +12198,7 @@
             "origin": "core",
             "upstreamName": "no-new-native-nonconstructor",
             "typeAware": true,
-            "messageIds": [
-                "noNewNativeNonconstructor"
-            ],
+            "messageIds": ["noNewNativeNonconstructor"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -12993,9 +12240,7 @@
             "origin": "core",
             "upstreamName": "no-new-wrappers",
             "typeAware": true,
-            "messageIds": [
-                "noNewWrappers"
-            ],
+            "messageIds": ["noNewWrappers"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13029,9 +12274,7 @@
             "origin": "core",
             "upstreamName": "no-nonoctal-decimal-escape",
             "typeAware": false,
-            "messageIds": [
-                "nonoctalDecimalEscape"
-            ],
+            "messageIds": ["nonoctalDecimalEscape"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -13066,10 +12309,7 @@
             "origin": "core",
             "upstreamName": "no-obj-calls",
             "typeAware": true,
-            "messageIds": [
-                "unexpectedCall",
-                "unexpectedRefCall"
-            ],
+            "messageIds": ["unexpectedCall", "unexpectedRefCall"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -13111,9 +12351,7 @@
             "origin": "core",
             "upstreamName": "no-object-constructor",
             "typeAware": true,
-            "messageIds": [
-                "preferLiteral"
-            ],
+            "messageIds": ["preferLiteral"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -13152,9 +12390,7 @@
             "origin": "core",
             "upstreamName": "no-octal",
             "typeAware": false,
-            "messageIds": [
-                "noOctal"
-            ],
+            "messageIds": ["noOctal"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13188,9 +12424,7 @@
             "origin": "core",
             "upstreamName": "no-octal-escape",
             "typeAware": false,
-            "messageIds": [
-                "octalEscapeSequence"
-            ],
+            "messageIds": ["octalEscapeSequence"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13227,10 +12461,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "assignmentToFunctionParam",
-                "assignmentToFunctionParamProp"
-            ],
+            "messageIds": ["assignmentToFunctionParam", "assignmentToFunctionParamProp"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13271,9 +12502,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedUnaryOp"
-            ]
+            "messageIds": ["unexpectedUnaryOp"]
         },
         {
             "name": "no-promise-executor-return",
@@ -13284,9 +12513,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "returnsValue"
-            ],
+            "messageIds": ["returnsValue"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -13321,9 +12548,7 @@
             "origin": "core",
             "upstreamName": "no-proto",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedProto"
-            ],
+            "messageIds": ["unexpectedProto"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13357,9 +12582,7 @@
             "origin": "core",
             "upstreamName": "no-prototype-builtins",
             "typeAware": false,
-            "messageIds": [
-                "noPrototypeBuiltins"
-            ],
+            "messageIds": ["noPrototypeBuiltins"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13393,9 +12616,7 @@
             "origin": "core",
             "upstreamName": "no-regex-spaces",
             "typeAware": false,
-            "messageIds": [
-                "multipleSpaces"
-            ],
+            "messageIds": ["multipleSpaces"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -13433,10 +12654,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "restrictedDefault",
-                "restrictedNamed"
-            ]
+            "messageIds": ["restrictedDefault", "restrictedNamed"]
         },
         {
             "name": "no-restricted-globals",
@@ -13447,10 +12665,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "customMessage",
-                "defaultMessage"
-            ],
+            "messageIds": ["customMessage", "defaultMessage"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13521,10 +12736,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "restrictedObjectProperty",
-                "restrictedProperty"
-            ],
+            "messageIds": ["restrictedObjectProperty", "restrictedProperty"],
             "sets": [
                 {
                     "set": "cohere:system-inc/base",
@@ -13545,10 +12757,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "arrowAssignment",
-                "returnAssignment"
-            ],
+            "messageIds": ["arrowAssignment", "returnAssignment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13586,9 +12795,7 @@
             "origin": "core",
             "upstreamName": "no-script-url",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedScriptURL"
-            ],
+            "messageIds": ["unexpectedScriptURL"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13625,9 +12832,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "selfAssignment"
-            ],
+            "messageIds": ["selfAssignment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13661,9 +12866,7 @@
             "origin": "core",
             "upstreamName": "no-self-compare",
             "typeAware": false,
-            "messageIds": [
-                "comparingToSelf"
-            ],
+            "messageIds": ["comparingToSelf"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13700,9 +12903,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedCommaExpression"
-            ],
+            "messageIds": ["unexpectedCommaExpression"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13740,9 +12941,7 @@
             "origin": "core",
             "upstreamName": "no-setter-return",
             "typeAware": true,
-            "messageIds": [
-                "noSetterReturn"
-            ],
+            "messageIds": ["noSetterReturn"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -13787,9 +12986,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "shadowingRestrictedName"
-            ],
+            "messageIds": ["shadowingRestrictedName"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13823,9 +13020,7 @@
             "origin": "core",
             "upstreamName": "no-sparse-arrays",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedSparseArray"
-            ],
+            "messageIds": ["unexpectedSparseArray"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13859,9 +13054,7 @@
             "origin": "core",
             "upstreamName": "no-template-curly-in-string",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedTemplateExpression"
-            ],
+            "messageIds": ["unexpectedTemplateExpression"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13895,9 +13088,7 @@
             "origin": "core",
             "upstreamName": "no-this-before-super",
             "typeAware": false,
-            "messageIds": [
-                "thisBeforeSuper"
-            ],
+            "messageIds": ["thisBeforeSuper"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -13939,10 +13130,7 @@
             "origin": "core",
             "upstreamName": "no-throw-literal",
             "typeAware": true,
-            "messageIds": [
-                "object",
-                "undef"
-            ],
+            "messageIds": ["object", "undef"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -13976,9 +13164,7 @@
             "origin": "core",
             "upstreamName": "no-unassigned-vars",
             "typeAware": true,
-            "messageIds": [
-                "noUnassignedVars"
-            ],
+            "messageIds": ["noUnassignedVars"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14012,9 +13198,7 @@
             "origin": "core",
             "upstreamName": "no-undef-init",
             "typeAware": true,
-            "messageIds": [
-                "unnecessaryUndefinedInit"
-            ],
+            "messageIds": ["unnecessaryUndefinedInit"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14056,9 +13240,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedUnderscore"
-            ]
+            "messageIds": ["unexpectedUnderscore"]
         },
         {
             "name": "no-unexpected-multiline",
@@ -14066,12 +13248,7 @@
             "origin": "core",
             "upstreamName": "no-unexpected-multiline",
             "typeAware": false,
-            "messageIds": [
-                "division",
-                "function",
-                "property",
-                "taggedTemplate"
-            ],
+            "messageIds": ["division", "function", "property", "taggedTemplate"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14105,9 +13282,7 @@
             "origin": "core",
             "upstreamName": "no-unmodified-loop-condition",
             "typeAware": true,
-            "messageIds": [
-                "loopConditionNotModified"
-            ],
+            "messageIds": ["loopConditionNotModified"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14144,10 +13319,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unnecessaryConditionalAssignment",
-                "unnecessaryConditionalExpression"
-            ],
+            "messageIds": ["unnecessaryConditionalAssignment", "unnecessaryConditionalExpression"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14189,9 +13361,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalid"
-            ],
+            "messageIds": ["invalid"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14225,12 +13395,7 @@
             "origin": "core",
             "upstreamName": "no-unsafe-finally",
             "typeAware": false,
-            "messageIds": [
-                "unsafeBreak",
-                "unsafeContinue",
-                "unsafeReturn",
-                "unsafeThrow"
-            ],
+            "messageIds": ["unsafeBreak", "unsafeContinue", "unsafeReturn", "unsafeThrow"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14267,9 +13432,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpected"
-            ],
+            "messageIds": ["unexpected"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -14315,10 +13478,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unsafeArithmetic",
-                "unsafeOptionalChain"
-            ],
+            "messageIds": ["unsafeArithmetic", "unsafeOptionalChain"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14352,9 +13512,7 @@
             "origin": "core",
             "upstreamName": "no-unused-labels",
             "typeAware": false,
-            "messageIds": [
-                "unusedLabel"
-            ],
+            "messageIds": ["unusedLabel"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14393,9 +13551,7 @@
             "origin": "core",
             "upstreamName": "no-unused-private-class-members",
             "typeAware": false,
-            "messageIds": [
-                "noUnusedPrivateClassMember"
-            ]
+            "messageIds": ["noUnusedPrivateClassMember"]
         },
         {
             "name": "no-use-before-define",
@@ -14406,9 +13562,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "usedBeforeDefined"
-            ],
+            "messageIds": ["usedBeforeDefined"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14446,9 +13600,7 @@
             "origin": "core",
             "upstreamName": "no-useless-assignment",
             "typeAware": true,
-            "messageIds": [
-                "noUselessAssignment"
-            ],
+            "messageIds": ["noUselessAssignment"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14482,13 +13634,7 @@
             "origin": "core",
             "upstreamName": "no-useless-backreference",
             "typeAware": true,
-            "messageIds": [
-                "backward",
-                "disjunctive",
-                "forward",
-                "intoNegativeLookaround",
-                "nested"
-            ],
+            "messageIds": ["backward", "disjunctive", "forward", "intoNegativeLookaround", "nested"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14522,9 +13668,7 @@
             "origin": "core",
             "upstreamName": "no-useless-call",
             "typeAware": false,
-            "messageIds": [
-                "unnecessaryCall"
-            ],
+            "messageIds": ["unnecessaryCall"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14558,10 +13702,7 @@
             "origin": "core",
             "upstreamName": "no-useless-catch",
             "typeAware": false,
-            "messageIds": [
-                "unnecessaryCatch",
-                "unnecessaryCatchClause"
-            ],
+            "messageIds": ["unnecessaryCatch", "unnecessaryCatchClause"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14598,9 +13739,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unnecessarilyComputedProperty"
-            ],
+            "messageIds": ["unnecessarilyComputedProperty"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14639,9 +13778,7 @@
             "origin": "core",
             "upstreamName": "no-useless-concat",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedConcat"
-            ],
+            "messageIds": ["unexpectedConcat"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14679,9 +13816,7 @@
             "origin": "core",
             "upstreamName": "no-useless-constructor",
             "typeAware": false,
-            "messageIds": [
-                "noUselessConstructor"
-            ],
+            "messageIds": ["noUselessConstructor"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -14723,9 +13858,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noUselessEscape"
-            ],
+            "messageIds": ["noUselessEscape"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14767,9 +13900,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unnecessarilyRenamed"
-            ],
+            "messageIds": ["unnecessarilyRenamed"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14808,9 +13939,7 @@
             "origin": "core",
             "upstreamName": "no-useless-return",
             "typeAware": true,
-            "messageIds": [
-                "unnecessaryReturn"
-            ],
+            "messageIds": ["unnecessaryReturn"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -14849,9 +13978,7 @@
             "origin": "core",
             "upstreamName": "no-var",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedVar"
-            ],
+            "messageIds": ["unexpectedVar"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -14892,9 +14019,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedComment"
-            ]
+            "messageIds": ["unexpectedComment"]
         },
         {
             "name": "no-with",
@@ -14902,9 +14027,7 @@
             "origin": "core",
             "upstreamName": "no-with",
             "typeAware": false,
-            "messageIds": [
-                "noWith"
-            ],
+            "messageIds": ["noWith"],
             "sets": [
                 {
                     "set": "cohere:adamic",
@@ -15049,10 +14172,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "replaced",
-                "unexpected"
-            ],
+            "messageIds": ["replaced", "unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15094,9 +14214,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferArrowCallback"
-            ],
+            "messageIds": ["preferArrowCallback"],
             "fixKind": "fix"
         },
         {
@@ -15108,9 +14226,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferConst"
-            ],
+            "messageIds": ["preferConst"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15152,9 +14268,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "preferDestructuring"
-            ],
+            "messageIds": ["preferDestructuring"],
             "fixKind": "fix"
         },
         {
@@ -15163,9 +14277,7 @@
             "origin": "core",
             "upstreamName": "prefer-exponentiation-operator",
             "typeAware": true,
-            "messageIds": [
-                "useExponentiation"
-            ],
+            "messageIds": ["useExponentiation"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15204,9 +14316,7 @@
             "origin": "core",
             "upstreamName": "prefer-numeric-literals",
             "typeAware": true,
-            "messageIds": [
-                "useLiteral"
-            ],
+            "messageIds": ["useLiteral"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15245,9 +14355,7 @@
             "origin": "core",
             "upstreamName": "prefer-object-has-own",
             "typeAware": true,
-            "messageIds": [
-                "useHasOwn"
-            ],
+            "messageIds": ["useHasOwn"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15286,10 +14394,7 @@
             "origin": "core",
             "upstreamName": "prefer-object-spread",
             "typeAware": true,
-            "messageIds": [
-                "useLiteralMessage",
-                "useSpreadMessage"
-            ],
+            "messageIds": ["useLiteralMessage", "useSpreadMessage"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15331,9 +14436,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "rejectAnError"
-            ]
+            "messageIds": ["rejectAnError"]
         },
         {
             "name": "prefer-regex-literals",
@@ -15344,11 +14447,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unexpectedRedundantRegExp",
-                "unexpectedRedundantRegExpWithFlags",
-                "unexpectedRegExp"
-            ],
+            "messageIds": ["unexpectedRedundantRegExp", "unexpectedRedundantRegExpWithFlags", "unexpectedRegExp"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -15387,9 +14486,7 @@
             "origin": "core",
             "upstreamName": "prefer-rest-params",
             "typeAware": true,
-            "messageIds": [
-                "preferRestParams"
-            ],
+            "messageIds": ["preferRestParams"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -15427,9 +14524,7 @@
             "origin": "core",
             "upstreamName": "prefer-spread",
             "typeAware": false,
-            "messageIds": [
-                "preferSpread"
-            ],
+            "messageIds": ["preferSpread"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -15467,9 +14562,7 @@
             "origin": "core",
             "upstreamName": "prefer-template",
             "typeAware": false,
-            "messageIds": [
-                "unexpectedStringConcatenation"
-            ],
+            "messageIds": ["unexpectedStringConcatenation"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -15555,11 +14648,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidRadix",
-                "missingParameters",
-                "missingRadix"
-            ],
+            "messageIds": ["invalidRadix", "missingParameters", "missingRadix"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -15602,9 +14691,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidTypeConfiguration"
-            ],
+            "messageIds": ["invalidTypeConfiguration"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15622,9 +14709,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "jsxInTryStatement"
-            ],
+            "messageIds": ["jsxInTryStatement"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15677,10 +14762,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidGatingDirective",
-                "multipleGatingDirectives"
-            ],
+            "messageIds": ["invalidGatingDirective", "multipleGatingDirectives"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15698,9 +14780,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "globalReassignment"
-            ],
+            "messageIds": ["globalReassignment"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15741,9 +14821,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "incompatibleLibrary"
-            ],
+            "messageIds": ["incompatibleLibrary"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15761,9 +14839,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noDerivingStateInEffects"
-            ],
+            "messageIds": ["noDerivingStateInEffects"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15781,10 +14857,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preserveManualMemoizationDependencyMutable",
-                "preserveManualMemoizationValueUnmemoized"
-            ],
+            "messageIds": ["preserveManualMemoizationDependencyMutable", "preserveManualMemoizationValueUnmemoized"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15802,9 +14875,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "impureFunctionCall"
-            ],
+            "messageIds": ["impureFunctionCall"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15822,12 +14893,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "functionAccessesRef",
-                "refPassedToFunction",
-                "refUpdate",
-                "refValueAccess"
-            ],
+            "messageIds": ["functionAccessesRef", "refPassedToFunction", "refUpdate", "refValueAccess"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15873,9 +14939,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "setStateInEffect"
-            ],
+            "messageIds": ["setStateInEffect"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15893,10 +14957,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "setStateInRender",
-                "setStateInUseMemo"
-            ],
+            "messageIds": ["setStateInRender", "setStateInUseMemo"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15914,9 +14975,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "staticComponents"
-            ],
+            "messageIds": ["staticComponents"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15934,11 +14993,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unsupportedEval",
-                "unsupportedInlineClass",
-                "unsupportedWith"
-            ],
+            "messageIds": ["unsupportedEval", "unsupportedInlineClass", "unsupportedWith"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -15982,10 +15037,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "useMemoCallbackReturnsNothing",
-                "useMemoResultUnused"
-            ],
+            "messageIds": ["useMemoCallbackReturnsNothing", "useMemoResultUnused"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16004,9 +15056,7 @@
                 "elements": "one",
                 "required": true
             },
-            "messageIds": [
-                "patternMismatch"
-            ]
+            "messageIds": ["patternMismatch"]
         },
         {
             "name": "react/button-has-type",
@@ -16018,12 +15068,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "complexType",
-                "forbiddenValue",
-                "invalidValue",
-                "missingType"
-            ],
+            "messageIds": ["complexType", "forbiddenValue", "invalidValue", "missingType"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16041,10 +15086,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "exclusiveCheckedAttribute",
-                "missingProperty"
-            ],
+            "messageIds": ["exclusiveCheckedAttribute", "missingProperty"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16062,10 +15104,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "defaultHasNoType",
-                "requiredHasDefault"
-            ],
+            "messageIds": ["defaultHasNoType", "requiredHasDefault"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16083,10 +15122,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noContextDisplayName",
-                "noDisplayName"
-            ],
+            "messageIds": ["noContextDisplayName", "noDisplayName"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16104,9 +15140,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "propIsForbidden"
-            ],
+            "messageIds": ["propIsForbidden"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16124,10 +15158,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "forbiddenElement",
-                "forbiddenElement_message"
-            ],
+            "messageIds": ["forbiddenElement", "forbiddenElement_message"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16145,9 +15176,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "forbiddenPropType"
-            ],
+            "messageIds": ["forbiddenPropType"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16165,9 +15194,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "forbiddenPropType"
-            ],
+            "messageIds": ["forbiddenPropType"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16182,9 +15209,7 @@
             "origin": "react",
             "upstreamName": "react/forward-ref-uses-ref",
             "typeAware": false,
-            "messageIds": [
-                "forwardRefUsesRef"
-            ],
+            "messageIds": ["forwardRefUsesRef"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -16200,11 +15225,7 @@
             "origin": "react",
             "upstreamName": "react/iframe-missing-sandbox",
             "typeAware": true,
-            "messageIds": [
-                "attributeMissing",
-                "invalidCombination",
-                "invalidValue"
-            ],
+            "messageIds": ["attributeMissing", "invalidCombination", "invalidValue"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16222,10 +15243,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "MissingCurly",
-                "UnnecessaryCurly"
-            ],
+            "messageIds": ["MissingCurly", "UnnecessaryCurly"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -16244,10 +15262,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "preferFragment",
-                "preferPragma"
-            ],
+            "messageIds": ["preferFragment", "preferPragma"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16287,9 +15302,7 @@
             "origin": "react",
             "upstreamName": "react/jsx-no-comment-textnodes",
             "typeAware": false,
-            "messageIds": [
-                "putCommentInBraces"
-            ],
+            "messageIds": ["putCommentInBraces"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16329,9 +15342,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "jsxNoDuplicateProps"
-            ],
+            "messageIds": ["jsxNoDuplicateProps"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16349,9 +15360,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "noScriptURL"
-            ],
+            "messageIds": ["noScriptURL"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16369,10 +15378,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noTargetBlankWithoutNoopener",
-                "noTargetBlankWithoutNoreferrer"
-            ],
+            "messageIds": ["noTargetBlankWithoutNoopener", "noTargetBlankWithoutNoreferrer"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -16391,9 +15397,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "jsxIdentifierNotDefined"
-            ],
+            "messageIds": ["jsxIdentifierNotDefined"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16411,10 +15415,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "ChildOfHtmlElement",
-                "NeedsMoreChildren"
-            ],
+            "messageIds": ["ChildOfHtmlElement", "NeedsMoreChildren"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -16430,10 +15431,7 @@
             "origin": "react",
             "upstreamName": "react/jsx-props-no-spread-multi",
             "typeAware": false,
-            "messageIds": [
-                "jsxPropsNoSpreadMultiIdentifier",
-                "jsxPropsNoSpreadMultiMemberExpression"
-            ],
+            "messageIds": ["jsxPropsNoSpreadMultiIdentifier", "jsxPropsNoSpreadMultiMemberExpression"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16448,9 +15446,7 @@
             "origin": "react",
             "upstreamName": "react/no-access-state-in-setstate",
             "typeAware": false,
-            "messageIds": [
-                "useCallback"
-            ],
+            "messageIds": ["useCallback"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16465,9 +15461,7 @@
             "origin": "react",
             "upstreamName": "react/no-adjacent-inline-elements",
             "typeAware": true,
-            "messageIds": [
-                "inlineElement"
-            ],
+            "messageIds": ["inlineElement"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16482,9 +15476,7 @@
             "origin": "react",
             "upstreamName": "react/no-array-index-key",
             "typeAware": true,
-            "messageIds": [
-                "noArrayIndex"
-            ],
+            "messageIds": ["noArrayIndex"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16499,9 +15491,7 @@
             "origin": "react",
             "upstreamName": "react/no-arrow-function-lifecycle",
             "typeAware": false,
-            "messageIds": [
-                "lifecycle"
-            ],
+            "messageIds": ["lifecycle"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -16520,11 +15510,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "nestFunction",
-                "noChildrenProp",
-                "passFunctionAsArgs"
-            ],
+            "messageIds": ["nestFunction", "noChildrenProp", "passFunctionAsArgs"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16542,9 +15528,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "dangerousProp"
-            ],
+            "messageIds": ["dangerousProp"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16559,9 +15543,7 @@
             "origin": "react",
             "upstreamName": "react/no-danger-with-children",
             "typeAware": true,
-            "messageIds": [
-                "noDangerWithChildren"
-            ],
+            "messageIds": ["noDangerWithChildren"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16576,9 +15558,7 @@
             "origin": "react",
             "upstreamName": "react/no-deprecated",
             "typeAware": false,
-            "messageIds": [
-                "deprecated"
-            ],
+            "messageIds": ["deprecated"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16596,9 +15576,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noDidMountSetState"
-            ],
+            "messageIds": ["noDidMountSetState"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16616,9 +15594,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noSetStateInComponentDidUpdate"
-            ],
+            "messageIds": ["noSetStateInComponentDidUpdate"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16633,9 +15609,7 @@
             "origin": "react",
             "upstreamName": "react/no-direct-mutation-state",
             "typeAware": false,
-            "messageIds": [
-                "noDirectMutationState"
-            ],
+            "messageIds": ["noDirectMutationState"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16650,9 +15624,7 @@
             "origin": "react",
             "upstreamName": "react/no-find-dom-node",
             "typeAware": false,
-            "messageIds": [
-                "noFindDOMNode"
-            ],
+            "messageIds": ["noFindDOMNode"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16695,9 +15667,7 @@
             "origin": "react",
             "upstreamName": "react/no-is-mounted",
             "typeAware": false,
-            "messageIds": [
-                "noIsMounted"
-            ],
+            "messageIds": ["noIsMounted"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16715,9 +15685,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "onlyOneComponent"
-            ],
+            "messageIds": ["onlyOneComponent"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16732,9 +15700,7 @@
             "origin": "react",
             "upstreamName": "react/no-namespace",
             "typeAware": true,
-            "messageIds": [
-                "noNamespace"
-            ],
+            "messageIds": ["noNamespace"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16749,9 +15715,7 @@
             "origin": "react",
             "upstreamName": "react/no-object-type-as-default-prop",
             "typeAware": true,
-            "messageIds": [
-                "forbiddenTypeDefaultParam"
-            ],
+            "messageIds": ["forbiddenTypeDefaultParam"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16766,9 +15730,7 @@
             "origin": "react",
             "upstreamName": "react/no-redundant-should-component-update",
             "typeAware": false,
-            "messageIds": [
-                "noShouldCompUpdate"
-            ],
+            "messageIds": ["noShouldCompUpdate"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16783,9 +15745,7 @@
             "origin": "react",
             "upstreamName": "react/no-render-return-value",
             "typeAware": false,
-            "messageIds": [
-                "noRenderReturnValue"
-            ],
+            "messageIds": ["noRenderReturnValue"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16800,9 +15760,7 @@
             "origin": "react",
             "upstreamName": "react/no-set-state",
             "typeAware": false,
-            "messageIds": [
-                "noSetState"
-            ],
+            "messageIds": ["noSetState"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16820,10 +15778,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "stringInRefDeprecated",
-                "thisRefsDeprecated"
-            ],
+            "messageIds": ["stringInRefDeprecated", "thisRefsDeprecated"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16838,9 +15793,7 @@
             "origin": "react",
             "upstreamName": "react/no-this-in-sfc",
             "typeAware": false,
-            "messageIds": [
-                "noThisInSfc"
-            ],
+            "messageIds": ["noThisInSfc"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16882,10 +15835,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unescapedEntity",
-                "unescapedEntityAlts"
-            ],
+            "messageIds": ["unescapedEntity", "unescapedEntityAlts"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -16904,12 +15854,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "dataLowercaseRequired",
-                "invalidPropOnTag",
-                "unknownProp",
-                "unknownPropWithStandardName"
-            ],
+            "messageIds": ["dataLowercaseRequired", "invalidPropOnTag", "unknownProp", "unknownPropWithStandardName"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -16928,11 +15873,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unsafeComponentWillMount",
-                "unsafeComponentWillReceiveProps",
-                "unsafeComponentWillUpdate"
-            ],
+            "messageIds": ["unsafeComponentWillMount", "unsafeComponentWillReceiveProps", "unsafeComponentWillUpdate"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16950,9 +15891,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unstableNestedComponent"
-            ],
+            "messageIds": ["unstableNestedComponent"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16967,10 +15906,7 @@
             "origin": "react",
             "upstreamName": "react/no-unused-class-component-methods",
             "typeAware": false,
-            "messageIds": [
-                "unused",
-                "unusedWithClass"
-            ],
+            "messageIds": ["unused", "unusedWithClass"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -16985,9 +15921,7 @@
             "origin": "react",
             "upstreamName": "react/no-unused-state",
             "typeAware": false,
-            "messageIds": [
-                "unusedStateField"
-            ],
+            "messageIds": ["unusedStateField"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17005,9 +15939,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noSetStateInComponentWillUpdate"
-            ],
+            "messageIds": ["noSetStateInComponentWillUpdate"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17025,10 +15957,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "shouldUseCreateClass",
-                "shouldUseES6Class"
-            ],
+            "messageIds": ["shouldUseCreateClass", "shouldUseES6Class"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17046,9 +15975,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "componentShouldBePure"
-            ],
+            "messageIds": ["componentShouldBePure"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17066,9 +15993,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "noShouldComponentUpdate"
-            ],
+            "messageIds": ["noShouldComponentUpdate"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17083,9 +16008,7 @@
             "origin": "react",
             "upstreamName": "react/require-render-return",
             "typeAware": false,
-            "messageIds": [
-                "noRenderReturn"
-            ],
+            "messageIds": ["noRenderReturn"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17103,9 +16026,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "notSelfClosing"
-            ],
+            "messageIds": ["notSelfClosing"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -17124,9 +16045,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "unsortedProps"
-            ]
+            "messageIds": ["unsortedProps"]
         },
         {
             "name": "react/sort-default-props",
@@ -17138,9 +16057,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "propsNotSorted"
-            ],
+            "messageIds": ["propsNotSorted"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17158,10 +16075,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "stateInitClassProp",
-                "stateInitConstructor"
-            ],
+            "messageIds": ["stateInitClassProp", "stateInitConstructor"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17179,11 +16093,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "declareOutsideClass",
-                "notGetterClassFunc",
-                "notStaticClassProp"
-            ],
+            "messageIds": ["declareOutsideClass", "notGetterClassFunc", "notStaticClassProp"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17201,9 +16111,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "stylePropNotObject"
-            ],
+            "messageIds": ["stylePropNotObject"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17218,9 +16126,7 @@
             "origin": "react",
             "upstreamName": "react/void-dom-elements-no-children",
             "typeAware": false,
-            "messageIds": [
-                "voidDomElementsNoChildren"
-            ],
+            "messageIds": ["voidDomElementsNoChildren"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17237,10 +16143,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "nonAtomicObjectUpdate",
-                "nonAtomicUpdate"
-            ]
+            "messageIds": ["nonAtomicObjectUpdate", "nonAtomicUpdate"]
         },
         {
             "name": "require-await",
@@ -17248,9 +16151,7 @@
             "origin": "core",
             "upstreamName": "require-await",
             "typeAware": true,
-            "messageIds": [
-                "missingAwait"
-            ],
+            "messageIds": ["missingAwait"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -17285,9 +16186,7 @@
             "origin": "core",
             "upstreamName": "require-yield",
             "typeAware": false,
-            "messageIds": [
-                "missingYield"
-            ],
+            "messageIds": ["missingYield"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -17324,9 +16223,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "sortVars"
-            ],
+            "messageIds": ["sortVars"],
             "fixKind": "fix"
         },
         {
@@ -17389,9 +16286,7 @@
             "origin": "house",
             "category": "boundary",
             "typeAware": false,
-            "messageIds": [
-                "forbiddenThemeValue"
-            ],
+            "messageIds": ["forbiddenThemeValue"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17409,9 +16304,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "requireMatchingFileName"
-            ],
+            "messageIds": ["requireMatchingFileName"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17430,9 +16323,7 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": false,
-            "messageIds": [
-                "importsNotOrganized"
-            ],
+            "messageIds": ["importsNotOrganized"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -17474,9 +16365,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "noDirectFetch"
-            ],
+            "messageIds": ["noDirectFetch"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17494,11 +16383,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "noDirectApollo",
-                "noDirectGraphqlImport",
-                "noDirectTanStackQuery"
-            ],
+            "messageIds": ["noDirectApollo", "noDirectGraphqlImport", "noDirectTanStackQuery"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17516,9 +16401,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "noInvalidateCacheInOnSuccess"
-            ],
+            "messageIds": ["noInvalidateCacheInOnSuccess"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17558,9 +16441,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "noStringLiteralGraphQlQuery"
-            ],
+            "messageIds": ["noStringLiteralGraphQlQuery"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17600,10 +16481,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "fileShouldEndWithRequest",
-                "hookShouldEndWithRequest"
-            ],
+            "messageIds": ["fileShouldEndWithRequest", "hookShouldEndWithRequest"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17621,10 +16499,7 @@
             "origin": "house",
             "category": "network",
             "typeAware": false,
-            "messageIds": [
-                "inlineVariablesType",
-                "unnecessaryVariablesDestructuring"
-            ],
+            "messageIds": ["inlineVariablesType", "unnecessaryVariablesDestructuring"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17642,10 +16517,7 @@
             "origin": "house",
             "category": "next",
             "typeAware": false,
-            "messageIds": [
-                "nearMissRouteExport",
-                "pagesRouterExport"
-            ],
+            "messageIds": ["nearMissRouteExport", "pagesRouterExport"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17663,9 +16535,7 @@
             "origin": "house",
             "category": "next",
             "typeAware": false,
-            "messageIds": [
-                "pageStateRemounts"
-            ],
+            "messageIds": ["pageStateRemounts"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17683,10 +16553,7 @@
             "origin": "house",
             "category": "next",
             "typeAware": false,
-            "messageIds": [
-                "useParamsNotParameters",
-                "useSearchParamsNotSearchParameters"
-            ],
+            "messageIds": ["useParamsNotParameters", "useSearchParamsNotSearchParameters"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -17705,11 +16572,7 @@
             "origin": "house",
             "category": "next",
             "typeAware": false,
-            "messageIds": [
-                "pageDefaultExportInline",
-                "pageDefaultExportNameSuffix",
-                "pageRequireDefaultExport"
-            ],
+            "messageIds": ["pageDefaultExportInline", "pageDefaultExportNameSuffix", "pageRequireDefaultExport"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17727,9 +16590,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "noConstAssignment"
-            ],
+            "messageIds": ["noConstAssignment"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17771,9 +16632,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "noDisplayNameAssignment"
-            ],
+            "messageIds": ["noDisplayNameAssignment"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17791,10 +16650,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "noForwardRefCall",
-                "noForwardRefImport"
-            ],
+            "messageIds": ["noForwardRefCall", "noForwardRefImport"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17812,9 +16668,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "noSeparateNamedExport"
-            ],
+            "messageIds": ["noSeparateNamedExport"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -17833,9 +16687,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "componentRequiresNamedExport"
-            ],
+            "messageIds": ["componentRequiresNamedExport"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17853,9 +16705,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": false,
-            "messageIds": [
-                "usePropertiesNotProps"
-            ],
+            "messageIds": ["usePropertiesNotProps"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -17874,11 +16724,7 @@
             "origin": "house",
             "category": "react-component",
             "typeAware": true,
-            "messageIds": [
-                "useComponentPropertyTypeSuffix",
-                "useInterfaceSuffix",
-                "useTypeAliasSuffix"
-            ],
+            "messageIds": ["useComponentPropertyTypeSuffix", "useInterfaceSuffix", "useTypeAliasSuffix"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -17914,9 +16760,7 @@
             "origin": "house",
             "category": "react-element",
             "typeAware": false,
-            "messageIds": [
-                "noHrElement"
-            ],
+            "messageIds": ["noHrElement"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -17934,9 +16778,7 @@
             "origin": "house",
             "category": "react-hook",
             "typeAware": true,
-            "messageIds": [
-                "reactHookNoAnyType"
-            ],
+            "messageIds": ["reactHookNoAnyType"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17954,9 +16796,7 @@
             "origin": "house",
             "category": "react-hook",
             "typeAware": false,
-            "messageIds": [
-                "noDestructuringInHook"
-            ],
+            "messageIds": ["noDestructuringInHook"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17974,9 +16814,7 @@
             "origin": "house",
             "category": "react-hook",
             "typeAware": false,
-            "messageIds": [
-                "extractPropertiesFirst"
-            ],
+            "messageIds": ["extractPropertiesFirst"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -17994,9 +16832,7 @@
             "origin": "house",
             "category": "react-hook",
             "typeAware": false,
-            "messageIds": [
-                "missingEffectComment"
-            ],
+            "messageIds": ["missingEffectComment"],
             "sets": [
                 {
                     "set": "cohere:react",
@@ -18014,11 +16850,7 @@
             "origin": "house",
             "category": "react-hook",
             "typeAware": false,
-            "messageIds": [
-                "hookResultNamingBadSuffix",
-                "hookResultNamingGeneric",
-                "hookResultNamingMismatch"
-            ],
+            "messageIds": ["hookResultNamingBadSuffix", "hookResultNamingGeneric", "hookResultNamingMismatch"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -18036,10 +16868,7 @@
             "origin": "house",
             "category": "storage",
             "typeAware": false,
-            "messageIds": [
-                "directLocalStorage",
-                "windowLocalStorage"
-            ],
+            "messageIds": ["directLocalStorage", "windowLocalStorage"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -18057,9 +16886,7 @@
             "origin": "house",
             "category": "tailwind",
             "typeAware": false,
-            "messageIds": [
-                "useLogicalClass"
-            ],
+            "messageIds": ["useLogicalClass"],
             "sets": [
                 {
                     "set": "cohere:system-inc/structure",
@@ -18076,9 +16903,7 @@
             "origin": "core",
             "upstreamName": "symbol-description",
             "typeAware": true,
-            "messageIds": [
-                "expected"
-            ],
+            "messageIds": ["expected"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -18119,10 +16944,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "expected",
-                "unexpected"
-            ],
+            "messageIds": ["expected", "unexpected"],
             "fixKind": "fix",
             "sets": [
                 {
@@ -18164,11 +16986,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "caseWithNaN",
-                "comparisonWithNaN",
-                "switchOnNaN"
-            ],
+            "messageIds": ["caseWithNaN", "comparisonWithNaN", "switchOnNaN"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -18205,10 +17023,7 @@
             "options": {
                 "elements": "one"
             },
-            "messageIds": [
-                "invalidTypeofValue",
-                "notString"
-            ],
+            "messageIds": ["invalidTypeofValue", "notString"],
             "fixKind": "suggestion",
             "sets": [
                 {
@@ -18243,9 +17058,7 @@
             "origin": "core",
             "upstreamName": "vars-on-top",
             "typeAware": false,
-            "messageIds": [
-                "top"
-            ],
+            "messageIds": ["top"],
             "sets": [
                 {
                     "set": "cohere:next",
@@ -18286,9 +17099,7 @@
             "options": {
                 "elements": "many"
             },
-            "messageIds": [
-                "expected"
-            ],
+            "messageIds": ["expected"],
             "fixKind": "fix",
             "sets": [
                 {

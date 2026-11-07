@@ -18,7 +18,5 @@
         "file": "/repository/source/MaxDepth.ts",
         "source": "function foo() { if (true) { if (false) { if (true) { } } } }"
     },
-    "assertedMessageIds": [
-        "tooDeeply"
-    ]
+    "assertedMessageIds": ["tooDeeply"]
 }

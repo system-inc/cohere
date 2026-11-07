@@ -20,8 +20,6 @@
         "file": "/repository/source/RegexSpaces.ts",
         "source": "var foo = / /;"
     },
-    "assertedMessageIds": [
-        "multipleSpaces"
-    ],
+    "assertedMessageIds": ["multipleSpaces"],
     "assertsFix": true
 }

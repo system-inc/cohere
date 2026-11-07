@@ -18,9 +18,5 @@
         "file": "/repository/source/Fallthrough.tsx",
         "source": "switch(foo) { }"
     },
-    "assertedMessageIds": [
-        "case",
-        "default",
-        "unusedFallthroughComment"
-    ]
+    "assertedMessageIds": ["case", "default", "unusedFallthroughComment"]
 }

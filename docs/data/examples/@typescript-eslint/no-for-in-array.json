@@ -18,7 +18,5 @@
         "file": "/repository/source/ForIn.ts",
         "source": "for (const x of [3, 4, 5]) {\n  console.log(x);\n}\n"
     },
-    "assertedMessageIds": [
-        "forInViolation"
-    ]
+    "assertedMessageIds": ["forInViolation"]
 }

@@ -18,8 +18,5 @@
         "file": "Getter.ts",
         "source": "var foo = { bar(){} };\n"
     },
-    "assertedMessageIds": [
-        "expected",
-        "expectedAlways"
-    ]
+    "assertedMessageIds": ["expected", "expectedAlways"]
 }

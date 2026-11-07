@@ -20,7 +20,7 @@
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const [entryPointArgument, ...restArguments] = process.argv.slice(2);
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: fixtures.mjs <theme.css> [--limit N] [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -44,18 +44,18 @@ const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await 
  */
 const classNames = new Set();
 const modifierClassNames = [];
-for (const entry of designSystem.getClassList()) {
+for(const entry of designSystem.getClassList()) {
     const name = Array.isArray(entry) ? entry[0] : entry;
     classNames.add(name);
-    if (Array.isArray(entry) && entry[1] && typeof entry[1] === 'object') {
-        for (const modifier of entry[1].modifiers ?? []) modifierClassNames.push(name + '/' + modifier);
+    if(Array.isArray(entry) && entry[1] && typeof entry[1] === 'object') {
+        for(const modifier of entry[1].modifiers ?? []) modifierClassNames.push(name + '/' + modifier);
     }
 }
 
 // Modifiers are the third axis and the registry keeps them separate, so they are sampled in rather
 // than folded into the headline count. Every eleventh, which is a stride rather than a random sample
 // so the corpus is the same on every run and a diff means a real change.
-for (let index = 0; index < modifierClassNames.length; index += 11) {
+for(let index = 0; index < modifierClassNames.length; index += 11) {
     classNames.add(modifierClassNames[index]);
 }
 
@@ -68,30 +68,51 @@ for (let index = 0; index < modifierClassNames.length; index += 11) {
  * remains, which is a split the Go side has to reproduce and which no bare value can test.
  */
 const arbitraryShapes = [
-    '[3px]', '[red]', '[16/9]', '[50%]', '[2]', '[0.5]', '[var(--a)]', '[url(a.png)]',
-    '[color:var(--a)]', '[length:3px]', '[url:x]', '[position:top]', '[image:none]',
-    '[1fr]', '[calc(1px+2px)]', '[#fff]', '[oklch(0.5_0.2_30)]', '[serif]', '[45deg]',
-    '[3px]/50', '[3px]/none', '[3px]/[0.5]', '[red]/50', '[red]/none', '[var(--a)]/[var(--b)]',
+    '[3px]',
+    '[red]',
+    '[16/9]',
+    '[50%]',
+    '[2]',
+    '[0.5]',
+    '[var(--a)]',
+    '[url(a.png)]',
+    '[color:var(--a)]',
+    '[length:3px]',
+    '[url:x]',
+    '[position:top]',
+    '[image:none]',
+    '[1fr]',
+    '[calc(1px+2px)]',
+    '[#fff]',
+    '[oklch(0.5_0.2_30)]',
+    '[serif]',
+    '[45deg]',
+    '[3px]/50',
+    '[3px]/none',
+    '[3px]/[0.5]',
+    '[red]/50',
+    '[red]/none',
+    '[var(--a)]/[var(--b)]',
 ];
 const bareShapes = ['4', 'full', 'none', 'bold', 'current', 'inherit', 'transparent', '25%', '1/2', 'sm', 'auto', '0'];
 
 const functionalRoots = new Set();
-for (const className of classNames) {
-    for (const probe of [className, className + '-4']) {
+for(const className of classNames) {
+    for(const probe of [className, className + '-4']) {
         const candidate = parseCandidate(designSystem, probe);
-        if (candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
+        if(candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
     }
 }
-for (const root of functionalRoots) {
-    for (const shape of arbitraryShapes) classNames.add(root + '-' + shape);
-    for (const shape of bareShapes) classNames.add(root + '-' + shape);
+for(const root of functionalRoots) {
+    for(const shape of arbitraryShapes) classNames.add(root + '-' + shape);
+    for(const shape of bareShapes) classNames.add(root + '-' + shape);
     // The empty form, which some roots accept and others reject, and the two are different facts.
     classNames.add(root);
     classNames.add(root + '/50');
 }
 
 // A handful of arbitrary properties, which are not utilities at all and take the other branch.
-for (const property of ['[font:inherit]', '[color:red]', '[--custom:1]', '[display:flex]', '[nonsense:1]']) {
+for(const property of ['[font:inherit]', '[color:red]', '[--custom:1]', '[display:flex]', '[nonsense:1]']) {
     classNames.add(property);
 }
 
@@ -127,13 +148,13 @@ const namespacesLongestFirst = [];
 const keysByNamespaceSet = new Map();
 {
     const candidatePrefixes = new Set();
-    for (const [key] of designSystem.theme.entries()) {
+    for(const [key] of designSystem.theme.entries()) {
         const segments = key.slice(2).split('-');
-        for (let length = 1; length <= segments.length - 1; length++) {
+        for(let length = 1; length <= segments.length - 1; length++) {
             candidatePrefixes.add('--' + segments.slice(0, length).join('-'));
         }
     }
-    for (const prefix of candidatePrefixes) {
+    for(const prefix of candidatePrefixes) {
         let keys;
         try {
             keys = designSystem.theme.keysInNamespaces([prefix]);
@@ -141,17 +162,19 @@ const keysByNamespaceSet = new Map();
         catch {
             continue;
         }
-        if (!keys || keys.length === 0) continue;
+        if(!keys || keys.length === 0) continue;
         keysByNamespaceSet.set(prefix, new Set(keys));
     }
     namespacesLongestFirst.push(
-        ...Array.from(keysByNamespaceSet.keys()).sort((left, right) => right.length - left.length || (left < right ? -1 : 1)),
+        ...Array.from(keysByNamespaceSet.keys()).sort(
+            (left, right) => right.length - left.length || (left < right ? -1 : 1),
+        ),
     );
 }
 
 function claimingNamespace(value) {
-    for (const namespace of namespacesLongestFirst) {
-        if (keysByNamespaceSet.get(namespace).has(value)) return namespace;
+    for(const namespace of namespacesLongestFirst) {
+        if(keysByNamespaceSet.get(namespace).has(value)) return namespace;
     }
     return '@none';
 }
@@ -164,7 +187,7 @@ const bareBucketCounts = new Map();
 
 const keptSignatures = new Set();
 function shouldKeep(entry) {
-    if (entry.valueKind === 'named') {
+    if(entry.valueKind === 'named') {
         const bucket = [
             entry.root,
             claimingNamespace(entry.value),
@@ -172,24 +195,27 @@ function shouldKeep(entry) {
             entry.reading === null ? 'null' : entry.reading.order.join('.') + '#' + entry.reading.count,
         ].join('|');
         const seen = bareBucketCounts.get(bucket) ?? 0;
-        if (seen >= bareKeysPerBucket) return false;
+        if(seen >= bareKeysPerBucket) return false;
         bareBucketCounts.set(bucket, seen + 1);
         return true;
     }
     const signature = [
-        entry.kind, entry.root, entry.valueKind, entry.dataType,
+        entry.kind,
+        entry.root,
+        entry.valueKind,
+        entry.dataType,
         entry.modifierKind === 'none' ? 'absent' : entry.modifierValue === 'none' ? 'themed' : 'alpha',
         entry.reading === null ? 'null' : entry.reading.order.join('.') + '#' + entry.reading.count,
     ].join('|');
-    if (keptSignatures.has(signature)) return false;
+    if(keptSignatures.has(signature)) return false;
     keptSignatures.add(signature);
     return true;
 }
 
 const cases = [];
 let nullCount = 0;
-for (const className of Array.from(classNames).sort()) {
-    if (cases.length >= limit) break;
+for(const className of Array.from(classNames).sort()) {
+    if(cases.length >= limit) break;
     const candidate = parseCandidate(designSystem, className);
     const reading = readingOf(designSystem, className);
     /*
@@ -200,8 +226,8 @@ for (const className of Array.from(classNames).sort()) {
      * fixture with a null reading so the Go side can assert it also declines, which is a real
      * assertion rather than a skipped one.
      */
-    if (reading === null) nullCount++;
-    if (!candidate) continue;
+    if(reading === null) nullCount++;
+    if(!candidate) continue;
 
     const entry = {
         className,
@@ -228,18 +254,24 @@ for (const className of Array.from(classNames).sort()) {
         modifierValue: candidate.modifier ? String(candidate.modifier.value ?? '') : '',
         reading: reading === null ? null : { order: reading.order, count: reading.count },
     };
-    if (shouldKeep(entry)) cases.push(entry);
+    if(shouldKeep(entry)) cases.push(entry);
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    counts: {
-        cases: cases.length,
-        classesConsidered: classNames.size,
-        roots: functionalRoots.size,
-        withoutReading: cases.filter((one) => one.reading === null).length,
-        nullReadingsSeen: nullCount,
-    },
-    cases,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            counts: {
+                cases: cases.length,
+                classesConsidered: classNames.size,
+                roots: functionalRoots.size,
+                withoutReading: cases.filter((one) => one.reading === null).length,
+                nullReadingsSeen: nullCount,
+            },
+            cases,
+        },
+        null,
+        2,
+    ) + '\n',
+);

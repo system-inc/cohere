@@ -19,8 +19,6 @@
         "file": "/repository/source/EmptyFunction.ts",
         "source": "var foo = () => 0;"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ],
+    "assertedMessageIds": ["unexpected"],
     "assertsSuggestion": true
 }

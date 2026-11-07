@@ -1,13 +1,13 @@
 # `nexus/correctness-no-process-exit-after-output`
 
-| | |
-|---|---|
-| **Recommendation** | **Registered `off` in ahra, by @system_cohere's ruling of 2026-10-03.** Every finding is true about the code, but ahra blocks stdout and stderr at every process entry (nexus `blockStandardStreams`), and a blocking stream has nothing queued when `process.exit` runs, so the 1,012 findings hold 0 real truncations there. The exactness moved to the entry rule, which requires a process that can exit after a write to block first. On for a project whose entries do not block |
-| Findings | **ahra 1,012** (983 in ahra's own files, 29 in the `libraries/structure` submodule), measured 2026-10-03 on a tree being edited live |
-| Measured precision | 1,012 of 1,012 true. 1,002 are reached having written on every path into the exit; the other 10 were read one by one and each prints on the path that exits |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, to resolve `console`, `process.exit` and `process.stdout` / `stderr` by symbol; without a checker the rule registers nothing |
+|                        |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Registered `off` in ahra, by @system_cohere's ruling of 2026-10-03.** Every finding is true about the code, but ahra blocks stdout and stderr at every process entry (nexus `blockStandardStreams`), and a blocking stream has nothing queued when `process.exit` runs, so the 1,012 findings hold 0 real truncations there. The exactness moved to the entry rule, which requires a process that can exit after a write to block first. On for a project whose entries do not block |
+| Findings               | **ahra 1,012** (983 in ahra's own files, 29 in the `libraries/structure` submodule), measured 2026-10-03 on a tree being edited live                                                                                                                                                                                                                                                                                                                                                   |
+| Measured precision     | 1,012 of 1,012 true. 1,002 are reached having written on every path into the exit; the other 10 were read one by one and each prints on the path that exits                                                                                                                                                                                                                                                                                                                            |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Auto-fixable           | no                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Needs type information | yes, to resolve `console`, `process.exit` and `process.stdout` / `stderr` by symbol; without a checker the rule registers nothing                                                                                                                                                                                                                                                                                                                                                      |
 
 ## What it checks
 
@@ -52,15 +52,15 @@ Measured 2026-10-04 on ahra with the rule forced on, cohere at main against the 
 findings before, 1,029 after, 12 added and none lost. All 12 read in place, each true by the rule's
 condition, a helper that writes on a path into the exit:
 
-| site | the helper that writes |
-|---|---|
-| `libraries/structure/command-line/Structure.ts` 519, 875, 1238; `StructureCohere.ts` 145 | `reportUnresolvableCohereBinary()`, then `exit(1)` |
-| `libraries/structure/command-line/Structure.ts` 1627 | `runDoctorScript(...)`, which prints the doctor's output |
-| `modules/ahra/AhraCommandLineInterface.ts` 187 | `showHelp()`, then `exit(0)`, the first named hazard |
-| `modules/backup/BackupCommandLineInterface.ts` 58, 164 | `reportFreshness` and `reportTreeCoverage` through `import()`, the second |
-| `modules/os/lifecycle/AhraOsBootCommandLineInterface.ts` 263 | `printStaleAwokeSweepResult(...)` earlier in boot |
-| `modules/phi/PhiCommerceCommandLineInterface.ts` 388, 529 | an awaited `resolveSubscription(...)`, which prints why it found none |
-| `modules/porings/PoringsCommandLineInterface.ts` 179 | `cleanup()` writing to stdout in a `SIGINT` handler |
+| site                                                                                     | the helper that writes                                                    |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `libraries/structure/command-line/Structure.ts` 519, 875, 1238; `StructureCohere.ts` 145 | `reportUnresolvableCohereBinary()`, then `exit(1)`                        |
+| `libraries/structure/command-line/Structure.ts` 1627                                     | `runDoctorScript(...)`, which prints the doctor's output                  |
+| `modules/ahra/AhraCommandLineInterface.ts` 187                                           | `showHelp()`, then `exit(0)`, the first named hazard                      |
+| `modules/backup/BackupCommandLineInterface.ts` 58, 164                                   | `reportFreshness` and `reportTreeCoverage` through `import()`, the second |
+| `modules/os/lifecycle/AhraOsBootCommandLineInterface.ts` 263                             | `printStaleAwokeSweepResult(...)` earlier in boot                         |
+| `modules/phi/PhiCommerceCommandLineInterface.ts` 388, 529                                | an awaited `resolveSubscription(...)`, which prints why it found none     |
+| `modules/porings/PoringsCommandLineInterface.ts` 179                                     | `cleanup()` writing to stdout in a `SIGINT` handler                       |
 
 Cost: the scan finds exits first and resolves a call's callee only inside a function that holds one,
 since resolving every call in every file took the rule from 2.5s to 4.2s of the run. As built, `--timing`
@@ -83,7 +83,7 @@ and stderr**. The two numbers measure different conditions:
 - Of the 1,009 exit calls in ahra's own files, 26 went unreported on 2026-10-03: exits in event callbacks
   with no write of their own (`process.on('SIGINT', ...)`, `child.on('close', ...)`), exits after a
   callee prints (`showHelp()`, `reportFreshness(...)`, `runLinkCommand(...)`), and `if(!subscription)
-  process.exit(1)` after a helper that printed the reason. All read; none is a write in the same function
+process.exit(1)` after a helper that printed the reason. All read; none is a write in the same function
   that the rule missed. Reading one callee since reaches `showHelp()`, `reportFreshness(...)` and the
   subscription helper (see above); `runLinkCommand(...)`'s exit is still unreported.
 
@@ -100,7 +100,7 @@ is a graph path) or only **some** path has.
   `runSync`, `runQuickBooksEnrichCommand`, `runQuickBooksLedgerImport`, `runStatement`, `runMonths` (a loop
   over report lines that prints nothing only when there are none);
   `libraries/structure/command-line/Structure.ts` dead-code and duplicates commands (`if(output.trim())
-  console.error(output); process.exit(1);`, which prints the analyzer's whole output, the worst case for
+console.error(output); process.exit(1);`, which prints the analyzer's whole output, the worst case for
   truncation); `StructureLintEngineParity.ts` (loop over report lines); `ClaudeCommandLineInterface.ts`
   usage (prints the table unless `--json`, then exits 1 when every account failed);
   `ReplicateCommandLineInterface.ts` (prints the failed prediction unless it went through a helper).
@@ -121,7 +121,7 @@ where no `return` is possible; 17 are in callbacks (`main().catch(...)`, `.on('c
   `GodwordEntropy.ts` (through the `NodeProcess` namespace import), each firing as it stands and silent
   with `process.exitCode` set. 17 more firing shapes and 17 silent ones, against a slice of
   `@types/node` 26.2.0 in its real layout (`declare module "node:process" { global { ... } export =
-  process }`, the `web-globals` console in `declare global`) plus lib.dom's console.
+process }`, the `web-globals` console in `declare global`) plus lib.dom's console.
 - Mutation check, each mutant a copy through `go test -overlay -count=1`, each killed but one: the
   written-state test at the exit (the exit before any write, and four more); an exit ending its path (a
   write laid out after an earlier exit); the catch cut (a write inside the try, the exit in its catch);

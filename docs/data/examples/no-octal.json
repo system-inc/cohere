@@ -18,7 +18,5 @@
         "file": "/repository/source/Octal.ts",
         "source": "var a = 0;"
     },
-    "assertedMessageIds": [
-        "noOctal"
-    ]
+    "assertedMessageIds": ["noOctal"]
 }

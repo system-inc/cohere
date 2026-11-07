@@ -18,9 +18,5 @@
         "file": "/repository/source/Children.tsx",
         "source": "<div />;"
     },
-    "assertedMessageIds": [
-        "nestFunction",
-        "noChildrenProp",
-        "passFunctionAsArgs"
-    ]
+    "assertedMessageIds": ["nestFunction", "noChildrenProp", "passFunctionAsArgs"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/Component.tsx",
         "source": "let v = 'used variable';\n"
     },
-    "assertedMessageIds": [
-        "noUselessAssignment"
-    ]
+    "assertedMessageIds": ["noUselessAssignment"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/modules/meta/CorrectnessNoDiscardedOutcome.ts",
         "source": "import { parseJson } from '../../libraries/structure/libraries/nexus/source/structured-text/json/Json';\nimport { parseJsonc } from '../../libraries/structure/libraries/nexus/source/structured-text/json/Jsonc';\nimport {\n    readJsonFile,\n    writeJsonFile,\n    type JsonFileReadOutcomeType,\n    type JsonFileWriteOutcomeType,\n} from '../../libraries/structure/libraries/nexus/source/structured-text/json/JsonFile';\nimport { readPackageJson } from '../../libraries/structure/libraries/nexus/source/system/PackageJson';\ndeclare const console: { warn(message: string): void };\ndeclare const statePath: string;\ndeclare const state: { lastSeen: Record<string, string> };\ndeclare const text: string;\ndeclare const flag: boolean;\ndeclare const items: string[];\ndeclare function use(value: unknown): void;\nexport function warn() {\n    console.warn('nothing to save');\n}\n"
     },
-    "assertedMessageIds": [
-        "outcomeDiscarded"
-    ]
+    "assertedMessageIds": ["outcomeDiscarded"]
 }

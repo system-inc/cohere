@@ -23,11 +23,6 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "dataLowercaseRequired",
-        "invalidPropOnTag",
-        "unknownProp",
-        "unknownPropWithStandardName"
-    ],
+    "assertedMessageIds": ["dataLowercaseRequired", "invalidPropOnTag", "unknownProp", "unknownPropWithStandardName"],
     "assertsFix": true
 }

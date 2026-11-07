@@ -1,12 +1,12 @@
 # `@typescript-eslint/use-unknown-in-catch-callback-variable`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **39** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong Yes**       |
+| Violations in ahra     | **39**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ attachmentUploadRequest.execute({ transactionId, file }).catch(function(error: E
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

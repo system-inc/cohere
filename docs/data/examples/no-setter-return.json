@@ -18,7 +18,5 @@
         "file": "/repository/source/SetterReturn.js",
         "source": "return 1;"
     },
-    "assertedMessageIds": [
-        "noSetterReturn"
-    ]
+    "assertedMessageIds": ["noSetterReturn"]
 }

@@ -1,23 +1,23 @@
 {
-  "rules": {
-    "Swift": "cohere-swift/toolchain-require-strict-memory-safety"
-  },
-  "phrases": {
-    "configurations": {
-      "every": "",
-      "some": " in {{configurations}}"
+    "rules": {
+        "Swift": "cohere-swift/toolchain-require-strict-memory-safety"
     },
-    "located": {
-      "found": "",
-      "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
-    }
-  },
-  "messages": {
-    "strictMemorySafetyMissing": {
-      "text": "{{target}} does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."
+    "phrases": {
+        "configurations": {
+            "every": "",
+            "some": " in {{configurations}}"
+        },
+        "located": {
+            "found": "",
+            "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
+        }
     },
-    "strictMemorySafetyMissingInXcode": {
-      "text": "{{target}} does not compile under strict memory safety<<configurations>>. Set the target's SWIFT_STRICT_MEMORY_SAFETY build setting to YES in every configuration, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be.<<located>>"
+    "messages": {
+        "strictMemorySafetyMissing": {
+            "text": "{{target}} does not compile under strict memory safety. Add .strictMemorySafety() to its swiftSettings, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be."
+        },
+        "strictMemorySafetyMissingInXcode": {
+            "text": "{{target}} does not compile under strict memory safety<<configurations>>. Set the target's SWIFT_STRICT_MEMORY_SAFETY build setting to YES in every configuration, so every unsafe construct is visible where it is used; then replace each flagged site with a safe API where one exists, and mark unsafe only what must be.<<located>>"
+        }
     }
-  }
 }

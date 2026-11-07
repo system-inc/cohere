@@ -1,13 +1,13 @@
 # `nexus/consistency-no-for-in`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, in place of `guard-for-in` (Kirk's ruling, 2026-10-01: one loop shape for objects) |
-| Findings in ahra | **8** at HEAD on 2026-10-01; **0** in the working tree after the syntax wave rewrote them |
-| Measured precision | 8 of 8 by the rule's definition (every `for...in` is the shape being retired) |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, in place of `guard-for-in` (Kirk's ruling, 2026-10-01: one loop shape for objects) |
+| Findings in ahra       | **8** at HEAD on 2026-10-01; **0** in the working tree after the syntax wave rewrote them   |
+| Measured precision     | 8 of 8 by the rule's definition (every `for...in` is the shape being retired)               |
+| Plugin                 | cohere-native, `nexus`                                                                      |
+| Auto-fixable           | no                                                                                          |
+| Needs type information | no                                                                                          |
 
 ## What it checks
 

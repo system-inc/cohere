@@ -1,12 +1,12 @@
 # `react/jsx-props-no-spreading`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **234** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | **234**               |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ return <p className="mt-3 text-sm/[22px] font-semibold first:mt-0" {...withoutNo
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

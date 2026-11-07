@@ -20,10 +20,7 @@
         "file": "/repository/source/Thing.ts",
         "source": "type Test = { get f(): number };"
     },
-    "assertedMessageIds": [
-        "errorMethod",
-        "errorProperty"
-    ],
+    "assertedMessageIds": ["errorMethod", "errorProperty"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

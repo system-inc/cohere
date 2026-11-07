@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-useless-default-assignment`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **1** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **1**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -18,7 +18,7 @@ Stylistic. Small enough to adopt if we want the convention, not urgent if we do 
 
 ## Violations
 
-1 in the tree. 
+1 in the tree.
 
 **`libraries/structure/libraries/nexus/source/security/random/Random.ts:11`**
 
@@ -31,4 +31,3 @@ customizedCharacterSet: string | undefined = undefined,
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

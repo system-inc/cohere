@@ -1,7 +1,4 @@
 {
     "rule": "nexus/consistency-no-utils-folder",
-    "assertedMessageIds": [
-        "noUnderscoreUtils",
-        "noUtils"
-    ]
+    "assertedMessageIds": ["noUnderscoreUtils", "noUtils"]
 }

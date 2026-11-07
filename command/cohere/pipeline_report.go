@@ -438,7 +438,8 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 			report.filesInScope, report.filesInProgram)
 	}
 
-	if !report.checkedEverything() {
+	// The format project has no program, so the type check and the lint rules it never runs are no gap in it.
+	if !report.checkedEverything() && !activeSummary.FormatProject {
 		fmt.Fprintf(out, "  this run did not check everything: the phases above say what was not checked\n")
 	} else if report.incompleteBeyondPhases != "" {
 		fmt.Fprintf(out, "  this run did not check everything: %s\n", report.incompleteBeyondPhases)

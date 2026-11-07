@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unnecessary-type-assertion`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **475** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **475**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const page = (await response.json()) as ActivityPageInterface;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

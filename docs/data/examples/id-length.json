@@ -18,10 +18,5 @@
         "file": "/repository/source/IdLength.ts",
         "source": "abc = d;"
     },
-    "assertedMessageIds": [
-        "tooLong",
-        "tooLongPrivate",
-        "tooShort",
-        "tooShortPrivate"
-    ]
+    "assertedMessageIds": ["tooLong", "tooLongPrivate", "tooShort", "tooShortPrivate"]
 }

@@ -20,9 +20,6 @@
         "file": "/repository/app/account/page.tsx",
         "source": "export async function generateMetadata() {\n    return {};\n}\n"
     },
-    "assertedMessageIds": [
-        "useParamsNotParameters",
-        "useSearchParamsNotSearchParameters"
-    ],
+    "assertedMessageIds": ["useParamsNotParameters", "useSearchParamsNotSearchParameters"],
     "assertsFix": true
 }

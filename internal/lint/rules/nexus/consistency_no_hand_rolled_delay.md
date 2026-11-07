@@ -1,13 +1,13 @@
 # `nexus/consistency-no-hand-rolled-delay`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** (option C of the `no-promise-executor-return` ruling, 2026-10-01: every sleep is `delay`) |
-| Findings in ahra | **13** at HEAD on 2026-10-01; **2** in the working tree |
-| Measured precision | 13 of 13 at HEAD, read by hand |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes** (option C of the `no-promise-executor-return` ruling, 2026-10-01: every sleep is `delay`) |
+| Findings in ahra       | **13** at HEAD on 2026-10-01; **2** in the working tree                                           |
+| Measured precision     | 13 of 13 at HEAD, read by hand                                                                    |
+| Plugin                 | cohere-native, `nexus`                                                                            |
+| Auto-fixable           | no                                                                                                |
+| Needs type information | no                                                                                                |
 
 ## Name
 

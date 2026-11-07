@@ -18,7 +18,5 @@
         "file": "/repository/source/NoAwaitInLoop.ts",
         "source": "while (true) { let value = 0; }"
     },
-    "assertedMessageIds": [
-        "unexpectedAwait"
-    ]
+    "assertedMessageIds": ["unexpectedAwait"]
 }

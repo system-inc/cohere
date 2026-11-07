@@ -18,7 +18,5 @@
         "file": "/repository/source/Namespace.tsx",
         "source": "<a.b />;\n"
     },
-    "assertedMessageIds": [
-        "noNamespace"
-    ]
+    "assertedMessageIds": ["noNamespace"]
 }

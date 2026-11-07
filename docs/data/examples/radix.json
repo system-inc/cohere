@@ -18,10 +18,6 @@
         "file": "/repository/source/Radix.ts",
         "source": "parseInt\n"
     },
-    "assertedMessageIds": [
-        "invalidRadix",
-        "missingParameters",
-        "missingRadix"
-    ],
+    "assertedMessageIds": ["invalidRadix", "missingParameters", "missingRadix"],
     "assertsSuggestion": true
 }

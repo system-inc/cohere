@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"hover:flex\" />;\n"
     },
-    "assertedMessageIds": [
-        "variantOrder"
-    ]
+    "assertedMessageIds": ["variantOrder"]
 }

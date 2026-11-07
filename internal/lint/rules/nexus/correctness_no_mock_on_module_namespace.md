@@ -1,12 +1,12 @@
 # `nexus/correctness-no-mock-on-module-namespace`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`.** Zero findings today, and every finding is a test that throws before its first assertion |
-| Findings | **ahra 0** (measured 2026-10-03; research count 0, and 2 before `d75fe890`) |
-| Measured precision | no findings to read; the shape always throws, so a finding cannot be false in a file that runs as an ES module |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`.** Zero findings today, and every finding is a test that throws before its first assertion                                    |
+| Findings               | **ahra 0** (measured 2026-10-03; research count 0, and 2 before `d75fe890`)                                                                     |
+| Measured precision     | no findings to read; the shape always throws, so a finding cannot be false in a file that runs as an ES module                                  |
+| Plugin                 | cohere-native, `nexus`                                                                                                                          |
+| Auto-fixable           | no                                                                                                                                              |
 | Needs type information | yes, to resolve the mock call to node:test's `MockTracker` and the argument to a namespace import; without a checker the rule registers nothing |
 
 ## What it checks

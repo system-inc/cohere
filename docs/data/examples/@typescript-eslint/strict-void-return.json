@@ -18,9 +18,5 @@
         "file": "/repository/source/Callbacks.ts",
         "source": "declare function takes(cb: () => void): void;\ntakes(() => 1);"
     },
-    "assertedMessageIds": [
-        "asyncFunc",
-        "nonVoidFunc",
-        "nonVoidReturn"
-    ]
+    "assertedMessageIds": ["asyncFunc", "nonVoidFunc", "nonVoidReturn"]
 }

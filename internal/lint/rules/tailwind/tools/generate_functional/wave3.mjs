@@ -33,7 +33,7 @@
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: wave3.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -49,10 +49,32 @@ const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await 
 );
 
 const roots = [
-    '@container', 'backdrop-filter', 'bg', 'bg-conic', 'bg-linear', 'bg-radial', 'decoration',
-    'drop-shadow', 'duration', 'fill', 'filter', 'flex', 'font', 'inset-ring', 'inset-shadow',
-    'mask', 'outline', 'ring', 'ring-offset', 'rotate', 'scale', 'shadow', 'stroke', 'text',
-    'text-shadow', 'transform',
+    '@container',
+    'backdrop-filter',
+    'bg',
+    'bg-conic',
+    'bg-linear',
+    'bg-radial',
+    'decoration',
+    'drop-shadow',
+    'duration',
+    'fill',
+    'filter',
+    'flex',
+    'font',
+    'inset-ring',
+    'inset-shadow',
+    'mask',
+    'outline',
+    'ring',
+    'ring-offset',
+    'rotate',
+    'scale',
+    'shadow',
+    'stroke',
+    'text',
+    'text-shadow',
+    'transform',
 ];
 
 /*
@@ -67,28 +89,56 @@ const roots = [
  * `--leading` key, so `text-lg/none` sets a line height), and with no probe carrying it, emptying
  * `themedModifierValues` changed no answer here on any theme.
  */
-const probeSuffixes = ['', '-4', '-0', '-1', '-50', '-90', '-100', '-sm', '-none', '-linear',
-    '-[3px]', '-[var(--a)]', '-2.5', '-1.3', '/50', '-16/9', '-3/2', '-1.3/2', '-7/3', '-red-500', '-red-500/50', '-current', '-inherit', '-transparent', '-xs', '-2xl', '-md', '-lg/none'];
+const probeSuffixes = [
+    '',
+    '-4',
+    '-0',
+    '-1',
+    '-50',
+    '-90',
+    '-100',
+    '-sm',
+    '-none',
+    '-linear',
+    '-[3px]',
+    '-[var(--a)]',
+    '-2.5',
+    '-1.3',
+    '/50',
+    '-16/9',
+    '-3/2',
+    '-1.3/2',
+    '-7/3',
+    '-red-500',
+    '-red-500/50',
+    '-current',
+    '-inherit',
+    '-transparent',
+    '-xs',
+    '-2xl',
+    '-md',
+    '-lg/none',
+];
 
 const registryByRoot = new Map();
-for (const entry of designSystem.getClassList?.() ?? []) {
+for(const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
+    if(typeof name !== 'string') continue;
     const candidate = parseCandidate(designSystem, name);
-    if (!candidate || candidate.kind !== 'functional' || !candidate.root) continue;
-    if (!roots.includes(candidate.root)) continue;
+    if(!candidate || candidate.kind !== 'functional' || !candidate.root) continue;
+    if(!roots.includes(candidate.root)) continue;
     const list = registryByRoot.get(candidate.root) ?? [];
     list.push(name);
     registryByRoot.set(candidate.root, list);
 }
 
 const cases = [];
-for (const root of roots) {
+for(const root of roots) {
     const names = new Set(registryByRoot.get(root) ?? []);
-    for (const suffix of probeSuffixes) names.add(root + suffix);
+    for(const suffix of probeSuffixes) names.add(root + suffix);
     names.add('-' + root + '-3');
 
-    for (const className of names) {
+    for(const className of names) {
         const candidate = parseCandidate(designSystem, className);
         const reading = readingOf(designSystem, className);
         cases.push({
@@ -110,8 +160,10 @@ for (const root of roots) {
 
 const answered = cases.filter((entry) => entry.reading !== null).length;
 const rejected = cases.length - answered;
-if (answered === 0 || rejected === 0) {
-    process.stderr.write('wave3.mjs: one side of the population is empty, so a comparison over this fixture would prove nothing\n');
+if(answered === 0 || rejected === 0) {
+    process.stderr.write(
+        'wave3.mjs: one side of the population is empty, so a comparison over this fixture would prove nothing\n',
+    );
     process.exit(4);
 }
 
@@ -122,23 +174,29 @@ if (answered === 0 || rejected === 0) {
  * on its value, and it needs its own representation rather than a row.
  */
 const distinctByRoot = {};
-for (const root of roots) {
+for(const root of roots) {
     const seen = new Set();
-    for (const entry of cases) {
-        if (entry.root !== root || entry.reading === null) continue;
+    for(const entry of cases) {
+        if(entry.root !== root || entry.reading === null) continue;
         seen.add(JSON.stringify(entry.reading));
     }
     distinctByRoot[root] = [...seen].map((raw) => JSON.parse(raw));
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    groundTruth: 'compileAstNodes propertySort, via readingOf',
-    rootCount: roots.length,
-    caseCount: cases.length,
-    answered,
-    rejected,
-    distinctByRoot,
-    cases,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            groundTruth: 'compileAstNodes propertySort, via readingOf',
+            rootCount: roots.length,
+            caseCount: cases.length,
+            answered,
+            rejected,
+            distinctByRoot,
+            cases,
+        },
+        null,
+        2,
+    ) + '\n',
+);

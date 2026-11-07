@@ -1,13 +1,13 @@
 # `no-restricted-syntax`
 
-| | |
-|---|---|
-| **Recommendation** | **No — not portable to this tree** |
-| Violations in ahra | none, and structurally so |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
-| Status | measured and declined, 2026-09-06 |
+|                        |                                    |
+| ---------------------- | ---------------------------------- |
+| **Recommendation**     | **No — not portable to this tree** |
+| Violations in ahra     | none, and structurally so          |
+| Plugin                 | `eslint core`                      |
+| Auto-fixable           | no                                 |
+| Needs type information | no                                 |
+| Status                 | measured and declined, 2026-09-06  |
 
 ## What it checks
 

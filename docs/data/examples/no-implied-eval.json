@@ -18,8 +18,5 @@
         "file": "subject.ts",
         "source": "setTimeout;\n"
     },
-    "assertedMessageIds": [
-        "execScript",
-        "impliedEval"
-    ]
+    "assertedMessageIds": ["execScript", "impliedEval"]
 }
