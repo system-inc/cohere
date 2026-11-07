@@ -287,8 +287,9 @@ struct TypesPhase {
      earlier session, then its owned C-family files. A server that fails is thrown as the named gap it is. With a
      scope, only its targets are checked again and every other one's records from the last check are read.
      */
-    private func check(scope: Scope?) throws -> CheckRun {
+    private func check(scope given: Scope?) throws -> CheckRun {
         var run = CheckRun()
+        var scope = given
         let targetByFile = Dictionary(
             files.map { ($0.url.resolvingSymlinksInPath().path, $0.targetName) },
             uniquingKeysWith: { first, _ in first },
@@ -297,7 +298,7 @@ struct TypesPhase {
         var checkedTargets = Set<String>()
         let swiftc = try FrontendCheck.toolchainExecutable(named: "swiftc", runner: runner)
         let clang = try FrontendCheck.toolchainExecutable(named: "clang", runner: runner)
-        for session in checks {
+        for (sessionIndex, session) in checks.enumerated() {
             let prepareStart = Date()
             let diagnosticsRoot = Self.checkDirectory(scratchPath: session.scratchPath)
             let frontend = FrontendCheck(
@@ -346,6 +347,10 @@ struct TypesPhase {
                     description:
                         "the check of \(session.root.path) failed before compiling anything, so the compiler never ran: \(error)\(unresolvableWords(error.description))"
                 )
+            }
+            /* The root's server lists the whole graph, local packages' targets among them, so it places edited C files. */
+            if sessionIndex == 0 {
+                scope = scope?.widened(by: description)
             }
             run.prepareSeconds += Date().timeIntervalSince(prepareStart)
             run.toolsBuilt += description.prepared?.toolsBuilt ?? []
@@ -633,12 +638,37 @@ struct TypesPhase {
         var cFamily: Bool
         /* Each owned target's imported modules, by target name. */
         var imports: [String: Set<String>] = [:]
+        /* The C-family files edited, by resolved path, which only the build server can place in a target (`widened(by:)`). */
+        var cFamilyEdits: Set<String> = []
+
+        /*
+         The scope with the target owning each edited C-family file in it, and every target importing those, as the
+         build server's target sources place them, headers among them: a Swift file that imports a C module breaks
+         when one of its headers changes. Nil, a check of everything, when a file is in no target's sources.
+         */
+        func widened(by description: BuildServerClient.Description) -> Scope? {
+            guard !cFamilyEdits.isEmpty else { return self }
+            var owners = targets
+            for path in cFamilyEdits {
+                guard
+                    let owner = description.targets.first(where: { target in
+                        target.sources.contains { $0.url.resolvingSymlinksInPath().path == path }
+                    })
+                else { return nil }
+                owners.insert(owner.displayName)
+            }
+            var widened = self
+            widened.targets = TypesPhase.importers(of: owners, imports: imports)
+            return widened
+        }
 
         /*
          The scope's targets that import no other target of the scope. Their check needs no module prepare is about to
          emit again, since every module they import is one no edit changed, so it runs alongside prepare.
          */
         var independent: Set<String> {
+            /* A header edit reaches modules only the build server can name, so nothing runs ahead of it. */
+            guard cFamilyEdits.isEmpty else { return [] }
             let names = Set(targets.map(TypesPhase.moduleName(of:)))
             return targets.filter { target in
                 imports[target, default: []].subtracting([TypesPhase.moduleName(of: target)]).isDisjoint(with: names)
@@ -671,6 +701,7 @@ struct TypesPhase {
         )
         var changedTargets = Set<String>()
         var cFamily = false
+        var cFamilyEdits = Set<String>()
         /*
          A removed Swift file belonged to the target that still owns a file in its folder: its own path cannot be
          resolved once it is gone, but its folder's can. A folder with none left, or any other file removed, checks
@@ -693,6 +724,7 @@ struct TypesPhase {
             }
             else if Self.cFamilyExtensions.contains(resolved.pathExtension.lowercased()) {
                 cFamily = true
+                cFamilyEdits.insert(resolved.path)
             }
             else {
                 return nil
@@ -703,15 +735,25 @@ struct TypesPhase {
             guard let tree = tree(of: file) else { return nil }
             imports[file.targetName, default: []].formUnion(Self.importedModules(of: tree))
         }
-        var affected = changedTargets
+        return Scope(
+            targets: Self.importers(of: changedTargets, imports: imports),
+            cFamily: cFamily,
+            imports: imports,
+            cFamilyEdits: cFamilyEdits,
+        )
+    }
+
+    /* These targets and every target that imports one of them, through any chain of imports. */
+    static func importers(of targets: Set<String>, imports: [String: Set<String>]) -> Set<String> {
+        var affected = targets
         var grew = true
         while grew {
-            let names = Set(affected.map(Self.moduleName(of:)))
+            let names = Set(affected.map(moduleName(of:)))
             let reached = imports.filter { !affected.contains($0.key) && !$0.value.isDisjoint(with: names) }.map(\.key)
             affected.formUnion(reached)
             grew = !reached.isEmpty
         }
-        return Scope(targets: affected, cFamily: cFamily, imports: imports)
+        return affected
     }
 
     /*

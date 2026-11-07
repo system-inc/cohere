@@ -158,6 +158,26 @@ struct CheckProofTests {
         #expect(removed.filesWithoutRecord.isEmpty)
     }
 
+    /*
+     A header edit reaches every Swift module that imports its C target: CCore.h renaming `ccore_answer` breaks Core's
+     Greeting.swift, which never changed, so Core is checked again because the build server lists the header as
+     CCore's and Core imports CCore, and the error comes back. A scope that only reran the C checks missed it.
+     */
+    @Test func aHeaderEditLooksAgainAtEverySwiftModuleImportingItsTarget() async throws {
+        let root = try CheckFixture.package()
+        defer { XcodeProjectPipelineTests.remove(root) }
+        let first = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(first.compilerFindings.isEmpty, "\(first.of("finding"))")
+
+        try CheckFixture.write("int ccore_reply(void);\n", to: "Sources/CCore/include/CCore.h", in: root)
+        let edited = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(
+            edited.compilerFindings.contains("Greeting.swift:11:error"),
+            "\(edited.typesBuild) \(edited.of("finding"))",
+        )
+        #expect(edited.filesWithoutRecord.isEmpty)
+    }
+
     /* The plugins SwiftPM compiled this run are named by the executables it left in the plugin cache since the run began. */
     @Test func thePluginsCompiledAreReadFromThePluginCache() throws {
         let scratch = CheckFixture.scratch()
