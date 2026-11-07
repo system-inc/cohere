@@ -25,6 +25,11 @@ struct Linter {
         var fileRules: [String: [FindingRecord]]
         var typedRules: [String]
         var typedFindings: [String: [FindingRecord]]?
+        /*
+         Each typed rule that asked whether a declaration is the standard library's of a symbol the demangler placed in
+         no module, with those symbols: what hinged on them was judged by nobody, so the file is unchecked by that rule.
+         */
+        var typedUnplaced: [String: [String]] = [:]
     }
 
     let configuration: RuleConfiguration
@@ -119,16 +124,27 @@ struct Linter {
                     else if applying.isEmpty {
                         byTypedRule = [:]
                     }
-                    else if let found = symbols.symbols[path] {
-                        byTypedRule = Dictionary(
-                            enabledTyped.filter { applying.contains($0.name) }.map {
-                                ($0.name, $0.findings(in: file, symbols: found))
-                            },
-                            uniquingKeysWith: { first, _ in first },
-                        )
+                    var unplaced: [String: [String]] = [:]
+                    if typedReplayed[path] == nil, !applying.isEmpty, let found = symbols.symbols[path] {
+                        var judged: [String: [FindingRecord]] = [:]
+                        /* Each rule with a log of its own, so an unplaced symbol is charged to the rule that asked of it. */
+                        for rule in enabledTyped where applying.contains(rule.name) {
+                            let log = FileSymbols.UnplacedSymbols()
+                            judged[rule.name] = rule.findings(in: file, symbols: found.watching(log))
+                            if !log.recorded.isEmpty {
+                                unplaced[rule.name] = log.recorded
+                            }
+                        }
+                        byTypedRule = judged
                     }
                     return (
-                        index, Verdict(fileRules: byFileRule, typedRules: applying, typedFindings: byTypedRule),
+                        index,
+                        Verdict(
+                            fileRules: byFileRule,
+                            typedRules: applying,
+                            typedFindings: byTypedRule,
+                            typedUnplaced: unplaced,
+                        ),
                     )
                 }
             }
@@ -178,6 +194,23 @@ struct Linter {
                 file: file.url.path,
                 error:
                     "\(symbols.unavailable[file.url.path] ?? ""), so the rules that read what its names resolve to could not judge it (\(missed.joined(separator: ", "))); every other rule ran on it",
+            )
+        }
+        /*
+         A file a typed rule judged, but where it asked of a symbol the demangler places in no module whether the
+         declaration is the standard library's (#awb2ykk). The rule said nothing of what hinged on it, so that is
+         unchecked, never clean; each such rule is named with its symbols, and everything else it judged stands.
+         */
+        for (file, verdict) in zip(files, perFile) where !verdict.typedUnplaced.isEmpty {
+            let rules = verdict.typedUnplaced.sorted { $0.key < $1.key }.map { rule, symbols in
+                "\(rule) asked of \(symbols.joined(separator: ", "))"
+            }
+            crashes.append(
+                LintRecord.Crash(
+                    file: file.url.path,
+                    error:
+                        "the demangler placed no module for a declaration a typed rule asked about, so whether it is the standard library's is unknown and nothing that rule would say of it was said (\(rules.joined(separator: "; "))); everything else was judged",
+                )
             )
         }
         /*

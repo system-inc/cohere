@@ -555,6 +555,27 @@ struct LintVerdictCacheTests {
 
     // MARK: Refusals and modes
 
+    /*
+     24. A typed verdict that asked of a symbol the demangler places in no module (#awb2ykk) judged that part by nobody,
+     so it is not kept and the rule asks again next run; the file rules' verdict beside it is. Red under: keeping it.
+     */
+    @Test func aTypedVerdictThatHingedOnAnUnplacedSymbolIsNotKept() {
+        let cache = LintVerdictCache(scratchPath: CheckFixture.scratch(), context: "context", enabledFileRules: [])
+        var verdict = Linter.Verdict(
+            fileRules: [:],
+            typedRules: [Self.emptyCount],
+            typedFindings: [Self.emptyCount: []],
+        )
+        #expect(
+            cache.entry(fileKey: "key", verdict: verdict, typedKey: "typed")?.typed != nil,
+            "the control: a placed verdict is kept",
+        )
+        verdict.typedUnplaced = [Self.emptyCount: ["s:Sa_unplaceable"]]
+        let entry = cache.entry(fileKey: "key", verdict: verdict, typedKey: "typed")
+        #expect(entry != nil, "the file rules' verdict is still kept")
+        #expect(entry?.typed == nil)
+    }
+
     /* 14. A verdict holding a rule's failure is not kept, so the rule is tried again. Red under: keeping it. */
     @Test func aVerdictHoldingARulesFailureIsNotKept() {
         let cache = LintVerdictCache(
