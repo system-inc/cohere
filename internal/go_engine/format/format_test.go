@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -131,7 +132,7 @@ func TestACheckReportsAnUnformattedFileAndWritesNothing(test *testing.T) {
 
 	file := fixturePath("unformatted.go")
 	result := Run([]string{file}, Options{})
-	want := Result{FilesConsidered: 1, Changed: []ChangedFile{{File: file, FirstDifferingLine: 5}}}
+	want := Result{FilesConsidered: 1, Changed: []ChangedFile{{File: file, Formatted: true, FirstDifferingLine: 5}}}
 	if !reflect.DeepEqual(result, want) {
 		test.Fatalf("got %+v, want %+v", result, want)
 	}
@@ -145,7 +146,10 @@ func TestAWriteRewritesAnUnformattedFileAndKeepsItsMode(test *testing.T) {
 
 	file := fixturePath("write/unformatted.go")
 	result := Run([]string{file}, Options{Write: true})
-	want := Result{FilesConsidered: 1, Changed: []ChangedFile{{File: file, Written: true, FirstDifferingLine: 5}}}
+	want := Result{
+		FilesConsidered: 1,
+		Changed:         []ChangedFile{{File: file, Formatted: true, Written: true, FirstDifferingLine: 5}},
+	}
 	if !reflect.DeepEqual(result, want) {
 		test.Fatalf("got %+v, want %+v", result, want)
 	}
@@ -258,7 +262,7 @@ func TestAGeneratedFileIsSkippedAndCounted(test *testing.T) {
 
 	file := fixturePath("markerafterpackage.go")
 	result := Run([]string{file}, Options{})
-	want := Result{FilesConsidered: 1, Changed: []ChangedFile{{File: file, FirstDifferingLine: 5}}}
+	want := Result{FilesConsidered: 1, Changed: []ChangedFile{{File: file, Formatted: true, FirstDifferingLine: 5}}}
 	if !reflect.DeepEqual(result, want) {
 		test.Fatalf("a marker below the package clause skipped the file: got %+v, want %+v", result, want)
 	}
@@ -324,7 +328,7 @@ func TestManyFilesComeBackInTheOrderGiven(test *testing.T) {
 		}
 		switch string(contents) {
 		case unformattedSource:
-			want.Changed = append(want.Changed, ChangedFile{File: file, FirstDifferingLine: 5})
+			want.Changed = append(want.Changed, ChangedFile{File: file, Formatted: true, FirstDifferingLine: 5})
 		case brokenSource, noPackageClauseSource:
 			want.NotFormatted = append(want.NotFormatted, NotFormattedFile{File: file})
 		case generatedSource:
@@ -400,8 +404,138 @@ func TestKnownFilesAnswerTheSameBytesAndOnlyThem(test *testing.T) {
 		test.Fatalf("unformatting %s: %v", edited, writeError)
 	}
 	afterEdit := Run(files, Options{Known: DecodeKnownFiles(encoded)})
-	want := []ChangedFile{{File: edited, FirstDifferingLine: 5}}
+	want := []ChangedFile{{File: edited, Formatted: true, FirstDifferingLine: 5}}
 	if afterEdit.Known != 2 || !reflect.DeepEqual(afterEdit.Changed, want) {
 		test.Fatalf("want the edited file formatted again and reported at line 5, got %+v", afterEdit)
+	}
+}
+
+// callSource is formatted, and callWrapped is the same program with its call broken one argument per line, gofmt's
+// own layout of it, which a wrap may write in its place.
+const (
+	callSource  = "package fixture\n\nvar Values = Pair(1, 2)\n"
+	callWrapped = "package fixture\n\nvar Values = Pair(\n\t1,\n\t2,\n)\n"
+)
+
+// wrapTo is an Options.Wrap that answers every file with output, claiming one line brought within the limit, and
+// counts how often it was asked.
+func wrapTo(output string, asked *atomic.Int32) func([]byte) Wrapping {
+	return func([]byte) Wrapping {
+		asked.Add(1)
+		return Wrapping{Output: []byte(output), Lines: 1}
+	}
+}
+
+// writeFile writes contents to a file of its own in a fresh directory and returns its path.
+func writeFile(test *testing.T, contents string) string {
+	test.Helper()
+	file := filepath.Join(test.TempDir(), "file.go")
+	if writeError := os.WriteFile(file, []byte(contents), 0o644); writeError != nil {
+		test.Fatalf("writing %s: %v", file, writeError)
+	}
+	return file
+}
+
+// A write keeps a wrap that is the same program and gofmt's own layout, as a change gofmt did not make, counted by
+// the lines it wrapped. A check never asks the wrap, since long lines are the lint phase's to report.
+func TestAWriteKeepsAnEquivalentWrapAndACheckNeverAsks(test *testing.T) {
+	test.Parallel()
+
+	var asked atomic.Int32
+	file := writeFile(test, callSource)
+	if checked := Run([]string{file}, Options{Wrap: wrapTo(callWrapped, &asked)}); asked.Load() != 0 ||
+		!reflect.DeepEqual(checked, Result{FilesConsidered: 1}) {
+		test.Fatalf("a check asked the wrap %d times and got %+v", asked.Load(), checked)
+	}
+	result := Run([]string{file}, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)})
+	want := Result{
+		FilesConsidered: 1,
+		Changed:         []ChangedFile{{File: file, WrappedLines: 1, Written: true, FirstDifferingLine: 3}},
+	}
+	if !reflect.DeepEqual(result, want) {
+		test.Fatalf("got %+v, want %+v", result, want)
+	}
+	requireContents(test, file, callWrapped)
+}
+
+// A wrap that is not the same program, or that gofmt would lay out again, is declined with why: the file holds gofmt's
+// output, and the run names it. Without the two checks the fix phase would write whatever a wrap returned.
+func TestAWriteDeclinesAWrapThatIsNotTheSameProgramOrNotGofmts(test *testing.T) {
+	test.Parallel()
+
+	for _, testCase := range []struct {
+		name   string
+		output string
+		reason string
+	}{
+		{"an argument changed", "package fixture\n\nvar Values = Pair(\n\t1,\n\t3,\n)\n", "not the same program"},
+		{"a layout gofmt changes", "package fixture\n\nvar  Values = Pair(\n\t1,\n\t2,\n)\n", "gofmt would change"},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+
+			var asked atomic.Int32
+			file := writeFile(test, callSource)
+			result := Run([]string{file}, Options{Write: true, Wrap: wrapTo(testCase.output, &asked)})
+			if len(result.Changed) != 0 || len(result.WrapDeclined) != 1 || result.WrapDeclined[0].File != file ||
+				!strings.Contains(result.WrapDeclined[0].Reason, testCase.reason) {
+				test.Fatalf("want the wrap declined as %q, got %+v", testCase.reason, result)
+			}
+			requireContents(test, file, callSource)
+		})
+	}
+}
+
+// gofmt's verdict that a file is formatted, kept by a run that did not wrap, is not trusted by a run that wraps: the
+// file may hold a long line, so the run asks the wrap, and keeps what the wrap says. A verdict the wrap gave is
+// trusted by both. A declined wrap is never known, so the next run asks again and says again why.
+func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
+	test.Parallel()
+
+	var asked atomic.Int32
+	file := writeFile(test, callSource)
+	gofmtOnly := DecodeKnownFiles(nil)
+	if learned := Run([]string{file}, Options{Known: gofmtOnly}); learned.Known != 0 {
+		test.Fatalf("want nothing known yet, got %+v", learned)
+	}
+	encoded, encodeError := gofmtOnly.Encode()
+	if encodeError != nil {
+		test.Fatalf("encoding the verdicts: %v", encodeError)
+	}
+	if again := Run([]string{file}, Options{Known: DecodeKnownFiles(encoded)}); again.Known != 1 {
+		test.Fatalf("want gofmt's verdict trusted by a run that does not wrap, got %+v", again)
+	}
+
+	wrapped := Run([]string{file}, Options{Write: true, Known: DecodeKnownFiles(encoded),
+		Wrap: wrapTo(callWrapped, &asked)})
+	if wrapped.Known != 0 || len(wrapped.Changed) != 1 || wrapped.Changed[0].WrappedLines != 1 {
+		test.Fatalf("want gofmt's verdict read past and the file wrapped, got %+v", wrapped)
+	}
+	requireContents(test, file, callWrapped)
+
+	fits := DecodeKnownFiles(nil)
+	nothingToDo := func([]byte) Wrapping { return Wrapping{} }
+	Run([]string{file}, Options{Write: true, Known: fits, Wrap: nothingToDo})
+	encoded, encodeError = fits.Encode()
+	if encodeError != nil {
+		test.Fatalf("encoding the verdicts: %v", encodeError)
+	}
+	for _, options := range []Options{{Write: true, Wrap: nothingToDo}, {}} {
+		options.Known = DecodeKnownFiles(encoded)
+		if known := Run([]string{file}, options); known.Known != 1 {
+			test.Fatalf("want the wrap's verdict trusted with %+v, got %+v", options, known)
+		}
+	}
+
+	declines := DecodeKnownFiles(nil)
+	declining := func([]byte) Wrapping { return Wrapping{Declined: "a planted refusal"} }
+	Run([]string{file}, Options{Write: true, Known: declines, Wrap: declining})
+	encoded, encodeError = declines.Encode()
+	if encodeError != nil {
+		test.Fatalf("encoding the verdicts: %v", encodeError)
+	}
+	again := Run([]string{file}, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: declining})
+	if again.Known != 0 || len(again.WrapDeclined) != 1 {
+		test.Fatalf("want a declined wrap tried and named again, got %+v", again)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 )
 
@@ -164,8 +165,9 @@ func (engine *pipeline) severityOf(name string) (contract.Severity, bool) {
 }
 
 // runFix is the fix and format phase: gofmt over every readable file in scope, written unless `--no-fix`, and
-// under `--no-fix` one finding per file gofmt would change, at the first line it would change. Analyzer fixes
-// are not applied yet, since applying them means loading again after the write.
+// under `--no-fix` one finding per file gofmt would change, at the first line it would change. A run that writes
+// and has the long-line rule on wraps the lines the rule reports too, after gofmt, counted under the rule. Analyzer
+// fixes are not applied yet, since applying them means loading again after the write.
 func (engine *pipeline) runFix() {
 	if !engine.request.requests(contract.PhaseFix) {
 		engine.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -189,18 +191,29 @@ func (engine *pipeline) runFix() {
 
 	severity, reported := engine.severityOf(ruleRequireFormatting)
 	known := engine.knownFiles()
-	result := format.Run(candidates, format.Options{
+	options := format.Options{
 		Write:          !engine.request.switches["no-fix"],
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          known,
-	})
+	}
+	if engine.wrapsLongLines() {
+		options.Wrap = wrapLongLines
+	}
+	result := format.Run(candidates, options)
 	engine.keepKnownFiles(known)
 	for _, changed := range result.Changed {
 		if changed.Written {
 			record.FilesRewritten++
-			record.FilesReformatted++
+			fixedBy := map[string]int{}
+			if changed.WrappedLines > 0 {
+				fixedBy[consistency_no_long_line.Name] = changed.WrappedLines
+				record.FixesApplied += changed.WrappedLines
+			}
+			if changed.Formatted {
+				record.FilesReformatted++
+			}
 			record.ChangedFiles = append(record.ChangedFiles,
-				contract.ChangedFile{File: changed.File, FixedBy: map[string]int{}, Formatted: true})
+				contract.ChangedFile{File: changed.File, FixedBy: fixedBy, Formatted: changed.Formatted})
 			engine.reread(changed.File)
 			continue
 		}
@@ -229,8 +242,27 @@ func (engine *pipeline) runFix() {
 		engine.incomplete = true
 		engine.note("%s was not formatted: %s", notFormatted.File, notFormatted.Reason)
 	}
+	for _, declined := range result.WrapDeclined {
+		// Not a gap: gofmt's output was written, and the lint phase still reports every long line in it.
+		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
+	}
 	engine.write(record)
 	engine.phase(contract.PhaseFix, contract.OutcomeRan, time.Since(started), "")
+}
+
+// wrapsLongLines is whether the fix phase wraps the long-line rule's findings: only in a run that writes and asks
+// for fixes, so neither `--no-fix` nor `--format-only` gets one, and only while the registry holds the rule and the
+// settings leave it on, so the fix never acts for a rule that reports nothing.
+func (engine *pipeline) wrapsLongLines() bool {
+	if engine.request.switches["no-fix"] || engine.request.switches["format-only"] {
+		return false
+	}
+	if _, on := engine.severityOf(consistency_no_long_line.Name); !on {
+		return false
+	}
+	return slices.ContainsFunc(engine.registered, func(registered rule.Rule) bool {
+		return registered.Name == consistency_no_long_line.Name
+	})
 }
 
 // knownFilesLabel names gofmt's verdicts among what the findings cache keeps.

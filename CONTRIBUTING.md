@@ -159,7 +159,8 @@ refused, and the refusal is listed with its reason. The passes:
   written as words. `-global` reaches across packages. A word with several meanings (`pos`) is listed for a
   person, never given its first.
 - `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
-- `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words), `type_split` (one type
+- `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
+  same wrap, `internal/line_wrap`, on the long-line rule's findings), `type_split` (one type
   with methods to a file, each file named for it), `folder_names` (a package folder moved with its clause, its
   import paths and every qualifier).
 

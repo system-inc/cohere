@@ -251,3 +251,39 @@ func TestTheInputsRecordIsTheSameWithAKeptListing(test *testing.T) {
 		test.Fatalf("the inputs record\nwith a kept listing %s\nasking go list     %s", kept, fresh)
 	}
 }
+
+// A run under `--no-fix` keeps gofmt's verdict that the long-lines fixture is formatted, and a run that writes after it
+// still wraps the file's long lines: gofmt's verdict says nothing of the wrap, so the run that wraps reads past it,
+// and only a verdict the wrap gave is trusted again. Trusting the first would leave every long line of a file gofmt
+// once found clean a finding for as long as its bytes stay the same.
+func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "long-lines"))
+	file := filepath.Join(root, "long_lines.go")
+	original, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatalf("reading %s: %v", file, readError)
+	}
+	checked := runCachedEngine(test, root)
+	if !checked.counts.On {
+		test.Fatalf("want the findings cache on, so gofmt's verdict is kept, got %+v", checked.counts)
+	}
+	unwrapped, readError := os.ReadFile(file)
+	if readError != nil || !bytes.Equal(unwrapped, original) {
+		test.Fatalf("the --no-fix run changed %s (%v)", file, readError)
+	}
+
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
+	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
+		rules.All())
+	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
+		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
+			standardOutput.String(), standardError.String())
+	}
+	wrapped, readError := os.ReadFile(file)
+	if readError != nil || bytes.Equal(wrapped, original) {
+		test.Fatalf("the run that writes left %s as it was (%v)", file, readError)
+	}
+}

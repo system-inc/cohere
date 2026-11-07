@@ -276,6 +276,55 @@ var endToEndCases = []endToEndCase{
 	{name: "refused-flag", fixture: "clean", extra: []string{"--unused"}, exitCode: 2},
 	{name: "refused-combination", fixture: "clean", extra: []string{"--format-only", "--lint"}, exitCode: 2},
 	{name: "scope-outside-root", fixture: "clean", extra: []string{"{root}/.."}, exitCode: 2},
+	// The fix phase wraps the three long lines a wrap can bring within the limit and leaves the string with a comment
+	// after it, which no break shortens, so the lint phase reports that one alone, and a second run changes nothing.
+	{
+		name: "long-lines-rewritten", fixture: "long-lines", exitCode: 1,
+		verify: wrapped("long_lines.go", "long-lines-rewritten"),
+	},
+	{
+		name: "long-lines-no-fix", fixture: "long-lines", extra: []string{"--no-fix"}, exitCode: 1,
+		verify: unchanged("long_lines.go", "long-lines"),
+	},
+	{
+		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 0, prepare: turnOffLongLines,
+		verify: unchanged("long_lines.go", "long-lines"),
+	},
+}
+
+// turnOffLongLines writes settings beside the copy's go.mod that turn the long-line rule off.
+func turnOffLongLines(root string) error {
+	settingsText := `{"go": {"rules": {"` + consistency_no_long_line.Name + `": "off"}}}` + "\n"
+	return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
+}
+
+// wrapped is a verify that a file of the copy reads as the case's golden, `<name>.golden` beside its expected files,
+// and that a second run over the copy rewrites nothing, since a wrap the fix phase keeps is gofmt's and its own fixed
+// point. Under -update the golden is rewritten from the copy.
+func wrapped(relative string, caseName string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		after, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if readError != nil {
+			test.Fatalf("reading %s: %v", relative, readError)
+		}
+		compareExpected(test, filepath.Join("testdata", caseName, filepath.Base(relative)+".golden"), string(after))
+		var standardOutput bytes.Buffer
+		var standardError bytes.Buffer
+		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
+			rules.All())
+		for line := range strings.Lines(standardOutput.String()) {
+			var record contract.FixRecord
+			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
+				record.FilesRewritten != 0 {
+				test.Errorf("a second run rewrote %d files: %s", record.FilesRewritten, line)
+			}
+		}
+		again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if againError != nil || !bytes.Equal(again, after) {
+			test.Errorf("a second run changed %s (%v)", relative, againError)
+		}
+	}
 }
 
 func TestEndToEnd(test *testing.T) {

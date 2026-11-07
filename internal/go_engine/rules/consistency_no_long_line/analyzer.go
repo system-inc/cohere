@@ -12,6 +12,10 @@
 // already counts as no cure for a key, so flagging the line buys no readability, and a new name or alias added only for
 // width is no cure either. A func type, a struct or interface literal, two type arguments or two names can all wrap,
 // so they are still judged, and a field with a tag is left to the tag's own exemption above.
+//
+// A run that writes fixes what it can of the lines this rule reports: the fix phase wraps them after gofmt with
+// internal/line_wrap, which measures by Limit and TabColumns and acts on ReportedLines alone, and keeps a wrap only
+// when it is the same program and gofmt's own layout. What no break shortens stays a finding.
 package consistency_no_long_line
 
 import (

@@ -1,6 +1,8 @@
 // Package format is the Go engine's fix phase: gofmt over every file in scope, run before the load so the load
 // reads the formatted tree. A run either rewrites what gofmt would change or, for `--no-fix`, writes nothing
-// and says where each file would change, which the engine reports as one finding per file at that line.
+// and says where each file would change, which the engine reports as one finding per file at that line. A run that
+// rewrites may also wrap each file's long lines after gofmt, through Options.Wrap, keeping the wrap only when it is
+// provably the same program and gofmt leaves it as it is.
 //
 // A formatter that formatted nothing must never read like one that found everything already correct, so
 // every file a run is handed comes back accounted for: already formatted, changed, not formatted with its
@@ -22,6 +24,8 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/line_wrap"
 )
 
 // Options says what a run does with the files gofmt would change.
@@ -36,11 +40,37 @@ type Options struct {
 	// Known is the verdicts of files gofmt had nothing to do to in an earlier run, read in place of formatting a
 	// file whose bytes are the same, and given what this run learns. Nil formats every file.
 	Known *KnownFiles
+
+	// Wrap, when set, wraps the long lines of each file gofmt formats or finds formatted, under Write only: a check
+	// leaves long lines to the lint phase, which reports them as the rule's findings. It is handed gofmt's output
+	// and says what it would write instead. The run keeps that only when it is the same program as gofmt's output
+	// (line_wrap.Equivalent) and gofmt leaves it as it is; otherwise it writes gofmt's output and names the file in
+	// Result.WrapDeclined, and the long lines stay findings.
+	Wrap func(formatted []byte) Wrapping
 }
 
-// ChangedFile is a file gofmt changed, or would change under a check.
+// Wrapping is what Options.Wrap would make of one file's formatted text.
+type Wrapping struct {
+	// Output is the wrapped text, nil when the wrap leaves the file as gofmt has it.
+	Output []byte
+
+	// Lines is how many long lines Output brings within the limit, at least one whenever Output is set.
+	Lines int
+
+	// Declined is why the wrap gave up on a file it set out to change, a check of its own that failed. Empty when
+	// it had nothing to do or Output is set.
+	Declined string
+}
+
+// ChangedFile is a file gofmt changed, or would change under a check, or whose long lines a write wrapped.
 type ChangedFile struct {
 	File string
+
+	// Formatted is whether gofmt changed the file, false for one only the wrap changed.
+	Formatted bool
+
+	// WrappedLines is how many long lines the wrap brought within the limit, none when the wrap left the file alone.
+	WrappedLines int
 
 	// Written is whether the run rewrote the file, which only a run with Options.Write does.
 	Written bool
@@ -48,6 +78,12 @@ type ChangedFile struct {
 	// FirstDifferingLine is the 1-based line of the original file where gofmt's output first differs, the line
 	// a check's finding points at.
 	FirstDifferingLine int
+}
+
+// WrapDeclinedFile is a file whose wrap the run did not keep, and why. The file holds gofmt's output.
+type WrapDeclinedFile struct {
+	File   string
+	Reason string
 }
 
 // NotFormattedFile is a file the run could not format, and why: it could not be read, it does not parse, or
@@ -67,6 +103,9 @@ type Result struct {
 	Changed      []ChangedFile
 	NotFormatted []NotFormattedFile
 
+	// WrapDeclined is the files whose wrap the run did not keep. Each is also in Changed when gofmt changed it.
+	WrapDeclined []WrapDeclinedFile
+
 	// Generated is the files skipped as generated, by the rule go/ast.IsGenerated reads: a comment line
 	// `// Code generated ... DO NOT EDIT.` before the package clause. Their output is their generator's, so
 	// they are neither formatted nor reported.
@@ -77,12 +116,13 @@ type Result struct {
 	Known int
 }
 
-// outcome is what a run did with one file: at most one of its fields is set, and none for a file gofmt would
-// leave as it is.
+// outcome is what a run did with one file: at most one of changed, notFormatted and generated is set, and none for
+// a file the run would leave as it is. A declined wrap may come with a change gofmt made.
 type outcome struct {
 	changed      *ChangedFile
 	notFormatted *NotFormattedFile
 	generated    bool
+	wrapDeclined *WrapDeclinedFile
 
 	// known is a file answered from Options.Known.
 	known bool
@@ -94,7 +134,7 @@ func Run(files []string, options Options) Result {
 	outcomes := make([]outcome, len(files))
 	if options.SingleThreaded {
 		for index, file := range files {
-			outcomes[index] = formatFile(file, options.Write, options.Known)
+			outcomes[index] = formatFile(file, options)
 		}
 	} else {
 		slots := make(chan struct{}, runtime.GOMAXPROCS(0))
@@ -103,7 +143,7 @@ func Run(files []string, options Options) Result {
 			slots <- struct{}{}
 			group.Go(func() {
 				defer func() { <-slots }()
-				outcomes[index] = formatFile(file, options.Write, options.Known)
+				outcomes[index] = formatFile(file, options)
 			})
 		}
 		group.Wait()
@@ -113,6 +153,9 @@ func Run(files []string, options Options) Result {
 	for index, file := range files {
 		if outcomes[index].known {
 			result.Known++
+		}
+		if outcomes[index].wrapDeclined != nil {
+			result.WrapDeclined = append(result.WrapDeclined, *outcomes[index].wrapDeclined)
 		}
 		switch {
 		case outcomes[index].changed != nil:
@@ -126,17 +169,18 @@ func Run(files []string, options Options) Result {
 	return result
 }
 
-// formatFile formats one file, writing the result when write is set, unless known says what gofmt made of the same
-// bytes before.
-func formatFile(file string, write bool, known *KnownFiles) outcome {
+// formatFile formats one file and wraps its long lines when options asks, writing the result under options.Write,
+// unless options.Known says what the run made of the same bytes before.
+func formatFile(file string, options Options) outcome {
 	original, readError := os.ReadFile(file)
 	if readError != nil {
 		return notFormatted(file, fmt.Sprintf("it cannot be read: %v", readError))
 	}
+	wraps := options.Write && options.Wrap != nil
 	var digest [sha256.Size]byte
-	if known != nil {
+	if options.Known != nil {
 		digest = sha256.Sum256(original)
-		if verdict, held := known.verdict(digest); held {
+		if verdict, held := options.Known.verdict(digest, wraps); held {
 			return outcome{generated: verdict == VerdictGenerated, known: true}
 		}
 	}
@@ -150,8 +194,8 @@ func formatFile(file string, write bool, known *KnownFiles) outcome {
 		return notFormatted(file, fmt.Sprintf("it does not parse: %v", headerError))
 	}
 	if ast.IsGenerated(header) {
-		if known != nil {
-			known.learn(digest, VerdictGenerated)
+		if options.Known != nil {
+			options.Known.learn(digest, VerdictGenerated)
 		}
 		return outcome{generated: true}
 	}
@@ -160,20 +204,68 @@ func formatFile(file string, write bool, known *KnownFiles) outcome {
 	if formatError != nil {
 		return notFormatted(file, formatFailureReason(formatError))
 	}
-	if bytes.Equal(formatted, original) {
-		if known != nil {
-			known.learn(digest, VerdictUnchanged)
+	result := outcome{}
+	output := formatted
+	wrappedLines := 0
+	if wraps {
+		var declined string
+		output, wrappedLines, declined = keptWrap(formatted, options.Wrap(formatted))
+		if declined != "" {
+			result.wrapDeclined = &WrapDeclinedFile{File: file, Reason: declined}
 		}
-		return outcome{}
 	}
-	changed := &ChangedFile{File: file, FirstDifferingLine: firstDifferingLine(original, formatted)}
-	if write {
-		if writeError := writeAtomically(file, formatted); writeError != nil {
+	if bytes.Equal(output, original) {
+		// A declined wrap is never known, so the next run tries it again and says again why it was not kept.
+		if options.Known != nil && result.wrapDeclined == nil {
+			verdict := VerdictUnchanged
+			if wraps {
+				verdict = VerdictWrapUnchanged
+			}
+			options.Known.learn(digest, verdict)
+		}
+		return result
+	}
+	changed := &ChangedFile{
+		File:               file,
+		Formatted:          !bytes.Equal(formatted, original),
+		WrappedLines:       wrappedLines,
+		FirstDifferingLine: firstDifferingLine(original, output),
+	}
+	if options.Write {
+		if writeError := writeAtomically(file, output); writeError != nil {
 			return notFormatted(file, fmt.Sprintf("it cannot be written: %v", writeError))
 		}
 		changed.Written = true
 	}
-	return outcome{changed: changed}
+	result.changed = changed
+	return result
+}
+
+// keptWrap is what a run writes of a wrapping of formatted, gofmt's output: the wrap's text and the lines it brought
+// within the limit when it is the same program and gofmt leaves it as it is, and otherwise formatted, with why the
+// wrap was not kept unless it had nothing to do.
+func keptWrap(formatted []byte, wrapping Wrapping) (output []byte, lines int, declined string) {
+	if wrapping.Declined != "" {
+		return formatted, 0, wrapping.Declined
+	}
+	if wrapping.Output == nil || bytes.Equal(wrapping.Output, formatted) {
+		return formatted, 0, ""
+	}
+	if wrapping.Lines < 1 {
+		return formatted, 0, "the wrap changed the file and brought no long line within the limit"
+	}
+	if equivalentError := line_wrap.Equivalent(formatted, wrapping.Output); equivalentError != nil {
+		return formatted, 0, fmt.Sprintf("the wrap is not the same program: %v", equivalentError)
+	}
+	reformatted, reformatError := goformat.Source(wrapping.Output)
+	if reformatError != nil {
+		return formatted, 0, fmt.Sprintf("gofmt cannot format the wrap: %v", reformatError)
+	}
+	if !bytes.Equal(reformatted, wrapping.Output) {
+		return formatted, 0, fmt.Sprintf("gofmt would change the wrap from line %d",
+			firstDifferingLine(wrapping.Output, reformatted))
+	}
+	return wrapping.Output, wrapping.Lines, ""
 }
 
 // notFormatted is the outcome for a file left as it was, and why.

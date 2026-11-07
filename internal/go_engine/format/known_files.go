@@ -11,17 +11,24 @@ import (
 type Verdict string
 
 const (
-	// VerdictUnchanged is a file gofmt leaves as it is.
+	// VerdictUnchanged is a file gofmt leaves as it is, learned by a run that does not wrap long lines, so a run
+	// that wraps them never trusts it: the file may hold a long line the wrap would change.
 	VerdictUnchanged Verdict = "Unchanged"
+
+	// VerdictWrapUnchanged is a file gofmt and the long-line wrap both leave as it is: it holds no long line the
+	// rule reports, or none the wrap could bring within the limit. Every run trusts it.
+	VerdictWrapUnchanged Verdict = "WrapUnchanged"
 
 	// VerdictGenerated is a file skipped as generated.
 	VerdictGenerated Verdict = "Generated"
 )
 
 // KnownFiles is the verdicts of files gofmt had nothing to do to, by the sha256 of their bytes, which a run reads
-// in place of formatting them again: gofmt's answer is a function of a file's bytes and of the gofmt the binary
-// links, which whoever keeps the verdicts keys them on. A file it would change, or could not format, is never known,
-// so its finding or its rewrite is always the run's own. Run asks it from any goroutine.
+// in place of formatting them again: gofmt's answer, and the wrap's, is a function of a file's bytes and of the
+// gofmt and the wrap the binary links, which whoever keeps the verdicts keys them on. A verdict says whether the
+// wrap was asked too, since a run that wraps must not trust one that only gofmt gave. A file the run would change,
+// could not format, or whose wrap it declined is never known, so its finding or its rewrite is always the run's own.
+// Run asks it from any goroutine.
 type KnownFiles struct {
 	lock     sync.Mutex
 	verdicts map[[sha256.Size]byte]Verdict
@@ -51,15 +58,17 @@ func (known *KnownFiles) Encode() ([]byte, error) {
 	return encoded.Bytes(), nil
 }
 
-// verdict is what is known of a file with digest, and false for a file not known.
-func (known *KnownFiles) verdict(digest [sha256.Size]byte) (Verdict, bool) {
+// verdict is what is known of a file with digest, and false for a file not known, or known only to gofmt when the
+// run wraps long lines.
+func (known *KnownFiles) verdict(digest [sha256.Size]byte, wraps bool) (Verdict, bool) {
 	known.lock.Lock()
 	defer known.lock.Unlock()
 	verdict, held := known.verdicts[digest]
-	if held {
-		known.seen[digest] = verdict
+	if !held || (wraps && verdict == VerdictUnchanged) {
+		return "", false
 	}
-	return verdict, held
+	known.seen[digest] = verdict
+	return verdict, true
 }
 
 // learn keeps what the run made of a file with digest.
