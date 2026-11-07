@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // The census of a workspace is every `.go` file go would see in its owned modules, as absolute paths: inner
@@ -126,7 +128,7 @@ func TestTakeCensusSeesTheRootModulesPackagesGoListSees(test *testing.T) {
 	}
 
 	command := exec.Command("go", "list", "-f", `{{if eq .Module.Path "example.com/root"}}{{.Dir}}{{end}}`, "./...")
-	command.Dir = built.repository
+	command.Dir = build_inputs.OutsideModule(test, built.repository)
 	// -mod=readonly, since a vendor directory at a go.work's root could otherwise read as the workspace's
 	// vendoring, and workspace mode allows no other value.
 	command.Env = append(withoutVariable(os.Environ(), "GOWORK"), "GOTOOLCHAIN=local", "GOPROXY=off",

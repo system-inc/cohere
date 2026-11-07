@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // newCache makes a directory in Go's cache layout, README included.
@@ -211,7 +213,7 @@ func TestTheGoCommandBuildsFromATrimmedCache(test *testing.T) {
 	build := func() {
 		test.Helper()
 		command := exec.Command("go", "build", "-o", filepath.Join(test.TempDir(), "trimmed"), ".")
-		command.Dir = module
+		command.Dir = build_inputs.OutsideModule(test, module)
 		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
 		if output, outputError := command.CombinedOutput(); outputError != nil {
 			test.Fatalf("go build: %v: %s", outputError, output)

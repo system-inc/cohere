@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // Every entry the fast tier leaves to the landing gate was recorded above fastBudgetCPUSeconds of CPU, and
@@ -104,6 +106,7 @@ func measureTests(test *testing.T, root string, pattern string, environment []st
 	test.Helper()
 	deadline, hasDeadline := test.Deadline()
 	timeout := "-timeout=" + inheritedTimeout(deadline, hasDeadline, time.Now())
+	build_inputs.Record(test, root, "-test", pattern)
 	// Uncached: this run exists to do the build now, untimed, and a cached result would skip the work
 	// and leave it to the measured run below.
 	build := exec.Command("go", "test", "-count=1", timeout, "-run", "^$", pattern)

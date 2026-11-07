@@ -80,7 +80,8 @@ var recordings sync.Map
 // Record opens, in the calling test's process, every file a go build of arguments run from directory reads, and
 // reads the environment variables that shape that build, so Go's test cache keys the test's result on all of
 // them. arguments are what the build is given after `go build`, less its -o: its flags and its packages, such as
-// "-tags", "cohere_planted_panic", ".". It returns how many files it opened.
+// "-tags", "cohere_planted_panic", ".". For a `go test`, add -test, so the test files and what they import are
+// listed too. It returns how many files it opened.
 //
 // Opened are every non-standard package's directory, whose listing Go hashes with each entry's size and
 // modification time, so an added or removed file is a miss too; each of its Go, cgo, assembly, embedded and
@@ -143,7 +144,10 @@ func record(directory string, arguments []string) (int, error) {
 			listed.EmbedFiles,
 		} {
 			for _, file := range files {
-				paths = append(paths, filepath.Join(listed.Directory, file))
+				// A test main go generates is named by its path in the build cache: go's own, not ours.
+				if !filepath.IsAbs(file) {
+					paths = append(paths, filepath.Join(listed.Directory, file))
+				}
 			}
 		}
 		if listed.Module != nil && listed.Module.GoMod != "" && !modules[listed.Module.GoMod] {
@@ -159,7 +163,13 @@ func record(directory string, arguments []string) (int, error) {
 		paths = append(paths, workspace, workspace+".sum")
 	}
 	opened := 0
+	// With -test a package is listed again as its test variant, so its files come twice.
+	seen := map[string]bool{}
 	for _, path := range paths {
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
 		file, openError := os.Open(path)
 		if errors.Is(openError, os.ErrNotExist) && isSumFile(path) {
 			// A module with no requirements has no go.sum, and a workspace no go.work.sum. The failed open is
@@ -175,6 +185,55 @@ func record(directory string, arguments []string) (int, error) {
 		}
 	}
 	return opened, nil
+}
+
+// OutsideModule returns directory, a place a test runs the go command, after failing the test unless it lies
+// outside the module the test belongs to, symbolic links followed. Go rechecks only files inside that module, so a
+// go command run on a module the test wrote somewhere of its own reads nothing the cache could miss, and needs no
+// Record; one that runs inside the module reads our code, and does. The guard in internal/guard accepts a go
+// command whose directory is set from this in place of a Record, and this makes that claim checked rather than
+// trusted.
+func OutsideModule(test testing.TB, directory string) string {
+	test.Helper()
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
+	}
+	module := workingDirectory
+	for {
+		if _, statError := os.Stat(filepath.Join(module, "go.mod")); statError == nil {
+			break
+		}
+		parent := filepath.Dir(module)
+		if parent == module {
+			test.Fatalf("no go.mod above %s, so there is no module to be outside of", workingDirectory)
+		}
+		module = parent
+	}
+	resolvedModule, moduleError := filepath.EvalSymlinks(module)
+	if moduleError != nil {
+		test.Fatal(moduleError)
+	}
+	absolute, absoluteError := filepath.Abs(directory)
+	if absoluteError != nil {
+		test.Fatal(absoluteError)
+	}
+	resolved, resolveError := filepath.EvalSymlinks(absolute)
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	relative, relativeError := filepath.Rel(resolvedModule, resolved)
+	if relativeError != nil {
+		test.Fatal(relativeError)
+	}
+	if relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		test.Fatalf(
+			"%s is inside the module at %s, so the go command run there reads our code: call Record for it",
+			directory,
+			resolvedModule,
+		)
+	}
+	return directory
 }
 
 func isSumFile(path string) bool {

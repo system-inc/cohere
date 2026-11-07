@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 	"golang.org/x/sys/unix"
@@ -175,6 +176,7 @@ func init() { rule.Register(rule.Registration[rule.NoOptions]{Rule: NoCrossEnumN
 		"-v",
 	)
 	command.Dir = root
+	build_inputs.Record(test, root, "-test", "./internal/lint/registry")
 	output, outputError := command.CombinedOutput()
 	text := string(output)
 	if outputError == nil ||
