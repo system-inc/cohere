@@ -157,6 +157,9 @@ var NoDeprecatedClasses = rule.Rule[NoDeprecatedClassesOptions]{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				reportDeprecations(ruleContext, literal)
 			}
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				reportTemplateDeprecations(ruleContext, segments)
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -213,14 +216,6 @@ func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 		}
 	}
 
-	if len(findings) == 0 {
-		return
-	}
-
-	// A literal holding a template hole is only partly known, so its classes can be reported but its
-	// text must not be rewritten from the fragments the reader could see.
-	canFix := !strings.Contains(literal.Text, "${")
-
 	for _, found := range findings {
 		if found.replacement == "" {
 			// Removed outright: reported and left as written, because this rule has no rewrite to offer
@@ -230,10 +225,6 @@ func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 		}
 
 		message := messageDeprecatedClassReplaceable(found.className, found.replacement)
-		if !canFix {
-			ruleContext.ReportRange(literal.Range, message)
-			continue
-		}
 
 		// Without tokens the literal's source is not its decoded value, and it is reported without a
 		// fix for the reason no-unnecessary-whitespace gives.
@@ -248,6 +239,76 @@ func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 			SourceFile: ruleContext.SourceFile,
 			Fixes:      fixes,
 		})
+	}
+}
+
+// reportTemplateDeprecations judges every static run of a template with holes, as upstream does.
+//
+// Upstream reads each piece of a template as a literal of its own and reports each deprecated class
+// at its own range, so `self-start rounded px-2 ${tone}` reports `rounded`. Until this read the runs,
+// the reader handed this rule string literals only, and a template with a hole was invisible to it:
+// ahra's parity found `rounded` at AdhocProposalPanel.tsx:150 reported by ESLint and not by cohere.
+//
+// A class glued to a hole is reported without a fix, and this is the one place the rule differs from
+// upstream on purpose. Upstream renames it, `rounded${size}` becoming `rounded-sm${size}`, measured on
+// 4.9.1 under its own createRule. The text before the hole is half of a class the hole completes, so
+// when `size` holds `-lg` the rename turns a working `rounded-lg` into `rounded-sm-lg`, which is no
+// class at all. The finding stays, since the visible text does match a deprecated name, but a
+// rewrite the author has to check is not one to land unattended.
+//
+// A repeat inside a run is `no-duplicate-classes`'s to delete, so it is reported and not renamed, as
+// in a literal; that rule counts and deletes exactly the unglued repeats within a run, so this skips
+// exactly those. A run whose source is not its decoded value is reported at the run, without a fix.
+func reportTemplateDeprecations(ruleContext rule.Context, segments []ClassSegment) {
+	sourceText := ""
+	if ruleContext.SourceFile != nil {
+		sourceText = ruleContext.SourceFile.Text()
+	}
+
+	for _, segment := range segments {
+		tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
+		if !tokenized {
+			tokens = classTokensOf(segment.Text, 0)
+		}
+
+		seenInRun := map[string]bool{}
+		for index, token := range tokens {
+			if token.Separator {
+				continue
+			}
+			glued := (index == 0 && segment.LeadingHole) || (index == len(tokens)-1 && segment.TrailingHole)
+			repeated := !glued && seenInRun[token.Text]
+			if !glued {
+				seenInRun[token.Text] = true
+			}
+
+			replacement, isDeprecated := deprecationFor(token.Text)
+			if !isDeprecated {
+				continue
+			}
+
+			// A token's range is a source range only when the run tokenized against the source.
+			findingRange := segment.Range
+			if tokenized {
+				findingRange = token.Range
+			}
+
+			if replacement == "" {
+				ruleContext.ReportRange(findingRange, messageDeprecatedClassIrreplaceable(token.Text))
+				continue
+			}
+
+			var fixes []rule.Fix
+			if tokenized && !glued && !repeated {
+				fixes = []rule.Fix{rule.ReplaceRange(token.Range, replacement)}
+			}
+			ruleContext.Report(rule.Diagnostic{
+				Range:      findingRange,
+				Message:    messageDeprecatedClassReplaceable(token.Text, replacement),
+				SourceFile: ruleContext.SourceFile,
+				Fixes:      fixes,
+			})
+		}
 	}
 }
 
