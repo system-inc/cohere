@@ -17,11 +17,13 @@ var consistencyRequireSeparatedFolderWordsText = policy.MessageOf(
 	"runTogetherProjectFolder",
 )
 
-// typeScriptFolderSpelling separates a folder's words with a hyphen or an underscore. A split takes the separator
-// the folder already uses between two parts, and a hyphen where it uses none, since every multi-word folder in the
-// house's TypeScript trees is spelled with hyphens (net-worth, sign-in, social-media), and a Next.js route folder is
-// a URL segment, where the hyphen is the web's separator.
-var typeScriptFolderSpelling = folder_words.Spelling{Separators: "-_", Joiner: "-"}
+// typeScriptFolderSpelling separates a folder's words with a hyphen, an underscore, or a capital after a lowercase
+// letter: serviceTypes and ProfileImages separate their words by case, and whether a folder should be kebab-case is
+// a casing question, not this rule's. A split takes the separator the folder already uses between two parts, by case
+// where it separates them by case, and a hyphen where it uses none, since every multi-word folder in the house's
+// TypeScript trees that uses no capitals is spelled with hyphens (net-worth, sign-in, social-media), and a Next.js
+// route folder is a URL segment, where the hyphen is the web's separator.
+var typeScriptFolderSpelling = folder_words.Spelling{Separators: "-_", Joiner: "-", CaseSeparates: true}
 
 // nodeModulesFolder holds what Node's resolution installs. A file below one is a package's, and so are its folders.
 const nodeModulesFolder = "node_modules"
@@ -29,8 +31,9 @@ const nodeModulesFolder = "node_modules"
 // ConsistencyRequireSeparatedFolderWords reports a folder inside the project whose name runs words together:
 // profileimages, not profile-images (#narw7aq, the text rules family `separated-folder-words`). It is the
 // TypeScript twin of cohere-go/consistency-require-separated-folder-words, and both read one judgment,
-// internal/folder_words: a name is cut into parts at its hyphens and underscores, a part that is a word passes, and
-// a part that splits into two or more words is the finding, with the split as the name it asks for.
+// internal/folder_words: a name is cut into parts at its hyphens and underscores and where a capital follows a
+// lowercase letter, a part that is a word passes, and a part that splits into two or more words is the finding, with
+// the split as the name it asks for.
 //
 // A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's
 // name is read before anything in it, on every import line and every path.
@@ -52,6 +55,11 @@ const nodeModulesFolder = "node_modules"
 // findings, so a finding that sat once per folder would move to another file whenever the first was renamed or
 // deleted. Renaming the folder clears every file's finding in it at once, and the next folder down, if it runs
 // together too, is reported then.
+//
+// A folder that mirrors another project's name, a brand or a package, keeps it by the name joining
+// policy/HouseWords.txt with its owner's page, as the census's Cloudflare and PlanetScale did, so every engine reads
+// it as one word. The rule offers no per-folder exemption, and a per-file finding would need a directive in every
+// file of the folder.
 //
 // The rule reads only the path, so it decides on a string and declines the file before any node is visited.
 var ConsistencyRequireSeparatedFolderWords = rule.Rule[ProjectRootOptions]{

@@ -25,7 +25,12 @@ func TestConsistencyRequireSeparatedFolderWordsFires(test *testing.T) {
 		{"/project/source/profileimages-leaf/Thing.tsx", "profileimages-leaf", "profile-images-leaf"},
 		{"/project/source/text_formatoptions/Thing.ts", "text_formatoptions", "text_format_options"},
 		{"/project/source/imessagebridge/Thing.ts", "imessagebridge", "imessage-bridge"},
-		{"/project/source/serviceTypes/Thing.ts", "serviceTypes", "service-types"},
+		{
+			"/project/source/serviceTypesprofileimages/Thing.ts",
+			"serviceTypesprofileimages",
+			"serviceTypesProfileImages",
+		},
+		{"/project/source/ProfileJsonlines/Thing.ts", "ProfileJsonlines", "ProfileJsonLines"},
 		// A private folder's name after its underscore is the project's own.
 		{"/project/app/_formatoptions/Thing.tsx", "_formatoptions", "_format-options"},
 		// A folder inside an App Router folder is still the project's.
@@ -70,6 +75,9 @@ func TestConsistencyRequireSeparatedFolderWordsStaysSilent(test *testing.T) {
 		"/project/source/net-worth/by-payee/Thing.ts",
 		"/project/source/cachedvfs/Thing.ts",
 		"/project/source/automations/Thing.ts",
+		// Case separates words, as a hyphen does.
+		"/project/source/serviceTypes/Thing.ts",
+		"/project/source/ProfileImages/Thing.ts",
 		"/project/source/marketing-webhooks/Thing.ts",
 		"/project/source/social-media-v2/Thing.ts",
 		"/project/app/_components/Thing.tsx",

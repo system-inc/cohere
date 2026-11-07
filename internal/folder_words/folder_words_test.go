@@ -122,12 +122,13 @@ func TestSeparated(test *testing.T) {
 }
 
 // typeScriptSpelling is TypeScript's, as nexus/consistency-require-separated-folder-words hands it in.
-var typeScriptSpelling = Spelling{Separators: "_-", Joiner: "-"}
+var typeScriptSpelling = Spelling{Separators: "_-", Joiner: "-", CaseSeparates: true}
 
 // With a hyphen among the separators, each hyphenated part is judged on its own, as each underscored one is, and a
 // split takes the name's own separator, or the spelling's joiner where the name separates no two parts. A leading
 // underscore separates no two parts, so it never chooses the joiner. Go's spelling separates on the underscore
-// alone, so a hyphenated name there is one part, which splits no way, and passes.
+// alone, so a hyphenated name there is one part, which splits no way, and passes, and a camel-cased one is one
+// part lowercased.
 func TestSeparatedBySpelling(test *testing.T) {
 	test.Parallel()
 	cases := []struct {
@@ -142,7 +143,19 @@ func TestSeparatedBySpelling(test *testing.T) {
 		{"text_formatoptions", typeScriptSpelling, "text_format_options"},
 		{"_formatoptions", typeScriptSpelling, "_format-options"},
 		{"_components", typeScriptSpelling, ""},
-		{"serviceTypes", typeScriptSpelling, "service-types"},
+		// A capital after a lowercase letter separates where case does, and the name keeps its case. A part that
+		// still runs together is split by case where it opens with a capital, or where the name separates by case
+		// alone, so the split reads as the rest of the name does.
+		{"serviceTypes", typeScriptSpelling, ""},
+		{"ProfileImages", typeScriptSpelling, ""},
+		{"serviceTypesprofileimages", typeScriptSpelling, "serviceTypesProfileImages"},
+		{"ProfileJsonlines", typeScriptSpelling, "ProfileJsonLines"},
+		{"Formatoptions", typeScriptSpelling, "FormatOptions"},
+		{"networthTypes", typeScriptSpelling, "netWorthTypes"},
+		{"Profile-formatoptions", typeScriptSpelling, "Profile-format-options"},
+		// Go's spelling reads case as nothing: the name is lowercased whole, as it always was.
+		{"serviceTypes", goSpelling, "service_types"},
+		{"ProfileImages", goSpelling, "profile_images"},
 		{"social-media-v2", typeScriptSpelling, ""},
 		{"--", typeScriptSpelling, ""},
 		{"profileimages-leaf", goSpelling, ""},

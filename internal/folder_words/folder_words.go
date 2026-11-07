@@ -8,10 +8,11 @@
 // importing nothing heavier than policy, because the nexus rules package links the TypeScript checker and the Go
 // engine must not.
 //
-// A name is judged one part at a time, a part being a run between two of the spelling's separators: a part that is a
-// word passes, and a part that splits into two or more words is the finding, with the split as the spelling it asks
-// for. The words are policy's (policy/Words.txt, cspell's lists with policy/HouseWords.txt merged in, and Brands.json's
-// brands joined), so a word the lists lack is a reviewed change to policy, never a carve-out here.
+// A name is judged one part at a time, a part being a run between two of the spelling's separators, or between a
+// lowercase letter and a capital where the spelling's case separates: a part that is a word passes, and a part that
+// splits into two or more words is the finding, with the split as the spelling it asks for. The words are policy's
+// (policy/Words.txt, cspell's lists with policy/HouseWords.txt merged in, and Brands.json's brands joined), so a word
+// the lists lack is a reviewed change to policy, never a carve-out here.
 package folder_words
 
 import (
@@ -29,6 +30,12 @@ type Spelling struct {
 	// Joiner joins the pieces of a split when the name separates no two parts already. Where it does, the split
 	// takes the name's own first separator between two parts, so a name keeps one way of separating its words.
 	Joiner string
+	// CaseSeparates says a lowercase letter followed by an uppercase one ends a part, as a separator does, so
+	// serviceTypes is service and Types and ProfileImages is Profile and Images, words a reader sees apart. Its
+	// parts keep the name's case, and a split that is spelled by case is spelled by case too: Typesprofileimages
+	// asks for TypesProfileImages. Go's package names hold no capitals, so its spelling leaves this false and reads a
+	// name lowercased whole, as it always has.
+	CaseSeparates bool
 }
 
 // minimumPieceLength is the fewest letters a piece of a split may have, unless it is one of twoLetterWords. It is what
@@ -72,30 +79,50 @@ func normalizedBrands(vocabulary policy.BrandVocabulary) map[string]bool {
 	return words
 }
 
-// Separated is name lowercased with each part that runs words together split into them, and whether any part did. A
-// part that is a word is kept whole, and so is one that splits no way into pieces that are each a word, which is a
-// name the lists cannot read (vfs, cachedvfs) rather than words run together. A word of three letters or more would
-// come out of fewestPieces whole too, as its own one piece, so the word check first is the short way to the common
-// answer, one search rather than one for every piece a split tries, and the answer for a word of one or two letters,
-// which is no piece. A part that is a plural of a word is kept whole too (isPlural).
+// Separated is name with each part that runs words together split into them, and whether any part did. A part is
+// judged lowercased: a part that is a word is kept whole, and so is one that splits no way into pieces that are each
+// a word, which is a name the lists cannot read (vfs, cachedvfs) rather than words run together. A word of three
+// letters or more would come out of fewestPieces whole too, as its own one piece, so the word check first is the
+// short way to the common answer, one search rather than one for every piece a split tries, and the answer for a word
+// of one or two letters, which is no piece. A part that is a plural of a word is kept whole too (isPlural).
+//
+// Where the spelling's case separates, the name keeps its case, and a split part's pieces are joined by case when
+// the part opens with a capital or the name separates its parts by case alone. Otherwise the name comes back
+// lowercased, its split parts joined as the spelling's Joiner says.
 func Separated(name string, spelling Spelling) (string, bool) {
-	parts, separators := splitParts(strings.ToLower(name), spelling.Separators)
+	parts, separators := splitParts(name, spelling)
 	joiner := spelling.Joiner
+	separatedByCaseAlone := false
 	for index, separator := range separators {
-		if parts[index] != "" && parts[index+1] != "" {
+		if parts[index] == "" || parts[index+1] == "" {
+			continue
+		}
+		if separator != "" {
 			joiner = separator
+			separatedByCaseAlone = false
 			break
 		}
+		separatedByCaseAlone = true
 	}
 	runTogether := false
 	for index, part := range parts {
-		if part == "" || isWord(part) || isPlural(part) {
+		lowered := strings.ToLower(part)
+		if !spelling.CaseSeparates {
+			parts[index] = lowered
+		}
+		if lowered == "" || isWord(lowered) || isPlural(lowered) {
 			continue
 		}
-		if pieces := fewestPieces(part); len(pieces) >= 2 {
-			parts[index] = strings.Join(pieces, joiner)
-			runTogether = true
+		pieces := fewestPieces(lowered)
+		if len(pieces) < 2 {
+			continue
 		}
+		runTogether = true
+		if spelling.CaseSeparates && (separatedByCaseAlone || startsUppercase(part)) {
+			parts[index] = joinedByCase(pieces, startsUppercase(part))
+			continue
+		}
+		parts[index] = strings.Join(pieces, joiner)
 	}
 	var joined strings.Builder
 	for index, part := range parts {
@@ -107,20 +134,54 @@ func Separated(name string, spelling Spelling) (string, bool) {
 	return joined.String(), runTogether
 }
 
-// splitParts is name cut at each of separators, the parts and, between each two, the separator that stood there, so
-// a part is empty where two separators meet or one leads or ends the name.
-func splitParts(name string, separators string) ([]string, []string) {
+// splitParts is name cut at each of the spelling's separators, and where its case separates, between a lowercase
+// letter and the uppercase one after it: the parts and, between each two, the separator that stood there, empty for
+// a case boundary. A part is empty where two separators meet or one leads or ends the name.
+func splitParts(name string, spelling Spelling) ([]string, []string) {
 	parts := []string{}
 	between := []string{}
 	start := 0
 	for index := 0; index < len(name); index++ {
-		if strings.IndexByte(separators, name[index]) >= 0 {
+		if strings.IndexByte(spelling.Separators, name[index]) >= 0 {
 			parts = append(parts, name[start:index])
 			between = append(between, name[index:index+1])
 			start = index + 1
+			continue
+		}
+		if spelling.CaseSeparates && index > start && isLowercase(name[index-1]) && isUppercase(name[index]) {
+			parts = append(parts, name[start:index])
+			between = append(between, "")
+			start = index
 		}
 	}
 	return append(parts, name[start:]), between
+}
+
+// joinedByCase is pieces spelled as one camel-cased run: each after the first opens with a capital, and the first
+// does when capitalized says so.
+func joinedByCase(pieces []string, capitalized bool) string {
+	var joined strings.Builder
+	for index, piece := range pieces {
+		if index > 0 || capitalized {
+			joined.WriteString(strings.ToUpper(piece[:1]) + piece[1:])
+			continue
+		}
+		joined.WriteString(piece)
+	}
+	return joined.String()
+}
+
+// startsUppercase reports whether text opens with an ASCII capital.
+func startsUppercase(text string) bool {
+	return text != "" && isUppercase(text[0])
+}
+
+func isLowercase(character byte) bool {
+	return 'a' <= character && character <= 'z'
+}
+
+func isUppercase(character byte) bool {
+	return 'A' <= character && character <= 'Z'
 }
 
 // isWord reports whether text is in the lists or is a brand, at any length.

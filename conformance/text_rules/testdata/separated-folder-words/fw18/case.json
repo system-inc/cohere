@@ -1,0 +1,14 @@
+{
+    "why": "fw18: `serviceTypesprofileimages` separates `service` from the rest by case, and its second part, `Typesprofileimages`, runs three words together, so it is reported. Go has no form: Go's package names hold no capitals, and its spelling reads a name lowercased whole",
+    "expect": [
+        {
+            "fileStart": true
+        }
+    ],
+    "options": {},
+    "path": "serviceTypesprofileimages/fw18",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}
