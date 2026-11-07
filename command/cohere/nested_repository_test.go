@@ -455,13 +455,15 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(test *testing.T)
 	}
 
 	// The positive control, right after a check that read the file clean from the record: a misformat
-	// planted in it is drift again, on this check and the next.
+	// planted in it is drift again, on this check and the next. The next may replay this one, since no input
+	// moved, and its line then says so between the label and the counts: the walk no longer enters the run's own
+	// .cache, whose writes made every run's inputs change (#fe4vr5s).
 	writeTree(test, root, map[string]string{"library/Inner.ts": "export const inner   =   1;\n"})
 	for _, label := range []string{"the check after the plant", "the check after that"} {
 		output, code = runCohere(test, binary, root, "--no-fix", "--format")
 		if code == 0 || !strings.Contains(
 			output,
-			"nested repositories: 1 read, 2 files: 1 checked by the formatter, 1 would change under their own run; 1 taken on their record's word as formatted at their current bytes",
+			": 1 read, 2 files: 1 checked by the formatter, 1 would change under their own run; 1 taken on their record's word as formatted at their current bytes",
 		) ||
 			!strings.Contains(output, filepath.Join(library, "Inner.ts")+
 				":1:1 - the formatter would rewrite this file in nested repository library") {

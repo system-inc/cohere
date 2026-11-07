@@ -85,7 +85,19 @@ const (
 	HouseIgnoreLayer    = "format.ignore"
 	IgnorePatternsLayer = "ignorePatterns"
 	FixturesLayer       = "testdata"
+	VendoredLayer       = "Vendor"
 )
+
+// NeverEntered are the directory names no walk of cohere's enters, whatever any ignore file says: discovery's and the
+// format walk's alike. A repository that doesn't gitignore `.cache` still never has cohere's own scratch judged, which
+// a Swift run writes there, so a gate can read 0 after one (#fe4vr5s). A walk that enters one counts it under its name.
+var NeverEntered = map[string]bool{
+	"node_modules": true,
+	".build":       true,
+	".cache":       true,
+	".git":         true,
+	FixturesLayer:  true,
+}
 
 // Enumerate walks a project root and returns the files handles accepts.
 //
@@ -232,6 +244,19 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 					enumeration.IgnoredByLayer[layer.name]++
 					return filepath.SkipDir
 				}
+			}
+			// What no ignore layer named and cohere never enters, as cohere's own `.cache` in a repository whose
+			// .gitignore leaves it out (#fe4vr5s).
+			if NeverEntered[info.Name()] {
+				enumeration.IgnoredByLayer[info.Name()]++
+				return filepath.SkipDir
+			}
+			// A directory named Vendor at any depth holds someone else's code, as the Swift engine reads it
+			// (swift/Sources/CohereSwift/Project/FileSet.swift, "vendored under Vendor/"), so the Format project
+			// at the same root never judges what the Swift run there calls not ours (#fe4vr5s).
+			if info.Name() == VendoredLayer {
+				enumeration.IgnoredByLayer[VendoredLayer]++
+				return filepath.SkipDir
 			}
 			entered, enterError := scope.Enter(relative)
 			if enterError != nil {

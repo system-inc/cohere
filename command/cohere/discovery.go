@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -57,14 +58,9 @@ import (
 // that list, less what the runs of the Swift projects below it account for, is the run's own gap (see
 // engineRun.writeExcluded).
 
-// neverDescended are the directory names discovery never enters, whatever any ignore file says.
-var neverDescended = map[string]bool{
-	"node_modules": true,
-	".build":       true,
-	".cache":       true,
-	".git":         true,
-	"testdata":     true,
-}
+// neverDescended are the directory names discovery never enters, whatever any ignore file says: the format walk's
+// set, so the Format project never judges what discovery never reads (#fe4vr5s).
+var neverDescended = format_files.NeverEntered
 
 // formattableExtensions are the file types the house formatter handles, the native printers', as discovery's
 // count of them reads them.
