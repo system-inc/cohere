@@ -35,6 +35,13 @@ type Options struct {
 
 	// Withheld is the load's Loaded.Withheld, which the cache keeps with each package it saves.
 	Withheld map[*packages.Package]load.PackageWithheld
+
+	// ReleaseAnalyzed lets each analyzed package's syntax and type information go once the rules have finished on it,
+	// as a dependency's already go, rather than when the run ends; the Result is the same either way. Run then
+	// leaves the analyzed packages without their Syntax and TypesInfo, so only a caller that runs once over a load
+	// and reads neither afterwards sets it, as the engine does. A caller that runs again over the same load, as the
+	// tests do over loads they share, leaves it unset.
+	ReleaseAnalyzed bool
 }
 
 // Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
@@ -171,7 +178,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if wrapError := wrapRuns(analyzers); wrapError != nil {
 		return nil, wrapError
 	}
+	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded}
+	if options.ReleaseAnalyzed {
+		checkerOptions.Finished = record.take
+	}
 	session := options.Cache
 	roots := analyzed
 	var graphs []*checker.Graph
@@ -221,7 +232,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	for _, enabled := range rules {
 		result.FindingsByRule[enabled.Name] = 0
 	}
-	files := analyzedFiles(analyzed, session)
+	files := analyzedFiles(analyzed, session, record)
 	generated, copies := withheldFiles(files)
 	seenFindings := map[findingKey]bool{}
 	seenCrashes := map[Crash]bool{}
@@ -388,12 +399,22 @@ func firstFile(analyzedPackage *packages.Package) string {
 }
 
 // analyzedFiles is each analyzed package's files as the rules were given them, with each one's walk and whether it
-// is generated or copied, read from the syntax, or from the entry of a package the cache restored, which has none.
-func analyzedFiles(analyzed []*packages.Package, session *CacheSession) map[*packages.Package][]storedFile {
+// is generated or copied: from the entry of a package the cache restored, which has no syntax; from the record
+// taken as the checker finished a package, which then let go of its syntax; or from the syntax, of a package the
+// checker had no action on.
+func analyzedFiles(
+	analyzed []*packages.Package,
+	session *CacheSession,
+	record *walkRecord,
+) map[*packages.Package][]storedFile {
 	files := make(map[*packages.Package][]storedFile, len(analyzed))
 	for _, analyzedPackage := range analyzed {
 		if restored, hit := session.filesOf(analyzedPackage); hit {
 			files[analyzedPackage] = restored
+			continue
+		}
+		if recorded, taken := record.files[analyzedPackage]; taken {
+			files[analyzedPackage] = recorded
 			continue
 		}
 		files[analyzedPackage] = storedFiles(analyzedPackage)
