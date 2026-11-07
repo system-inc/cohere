@@ -13,7 +13,7 @@ import (
 // TestTheFormatOnlyGateExitsOnFormattingAlone is the commit gate's command, through the binary: `--no-fix
 // --format-only` exits 0 over a tree whose only findings are lint's, and nonzero, naming the file, when
 // formatting would change one in the repository or in a nested repository it reads, or when the formatter
-// could not read one there.
+// could not read one of the repository's own. One in a nested repository it could not read is a named gap.
 func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -110,11 +110,11 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 
 	nestedBroken := filepath.Join(root, "library", "broken.json")
 	writeTree(test, root, map[string]string{"library/broken.json": "{ \"a\": \n"})
-	gate("a file the formatter cannot read in a nested repository", 1,
-		nestedBroken+
-			":1:1 - the formatter could not check this file: in nested repository library, "+
-			unparseableSkipReason+
-			" [format/unchecked]")
+	// A gap the account names and the footer counts, never the verdict: the nested repository's own gate is the one
+	// that fails on it (#zmt3tv5).
+	gate("a file the formatter cannot read in a nested repository", 0,
+		"note: "+nestedBroken+" not checked: in nested repository library, "+unparseableSkipReason,
+		"⚠ 1 nested file not checked")
 	removeForTest(test, nestedBroken)
 
 	gate("neither", 0, "0 files would change")
