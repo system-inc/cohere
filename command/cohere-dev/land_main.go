@@ -16,7 +16,8 @@ import (
 // differs from main's runs main's from the main checkout, against the lander's worktree, and says so.
 //
 // A worktree whose code predates this file can't be reached by it: only moving the worktree to main does
-// that. From here on, a change to land reaches every landing the moment it is on main.
+// that. From here on, a change to land reaches every landing the moment it is on main. Land's source is everything
+// it links (tree_listing.go), since #j3bfnyt changed a package the gate calls and no landing ran it.
 
 // landSource is cohere-dev's source, relative to the repository, which decides how land behaves.
 const landSource = "command/cohere-dev"
@@ -54,32 +55,31 @@ func landWorktree() (string, error) {
 }
 
 // runsMainsLand reports whether this land is main's, so the landing is its own: it was handed the landing, or
-// the worktree's cohere-dev is main's, or the repository has no cohere-dev source at all, so there is no other
-// land to run.
-func runsMainsLand(worktree string) bool {
+// everything the worktree's land links is main's, or the repository has no cohere-dev source at all, so there is
+// no other land to run. When it is not, it also names the first input that differs.
+func runsMainsLand(worktree string) (bool, string) {
 	if handedWorktree != "" {
-		return true
+		return true, ""
 	}
-	mains, gitOutputError := gitOutput(worktree, "rev-parse", "--verify", "--quiet", "main:"+landSource)
+	_, gitOutputError := gitOutput(worktree, "rev-parse", "--verify", "--quiet", "main:"+landSource)
 	if gitOutputError != nil {
-		return true
+		return true, ""
 	}
 	// A main whose land predates this file reads the worktree from where it runs, so it would refuse to land the
 	// main checkout itself, and its landing is this land's: the first landing of this file was one.
 	mainTakesOne := "main:" + landSource + "/" + landMainFile
 	if _, gitOutputError := gitOutput(worktree, "cat-file", "-e", mainTakesOne); gitOutputError != nil {
-		return true
+		return true, ""
 	}
 	// The source that is running: land refuses a worktree with changes, so its committed tree is its disk.
-	// Ignored: a head with no cohere-dev source differs from main's, and main's land is the one to run.
-	own, _ := gitOutput(worktree, "rev-parse", "--verify", "--quiet", "HEAD:"+landSource)
-	return own == mains
+	differs := landInputsDiffer(worktree)
+	return differs == "", differs
 }
 
 // runMainsLand runs main's land from the main checkout against worktree, with the same arguments, and returns
 // its exit code. A main checkout whose cohere-dev differs from main's commit would run neither the lander's
 // land nor main's, so it is refused.
-func runMainsLand(worktree string, mainCheckout string, arguments []string) int {
+func runMainsLand(worktree string, mainCheckout string, differs string, arguments []string) int {
 	if _, gitOutputError := gitOutput(
 		mainCheckout,
 		"diff",
@@ -100,7 +100,7 @@ func runMainsLand(worktree string, mainCheckout string, arguments []string) int 
 	fmt.Fprintf(
 		streams.Errors,
 		"cohere-dev: this worktree's %s differs from main's, so main's land runs, from %s\n",
-		landSource,
+		differs,
 		mainCheckout,
 	)
 	command := exec.Command("go", append([]string{"run", "./" + landSource, "land"}, arguments...)...)
