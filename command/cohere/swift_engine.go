@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
@@ -74,7 +76,7 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 		return 1, resolveSwiftEngineBinaryError
 	}
 
-	run := newEngineRun(streams.Output, mode, swiftLanguage, location.rootNote(), processStart)
+	run := swiftEngineRun(streams.Output, mode, location)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.engineSourceCommit = sourceCommit
 	run.requested = engineRequestedPhases(given, flagValue)
@@ -106,6 +108,16 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	}
 	return exitCode, runError
 }
+
+// swiftEngineRun is a Swift run timed from its check's start, so a build of the engine before it is said apart
+// from the check's time (engine_build.go).
+func swiftEngineRun(out *bufio.Writer, mode engineMode, location projectLocation) *engineRun {
+	return newEngineRun(out, mode, swiftLanguage, location.rootNote(), checkStart())
+}
+
+// resolveDevelopmentSwiftEngine resolves a development cohere's engine, building it when there is none. A
+// variable so a test can stand in for a build, which takes minutes.
+var resolveDevelopmentSwiftEngine = dispatch.ResolveSwiftEngine
 
 // swiftEnginePlatform is the platform this cohere runs on. A variable so a test can run as a platform
 // the machine running it is not.
@@ -186,7 +198,8 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 	if swiftVersionOutputError != nil {
 		return "", "", swiftVersionOutputError
 	}
-	binaryPath, _, resolveSwiftEngineError := dispatch.ResolveSwiftEngine(
+	started := time.Now()
+	binaryPath, built, resolveSwiftEngineError := resolveDevelopmentSwiftEngine(
 		dispatch.DefaultPaths(moduleDirectory),
 		commit,
 		engineContractVersion,
@@ -194,6 +207,9 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 	)
 	if resolveSwiftEngineError != nil {
 		return "", "", resolveSwiftEngineError
+	}
+	if built {
+		recordEngineBuild(swiftEngineName, binaryPath, time.Since(started))
 	}
 	return binaryPath, commit, nil
 }
