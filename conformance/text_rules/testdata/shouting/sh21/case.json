@@ -1,0 +1,15 @@
+{
+    "why": "sh21: a sentence continuing onto `ahra run,` is prose, the comma no argument a command takes, so the shout on it is read",
+    "expect": [
+        {
+            "covers": "NEVER",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}
