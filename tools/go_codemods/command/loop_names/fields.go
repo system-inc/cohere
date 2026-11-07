@@ -6,8 +6,8 @@ import (
 	"go/types"
 	"strings"
 
-	"github.com/system-inc/cohere/tools/go_codemods/global_rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/internal/go_rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 
 	"golang.org/x/tools/go/packages"
 )

@@ -16,14 +16,6 @@
         "reason": "neither casing rule judges a leading underscore, so `_cache` is not reported"
     },
     {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh25",
-        "kind": "verdict",
-        "task": "0n6zmqq",
-        "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
-    },
-    {
         "engine": "swift",
         "family": "shouting",
         "case": "sh25",

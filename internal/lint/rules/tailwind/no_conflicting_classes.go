@@ -111,6 +111,19 @@ var NoConflictingClasses = rule.Rule[NoConflictingClassesOptions]{
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				reportConflicts(ruleContext, literal, designSystem)
 			}
+			// The static runs of a template with holes, each run judged on its own as upstream judges
+			// each piece: `flex block ${x}` reports and `flex ${x} block` does not, since the hole may
+			// hold anything and the two may never meet. A finding sits on its run, as a literal's sits
+			// on the literal.
+			sourceText := ruleContext.SourceFile.Text()
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				for _, run := range TemplateRunsOf(sourceText, segments) {
+					for _, finding := range conflictFindingsIn(distinctClasses(run.Texts()), designSystem) {
+						ruleContext.ReportRange(run.Range, messageConflictingClasses(
+							finding.ClassName, finding.Conflicting, finding.Properties))
+					}
+				}
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -149,8 +162,19 @@ func reportConflicts(ruleContext rule.Context, literal ClassLiteral, designSyste
 		return
 	}
 
-	// A repeated class is `no-duplicate-classes`'s finding; pairing it with itself would report
-	// every duplicate in the tree as a conflict.
+	for _, finding := range conflictFindingsIn(distinctClasses(classes), designSystem) {
+		// Reported per class rather than per pair, which is what makes the output symmetric and
+		// matches upstream: `flex block` produces two findings, one anchored at each class.
+		ruleContext.ReportRange(literal.Range, messageConflictingClasses(
+			finding.ClassName, finding.Conflicting, finding.Properties))
+	}
+}
+
+// distinctClasses drops every repeat after a class's first, keeping the order.
+//
+// A repeated class is `no-duplicate-classes`'s finding; pairing it with itself would report every
+// duplicate in the tree as a conflict.
+func distinctClasses(classes []string) []string {
 	seen := make(map[string]bool, len(classes))
 	distinct := make([]string, 0, len(classes))
 	for _, className := range classes {
@@ -160,13 +184,7 @@ func reportConflicts(ruleContext rule.Context, literal ClassLiteral, designSyste
 		seen[className] = true
 		distinct = append(distinct, className)
 	}
-
-	for _, finding := range conflictFindingsIn(distinct, designSystem) {
-		// Reported per class rather than per pair, which is what makes the output symmetric and
-		// matches upstream: `flex block` produces two findings, one anchored at each class.
-		ruleContext.ReportRange(literal.Range, messageConflictingClasses(
-			finding.ClassName, finding.Conflicting, finding.Properties))
-	}
+	return distinct
 }
 
 // conflictFinding is one class that collides, and what it collides with.

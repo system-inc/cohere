@@ -554,3 +554,89 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 		test.Fatalf("want a declined wrap tried and named again, got %+v", again)
 	}
 }
+
+// A set is written whole or not at all: two files beside each other are both replaced, and a set with one file whose
+// directory refuses a temporary file writes neither, leaving no temporary file behind. Written one by one, the first
+// would be replaced before the second failed. The read-only directory is made writable again before the test's
+// directory is removed.
+// A placement that fails once others are in place puts back every file already placed, so the set is never left
+// half written: of three files, the second placement fails, and all three read as they did before, with no temporary
+// file left beside them.
+func TestALatePlacementFailurePutsThePlacedFilesBack(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	files := map[string][]byte{}
+	for _, name := range []string{"first.go", "second.go", "third.go"} {
+		file := filepath.Join(root, name)
+		if writeError := os.WriteFile(file, []byte(formattedSource), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		files[file] = []byte(callSource)
+	}
+	placements := 0
+	failSecond := func(staged stagedFile) error {
+		placements++
+		if placements == 2 {
+			// Ignored: the temporary file is the test's to remove, as putInPlace removes it on a failed rename.
+			_ = os.Remove(staged.temporary)
+			return fmt.Errorf("renaming %s: the placement this test fails", staged.target)
+		}
+		return putInPlace(staged)
+	}
+	partlyWritten, writeError := writeAllAtomically(files, failSecond)
+	if writeError == nil || len(partlyWritten) != 0 {
+		test.Fatalf("want the set refused and every placed file put back, got %v, partly written %v", writeError,
+			partlyWritten)
+	}
+	if placements != 2 {
+		test.Fatalf("want the placements to stop at the failed second, got %d", placements)
+	}
+	for file := range files {
+		requireContents(test, file, formattedSource)
+	}
+	entries, readError := os.ReadDir(root)
+	if readError != nil || len(entries) != 3 {
+		test.Fatalf("want the three files alone in the directory, got %v (%v)", entries, readError)
+	}
+}
+
+func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	first, second := filepath.Join(root, "first.go"), filepath.Join(root, "locked", "second.go")
+	if directoryError := os.MkdirAll(filepath.Dir(second), 0o755); directoryError != nil {
+		test.Fatal(directoryError)
+	}
+	for _, file := range []string{first, second} {
+		if writeError := os.WriteFile(file, []byte(formattedSource), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if _, writeError := WriteAllAtomically(map[string][]byte{first: []byte(callSource),
+		second: []byte(callSource)}); writeError != nil {
+		test.Fatalf("a writable set was refused: %v", writeError)
+	}
+	requireContents(test, first, callSource)
+	requireContents(test, second, callSource)
+
+	if chmodError := os.Chmod(filepath.Dir(second), 0o555); chmodError != nil {
+		test.Fatal(chmodError)
+	}
+	test.Cleanup(func() {
+		// Ignored: a directory left read-only fails only the temporary directory's removal, which says so.
+		_ = os.Chmod(filepath.Dir(second), 0o755)
+	})
+	partlyWritten, writeError := WriteAllAtomically(map[string][]byte{first: []byte(formattedSource),
+		second: []byte(formattedSource)})
+	if writeError == nil || len(partlyWritten) != 0 {
+		test.Fatalf("want the set refused whole, got %v, partly written %v", writeError, partlyWritten)
+	}
+	requireContents(test, first, callSource)
+	requireContents(test, second, callSource)
+	entries, readError := os.ReadDir(root)
+	if readError != nil || len(entries) != 2 {
+		test.Fatalf("want first.go and locked alone in the directory, got %v (%v)", entries, readError)
+	}
+}

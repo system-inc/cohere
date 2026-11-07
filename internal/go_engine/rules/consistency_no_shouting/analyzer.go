@@ -96,11 +96,15 @@ func generatedMarkerOf(file *ast.File) *ast.Comment {
 	return nil
 }
 
-// commentSpan is where one comment's body sits in its group's joined text.
+// commentSpan is where one comment's body sits in its group's joined text, and where it starts in the comment's own
+// text.
 type commentSpan struct {
 	comment *ast.Comment
 	start   int
 	end     int
+	// bodyStart is what bodyOf cut from the front of the comment's text, so a word's offset in the body plus this is
+	// its offset in the comment.
+	bodyStart int
 }
 
 // judgeGroup masks a comment group as one text, then reports each shout left in each comment's own span of it, one
@@ -119,8 +123,9 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 			joined.WriteByte('\n')
 		}
 		start := joined.Len()
-		joined.WriteString(bodyOf(comment))
-		spans = append(spans, commentSpan{comment: comment, start: start, end: joined.Len()})
+		body, bodyStart := bodyOf(comment)
+		joined.WriteString(body)
+		spans = append(spans, commentSpan{comment: comment, start: start, end: joined.Len(), bodyStart: bodyStart})
 	}
 	text := joined.String()
 	// The shared gate: without two capitals in a row nothing can be reported, so most groups skip the masking.
@@ -129,13 +134,11 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 	}
 	masked := shouting.MaskCodeAndCommands(text)
 	for _, span := range spans {
-		// The body is a suffix of the comment's text, so where it starts is what bodyOf cut from the front. Masking
-		// keeps every byte's place, so a word's offset in the span is its offset in the body, and the text's bytes
-		// are the file's: go/scanner changes a comment's text only by dropping a carriage return, which gofmt never
-		// writes.
-		bodyStart := len(span.comment.Text) - (span.end - span.start)
+		// Masking keeps every byte's place, so a word's offset in the span is its offset in the body, and the text's
+		// bytes are the file's: go/scanner changes a comment's text only by dropping a carriage return, which gofmt
+		// never writes.
 		for _, shouted := range shouting.ShoutedTokensInMasked(masked[span.start:span.end]) {
-			start := span.comment.Pos() + token.Pos(bodyStart+shouted.Offset)
+			start := span.comment.Pos() + token.Pos(span.bodyStart+shouted.Offset)
 			pass.Report(analysis.Diagnostic{
 				Pos:      start,
 				End:      start + token.Pos(len(shouted.Text)),
@@ -148,20 +151,30 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 	}
 }
 
-// bodyOf is the text of comment the masks read: shouting.GoCommentBody, which the warning-comment rule reads too, so
-// the two rules measure a code block's indentation alike. A block comment is kept whole, as the TypeScript rule reads
-// one. A go/doc note marker opening the comment is blanked, keeping every offset.
-func bodyOf(comment *ast.Comment) string {
+// bodyOf is the text of comment the masks read, and where it starts in the comment's text, so a word maps back to the
+// file. A // line is shouting.GoCommentBody, which the warning-comment rule reads too, so the two rules measure a code
+// block's indentation alike. A block comment loses its `/*` and `*/` (#0n6zmqq), as the TypeScript rule and ESLint's
+// comment value read one: the command patterns anchor at a line's start, so a `/* git commit --amend */` read whole
+// opens on its delimiter and is never masked. The delimiters are cut, not blanked, since two spaces before a line's
+// text would make it an indented code block. A go/doc note marker opening the comment is blanked, keeping every
+// offset.
+func bodyOf(comment *ast.Comment) (string, int) {
 	body := shouting.GoCommentBody(comment.Text)
-	// The body is a suffix of the text, so what it lost from the front is where it starts.
+	// A // line's body is a suffix of its text, so what it lost from the front is where it starts.
 	start := len(comment.Text) - len(body)
+	if afterOpening, isBlock := strings.CutPrefix(comment.Text, "/*"); isBlock {
+		// go/scanner reports an unterminated block comment as an error and the load stops, but the cut is safe
+		// without its closer anyway.
+		body = strings.TrimSuffix(afterOpening, "*/")
+		start = len("/*")
+	}
 	location := noteMarker.FindStringSubmatchIndex(comment.Text)
 	if location == nil {
-		return body
+		return body, start
 	}
-	// The marker follows the slashes and any spaces or tabs after them, so it never starts before the body does.
+	// The marker follows the delimiter and any spaces or tabs after it, so it never starts before the body does.
 	markerStart, markerEnd := location[2]-start, location[3]-start
-	return body[:markerStart] + strings.Repeat(" ", markerEnd-markerStart) + body[markerEnd:]
+	return body[:markerStart] + strings.Repeat(" ", markerEnd-markerStart) + body[markerEnd:], start
 }
 
 // exampleOutputGroups is the comment group holding each example's expected output in file, found as go/doc finds it:

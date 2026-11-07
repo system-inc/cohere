@@ -33,10 +33,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/policy"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
 
 	"golang.org/x/tools/go/types/typeutil"
 )

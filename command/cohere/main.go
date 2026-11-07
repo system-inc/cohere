@@ -1201,11 +1201,12 @@ func run() error {
 				printNestedDrift(streams.Output, nested)
 				findings += len(nested.Drift)
 				activeSummary.WouldChange += len(nested.Drift)
-				if *formatOnly {
-					printUnchecked(streams.Output, nestedUnchecked(nested))
-					findings += len(nested.Unchecked)
-					activeSummary.Findings += len(nested.Unchecked)
+				// A nested file the formatter could not check is named in every mode and counted as a gap, never as
+				// a finding: the nested repository is read-only here, and its own run fails on it (#zmt3tv5).
+				for _, file := range nestedUnchecked(nested) {
+					fmt.Fprintf(accountOutput(streams.Errors), "note: %s not checked: %s\n", file.FileName, file.Reason)
 				}
+				activeSummary.Gaps.NestedUnchecked = len(nested.Unchecked)
 				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))

@@ -244,7 +244,7 @@ func TestFormatMatchesTheFork(test *testing.T) {
 					}
 				}
 			}
-			actual, formatError := Format(testCase.source, options)
+			actual, formatError := Format(testCase.source, options, nil)
 			if formatError != nil {
 				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatError)
 				continue
@@ -265,8 +265,8 @@ func TestOptionSetsChangeTheOutput(test *testing.T) {
 		}
 		changed := false
 		for _, testCase := range formatCases {
-			withDefaults, defaultsError := Format(testCase.source, format_options.Default())
-			withOptions, optionsError := Format(testCase.source, options)
+			withDefaults, defaultsError := Format(testCase.source, format_options.Default(), nil)
+			withOptions, optionsError := Format(testCase.source, options, nil)
 			if defaultsError == nil && optionsError == nil && withDefaults != withOptions {
 				changed = true
 				break
@@ -287,7 +287,7 @@ func TestFormatRefusesWhatTheForkRefuses(test *testing.T) {
 		if _, formatError := oracle.Format("Probe.css", source); formatError == nil {
 			test.Fatalf("the oracle accepted %q", source)
 		}
-		if formatted, formatError := Format(source, format_options.Default()); formatError == nil {
+		if formatted, formatError := Format(source, format_options.Default(), nil); formatError == nil {
 			test.Errorf("%q was printed instead of refused:\n%s", source, formatted)
 		}
 	}
@@ -298,11 +298,11 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := format_options.Default()
 	for _, testCase := range formatCases {
-		formatted, formatError := Format(testCase.source, options)
+		formatted, formatError := Format(testCase.source, options, nil)
 		if formatError != nil {
 			test.Fatalf("%s: %v", testCase.name, formatError)
 		}
-		document, printToDocError := PrintToDoc(testCase.source, options)
+		document, printToDocError := PrintToDoc(testCase.source, options, nil)
 		if printToDocError != nil {
 			test.Fatalf("%s: %v", testCase.name, printToDocError)
 		}
@@ -373,7 +373,7 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 				if expected != variant {
 					rewritten++
 				}
-				actual, formatError := Format(variant, options)
+				actual, formatError := Format(variant, options, nil)
 				if formatError != nil {
 					test.Errorf("%s (%s): %v", file, optionsName, formatError)
 					continue
@@ -442,7 +442,7 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 				test.Fatal(readError)
 			}
 			text := string(source)
-			actual, nativeError := Format(text, options)
+			actual, nativeError := Format(text, options, nil)
 
 			// A byte order mark is the shared layer's to strip, before any printer runs.
 			if strings.HasPrefix(text, "\xef\xbb\xbf") {
@@ -635,7 +635,7 @@ func TestFormatScssMatchesTheFork(test *testing.T) {
 					}
 				}
 			}
-			actual, formatScssError := FormatScss(testCase.source, options)
+			actual, formatScssError := FormatScss(testCase.source, options, nil)
 			if formatScssError != nil {
 				test.Errorf("%s (%s): %v", testCase.name, optionsName, formatScssError)
 				continue
@@ -669,11 +669,11 @@ func TestFormatScssIsNotFormat(test *testing.T) {
 				source,
 			)
 		}
-		actualScss, formatScssError := FormatScss(source, format_options.Default())
+		actualScss, formatScssError := FormatScss(source, format_options.Default(), nil)
 		if formatScssError != nil || actualScss != asScss {
 			test.Errorf("%q as scss:\n--- fork\n%s--- native (%v)\n%s", source, asScss, formatScssError, actualScss)
 		}
-		actualCss, formatError := Format(source, format_options.Default())
+		actualCss, formatError := Format(source, format_options.Default(), nil)
 		if (formatError == nil) != (cssError == nil) || actualCss != asCss {
 			test.Errorf(
 				"%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s",
@@ -692,11 +692,11 @@ func TestPrintToDocScssIsFormatScssWithoutTheTrailingHardline(test *testing.T) {
 	test.Parallel()
 	options := format_options.Default()
 	for _, testCase := range scssFormatCases {
-		formatted, formatScssError := FormatScss(testCase.source, options)
+		formatted, formatScssError := FormatScss(testCase.source, options, nil)
 		if formatScssError != nil {
 			test.Fatalf("%s: %v", testCase.name, formatScssError)
 		}
-		document, printToDocScssError := PrintToDocScss(testCase.source, options)
+		document, printToDocScssError := PrintToDocScss(testCase.source, options, nil)
 		if printToDocScssError != nil {
 			test.Fatalf("%s: %v", testCase.name, printToDocScssError)
 		}
@@ -740,7 +740,7 @@ func TestPrettierScssFixturesMatchTheFork(test *testing.T) {
 			}
 			// The shared layer normalizes line endings before any printer runs, as Prettier's core does.
 			text := strings.ReplaceAll(string(source), "\r\n", "\n")
-			actual, nativeError := FormatScss(text, options)
+			actual, nativeError := FormatScss(text, options, nil)
 
 			// yaml front matter is formatted by the yaml printer, which FormatSCSS cannot reach, so it refuses.
 			if strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
