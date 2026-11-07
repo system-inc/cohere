@@ -47,9 +47,6 @@ var escapeHatchWithoutReasonMessage = policy.MessageOf(Name, "escapeHatchWithout
 
 var unsafeMarkerWithoutReasonMessage = policy.MessageOf(Name, "unsafeMarkerWithoutReason")
 
-// unsafeMarker opens the comment that says why an escape hatch is safe, matched as written.
-const unsafeMarker = "Unsafe:"
-
 // linknameDirective opens a //go:linkname line. The compiler reads a directive only where the comment's text starts
 // with it, with no space after the slashes, so `// go:linkname` and a block comment are prose.
 const linknameDirective = "//go:linkname"
@@ -152,16 +149,16 @@ func isUntypedNil(candidate types.Type) bool {
 // statement, declaration or specification holding it, a function's doc comment among them, or one at the end of the
 // last line of the hatch or of the innermost statement holding it, which may end lines below the hatch.
 func excuseForExpression(comments *marker.Index, hatch ast.Node, enclosing []ast.Node) marker.Excuse {
-	found := comments.ExcuseFor(hatch, unsafeMarker)
+	found := comments.ExcuseFor(hatch, marker.Unsafe)
 	innermostFound := false
 	for index := len(enclosing) - 1; index >= 0; index-- {
 		switch holder := enclosing[index].(type) {
 		case ast.Stmt, ast.Decl, ast.Spec:
-			found = max(found, marker.Read(comments.Above(holder), unsafeMarker))
+			found = max(found, marker.Read(comments.Above(holder), marker.Unsafe))
 			if !innermostFound {
 				innermostFound = true
 				for _, group := range comments.Trailing(holder) {
-					found = max(found, marker.Read(group, unsafeMarker))
+					found = max(found, marker.Read(group, marker.Unsafe))
 				}
 			}
 		}
@@ -182,7 +179,7 @@ func judgeLinknames(pass *analysis.Pass, file *ast.File) {
 			// above, is a group of its own and speaks for nothing here.
 			above := &ast.CommentGroup{List: group.List[:index]}
 			report(pass, comment, "Linking to another package's symbol with `//go:linkname`",
-				marker.Read(above, unsafeMarker))
+				marker.Read(above, marker.Unsafe))
 		}
 	}
 }

@@ -47,9 +47,6 @@ var timingAssertionMessage = policy.MessageOf(Name, "timingAssertion")
 
 var timingAssertionWithoutReasonMessage = policy.MessageOf(Name, "timingAssertionWithoutReason")
 
-// timingAssertionMarker opens the comment that excuses a timing assertion, matched as written.
-const timingAssertionMarker = "Timing assertion:"
-
 // failureMethods are the *testing.T methods that fail the test. Skip and Log end or annotate a test without
 // failing it, so a check that only reaches them asserts nothing.
 var failureMethods = map[string]bool{
@@ -115,7 +112,7 @@ func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, comments *marker.Index)
 		}
 		// Only the comment directly above the if, on lines of its own, speaks for it. One trailing code above the if,
 		// `work() // Timing assertion: ...`, speaks for that code.
-		given := marker.Read(comments.Above(statement), timingAssertionMarker)
+		given := marker.Read(comments.Above(statement), marker.TimingAssertion)
 		for _, comparison := range comparisons {
 			report(pass, comparison, given)
 		}
