@@ -297,10 +297,11 @@ func (loader *loader) parseFile(file string) (*ast.File, error) {
 }
 
 // check type-checks one package from syntax, whose imports are checked, as go/packages' loadPackage does, so its
-// errors and types are the ones go/packages gave, and sets what go/packages sets. Two things differ: no cgo tool
-// ran, so the type checker fakes package "C" (types.Config.FakeImportC) for the cgo files as written, and a type
-// error of a dependency's that reaches its cgo files is withheld (see withheld_errors.go). The package is checked at
-// its module's go version, and a package in no module, as the standard library's, at the newest.
+// errors and types are the ones go/packages gave, and sets what go/packages sets. A translated package is exactly
+// that: its syntax is the cgo tool's outputs. One the cgo tool did not translate differs in two things: the type
+// checker fakes package "C" (types.Config.FakeImportC) for the cgo files as written, and a type error of a
+// dependency's that reaches its cgo files is withheld (see withheld_errors.go). The package is checked at its
+// module's go version, and a package in no module, as the standard library's, at the newest.
 //
 // Mutates: current its package gains its syntax, types and errors
 func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []error) {
@@ -365,7 +366,8 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	if checkError != nil && len(loaded.Errors) == 0 && !errors.As(checkError, &typeError) {
 		appendError(checkError)
 	}
-	if len(current.listed.CgoFiles) > 0 {
+	// A translated package's types import what the cgo tool's outputs import already.
+	if len(current.listed.CgoFiles) > 0 && !current.translated {
 		addCgoImports(loaded)
 	}
 	loaded.IllTyped = len(loaded.Errors) > 0
@@ -401,13 +403,14 @@ func (loader *loader) appendError(current *node, found error) {
 	}
 }
 
-// addCgoImports makes the types of a package with cgo files import what they would had the cgo tool translated
-// it, as go/packages gave them: the imports cgo adds, which its Imports hold already (see newNode), and not the
-// package "C" the type checker faked. An analyzer that reads a package's imports then reads the same package from
-// either load: vet's cgocall, which runs only on a package whose types import runtime/cgo, and the import graph
-// every fact is carried along. On this load such a package is never the project's own, whose cgo sends the whole
-// load through go/packages, so what this keeps the same is a dependency, and a package outside the workspace a
-// pattern names; cgocall over one finds nothing, since its functions that reach C are withheld without their
+// addCgoImports makes the types of a package with cgo files the cgo tool did not translate import what they would
+// had it translated them, as go/packages gave them: the imports cgo adds, which its Imports hold already (see
+// newNode), and not the package "C" the type checker faked. An analyzer that reads a package's imports then reads
+// the same package from either load: vet's cgocall, which runs only on a package whose types import runtime/cgo,
+// and the import graph every fact is carried along. Such a package is the project's own only when the cgo tool
+// failed on it, a diagnostic already, since the project's own cgo has every package with cgo files translated, so
+// what this keeps the same is a dependency on the load that translates nothing, and a package outside the workspace
+// a pattern names; cgocall over one finds nothing, since its functions that reach C are withheld without their
 // bodies (see withholdCgoDeclarations).
 //
 // Mutates: loaded its types' imports

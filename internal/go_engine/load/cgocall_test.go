@@ -21,8 +21,8 @@ var cgocallFiles = map[string]string{
 }
 
 // vet's cgocall reads a package's raw cgo files, and runs only on a package whose types import runtime/cgo, as
-// cgo's translation makes them. A project's own cgo package sends the load through go/packages, whose cgo tool
-// translates it, so cgocall runs over it as it would under go vet, and finds the slice passed to C. It needs a go
+// cgo's translation makes them. A project's own cgo package is type-checked from the cgo tool's translation of it,
+// so cgocall runs over it as it would under go vet, and finds the slice passed to C. It needs a go
 // that translates cgo, so it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as
 // Loom's, which refuses to compile.
 func TestCgocallFindsItsViolationInAProjectsCgoPackage(test *testing.T) {

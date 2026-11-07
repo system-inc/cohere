@@ -211,8 +211,8 @@ type endToEndCase struct {
 
 	exitCode int
 
-	// needsCgo marks a case whose project has cgo of its own, which the engine loads through go/packages and the cgo
-	// tool: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
+	// needsCgo marks a case whose project has cgo of its own, which the engine has go list -compiled's cgo tool
+	// translate: it skips, named, where the toolchain has no cgo and under a runner's stand-in go, as Loom's, which
 	// refuses to compile (see cgo_testing).
 	needsCgo bool
 

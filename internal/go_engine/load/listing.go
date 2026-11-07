@@ -177,6 +177,90 @@ func runList(workspace string, environment []string, patterns []string) ([]*list
 	return listed, nil
 }
 
+// listCompiled runs `go list -e -compiled` once in workspace for every listed package with cgo files, the
+// dependencies' and the standard library's too, so the cgo tool translates each, and returns what it said of each by
+// import path. environment is the whole environment, the one translatedEnvironment gives, and -pgo=off is asked as
+// go/packages asks it, so a command with a default.pgo profile is not listed twice. No -deps and no -test: the graph,
+// its test variants among it, is the plain listing's, and only the compiled files are read from this one. Nothing of
+// it is kept with go list's kept answer, whose shape stays the plain listing's, so the translation runs every run.
+func listCompiled(workspace string, environment []string, listed *listing) (map[string]*compiledPackage, error) {
+	var paths []string
+	compiled := map[string]*compiledPackage{}
+	for _, listedPackage := range listed.packages {
+		if len(listedPackage.CgoFiles) > 0 {
+			paths = append(paths, listedPackage.ImportPath)
+			compiled[listedPackage.ImportPath] = &compiledPackage{ImportPath: listedPackage.ImportPath}
+		}
+	}
+	if len(paths) == 0 {
+		return compiled, nil
+	}
+	arguments := append([]string{"list", "-e", "-compiled", "-pgo=off", "-json=ImportPath,CompiledGoFiles,Error"},
+		paths...)
+	command := exec.Command("go", arguments...)
+	command.Dir = workspace
+	// PWD as in runList, so a position go list writes relative to the workspace is relative to it as the load names it.
+	command.Env = append(slices.Clone(environment), "PWD="+workspace)
+	var standardError bytes.Buffer
+	command.Stderr = &standardError
+	output, runError := command.Output()
+	if runError != nil && !cgoFailureOnly(standardError.String()) {
+		return nil, fmt.Errorf("translating the cgo files of %s with go list -compiled in %s: %w: %s",
+			strings.Join(paths, " "), workspace, runError, strings.TrimSpace(standardError.String()))
+	}
+	decoder := json.NewDecoder(bytes.NewReader(output))
+	for {
+		each := &compiledPackage{}
+		if decodeError := decoder.Decode(each); errors.Is(decodeError, io.EOF) {
+			break
+		} else if decodeError != nil {
+			return nil, fmt.Errorf("reading go list -compiled's output in %s: %w", workspace, decodeError)
+		}
+		if compiled[each.ImportPath] == nil {
+			return nil, fmt.Errorf("go list -compiled in %s printed %s, which was not asked for", workspace,
+				each.ImportPath)
+		}
+		listedPackage := listed.byPath[each.ImportPath]
+		// go list names the package's own files relative to its directory and the cgo tool's outputs absolute. Any
+		// file with an extension other than .go is left out, as go/packages leaves it out (golang.org/issue/28749):
+		// the outputs have none.
+		var files []string
+		for _, file := range each.CompiledGoFiles {
+			if extension := filepath.Ext(file); extension != ".go" && extension != "" {
+				continue
+			}
+			if !filepath.IsAbs(file) {
+				file = filepath.Join(listedPackage.Directory, file)
+			}
+			files = append(files, file)
+		}
+		each.CompiledGoFiles = files
+		compiled[each.ImportPath] = each
+	}
+	// A package go list neither translated nor gave an error for, as one it left out of its answer when a dependency's
+	// C compiler failed, is a translation that failed all the same, and says so, with what go printed, rather than
+	// being checked with its package "C" faked and nothing said.
+	said := strings.TrimSpace(standardError.String())
+	for _, path := range paths {
+		if each := compiled[path]; each.Error == nil && !each.translated(listed.byPath[path]) {
+			each.Error = &listedError{Message: "go list -compiled gave no translation of the package's cgo files"}
+			if said != "" {
+				each.Error.Message += ": " + said
+			}
+		}
+	}
+	return compiled, nil
+}
+
+// cgoFailureOnly reports whether go list's standard error is only a package's C compiler failing, "# path" and then
+// the compiler's words, which go list -e reports in the package's Error and yet exits non-zero for, as go/packages
+// reads it: the answer on standard output is whole, and the failure is the package's diagnostic.
+func cgoFailureOnly(standardError string) bool {
+	header, _, found := strings.Cut(standardError, "\n")
+	path, isHeader := strings.CutPrefix(header, "# ")
+	return found && isHeader && path != "" && !strings.ContainsAny(path, " \t")
+}
+
 // canonical is the import path a package's import of path resolves to.
 func canonical(importer *listedPackage, path string) string {
 	if resolved, found := importer.ImportMap[path]; found {

@@ -91,17 +91,3 @@ func TestAGopathTreeLoadsInGopathMode(test *testing.T) {
 		test.Errorf("want p's external tests to import q [p.test], got %+v", loaded.Roots[external].Imports)
 	}
 }
-
-// go test's synthesized main, the one root that is no test variant and imports one, is left out of what
-// go/packages returned; the package it tests and its variants stay.
-func TestWithoutTestMainDropsOnlyTheSynthesizedMain(test *testing.T) {
-	test.Parallel()
-
-	plain := &packages.Package{ID: "p"}
-	withTests := &packages.Package{ID: "p [p.test]", ForTest: "p"}
-	testMain := &packages.Package{ID: "p.test", Imports: map[string]*packages.Package{"p": withTests}}
-	kept := withoutTestMain([]*packages.Package{plain, withTests, testMain})
-	if !slices.Equal(kept, []*packages.Package{plain, withTests}) {
-		test.Fatalf("want p and p [p.test] kept, got %+v", kept)
-	}
-}

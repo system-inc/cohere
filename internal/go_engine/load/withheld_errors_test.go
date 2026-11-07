@@ -47,8 +47,8 @@ var otherFiles = map[string]string{
 
 // cgoFixtures are the cgo loads, written and loaded once per test binary. project is a module whose own package
 // own wraps C names, and whose package user imports dependency, a module beside it, outside the workspace, that
-// wraps them the same way, and its package other. A project with cgo of its own is loaded through go/packages, so
-// project is loaded from source by the tests alone, to judge that load on the project's own cgo package too. linux
+// wraps them the same way, and its package other. A project with cgo of its own has its cgo translated, so project
+// is loaded with package "C" faked by the tests alone, to judge that load on the project's own cgo package too. linux
 // is a package importing net and os/user, loaded for linux with cgo on, as the probe that settled the boundary
 // loaded it. The tests share these loads and only read them, in parallel: a test that hands one to
 // checker.Analyze loads its own, since the checker lets a dependency's syntax and type information go once its last
@@ -230,7 +230,7 @@ func TestNetAndOsUserForLinuxWithholdExactlyTheirWrapperCallers(test *testing.T)
 		test.Fatalf("want no diagnostics, got %+v", cgoFixtures.linux.Diagnostics)
 	}
 	if cgoFixtures.linux.CgoTranslated {
-		test.Error("a project that only reaches net went through go/packages; only its own cgo sends it there")
+		test.Error("a project that only reaches net had its cgo translated; only its own cgo has it translated")
 	}
 	if cgoFixtures.linux.WithheldDependencyCgoDeclarations == 0 {
 		test.Error("no declaration of net or os/user was withheld, though their wrappers call C")

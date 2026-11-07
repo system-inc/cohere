@@ -3,7 +3,8 @@ package load
 import "golang.org/x/tools/go/packages"
 
 // The loaders a Restorer is told ran, which the findings cache keys every package on, since each gives a package
-// other files: the load from source, and go/packages with the project's cgo translated.
+// with cgo files other files: the load that translates nothing, its package "C" faked, and the load of a project
+// with cgo of its own, which type-checks every package with cgo files from the cgo tool's outputs.
 const (
 	LoaderSource        = "source"
 	LoaderCgoTranslated = "cgo-translated"
@@ -11,10 +12,9 @@ const (
 
 // Restorer is the findings cache as the load sees it. Once go list has run and the graph is built, and before any
 // package is parsed, Restore is given every package the load reaches, files and imports set, and the packages to
-// analyze, and returns those it holds an entry for. The load from source parses and type-checks none of those: it
-// reads one's types from its export data, and only when a package it does check imports it, directly or through
-// other restored packages. go/packages has checked every package by then, so on that load the answer changes
-// nothing the load does.
+// analyze, and returns those it holds an entry for. The load parses and type-checks none of those: it reads one's
+// types from its export data, and only when a package it does check imports it, directly or through other restored
+// packages.
 type Restorer interface {
 	Restore(loader string, reachable []*packages.Package, analyzed []*packages.Package) map[*packages.Package]*Restored
 }

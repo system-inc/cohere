@@ -383,13 +383,15 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		}
 		withheld = append(withheld, contract.WithheldFile{Package: each.Package, File: each.File, Errors: each.Errors})
 	}
-	// The build text says which load ran: from source, or through go/packages for a project with cgo of its own. It
-	// reads the same with the findings cache or without, so a run under `--no-cache` writes the same record.
+	// The build text says what ran: go list, and for a project with cgo of its own go list -compiled, whose cgo tool
+	// translated the packages with cgo files. It reads the same with the findings cache or without, so a run under
+	// `--no-cache` writes the same record.
 	build := "go list -deps with go test's variants built here, each package type-checked from source unless the " +
 		"findings cache holds its export data"
 	if loaded.CgoTranslated {
-		build = "go/packages with go list -deps -test -compiled, the project's cgo translated by the cgo tool, " +
-			"each package type-checked from source, the findings cache restoring analysis only"
+		build = "go list -deps with go test's variants built here, cgo translated by go list -compiled for the " +
+			"packages with cgo files, each package type-checked from source unless the findings cache holds its " +
+			"export data"
 	}
 	engine.write(contract.TypesRecord{
 		Diagnostics:         len(loaded.Diagnostics),

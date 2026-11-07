@@ -444,17 +444,17 @@ nothing was withheld. A parse or list error is never withheld, nor a type error 
 files, nor anything in the project's own packages. `withheldDependencyCgoDeclarations` counts the declarations
 of such dependencies that use the same, or what it left without a valid type: functions, which every rule was
 given without their bodies, as an assembly function is given, and package-level variables, given without their
-initial values. It is `0` when there were none. A project with cgo files of its own is loaded through
-go/packages instead, which has the cgo tool translate every cgo file, so both are empty then, and the record's
-`build` says which load ran.
+initial values. It is `0` when there were none. For a project with cgo files of its own, go list
+-compiled has the cgo tool translate every package with cgo files instead, and those are type-checked from
+its outputs, so both are empty then, and the record's `build` says so.
 
-The Go engine type-checks and never builds, with one exception: cgo's preprocessing, which the
-go/packages load of a project with cgo of its own has the cgo tool run. So the Go engine's types
-record carries one more additive field, `cgoTranslation`, that counts the exception on every run:
+The Go engine type-checks and never builds, with one exception: cgo's preprocessing, which go list
+-compiled has the cgo tool run for a project with cgo of its own. So the Go engine's types record
+carries one more additive field, `cgoTranslation`, that counts the exception on every run:
 `"cgoTranslation":{"packages":3,"milliseconds":2140}` is how many packages the cgo tool translated,
-the project's and its dependencies' with cgo files alike, and how long that load took. On the load
-from source, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never left
-out, so a front door can always say whether a run built anything.
+the project's and its dependencies' with cgo files alike, and how long that took. On a load that
+translates nothing, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never
+left out, so a front door can always say whether a run built anything.
 
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
@@ -591,8 +591,7 @@ no importer can name either. The entries live in `<root>/.cache/cohere/go/`, bes
 own cache. The cache changes no finding and no other field of any record: a run with it and a run
 under `--no-cache` write the same stream but for this field and the elapsed times. Under `--no-cache`
 the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
-its own is loaded through go/packages, which type-checks every package whatever the cache holds, so
-there the cache restores analysis only, and the types record's `build` says so.
+its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
 
 ### `phase`
 
