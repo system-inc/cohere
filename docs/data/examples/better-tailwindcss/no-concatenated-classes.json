@@ -18,7 +18,5 @@
         "file": "Styles.ts",
         "source": "const description = `px-${size}`;"
     },
-    "assertedMessageIds": [
-        "concatenatedClass"
-    ]
+    "assertedMessageIds": ["concatenatedClass"]
 }

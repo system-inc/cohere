@@ -110,3 +110,53 @@ func trimDelimiters(textRange core.TextRange, leading int, trailing int) core.Te
 	}
 	return core.NewTextRange(start, end)
 }
+
+// TemplateClass is one class in a static run of a template with holes, where a rule reports it.
+//
+// Upstream reads each piece of a template as a literal of its own and judges every class in it, so
+// the per-class rules all walk the runs the same way. This is that walk, in one home.
+type TemplateClass struct {
+	Text string
+	// Range is the class's own source range when Anchored, and the run's range when not: a run holding
+	// an escape is a different string in the source than the value the rule judged, so no class in it
+	// has a source range, and a finding sits on the run instead.
+	Range    core.TextRange
+	Anchored bool
+	// GluedLeading and GluedTrailing say a hole touches the class with no whitespace between, so the
+	// class is half of whatever the hole completes: `rounded` in `rounded${size}`. Upstream judges it
+	// as written. A rule may report it, and must not rewrite it, since `rounded-sm${size}` breaks a
+	// `rounded-lg` the hole would have completed. no-unknown-classes skips it, as upstream does.
+	GluedLeading  bool
+	GluedTrailing bool
+	// Run indexes the run the class sits in, so a rule judging classes in pairs pairs only within one.
+	Run int
+}
+
+// TemplateClassesOf lists every class in the static runs of a template with holes, in source order.
+func TemplateClassesOf(sourceText string, segments []ClassSegment) []TemplateClass {
+	classes := []TemplateClass{}
+	for runIndex, segment := range segments {
+		tokens, anchored := classTokensIn(sourceText, segment.Range, segment.Text)
+		if !anchored {
+			tokens = classTokensOf(segment.Text, 0)
+		}
+		for index, token := range tokens {
+			if token.Separator {
+				continue
+			}
+			classRange := segment.Range
+			if anchored {
+				classRange = token.Range
+			}
+			classes = append(classes, TemplateClass{
+				Text:          token.Text,
+				Range:         classRange,
+				Anchored:      anchored,
+				GluedLeading:  index == 0 && segment.LeadingHole,
+				GluedTrailing: index == len(tokens)-1 && segment.TrailingHole,
+				Run:           runIndex,
+			})
+		}
+	}
+	return classes
+}

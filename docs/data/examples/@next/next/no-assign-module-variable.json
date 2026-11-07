@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Message = 'module';\n"
     },
-    "assertedMessageIds": [
-        "noAssignModuleVariable"
-    ]
+    "assertedMessageIds": ["noAssignModuleVariable"]
 }

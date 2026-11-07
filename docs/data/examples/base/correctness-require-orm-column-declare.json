@@ -18,7 +18,5 @@
         "file": "/repository/source/Column.ts",
         "source": "declare const OrmColumn: any;\ndeclare const OrmPrimaryKey: any;\ndeclare const OrmPrimaryAutoColumn: any;\ndeclare const OrmCreateDateColumn: any;\ndeclare const OrmUpdateDateColumn: any;\ndeclare const OrmColumnIndex: any;\ndeclare const OrmColumnUnique: any;\ndeclare const OrmColumnUniqueIndex: any;\ndeclare const OrmManyToOne: any;\ndeclare const Orm: any;\nclass E { name: string; }\n"
     },
-    "assertedMessageIds": [
-        "missingDeclare"
-    ]
+    "assertedMessageIds": ["missingDeclare"]
 }

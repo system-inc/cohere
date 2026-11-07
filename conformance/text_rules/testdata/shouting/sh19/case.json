@@ -1,0 +1,10 @@
+{
+    "why": "sh19: a run of command lines stays masked, since each follows a masked line, even where the arguments read like words",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}

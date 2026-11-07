@@ -18,7 +18,5 @@
         "file": "/repository/source/Loops.ts",
         "source": "for (let x = 0; ; x++) {}\n"
     },
-    "assertedMessageIds": [
-        "preferForOf"
-    ]
+    "assertedMessageIds": ["preferForOf"]
 }

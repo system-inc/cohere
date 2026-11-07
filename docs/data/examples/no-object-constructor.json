@@ -19,8 +19,6 @@
         "file": "/repository/source/ObjectConstructor.ts",
         "source": "Object(x)\n"
     },
-    "assertedMessageIds": [
-        "preferLiteral"
-    ],
+    "assertedMessageIds": ["preferLiteral"],
     "assertsSuggestion": true
 }

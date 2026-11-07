@@ -18,7 +18,5 @@
         "file": "fixture.tsx",
         "source": "import React from 'react';\nexport function Widget() {\n    return React.createElement('div');\n}\n"
     },
-    "assertedMessageIds": [
-        "reactHookNoAnyType"
-    ]
+    "assertedMessageIds": ["reactHookNoAnyType"]
 }

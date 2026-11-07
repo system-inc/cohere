@@ -1,0 +1,10 @@
+{
+    "why": "sh16: a `git status` line after a colon is a command, so the word on it is masked",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}

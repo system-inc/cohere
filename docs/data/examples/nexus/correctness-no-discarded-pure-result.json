@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoDiscardedPureResult.ts",
         "source": "declare let name: string;\ndeclare const maybeName: string | undefined;\ndeclare const path: string;\ndeclare let list: string[];\ndeclare const more: string[];\ndeclare const items: readonly string[];\ndeclare const either: string | string[];\ndeclare const pattern: RegExp;\ndeclare const matches: string[];\ndeclare function use(value: unknown): void;\ndeclare function replacer(match: string): string;\nvoid name.trim();\n"
     },
-    "assertedMessageIds": [
-        "discardedPureResult"
-    ]
+    "assertedMessageIds": ["discardedPureResult"]
 }

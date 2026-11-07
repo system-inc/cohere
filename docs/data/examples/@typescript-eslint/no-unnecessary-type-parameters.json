@@ -19,8 +19,6 @@
         "file": "/repository/source/TypeParameters.ts",
         "source": "declare class C<V> {}\n"
     },
-    "assertedMessageIds": [
-        "sole"
-    ],
+    "assertedMessageIds": ["sole"],
     "assertsSuggestion": true
 }

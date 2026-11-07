@@ -29,6 +29,10 @@ type runSummary struct {
 	// Label is the project's path in a repository with several. Empty for a project checked on its own.
 	Label string
 
+	// FormatProject is whether this is the format project of a root no TypeScript project holds, which has no
+	// program, so the type check and the lint rules it never runs are no gap in it.
+	FormatProject bool
+
 	// Total is the run's wall clock, the number a developer waited for.
 	Total time.Duration
 	// Graph is how long reading, parsing and binding the program took, zero when no graph was built.
@@ -190,9 +194,20 @@ type runGaps struct {
 	ModifiedBuild bool `json:"modifiedBuild"`
 	// Unread is files the run could not check for any other reason, said as the run said it.
 	Unread string `json:"unread,omitempty"`
+	// NestedUnread is why the nested repositories could not be read for drift, when they could not. Their
+	// files are never this run's to check, so the run goes on, and says so here (#71njcj8).
+	NestedUnread string `json:"nestedUnread,omitempty"`
+	// PhasesNotRun are the check's phases the run has no record of, so it stopped before them. A run that
+	// formatted and never type-checked or linted says it here, rather than reading as 0 rules that found
+	// nothing (#71njcj8). Set where a run stops: its failed summary, and a project's run that never finished.
+	PhasesNotRun []string `json:"phasesNotRun,omitempty"`
 	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
 	// format walk: checked, and never formatted (#6mhafvb).
 	AdamicIgnored int `json:"adamicIgnored,omitempty"`
+	// NestedUnchecked is the files in the nested repositories the run reads that the formatter could not check,
+	// each named in the account (#zmt3tv5). A gap and never the verdict: the nested repository is read-only here,
+	// and its own run is the one that fails on them.
+	NestedUnchecked int `json:"nestedUnchecked,omitempty"`
 	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
 	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
 	MissingGenerated []string `json:"missingGenerated,omitempty"`
@@ -239,6 +254,26 @@ type withheldCgoFile struct {
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings
 // stay in the finding total without failing it, including when the summary is replayed from the run cache.
+// phasesNotRun are the check's phases this summary has no record of: fix, types and lint, the opt-in phases
+// aside. Asked only of a run that stopped on an error, whose summary holds the phases it reached, if any; a
+// replay records no phase and stopped before nothing.
+func (summary runSummary) phasesNotRun() []string {
+	var missing []string
+	for _, name := range phaseOrder {
+		if optInPhases[name] {
+			continue
+		}
+		recorded := false
+		for _, record := range summary.Phases {
+			recorded = recorded || record.Name == name
+		}
+		if !recorded {
+			missing = append(missing, string(name))
+		}
+	}
+	return missing
+}
+
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0

@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "console;"
     },
-    "assertedMessageIds": [
-        "consistencyNoConsole"
-    ]
+    "assertedMessageIds": ["consistencyNoConsole"]
 }

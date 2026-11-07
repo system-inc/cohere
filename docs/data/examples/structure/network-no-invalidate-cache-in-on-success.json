@@ -18,7 +18,5 @@
         "file": "/repository/source/api/Thing.ts",
         "source": "declare const networkService: { cache: { invalidate(key: string): void } };\ndeclare const apiService: { cache: { invalidate(key: string): void } };\ndeclare function useMutation(options: unknown): void;\nexport const Value = 1;\n"
     },
-    "assertedMessageIds": [
-        "noInvalidateCacheInOnSuccess"
-    ]
+    "assertedMessageIds": ["noInvalidateCacheInOnSuccess"]
 }

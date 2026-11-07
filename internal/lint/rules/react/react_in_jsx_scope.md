@@ -1,12 +1,12 @@
 # `react/react-in-jsx-scope`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -24,4 +24,3 @@ Nothing to do with Prettier; it is obsolete under React 19's automatic JSX runti
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

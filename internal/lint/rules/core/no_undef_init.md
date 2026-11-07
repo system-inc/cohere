@@ -1,12 +1,12 @@
 # `no-undef-init`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **17** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                |
+| ---------------------- | -------------- |
+| **Recommendation**     | **Strong Yes** |
+| Violations in ahra     | **17**         |
+| Plugin                 | `eslint core`  |
+| Auto-fixable           | yes            |
+| Needs type information | no             |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ let animatedIconRight: NonLinkButtonProperties['iconRight'] = undefined;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

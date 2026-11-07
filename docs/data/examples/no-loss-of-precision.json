@@ -18,7 +18,5 @@
         "file": "/repository/source/Numbers.ts",
         "source": "var x = 0"
     },
-    "assertedMessageIds": [
-        "noLossOfPrecision"
-    ]
+    "assertedMessageIds": ["noLossOfPrecision"]
 }

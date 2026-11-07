@@ -1,12 +1,12 @@
 # `no-unexpected-multiline`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | none |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Yes**       |
+| Violations in ahra     | none          |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -24,4 +24,3 @@ Not a formatting preference: it catches ASI hazards that Prettier's output canno
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

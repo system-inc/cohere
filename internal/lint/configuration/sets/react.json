@@ -1,9 +1,6 @@
 {
     "extends": "cohere:typescript",
-    "plugins": [
-        "react",
-        "react-hooks"
-    ],
+    "plugins": ["react", "react-hooks"],
     "rules": {
         "react-hooks/config": "error",
         "react/forward-ref-uses-ref": "error",

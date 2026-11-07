@@ -19,15 +19,15 @@ import (
 	"go/types"
 	"os"
 	"path"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/policy"
 )
 
 // main is the one way out: it exits with the code finishedExitCode returns, once that has run its deferred show.
@@ -54,33 +54,35 @@ func runCommandLine() int {
 	abbreviations := flag.String(
 		"abbreviations",
 		"",
-		"the abbreviation vocabulary (default: <root>/policy/Abbreviations.json)",
+		"the abbreviation vocabulary (default: the one built into the pass, from the tree it is built in)",
 	)
 	var skips skipFlags
 	flag.Var(&skips, "skip", "a path prefix, relative to the root, never edited (repeatable)")
 	flag.Parse()
-	if *abbreviations == "" {
-		*abbreviations = filepath.Join(*root, "policy", "Abbreviations.json")
-	}
 	return run(*root, skips, *abbreviations, *dryRun)
 }
 
-// loadVocabulary reads every abbreviated word of policy/Abbreviations.json, lowercased.
+// loadVocabulary reads every abbreviated word of the vocabulary file, lowercased: the one at filename, or the one built
+// into the pass when filename is empty, so a pass run over another repository judges words as it does over cohere.
 func loadVocabulary(filename string) (map[string]bool, error) {
-	contents, readError := os.ReadFile(filename)
-	if readError != nil {
-		return nil, readError
+	contents := policy.AbbreviationsFile()
+	if filename != "" {
+		read, readError := os.ReadFile(filename)
+		if readError != nil {
+			return nil, readError
+		}
+		contents = read
 	}
-	var policy struct {
+	var decoded struct {
 		Abbreviations []struct {
 			Abbreviation string `json:"abbreviation"`
 		} `json:"abbreviations"`
 	}
-	if decodeError := json.Unmarshal(contents, &policy); decodeError != nil {
+	if decodeError := json.Unmarshal(contents, &decoded); decodeError != nil {
 		return nil, fmt.Errorf("%s: %w", filename, decodeError)
 	}
 	vocabulary := map[string]bool{}
-	for _, entry := range policy.Abbreviations {
+	for _, entry := range decoded.Abbreviations {
 		if entry.Abbreviation != "" {
 			vocabulary[strings.ToLower(entry.Abbreviation)] = true
 		}

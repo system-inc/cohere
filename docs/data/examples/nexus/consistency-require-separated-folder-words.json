@@ -1,6 +1,4 @@
 {
     "rule": "nexus/consistency-require-separated-folder-words",
-    "assertedMessageIds": [
-        "runTogetherProjectFolder"
-    ]
+    "assertedMessageIds": ["runTogetherProjectFolder"]
 }

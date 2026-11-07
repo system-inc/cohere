@@ -18,7 +18,5 @@
         "file": "/repository/source/Members.ts",
         "source": "class A {\n  1() {}\n  2() {}\n}\n"
     },
-    "assertedMessageIds": [
-        "noDupeClassMembers"
-    ]
+    "assertedMessageIds": ["noDupeClassMembers"]
 }

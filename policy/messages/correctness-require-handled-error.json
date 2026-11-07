@@ -1,13 +1,13 @@
 {
-  "rules": {
-    "Go": "cohere-go/correctness-require-handled-error"
-  },
-  "messages": {
-    "unhandledError": {
-      "text": "`{{callee}}` returns an error and this call drops it, so a failure here (a file that never closed, a write that never landed) passes unseen and the code runs on as if it succeeded. Handle the error, or return it to a caller that will. If dropping it is right, say why in a `// Ignored: <reason>` comment directly above the statement or at the end of its line, so the next reader knows the failure was weighed."
+    "rules": {
+        "Go": "cohere-go/correctness-require-handled-error"
     },
-    "unhandledErrorWithoutReason": {
-      "text": "This call drops the error `{{callee}}` returns and says it is ignored without saying why. Name why the failure cannot matter after `Ignored:`, such as a cleanup whose failure changes nothing, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    "messages": {
+        "unhandledError": {
+            "text": "`{{callee}}` returns an error and this call drops it, so a failure here (a file that never closed, a write that never landed) passes unseen and the code runs on as if it succeeded. Handle the error, or return it to a caller that will. If dropping it is right, say why in a `// Ignored: <reason>` comment directly above the statement or at the end of its line, so the next reader knows the failure was weighed."
+        },
+        "unhandledErrorWithoutReason": {
+            "text": "This call drops the error `{{callee}}` returns and says it is ignored without saying why. Name why the failure cannot matter after `Ignored:`, such as a cleanup whose failure changes nothing, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+        }
     }
-  }
 }

@@ -1,29 +1,29 @@
 {
-  "rules": {
-    "TypeScript": "nexus/correctness-no-process-exit-after-output",
-    "Go": "cohere-go/correctness-no-process-exit-after-output"
-  },
-  "messages": {
-    "exitAfterOutput": {
-      "text": "This calls [[exit]] on a path that [[pending]]. [[why]] [[repair]]",
-      "terms": {
-        "exit": {
-          "TypeScript": "`process.exit()`",
-          "Go": "`{{call}}`"
-        },
-        "pending": {
-          "TypeScript": "has already written to stdout or stderr in this function",
-          "Go": "has already deferred a call in this function"
-        },
-        "why": {
-          "TypeScript": "`process.exit()` ends the process without waiting for writes still in flight, and a write to a pipe can be one: a reader piping this command (`| grep`, `execSync`, a spawned child) gets the output cut at 64 KB, with exit status 0 and no error.",
-          "Go": "`{{call}}` ends the process at once and runs no deferred call, so a `defer writer.Flush()` or `defer file.Close()` above it never happens: the buffered output is lost, or the file is left half written, and nothing says so."
-        },
-        "repair": {
-          "TypeScript": "Set `process.exitCode = n` and return instead, so the process ends on its own once the output has drained.",
-          "Go": "Return the error or the exit code instead, and exit in `main` once every deferred call has run, as `os.Exit(run())` does when `run` holds the defers."
+    "rules": {
+        "TypeScript": "nexus/correctness-no-process-exit-after-output",
+        "Go": "cohere-go/correctness-no-process-exit-after-output"
+    },
+    "messages": {
+        "exitAfterOutput": {
+            "text": "This calls [[exit]] on a path that [[pending]]. [[why]] [[repair]]",
+            "terms": {
+                "exit": {
+                    "TypeScript": "`process.exit()`",
+                    "Go": "`{{call}}`"
+                },
+                "pending": {
+                    "TypeScript": "has already written to stdout or stderr in this function",
+                    "Go": "has already deferred a call in this function"
+                },
+                "why": {
+                    "TypeScript": "`process.exit()` ends the process without waiting for writes still in flight, and a write to a pipe can be one: a reader piping this command (`| grep`, `execSync`, a spawned child) gets the output cut at 64 KB, with exit status 0 and no error.",
+                    "Go": "`{{call}}` ends the process at once and runs no deferred call, so a `defer writer.Flush()` or `defer file.Close()` above it never happens: the buffered output is lost, or the file is left half written, and nothing says so."
+                },
+                "repair": {
+                    "TypeScript": "Set `process.exitCode = n` and return instead, so the process ends on its own once the output has drained.",
+                    "Go": "Return the error or the exit code instead, and exit in `main` once every deferred call has run, as `os.Exit(run())` does when `run` holds the defers."
+                }
+            }
         }
-      }
     }
-  }
 }

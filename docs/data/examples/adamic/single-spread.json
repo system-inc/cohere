@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "const point = { x: 1, y: 2 };\n"
     },
-    "assertedMessageIds": [
-        "laterSpread"
-    ]
+    "assertedMessageIds": ["laterSpread"]
 }

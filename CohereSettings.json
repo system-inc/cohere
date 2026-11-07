@@ -1,0 +1,3 @@
+{
+    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"]
+}

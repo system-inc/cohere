@@ -276,36 +276,229 @@ var endToEndCases = []endToEndCase{
 	{name: "refused-flag", fixture: "clean", extra: []string{"--unused"}, exitCode: 2},
 	{name: "refused-combination", fixture: "clean", extra: []string{"--format-only", "--lint"}, exitCode: 2},
 	{name: "scope-outside-root", fixture: "clean", extra: []string{"{root}/.."}, exitCode: 2},
-	// The fix phase wraps the three long lines a wrap can bring within the limit and leaves the two it cannot as they
-	// were written: the string with a comment after it, which no break touches, and the return of a long string and a
-	// name, which a break after its + would leave long. The lint phase reports those two alone, and a second run
-	// changes nothing.
+	// The fix phase wraps the four code lines a wrap can bring within the limit, the Example's call among them, and
+	// Greeting's chain everywhere but between its two joined literals, which useless-concatenation still reports, and
+	// leaves as they were written the two it cannot (the string with a comment after it, which no break touches, and
+	// the return of a long string and a name, which a break after its + would leave long) and every comment: a long
+	// doc comment, a `// Serial:` marker and an Example's `// Output:` line, which a line-based reader parses. The lint
+	// phase reports those five and the join alone, and a second run changes nothing.
 	{
 		name: "long-lines-rewritten", fixture: "long-lines", exitCode: 1,
-		verify: both(wrapped("long_lines.go", "long-lines-rewritten"),
-			keepsLine("long_lines.go", "long-lines", `	return "with thanks from the whole depot`)),
+		verify: every(wrapped("long_lines.go", "long-lines-rewritten"),
+			golden("long_lines_test.go", "long-lines-rewritten"),
+			keepsLine("long_lines.go", "long-lines", `	return "with thanks from the whole depot`),
+			keepsLine("long_lines.go", "long-lines", "// Describe says where a delivery goes"),
+			keepsLine("long_lines.go", "long-lines", "\t// Serial: "),
+			keepsLine("long_lines_test.go", "long-lines", "\t// Ada Lovelace sends a parcel")),
+	},
+	// A file one wrap short of the long-file limit the settings give is left unwrapped, its long line a finding and
+	// the note saying the wrap would take it past the limit, and the same file with room for the wrap is wrapped.
+	{
+		name: "long-lines-crowded", exitCode: 1, prepare: limitLongFiles(14), rules: ownLongFileAnalyzer(),
+		verify: unchanged("crowded.go", "long-lines-crowded"),
+	},
+	{
+		name: "long-lines-room", fixture: "long-lines-crowded", exitCode: 0, prepare: limitLongFiles(15),
+		rules: ownLongFileAnalyzer(), verify: golden("crowded.go", "long-lines-room"),
+	},
+	// A writing run over a package that does not type-check writes gofmt's output and wraps nothing, saying the
+	// long-line fix was held, and the same package once it type-checks is wrapped.
+	{
+		name: "long-lines-type-error", exitCode: 1, verify: wrapped("held.go", "long-lines-type-error"),
+	},
+	{
+		name: "long-lines-type-error-fixed", fixture: "long-lines-type-error", exitCode: 0, prepare: fixTypeError,
+		verify: wrapped("held.go", "long-lines-type-error-fixed"),
 	},
 	{
 		name: "long-lines-no-fix", fixture: "long-lines", extra: []string{"--no-fix"}, exitCode: 1,
 		verify: unchanged("long_lines.go", "long-lines"),
 	},
 	{
-		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 0, prepare: turnOffLongLines,
+		// Greeting's join of two literals is still useless-concatenation's finding, so the run exits 1.
+		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 1, prepare: turnOffLongLines,
 		verify: unchanged("long_lines.go", "long-lines"),
+	},
+	// The fix phase renames what the naming rules ask, at every reference: maxLen in two rounds to maximumLength,
+	// ParseURL across its package, both test packages and the command, FetchURL with its implementation, and maxRows in
+	// report.go, a file the long-line wrap writes first, whose one changedFiles entry carries both rules, and cfg and
+	// modeID under their //go:embed and //go:generate directives, which come out as written, beside a //go:linkname
+	// whose name the rule never flags. It leaves msg, a type switch's symbol, which no object declares, refused once
+	// though three rounds read its finding, and OwnerID, which json reads by name with no tag, UserID, which reflect
+	// reads with FieldByName, TitleHTML, which a template calls as .TitleHTML, LinkURL and PageID, which a template
+	// parsed from an embedded page.html calls and reads, RunHTTP, which reflect's MethodByName may call by a computed
+	// name, pageHTML and rowCSV, whose type names %T and reflect.TypeOf read, cfgName, which a generated file reads,
+	// groupID, whose new name is taken, readHTML, which a directive keeps, and ToHTML, exported from an importable
+	// package, each still a finding, and MarshalJSON, which json.Marshaler names, no finding at all. A second run
+	// changes nothing.
+	{name: "rename-rewritten", fixture: "rename", exitCode: 1, verify: renamedTree("rename", "rename-rewritten")},
+	{
+		name: "rename-no-fix", fixture: "rename", extra: []string{"--no-fix"}, exitCode: 1,
+		verify: unchangedTree("rename"),
+	},
+	// A rename's files are written as one set: with the command's directory read-only, the rename of ParseURL, which
+	// reaches it, can't be written whole, so no rename is written, each is refused as unwritable, and every finding
+	// stands. The long-line wrap, which wrote report.go before the rename, is its own write and stands too.
+	{
+		name: "rename-unwritable", fixture: "rename", exitCode: 1, prepare: lockDirectory("command/report"),
+		verify: renamedNothing("rename", "rename-unwritable", "command/report", "internal/store/report.go"),
+	},
+	// With files held to 12 lines, the wrap of report.go's long line would take it past the long-file limit, so both
+	// wraps of it are declined and noted: the one after the load, and the one over the rename of maxRows, which
+	// lengthens the line. The file holds gofmt's output of the rename, and the line stays a finding.
+	{
+		name: "rename-wrap-declined", fixture: "rename", exitCode: 1, prepare: limitLongFiles(12),
+		rules: ownLongFileAnalyzer(), verify: renamedTree("rename", "rename-wrap-declined"),
+	},
+	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
+	{
+		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
+		verify: renamedTree("rename", "rename-exports"),
 	},
 }
 
-// both is a verify that runs first and then second.
-func both(first, second func(test *testing.T, root string)) func(test *testing.T, root string) {
+// renameExports writes settings beside the copy's go.mod that set renameExports on the initialism rule.
+func renameExports(root string) error {
+	settingsText := `{"go": {"rules": {"` + consistency_no_uppercase_initialism.Name +
+		`": ["error", {"renameExports": true}]}}}` + "\n"
+	return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
+}
+
+// renamingOwnAnalyzers is the registry with each naming rule on an analyzer of its own, so a case that sets
+// renameExports sets it on no analyzer another case runs.
+func renamingOwnAnalyzers() []rule.Rule {
+	registered := rules.All()
+	for index, each := range registered {
+		switch each.Name {
+		case consistency_no_abbreviated_identifier.Name:
+			registered[index] = withOwnAnalyzer(each, consistency_no_abbreviated_identifier.NewAnalyzer())
+		case consistency_no_uppercase_initialism.Name:
+			registered[index] = withOwnAnalyzer(each, consistency_no_uppercase_initialism.NewAnalyzer())
+		}
+	}
+	return registered
+}
+
+// goFilesOf is every .go file below root, relative and slash-separated, sorted.
+func goFilesOf(test *testing.T, root string) []string {
+	test.Helper()
+	var files []string
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || filepath.Ext(path) != ".go" {
+			return pathError
+		}
+		relative, relativeError := filepath.Rel(root, path)
+		files = append(files, filepath.ToSlash(relative))
+		return relativeError
+	})
+	if walkError != nil {
+		test.Fatalf("listing %s: %v", root, walkError)
+	}
+	slices.Sort(files)
+	return files
+}
+
+// renamedTree is a verify that every .go file of the copy reads as the case's golden, `<path>.golden` beside its
+// expected files under the file's own path, and that a second run, which reads the renamed tree and the same rules,
+// rewrites nothing. Under -update the goldens are rewritten from the copy.
+func renamedTree(fixture string, caseName string) func(test *testing.T, root string) {
 	return func(test *testing.T, root string) {
 		test.Helper()
-		first(test, root)
-		second(test, root)
+		files := goFilesOf(test, root)
+		if !slices.Equal(files, goFilesOf(test, filepath.Join("testdata", fixture))) {
+			test.Fatalf("the run left the files %q, and the fixture has others", files)
+		}
+		after := map[string][]byte{}
+		for _, relative := range files {
+			contents, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+			if readError != nil {
+				test.Fatalf("reading %s: %v", relative, readError)
+			}
+			after[relative] = contents
+			compareExpected(test, filepath.Join("testdata", caseName, filepath.FromSlash(relative)+".golden"),
+				string(contents))
+		}
+		registered := rules.All()
+		switch caseName {
+		case "rename-exports":
+			registered = renamingOwnAnalyzers()
+		case "rename-wrap-declined":
+			registered = ownLongFileAnalyzer()
+		}
+		var standardOutput bytes.Buffer
+		var standardError bytes.Buffer
+		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
+			registered)
+		for line := range strings.Lines(standardOutput.String()) {
+			var record contract.FixRecord
+			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
+				record.FilesRewritten != 0 {
+				test.Errorf("a second run rewrote %d files: %s", record.FilesRewritten, line)
+			}
+		}
+		for _, relative := range files {
+			again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+			if againError != nil || !bytes.Equal(again, after[relative]) {
+				test.Errorf("a second run changed %s (%v)", relative, againError)
+			}
+		}
+	}
+}
+
+// lockDirectory makes a directory of the copy read-only, so no file can be created in it, nor one renamed over a file
+// there.
+func lockDirectory(relative string) func(root string) error {
+	return func(root string) error {
+		return os.Chmod(filepath.Join(root, filepath.FromSlash(relative)), 0o555)
+	}
+}
+
+// renamedNothing is a verify, after a run whose rename could not be written, that the locked directory is writable
+// again, so the copy can be removed, that wrapped, the file the long-line wrap writes, reads as the case's golden, and
+// that every other .go file reads as its fixture.
+func renamedNothing(fixture string, caseName string, locked string, wrapped string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		if chmodError := os.Chmod(filepath.Join(root, filepath.FromSlash(locked)), 0o755); chmodError != nil {
+			test.Fatalf("unlocking %s: %v", locked, chmodError)
+		}
+		contents, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(wrapped)))
+		if readError != nil {
+			test.Fatalf("reading %s: %v", wrapped, readError)
+		}
+		golden := filepath.Join("testdata", caseName, filepath.FromSlash(wrapped)+".golden")
+		compareExpected(test, golden, string(contents))
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			if relative != wrapped {
+				unchanged(relative, fixture)(test, root)
+			}
+		}
+	}
+}
+
+// unchangedTree is a verify that every .go file of the copy reads as it does in its fixture.
+func unchangedTree(fixture string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			unchanged(relative, fixture)(test, root)
+		}
+	}
+}
+
+// every is a verify that runs each of verifies in order.
+func every(verifies ...func(test *testing.T, root string)) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		for _, verify := range verifies {
+			verify(test, root)
+		}
 	}
 }
 
 // keepsLine is a verify that the one line of a fixture file starting with prefix is in the copy's file after the run,
-// byte for byte and whole: a long line no break cures is left as it was written, not broken and left long.
+// byte for byte and whole: a long line no break cures is left as it was written, not broken and left long, and so is
+// every comment line, which the wrap never touches.
 func keepsLine(relative string, fixture string, prefix string) func(test *testing.T, root string) {
 	return func(test *testing.T, root string) {
 		test.Helper()
@@ -324,7 +517,7 @@ func keepsLine(relative string, fixture string, prefix string) func(test *testin
 			test.Fatalf("want one line of %s starting %q, found %d", relative, prefix, len(kept))
 		}
 		if !slices.Contains(slices.Collect(strings.Lines(string(after))), kept[0]) {
-			test.Errorf("the run changed the line it could not cure:\n%s\nfile now:\n%s", kept[0], after)
+			test.Errorf("the run changed a line it must leave as it was written:\n%s\nfile now:\n%s", kept[0], after)
 		}
 	}
 }
@@ -335,10 +528,37 @@ func turnOffLongLines(root string) error {
 	return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
 }
 
-// wrapped is a verify that a file of the copy reads as the case's golden, `<name>.golden` beside its expected files,
-// and that a second run over the copy rewrites nothing, since a wrap the fix phase keeps is gofmt's and its own fixed
-// point. Under -update the golden is rewritten from the copy.
-func wrapped(relative string, caseName string) func(test *testing.T, root string) {
+// limitLongFiles is a prepare that writes settings beside the copy's go.mod holding files to maximum lines.
+func limitLongFiles(maximum int) func(root string) error {
+	return func(root string) error {
+		settingsText := fmt.Sprintf(`{"go": {"rules": {"%s": ["error", {"max": %d}]}}}`+"\n",
+			consistency_no_long_file.Name, maximum)
+		return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
+	}
+}
+
+// ownLongFileAnalyzer is the registry with the long-file rule on an analyzer of its own, for a case whose settings
+// set its limit, since an option set on the registry's analyzer would reach every case running beside it.
+func ownLongFileAnalyzer() []rule.Rule {
+	registered := rules.All()
+	for index := range registered {
+		if registered[index].Name == consistency_no_long_file.Name {
+			registered[index] = withOwnAnalyzer(registered[index], consistency_no_long_file.NewAnalyzer())
+		}
+	}
+	return registered
+}
+
+// fixTypeError is a prepare that gives the long-lines-type-error copy's Count the number it is declared to hold, so
+// its package type-checks.
+func fixTypeError(root string) error {
+	fixed := "package heldwrap\n\n// Count is a number, given one.\nvar Count int = 1\n"
+	return os.WriteFile(filepath.Join(root, "broken.go"), []byte(fixed), 0o644)
+}
+
+// golden is a verify that a file of the copy reads as the case's golden, `<name>.golden` beside its expected files.
+// Under -update the golden is rewritten from the copy.
+func golden(relative string, caseName string) func(test *testing.T, root string) {
 	return func(test *testing.T, root string) {
 		test.Helper()
 		after, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
@@ -346,6 +566,19 @@ func wrapped(relative string, caseName string) func(test *testing.T, root string
 			test.Fatalf("reading %s: %v", relative, readError)
 		}
 		compareExpected(test, filepath.Join("testdata", caseName, filepath.Base(relative)+".golden"), string(after))
+	}
+}
+
+// wrapped is a verify that a file of the copy reads as the case's golden (see golden), and that a second run over the
+// copy rewrites nothing, since a wrap the fix phase keeps is gofmt's and its own fixed point.
+func wrapped(relative string, caseName string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		golden(relative, caseName)(test, root)
+		after, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if readError != nil {
+			test.Fatalf("reading %s: %v", relative, readError)
+		}
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
 		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,

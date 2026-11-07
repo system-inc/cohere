@@ -1,6 +1,8 @@
 package native
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -179,5 +181,70 @@ func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 		if actual != expected {
 			test.Fatalf("printWidth %d:\n--- fork\n%s--- native\n%s", width, expected, actual)
 		}
+	}
+}
+
+// TestCssYamlFrontMatterMatchesTheFork formats every css fixture of Prettier's own whose yaml front matter has a
+// value, natively and through the fork, and requires the same bytes (#zmt3tv5). css.Format refuses these alone,
+// with no way to reach the yaml printer, and css's own fork test sets them aside for that reason; through native
+// the embed has the yaml printer, as upstream's front matter embed does. Both in the house options and Prettier's
+// defaults, since tab width and print width reach the embedded yaml.
+func TestCssYamlFrontMatterMatchesTheFork(test *testing.T) {
+	test.Parallel()
+	fixtures := filepath.Join("..", "css", "testdata", "prettier", "css")
+	var files []string
+	walkError := filepath.WalkDir(fixtures, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || !strings.HasSuffix(path, ".css") {
+			return pathError
+		}
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
+		}
+		if text := string(contents); strings.HasPrefix(text, "---") && strings.Contains(text[3:], "\n---") {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
+	if len(files) < 9 {
+		test.Fatalf("found %d css fixtures with front matter, want the 9 or more the fork's tests hold", len(files))
+	}
+	for name, options := range map[string]format_options.Options{
+		"house":    format_options.Default(),
+		"defaults": format_options.PrettierDefaults(),
+	} {
+		oracle, newPrettierError := prettier.New(options)
+		if newPrettierError != nil {
+			test.Fatal(newPrettierError)
+		}
+		formatter := Formatter{Options: options}
+		printed := 0
+		for _, file := range files {
+			contents, readError := os.ReadFile(file)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			expected, oracleError := oracle.Format("Probe.css", string(contents))
+			actual, nativeError := formatter.Format("Probe.css", string(contents))
+			switch {
+			case oracleError != nil && nativeError != nil:
+			case oracleError != nil:
+				test.Errorf("%s (%s): the fork refused it (%v) and native printed it", file, name, oracleError)
+			case nativeError != nil:
+				test.Errorf("%s (%s): native refused what the fork prints: %v", file, name, nativeError)
+			case actual != expected:
+				test.Errorf("%s (%s):\n--- fork\n%s--- native\n%s", file, name, expected, actual)
+			default:
+				printed++
+			}
+		}
+		// A comparison where both sides refused everything would pass while proving nothing.
+		if printed == 0 {
+			test.Errorf("%s: no fixture was printed by both, of %d", name, len(files))
+		}
+		test.Logf("%s: %d of %d front-matter fixtures printed byte-identical to the fork", name, printed, len(files))
 	}
 }

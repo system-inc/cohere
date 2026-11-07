@@ -260,55 +260,41 @@ func reportDeprecations(ruleContext rule.Context, literal ClassLiteral) {
 // in a literal; that rule counts and deletes exactly the unglued repeats within a run, so this skips
 // exactly those. A run whose source is not its decoded value is reported at the run, without a fix.
 func reportTemplateDeprecations(ruleContext rule.Context, segments []ClassSegment) {
-	sourceText := ""
-	if ruleContext.SourceFile != nil {
-		sourceText = ruleContext.SourceFile.Text()
-	}
+	// The rule declines a file with no source before it listens, so the source is always here.
+	sourceText := ruleContext.SourceFile.Text()
 
-	for _, segment := range segments {
-		tokens, tokenized := classTokensIn(sourceText, segment.Range, segment.Text)
-		if !tokenized {
-			tokens = classTokensOf(segment.Text, 0)
+	seenInRun := map[string]bool{}
+	run := -1
+	for _, class := range TemplateClassesOf(sourceText, segments) {
+		if class.Run != run {
+			run = class.Run
+			seenInRun = map[string]bool{}
+		}
+		glued := class.GluedLeading || class.GluedTrailing
+		repeated := !glued && seenInRun[class.Text]
+		if !glued {
+			seenInRun[class.Text] = true
 		}
 
-		seenInRun := map[string]bool{}
-		for index, token := range tokens {
-			if token.Separator {
-				continue
-			}
-			glued := (index == 0 && segment.LeadingHole) || (index == len(tokens)-1 && segment.TrailingHole)
-			repeated := !glued && seenInRun[token.Text]
-			if !glued {
-				seenInRun[token.Text] = true
-			}
-
-			replacement, isDeprecated := deprecationFor(token.Text)
-			if !isDeprecated {
-				continue
-			}
-
-			// A token's range is a source range only when the run tokenized against the source.
-			findingRange := segment.Range
-			if tokenized {
-				findingRange = token.Range
-			}
-
-			if replacement == "" {
-				ruleContext.ReportRange(findingRange, messageDeprecatedClassIrreplaceable(token.Text))
-				continue
-			}
-
-			var fixes []rule.Fix
-			if tokenized && !glued && !repeated {
-				fixes = []rule.Fix{rule.ReplaceRange(token.Range, replacement)}
-			}
-			ruleContext.Report(rule.Diagnostic{
-				Range:      findingRange,
-				Message:    messageDeprecatedClassReplaceable(token.Text, replacement),
-				SourceFile: ruleContext.SourceFile,
-				Fixes:      fixes,
-			})
+		replacement, isDeprecated := deprecationFor(class.Text)
+		if !isDeprecated {
+			continue
 		}
+		if replacement == "" {
+			ruleContext.ReportRange(class.Range, messageDeprecatedClassIrreplaceable(class.Text))
+			continue
+		}
+
+		var fixes []rule.Fix
+		if class.Anchored && !glued && !repeated {
+			fixes = []rule.Fix{rule.ReplaceRange(class.Range, replacement)}
+		}
+		ruleContext.Report(rule.Diagnostic{
+			Range:      class.Range,
+			Message:    messageDeprecatedClassReplaceable(class.Text, replacement),
+			SourceFile: ruleContext.SourceFile,
+			Fixes:      fixes,
+		})
 	}
 }
 

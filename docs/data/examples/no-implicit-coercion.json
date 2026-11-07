@@ -20,9 +20,7 @@
         "file": "/repository/source/NoImplicitCoercion.ts",
         "source": "+42\n"
     },
-    "assertedMessageIds": [
-        "implicitCoercion"
-    ],
+    "assertedMessageIds": ["implicitCoercion"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

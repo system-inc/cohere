@@ -1,8 +1,6 @@
 {
     "extends": "cohere:typescript",
-    "plugins": [
-        "@typescript-eslint"
-    ],
+    "plugins": ["@typescript-eslint"],
     "departures": {
         "@typescript-eslint/ban-ts-comment": "Allows @ts-expect-error with a description, and @ts-check, as before the cohere:adamic split, which bans all four directives: www-phi-health has 3 at cohere 5f65dd9d, so this holds until its fix wave reads 0 in every consumer (#cwycf2h).",
         "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c). cohere:adamic turns it on for outsiders.",
@@ -11,7 +9,7 @@
         "adamic/no-definite-assignment": "cohere:adamic turns it on, and our code has 43 findings in ahra, 5 in www-phi-health and 5 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#vk7621w). Outsiders get it on.",
         "adamic/no-optional-widening": "cohere:adamic turns it on, and our code has 349 findings in ahra, 244 in www-phi-health and 163 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#aaajpke). Outsiders get it on.",
         "adamic/no-type-predicate": "cohere:adamic turns it on, and our code has 352 findings in ahra, 138 in www-phi-health and 123 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#05k4swm). Outsiders get it on.",
-        "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 916 findings in ahra, 270 in www-phi-health and 218 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). Outsiders get it on.",
+        "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 916 findings in ahra, 270 in www-phi-health and 218 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). runtimeChecksEmitted is false because our code runs on tsc, which emits no check behind a cast, so the wave also covers the union downcasts Adamic would check: 71 sites across our four consumers, 28 of them real bugs (#mdccedj). Outsiders get it on.",
         "adamic/no-void-widening": "cohere:adamic turns it on, and our code has 56 findings in ahra, 47 in www-phi-health and 46 in www-ahra-ai at cohere cf0a4b7f, so it is off here until its fix wave reads 0 in every consumer (#zqe5fv4). Outsiders get it on.",
         "adamic/nominal-class": "cohere:adamic turns it on, and our code has 9 findings in ahra, 4 in www-phi-health and 4 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#zeqjfyx). Outsiders get it on.",
         "adamic/single-spread": "cohere:adamic turns it on, and our code has 259 findings in ahra, 163 in www-phi-health and 108 in www-ahra-ai at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#hzk757e). Outsiders get it on.",
@@ -33,7 +31,12 @@
         "adamic/no-definite-assignment": "off",
         "adamic/no-optional-widening": "off",
         "adamic/no-type-predicate": "off",
-        "adamic/no-unchecked-cast": "off",
+        "adamic/no-unchecked-cast": [
+            "off",
+            {
+                "runtimeChecksEmitted": false
+            }
+        ],
         "adamic/no-void-widening": "off",
         "adamic/nominal-class": "off",
         "adamic/single-spread": "off",
@@ -115,25 +118,10 @@
         "nexus/consistency-no-abbreviated-identifier": [
             "error",
             {
-                "frameworkParameterFilePatterns": [
-                    "/page.tsx",
-                    "/page.jsx",
-                    "/layout.tsx",
-                    "/layout.jsx",
-                    "/route.ts"
-                ],
-                "frameworkConstantFilePatterns": [
-                    "/middleware.ts",
-                    "middleware.ts"
-                ],
-                "frameworkParameterScopeNames": [
-                    "generateMetadata",
-                    "generateStaticParams",
-                    "generateViewport"
-                ],
-                "frameworkParameterScopeSuffixes": [
-                    "PageRoute"
-                ]
+                "frameworkParameterFilePatterns": ["/page.tsx", "/page.jsx", "/layout.tsx", "/layout.jsx", "/route.ts"],
+                "frameworkConstantFilePatterns": ["/middleware.ts", "middleware.ts"],
+                "frameworkParameterScopeNames": ["generateMetadata", "generateStaticParams", "generateViewport"],
+                "frameworkParameterScopeSuffixes": ["PageRoute"]
             }
         ],
         "nexus/consistency-require-constant-casing": [
@@ -240,18 +228,14 @@
     ],
     "overrides": [
         {
-            "files": [
-                "**/graphql/GraphQl*.generated.ts"
-            ],
+            "files": ["**/graphql/GraphQl*.generated.ts"],
             "reason": "Interim, until the last open decision on the generated-code ruling (#c076xbg) lands: the GraphQL schema itself names fields like min, max and idx, a wire change waiting on Kirk because the Phi mobile app may read them. When it lands, this override is deleted.",
             "rules": {
                 "nexus/consistency-no-abbreviated-identifier": "off"
             }
         },
         {
-            "files": [
-                "**/next-env.d.ts"
-            ],
+            "files": ["**/next-env.d.ts"],
             "rules": {
                 "@typescript-eslint/triple-slash-reference": "off",
                 "structure/consistency-require-organized-imports": "off"

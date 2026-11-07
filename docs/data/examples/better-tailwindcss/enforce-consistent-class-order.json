@@ -20,8 +20,6 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"flex\" />;\n"
     },
-    "assertedMessageIds": [
-        "inconsistentClassOrder"
-    ],
+    "assertedMessageIds": ["inconsistentClassOrder"],
     "assertsFix": true
 }

@@ -59,7 +59,7 @@ import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
 
 const [, , packageRootArgument, designSystemArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [design-system.css]\n');
     process.exit(2);
 }
@@ -98,14 +98,16 @@ const designSystemSource = designSystemPath
  */
 function loadStylesheet(identifier, base) {
     let resolved;
-    if (identifier === 'tailwindcss') {
+    if(identifier === 'tailwindcss') {
         resolved = NodePath.join(packageRoot, 'index.css');
-    } else if (identifier.startsWith('tailwindcss/')) {
+    }
+    else if(identifier.startsWith('tailwindcss/')) {
         resolved = NodePath.join(packageRoot, identifier.slice('tailwindcss/'.length));
-    } else {
+    }
+    else {
         resolved = NodePath.resolve(base, identifier);
     }
-    if (!resolved.endsWith('.css')) resolved += '.css';
+    if(!resolved.endsWith('.css')) resolved += '.css';
     try {
         return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
     }
@@ -129,7 +131,7 @@ async function loadDesignSystem(css = designSystemSource) {
 const designSystem = await loadDesignSystem();
 
 const entries = [];
-for (const [name, info] of designSystem.variants.entries()) {
+for(const [name, info] of designSystem.variants.entries()) {
     entries.push({ name, order: info.order, kind: info.kind });
 }
 
@@ -150,10 +152,10 @@ const compareFnOrders = Array.from(designSystem.variants.compareFns.keys()).sort
  */
 function probePairFor(members) {
     const statics = members.filter((member) => member.kind === 'static').map((member) => member.name);
-    if (statics.includes('sm') && statics.includes('lg')) return ['sm', 'lg'];
+    if(statics.includes('sm') && statics.includes('lg')) return ['sm', 'lg'];
 
     const functional = members.filter((member) => member.kind === 'functional').map((member) => member.name);
-    for (const root of functional) {
+    for(const root of functional) {
         // `@` is written `@sm`, everything else `min-sm`.
         const small = root === '@' ? '@sm' : `${root}-sm`;
         const large = root === '@' ? '@lg' : `${root}-lg`;
@@ -163,16 +165,16 @@ function probePairFor(members) {
 }
 
 const byOrder = new Map();
-for (const entry of entries) {
-    if (!byOrder.has(entry.order)) byOrder.set(entry.order, []);
+for(const entry of entries) {
+    if(!byOrder.has(entry.order)) byOrder.set(entry.order, []);
     byOrder.get(entry.order).push(entry);
 }
 
 const comparisons = [];
-for (const order of compareFnOrders) {
+for(const order of compareFnOrders) {
     const members = byOrder.get(order) ?? [];
     const pair = probePairFor(members);
-    if (pair === null) {
+    if(pair === null) {
         comparisons.push({ order, ascending: null, probe: null, members: members.map((m) => m.name) });
         continue;
     }
@@ -180,7 +182,7 @@ for (const order of compareFnOrders) {
     // A fresh design system per probe, because the dense index is a function of exactly which
     // variants have been parsed. Reusing one would let an earlier probe widen a later one's map.
     const probeSystem = await loadDesignSystem();
-    for (const raw of pair) probeSystem.parseVariant(raw);
+    for(const raw of pair) probeSystem.parseVariant(raw);
     const probeOrder = probeSystem.getVariantOrder();
     const [smallRaw, largeRaw] = pair;
     const smallIndex = probeOrder.get(probeSystem.parseVariant(smallRaw)) ?? null;

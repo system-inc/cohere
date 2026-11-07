@@ -245,6 +245,23 @@ var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 					))
 				}
 			}
+			// The static runs of a template with holes, each run judged on its own as upstream judges
+			// each piece: `px-4 py-4 ${x}` reports and `px-4 ${x} py-4` does not. A finding sits on its
+			// run, as a literal's sits on the literal, and this rule offers no fix.
+			sourceText := ruleContext.SourceFile.Text()
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				for _, run := range TemplateRunsOf(sourceText, segments) {
+					for _, collapse := range shorthandCollapses(run.Texts()) {
+						if !shorthandsExistIn(collapse.shorthands, system) {
+							continue
+						}
+						ruleContext.ReportRange(run.Range, messageShorthandClasses(
+							strings.Join(collapse.longhands, " "),
+							strings.Join(collapse.shorthands, " "),
+						))
+					}
+				}
+			}
 		}
 
 		listeners := rule.Listeners{}

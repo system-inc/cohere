@@ -1,23 +1,23 @@
 {
-  "rules": {
-    "Swift": "cohere-swift/toolchain-require-swift-6-language-mode"
-  },
-  "phrases": {
-    "configurations": {
-      "every": "",
-      "some": " in {{configurations}}"
+    "rules": {
+        "Swift": "cohere-swift/toolchain-require-swift-6-language-mode"
     },
-    "located": {
-      "found": "",
-      "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
-    }
-  },
-  "messages": {
-    "languageModeBelowSix": {
-      "text": "{{target}} compiles in Swift {{languageMode}} language mode. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set .swiftLanguageMode(.v6) on the target, or remove the setting that lowers it."
+    "phrases": {
+        "configurations": {
+            "every": "",
+            "some": " in {{configurations}}"
+        },
+        "located": {
+            "found": "",
+            "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
+        }
     },
-    "languageModeBelowSixInXcode": {
-      "text": "{{target}} compiles in Swift {{languageMode}} language mode<<configurations>>. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set the target's SWIFT_VERSION build setting to 6.0 in every configuration, or remove the setting that lowers it.<<located>>"
+    "messages": {
+        "languageModeBelowSix": {
+            "text": "{{target}} compiles in Swift {{languageMode}} language mode. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set .swiftLanguageMode(.v6) on the target, or remove the setting that lowers it."
+        },
+        "languageModeBelowSixInXcode": {
+            "text": "{{target}} compiles in Swift {{languageMode}} language mode<<configurations>>. Swift 6 is required: it makes data-race safety a compile error instead of a warning nobody reads. Set the target's SWIFT_VERSION build setting to 6.0 in every configuration, or remove the setting that lowers it.<<located>>"
+        }
     }
-  }
 }

@@ -1,12 +1,12 @@
 # `no-array-constructor`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | none |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | none          |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -24,4 +24,3 @@ Misfiled as formatting; it is a correctness rule already covered by verify's own
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

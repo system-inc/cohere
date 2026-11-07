@@ -18,7 +18,5 @@
         "file": "/repository/source/AsyncPromiseExecutor.ts",
         "source": "new Promise()"
     },
-    "assertedMessageIds": [
-        "noAsyncPromiseExecutor"
-    ]
+    "assertedMessageIds": ["noAsyncPromiseExecutor"]
 }

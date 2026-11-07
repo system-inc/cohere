@@ -4,7 +4,5 @@
         "file": "file.ts",
         "source": "foo(function(){ foo(function(){}) })"
     },
-    "assertedMessageIds": [
-        "exceed"
-    ]
+    "assertedMessageIds": ["exceed"]
 }

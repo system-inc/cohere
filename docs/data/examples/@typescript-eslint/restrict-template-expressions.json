@@ -18,7 +18,5 @@
         "file": "/repository/source/Templating.ts",
         "source": "declare const e: Error;\n`${e}`;\n"
     },
-    "assertedMessageIds": [
-        "invalidType"
-    ]
+    "assertedMessageIds": ["invalidType"]
 }

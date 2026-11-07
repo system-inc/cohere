@@ -197,8 +197,10 @@ func consistencyNoBareThrowFileIsExempt(fileName string) bool {
 			return true
 		}
 	}
-	// `Dog.test.a`, Adamic's test file, is one too (#kwt1htp).
-	if strings.HasSuffix(source_name.TreatedAs(fileName), ".test.ts") {
+	// The original's `.test.ts` suffix, widened to the house's one test-file notion: a `.test` name before
+	// any script extension, `.tsx` and `.js` included, and Adamic's `Dog.test.a` (#kwt1htp), so this rule and
+	// base/consistency-no-console agree on what a test is (Kirk, 2026-11-06, #4b337jk).
+	if source_name.IsTestFile(fileName) {
 		return true
 	}
 	for _, testPath := range consistencyNoBareThrowTestPaths {

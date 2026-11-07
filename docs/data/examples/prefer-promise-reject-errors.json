@@ -18,7 +18,5 @@
         "file": "input.ts",
         "source": "Foo.reject(5)\n"
     },
-    "assertedMessageIds": [
-        "rejectAnError"
-    ]
+    "assertedMessageIds": ["rejectAnError"]
 }

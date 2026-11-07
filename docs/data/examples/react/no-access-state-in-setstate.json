@@ -18,7 +18,5 @@
         "file": "/repository/source/NoAccessStateInSetstate.tsx",
         "source": "\n        function testFunction({a, b}) {\n        };\n      "
     },
-    "assertedMessageIds": [
-        "useCallback"
-    ]
+    "assertedMessageIds": ["useCallback"]
 }

@@ -20,9 +20,7 @@
         "file": "/repository/source/Eqeqeq.ts",
         "source": "a !== b"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ],
+    "assertedMessageIds": ["unexpected"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

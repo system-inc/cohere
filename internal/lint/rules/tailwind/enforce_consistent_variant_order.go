@@ -113,6 +113,9 @@ var EnforceConsistentVariantOrder = rule.Rule[EnforceConsistentVariantOrderOptio
 			for _, literal := range reader.ClassLiteralsIn(node) {
 				reportVariantOrder(ruleContext, literal, designSystem)
 			}
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				reportTemplateVariantOrder(ruleContext, segments, designSystem)
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -136,6 +139,35 @@ func reportVariantOrder(ruleContext rule.Context, literal ClassLiteral, designSy
 			continue
 		}
 		ruleContext.ReportRange(literal.Range, messageVariantOrder(className, sorted))
+	}
+}
+
+// reportTemplateVariantOrder judges every class in the static runs of a template with holes.
+//
+// Upstream reads each piece of a template as a literal of its own, so `hover:sm:flex ${size}` reports
+// as the plain string would, and so does a class glued to a hole: measured on 4.9.1 under ESLint,
+// `hover:sm:flex${x}` reports. That class is half of whatever the hole completes, but the variants
+// are written in full before the hole, so their order is judged either way. This rule offers no fix,
+// so nothing glued is ever rewritten. Each finding sits at its own class when the run's source is its
+// decoded value, and at the run when it is not.
+func reportTemplateVariantOrder(
+	ruleContext rule.Context,
+	segments []ClassSegment,
+	designSystem DesignSystemResult,
+) {
+	system := designSystem.System
+	if system == nil {
+		return
+	}
+	// The rule declines a file with no source before it listens, so the source is always here.
+	sourceText := ruleContext.SourceFile.Text()
+
+	for _, class := range TemplateClassesOf(sourceText, segments) {
+		sorted, needsReorder := sortedVariantSpelling(class.Text, system)
+		if !needsReorder {
+			continue
+		}
+		ruleContext.ReportRange(class.Range, messageVariantOrder(class.Text, sorted))
 	}
 }
 

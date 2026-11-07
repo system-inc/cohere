@@ -1,0 +1,10 @@
+{
+    "why": "sh17: a list of `ahra` commands under `Usage:` is masked whole, each line following the one above it",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}

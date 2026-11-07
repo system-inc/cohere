@@ -61,6 +61,11 @@ func runRenameVerb(arguments []string) error {
 	)
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
+	comments := flags.Bool(
+		"comments",
+		false,
+		"also rewrite text mentions of the old name in comments and markdown prose, when the name is distinctive",
+	)
 	dryRun := flags.Bool(
 		"dry-run",
 		false,
@@ -74,7 +79,9 @@ func runRenameVerb(arguments []string) error {
 		fmt.Fprintf(streams.Errors, "       cohere %s <name> <newName>\n\n", renameVerbName)
 		fmt.Fprintf(streams.Errors, "Renames a symbol everywhere the type graph says it is used.\n")
 		fmt.Fprintf(streams.Errors, "The position form is primary; a bare name is refused when it is ambiguous.\n")
-		fmt.Fprintf(streams.Errors, "Nothing is written without --write.\n\n")
+		fmt.Fprintf(streams.Errors, "Nothing is written without --write.\n")
+		fmt.Fprintf(streams.Errors, "Text mentions in comments and markdown are listed; --comments rewrites the\n")
+		fmt.Fprintf(streams.Errors, "ones a distinctive name makes likely, never one in a string or code fence.\n\n")
 		flags.PrintDefaults()
 	}
 	if parseError := flags.Parse(arguments); parseError != nil {
@@ -158,6 +165,15 @@ func runRenameVerb(arguments []string) error {
 	if buildError != nil {
 		return buildError
 	}
+	// The markdown searched is the program's directory's, where its tsconfig is.
+	markdownRoot, markdownRootError := absolutePath(filepath.Dir(*configurationFileName), *directory)
+	if markdownRootError != nil {
+		return markdownRootError
+	}
+	if collectError := rename.CollectMentions(graph, plan, markdownRoot); collectError != nil {
+		return collectError
+	}
+	plan.RewriteMentions = *comments
 
 	if len(plan.Refusals) > 0 {
 		if writeError := rename.Write(streams.Output, plan, false); writeError != nil {

@@ -18,8 +18,5 @@
         "file": "/repository/source/Unbound.ts",
         "source": "let b = window.blur;\n"
     },
-    "assertedMessageIds": [
-        "unbound",
-        "unboundWithoutThisAnnotation"
-    ]
+    "assertedMessageIds": ["unbound", "unboundWithoutThisAnnotation"]
 }

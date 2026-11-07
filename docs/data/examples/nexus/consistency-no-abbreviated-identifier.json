@@ -18,10 +18,5 @@
         "file": "/repository/source/Thing.tsx",
         "source": "use(args);\n"
     },
-    "assertedMessageIds": [
-        "abbreviatedIdentifier",
-        "abbreviatedSuffix",
-        "abbreviatedWordSegment",
-        "millisecondSuffix"
-    ]
+    "assertedMessageIds": ["abbreviatedIdentifier", "abbreviatedSuffix", "abbreviatedWordSegment", "millisecondSuffix"]
 }

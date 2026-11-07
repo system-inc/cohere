@@ -26,7 +26,5 @@
         "file": "/repository/source/InvalidThis.ts",
         "source": "function Foo() {\n  this.x = 1;\n}"
     },
-    "assertedMessageIds": [
-        "unexpectedThis"
-    ]
+    "assertedMessageIds": ["unexpectedThis"]
 }

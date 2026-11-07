@@ -26,9 +26,5 @@
         "file": "/repository/source/NoLabels.ts",
         "source": "while (true) {}"
     },
-    "assertedMessageIds": [
-        "unexpectedLabel",
-        "unexpectedLabelInBreak",
-        "unexpectedLabelInContinue"
-    ]
+    "assertedMessageIds": ["unexpectedLabel", "unexpectedLabelInBreak", "unexpectedLabelInContinue"]
 }

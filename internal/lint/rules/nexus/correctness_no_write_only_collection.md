@@ -1,12 +1,12 @@
 # `nexus/correctness-no-write-only-collection`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` once the two ahra sites are fixed.** 2 findings, 2 true |
-| Findings | **ahra 2** (measured 2026-10-03) |
-| Measured precision | 2 of 2 true: each map is filled with `.set` and never read |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Recommendation**     | **Yes, at `error` once the two ahra sites are fixed.** 2 findings, 2 true                                                                                    |
+| Findings               | **ahra 2** (measured 2026-10-03)                                                                                                                             |
+| Measured precision     | 2 of 2 true: each map is filled with `.set` and never read                                                                                                   |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                       |
+| Auto-fixable           | no                                                                                                                                                           |
 | Needs type information | yes, to find every reference by symbol and to tie `Map`, `Set` and each mutating method to the default library; without a checker the rule registers nothing |
 
 ## What it checks

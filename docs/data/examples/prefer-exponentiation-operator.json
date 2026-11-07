@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferExponentiationOperator.ts",
         "source": "pow\n"
     },
-    "assertedMessageIds": [
-        "useExponentiation"
-    ],
+    "assertedMessageIds": ["useExponentiation"],
     "assertsFix": true
 }

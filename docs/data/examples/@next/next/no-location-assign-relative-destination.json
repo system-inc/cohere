@@ -18,7 +18,5 @@
         "file": "/repository/source/Navigate.tsx",
         "source": "location.assign();\n"
     },
-    "assertedMessageIds": [
-        "noLocationAssign"
-    ]
+    "assertedMessageIds": ["noLocationAssign"]
 }

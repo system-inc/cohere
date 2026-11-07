@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferTemplate.tsx",
         "source": "'use strict';"
     },
-    "assertedMessageIds": [
-        "unexpectedStringConcatenation"
-    ],
+    "assertedMessageIds": ["unexpectedStringConcatenation"],
     "assertsFix": true
 }

@@ -20,8 +20,6 @@
         "file": "/repository/source/Returning.ts",
         "source": "class Foo {\n  f?: string;\n}\n"
     },
-    "assertedMessageIds": [
-        "useThisType"
-    ],
+    "assertedMessageIds": ["useThisType"],
     "assertsFix": true
 }

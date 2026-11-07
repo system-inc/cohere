@@ -15,17 +15,17 @@ in command/cohere: "the Go engine", "Go files", a `go` label on a compiler findi
 The fixtures in `Contract/` are the agreement made executable. The Go renderer's tests and the Swift
 encoder's tests both read them, so neither side can drift without the other's test failing.
 
-| Fixture | What it pins |
-|---|---|
-| `Clean.jsonl` | Every phase ran or was reused. One file is excluded with its reason. Exit 0. |
-| `Findings.jsonl` | A compiler warning with its group, and a rule finding whose message has a newline. Lint still runs after a warning. The binary was built from a modified tree. Exit 1. |
-| `TypesBail.jsonl` | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1. |
-| `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1. |
-| `Unreadable.jsonl` | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1. |
-| `LintOnly.jsonl` | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings. |
-| `FormatOnly.jsonl` | `--no-fix --format-only`, a real run: the fix phase ran with no fix proposed and found one file the formatter would change, which is the one finding; types, lint and unused skipped as `not requested`, and the summary calls the run complete. Exit 1, for the finding. |
-| `GoClean.jsonl` | A clean run as the Go engine writes it: its provenance names a go toolchain and no swift-syntax or swift-format, and the front door renders it in Go's words, with nothing in the output saying Swift. Exit 0. |
-| `Unused.jsonl` | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
+| Fixture                     | What it pins                                                                                                                                                                                                                                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Clean.jsonl`               | Every phase ran or was reused. One file is excluded with its reason. Exit 0.                                                                                                                                                                                                                                   |
+| `Findings.jsonl`            | A compiler warning with its group, and a rule finding whose message has a newline. Lint still runs after a warning. The binary was built from a modified tree. Exit 1.                                                                                                                                         |
+| `TypesBail.jsonl`           | Under `--no-fix`, a compiler error cuts lint off as `notReached`. The run is incomplete. Exit 1.                                                                                                                                                                                                               |
+| `CrashWithoutSummary.jsonl` | The stream stops after the fix phase. The front door must say nothing was checked and exit 1.                                                                                                                                                                                                                  |
+| `Unreadable.jsonl`          | One file the engine could not read: named beside the excluded files, every phase ran, nothing found, and still incomplete with exit 1.                                                                                                                                                                         |
+| `LintOnly.jsonl`            | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings.                                                                                                                                         |
+| `FormatOnly.jsonl`          | `--no-fix --format-only`, a real run: the fix phase ran with no fix proposed and found one file the formatter would change, which is the one finding; types, lint and unused skipped as `not requested`, and the summary calls the run complete. Exit 1, for the finding.                                      |
+| `GoClean.jsonl`             | A clean run as the Go engine writes it: its provenance names a go toolchain and no swift-syntax or swift-format, and the front door renders it in Go's words, with nothing in the output saying Swift. Exit 0.                                                                                                 |
+| `Unused.jsonl`              | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
 note on stderr: the summary said the run fell short and the front door believed it, but could not say
@@ -100,7 +100,17 @@ TypeScript.
 ### `provenance`, always first
 
 ```json
-{"kind":"provenance","contract":3,"engine":"cohere-swift","version":"0.1.0","commit":"<40 hex or dev>","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}
+{
+    "kind": "provenance",
+    "contract": 3,
+    "engine": "cohere-swift",
+    "version": "0.1.0",
+    "commit": "<40 hex or dev>",
+    "sourceTreeModified": false,
+    "toolchain": "swiftlang-6.4.0.34.1",
+    "swiftSyntax": "604.0.0",
+    "swiftFormat": "604.0.0"
+}
 ```
 
 `sourceTreeModified` drives the same warning the TypeScript run prints: this binary was built from a
@@ -110,10 +120,18 @@ nothing else.
 ### `project`, the Swift counterpart of `graph built in`
 
 ```json
-{"kind":"project","root":"/…/ahraos-macos","package":"AhraOs","elapsedMilliseconds":412,
- "filesInPackage":152,"filesOurs":149,"filesInScope":149,"scopeDescription":"",
- "targets":[{"name":"AhraOsCore","kind":"library","files":14,"languageMode":"6"}],
- "excluded":[{"file":"/…/Scratch.swift","reason":"ignored by git"}]}
+{
+    "kind": "project",
+    "root": "/…/ahraos-macos",
+    "package": "AhraOs",
+    "elapsedMilliseconds": 412,
+    "filesInPackage": 152,
+    "filesOurs": 149,
+    "filesInScope": 149,
+    "scopeDescription": "",
+    "targets": [{ "name": "AhraOsCore", "kind": "library", "files": 14, "languageMode": "6" }],
+    "excluded": [{ "file": "/…/Scratch.swift", "reason": "ignored by git" }]
+}
 ```
 
 - `filesInPackage` is every `.swift` file in a root target. `filesOurs` is the subset that is
@@ -149,7 +167,7 @@ reason are named, `  not checked: <file> (<reason>)`; more are counted, `  not c
 ### `unreadable`, between `project` and the first `phase`
 
 ```json
-{"kind":"unreadable","file":"/…/Latin1.swift","error":"it is not valid UTF-8 or could not be opened (…)"}
+{ "kind": "unreadable", "file": "/…/Latin1.swift", "error": "it is not valid UTF-8 or could not be opened (…)" }
 ```
 
 One per file the engine could not read, so nothing in it was checked. `error` is a sentence. The front
@@ -162,9 +180,21 @@ reports on the files it could.
 ### `finding`
 
 ```json
-{"kind":"finding","source":"rule","file":"/…/ByteRing.swift","line":159,"column":61,"endLine":159,"endColumn":62,
- "severity":"error","rule":"cohere-swift/force-unwrapping","messageId":"forceUnwrap",
- "message":"…why, not only what…","fixes":[],"suggestions":[]}
+{
+    "kind": "finding",
+    "source": "rule",
+    "file": "/…/ByteRing.swift",
+    "line": 159,
+    "column": 61,
+    "endLine": 159,
+    "endColumn": 62,
+    "severity": "error",
+    "rule": "cohere-swift/force-unwrapping",
+    "messageId": "forceUnwrap",
+    "message": "…why, not only what…",
+    "fixes": [],
+    "suggestions": []
+}
 ```
 
 - `source` is `compiler`, `rule`, or `format`.
@@ -278,11 +308,22 @@ shader's constants), cases an enum's conformances or raw values may reach, and a
 ### `fix`, the fix and format phase's summary
 
 ```json
-{"kind":"fix","filesConsidered":149,"filesRewritten":2,"fixesApplied":5,"fixesRefused":1,
- "refusalsByReason":{"overlaps another fix":1},"filesReformatted":2,"filesNotFormatted":0,
- "notFormattedReasons":{},"formatScope":"Sources/AhraOsCore",
- "changedFiles":[{"file":"/…/Pane.swift","fixedBy":{"cohere-swift/private-over-fileprivate":3},"formatted":true},
-                 {"file":"/…/Ring.swift","fixedBy":{"cohere-swift/legacy-constructors":2},"formatted":true}]}
+{
+    "kind": "fix",
+    "filesConsidered": 149,
+    "filesRewritten": 2,
+    "fixesApplied": 5,
+    "fixesRefused": 1,
+    "refusalsByReason": { "overlaps another fix": 1 },
+    "filesReformatted": 2,
+    "filesNotFormatted": 0,
+    "notFormattedReasons": {},
+    "formatScope": "Sources/AhraOsCore",
+    "changedFiles": [
+        { "file": "/…/Pane.swift", "fixedBy": { "cohere-swift/private-over-fileprivate": 3 }, "formatted": true },
+        { "file": "/…/Ring.swift", "fixedBy": { "cohere-swift/legacy-constructors": 2 }, "formatted": true }
+    ]
+}
 ```
 
 The front door fills an `edit.Summary` from it and prints that summary's `String()`, then
@@ -302,14 +343,20 @@ from `filesRewritten`. Until then it ignores the field, as below.
 The field is additive within contract 3 (@system_cohere_build's ruling on #s4k5yb9). A field this
 document does not list is ignored by the front door, so an older front door loses only the list, never a
 count or a verdict. The counts stay what the verdict reads, and the list never changes an exit code. An
-engine from before the field writes no `changedFiles` at all. The front door reads that as *not listed*,
-never as *no files changed*, and renders the counts alone. `Clean.jsonl` is such a stream.
+engine from before the field writes no `changedFiles` at all. The front door reads that as _not listed_,
+never as _no files changed_, and renders the counts alone. `Clean.jsonl` is such a stream.
 
 ### `types`
 
 ```json
-{"kind":"types","diagnostics":1,"files":149,"elapsedMilliseconds":2187,
- "filesWithoutRecord":[],"build":"checked without building: the build server prepared the dependencies in 4.1s, and 12 frontend jobs checked 149 files of 8 modules with -emit-sib in 6.2s, scratch <root>/.cache/cohere/swift; prepare built no plugin host tool"}
+{
+    "kind": "types",
+    "diagnostics": 1,
+    "files": 149,
+    "elapsedMilliseconds": 2187,
+    "filesWithoutRecord": [],
+    "build": "checked without building: the build server prepared the dependencies in 4.1s, and 12 frontend jobs checked 149 files of 8 modules with -emit-sib in 6.2s, scratch <root>/.cache/cohere/swift; prepare built no plugin host tool"
+}
 ```
 
 Rendered as `types: 1 diagnostics over 149 files in 2.187s`. Each entry in `filesWithoutRecord`
@@ -425,8 +472,19 @@ differ.
 ### `inputs`, just before `summary`
 
 ```json
-{"kind":"inputs","files":["/…/go.mod","/…/go.sum","/…/p/p.go","<goroot>/VERSION","<goroot>/bin/go","<goroot>/src/fmt/print.go"],
- "directories":["/…","/…/p"],"absent":["/…/CohereSettings.json","/…/staticcheck.conf","/go.work"]}
+{
+    "kind": "inputs",
+    "files": [
+        "/…/go.mod",
+        "/…/go.sum",
+        "/…/p/p.go",
+        "<goroot>/VERSION",
+        "<goroot>/bin/go",
+        "<goroot>/src/fmt/print.go"
+    ],
+    "directories": ["/…", "/…/p"],
+    "absent": ["/…/CohereSettings.json", "/…/staticcheck.conf", "/go.work"]
+}
 ```
 
 Additive within contract 3, and written once, just before the summary: by the Go engine in a check run whose load
@@ -484,10 +542,21 @@ project, and the front door records nothing for either.
 ### `lint`
 
 ```json
-{"kind":"lint","findings":3,"rulesRun":15,"filesWalked":149,"nodesVisited":412233,"elapsedMilliseconds":96,
- "reusedFrom":"","rulesSilent":["cohere-swift/consistency-no-print"],"rulesWatchedAndQuiet":9,
- "crashes":[{"file":"/…/X.swift","error":"…"}],
- "rulesScopedOff":{"cohere-swift/consistency-no-print":12},"rulesNotConfigured":[],"configNote":""}
+{
+    "kind": "lint",
+    "findings": 3,
+    "rulesRun": 15,
+    "filesWalked": 149,
+    "nodesVisited": 412233,
+    "elapsedMilliseconds": 96,
+    "reusedFrom": "",
+    "rulesSilent": ["cohere-swift/consistency-no-print"],
+    "rulesWatchedAndQuiet": 9,
+    "crashes": [{ "file": "/…/X.swift", "error": "…" }],
+    "rulesScopedOff": { "cohere-swift/consistency-no-print": 12 },
+    "rulesNotConfigured": [],
+    "configNote": ""
+}
 ```
 
 Rendered by the existing lint line and coverage printers:
@@ -528,7 +597,13 @@ there the cache restores analysis only, and the types record's `build` says so.
 ### `phase`
 
 ```json
-{"kind":"phase","name":"types","outcome":"notReached","elapsedMilliseconds":0,"detail":"1 type diagnostics — lint findings against wrong semantics are noise"}
+{
+    "kind": "phase",
+    "name": "types",
+    "outcome": "notReached",
+    "elapsedMilliseconds": 0,
+    "detail": "1 type diagnostics — lint findings against wrong semantics are noise"
+}
 ```
 
 `name` is `fix`, `types`, `lint`, or `unused`. `outcome` is `ran`, `skipped`, `notReached` or
@@ -548,7 +623,7 @@ back `not requested` is a protocol error, not a smaller run.
 ### `rule`, only under `--rules` and `--rules-enabled`
 
 ```json
-{"kind":"rule","name":"cohere-swift/force-unwrapping","severity":"error"}
+{ "kind": "rule", "name": "cohere-swift/force-unwrapping", "severity": "error" }
 ```
 
 `--rules` prints names, sorted. `--rules-enabled` prints `name<TAB>severity`. The development-build
@@ -557,7 +632,7 @@ note goes to stderr, as it does for TypeScript.
 ### `summary`, always last
 
 ```json
-{"kind":"summary","findings":4,"complete":true,"exitCode":1}
+{ "kind": "summary", "findings": 4, "complete": true, "exitCode": 1 }
 ```
 
 - `findings` is the sum of every `finding` record. The front door counts the findings it received
@@ -572,12 +647,12 @@ note goes to stderr, as it does for TypeScript.
 
 ## Exit codes
 
-| Engine exit | Meaning | Front door |
-|---|---|---|
-| 0 | summary written, `findings` 0, `complete` true | exits 0 |
-| 1 | summary written, findings or an incomplete run | exits 1 |
-| 2 | the engine could not run: bad flag, contract mismatch, no package, toolchain missing, refused config (a leftover `.swift-format`, a `format` key) | prints the engine's stderr, then `cohere: the Swift engine did not run, so nothing was checked`, exits 1 |
-| other, or killed | crash | `cohere: the Swift engine exited <code> without a summary, so nothing was checked`, exits 1 |
+| Engine exit      | Meaning                                                                                                                                           | Front door                                                                                               |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 0                | summary written, `findings` 0, `complete` true                                                                                                    | exits 0                                                                                                  |
+| 1                | summary written, findings or an incomplete run                                                                                                    | exits 1                                                                                                  |
+| 2                | the engine could not run: bad flag, contract mismatch, no package, toolchain missing, refused config (a leftover `.swift-format`, a `format` key) | prints the engine's stderr, then `cohere: the Swift engine did not run, so nothing was checked`, exits 1 |
+| other, or killed | crash                                                                                                                                             | `cohere: the Swift engine exited <code> without a summary, so nothing was checked`, exits 1              |
 
 An exit of 0 or 1 without a `summary` record is a crash. An exit code that disagrees with the
 summary is a protocol error. The front door owns the final exit code, and there is no path through
@@ -585,25 +660,25 @@ it where a run that did not finish prints green.
 
 ## Flags
 
-| Flag | Swift meaning in phase 1 |
-|---|---|
-| `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project. A package is built from its own `Package.resolved` with resolution disabled, since SwiftPM keeps pins nowhere else, so one with remote dependencies and none fails by name; an Xcode project resolves into the engine's scratch, held to a resolution the repository commits when there is one. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
-| `--fix` | Fix and format only. |
-| `--types`, `--lint` | That phase alone, as for TypeScript. A `--lint` run whose typed rules apply to a file still checks, skipped when no input changed, because those rules read the check's index and compile commands, the way TypeScript's lint still loads the checker (#q1574nq). Nothing the compiler said is reported, and types stays `skipped` as `not requested`. |
-| `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
-| `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope. |
-| `--format-only` | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2. |
-| `--no-format` | Formatting left out of a bare run, `--fix` or `--no-fix`, as TypeScript's `--no-format`: the fixers run, types and lint run, and no file is formatted or reported unformatted. The `fix` record counts nothing formatted, and its `formatScope` says formatting was left out. Named with `--format`, `--format-all` or `--format-only`, the run is refused with exit 2. |
-| `--no-cache` | Every phase from source, as TypeScript's `--no-cache`. The run uses a scratch of its own in the system's temporary directory and removes it when it ends, so it reads no package description, build, compiler record or index a run before it left, and writes nothing to the project's `.cache`. Every cache the engine keeps lives under its scratch, so this is all of them. It costs a cold build. |
-| `--covered-packages` | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). At an Xcode root `checked` is the root alone: a local package the project links is outside it and runs as its own. Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
-| `[paths]` | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`). |
-| `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
-| `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
-| `--rules`, `--rules-enabled`, `--version` | `rule` and `provenance` records. |
-| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
-| `--timing`, `--explain <file>` | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked. |
-| `--tsconfig` | Meaningless for Swift. The front door refuses it against a Swift root. |
-| `--directory` | Resolved by the front door into `--root`. |
+| Flag                                        | Swift meaning in phase 1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--no-fix`                                  | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project. A package is built from its own `Package.resolved` with resolution disabled, since SwiftPM keeps pins nowhere else, so one with remote dependencies and none fails by name; an Xcode project resolves into the engine's scratch, held to a resolution the repository commits when there is one. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line.                                                                |
+| `--fix`                                     | Fix and format only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `--types`, `--lint`                         | That phase alone, as for TypeScript. A `--lint` run whose typed rules apply to a file still checks, skipped when no input changed, because those rules read the check's index and compile commands, the way TypeScript's lint still loads the checker (#q1574nq). Nothing the compiler said is reported, and types stays `skipped` as `not requested`.                                                                                                                                                                                                                                                                                               |
+| `--format`                                  | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing.                                                                                                                                                                                                                                                                                                                                                             |
+| `--format-all`                              | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `--format-only`                             | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2.                                                                                                                                                                                         |
+| `--no-format`                               | Formatting left out of a bare run, `--fix` or `--no-fix`, as TypeScript's `--no-format`: the fixers run, types and lint run, and no file is formatted or reported unformatted. The `fix` record counts nothing formatted, and its `formatScope` says formatting was left out. Named with `--format`, `--format-all` or `--format-only`, the run is refused with exit 2.                                                                                                                                                                                                                                                                              |
+| `--no-cache`                                | Every phase from source, as TypeScript's `--no-cache`. The run uses a scratch of its own in the system's temporary directory and removes it when it ends, so it reads no package description, build, compiler record or index a run before it left, and writes nothing to the project's `.cache`. Every cache the engine keeps lives under its scratch, so this is all of them. It costs a cold build.                                                                                                                                                                                                                                               |
+| `--covered-packages`                        | Prints one `coveredPackages` record after `provenance` and exits 0, building nothing: `checked` is the root and each local package inside it whose files a run at this root checks, and `vendored` each local package under `Vendor/`, whose files the run lists as not checked. It comes from the run's own traversal (manifests only), so the front door can skip a nested package a run already covers (#sxs26s3). At an Xcode root `checked` is the root alone: a local package the project links is outside it and runs as its own. Paths are absolute, standardized as Foundation spells them; compare after resolving symlinks on both sides. |
+| `[paths]`                                   | Narrow fix, format and lint to the scope. Types still reports the whole package (see `types`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `--lint-config <file>`                      | The `CohereSettings.json` whose `swift` block configures rules.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `--fix-passes <n>`, `--single-threaded`     | As for TypeScript.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `--rules`, `--rules-enabled`, `--version`   | `rule` and `provenance` records.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
+| `--timing`, `--explain <file>`              | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `--directory`                               | Resolved by the front door into `--root`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 
 ## Config
 

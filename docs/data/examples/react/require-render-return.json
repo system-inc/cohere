@@ -18,7 +18,5 @@
         "file": "/repository/source/RequireRenderReturn.tsx",
         "source": "var Hello = createReactClass({});"
     },
-    "assertedMessageIds": [
-        "noRenderReturn"
-    ]
+    "assertedMessageIds": ["noRenderReturn"]
 }

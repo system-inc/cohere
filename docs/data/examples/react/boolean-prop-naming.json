@@ -4,7 +4,5 @@
         "file": "/repository/source/BooleanPropNaming.tsx",
         "source": "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };\n"
     },
-    "assertedMessageIds": [
-        "patternMismatch"
-    ]
+    "assertedMessageIds": ["patternMismatch"]
 }

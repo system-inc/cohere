@@ -8,7 +8,5 @@
         "file": "/repository/source/Keys.tsx",
         "source": "<Foo key />;\n"
     },
-    "assertedMessageIds": [
-        "noArrayIndex"
-    ]
+    "assertedMessageIds": ["noArrayIndex"]
 }

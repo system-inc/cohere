@@ -1,12 +1,12 @@
 # `no-loop-func`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **10** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                |
+| ---------------------- | -------------- |
+| **Recommendation**     | **Strong Yes** |
+| Violations in ahra     | **10**         |
+| Plugin                 | `eslint core`  |
+| Auto-fixable           | no             |
+| Needs type information | no             |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ onHeader(header, table) {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -18,7 +18,5 @@
         "file": "/repository/source/NoObjectTypeAsDefaultProp.tsx",
         "source": "function C({a = {}}) { return <div/>; }"
     },
-    "assertedMessageIds": [
-        "forbiddenTypeDefaultParam"
-    ]
+    "assertedMessageIds": ["forbiddenTypeDefaultParam"]
 }

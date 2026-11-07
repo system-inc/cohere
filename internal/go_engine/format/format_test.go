@@ -419,8 +419,8 @@ const (
 
 // wrapTo is an Options.Wrap that answers every file with output, claiming one line brought within the limit, and
 // counts how often it was asked.
-func wrapTo(output string, asked *atomic.Int32) func([]byte) Wrapping {
-	return func([]byte) Wrapping {
+func wrapTo(output string, asked *atomic.Int32) func(string, []byte) Wrapping {
+	return func(string, []byte) Wrapping {
 		asked.Add(1)
 		return Wrapping{Output: []byte(output), Lines: 1}
 	}
@@ -436,18 +436,24 @@ func writeFile(test *testing.T, contents string) string {
 	return file
 }
 
-// A write keeps a wrap that is the same program and gofmt's own layout, as a change gofmt did not make, counted by
-// the lines it wrapped. A check never asks the wrap, since long lines are the lint phase's to report.
-func TestAWriteKeepsAnEquivalentWrapAndACheckNeverAsks(test *testing.T) {
+// RunWrap keeps a wrap that is the same program and gofmt's own layout, as a change gofmt did not make, counted by the
+// lines it wrapped, and writes it. Run never asks the wrap, even writing, since a wrap waits for the load to find the
+// types sound, and neither does a RunWrap that does not write, since long lines are the lint phase's to report.
+func TestRunWrapKeepsAnEquivalentWrapAndNothingElseAsks(test *testing.T) {
 	test.Parallel()
 
 	var asked atomic.Int32
 	file := writeFile(test, callSource)
-	if checked := Run([]string{file}, Options{Wrap: wrapTo(callWrapped, &asked)}); asked.Load() != 0 ||
+	if formatted := Run([]string{file}, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)}); asked.Load() != 0 ||
+		!reflect.DeepEqual(formatted, Result{FilesConsidered: 1}) {
+		test.Fatalf("a run of gofmt asked the wrap %d times and got %+v", asked.Load(), formatted)
+	}
+	sources := []Source{{File: file, Contents: []byte(callSource)}}
+	if checked := RunWrap(sources, Options{Wrap: wrapTo(callWrapped, &asked)}); asked.Load() != 0 ||
 		!reflect.DeepEqual(checked, Result{FilesConsidered: 1}) {
 		test.Fatalf("a check asked the wrap %d times and got %+v", asked.Load(), checked)
 	}
-	result := Run([]string{file}, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)})
+	result := RunWrap(sources, Options{Write: true, Wrap: wrapTo(callWrapped, &asked)})
 	want := Result{
 		FilesConsidered: 1,
 		Changed:         []ChangedFile{{File: file, WrappedLines: 1, Written: true, FirstDifferingLine: 3}},
@@ -459,7 +465,8 @@ func TestAWriteKeepsAnEquivalentWrapAndACheckNeverAsks(test *testing.T) {
 }
 
 // A wrap that is not the same program, or that gofmt would lay out again, is declined with why: the file holds gofmt's
-// output, and the run names it. Without the two checks the fix phase would write whatever a wrap returned.
+// output, and the run names it. Without the two checks the fix phase would write whatever a wrap returned. WrapSource,
+// the step in memory, declines it the same way.
 func TestAWriteDeclinesAWrapThatIsNotTheSameProgramOrNotGofmts(test *testing.T) {
 	test.Parallel()
 
@@ -476,19 +483,25 @@ func TestAWriteDeclinesAWrapThatIsNotTheSameProgramOrNotGofmts(test *testing.T) 
 
 			var asked atomic.Int32
 			file := writeFile(test, callSource)
-			result := Run([]string{file}, Options{Write: true, Wrap: wrapTo(testCase.output, &asked)})
+			result := RunWrap([]Source{{File: file, Contents: []byte(callSource)}},
+				Options{Write: true, Wrap: wrapTo(testCase.output, &asked)})
 			if len(result.Changed) != 0 || len(result.WrapDeclined) != 1 || result.WrapDeclined[0].File != file ||
 				!strings.Contains(result.WrapDeclined[0].Reason, testCase.reason) {
 				test.Fatalf("want the wrap declined as %q, got %+v", testCase.reason, result)
 			}
 			requireContents(test, file, callSource)
+			output, lines, declined := WrapSource(file, []byte(callSource), wrapTo(testCase.output, &asked))
+			if string(output) != callSource || lines != 0 || !strings.Contains(declined, testCase.reason) {
+				test.Fatalf("want WrapSource to keep gofmt's output and decline as %q, got %d lines, %q:\n%s",
+					testCase.reason, lines, declined, output)
+			}
 		})
 	}
 }
 
-// gofmt's verdict that a file is formatted, kept by a run that did not wrap, is not trusted by a run that wraps: the
-// file may hold a long line, so the run asks the wrap, and keeps what the wrap says. A verdict the wrap gave is
-// trusted by both. A declined wrap is never known, so the next run asks again and says again why.
+// gofmt's verdict that a file is formatted, which Run keeps, is not trusted by RunWrap: the file may hold a long line,
+// so RunWrap asks the wrap, and keeps what the wrap says. A verdict the wrap gave is trusted by both. A declined wrap
+// is never known, so the next run asks again and says again why.
 func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 	test.Parallel()
 
@@ -506,36 +519,124 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 		test.Fatalf("want gofmt's verdict trusted by a run that does not wrap, got %+v", again)
 	}
 
-	wrapped := Run([]string{file}, Options{Write: true, Known: DecodeKnownFiles(encoded),
-		Wrap: wrapTo(callWrapped, &asked)})
+	wrapped := RunWrap([]Source{{File: file, Contents: []byte(callSource)}}, Options{Write: true,
+		Known: DecodeKnownFiles(encoded), Wrap: wrapTo(callWrapped, &asked)})
 	if wrapped.Known != 0 || len(wrapped.Changed) != 1 || wrapped.Changed[0].WrappedLines != 1 {
 		test.Fatalf("want gofmt's verdict read past and the file wrapped, got %+v", wrapped)
 	}
 	requireContents(test, file, callWrapped)
 
+	sources := []Source{{File: file, Contents: []byte(callWrapped)}}
 	fits := DecodeKnownFiles(nil)
-	nothingToDo := func([]byte) Wrapping { return Wrapping{} }
-	Run([]string{file}, Options{Write: true, Known: fits, Wrap: nothingToDo})
+	nothingToDo := func(string, []byte) Wrapping { return Wrapping{} }
+	RunWrap(sources, Options{Write: true, Known: fits, Wrap: nothingToDo})
 	encoded, encodeError = fits.Encode()
 	if encodeError != nil {
 		test.Fatalf("encoding the verdicts: %v", encodeError)
 	}
-	for _, options := range []Options{{Write: true, Wrap: nothingToDo}, {}} {
-		options.Known = DecodeKnownFiles(encoded)
-		if known := Run([]string{file}, options); known.Known != 1 {
-			test.Fatalf("want the wrap's verdict trusted with %+v, got %+v", options, known)
-		}
+	trusted := RunWrap(sources, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: nothingToDo})
+	if trusted.Known != 1 {
+		test.Fatalf("want the wrap's verdict trusted by a run that wraps, got %+v", trusted)
+	}
+	if known := Run([]string{file}, Options{Known: DecodeKnownFiles(encoded)}); known.Known != 1 {
+		test.Fatalf("want the wrap's verdict trusted by a run of gofmt, got %+v", known)
 	}
 
 	declines := DecodeKnownFiles(nil)
-	declining := func([]byte) Wrapping { return Wrapping{Declined: "a planted refusal"} }
-	Run([]string{file}, Options{Write: true, Known: declines, Wrap: declining})
+	declining := func(string, []byte) Wrapping { return Wrapping{Declined: "a planted refusal"} }
+	RunWrap(sources, Options{Write: true, Known: declines, Wrap: declining})
 	encoded, encodeError = declines.Encode()
 	if encodeError != nil {
 		test.Fatalf("encoding the verdicts: %v", encodeError)
 	}
-	again := Run([]string{file}, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: declining})
+	again := RunWrap(sources, Options{Write: true, Known: DecodeKnownFiles(encoded), Wrap: declining})
 	if again.Known != 0 || len(again.WrapDeclined) != 1 {
 		test.Fatalf("want a declined wrap tried and named again, got %+v", again)
+	}
+}
+
+// A set is written whole or not at all: two files beside each other are both replaced, and a set with one file whose
+// directory refuses a temporary file writes neither, leaving no temporary file behind. Written one by one, the first
+// would be replaced before the second failed. The read-only directory is made writable again before the test's
+// directory is removed.
+// A placement that fails once others are in place puts back every file already placed, so the set is never left
+// half written: of three files, the second placement fails, and all three read as they did before, with no temporary
+// file left beside them.
+func TestALatePlacementFailurePutsThePlacedFilesBack(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	files := map[string][]byte{}
+	for _, name := range []string{"first.go", "second.go", "third.go"} {
+		file := filepath.Join(root, name)
+		if writeError := os.WriteFile(file, []byte(formattedSource), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		files[file] = []byte(callSource)
+	}
+	placements := 0
+	failSecond := func(staged stagedFile) error {
+		placements++
+		if placements == 2 {
+			// Ignored: the temporary file is the test's to remove, as putInPlace removes it on a failed rename.
+			_ = os.Remove(staged.temporary)
+			return fmt.Errorf("renaming %s: the placement this test fails", staged.target)
+		}
+		return putInPlace(staged)
+	}
+	partlyWritten, writeError := writeAllAtomically(files, failSecond)
+	if writeError == nil || len(partlyWritten) != 0 {
+		test.Fatalf("want the set refused and every placed file put back, got %v, partly written %v", writeError,
+			partlyWritten)
+	}
+	if placements != 2 {
+		test.Fatalf("want the placements to stop at the failed second, got %d", placements)
+	}
+	for file := range files {
+		requireContents(test, file, formattedSource)
+	}
+	entries, readError := os.ReadDir(root)
+	if readError != nil || len(entries) != 3 {
+		test.Fatalf("want the three files alone in the directory, got %v (%v)", entries, readError)
+	}
+}
+
+func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	first, second := filepath.Join(root, "first.go"), filepath.Join(root, "locked", "second.go")
+	if directoryError := os.MkdirAll(filepath.Dir(second), 0o755); directoryError != nil {
+		test.Fatal(directoryError)
+	}
+	for _, file := range []string{first, second} {
+		if writeError := os.WriteFile(file, []byte(formattedSource), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	if _, writeError := WriteAllAtomically(map[string][]byte{first: []byte(callSource),
+		second: []byte(callSource)}); writeError != nil {
+		test.Fatalf("a writable set was refused: %v", writeError)
+	}
+	requireContents(test, first, callSource)
+	requireContents(test, second, callSource)
+
+	if chmodError := os.Chmod(filepath.Dir(second), 0o555); chmodError != nil {
+		test.Fatal(chmodError)
+	}
+	test.Cleanup(func() {
+		// Ignored: a directory left read-only fails only the temporary directory's removal, which says so.
+		_ = os.Chmod(filepath.Dir(second), 0o755)
+	})
+	partlyWritten, writeError := WriteAllAtomically(map[string][]byte{first: []byte(formattedSource),
+		second: []byte(formattedSource)})
+	if writeError == nil || len(partlyWritten) != 0 {
+		test.Fatalf("want the set refused whole, got %v, partly written %v", writeError, partlyWritten)
+	}
+	requireContents(test, first, callSource)
+	requireContents(test, second, callSource)
+	entries, readError := os.ReadDir(root)
+	if readError != nil || len(entries) != 2 {
+		test.Fatalf("want first.go and locked alone in the directory, got %v (%v)", entries, readError)
 	}
 }

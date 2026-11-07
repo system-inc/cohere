@@ -18,7 +18,5 @@
         "file": "fixture.tsx",
         "source": "function helper() {\n  return Math.random();\n}\n"
     },
-    "assertedMessageIds": [
-        "impureFunctionCall"
-    ]
+    "assertedMessageIds": ["impureFunctionCall"]
 }

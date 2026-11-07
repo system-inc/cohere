@@ -20,10 +20,7 @@
         "file": "/repository/source/ExtraBooleanCast.ts",
         "source": "for(!!foo;;) {}"
     },
-    "assertedMessageIds": [
-        "redundantBooleanCall",
-        "redundantDoubleNegation"
-    ],
+    "assertedMessageIds": ["redundantBooleanCall", "redundantDoubleNegation"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

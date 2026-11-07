@@ -79,8 +79,9 @@ type typeReachScan struct {
 //
 //   - rule.DeclarationsIn filters to the file it is handed, and is trusted only when handed the rule's
 //     own ctx.SourceFile;
-//   - rule.IsDeclaredOnlyInDeclarationFiles, rule.IsDeclaredInASourceFile, rule.IsDeclaredByADependency and
-//     rule.IsDependencyDeclaration answer a bool about which files declare a symbol;
+//   - rule.IsDeclaredOnlyInDeclarationFiles, rule.IsDeclaredInASourceFile, rule.IsDeclaredByADependency,
+//     rule.IsDependencyDeclaration and rule.IsDeclaredInPackage answer a bool about which files declare a
+//     symbol;
 //   - rule.IsFirstDeclaredInDeclarationFile answers only the first declaration's file kind, preserving
 //     the order-sensitive query used by core.resolvesToAGlobal. Its tests cover mixed files in both orders.
 //   - rule.HasDeclarations answers only existence; rule.IsDeclaredInANonDeclarationFile ignores
@@ -106,6 +107,7 @@ var ownFileDeclarationReaders = map[string]bool{
 	"rule.IsDeclaredInASourceFile":          true,
 	"rule.IsDeclaredByADependency":          true,
 	"rule.IsDependencyDeclaration":          true,
+	"rule.IsDeclaredInPackage":              true,
 }
 
 // shapeReaders read other files' declarations, and only what a shape covers, and hand back no syntax at

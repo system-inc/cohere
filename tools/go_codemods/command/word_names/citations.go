@@ -15,9 +15,9 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/system-inc/cohere/tools/go_codemods/global_rename"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/internal/go_rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
 // citationEdits respells every comment citation of an accepted rename's old name, in the editable files of the

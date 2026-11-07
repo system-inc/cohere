@@ -2,22 +2,50 @@ package line_wrap
 
 import (
 	"go/ast"
+	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
-// proseComment reports whether a comment-only line is a prose line a reflow may touch: `// ` then a word, not
-// a directive, not a doc-comment code block (`//\t` or `//` with extra spaces), not a list item, not a heading.
-func proseComment(comment string) bool {
+// exampleOutput is how go/doc recognizes an Example's output block, `// Output:` or `// Unordered output:` in any case,
+// copied from its outputPrefix, so the two-word form and a lowercase one, which go test compares line by line as well,
+// are markers by Go's own reading rather than by a guess at the shape.
+var exampleOutput = regexp.MustCompile(`(?i)^[[:space:]]*(unordered )?output:`)
+
+// ProseComment reports whether a comment-only line is a prose line a reflow may touch: `// ` then a word, not
+// a directive, not a doc-comment code block (`//\t` or `//` with extra spaces), not a list item, not a heading,
+// not a marker line. It is exported so every reflow in the house (word_names' after a respelling, as well as this
+// package's) reads a paragraph the same way and none of them can join a marker line into one.
+func ProseComment(comment string) bool {
 	if !strings.HasPrefix(comment, "// ") || len(comment) < 4 {
 		return false
 	}
-	if comment[3] == ' ' || comment[3] == '\t' || isDirective(comment) {
+	if comment[3] == ' ' || comment[3] == '\t' || IsDirective(comment) {
 		return false
 	}
 	fields := strings.Fields(comment[3:])
-	return len(fields) > 0 && !listMarker(fields[0]) && !strings.HasPrefix(fields[0], "#")
+	return len(fields) > 0 && !listMarker(fields[0]) && !strings.HasPrefix(fields[0], "#") && !markerWord(fields[0]) &&
+		!exampleOutput.MatchString(comment[3:])
+}
+
+// markerWord reports whether a word opening a comment line marks the line as data a line-based reader parses: a
+// capitalized word then a colon, as Go's `Deprecated:`, an Example's `Output:` and a project's own `Serial:` or
+// `Wall:` guards are spelled. Such a line is never reflowed, and a paragraph written straight above it with no blank
+// line between stops before it, so no words are carried onto it and it is never joined into the paragraph. Prose that
+// happens to open a line this way (`Note: ...`) is left as written too, which costs only a long line a person wraps.
+func markerWord(word string) bool {
+	name, isMarked := strings.CutSuffix(word, ":")
+	if !isMarked || name == "" || name[0] < 'A' || name[0] > 'Z' {
+		return false
+	}
+	for _, character := range name {
+		if !unicode.IsLetter(character) && !unicode.IsDigit(character) {
+			return false
+		}
+	}
+	return true
 }
 
 // listMarker reports whether a word starting a comment line would read as a list item marker.
@@ -40,7 +68,7 @@ func listMarker(word string) bool {
 // of the next line of the paragraph, cascading until a line absorbs them, or onto new lines at its end.
 func (sourceFile *sourceFile) commentEdit(line int) (edit, bool) {
 	comment, isComment := sourceFile.commentOnlyLine(line)
-	if !isComment || !proseComment(comment.text) {
+	if !isComment || !ProseComment(comment.text) {
 		return edit{}, false
 	}
 	text := sourceFile.lineText(line)
@@ -48,7 +76,7 @@ func (sourceFile *sourceFile) commentEdit(line int) (edit, bool) {
 	paragraph := []string{comment.text}
 	for next := line + 1; next <= sourceFile.lineCount(); next++ {
 		nextComment, nextIsComment := sourceFile.commentOnlyLine(next)
-		if !nextIsComment || indentation(sourceFile.lineText(next)) != indent || !proseComment(nextComment.text) {
+		if !nextIsComment || indentation(sourceFile.lineText(next)) != indent || !ProseComment(nextComment.text) {
 			break
 		}
 		paragraph = append(paragraph, nextComment.text)
@@ -130,7 +158,7 @@ func (sourceFile *sourceFile) residueShape(line int) string {
 			len(strings.Fields(comment.text[3:])) > 0 &&
 			listMarker(strings.Fields(comment.text[3:])[0]):
 			return "CommentListItem"
-		case proseComment(comment.text):
+		case ProseComment(comment.text):
 			return "CommentLongWord"
 		}
 		return "CommentOther"

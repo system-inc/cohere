@@ -19,8 +19,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "longLineComment"
-    ],
+    "assertedMessageIds": ["longLineComment"],
     "assertsFix": true
 }

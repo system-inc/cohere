@@ -1,13 +1,13 @@
 # `nexus/correctness-no-implicit-return`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`, in a project whose tsconfig leaves `noImplicitReturns` off.** Where the flag is on, the rule stands down and says so in `--coverage`, because the type check reports the same findings |
-| Findings | **api 17 before #rbvd7sv's wave, 0 after** (measured 2026-10-04), each on the same file, line and column as `tsgo --noImplicitReturns` |
-| Measured precision | exact against TypeScript: the fixtures compare the rule's spans with TS7030's, built with the flag on |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes; without a checker the rule registers nothing |
+|                        |                                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`, in a project whose tsconfig leaves `noImplicitReturns` off.** Where the flag is on, the rule stands down and says so in `--coverage`, because the type check reports the same findings |
+| Findings               | **api 17 before #rbvd7sv's wave, 0 after** (measured 2026-10-04), each on the same file, line and column as `tsgo --noImplicitReturns`                                                                    |
+| Measured precision     | exact against TypeScript: the fixtures compare the rule's spans with TS7030's, built with the flag on                                                                                                     |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                    |
+| Auto-fixable           | no                                                                                                                                                                                                        |
+| Needs type information | yes; without a checker the rule registers nothing                                                                                                                                                         |
 
 ## What it checks
 

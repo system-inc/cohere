@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoGlobalListenerTargetAssertion.ts",
         "source": "/// <reference lib=\"dom\" />\ndeclare function use(value: unknown): void;\ndeclare const textarea: HTMLTextAreaElement;\ndeclare const textareaReference: { current: HTMLTextAreaElement | null };\ndeclare global {\n    interface Document { addEventListener(type: 'editor-ready', listener: (event: CustomEvent) => void): void }\n}\ndocument.addEventListener('keydown', function(event) { use((event.target as HTMLTextAreaElement).selectionStart); });\n"
     },
-    "assertedMessageIds": [
-        "globalListenerTargetAssertion"
-    ]
+    "assertedMessageIds": ["globalListenerTargetAssertion"]
 }

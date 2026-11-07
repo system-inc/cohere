@@ -18,7 +18,5 @@
         "file": "/repository/source/ProviderReturn.ts",
         "source": "type ObjectFactory<T> = { create(): T };\ntype BrandedMethodDecoratorType<TExpectedReturn> = MethodDecorator & {\n    readonly __expectedReturnType?: TExpectedReturn;\n};\ndeclare class TypedInjectionKey<T = unknown> { private brand?: T; }\ndeclare function Provider<T = unknown>(\n    token: TypedInjectionKey<T>,\n): BrandedMethodDecoratorType<T | ObjectFactory<T> | undefined>;\ndeclare function Plain(): MethodDecorator;\ndeclare function Loose(): BrandedMethodDecoratorType<any>;\ndeclare function Unknowable(): BrandedMethodDecoratorType<unknown>;\ndeclare function Strict(): BrandedMethodDecoratorType<string>;\ndeclare const stringToken: TypedInjectionKey<string>;\ndeclare namespace Namespace {\n    function Strict(): BrandedMethodDecoratorType<string>;\n}\nclass C { plain(): number { return 1; } }\n"
     },
-    "assertedMessageIds": [
-        "mismatch"
-    ]
+    "assertedMessageIds": ["mismatch"]
 }

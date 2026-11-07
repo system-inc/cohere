@@ -1,8 +1,5 @@
 {
     "rule": "@typescript-eslint/dot-notation",
-    "assertedMessageIds": [
-        "useBrackets",
-        "useDot"
-    ],
+    "assertedMessageIds": ["useBrackets", "useDot"],
     "assertsFix": true
 }

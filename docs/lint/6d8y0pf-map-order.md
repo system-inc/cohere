@@ -54,7 +54,7 @@ inline_order_test.go:54: run 1 differs from run 0 (2256 bytes, 1 splices)
 - `gofmt -l internal/lint/ecmascript/high_level_intermediate_representation`:
   exit 0, 0 listed files. `go vet $P`: exit 0, 0 diagnostic bytes.
 - `go test -v $P -run '^TestExport(Graphs|Ranges)ForAdamic$' -args
-  -export-graphs <directory> -export-ranges <directory>` on both old and fixed code:
+-export-graphs <directory> -export-ranges <directory>` on both old and fixed code:
   2 passing exporters each time. Graphs: 355 fixtures, 695 functions. Ranges:
   355 fixtures, 1,010 functions, 407 closure answers. Comparing corresponding
   files byte for byte: 0/355 graph files and 0/355 range files changed in these runs.
@@ -70,35 +70,35 @@ are base-code line numbers. Identifiers, Instructions, Functions, Blocks and phi
 in `inline_remap.go` are slices; neither InlineRemap.Identifiers nor InlineRemap.Instructions
 is ranged in production. The sole inliner id-allocating map range is the one fixed.
 
-| File and lines | Observable ordering |
-| --- | --- |
-| inline_iife.go:379 | Allocates ids; fixed to nested block order. |
-| inline_iife.go:433 | Counts only; addition commutes. |
-| align_method_calls.go:123,134,169,172 | Keyed updates; member appends at 169 are sorted at 172 before use. |
-| align_scopes.go:335 | Copies keyed range entries. |
-| clone.go:79 | Copies the block lookup table; canonical Blocks slice copied first. Object allocations mint no IR ids. |
-| context_identifiers.go:122 | Produces a membership set. |
-| dependencies.go:1096,1158,1428,1545 | Copies keyed entries; overriding happens between loops, never between keys within a loop. |
-| dependencies.go:1593,1606 | Membership predicate; break means existence of a match, not selection of its value. |
-| disjoint.go:283 | Members sorted before grouping or output. |
-| drop_manual_memoization.go:225 | Copies keyed dependencies. |
-| graph.go:129,146 | Maximum bound; keyed deletion. |
-| hoistable.go:199,245,390,613,633,635,745,761,764,809 | Existential test, sorted node indices, set copies/intersections/unions, sorted successor lists, set equality. |
-| invoked_functions.go:70,74,181 | Reachability fixed point; only monotonic set insertion. |
-| lower.go:465 | Writes each capture to its existing Context slice position; no append or id allocation. |
-| memoization_graph.go:139,211,221 | Independent flag resets; collected keys sorted before traversal. |
-| merge_scopes.go:512,514 | Scope lists sorted; outer position map read later via ordered positions. |
-| postdominator.go:172,279,354 | Internal predecessor lists feed a commutative dominator intersection fixed point; existential test; frontier membership set. No ids or emitted lists. |
-| preserve_manual_memoization.go:466 | Produces a flattened membership set. |
-| preserve_manual_memoization.go:561 | Emits findings, but supported upstream marker graphs have at most one open memo block. See limitation below. |
-| reactive.go:834,903 | Independent existential tests; children traversal marks a subtree set, while emitted frontier order comes from Function.Blocks. |
-| reactive_build.go:780 | Copies keyed emitted flags. |
-| scope_terminals.go:425,433 | Independent keyed bounds updates. |
-| mutation_aliasing/ranges.go:571 | Invalid identifiers sorted before return. |
-| mutation_aliasing/ranges.go:867 | Freezing identity members and source reachability; final frozen membership commutes, no ids or ordered output. |
+| File and lines                                       | Observable ordering                                                                                                                                   |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| inline_iife.go:379                                   | Allocates ids; fixed to nested block order.                                                                                                           |
+| inline_iife.go:433                                   | Counts only; addition commutes.                                                                                                                       |
+| align_method_calls.go:123,134,169,172                | Keyed updates; member appends at 169 are sorted at 172 before use.                                                                                    |
+| align_scopes.go:335                                  | Copies keyed range entries.                                                                                                                           |
+| clone.go:79                                          | Copies the block lookup table; canonical Blocks slice copied first. Object allocations mint no IR ids.                                                |
+| context_identifiers.go:122                           | Produces a membership set.                                                                                                                            |
+| dependencies.go:1096,1158,1428,1545                  | Copies keyed entries; overriding happens between loops, never between keys within a loop.                                                             |
+| dependencies.go:1593,1606                            | Membership predicate; break means existence of a match, not selection of its value.                                                                   |
+| disjoint.go:283                                      | Members sorted before grouping or output.                                                                                                             |
+| drop_manual_memoization.go:225                       | Copies keyed dependencies.                                                                                                                            |
+| graph.go:129,146                                     | Maximum bound; keyed deletion.                                                                                                                        |
+| hoistable.go:199,245,390,613,633,635,745,761,764,809 | Existential test, sorted node indices, set copies/intersections/unions, sorted successor lists, set equality.                                         |
+| invoked_functions.go:70,74,181                       | Reachability fixed point; only monotonic set insertion.                                                                                               |
+| lower.go:465                                         | Writes each capture to its existing Context slice position; no append or id allocation.                                                               |
+| memoization_graph.go:139,211,221                     | Independent flag resets; collected keys sorted before traversal.                                                                                      |
+| merge_scopes.go:512,514                              | Scope lists sorted; outer position map read later via ordered positions.                                                                              |
+| postdominator.go:172,279,354                         | Internal predecessor lists feed a commutative dominator intersection fixed point; existential test; frontier membership set. No ids or emitted lists. |
+| preserve_manual_memoization.go:466                   | Produces a flattened membership set.                                                                                                                  |
+| preserve_manual_memoization.go:561                   | Emits findings, but supported upstream marker graphs have at most one open memo block. See limitation below.                                          |
+| reactive.go:834,903                                  | Independent existential tests; children traversal marks a subtree set, while emitted frontier order comes from Function.Blocks.                       |
+| reactive_build.go:780                                | Copies keyed emitted flags.                                                                                                                           |
+| scope_terminals.go:425,433                           | Independent keyed bounds updates.                                                                                                                     |
+| mutation_aliasing/ranges.go:571                      | Invalid identifiers sorted before return.                                                                                                             |
+| mutation_aliasing/ranges.go:867                      | Freezing identity members and source reachability; final frozen membership commutes, no ids or ordered output.                                        |
 
 One audit limitation: `compareInferredDependencies` can iterate several source dependency
-lists for *nested open memo marker graphs*, which React rejects by its non-nesting
+lists for _nested open memo marker graphs_, which React rejects by its non-nesting
 invariant. Cohere's fallback permits such graphs, so their finding order could be
 observable. This change leaves that unsupported-input diagnostic behavior alone;
 it is not a second inliner allocation bug and upstream provides no nested-block order

@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "export const C = () => <Foo.script src=\"/a.js\" />;"
     },
-    "assertedMessageIds": [
-        "noSyncScripts"
-    ]
+    "assertedMessageIds": ["noSyncScripts"]
 }

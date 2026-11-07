@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_useless_concatenation"
 )
 
 // Shape names the construct a plan breaks, and labels residue.
@@ -104,7 +105,10 @@ func (sourceFile *sourceFile) listPlan(
 	return result, len(result.breaks) > 0
 }
 
-// chainPlan breaks a maximal chain of one operator after each operator.
+// chainPlan breaks a maximal chain of one operator after each operator, but a + joining two string literals that
+// consistency_no_useless_concatenation reports on one line: that rule leaves alone a join across lines, so a break
+// there would hide its finding rather than fix the long line. The chain breaks at its other operators instead, and a
+// line only that break would cure is left to CuredOnly.
 func (sourceFile *sourceFile) chainPlan(root *ast.BinaryExpr) (plan, bool) {
 	result := plan{
 		shape:    ShapeOperatorChain,
@@ -124,6 +128,9 @@ func (sourceFile *sourceFile) chainPlan(root *ast.BinaryExpr) (plan, bool) {
 	for index := len(operators) - 1; index >= 0; index-- {
 		operator := operators[index]
 		if sourceFile.lineOfPosition(operator.OpPos) != sourceFile.lineOfPosition(operator.Y.Pos()) {
+			continue
+		}
+		if _, _, joins := consistency_no_useless_concatenation.JoinedLiterals(operator); joins {
 			continue
 		}
 		offset := sourceFile.offset(operator.OpPos) + len(operator.Op.String())

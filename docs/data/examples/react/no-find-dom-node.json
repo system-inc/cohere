@@ -18,7 +18,5 @@
         "file": "/repository/source/FindDomNode.tsx",
         "source": "ReactDOM[k](this);"
     },
-    "assertedMessageIds": [
-        "noFindDOMNode"
-    ]
+    "assertedMessageIds": ["noFindDOMNode"]
 }

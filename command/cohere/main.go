@@ -294,11 +294,15 @@ func run() error {
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
+		// A run formats unless it names only the type check or the lint rules, or leaves formatting out.
+		formats := !given["no-format"] && (given["format"] || given["format-all"] || given["format-only"] ||
+			given["fix"] || !(given["types"] || given["lint"]))
 		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(
 			location,
 			locateError,
 			workingDirectory,
 			namedLintConfiguration,
+			formats,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError
@@ -464,6 +468,16 @@ func run() error {
 			return locateError
 		}
 		return dumpCacheTable(location)
+	}
+
+	// The format project at a root no TypeScript project holds is formatting and nothing else: there is no
+	// program to type-check or lint, so whatever its parent was given, a bare run, `--fix` or `--no-fix`, it
+	// formats alone, writing or not as the parent's run does. Discovery adds it only to a run that formats.
+	if locateError == nil && location.Engine == engineFormat {
+		*fixOnly = false
+		*formatOnly = true
+		*unusedReport, *unusedAll, *unusedDeep = false, false, false
+		activeSummary.FormatProject = true
 	}
 
 	// A bare `cohere` runs the whole pipeline. The phase flags isolate one phase for someone
@@ -1173,26 +1187,31 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
+				// A nested repository's drift is reported, never this project's to check, so a failure reading one is a
+				// gap the footer names, never a stop: at adamic's root one stopped the run before lint (#71njcj8).
 				if answer.checkError != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
+					activeSummary.Gaps.NestedUnread = sentence.FromError(answer.checkError)
+				} else {
+					nested := answer.check
+					for _, walk := range nested.Walks {
+						declareFormatWalk(walk)
+					}
+					for _, note := range nested.Notes {
+						fmt.Fprintln(accountOutput(streams.Errors), note)
+					}
+					showWarning()
+					printNestedDrift(streams.Output, nested)
+					findings += len(nested.Drift)
+					activeSummary.WouldChange += len(nested.Drift)
+					// A nested file the formatter could not check is named in every mode and counted as a gap, never as
+					// a finding: the nested repository is read-only here, and its own run fails on it (#zmt3tv5).
+					for _, file := range nestedUnchecked(nested) {
+						fmt.Fprintf(accountOutput(streams.Errors), "note: %s not checked: %s\n", file.FileName,
+							file.Reason)
+					}
+					activeSummary.Gaps.NestedUnchecked = len(nested.Unchecked)
+					printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 				}
-				nested := answer.check
-				for _, walk := range nested.Walks {
-					declareFormatWalk(walk)
-				}
-				for _, note := range nested.Notes {
-					fmt.Fprintln(accountOutput(streams.Errors), note)
-				}
-				showWarning()
-				printNestedDrift(streams.Output, nested)
-				findings += len(nested.Drift)
-				activeSummary.WouldChange += len(nested.Drift)
-				if *formatOnly {
-					printUnchecked(streams.Output, nestedUnchecked(nested))
-					findings += len(nested.Unchecked)
-					activeSummary.Findings += len(nested.Unchecked)
-				}
-				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}

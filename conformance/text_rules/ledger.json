@@ -1,42 +1,10 @@
 [
     {
         "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am03",
-        "kind": "verdict",
-        "task": "1289mz6",
-        "reason": "`.sort`'s comparator parameters are exempt, so `a` and `b` are not reported"
-    },
-    {
-        "engine": "typescript",
         "family": "casing",
         "case": "us05",
         "kind": "verdict",
         "task": "bjxkmf8",
         "reason": "neither casing rule judges a leading underscore, so `_cache` is not reported"
-    },
-    {
-        "engine": "typescript",
-        "family": "console",
-        "case": "co05",
-        "kind": "verdict",
-        "task": "p5hm8xm",
-        "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
-    },
-    {
-        "engine": "typescript",
-        "family": "shouting",
-        "case": "sh26",
-        "kind": "verdict",
-        "task": "tp7ahz0",
-        "reason": "the command mask blanks every line opening with `git`, so the sentence wrapped onto one is masked and `HOME` is not reported until #tp7ahz0 reads a line that continues a sentence as prose"
-    },
-    {
-        "engine": "go",
-        "family": "shouting",
-        "case": "sh25",
-        "kind": "verdict",
-        "task": "0n6zmqq",
-        "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
     }
 ]

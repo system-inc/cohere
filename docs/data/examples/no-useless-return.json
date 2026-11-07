@@ -20,8 +20,6 @@
         "file": "file.ts",
         "source": "() => 5"
     },
-    "assertedMessageIds": [
-        "unnecessaryReturn"
-    ],
+    "assertedMessageIds": ["unnecessaryReturn"],
     "assertsFix": true
 }

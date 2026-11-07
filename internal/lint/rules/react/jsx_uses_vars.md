@@ -1,12 +1,12 @@
 # `react/jsx-uses-vars`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Yes**               |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -19,7 +19,6 @@ Stylistic, but the tree already satisfies it, so enabling costs nothing and prev
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-
 
 ## Ported? No, and the reason is measured
 
@@ -46,9 +45,9 @@ Measured with a probe at `internal/jsx_uses_vars_probe/`, which is **still in th
 runnable**, driving this repository's own `no-unused-vars` over **upstream's own corpus for this
 rule**:
 
-| | |
-|---|---|
-| All 11 of upstream's `valid` cases, which are bindings referenced only from JSX | **clean** |
+|                                                                                      |                  |
+| ------------------------------------------------------------------------------------ | ---------------- |
+| All 11 of upstream's `valid` cases, which are bindings referenced only from JSX      | **clean**        |
 | 7 controls taken from upstream's `invalid` list, which are genuinely unread bindings | **all 7 report** |
 
 The controls firing are what make the clean column a measurement rather than a broken instrument.

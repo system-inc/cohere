@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-misused-spread`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **2** (measured 2026-10-01, after dropping the string branch; the gate adds the four string sites below) |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                                                                                                          |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Strong Yes**                                                                                           |
+| Violations in ahra     | **2** (measured 2026-10-01, after dropping the string branch; the gate adds the four string sites below) |
+| Plugin                 | `@typescript-eslint`                                                                                     |
+| Auto-fixable           | no                                                                                                       |
+| Needs type information | yes                                                                                                      |
 
 ## What it checks
 
@@ -24,12 +24,12 @@ iterable, class instance, class declaration), which catches silent data loss, is
 
 So cohere is silent where the gate reports, on the four string sites ahra had:
 
-| site | why the code wants code points |
-|---|---|
+| site                                                                   | why the code wants code points              |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
 | `libraries/structure/libraries/nexus/source/geography/Countries.ts:13` | `ISO` letters mapped to regional indicators |
-| `modules/openai/PngTextMetadata.ts:64` | a Latin-1 filter |
-| `modules/pensieve/PensieveDailyQuotes.ts:163` | quote-mark scanning |
-| `modules/pensieve/PensieveDailyQuotes.ts:201` | ignored characters filtered out |
+| `modules/openai/PngTextMetadata.ts:64`                                 | a Latin-1 filter                            |
+| `modules/pensieve/PensieveDailyQuotes.ts:163`                          | quote-mark scanning                         |
+| `modules/pensieve/PensieveDailyQuotes.ts:201`                          | ignored characters filtered out             |
 
 ESLint draws the same line through Nexus's `NexusTypeScriptEsLintPlugin`, whose wrapper of this rule
 drops `noStringSpread` (Nexus 4e3395d), so the engines agree on all four (#cn8sthd). The fixture is
@@ -99,4 +99,3 @@ const spread = { ...secret };
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

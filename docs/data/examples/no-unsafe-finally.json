@@ -18,10 +18,5 @@
         "file": "clean.ts",
         "source": "var foo = function() { try {} finally { while (true) break; } };"
     },
-    "assertedMessageIds": [
-        "unsafeBreak",
-        "unsafeContinue",
-        "unsafeReturn",
-        "unsafeThrow"
-    ]
+    "assertedMessageIds": ["unsafeBreak", "unsafeContinue", "unsafeReturn", "unsafeThrow"]
 }

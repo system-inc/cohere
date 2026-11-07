@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-import-type-side-effects`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **54** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong Yes**       |
+| Violations in ahra     | **54**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ import { type MenuItemProperties } from '@structure/source/components/menus/Menu
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

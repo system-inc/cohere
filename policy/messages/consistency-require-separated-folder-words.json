@@ -1,33 +1,25 @@
 {
-  "rules": {
-    "TypeScript": "nexus/consistency-require-separated-folder-words",
-    "Swift": "cohere-swift/consistency-require-separated-folder-words",
-    "Go": "cohere-go/consistency-require-separated-folder-words"
-  },
-  "messages": {
-    "runTogetherFolder": {
-      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated by underscores. A name that mirrors another project's keeps it through a `//cohere:file-ignore` in this file, naming whose name it is, since the finding sits at the file's start, where no line directive reaches.",
-      "languages": [
-        "Go"
-      ]
+    "rules": {
+        "TypeScript": "nexus/consistency-require-separated-folder-words",
+        "Swift": "cohere-swift/consistency-require-separated-folder-words",
+        "Go": "cohere-go/consistency-require-separated-folder-words"
     },
-    "runTogetherPackageName": {
-      "text": "Package name \"{{package}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a caller reads the package name before every exported name it uses, so its words are separated by underscores.",
-      "languages": [
-        "Go"
-      ]
-    },
-    "runTogetherProjectFolder": {
-      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated.",
-      "languages": [
-        "TypeScript"
-      ]
-    },
-    "runTogetherFolderWords": {
-      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `FormatOptions` at a glance and has to stop and parse `Formatoptions`, and a folder's name is read on every path, so its words are separated: by capitals in a capitalized name, by underscores or hyphens in a lowercase one.",
-      "languages": [
-        "Swift"
-      ]
+    "messages": {
+        "runTogetherFolder": {
+            "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated by underscores. A name that mirrors another project's keeps it through a `//cohere:file-ignore` in this file, naming whose name it is, since the finding sits at the file's start, where no line directive reaches.",
+            "languages": ["Go"]
+        },
+        "runTogetherPackageName": {
+            "text": "Package name \"{{package}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a caller reads the package name before every exported name it uses, so its words are separated by underscores.",
+            "languages": ["Go"]
+        },
+        "runTogetherProjectFolder": {
+            "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated.",
+            "languages": ["TypeScript"]
+        },
+        "runTogetherFolderWords": {
+            "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `FormatOptions` at a glance and has to stop and parse `Formatoptions`, and a folder's name is read on every path, so its words are separated: by capitals in a capitalized name, by underscores or hyphens in a lowercase one.",
+            "languages": ["Swift"]
+        }
     }
-  }
 }

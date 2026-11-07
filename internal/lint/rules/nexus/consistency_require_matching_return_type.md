@@ -1,13 +1,13 @@
 # `nexus/consistency-require-matching-return-type`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, in place of `consistent-return` (already `off` in ahra) |
-| Findings in ahra | **9** (measured 2026-10-01): 2 bare `return;` in a value function, 7 `return undefined;` in a void function |
-| Subject matter in ahra | 2,291 bare returns and 252 `return undefined;` judged; 32 of them in functions whose type cannot say |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | yes, both directions, canonical text only |
-| Needs type information | yes, the verdict is the function's return type |
+|                        |                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, in place of `consistent-return` (already `off` in ahra)                                            |
+| Findings in ahra       | **9** (measured 2026-10-01): 2 bare `return;` in a value function, 7 `return undefined;` in a void function |
+| Subject matter in ahra | 2,291 bare returns and 252 `return undefined;` judged; 32 of them in functions whose type cannot say        |
+| Plugin                 | cohere-native, `nexus`                                                                                      |
+| Auto-fixable           | yes, both directions, canonical text only                                                                   |
+| Needs type information | yes, the verdict is the function's return type                                                              |
 
 ## What it checks
 
@@ -17,11 +17,29 @@ so there is one shape everywhere: in a function whose type says `void`, the earl
 never `return undefined;`.
 
 ```ts
-function find(): string | undefined { if(!ready) return; return name; }           // reports
-function find(): string | undefined { if(!ready) return undefined; return name; } // clean
-function save(): void { if(!ready) return; write(); }                              // clean
-function save(): void { if(!ready) return undefined; write(); }                    // reports
-useEffect(function() { if(!ready) return; start(); return function() { stop(); }; }); // clean
+function find(): string | undefined {
+    if(!ready) return;
+    return name;
+} // reports
+function find(): string | undefined {
+    if(!ready) return undefined;
+    return name;
+} // clean
+function save(): void {
+    if(!ready) return;
+    write();
+} // clean
+function save(): void {
+    if(!ready) return undefined;
+    write();
+} // reports
+useEffect(function() {
+    if(!ready) return;
+    start();
+    return function() {
+        stop();
+    };
+}); // clean
 ```
 
 `void` means no value; `undefined` is a value. The spelling at the return tells the reader which kind
@@ -50,18 +68,18 @@ passed over for the inferred type.
 
 ## Decisions
 
-| Case | Verdict | Why |
-|---|---|---|
-| Declared `any` / `unknown` | no finding either way | the author declined to say; the rule cannot know |
-| `never` | no finding | no `return` is reachable without a type error, so there is no spelling to offer |
-| A bare type parameter `T` | no finding | it could be instantiated as `void` |
-| Async | the awaited type | `Promise<void>` is void, `Promise<string \| undefined>` a value; a non-async function returning a promise is not unwrapped |
-| Generator | its TReturn (second type argument of `Generator`, `Iterator`, ...) | that is what `return` sets; an unannotated generator with bare returns infers `void` |
-| Constructor, setter | void | `return` in them is only an early exit; `return undefined;` reports |
-| Getter | an ordinary function | its type is the property's |
-| Declared `(): undefined` | a value | the author said `undefined` is the value |
-| Contextual or inferred exactly `undefined` | no finding | see below |
-| `return void expr;`, `return (undefined)` | `void expr` is left alone; `(undefined)` reports in a void function, without a fix | only the identifier `undefined` resolving to the global counts |
+| Case                                       | Verdict                                                                            | Why                                                                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Declared `any` / `unknown`                 | no finding either way                                                              | the author declined to say; the rule cannot know                                                                           |
+| `never`                                    | no finding                                                                         | no `return` is reachable without a type error, so there is no spelling to offer                                            |
+| A bare type parameter `T`                  | no finding                                                                         | it could be instantiated as `void`                                                                                         |
+| Async                                      | the awaited type                                                                   | `Promise<void>` is void, `Promise<string \| undefined>` a value; a non-async function returning a promise is not unwrapped |
+| Generator                                  | its TReturn (second type argument of `Generator`, `Iterator`, ...)                 | that is what `return` sets; an unannotated generator with bare returns infers `void`                                       |
+| Constructor, setter                        | void                                                                               | `return` in them is only an early exit; `return undefined;` reports                                                        |
+| Getter                                     | an ordinary function                                                               | its type is the property's                                                                                                 |
+| Declared `(): undefined`                   | a value                                                                            | the author said `undefined` is the value                                                                                   |
+| Contextual or inferred exactly `undefined` | no finding                                                                         | see below                                                                                                                  |
+| `return void expr;`, `return (undefined)`  | `void expr` is left alone; `(undefined)` reports in a void function, without a fix | only the identifier `undefined` resolving to the global counts                                                             |
 
 ### Why an undeclared `undefined` is unknowable
 
@@ -74,7 +92,7 @@ were wrong on ahra:
   dispatcher (`modules/phi/PhiSocialMediaCommandLineInterface.ts`) whose `return void console.log(...)`
   made its inferred type `Promise<undefined>`, and one `forEachChild` visitor.
 - Read as **void**, the second measurement reported `Array.from({ length }, function() { return
-  undefined; })` (`useGraphQlInfiniteScroll.ts:342`) and two stub methods standing in for
+undefined; })` (`useGraphQlInfiniteScroll.ts:342`) and two stub methods standing in for
   `() => X | undefined` (`useForm.tsx:97`, `:100`). There `undefined` is the value, and the fix would
   retype each callback as `void` and break its consumer.
 

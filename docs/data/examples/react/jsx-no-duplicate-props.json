@@ -18,7 +18,5 @@
         "file": "/repository/source/Duplicate.tsx",
         "source": "<App />;"
     },
-    "assertedMessageIds": [
-        "jsxNoDuplicateProps"
-    ]
+    "assertedMessageIds": ["jsxNoDuplicateProps"]
 }

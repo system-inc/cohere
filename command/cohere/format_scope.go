@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/types/source_name"
@@ -54,6 +56,12 @@ type formatScope struct {
 	// failure is why the scope holds nothing when the walk that should have drawn it failed. A run whose
 	// verdict is formatting alone must not read that empty scope as a clean tree.
 	failure error
+
+	// walked are the files in FileNames that came from walking a directory the caller named, rather than being
+	// named themselves. A directory is a scope to walk, never a reason to enter what the ignore layers keep out, so
+	// narrowToEnumeration keeps only those the format walk offers. A file named by itself is the caller's own
+	// choice and stays (#wax4mdn).
+	walked map[string]struct{}
 
 	// adamic is the walk's held-back Adamic `.a` files (format_files.Enumeration.Adamic): admitted by the
 	// ignore layers, and in no scope until the program claims them, since `.a` is also a static library's
@@ -233,9 +241,40 @@ func (scope formatScope) narrowToEnumeration(enumeration format_files.Enumeratio
 		handled[fileName] = struct{}{}
 	}
 
+	for _, fileName := range enumeration.Adamic {
+		handled[fileName] = struct{}{}
+	}
+
+	// A file found under a named directory is formatted only if the format walk offers it: never one .gitignore,
+	// the house list, the ignorePatterns or testdata keep out. One inside a nested repository stays, since the walk
+	// never enters those and a named directory there is the caller asking for it, as it was before.
+	offered := scope.FileNames[:0:0]
+	leftOut := 0
+	for _, fileName := range scope.FileNames {
+		_, isWalked := scope.walked[fileName]
+		_, isHandled := handled[fileName]
+		if isWalked && !isHandled && !insideNestedRepository(enumeration, fileName) {
+			leftOut++
+			continue
+		}
+		offered = append(offered, fileName)
+	}
+	if leftOut > 0 {
+		index := make(map[string]struct{}, len(offered))
+		for _, fileName := range offered {
+			index[fileName] = struct{}{}
+		}
+		scope.FileNames, scope.index = offered, index
+		scope.Description = fmt.Sprintf(
+			"%s, less %s under the named directories the format walk does not offer",
+			scope.Description,
+			counted(leftOut, "file", "files"),
+		)
+	}
+
 	formattable := 0
 	for _, fileName := range scope.FileNames {
-		if _, present := handled[fileName]; present {
+		if _, present := handled[fileName]; present && !source_name.IsAdamic(fileName) {
 			formattable++
 		}
 	}
@@ -270,6 +309,18 @@ func (scope formatScope) narrowToEnumeration(enumeration format_files.Enumeratio
 		scope.Description, formattable, describeEnumeration(enumeration, formattable),
 	)
 	return scope
+}
+
+// insideNestedRepository reports whether a file lies in a repository of its own below the walk's root, which the
+// walk names and never enters.
+func insideNestedRepository(enumeration format_files.Enumeration, fileName string) bool {
+	for _, repository := range enumeration.NestedRepositories {
+		directory := filepath.Join(enumeration.Root, filepath.FromSlash(repository))
+		if strings.HasPrefix(fileName, directory+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
 }
 
 // formatCandidates is the files the format phase should visit.

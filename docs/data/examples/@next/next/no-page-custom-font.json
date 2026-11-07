@@ -18,8 +18,5 @@
         "file": "pages/_document.tsx",
         "source": "export default () => (<link href=\"https://fonts.googleapis.com/css2?family=Inter\" />);\n"
     },
-    "assertedMessageIds": [
-        "noPageCustomFontNotInDocument",
-        "noPageCustomFontOutsideDefaultExport"
-    ]
+    "assertedMessageIds": ["noPageCustomFontNotInDocument", "noPageCustomFontOutsideDefaultExport"]
 }

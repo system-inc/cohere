@@ -1,6 +1,8 @@
 package consistency_no_long_file_test
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"testing"
 
@@ -156,6 +158,63 @@ func TestFindingRunsToTheEndOfTheFile(test *testing.T) {
 		if reported != 1 {
 			test.Errorf("%s reported %d findings, where it has one file over the limit", run.name, reported)
 		}
+	}
+}
+
+// LineCount reads a file's lines as the parsed file's line table does, which is what the rule's run counts: a final
+// newline ends the last line, no final newline still ends one, a blank last line counts, and a newline inside a raw
+// string or a comment counts like any other.
+func TestLineCountIsTheParsedLineTable(test *testing.T) {
+	test.Parallel()
+	for _, source := range []string{
+		"package fixture\n",
+		"package fixture",
+		"package fixture\n\n",
+		"package fixture\n\nvar Text = `one\ntwo`\n\n// a\n// b\n",
+		"package fixture\r\n\r\nvar Count = 1\r\n",
+	} {
+		fileSet := token.NewFileSet()
+		file, parseError := parser.ParseFile(fileSet, "fixture.go", source, parser.ParseComments)
+		if parseError != nil {
+			test.Fatalf("parsing %q: %v", source, parseError)
+		}
+		parsed := fileSet.File(file.FileStart).LineCount()
+		if counted := consistency_no_long_file.LineCount([]byte(source)); counted != parsed {
+			test.Errorf("%q counts %d lines, and its parse holds %d", source, counted, parsed)
+		}
+	}
+}
+
+// Reports answers as the rule's run does: a file past the limit is reported, one at it is not, and a file past it
+// whose base name has the `*.generated.*` shape is not, while the word alone in a name is no exemption. LimitOf reads
+// the limit the max option set on the analyzer, and the house limit from an analyzer with no such option.
+func TestReportsAndLimitOfAreTheRulesJudgment(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name      string
+		lineCount int
+		want      bool
+	}{
+		{"fixture.go", 51, true},
+		{"fixture.go", 50, false},
+		{"directory/schema.generated.go", 51, false},
+		{"generated_long.go", 51, true},
+	} {
+		reported, reportsError := consistency_no_long_file.Reports(testCase.name, testCase.lineCount, 50)
+		if reportsError != nil || reported != testCase.want {
+			test.Errorf("%s at %d lines: reported %t (%v), want %t", testCase.name, testCase.lineCount, reported,
+				reportsError, testCase.want)
+		}
+	}
+	stricter := consistency_no_long_file.NewAnalyzer()
+	if setError := stricter.Flags.Set("max", "50"); setError != nil {
+		test.Fatal(setError)
+	}
+	if limit := consistency_no_long_file.LimitOf(stricter); limit != 50 {
+		test.Errorf("the limit set to 50 reads %d", limit)
+	}
+	if limit := consistency_no_long_file.LimitOf(&analysis.Analyzer{Name: "bare"}); limit != 2000 {
+		test.Errorf("an analyzer with no max option reads %d, want the house's 2000", limit)
 	}
 }
 

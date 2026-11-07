@@ -1,12 +1,12 @@
 # `react/jsx-no-constructed-context-values`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **0** (measured 2026-10-01, after the react wave fixed the 18 it had) |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                                                                       |
+| ---------------------- | --------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**                                                               |
+| Violations in ahra     | **0** (measured 2026-10-01, after the react wave fixed the 18 it had) |
+| Plugin                 | `eslint-plugin-react`                                                 |
+| Auto-fixable           | no                                                                    |
+| Needs type information | no                                                                    |
 
 ## What it checks
 
@@ -69,7 +69,6 @@ const contextValue = {
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
 
-
 ## Deliberate divergence: a memoized value is only stable if every input is
 
 Kirk's ruling on the 2026-10-01 rule review: "go for C right out of the gate". cohere reports
@@ -93,14 +92,14 @@ inputs reported, and a memo over hooks and props stayed silent.
 The analysis is one-sided, and that is how it keeps zero false positives. A dependency is unstable
 only when the code proves it:
 
-| reported | why |
-|---|---|
-| an object, array, function, class, `new`, `JSX` or regular expression built during render | a new identity each evaluation |
-| a function declared in the render body | the same |
-| a `const` in the render body initialized with any of these, including through `?:`, `&&`, `\|\|`, `??`, a comma or `=` | either branch is reachable |
+| reported                                                                                                                      | why                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| an object, array, function, class, `new`, `JSX` or regular expression built during render                                     | a new identity each evaluation                                               |
+| a function declared in the render body                                                                                        | the same                                                                     |
+| a `const` in the render body initialized with any of these, including through `?:`, `&&`, `\|\|`, `??`, a comma or `=`        | either branch is reachable                                                   |
 | a call whose callee's body returns such a construction on some path, directly or through a `const` local or another such call | on that path every call is a new identity (subject to the escape rule below) |
-| a call to an async function or a generator | a new promise or iterator every call |
-| another memo whose own dependencies are unstable, and whose factory returns a new value (a `useCallback` always does) | transitive |
+| a call to an async function or a generator                                                                                    | a new promise or iterator every call                                         |
+| another memo whose own dependencies are unstable, and whose factory returns a new value (a `useCallback` always does)         | transitive                                                                   |
 
 **The escape rule.** When a function (or a render initializer) can return a new value on one path
 and an existing object on another, the new value proves nothing if it can have been stored on the
@@ -156,12 +155,12 @@ not. That was a cohere false positive: a module-scope object is evaluated once a
 Upstream resolves a name only in the scope the `JSX` sits in (`callScope.set`, no walk up). Measured on
 the installed 7.37.5 through the Linter `API`:
 
-| shape | upstream | cohere now |
-|---|---|---|
-| module-scope object, function or arrow as the value | silent | silent |
-| component `const v = m` where `m` is module-scope | silent | silent |
-| object declared in a function enclosing the component | silent | silent |
-| object declared in the component | reports | reports |
+| shape                                                          | upstream   | cohere now  |
+| -------------------------------------------------------------- | ---------- | ----------- |
+| module-scope object, function or arrow as the value            | silent     | silent      |
+| component `const v = m` where `m` is module-scope              | silent     | silent      |
+| object declared in a function enclosing the component          | silent     | silent      |
+| object declared in the component                               | reports    | reports     |
 | component-level object used by a provider inside an `if` block | **silent** | **reports** |
 
 cohere follows an identifier only to a declaration whose nearest function is the identifier's own,

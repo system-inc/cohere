@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "import Head from \"next/head\";\nexport default function Index() { return (<div></div>); }\n"
     },
-    "assertedMessageIds": [
-        "noScriptComponentInHead"
-    ]
+    "assertedMessageIds": ["noScriptComponentInHead"]
 }

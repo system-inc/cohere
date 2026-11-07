@@ -18,9 +18,17 @@ No rule set changed.
   projects, and the worst exit wins. A workspace checks every module its `go.work` uses, and a module
   no workspace uses runs on its own, with a note when a workspace above it leaves it out. A Go engine
   that crashes, prints nothing or stops early is reported as nothing checked, never as green.
+- A root that's a Go workspace or a Swift package is format-checked too: when it holds JSON, Markdown,
+  YAML or anything else the house formatter reads, outside every TypeScript project's directory, the run
+  adds a `Format` project there, the format phase alone, so a misformatted file in it fails the commit gate
+  as one in a TypeScript project always did. It needs no file of its own, and the summary counts it.
 
 ### Changed
 
+- The format walk never enters `testdata`, whose fixtures are what their tests read, and the account counts
+  each one it skipped.
+- A declared submodule the root's `ignorePatterns` name isn't read by the nested format check, and a note
+  says so.
 - A failure cohere prints is one sentence: its first letter capitalized and a closing period, as in
   `cohere: No tsconfig.json, Package.swift, go.work or go.mod in /repo or any directory above it, ...`.
   A path, a file, a quoted value or another tool's output at the end keeps its spelling. A script that
@@ -103,7 +111,7 @@ chain's Nexus tier alone, and a `format` block anywhere else in it is refused.
   beside what fixing would, and exits nonzero on either. `--no-format` leaves formatting out of all three.
   `--format` keeps its meaning and changes nothing on those runs, since they already format.
 - The default output: a run prints the files it rewrote, its findings as `path:line:col severity rule
-  message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)`, whose
+message`, and one footer line, `✓ 💎 0.7s • 2 cohered (480 rules • 3 checked • 3,923 cached)`, whose
   counts are exact and which names anything the run did not check even when it passes. `--verbose`
   prints everything a run printed before, notes included, and `--phases` (or
   `"output": { "phases": true }` in `CohereSettings.json`) adds the phase timings to the footer. Exit

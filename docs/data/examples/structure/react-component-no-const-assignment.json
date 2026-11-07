@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Thing = () => 1;\n"
     },
-    "assertedMessageIds": [
-        "noConstAssignment"
-    ]
+    "assertedMessageIds": ["noConstAssignment"]
 }

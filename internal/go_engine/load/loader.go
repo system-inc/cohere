@@ -38,6 +38,9 @@ type loader struct {
 
 	withheld *withheldErrors
 
+	// overlay is the bytes a file is parsed from in place of what is on disk, by its absolute path.
+	overlay map[string][]byte
+
 	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
 	restored map[*packages.Package]*Restored
 
@@ -280,9 +283,12 @@ func (loader *loader) parseFiles(files []string) ([]*ast.File, []error) {
 	return syntax, parseErrors
 }
 
-// parseFile reads and parses one file in the mode go/packages parses in.
+// parseFile reads and parses one file in the mode go/packages parses in, from the overlay when it holds the file.
 func (loader *loader) parseFile(file string) (*ast.File, error) {
 	loader.filesParsed.Add(1)
+	if contents, overlaid := loader.overlay[file]; overlaid {
+		return parser.ParseFile(loader.fileSet, file, contents, parser.AllErrors|parser.ParseComments)
+	}
 	contents, readError := os.ReadFile(file)
 	if readError != nil {
 		return nil, readError
@@ -434,8 +440,8 @@ func newTypesInfo() *types.Info {
 	}
 }
 
-// newLoader is a loader for graph, with one slot per core.
-func newLoader(built *graph, sizes types.Sizes, withheld *withheldErrors) *loader {
+// newLoader is a loader for graph, with one slot per core, parsing each file in overlay from its bytes there.
+func newLoader(built *graph, sizes types.Sizes, withheld *withheldErrors, overlay map[string][]byte) *loader {
 	return &loader{
 		graph:    built,
 		fileSet:  token.NewFileSet(),
@@ -443,5 +449,6 @@ func newLoader(built *graph, sizes types.Sizes, withheld *withheldErrors) *loade
 		slots:    make(chan struct{}, runtime.GOMAXPROCS(0)),
 		parsed:   map[string]*parsedFile{},
 		withheld: withheld,
+		overlay:  overlay,
 	}
 }

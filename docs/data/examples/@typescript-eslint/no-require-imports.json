@@ -18,7 +18,5 @@
         "file": "/repository/source/RequireImports.ts",
         "source": "var lib7 = 700;\n"
     },
-    "assertedMessageIds": [
-        "noRequireImports"
-    ]
+    "assertedMessageIds": ["noRequireImports"]
 }

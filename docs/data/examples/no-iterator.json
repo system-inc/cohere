@@ -19,8 +19,6 @@
         "file": "/repository/source/Iterator.ts",
         "source": "var __iterator__ = null;"
     },
-    "assertedMessageIds": [
-        "noIterator"
-    ],
+    "assertedMessageIds": ["noIterator"],
     "assertsSuggestion": true
 }

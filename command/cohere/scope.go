@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -147,6 +148,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 	}
 
 	absolute := make([]string, 0, len(names))
+	walked := map[string]struct{}{}
 
 	for _, name := range names {
 		path := name
@@ -180,6 +182,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 				return nil
 			}
 			absolute = append(absolute, filepath.Clean(entry))
+			walked[filepath.Clean(entry)] = struct{}{}
 			return nil
 		})
 		if walkError != nil {
@@ -187,7 +190,15 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 		}
 	}
 
-	sort.Strings(absolute)
+	// A file named by itself is the caller's choice even when a directory named beside it holds it too.
+	for _, name := range names {
+		path := name
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(resolvedWorkingDirectory, name)
+		}
+		delete(walked, filepath.Clean(path))
+	}
+	absolute = slices.Compact(slices.Sorted(slices.Values(absolute)))
 
 	index := make(map[string]struct{}, len(absolute))
 	for _, path := range absolute {
@@ -209,6 +220,7 @@ func namedPathsScope(workingDirectory string, root string, names []string) (form
 		index:              index,
 		Description:        description,
 		RequestDescription: request,
+		walked:             walked,
 	}, nil
 }
 

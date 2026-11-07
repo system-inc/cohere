@@ -29,7 +29,8 @@ var Analyzer = &analysis.Analyzer{
 		"go, or with the error assigned to _, unless a // Ignored: <reason> comment directly above the statement or " +
 		"at the end of its line says why. Writes whose error is documented never to be non-nil, such as those to a " +
 		"*strings.Builder, or to be kept for a later checked call, a *bufio.Writer's Flush, are exempt by type.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -103,10 +104,14 @@ func run(pass *analysis.Pass) (any, error) {
 	if !isInterface {
 		return nil, fmt.Errorf("reading the predeclared error as an interface")
 	}
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	checker := checker{pass: pass, errorInterface: errorInterface, hashInterface: findHashInterface(pass.Pkg)}
 	for _, file := range pass.Files {
 		// A comment excuses a statement from directly above it, on lines of its own, or from the end of its last line.
-		comments := marker.NewIndex(pass.Fset, file)
+		comments := indexes.ForFile(file)
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch statement := node.(type) {
 			case *ast.ExprStmt:

@@ -643,3 +643,31 @@ func TestAnUnearnedQuietNumberRefusesTheBuild(test *testing.T) {
 		test.Error("a quiet number the runs did not earn was published")
 	}
 }
+
+// Every file under docs/data is one the generator builds, so a file there is generated whole, which is what lets
+// cohere-dev land resolve a merge conflict confined to docs/data by rerunning the generator (#y84h1te). A
+// hand-written file put there would be overwritten by that resolution, and fails here first.
+func TestEveryFileUnderDocsDataIsGenerated(test *testing.T) {
+	test.Parallel()
+	files := built(test, sourceInputs(test))
+	// cli.json is built from the binary's help, which these inputs leave out (Inputs.Help), and the generator
+	// adds whenever it runs.
+	files[CommandLineInterfacePath] = nil
+	directory := filepath.Join(moduleRoot, "docs", "data")
+	walkError := filepath.WalkDir(directory, func(path string, entry os.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() {
+			return pathError
+		}
+		relative, relativePathError := filepath.Rel(moduleRoot, path)
+		if relativePathError != nil {
+			return relativePathError
+		}
+		if _, generated := files[filepath.ToSlash(relative)]; !generated {
+			test.Errorf("%s is under docs/data and the generator does not build it", filepath.ToSlash(relative))
+		}
+		return nil
+	})
+	if walkError != nil {
+		test.Fatal(walkError)
+	}
+}

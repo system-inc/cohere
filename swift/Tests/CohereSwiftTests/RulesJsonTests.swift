@@ -56,8 +56,9 @@ struct RulesJsonTests {
     }
 
     /*
-     The file's text: two-space JSON, one key per line in the row's order, as `HouseRuleVerdicts.json` is
-     written. A house row has no `upstreamName` key at all, as the brief the Go reader is written against says.
+     The file's text: four-space JSON, one key per line in the row's order, which is the house format the format
+     check at cohere's root holds it to (#4wjhppw), so a regeneration leaves the file as it is. A house row has no
+     `upstreamName` key at all, as the brief the Go reader is written against says.
      */
     static func rendered(_ rows: [Row]) throws -> String {
         let encoder = JSONEncoder()
@@ -67,12 +68,12 @@ struct RulesJsonTests {
         }
         let objects = try rows.map { row in
             [
-                "  {",
-                "    \"name\": \(try literal(row.name)),",
-                "    \"origin\": \(try literal(row.origin)),",
-                try row.upstreamName.map { "    \"upstreamName\": \(try literal($0))," },
-                "    \"typeAware\": \(row.typeAware)",
-                "  }",
+                "    {",
+                "        \"name\": \(try literal(row.name)),",
+                "        \"origin\": \(try literal(row.origin)),",
+                try row.upstreamName.map { "        \"upstreamName\": \(try literal($0))," },
+                "        \"typeAware\": \(row.typeAware)",
+                "    }",
             ]
             .compactMap(\.self)
             .joined(separator: "\n")

@@ -18,7 +18,5 @@
         "file": "/repository/source/TemplateCurlyInString.ts",
         "source": "'$2'"
     },
-    "assertedMessageIds": [
-        "unexpectedTemplateExpression"
-    ]
+    "assertedMessageIds": ["unexpectedTemplateExpression"]
 }

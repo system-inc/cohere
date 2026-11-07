@@ -4,11 +4,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -527,4 +529,96 @@ func relativeIn(test testing.TB, root string, path string) string {
 		test.Fatal(relativeError)
 	}
 	return relative
+}
+
+// TestASubmoduleTheRootsIgnorePatternsNameIsNotRead: a declared submodule the root's ignorePatterns match is
+// somebody else's code the repository pins, as cohere's TypeScript is typescript-go at a commit, so the check never
+// reads it, nor the submodules it declares, and says so in a note (#4wjhppw). The control is
+// TestTheProjectReadsItsLibrariesDrift, the same tree with no settings file, which reads both.
+func TestASubmoduleTheRootsIgnorePatternsNameIsNotRead(test *testing.T) {
+	test.Parallel()
+	root := nestedTree(test)
+	writeTree(test, root, map[string]string{"CohereSettings.json": `{"ignorePatterns":["library/**"]}`})
+	engine := prettierLike()
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
+	}
+
+	check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+	if checkNestedRepositoriesError != nil {
+		test.Fatal(checkNestedRepositoriesError)
+	}
+	if check.Repositories != 0 || check.Files != 0 || len(check.Drift) != 0 {
+		test.Fatalf("read %d repositories, %d files and %d drifted, want none", check.Repositories, check.Files,
+			len(check.Drift))
+	}
+	want := []string{"note: nested repository library not read: the root's ignorePatterns match it"}
+	if !slices.Equal(check.Notes, want) {
+		test.Errorf("notes %q, want %q", check.Notes, want)
+	}
+}
+
+// TestANestedRepositorysFailureIsAGapAndItsOwnIgnoresApply is #zmt3tv5, through the binary. A parent run reads a
+// declared submodule from the submodule's own root, under the submodule's own settings, so a misformatted file its
+// ignorePatterns name is never reported here, while one they don't name is reported as its drift, the control. A
+// file there the formatter cannot print, a transform failure rather than a file that does not parse, is named in the
+// account and counted on the footer as a gap: it never ends the check and never decides the parent's exit, in the
+// commit gate or in `--no-fix`. Adamic's root stopped on one in its cohere submodule. A run that writes never reads
+// the submodule at all, and leaves it as it was.
+func TestANestedRepositorysFailureIsAGapAndItsOwnIgnoresApply(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	writeTree(test, root, map[string]string{
+		"tsconfig.json":            "{ \"compilerOptions\": { \"strict\": true, \"noEmit\": true }, \"files\": [\"Root.ts\"] }\n",
+		"CohereSettings.json":      "{ \"extends\": \"./NexusCohereSettings.json\" }\n",
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
+		".gitignore":               ".cache/\n",
+		"Root.ts":                  "export const root = 1;\n",
+		".gitmodules":              "[submodule \"library\"]\n\tpath = library\n\turl = ../library\n",
+		"library/.git":             "gitdir: ../.git/modules/library\n",
+		"library/CohereSettings.json": "{ \"extends\": \"./NexusCohereSettings.json\", " +
+			"\"ignorePatterns\": [\"vendored/**\"] }\n",
+		"library/NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
+		"library/vendored/Theirs.ts":       "export const theirs   =   1\n",
+		"library/Unprintable.ts":           "let value: ?string = null;\n",
+		"library/Drifted.ts":               "export const drifted   =   1\n",
+	})
+	theirs := filepath.Join(root, "library", "vendored", "Theirs.ts")
+	unprintable := filepath.Join(root, "library", "Unprintable.ts")
+	drifted := filepath.Join(root, "library", "Drifted.ts")
+
+	output, _ := runCohere(test, binary, root, "--no-fix", "--format-only")
+	if !strings.Contains(output, drifted) {
+		test.Fatalf("the nested repository's drift was not reported, so the check proves nothing:\n%s", output)
+	}
+	if strings.Contains(output, theirs) {
+		test.Errorf("a file the nested repository's own ignorePatterns name was read:\n%s", output)
+	}
+	writeTree(test, root, map[string]string{"library/Drifted.ts": "export const drifted = 1;\n"})
+
+	for _, arguments := range [][]string{{"--no-fix", "--format-only"}, {"--no-fix", "--format-only", "--format-all"},
+		{"--no-fix"}} {
+		output, code := runCohere(test, binary, root, arguments...)
+		if code != 0 {
+			test.Errorf("%v: exit %d, want 0, the nested file a gap and not the verdict:\n%s", arguments, code, output)
+		}
+		for _, want := range []string{"note: " + unprintable + " not checked: in nested repository library, " +
+			edit.ReasonTransformFailed, "⚠ 1 nested file not checked"} {
+			if !strings.Contains(output, want) {
+				test.Errorf("%v: missing %q:\n%s", arguments, want, output)
+			}
+		}
+		if strings.Contains(output, "reading the nested repositories") {
+			test.Errorf("%v: the nested check ended on the file:\n%s", arguments, output)
+		}
+	}
+
+	// A run that writes never reads the submodule, which a run inside it formats: it passes, and the submodule's
+	// files are as they were.
+	before := treeSnapshot(test, filepath.Join(root, "library"))
+	if output, code := runCohere(test, binary, root); code != 0 {
+		test.Errorf("the writing run exited %d:\n%s", code, output)
+	}
+	assertTreeUnchanged(test, filepath.Join(root, "library"), before, "the writing run")
 }

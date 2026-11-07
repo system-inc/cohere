@@ -18,8 +18,5 @@
         "file": "input.ts",
         "source": "Math();"
     },
-    "assertedMessageIds": [
-        "unexpectedCall",
-        "unexpectedRefCall"
-    ]
+    "assertedMessageIds": ["unexpectedCall", "unexpectedRefCall"]
 }
