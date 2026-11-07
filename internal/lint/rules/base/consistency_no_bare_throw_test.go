@@ -128,6 +128,20 @@ func TestNoBareThrowFires(test *testing.T) {
 			reason:     "protest contains test but is not a test directory",
 		},
 		{
+			fileName:   "/repository/source/modules/thing/Service.spec.tsx",
+			sourceText: "export function f(): void { throw new Error('x'); }",
+			wantSpans:  []string{"new Error('x')"},
+			wantNames:  []string{"Error"},
+			reason:     "a spec file is not a test file by the house's notion (#4b337jk)",
+		},
+		{
+			fileName:   "/repository/source/modules/thing/Service.test.helpers.tsx",
+			sourceText: "export function f(): void { throw new Error('x'); }",
+			wantSpans:  []string{"new Error('x')"},
+			wantNames:  []string{"Error"},
+			reason:     "a test helper holds .test. in its middle and is not itself a test file (#4b337jk)",
+		},
+		{
 			fileName:   "/repository/source/modules/thing/NotBaseError.ts",
 			sourceText: "export function f(): void { throw new Error('x'); }",
 			wantSpans:  []string{"new Error('x')"},
@@ -331,6 +345,12 @@ func TestNoBareThrowStaysSilent(test *testing.T) {
 			fileName:   "/repository/source/modules/thing/Service.test.ts",
 			sourceText: "export function f(): void { throw new Error('x'); }",
 			reason:     "a test file by suffix",
+		},
+		{
+			fileName:   "/repository/source/modules/thing/Service.test.tsx",
+			sourceText: "export function f(): void { throw new Error('x'); }",
+			reason: "a test file before any script extension, source_name.IsTestFile's notion, which the original's " +
+				"`.test.ts` widened to (Kirk, 2026-11-06, #4b337jk)",
 		},
 		{
 			fileName:   "/repository/source/test/Helper.ts",
