@@ -5,7 +5,7 @@
   },
   "messages": {
     "runTogetherFolder": {
-      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated by underscores. A name that mirrors another project's keeps it through a //cohere:ignore directly above this package clause, naming whose name it is.",
+      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated by underscores. A name that mirrors another project's keeps it through a `//cohere:file-ignore` in this file, naming whose name it is, since the finding sits at the file's start, where no line directive reaches.",
       "languages": [
         "Go"
       ]

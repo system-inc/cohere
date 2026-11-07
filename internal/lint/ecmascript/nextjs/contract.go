@@ -1,4 +1,4 @@
-//cohere:ignore cohere-go/consistency-require-separated-folder-words Vercel's Next.js, a brand Brands.json cannot hold
+//cohere:file-ignore consistency-require-separated-folder-words Vercel's Next.js, a brand Brands.json cannot hold
 package nextjs
 
 import (
