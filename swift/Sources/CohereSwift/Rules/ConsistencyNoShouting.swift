@@ -14,6 +14,8 @@ import SwiftSyntax
    - a run of `//` lines, each on the line after the last, is one text (`CommentText`), so a fence or a backtick span
      across lines masks what it holds, and each line is read past its slashes and the one space after them, as go/doc
      reads a `//` line, so an indented code block is measured by the writer's indentation;
+   - a block comment is read without its delimiters, as the TypeScript rule reads one (#gzwa8xr), so a command line
+     in a one-line block comment opens its line and is masked as one behind a gutter is;
    - Swift's own notations are not prose: the generated-code marker, `// Code generated ... DO NOT EDIT.`, whose
      text an external convention fixes (only before the first token, where tools look for it), and Xcode's
      `// MARK:`, whose word is the editor's;
@@ -52,7 +54,12 @@ public struct ConsistencyNoShouting: FileRule {
         let comments = CommentText.comments(in: file)
         let notation = Self.notationOffsets(of: comments, in: file)
         var findings: [FindingRecord] = []
-        for text in CommentText.texts(of: comments, source: source, droppingOneSpace: true) {
+        for text in CommentText.texts(
+            of: comments,
+            source: source,
+            droppingOneSpace: true,
+            cuttingBlockDelimiters: true,
+        ) {
             var masked = text.map(\.byte)
             /* Nothing is reported without two capitals in a row, so most texts skip the masking. */
             guard Self.hasAdjacentUppercaseLetters(masked) else { continue }
