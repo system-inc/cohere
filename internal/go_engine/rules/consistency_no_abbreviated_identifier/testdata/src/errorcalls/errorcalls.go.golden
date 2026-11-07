@@ -8,6 +8,7 @@ package errorcalls
 import (
 	"fmt"
 	"os"
+	"os/exec"
 )
 
 // A table call names its error, and the finding names the spelling and offers it.
@@ -17,6 +18,15 @@ func read(path string) []byte {
 		return nil
 	}
 	return data
+}
+
+// A method in the table names its error by the whole method, so exec's CombinedOutput is told apart from Output.
+func run(command *exec.Cmd) []byte {
+	output, combinedOutputError := command.CombinedOutput() // want `Identifier "err" should not be abbreviated\. Use "combinedOutputError", named for the call that produced it\.`
+	if err != nil {
+		return nil
+	}
+	return output
 }
 
 // A call of a function value names its error for the value.

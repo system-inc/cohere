@@ -50,7 +50,7 @@ var errorTable = []tableEntry{
 	{packagePath: "os/exec", name: "LookPath", newName: "lookPathError"},
 	{packagePath: "os/exec", receiver: "Cmd", name: "Run", newName: "runError"},
 	{packagePath: "os/exec", receiver: "Cmd", name: "Output", newName: "outputError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "CombinedOutput", newName: "outputError"},
+	{packagePath: "os/exec", receiver: "Cmd", name: "CombinedOutput", newName: "combinedOutputError"},
 	{packagePath: "os/exec", receiver: "Cmd", name: "Start", newName: "startError"},
 	{packagePath: "os/exec", receiver: "Cmd", name: "Wait", newName: "waitError"},
 	{packagePath: "regexp", name: "Compile", newName: "compileError"},
