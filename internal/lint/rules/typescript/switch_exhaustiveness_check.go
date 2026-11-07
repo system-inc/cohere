@@ -138,7 +138,7 @@ var defaultCaseCommentPattern = esregexp.MustCompile(`^no default$`, "iu")
 // tsgolint's `buildSwitchIsNotExhaustiveMessage` took the missing-branch list and threw it away,
 // rendering the bare sentence with the interpolating half of the format string commented out. That
 // was reproduced while the differential harness compared against oxlint, which runs tsgolint. Parity
-// is now measured against `@typescript-eslint` (`s l --linter both`), which renders
+// is now measured against `@typescript-eslint` (`ahra cohere parity`), which renders
 // `Switch is not exhaustive. Cases not matched: "b" | "c"`, and the list is most of what makes the
 // finding actionable, so it is restored (#21011kd). See renderMissingBranches.
 //

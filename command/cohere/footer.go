@@ -35,7 +35,7 @@ import (
 // It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
 // summary's, so this file only says them.
 //
-// The glyphs are the house's, from `s c`: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
+// The glyphs are the house's: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
 // 🔷 the type check and 👑 lint.
 //
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a

@@ -562,7 +562,7 @@ func missingDirectories(directory string, root string) ([]string, error) {
 //
 // The merged config is written beside the tree's own rather than over it, and removed afterward, so
 // the gate and every other process in this worktree keep reading the unmodified file. Editing the
-// real config in place would change what a sibling's `s c` does mid-run, which on a tree with
+// real config in place would change what a sibling's cohere run does mid-run, which on a tree with
 // several authors is a defect rather than a shortcut.
 //
 // With no extra rules this returns the command untouched, so the ordinary path allocates nothing
