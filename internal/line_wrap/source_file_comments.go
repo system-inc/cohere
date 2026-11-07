@@ -2,11 +2,17 @@ package line_wrap
 
 import (
 	"go/ast"
+	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
+
+// exampleOutput is how go/doc recognizes an Example's output block, `// Output:` or `// Unordered output:` in any case,
+// copied from its outputPrefix, so the two-word form and a lowercase one, which go test compares line by line as well,
+// are markers by Go's own reading rather than by a guess at the shape.
+var exampleOutput = regexp.MustCompile(`(?i)^[[:space:]]*(unordered )?output:`)
 
 // ProseComment reports whether a comment-only line is a prose line a reflow may touch: `// ` then a word, not
 // a directive, not a doc-comment code block (`//\t` or `//` with extra spaces), not a list item, not a heading,
@@ -20,7 +26,8 @@ func ProseComment(comment string) bool {
 		return false
 	}
 	fields := strings.Fields(comment[3:])
-	return len(fields) > 0 && !listMarker(fields[0]) && !strings.HasPrefix(fields[0], "#") && !markerWord(fields[0])
+	return len(fields) > 0 && !listMarker(fields[0]) && !strings.HasPrefix(fields[0], "#") && !markerWord(fields[0]) &&
+		!exampleOutput.MatchString(comment[3:])
 }
 
 // markerWord reports whether a word opening a comment line marks the line as data a line-based reader parses: a

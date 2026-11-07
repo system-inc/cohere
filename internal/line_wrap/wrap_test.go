@@ -202,6 +202,13 @@ func TestRuns(test *testing.T) {
 	run(test)
 }
 
+func ExampleSort() {
+	Sort(values)
+	// The order the sort leaves its input in is not fixed for equal elements, so the output is compared as a set of its lines.
+	// Unordered output:
+	// first
+}
+
 // Parse reads a configuration file and returns what it holds, the way the loader expects it to be laid out for a single run.
 // Deprecated: use Load, which reads every file the configuration names and reports the first one it cannot read
 func Parse() {}
@@ -214,6 +221,14 @@ func TestRuns(test *testing.T) {
 	// Serial: the runner takes the machine-wide lock, which no two tests in this process may hold at once, so it runs alone
 	// Wall: about four seconds
 	run(test)
+}
+
+func ExampleSort() {
+	Sort(values)
+	// The order the sort leaves its input in is not fixed for equal elements, so the output is compared as a set of its
+	// lines.
+	// Unordered output:
+	// first
 }
 
 // Parse reads a configuration file and returns what it holds, the way the loader expects it to be laid out for a single
