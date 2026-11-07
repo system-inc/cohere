@@ -297,6 +297,33 @@ public struct Pipeline {
         var reusableFindings: [String: [String: [FindingRecord]]] = [:]
         var nothingRewritten = false
 
+        /*
+         The rules' verdicts the last runs kept (`LintVerdictCache`), read by the fixer, which need not walk a file whose
+         kept verdict proposes no fix, and by lint. None under `--no-cache`, in a run that runs no rule, or when this
+         engine cannot read its own executable to key them by.
+         */
+        let enabledFileRules = fileRules.map(\.name).filter { configuration.severity(of: $0) != .off }
+        let enabledTypedRules = RuleRegistry.typedRules.map(\.name).filter { configuration.severity(of: $0) != .off }
+        let lintCache: LintVerdictCache? =
+            options.noCache || filesThatDoNotParse > 0 || !(options.proposeFixes || options.runLint)
+            ? nil
+            : LintVerdictCache.engineIdentity.map { engine in
+                LintVerdictCache(
+                    scratchPath: runScratch(for: root),
+                    context: LintVerdictCache.context(
+                        engine: engine,
+                        ruleSet: LintVerdictCache.ruleSet(
+                            fileRules: enabledFileRules,
+                            typedRules: enabledTypedRules,
+                            options: configuration.options,
+                        ),
+                    ),
+                    enabledFileRules: enabledFileRules,
+                )
+            }
+        /* Each file's key for those verdicts, by path, for the text it has now; a file the fix phase rewrites is keyed again. */
+        var lintKeys = lintCache == nil ? [:] : LintVerdictCache.fileKeys(of: parsed.files)
+
         if !options.runFix {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
         }
@@ -333,9 +360,31 @@ public struct Pipeline {
                 let fixer = FileFixer(configuration: configuration, rules: fileRules, maximumPasses: options.fixPasses)
                 /* Each file is fixed on its own, so the files are fixed side by side; results are gathered back in input order. */
                 let files = parsed.files
+                let keys = lintKeys
                 let results = await withTaskGroup(of: (Int, FileFixer.Result).self) { group in
                     for (index, file) in files.enumerated() {
-                        group.addTask { (index, fixer.fix(file)) }
+                        group.addTask {
+                            /*
+                             A kept verdict for these bytes that proposes no fix is what the fixer's one pass would find:
+                             it would apply nothing and stop. So the file is left as it is, and lint reads the verdict.
+                             */
+                            if let key = keys[file.url.path],
+                                let kept = lintCache?.fileVerdict(path: file.url.path, key: key),
+                                FixApplier.proposals(from: kept.fileRules.values.flatMap(\.self)).isEmpty
+                            {
+                                return (
+                                    index,
+                                    FileFixer.Result(
+                                        file: file,
+                                        applied: 0,
+                                        appliedByRule: [:],
+                                        refusalsByReason: [:],
+                                        findingsOfFinalText: nil,
+                                    ),
+                                )
+                            }
+                            return (index, fixer.fix(file))
+                        }
                     }
                     var collected = [FileFixer.Result?](repeating: nil, count: files.count)
                     for await (index, result) in group {
@@ -441,6 +490,9 @@ public struct Pipeline {
                     uniquingKeysWith: { first, _ in first },
                 )
                 parsed.files = parsed.files.map { replacements[$0.url.path] ?? $0 }
+                if lintCache != nil {
+                    lintKeys.merge(LintVerdictCache.fileKeys(of: reparsed.files)) { _, rekeyed in rekeyed }
+                }
             }
             nothingRewritten = rewritten.isEmpty
             try writer.write(
@@ -478,6 +530,33 @@ public struct Pipeline {
             )
             try writer.write(unusedPhase(notReached: reason))
             return try finish(complete: false)
+        }
+
+        /*
+         The file rules' verdict kept for each file's final text, by path, for the files the fixer's walk does not
+         already answer, and for every kept file which typed rules apply, which the same bytes decide.
+         */
+        var replayedFileRules: [String: [String: [FindingRecord]]] = [:]
+        var knownTypedRules: [String: [String]] = [:]
+        if let lintCache {
+            for file in parsed.files {
+                guard let key = lintKeys[file.url.path],
+                    let kept = lintCache.fileVerdict(path: file.url.path, key: key)
+                else { continue }
+                knownTypedRules[file.url.path] = kept.typedRules
+                if reusableFindings[file.url.path] == nil {
+                    replayedFileRules[file.url.path] = kept.fileRules
+                }
+            }
+        }
+        let typedRulesByName = Dictionary(
+            RuleRegistry.typedRules.map { ($0.name, $0) },
+            uniquingKeysWith: { first, _ in first },
+        )
+        /* The enabled typed rules that apply to a file: as kept for its bytes, or asked of each rule. */
+        func typedRulesApplying(to file: ParsedFile) -> [String] {
+            knownTypedRules[file.url.path]
+                ?? enabledTypedRules.filter { typedRulesByName[$0]?.applies(to: file) ?? false }
         }
 
         /*
@@ -536,9 +615,7 @@ public struct Pipeline {
              last one. Without it, a tree no run had built marked every such file crashed (@ahra_os_presence_motion,
              2026-11-05: 1,251 files at ahraos-presence's root under `--lint --no-fix`).
              */
-            let typedRulesApply = parsed.files.contains { file in
-                RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
-            }
+            let typedRulesApply = parsed.files.contains { !typedRulesApplying(to: $0).isEmpty }
             if options.runLint && typedRulesApply {
                 do {
                     /* A build that failed after compiling something is said by a `buildFailed` finding rather than thrown. */
@@ -591,9 +668,11 @@ public struct Pipeline {
             let lintStart = Date()
             var linter = Linter(configuration: configuration, fileRules: fileRules)
             linter.typedRules = RuleRegistry.typedRules
-            let typedCandidates = parsed.files.filter { file in
-                RuleRegistry.typedRules.contains { configuration.severity(of: $0.name) != .off && $0.applies(to: file) }
+            var typedRules: [String: [String]] = [:]
+            for file in parsed.files {
+                typedRules[file.url.path] = typedRulesApplying(to: file)
             }
+            let typedCandidates = parsed.files.filter { !(typedRules[$0.url.path] ?? []).isEmpty }
             var symbolProvider = SymbolProvider(
                 layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
@@ -601,7 +680,24 @@ public struct Pipeline {
             symbolProvider.ownedModules = Self.ownedModules(of: package)
                 .union(Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts))
                 .union(fileSet.scripts.map(\.targetName))
-            linter.symbols = symbolProvider.symbols(for: typedCandidates)
+            let ownedModules = symbolProvider.ownedModules
+            let keys = lintKeys
+            /* The typed key of a file under a record: its own key, the record, and the modules the package owns. */
+            func typedKey(_ path: String, _ record: IndexStore.FreshRecord.Identity) -> String? {
+                keys[path].map {
+                    LintVerdictCache.typedKey(fileKey: $0, record: record, ownedModules: ownedModules)
+                }
+            }
+            linter.symbols = symbolProvider.symbols(for: typedCandidates) { file, record in
+                guard let lintCache, let key = typedKey(file.url.path, record) else { return false }
+                return lintCache.typedVerdict(path: file.url.path, key: key) != nil
+            }
+            var typedReplayed: [String: [String: [FindingRecord]]] = [:]
+            for (path, record) in linter.symbols.replayed {
+                if let key = typedKey(path, record), let kept = lintCache?.typedVerdict(path: path, key: key) {
+                    typedReplayed[path] = kept
+                }
+            }
             if let lintBuildFailure {
                 linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
                     "\($0), since the check this run made for the typed rules failed: \(lintBuildFailure)"
@@ -628,10 +724,36 @@ public struct Pipeline {
                 package: judged,
                 manifests: await manifests(of: package),
                 files: parsed.files,
-                reusable: reusableFindings,
+                reusable: reusableFindings.merging(replayedFileRules) { walked, _ in walked },
+                typedReplayed: typedReplayed,
+                typedRules: typedRules,
             )
             for finding in lint.findings {
                 try writer.write(finding)
+            }
+            /* A file is replayed when the store answered for every rule that judged it: its file rules, and its typed rules if any apply. */
+            let filesReplayed = parsed.files.filter { file in
+                replayedFileRules[file.url.path] != nil
+                    && ((typedRules[file.url.path] ?? []).isEmpty || typedReplayed[file.url.path] != nil)
+            }
+            if let lintCache {
+                /* A typed verdict is kept under the record it was read from or replayed under; one sourcekitd gave has none. */
+                var typedKeys: [String: String] = [:]
+                for (path, record) in linter.symbols.records.merging(
+                    linter.symbols.replayed,
+                    uniquingKeysWith: { read, _ in read },
+                ) {
+                    typedKeys[path] = typedKey(path, record)
+                }
+                lintCache.store(
+                    lintCache.entries(
+                        of: parsed.files,
+                        verdicts: lint.verdicts,
+                        keys: keys,
+                        replayed: Set(filesReplayed.map(\.url.path)),
+                        typedKeys: typedKeys,
+                    )
+                )
             }
             /*
              Reported as reused only when every file's findings came from the fix phase and nothing was rewritten,
@@ -644,6 +766,7 @@ public struct Pipeline {
             var record = lint.record
             record.elapsedMilliseconds = Self.milliseconds(since: lintStart)
             record.reusedFrom = reusedEverything ? "fix" : ""
+            record.filesReplayed = filesReplayed.count
             try writer.write(record)
             try writer.write(
                 reusedEverything

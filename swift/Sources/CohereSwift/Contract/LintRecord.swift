@@ -28,11 +28,18 @@ public struct LintRecord: Codable, Equatable, Sendable {
     public var rulesScopedOff: [String: Int]
     public var rulesNotConfigured: [String]
     public var configurationNote: String
+    /*
+     Of `filesWalked`, the files whose every rule's verdict was read from `LintVerdictCache` rather than computed this
+     run. Every file is still counted in `filesWalked` and its findings written, so the coverage line reads the same.
+     Additive within contract 3 (Contract.md): this engine always writes it, and a stream from an engine before it
+     has none, which decodes as nil.
+     */
+    public var filesReplayed: Int?
 
     /* The contract spells this field `configNote`, which the Go front door reads; the Swift name is a full word and the wire name stays the contract's. */
     enum CodingKeys: String, CodingKey {
         case kind, findings, rulesRun, filesWalked, nodesVisited, elapsedMilliseconds, reusedFrom, rulesSilent,
-            rulesWatchedAndQuiet, crashes, rulesScopedOff, rulesNotConfigured
+            rulesWatchedAndQuiet, crashes, rulesScopedOff, rulesNotConfigured, filesReplayed
         case configurationNote = "configNote"
     }
 
@@ -49,6 +56,7 @@ public struct LintRecord: Codable, Equatable, Sendable {
         rulesScopedOff: [String: Int],
         rulesNotConfigured: [String],
         configurationNote: String,
+        filesReplayed: Int? = nil,
     ) {
         self.findings = findings
         self.rulesRun = rulesRun
@@ -62,5 +70,6 @@ public struct LintRecord: Codable, Equatable, Sendable {
         self.rulesScopedOff = rulesScopedOff
         self.rulesNotConfigured = rulesNotConfigured
         self.configurationNote = configurationNote
+        self.filesReplayed = filesReplayed
     }
 }

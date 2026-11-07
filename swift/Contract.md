@@ -578,7 +578,8 @@ project, and the front door records nothing for either.
     "crashes": [{ "file": "/…/X.swift", "error": "…" }],
     "rulesScopedOff": { "cohere-swift/consistency-no-print": 12 },
     "rulesNotConfigured": [],
-    "configNote": ""
+    "configNote": "",
+    "filesReplayed": 140
 }
 ```
 
@@ -586,6 +587,23 @@ Rendered by the existing lint line and coverage printers:
 `lint: 3 findings — 15 rules over 149 files, 412233 nodes visited, in 96ms`, followed by the rule
 coverage, crash, and config notes. `reusedFrom` names the phase whose walk was reused (`fix`), and
 the line then says so instead of printing a duration.
+
+`filesReplayed` counts the files of `filesWalked` whose every rule's verdict was read from the
+engine's lint verdict store, `<scratch>/lint-verdicts.json`, rather than computed this run
+(#da5fx6d). It is additive within contract 3, as `changedFiles` is: this engine always writes it, a
+stream from an engine before it has none, and a front door that does not read it loses only the
+count. Every other field reads as it would without the store: a replayed file is still in
+`filesWalked` and `nodesVisited`, its findings are written, and it counts toward each rule's
+coverage, so a run that replayed and a run under `--no-cache` write the same stream but for this
+field and the elapsed times. A verdict is replayed only under the key it was kept under. The store
+is keyed as a whole by the engine (the executable's sha256) and the enabled rules with their
+options. Each file is keyed by its bytes, its path and its package root, both with links resolved,
+its target and the target's kind, and a standalone script's platform. Its typed rules' verdict is
+also keyed by the index record that describes the file as it stands, by store and record name (a
+content address of what the file's names resolve to), and by the modules the package owns. Never
+kept: the package rules, a typed verdict sourcekitd answered, a typed verdict for a file no source
+described, a verdict holding a rule's failure, and a file whose text moved during the run. Under
+`--no-cache` nothing is read or kept, and the count is 0.
 
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
