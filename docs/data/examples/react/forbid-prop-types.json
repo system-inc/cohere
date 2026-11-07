@@ -18,7 +18,5 @@
         "file": "/repository/source/PropTypes.tsx",
         "source": "class C extends React.Component { render() { return null; } }\nif (C.propTypes === { a: PropTypes.any }) {}\n"
     },
-    "assertedMessageIds": [
-        "forbiddenPropType"
-    ]
+    "assertedMessageIds": ["forbiddenPropType"]
 }

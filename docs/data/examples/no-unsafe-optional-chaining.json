@@ -18,8 +18,5 @@
         "file": "/repository/source/Chain.ts",
         "source": "var foo;"
     },
-    "assertedMessageIds": [
-        "unsafeArithmetic",
-        "unsafeOptionalChain"
-    ]
+    "assertedMessageIds": ["unsafeArithmetic", "unsafeOptionalChain"]
 }

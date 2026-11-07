@@ -19,8 +19,6 @@
         "file": "/repository/source/UselessConstructor.ts",
         "source": "class A { }"
     },
-    "assertedMessageIds": [
-        "noUselessConstructor"
-    ],
+    "assertedMessageIds": ["noUselessConstructor"],
     "assertsSuggestion": true
 }

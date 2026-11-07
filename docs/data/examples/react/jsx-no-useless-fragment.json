@@ -14,9 +14,6 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "ChildOfHtmlElement",
-        "NeedsMoreChildren"
-    ],
+    "assertedMessageIds": ["ChildOfHtmlElement", "NeedsMoreChildren"],
     "assertsFix": true
 }

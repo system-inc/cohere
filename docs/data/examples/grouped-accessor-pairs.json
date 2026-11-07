@@ -18,8 +18,5 @@
         "file": "/repository/source/GroupedAccessorPairs.ts",
         "source": "({})"
     },
-    "assertedMessageIds": [
-        "invalidOrder",
-        "notGrouped"
-    ]
+    "assertedMessageIds": ["invalidOrder", "notGrouped"]
 }

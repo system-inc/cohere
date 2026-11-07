@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-confusing-void-expression`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **226** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **226**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -87,4 +87,3 @@ onClick={() => setActiveType(activeType === 'Person' ? null : 'Person')}
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

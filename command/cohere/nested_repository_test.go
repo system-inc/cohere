@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -527,4 +528,31 @@ func relativeIn(test testing.TB, root string, path string) string {
 		test.Fatal(relativeError)
 	}
 	return relative
+}
+
+// TestASubmoduleTheRootsIgnorePatternsNameIsNotRead: a declared submodule the root's ignorePatterns match is
+// somebody else's code the repository pins, as cohere's TypeScript is typescript-go at a commit, so the check never
+// reads it, nor the submodules it declares, and says so in a note (#4wjhppw). The control is
+// TestTheProjectReadsItsLibrariesDrift, the same tree with no settings file, which reads both.
+func TestASubmoduleTheRootsIgnorePatternsNameIsNotRead(test *testing.T) {
+	test.Parallel()
+	root := nestedTree(test)
+	writeTree(test, root, map[string]string{"CohereSettings.json": `{"ignorePatterns":["library/**"]}`})
+	engine := prettierLike()
+	engine.enumerate = func(walkRoot string) (format_files.Enumeration, error) {
+		return format_files.Enumerate(walkRoot, engine.Handles)
+	}
+
+	check, checkNestedRepositoriesError := checkNestedRepositories(engine, root, false)
+	if checkNestedRepositoriesError != nil {
+		test.Fatal(checkNestedRepositoriesError)
+	}
+	if check.Repositories != 0 || check.Files != 0 || len(check.Drift) != 0 {
+		test.Fatalf("read %d repositories, %d files and %d drifted, want none", check.Repositories, check.Files,
+			len(check.Drift))
+	}
+	want := []string{"note: nested repository library not read: the root's ignorePatterns match it"}
+	if !slices.Equal(check.Notes, want) {
+		test.Errorf("notes %q, want %q", check.Notes, want)
+	}
 }

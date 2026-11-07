@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unsafe-enum-comparison`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **508** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong No**        |
+| Violations in ahra     | **508**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ if(node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'TSInter
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

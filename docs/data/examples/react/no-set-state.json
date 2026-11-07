@@ -18,7 +18,5 @@
         "file": "/repository/source/NoSetState.tsx",
         "source": "\n        var Hello = function() {\n          this.setState({})\n        };\n      "
     },
-    "assertedMessageIds": [
-        "noSetState"
-    ]
+    "assertedMessageIds": ["noSetState"]
 }

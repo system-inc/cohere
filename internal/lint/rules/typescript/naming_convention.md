@@ -1,12 +1,12 @@
 # `@typescript-eslint/naming-convention`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **19173** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **19173**            |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ export const ProjectSettings: StructureSettingsInterface = {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

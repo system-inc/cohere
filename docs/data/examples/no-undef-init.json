@@ -20,8 +20,6 @@
         "file": "/repository/source/UndefInit.ts",
         "source": "var a;\n"
     },
-    "assertedMessageIds": [
-        "unnecessaryUndefinedInit"
-    ],
+    "assertedMessageIds": ["unnecessaryUndefinedInit"],
     "assertsFix": true
 }

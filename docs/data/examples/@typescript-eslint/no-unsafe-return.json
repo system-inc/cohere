@@ -18,8 +18,5 @@
         "file": "/repository/source/Returns.ts",
         "source": "function foo() {\n  return;\n}\n"
     },
-    "assertedMessageIds": [
-        "unsafeReturn",
-        "unsafeReturnAssignment"
-    ]
+    "assertedMessageIds": ["unsafeReturn", "unsafeReturnAssignment"]
 }

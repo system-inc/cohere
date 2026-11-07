@@ -18,7 +18,5 @@
         "file": "/repository/source/ForbidForeignPropTypes.tsx",
         "source": "foo(propTypes)"
     },
-    "assertedMessageIds": [
-        "forbiddenPropType"
-    ]
+    "assertedMessageIds": ["forbiddenPropType"]
 }

@@ -19,8 +19,6 @@
         "file": "/repository/source/Searching.ts",
         "source": "null?.filter(x => x)[0];\n"
     },
-    "assertedMessageIds": [
-        "preferFind"
-    ],
+    "assertedMessageIds": ["preferFind"],
     "assertsSuggestion": true
 }

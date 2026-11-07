@@ -4,8 +4,5 @@
         "file": "/repository/source/NoRestrictedProperties.ts",
         "source": "foo.bar; baz.qux; var { bar } = foo;"
     },
-    "assertedMessageIds": [
-        "restrictedObjectProperty",
-        "restrictedProperty"
-    ]
+    "assertedMessageIds": ["restrictedObjectProperty", "restrictedProperty"]
 }

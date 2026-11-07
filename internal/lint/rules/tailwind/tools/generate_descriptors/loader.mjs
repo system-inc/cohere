@@ -45,17 +45,17 @@ function resolveModuleUrl(specifier, directory) {
  * package the caller named.
  */
 function resolveStylesheet(specifier, directory, resolveRoot) {
-    if (specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
+    if(specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
         return NodePath.resolve(directory, specifier);
     }
     const requireFromDirectory = NodeModule.createRequire(NodePath.join(resolveRoot, 'noop.js'));
-    if (specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
+    if(specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
 
     const packageJsonPath = requireFromDirectory.resolve(specifier + '/package.json');
     const packageJson = JSON.parse(NodeFileSystem.readFileSync(packageJsonPath, 'utf8'));
     const rootExport = packageJson.exports?.['.'] ?? packageJson.exports;
     const styleEntry = (typeof rootExport === 'object' ? rootExport?.style : undefined) ?? packageJson.style;
-    if (!styleEntry) return requireFromDirectory.resolve(specifier);
+    if(!styleEntry) return requireFromDirectory.resolve(specifier);
     return NodePath.join(NodePath.dirname(packageJsonPath), styleEntry);
 }
 
@@ -82,7 +82,7 @@ async function loadInferDataType(tailwindModuleUrl) {
         return null;
     }
 
-    for (const chunkName of chunkNames) {
+    for(const chunkName of chunkNames) {
         let chunkModule;
         try {
             chunkModule = await import(NodeUrl.pathToFileURL(NodePath.join(distDirectory, chunkName)).href);
@@ -90,15 +90,15 @@ async function loadInferDataType(tailwindModuleUrl) {
         catch {
             continue;
         }
-        for (const exported of Object.values(chunkModule)) {
-            if (typeof exported !== 'function' || exported.length !== 2) continue;
+        for(const exported of Object.values(chunkModule)) {
+            if(typeof exported !== 'function' || exported.length !== 2) continue;
             try {
                 const probeTypes = ['image', 'length', 'percentage', 'color'];
-                if (exported('url(a.png)', probeTypes) !== 'image') continue;
-                if (exported('3px', probeTypes) !== 'length') continue;
-                if (exported('50%', probeTypes) !== 'percentage') continue;
-                if (exported('red', probeTypes) !== 'color') continue;
-                if (exported('var(--a)', probeTypes) !== null) continue;
+                if(exported('url(a.png)', probeTypes) !== 'image') continue;
+                if(exported('3px', probeTypes) !== 'length') continue;
+                if(exported('50%', probeTypes) !== 'percentage') continue;
+                if(exported('red', probeTypes) !== 'color') continue;
+                if(exported('var(--a)', probeTypes) !== null) continue;
                 return exported;
             }
             catch {
@@ -154,7 +154,7 @@ export async function loadDesignSystem(entryPointArgument, resolveRootArgument, 
         entrySourceOverride ?? NodeFileSystem.readFileSync(entryPointPath, 'utf8'),
         {
             base: entryDirectory,
-            loadModule: async function (specifier, base, resourceType) {
+            loadModule: async function(specifier, base, resourceType) {
                 try {
                     /*
                      * A relative `@plugin` is resolved against the importing file, as before; a bare
@@ -172,7 +172,7 @@ export async function loadDesignSystem(entryPointArgument, resolveRootArgument, 
                     return { base, module: resourceType === 'config' ? {} : () => {} };
                 }
             },
-            loadStylesheet: async function (specifier, base) {
+            loadStylesheet: async function(specifier, base) {
                 try {
                     const resolved = resolveStylesheet(specifier, base, resolveRoot);
                     return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
@@ -230,9 +230,9 @@ export async function surveyOwnContributions(designSystem, resolveRoot) {
 
     function rootsOf(system) {
         const roots = new Set();
-        for (const entry of system.getClassList()) {
+        for(const entry of system.getClassList()) {
             const candidate = parseCandidate(system, entry[0]);
-            if (candidate?.root) roots.add(candidate.root);
+            if(candidate?.root) roots.add(candidate.root);
         }
         return roots;
     }
@@ -243,8 +243,12 @@ export async function surveyOwnContributions(designSystem, resolveRoot) {
 
     const baselineRoots = rootsOf(baseline.designSystem);
     const baselineThemeKeys = themeKeysOf(baseline.designSystem);
-    const ownRoots = Array.from(rootsOf(designSystem)).filter((root) => !baselineRoots.has(root)).sort();
-    const ownThemeKeys = Array.from(themeKeysOf(designSystem)).filter((key) => !baselineThemeKeys.has(key)).sort();
+    const ownRoots = Array.from(rootsOf(designSystem))
+        .filter((root) => !baselineRoots.has(root))
+        .sort();
+    const ownThemeKeys = Array.from(themeKeysOf(designSystem))
+        .filter((key) => !baselineThemeKeys.has(key))
+        .sort();
 
     return {
         baselineTailwindVersion: baseline.tailwindVersion,
@@ -282,7 +286,7 @@ export function readingOf(designSystem, className) {
     catch {
         return null;
     }
-    if (!candidate) return null;
+    if(!candidate) return null;
 
     let nodes;
     try {
@@ -291,10 +295,10 @@ export function readingOf(designSystem, className) {
     catch {
         return null;
     }
-    if (!nodes || nodes.length === 0) return null;
+    if(!nodes || nodes.length === 0) return null;
 
     const propertySort = nodes[0]?.propertySort;
-    if (!propertySort) return null;
+    if(!propertySort) return null;
     return { order: propertySort.order ?? [], count: propertySort.count ?? 0 };
 }
 
@@ -308,6 +312,6 @@ export function parseCandidate(designSystem, className) {
 }
 
 export function readingKey(reading) {
-    if (reading === null) return 'null';
+    if(reading === null) return 'null';
     return '[' + reading.order.join(',') + ']#' + reading.count;
 }

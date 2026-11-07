@@ -20,10 +20,6 @@
         "file": "/repository/source/Thing.tsx",
         "source": "const noop = () => {};\n"
     },
-    "assertedMessageIds": [
-        "addEventListenerArrow",
-        "multilineArrow",
-        "reactHookArrow"
-    ],
+    "assertedMessageIds": ["addEventListenerArrow", "multilineArrow", "reactHookArrow"],
     "assertsFix": true
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/BlockScopedVar.ts",
         "source": "a:;\n"
     },
-    "assertedMessageIds": [
-        "outOfScope"
-    ]
+    "assertedMessageIds": ["outOfScope"]
 }

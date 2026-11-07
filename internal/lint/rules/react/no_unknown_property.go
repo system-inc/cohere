@@ -1081,6 +1081,10 @@ type noUnknownPropertyTagInfo struct {
 	// Name is the tag's plain name, empty when the tag is a member expression or absent.
 	Name string
 
+	// NameNode is the tag's name identifier, nil exactly when Name is empty, for asking the checker which
+	// declaration supplies the element.
+	NameNode *ast.Node
+
 	// HasDot reports a member tag such as `<Foo.bar />`, which upstream skips outright.
 	HasDot bool
 
@@ -1114,6 +1118,7 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 		return info
 	}
 	info.Name = tagName.Text()
+	info.NameNode = tagName
 
 	// Upstream's tag convention is `/^[a-z][^-]*$/`: starts lowercase, contains no hyphen. A
 	// hyphen means a custom element, which React passes through untouched.
@@ -1124,6 +1129,41 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 	return info
 }
 
+// noUnknownPropertyIsReactDomElement reports whether React's own DOM declarations supply the element a tag
+// names, which is what makes React's DOM property tables the right ones to judge its attributes by.
+//
+// A lowercase tag is an entry of `JSX.IntrinsicElements`, and the checker resolves the tag name to the
+// property symbol of that entry. `@types/react` declares div, svg, circle and the rest in its own
+// `IntrinsicElements`, so their entries' declarations sit in its files. Any other package or file that
+// augments the interface supplies its own entries: react-three-fiber's `ThreeElements` makes `<mesh>` and
+// `<bufferAttribute>` intrinsic, and TypeScript checks every property on them against three.js's types.
+// Judging `position` or `args` there by React's DOM table was 24 false positives in www-connected-app
+// (#ccs1c9c). So the answer is read from the declaration's file, by its package, and no element is named.
+//
+// The `react` package itself counts beside `@types/react`. React's types live in DefinitelyTyped today,
+// and the day React ships them in its own package, an answer naming only `@types/react` would stop
+// judging every element in silence. Augmentations live in other packages either way: r3f's is in
+// `@react-three/fiber`, though it writes `declare module 'react'`.
+//
+// An entry with no declarations at all is not React's either. react-three-fiber builds its entries with a
+// key-remapping mapped type over three.js's exports, `[K in keyof T & string as Uncapitalize<K>]`, and the
+// checker links no declaration to a remapped property, so `<mesh>` resolves to a symbol with none.
+// `@types/react` writes every DOM entry by hand, so each of them carries one.
+//
+// When the checker cannot resolve the entry, the rule judges as it always has, so it fails closed toward
+// reporting: no checker, no `JSX` namespace in reach (a JavaScript tree without `@types/react`), or a tag
+// `IntrinsicElements` does not list, which the checker answers with no symbol.
+func noUnknownPropertyIsReactDomElement(ruleContext rule.Context, tagName *ast.Node) bool {
+	if ruleContext.TypeChecker == nil || tagName == nil {
+		return true
+	}
+	entry := ruleContext.TypeChecker.GetSymbolAtLocation(tagName)
+	if entry == nil {
+		return true
+	}
+	return rule.IsDeclaredInPackage(entry, "@types/react") || rule.IsDeclaredInPackage(entry, "react")
+}
+
 // NoUnknownProperty flags a JSX attribute React does not recognise on a DOM element.
 //
 //	valid:   <div className="x" />
@@ -1132,6 +1172,7 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 //	valid:   <Foo bogus="x" />                 a component, not a DOM element
 //	valid:   <my-elem bogus="x" />             a custom element
 //	valid:   <div is="my-elem" bogus="x" />    a customised built-in
+//	valid:   <mesh position={[0, 0, 0]} />     an intrinsic another package declares
 //	invalid: <div class="x" />                 use className
 //	invalid: <label for="x" />                 use htmlFor
 //	invalid: <path stroke-width="1" />         use strokeWidth
@@ -1196,8 +1237,18 @@ func noUnknownPropertyTagOf(node *ast.Node) noUnknownPropertyTagInfo {
 // known ARIA name passes; `fbt` and `fbs` tags are skipped; a non-HTML-like tag passes; the
 // tag-restricted table returns either way once matched; and only then does the standard-name search
 // run. Moving any step changes verdicts, which the fixtures pin.
+//
+// # An intrinsic React does not declare is not judged, which upstream cannot see
+//
+// Upstream reads syntax alone, so every lowercase tag is a DOM element to it, react-three-fiber's
+// `<mesh>` included. This port asks the checker which declaration supplies the element and judges only
+// those `@types/react` or `react` supplies (noUnknownPropertyIsReactDomElement). It asks only on the way to a
+// finding, since every other path returns silently whatever the answer, so a clean file costs no query.
+// The checker is read for that one question, and only through the entry's file, which a shape covers.
 var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
-	Name: "react/no-unknown-property",
+	Name:             "react/no-unknown-property",
+	NeedsTypeChecker: true,
+	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options rule.Given[NoUnknownPropertyOptions]) rule.Listeners {
 		settings, _ := options.Read()
@@ -1267,7 +1318,7 @@ var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
 								break
 							}
 						}
-						if !allowed {
+						if !allowed && noUnknownPropertyIsReactDomElement(ruleContext, tag.NameNode) {
 							ruleContext.ReportNode(node, noUnknownPropertyInvalidPropOnTag(
 								actualName, tag.Name, allowedTags))
 						}
@@ -1277,6 +1328,10 @@ var NoUnknownProperty = rule.Rule[NoUnknownPropertyOptions]{
 
 				standardName, found := noUnknownPropertyStandardName(name)
 				if found && standardName == name {
+					return
+				}
+				// Every path from here reports, so this is where the checker is asked.
+				if !noUnknownPropertyIsReactDomElement(ruleContext, tag.NameNode) {
 					return
 				}
 				if found {

@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "export function run(flag: boolean): void {\n    if(flag) {\n        return;\n    }\n}\n"
     },
-    "assertedMessageIds": [
-        "implicitReturn"
-    ]
+    "assertedMessageIds": ["implicitReturn"]
 }

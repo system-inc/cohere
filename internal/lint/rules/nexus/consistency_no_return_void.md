@@ -1,13 +1,13 @@
 # `nexus/consistency-no-return-void`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** (Kirk's rulings on `no-confusing-void-expression` and the `void`/`undefined` return rule, 2026-10-01) |
-| Findings in ahra | **10** at HEAD on 2026-10-01, all in `modules/phi/PhiSocialMediaCommandLineInterface.ts`; **0** in the working tree after the syntax wave |
-| Measured precision | 10 of 10 |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | yes, for the canonical text |
-| Needs type information | no |
+|                        |                                                                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes** (Kirk's rulings on `no-confusing-void-expression` and the `void`/`undefined` return rule, 2026-10-01)                             |
+| Findings in ahra       | **10** at HEAD on 2026-10-01, all in `modules/phi/PhiSocialMediaCommandLineInterface.ts`; **0** in the working tree after the syntax wave |
+| Measured precision     | 10 of 10                                                                                                                                  |
+| Plugin                 | cohere-native, `nexus`                                                                                                                    |
+| Auto-fixable           | yes, for the canonical text                                                                                                               |
+| Needs type information | no                                                                                                                                        |
 
 ## What it checks
 

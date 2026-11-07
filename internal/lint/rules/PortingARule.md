@@ -167,14 +167,14 @@ is.
 **The authority is whoever wrote the rule, and its source is in
 `/tmp/lint-sources`.**
 
-  | rules | authority | source |
-  |---|---|---|
-  | core `eslint/*` | ESLint | `/tmp/lint-sources/eslint` |
-  | `@typescript-eslint/*` | typescript-eslint | `/tmp/lint-sources/typescript-eslint` |
-  | `react/*` | jsx-eslint | `/tmp/lint-sources/eslint-plugin-react` |
-  | `react-hooks/*`, `rules-of-hooks`, `exhaustive-deps` | React | `/tmp/lint-sources/react` |
-  | `@next/next/*` | Vercel | not cloned; read the installed build |
-  | `structure/*`, `nexus/*`, `base/*` | Kirk's and Kam's own TypeScript lint layers | in the ahra and api-phi-health trees, and those are the source |
+| rules                                                | authority                                   | source                                                         |
+| ---------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------- |
+| core `eslint/*`                                      | ESLint                                      | `/tmp/lint-sources/eslint`                                     |
+| `@typescript-eslint/*`                               | typescript-eslint                           | `/tmp/lint-sources/typescript-eslint`                          |
+| `react/*`                                            | jsx-eslint                                  | `/tmp/lint-sources/eslint-plugin-react`                        |
+| `react-hooks/*`, `rules-of-hooks`, `exhaustive-deps` | React                                       | `/tmp/lint-sources/react`                                      |
+| `@next/next/*`                                       | Vercel                                      | not cloned; read the installed build                           |
+| `structure/*`, `nexus/*`, `base/*`                   | Kirk's and Kam's own TypeScript lint layers | in the ahra and api-phi-health trees, and those are the source |
 
 **Every one of these ships a test corpus in its repository, and none of them ship it
 in the published package.** That corpus is your fixture floor and it is richer than
@@ -305,33 +305,33 @@ Four things to establish explicitly before continuing:
   a compiler pass, then the rule file is a thin caller and the algorithm is
   elsewhere. A forty-line rule file can be a large port.
 
-  **Needing the checker is not the same as the checker being sufficient.** Establish
-  both what resolution answers and what it cannot. `react/jsx-no-undef` needs
-  `GetSymbolAtLocation`, and resolution alone does not separate an intrinsic element
-  from a typo: `<img />` and `<x-gif />` resolve to no symbol, identically to
-  `<Uddefined />`. A port using resolution alone passes all eight of upstream's
-  reported cases and then reports every `<div>` in the tree. The case predicate is
-  load-bearing rather than an optimization, and only the corpus says so.
+    **Needing the checker is not the same as the checker being sufficient.** Establish
+    both what resolution answers and what it cannot. `react/jsx-no-undef` needs
+    `GetSymbolAtLocation`, and resolution alone does not separate an intrinsic element
+    from a typo: `<img />` and `<x-gif />` resolve to no symbol, identically to
+    `<Uddefined />`. A port using resolution alone passes all eight of upstream's
+    reported cases and then reports every `<div>` in the tree. The case predicate is
+    load-bearing rather than an optimization, and only the corpus says so.
 
-  **Two rules about searching, because both have cost real work.**
+    **Two rules about searching, because both have cost real work.**
 
-  *Search for the thing, not for the citation.* If somebody tells you a claim lives
-  at commit X or file Y, search the whole tree for the thing itself. A search bounded
-  by someone else's reference cannot find what their reference got wrong, which is
-  the only case where checking was worth doing.
+    _Search for the thing, not for the citation._ If somebody tells you a claim lives
+    at commit X or file Y, search the whole tree for the thing itself. A search bounded
+    by someone else's reference cannot find what their reference got wrong, which is
+    the only case where checking was worth doing.
 
-  *Run a control alongside any zero.* Grep for something you know is present in the
-  same place with the same command. A zero from a real absence and a zero from a bad
-  pattern, a wrong path, or a shim alias are the same zero. This costs one extra
-  command and it is the difference between a measurement and a guess.
+    _Run a control alongside any zero._ Grep for something you know is present in the
+    same place with the same command. A zero from a real absence and a zero from a bad
+    pattern, a wrong path, or a shim alias are the same zero. This costs one extra
+    command and it is the difference between a measurement and a guess.
 
-  **If you conclude our tree lacks the substrate it needs, prove it with a compiling
-  probe before you stop.** A grep over `TypeScript-shim/` cannot see through a Go
-  type alias, and the shim is full of them: `type Checker = checker.Checker` carries
-  every exported upstream method without restating one. Three capabilities were
-  called unavailable in one night on the evidence of a grep, and all three were
-  reachable. Write a throwaway test that calls the thing, run it, delete it. Two
-  minutes, and it cannot lie the way the grep did.
+    **If you conclude our tree lacks the substrate it needs, prove it with a compiling
+    probe before you stop.** A grep over `TypeScript-shim/` cannot see through a Go
+    type alias, and the shim is full of them: `type Checker = checker.Checker` carries
+    every exported upstream method without restating one. Three capabilities were
+    called unavailable in one night on the evidence of a grep, and all three were
+    reachable. Write a throwaway test that calls the thing, run it, delete it. Two
+    minutes, and it cannot lie the way the grep did.
 
 - **What does it deliberately not catch?** Commented-out cases and `TODO`s are
   upstream telling you what it knowingly misses. Reproduce those gaps; do not
@@ -350,7 +350,7 @@ parsed.
 **Reproducing a workaround for a constraint we do not have is not fidelity, it is
 cargo cult.** If the reference implementation shells out to the filesystem to answer
 a question the checker can answer directly, answer it directly and say so in the
-commit. What you must reproduce exactly is the *decision*: which inputs report, which
+commit. What you must reproduce exactly is the _decision_: which inputs report, which
 do not, where the finding points, what it offers.
 
 Three consequences, and the third is the one that ships.
@@ -371,7 +371,7 @@ helpfully correct it back to the wrong one.
 grammar is not the parser.** A porter emptied the getter and setter arms of
 `default-param-last` and both mutants lived through all 87 corpus cases. The doc
 comment beside them said those arms can never fire, because a setter takes exactly
-one parameter — which is true of the *grammar* and false of the *parser*, which
+one parameter — which is true of the _grammar_ and false of the _parser_, which
 recovers from illegal source and hands back a two-parameter setter. They probed the
 parse instead of writing the survivor off, measured upstream reporting all four such
 shapes, and added the fixtures. Two mutants caught, one doc comment corrected from an
@@ -472,7 +472,7 @@ false-positive class no imported fixture can see.**
 
 **The clones ship no `node_modules`, and each rule needs a different one.** Any
 upstream tester or rule file that imports `ast-utils`, `eslint-visitor-keys`,
-`esutils`, and friends fails to load with a *different* missing module each time, so
+`esutils`, and friends fails to load with a _different_ missing module each time, so
 installing them one at a time costs a cycle per rule. Resolve them out of
 `~/Projects/ahra/node_modules/.pnpm` by package name and they all land at once.
 
@@ -513,7 +513,7 @@ message id, so it catches a fixer that repairs the right span with the wrong tex
 
 **And they are not extra coverage for a fixer. They are the ONLY coverage it has.**
 This is the asymmetry to hold onto, because it is what makes skipping them feel safe:
-a fixer that reports in the right place and repairs wrongly is *indistinguishable*, at
+a fixer that reports in the right place and repairs wrongly is _indistinguishable_, at
 the message-id layer, from a correct one. Every id fixture stays green. The span
 assertions stay green. The rule looks finished.
 
@@ -526,7 +526,7 @@ first run. Two defects, neither reachable by any id:
     foo['bar']instanceof baz  ->  foo.barinstanceof baz
 
 The first is a transcription failure: `DECIMAL_INTEGER_PATTERN` was written from what
-the rule *looked like* it needed rather than read from `ast-utils.js:64`, and the real
+the rule _looked like_ it needed rather than read from `ast-utils.js:64`, and the real
 one accepts numeric separators and a leading zero before an 8 or 9.
 
 **The second is the one to remember.** It is not a wrong fix, it is a fix that produces
@@ -672,7 +672,7 @@ search of the shelf. A porter needing an edit distance nearly used
 `core.GetSpellingSuggestionForStrings` — closest name on any shelf, reachable, and
 **wrong**: it charges 0.1 for a case-only substitution and 2 for anything else, then
 accepts within 0.4 of the name length. Measured, it returns suggestions for three of
-upstream's own *passing* cases. Read the body of anything whose name matches your
+upstream's own _passing_ cases. Read the body of anything whose name matches your
 question, wherever it lives.
 
 Search the shelf, and search the rule package you are writing in, before adding a
@@ -686,7 +686,7 @@ failure mode is not "weaker than documented" — it is "different from upstream"
 runs in both directions, **including the direction where the helper is MORE careful.**
 
 `react.IsEs6ComponentClass` skips parentheses on the heritage receiver and its doc
-advertises that skip as a correctness *feature*. It is a divergence:
+advertises that skip as a correctness _feature_. It is a divergence:
 `extends (React.Component)` is **silent** upstream and the helper answers true. That
 is invisible from the doc comment, which is accurate about what the code does, and
 invisible from the corpus, which writes no parens. A helper doing something sensible
@@ -919,7 +919,7 @@ list of physical lines and emit it through `json.dumps`, so no `\n` is ever type
 nothing can cook it. A porter's `\n` sequences became real newlines through a
 Python-heredoc-through-Bash path, and their piecemeal repair then silently damaged a
 second case because one placeholder was a **prefix of another**. Their verification
-script also asserted *before* writing, which is why the failed run left the file
+script also asserted _before_ writing, which is why the failed run left the file
 untouched. Both are the pattern.
 
 **A passing case in the imported corpus is not evidence about the thing you think it
@@ -951,7 +951,7 @@ silent only because of an `eslint-disable-next-line` comment cannot be reproduce
 silent by a rule test. A porter following step 5 literally will either break their port
 to green it or quietly delete the case, and both are wrong.
 
-**Pin it at the layer that actually decides it.** Record the case as *reporting*, with
+**Pin it at the layer that actually decides it.** Record the case as _reporting_, with
 the reasoning at the line, and say in your report that the suppression layer is what
 makes it clean upstream. The porter who hit this confirmed the mechanism by deleting
 the disable comment and watching the same file report.
@@ -973,7 +973,7 @@ run — one line, and it tells you exactly which rows are about the wrong layer:
     grep -c "eslint-disable" tests/lib/rules/<rule>.js
 
 Confirm each hit the same way: re-run that source through the oracle with the comment
-deleted. If it reports, the rule's own verdict is *reporting*, and that is what the
+deleted. If it reports, the rule's own verdict is _reporting_, and that is what the
 fixture asserts.
 
 ## 6. Write the rule until the fixtures pass
@@ -1787,7 +1787,7 @@ clean cases stayed green. Any rule that resolves an identifier through the check
 hit it.
 
 **A shorthand destructuring target needs a different accessor.** `({A} = 0)` resolves
-through `GetSymbolAtLocation` to the *property's own* symbol, which reads exactly like
+through `GetSymbolAtLocation` to the _property's own_ symbol, which reads exactly like
 a correctly-declined shadow. Use
 `ctx.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent)`, which lives in
 the vendored compiler's `checker/services.go` rather than `checker.go`, so a grep
@@ -1893,7 +1893,7 @@ Your fixtures must use `testing.RunTyped` rather than `testing.Run`. The plain h
 hands the rule a nil checker.
 
 **What happens next depends on whether the rule guards.** Measured both ways: `no-eval`
-guards, so it goes *completely silent* — every StaysSilent case passes vacuously and
+guards, so it goes _completely silent_ — every StaysSilent case passes vacuously and
 every Fires case fails in a way that looks like a rule bug. A rule that dereferences a
 checker result **without** a nil check may panic and take the whole run down — **but
 the shim tolerates more than you would expect.** Measured: `GetSymbolAtLocation` on a
@@ -2050,7 +2050,7 @@ clean only because upstream named its fixture `file.ts`, while three reporting c
 depend on the same comparison failing for `tests/fixtures/file.ts`. Varying only the
 filename reproduced all three rows.
 
-**A panic in your rule costs every rule that file.** The walk recovers per *file*, not
+**A panic in your rule costs every rule that file.** The walk recovers per _file_, not
 per rule, so one nil dereference does not lose your verdict on one file — it takes the
 whole file away from every registered rule. A single unguarded
 `ast.SkipParentheses(memberAccessObject(callee))` in `no-alert` crashed **167 files,
@@ -2089,7 +2089,7 @@ wave, in different rules. `TestAPanickingRuleLosesOnlyItsFile` and the crash cor
 
 **Where a nil check is unnecessary, say why at the line.** `no-useless-call` and
 `prefer-spread` both take the identical shape and are safe by a gate established
-fifteen lines earlier. Both carry a comment naming the invariant *and* the consequence
+fifteen lines earlier. Both carry a comment naming the invariant _and_ the consequence
 of widening it. That is the difference between a guard someone deletes as dead and a
 guard someone keeps.
 
@@ -2163,7 +2163,7 @@ all before comparing outputs.
 
 **An oracle can be wrong in the PESSIMISTIC direction, and that is rarer and just as
 misleading.** The usual failure is an oracle that reports nothing and reads as clean.
-This one reported *fewer cases than it had* and read as a smaller corpus.
+This one reported _fewer cases than it had_ and read as a smaller corpus.
 
 Measured on `dot-notation`. Five of its reporting cases are legacy octals -- `01['prop']`,
 `08['prop']` and friends -- and driven through `@typescript-eslint/parser` all five come
@@ -2207,7 +2207,7 @@ per file, reference identity failed, and **two of upstream's own failing cases c
 clean**. It reads exactly like a rule that cannot see object types.
 
 One file per program reproduced all twenty. `RunTyped` is naturally one-file-per-call,
-so fixtures are safe — this bites the *oracle you build to check them*, which is the
+so fixtures are safe — this bites the _oracle you build to check them_, which is the
 instrument you trust most and scrutinize least. If your rule asks the checker whether
 two types are the same object rather than the same shape, batch nothing.
 
@@ -2216,7 +2216,7 @@ two types are the same object rather than the same shape, batch nothing.
 They are collected here because the class is the point, not any one instance.
 
 1. **A run that never ran.** An author grepped a `go test` log for failures, got zero,
-   and reported the corpus green. The log was fourteen lines of a *sibling's* compile
+   and reported the corpus green. The log was fourteen lines of a _sibling's_ compile
    error — the package never built, so no test in it ever executed. Zero failures, zero
    tests, and the grep cannot tell those apart. Check that the log ends in `ok` or
    `FAIL` for your package before you read a count out of it.

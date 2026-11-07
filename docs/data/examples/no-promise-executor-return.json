@@ -19,8 +19,6 @@
         "file": "/repository/source/PromiseExecutor.ts",
         "source": "new Set(() => 1);\n"
     },
-    "assertedMessageIds": [
-        "returnsValue"
-    ],
+    "assertedMessageIds": ["returnsValue"],
     "assertsSuggestion": true
 }

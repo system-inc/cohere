@@ -1,7 +1,4 @@
 {
     "rule": "id-match",
-    "assertedMessageIds": [
-        "notMatch",
-        "notMatchPrivate"
-    ]
+    "assertedMessageIds": ["notMatch", "notMatchPrivate"]
 }

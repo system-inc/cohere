@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Value = 1;\n"
     },
-    "assertedMessageIds": [
-        "missingYield"
-    ]
+    "assertedMessageIds": ["missingYield"]
 }

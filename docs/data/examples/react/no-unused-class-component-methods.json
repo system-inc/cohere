@@ -8,8 +8,5 @@
         "file": "/repository/source/NoUnusedClassComponentMethods.tsx",
         "source": "\n        class Foo {\n          action = () => {}\n          anotherAction = () => this.action()\n        }\n      "
     },
-    "assertedMessageIds": [
-        "unused",
-        "unusedWithClass"
-    ]
+    "assertedMessageIds": ["unused", "unusedWithClass"]
 }

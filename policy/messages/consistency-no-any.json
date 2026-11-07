@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-any"
-  },
-  "messages": {
-    "anyType": {
-      "text": "This declaration states its type as `{{spelling}}`, which says it could hold anything, so the compiler checks nothing about it and the next reader has to find every place it is set to learn what it really is. Name the type it carries: a concrete type, a small interface of the methods the code needs, or a type parameter if it truly takes any type. Where another package's signature fixes the type, it is not ours to state, and this rule leaves it alone."
+    "rules": {
+        "Go": "cohere-go/consistency-no-any"
+    },
+    "messages": {
+        "anyType": {
+            "text": "This declaration states its type as `{{spelling}}`, which says it could hold anything, so the compiler checks nothing about it and the next reader has to find every place it is set to learn what it really is. Name the type it carries: a concrete type, a small interface of the methods the code needs, or a type parameter if it truly takes any type. Where another package's signature fixes the type, it is not ours to state, and this rule leaves it alone."
+        }
     }
-  }
 }

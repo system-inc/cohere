@@ -18,7 +18,5 @@
         "file": "/repository/source/NoNegatedCondition.ts",
         "source": "a ? b : c"
     },
-    "assertedMessageIds": [
-        "unexpectedNegated"
-    ]
+    "assertedMessageIds": ["unexpectedNegated"]
 }

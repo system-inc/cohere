@@ -42,7 +42,7 @@ import * as NodePath from 'node:path';
 import { locate } from '../corpus.mjs';
 
 const [, , packageRootArgument, corpusPathArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [corpus.json]\n');
     process.exit(2);
 }
@@ -58,14 +58,16 @@ const bundle = await import(NodePath.join(packageRoot, 'dist', 'lib.mjs'));
  */
 function loadStylesheet(identifier, base) {
     let resolved;
-    if (identifier === 'tailwindcss') {
+    if(identifier === 'tailwindcss') {
         resolved = NodePath.join(packageRoot, 'index.css');
-    } else if (identifier.startsWith('tailwindcss/')) {
+    }
+    else if(identifier.startsWith('tailwindcss/')) {
         resolved = NodePath.join(packageRoot, identifier.slice('tailwindcss/'.length));
-    } else {
+    }
+    else {
         resolved = NodePath.resolve(base, identifier);
     }
-    if (!resolved.endsWith('.css')) resolved += '.css';
+    if(!resolved.endsWith('.css')) resolved += '.css';
     return {
         base: NodePath.dirname(resolved),
         content: NodeFileSystem.readFileSync(resolved, 'utf8'),
@@ -103,11 +105,11 @@ async function loadTheme(entryCss, entryBase) {
  */
 function candidateNamespaces(theme) {
     const namespaces = new Set();
-    for (const [key] of theme.entries()) {
+    for(const [key] of theme.entries()) {
         const subVariableIndex = key.indexOf('--', 2);
         const withoutSubVariable = subVariableIndex === -1 ? key : key.slice(0, subVariableIndex);
         const parts = withoutSubVariable.slice(2).split('-');
-        for (let index = 1; index <= parts.length; index++) {
+        for(let index = 1; index <= parts.length; index++) {
             namespaces.add(`--${parts.slice(0, index).join('-')}`);
         }
     }
@@ -150,7 +152,7 @@ function serializeTheme(theme) {
     const seen = new Set();
     function ask(candidateValue, themeKeys) {
         const signature = `${candidateValue} ${themeKeys.join('')}`;
-        if (seen.has(signature)) return;
+        if(seen.has(signature)) return;
         seen.add(signature);
         resolutions.push({
             candidateValue: candidateValue === null ? '' : candidateValue,
@@ -161,13 +163,13 @@ function serializeTheme(theme) {
         });
     }
 
-    for (const { key } of entries) {
+    for(const { key } of entries) {
         const subVariableIndex = key.indexOf('--', 2);
         const withoutSubVariable = subVariableIndex === -1 ? key : key.slice(0, subVariableIndex);
         const parts = withoutSubVariable.slice(2).split('-');
         // Ask under every split point, so `--color-red-500` is asked as `--color` + `red-500` and
         // as `--color-red` + `500`, and the ignored-key map is exercised from both sides.
-        for (let index = 1; index < parts.length; index++) {
+        for(let index = 1; index < parts.length; index++) {
             ask(parts.slice(index).join('-'), [`--${parts.slice(0, index).join('-')}`]);
         }
         ask(null, [withoutSubVariable]);
@@ -195,8 +197,8 @@ function serializeTheme(theme) {
         ['--shadow', ['--color']],
     ];
     const resolveWithResults = [];
-    for (const [namespace, nestedKeys] of nestedKeyGroups) {
-        for (const candidateValue of theme.keysInNamespaces([namespace])) {
+    for(const [namespace, nestedKeys] of nestedKeyGroups) {
+        for(const candidateValue of theme.keysInNamespaces([namespace])) {
             const result = theme.resolveWith(candidateValue, [namespace], nestedKeys);
             resolveWithResults.push({
                 candidateValue,
@@ -311,7 +313,7 @@ const syntheticStylesheets = [
 
 const cases = [];
 
-for (const [name, content] of syntheticStylesheets) {
+for(const [name, content] of syntheticStylesheets) {
     const theme = await loadTheme(content, packageRoot);
     cases.push({ name, source: 'synthetic', input: content, theme: serializeTheme(theme) });
 }
@@ -320,7 +322,7 @@ const realFiles = corpusPathArgument
     ? JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(corpusPathArgument), 'utf8'))
     : [];
 
-for (const entry of realFiles) {
+for(const entry of realFiles) {
     const entryLocated = locate(entry.path);
     const content = NodeFileSystem.readFileSync(entryLocated.path, 'utf8');
     const theme = await loadTheme(content, NodePath.dirname(entryLocated.path));

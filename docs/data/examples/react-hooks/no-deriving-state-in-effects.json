@@ -8,7 +8,5 @@
         "file": "a.tsx",
         "source": "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n"
     },
-    "assertedMessageIds": [
-        "noDerivingStateInEffects"
-    ]
+    "assertedMessageIds": ["noDerivingStateInEffects"]
 }

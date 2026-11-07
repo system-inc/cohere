@@ -30,13 +30,13 @@ import { recordBeside } from '../corpus.mjs';
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const systemsArgument = process.argv[2];
-if (!systemsArgument) {
+if(!systemsArgument) {
     process.stderr.write('usage: enumerate.mjs <systems.json>\n');
     process.exit(2);
 }
 
 const systemDefinitions = JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(systemsArgument), 'utf8'));
-if (!Array.isArray(systemDefinitions) || systemDefinitions.length < 2) {
+if(!Array.isArray(systemDefinitions) || systemDefinitions.length < 2) {
     // Two is the floor rather than a preference. One design system is not a population: the entire
     // argument for this port is that two repositories on the same Tailwind resolve differently, and
     // a harness that can only see one of them cannot observe the defect it exists to catch.
@@ -71,18 +71,18 @@ function expandRegistry(designSystem) {
     const seen = new Set();
 
     function add(className) {
-        if (seen.has(className)) return;
+        if(seen.has(className)) return;
         seen.add(className);
         classNames.push(className);
     }
 
-    for (const entry of designSystem.getClassList()) {
+    for(const entry of designSystem.getClassList()) {
         const name = Array.isArray(entry) ? entry[0] : entry;
         const meta = Array.isArray(entry) ? entry[1] : null;
         add(name);
 
         const declaredModifiers = meta?.modifiers;
-        if (!Array.isArray(declaredModifiers) || declaredModifiers.length === 0) continue;
+        if(!Array.isArray(declaredModifiers) || declaredModifiers.length === 0) continue;
 
         // One probe per modifier axis. `50` is the alpha axis; a declared theme-key modifier is the
         // themed axis; the bare class above is the absent axis. `[var(--a)]` is added because an
@@ -90,8 +90,10 @@ function expandRegistry(designSystem) {
         // the seam under test is the parser.
         add(name + '/50');
         add(name + '/[var(--a)]');
-        const themedModifier = declaredModifiers.find((modifier) => typeof modifier === 'string' && !/^\d+$/.test(modifier));
-        if (themedModifier !== undefined) add(name + '/' + themedModifier);
+        const themedModifier = declaredModifiers.find(
+            (modifier) => typeof modifier === 'string' && !/^\d+$/.test(modifier),
+        );
+        if(themedModifier !== undefined) add(name + '/' + themedModifier);
     }
 
     return classNames;
@@ -116,7 +118,7 @@ function scanCorpus(entryPoint) {
     let occurrences = 0;
 
     function scanDirectory(directory, depth) {
-        if (depth > 8) return;
+        if(depth > 8) return;
         let entries;
         try {
             entries = NodeFileSystem.readdirSync(directory, { withFileTypes: true });
@@ -124,14 +126,14 @@ function scanCorpus(entryPoint) {
         catch {
             return;
         }
-        for (const entry of entries) {
-            if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        for(const entry of entries) {
+            if(entry.name.startsWith('.') || entry.name === 'node_modules') continue;
             const fullPath = NodePath.join(directory, entry.name);
-            if (entry.isDirectory()) {
+            if(entry.isDirectory()) {
                 scanDirectory(fullPath, depth + 1);
                 continue;
             }
-            if (!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
+            if(!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
             let contents;
             try {
                 contents = NodeFileSystem.readFileSync(fullPath, 'utf8');
@@ -139,9 +141,9 @@ function scanCorpus(entryPoint) {
             catch {
                 continue;
             }
-            for (const match of contents.matchAll(/className="([^"]*)"/g)) {
-                for (const className of match[1].split(/\s+/)) {
-                    if (className.length === 0) continue;
+            for(const match of contents.matchAll(/className="([^"]*)"/g)) {
+                for(const className of match[1].split(/\s+/)) {
+                    if(className.length === 0) continue;
                     occurrences++;
                     distinctClasses.add(className);
                 }
@@ -176,19 +178,21 @@ function registrationTables(designSystem) {
      * answer for the wrong registration on every root that carries two.
      */
     const utilityRoots = {};
-    for (const [root, declarations] of designSystem.utilities.utilities) {
+    for(const [root, declarations] of designSystem.utilities.utilities) {
         const kinds = new Set();
-        for (const declaration of Array.isArray(declarations) ? declarations : [declarations]) {
-            if (declaration?.kind === 'static' || declaration?.kind === 'functional') kinds.add(declaration.kind);
+        for(const declaration of Array.isArray(declarations) ? declarations : [declarations]) {
+            if(declaration?.kind === 'static' || declaration?.kind === 'functional') kinds.add(declaration.kind);
         }
-        if (kinds.size > 0) utilityRoots[root] = Array.from(kinds).sort();
+        if(kinds.size > 0) utilityRoots[root] = Array.from(kinds).sort();
     }
 
-    if (Object.keys(utilityRoots).length === 0) {
+    if(Object.keys(utilityRoots).length === 0) {
         // Loud rather than empty. An empty utility table makes every class parse as nothing, the Go
         // side declines everything, and the run reports total silence — which this harness fails on
         // by design, but it would fail naming the wrong cause.
-        process.stderr.write('enumerate.mjs: the utility registry could not be read; the parser tables would be empty\n');
+        process.stderr.write(
+            'enumerate.mjs: the utility registry could not be read; the parser tables would be empty\n',
+        );
         process.exit(3);
     }
 
@@ -200,7 +204,7 @@ function registrationTables(designSystem) {
      * other would make every compound-variant parse agree for the wrong reason.
      */
     const variantRoots = {};
-    for (const [root, variant] of designSystem.variants.entries()) {
+    for(const [root, variant] of designSystem.variants.entries()) {
         variantRoots[root] = {
             kind: variant?.kind ?? 'static',
             compounds: variant?.compounds ?? 0,
@@ -214,7 +218,7 @@ function registrationTables(designSystem) {
 }
 
 const systems = [];
-for (const definition of systemDefinitions) {
+for(const definition of systemDefinitions) {
     process.stderr.write(`enumerate.mjs: loading ${definition.name}\n`);
     const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint } = await loadDesignSystem(definition.path);
 
@@ -237,10 +241,10 @@ for (const definition of systemDefinitions) {
     const readingKeys = new Map();
     const readings = [];
     function internReading(reading) {
-        if (reading === null) return -1;
+        if(reading === null) return -1;
         const key = `[${reading.order.join(',')}]#${reading.count}`;
         const existing = readingKeys.get(key);
-        if (existing !== undefined) return existing;
+        if(existing !== undefined) return existing;
         const index = readings.length;
         readings.push({ order: reading.order, count: reading.count });
         readingKeys.set(key, index);
@@ -253,17 +257,17 @@ for (const definition of systemDefinitions) {
     let corpusNullCount = 0;
     const corpusNullExamples = [];
 
-    for (const className of registryClassNames) {
+    for(const className of registryClassNames) {
         const reading = readingOf(designSystem, className);
-        if (reading === null) registryNullCount++;
+        if(reading === null) registryNullCount++;
         registryCases.push({ className, readingIndex: internReading(reading) });
     }
 
-    for (const className of corpus.classNames) {
+    for(const className of corpus.classNames) {
         const reading = readingOf(designSystem, className);
-        if (reading === null) {
+        if(reading === null) {
             corpusNullCount++;
-            if (corpusNullExamples.length < 25) corpusNullExamples.push(className);
+            if(corpusNullExamples.length < 25) corpusNullExamples.push(className);
         }
         corpusCases.push({ className, readingIndex: internReading(reading) });
     }
@@ -280,13 +284,13 @@ for (const definition of systemDefinitions) {
     const crossCheckSample = registryClassNames.filter((_, index) => index % 37 === 0).slice(0, 2000);
     const classOrder = designSystem.getClassOrder(crossCheckSample);
     const publicOrder = [];
-    for (const [className, order] of classOrder) {
+    for(const [className, order] of classOrder) {
         publicOrder.push({ className, order: order === null ? null : String(order) });
     }
 
     process.stderr.write(
-        `  ${definition.name}: ${registryClassNames.length} registry, ${corpus.classNames.length} corpus, `
-        + `${registryNullCount} registry nulls, ${corpusNullCount} corpus nulls\n`,
+        `  ${definition.name}: ${registryClassNames.length} registry, ${corpus.classNames.length} corpus, ` +
+            `${registryNullCount} registry nulls, ${corpusNullCount} corpus nulls\n`,
     );
 
     systems.push({
@@ -333,12 +337,18 @@ for (const definition of systemDefinitions) {
  * that starts diverging readings shows up as a number moving off zero rather than as a fixture that
  * quietly still passes.
  */
-const divergence = { sharedClasses: 0, divergentReadings: 0, uniqueToOneSystem: 0, readingExamples: [], membershipExamples: [] };
-if (systems.length >= 2) {
+const divergence = {
+    sharedClasses: 0,
+    divergentReadings: 0,
+    uniqueToOneSystem: 0,
+    readingExamples: [],
+    membershipExamples: [],
+};
+if(systems.length >= 2) {
     const [left, right] = systems;
     const registryOf = (system) => {
         const byName = new Map();
-        for (const aCase of system.registryCases) {
+        for(const aCase of system.registryCases) {
             const reading = aCase.readingIndex < 0 ? null : system.readings[aCase.readingIndex];
             byName.set(aCase.className, reading === null ? 'null' : `[${reading.order.join(',')}]#${reading.count}`);
         }
@@ -348,41 +358,47 @@ if (systems.length >= 2) {
     const leftRegistry = registryOf(left);
     const rightRegistry = registryOf(right);
 
-    for (const [className, leftKey] of leftRegistry) {
-        if (!rightRegistry.has(className)) {
+    for(const [className, leftKey] of leftRegistry) {
+        if(!rightRegistry.has(className)) {
             divergence.uniqueToOneSystem++;
-            if (divergence.membershipExamples.length < 25) {
+            if(divergence.membershipExamples.length < 25) {
                 divergence.membershipExamples.push({ className, presentIn: left.name });
             }
             continue;
         }
         divergence.sharedClasses++;
         const rightKey = rightRegistry.get(className);
-        if (leftKey === rightKey) continue;
+        if(leftKey === rightKey) continue;
         divergence.divergentReadings++;
-        if (divergence.readingExamples.length < 25) {
+        if(divergence.readingExamples.length < 25) {
             divergence.readingExamples.push({ className, left: leftKey, right: rightKey });
         }
     }
 
-    for (const className of rightRegistry.keys()) {
-        if (leftRegistry.has(className)) continue;
+    for(const className of rightRegistry.keys()) {
+        if(leftRegistry.has(className)) continue;
         divergence.uniqueToOneSystem++;
-        if (divergence.membershipExamples.length < 25) {
+        if(divergence.membershipExamples.length < 25) {
             divergence.membershipExamples.push({ className, presentIn: right.name });
         }
     }
 }
 
 process.stderr.write(
-    `enumerate.mjs: ${divergence.sharedClasses} classes in both registries, `
-    + `${divergence.divergentReadings} read differently, `
-    + `${divergence.uniqueToOneSystem} present in only one system\n`,
+    `enumerate.mjs: ${divergence.sharedClasses} classes in both registries, ` +
+        `${divergence.divergentReadings} read differently, ` +
+        `${divergence.uniqueToOneSystem} present in only one system\n`,
 );
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion: systems[0].tailwindVersion,
-    groundTruth: 'compileAstNodes',
-    divergence,
-    systems,
-}, null, 0) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion: systems[0].tailwindVersion,
+            groundTruth: 'compileAstNodes',
+            divergence,
+            systems,
+        },
+        null,
+        0,
+    ) + '\n',
+);

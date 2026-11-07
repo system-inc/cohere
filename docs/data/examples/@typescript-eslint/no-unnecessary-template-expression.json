@@ -20,8 +20,6 @@
         "file": "/repository/source/Templates.ts",
         "source": "`${() => {}}`;\n"
     },
-    "assertedMessageIds": [
-        "noUnnecessaryTemplateExpression"
-    ],
+    "assertedMessageIds": ["noUnnecessaryTemplateExpression"],
     "assertsFix": true
 }

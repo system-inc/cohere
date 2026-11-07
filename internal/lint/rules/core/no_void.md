@@ -1,12 +1,12 @@
 # `no-void`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **461** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **461**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ void setStackParameter(length > 0 ? stackTaskIds.slice(0, length).join(',') : nu
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

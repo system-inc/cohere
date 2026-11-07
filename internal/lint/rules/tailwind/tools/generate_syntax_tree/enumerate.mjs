@@ -17,7 +17,7 @@ import * as NodeFileSystem from 'node:fs';
 import * as NodePath from 'node:path';
 
 const [, , packageRootArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root>\n');
     process.exit(2);
 }
@@ -36,7 +36,7 @@ const design = await __unstable__loadDesignSystem('@import "tailwindcss";', {
     base: packageRoot,
     loadStylesheet: async (id, base) => {
         let file = id.replace(/^tailwindcss\/?/, '') || 'index.css';
-        if (!file.endsWith('.css')) file += '.css';
+        if(!file.endsWith('.css')) file += '.css';
         const path = NodePath.join(packageRoot, file);
         return { base: NodePath.dirname(path), content: NodeFileSystem.readFileSync(path, 'utf8'), path };
     },
@@ -48,7 +48,7 @@ const design = await __unstable__loadDesignSystem('@import "tailwindcss";', {
  * distinction between a declaration whose value is `undefined` and one whose value is ''.
  */
 function serializeNode(node) {
-    switch (node.kind) {
+    switch(node.kind) {
         case 'rule':
             return { kind: 'rule', selector: node.selector, nodes: node.nodes.map(serializeNode) };
         case 'at-rule':
@@ -83,7 +83,7 @@ function serializeNode(node) {
  * engine can build is represented and near-duplicates are not.
  */
 function signature(node) {
-    switch (node.kind) {
+    switch(node.kind) {
         case 'declaration':
             return `d:${node.property}`;
         case 'comment':
@@ -160,23 +160,25 @@ const extraClassNames = [
 
 const cases = [];
 
-for (const name of [...extraClassNames, ...classNames]) {
+for(const name of [...extraClassNames, ...classNames]) {
     let candidates;
     try {
         candidates = design.parseCandidate(name);
-    } catch {
+    }
+    catch {
         continue;
     }
-    if (!candidates || candidates.length === 0) continue;
+    if(!candidates || candidates.length === 0) continue;
 
-    for (const candidate of candidates) {
+    for(const candidate of candidates) {
         let compiled;
         try {
             compiled = design.compileAstNodes(candidate);
-        } catch {
+        }
+        catch {
             continue;
         }
-        if (!compiled || compiled.length === 0) continue;
+        if(!compiled || compiled.length === 0) continue;
 
         /*
          * `getPropertySort` is seeded with the utility's declaration list *before* the wrapping
@@ -191,26 +193,30 @@ for (const name of [...extraClassNames, ...classNames]) {
          * the call site.
          */
         let bareCompiled = null;
-        if (candidate.variants && candidate.variants.length > 0) {
+        if(candidate.variants && candidate.variants.length > 0) {
             try {
                 bareCompiled = design.compileAstNodes({ ...candidate, variants: [] });
-            } catch {
+            }
+            catch {
                 bareCompiled = null;
             }
         }
 
-        for (const [index, entry] of compiled.entries()) {
+        for(const [index, entry] of compiled.entries()) {
             compiledCount++;
             const readNode = serializeNode((bareCompiled?.[index] ?? entry).node);
             const emittedNode = serializeNode(entry.node);
             const key = signature(readNode);
             const seen = perSignature.get(key) ?? 0;
             const forced = extraClassNames.includes(name);
-            if (!forced && seen >= perSignatureLimit) continue;
+            if(!forced && seen >= perSignatureLimit) continue;
             perSignature.set(key, seen + 1);
 
             const bareSort = bareCompiled?.[index]?.propertySort ?? entry.propertySort;
-            if (bareSort.count !== entry.propertySort.count || bareSort.order.join(',') !== entry.propertySort.order.join(',')) {
+            if(
+                bareSort.count !== entry.propertySort.count ||
+                bareSort.order.join(',') !== entry.propertySort.order.join(',')
+            ) {
                 throw new Error(
                     `${name}: reading changed when variants were stripped ` +
                         `(${JSON.stringify(entry.propertySort)} vs ${JSON.stringify(bareSort)}); ` +
@@ -252,12 +258,13 @@ for (const name of [...extraClassNames, ...classNames]) {
 function breadthFirstProperties(nodes) {
     const out = [];
     const q = nodes.slice();
-    while (q.length > 0) {
+    while(q.length > 0) {
         const n = q.shift();
-        if (n.kind === 'declaration') {
-            if (n.valuePresent) out.push(n.property);
-        } else if (n.kind === 'rule' || n.kind === 'at-rule') {
-            for (const child of n.nodes) q.push(child);
+        if(n.kind === 'declaration') {
+            if(n.valuePresent) out.push(n.property);
+        }
+        else if(n.kind === 'rule' || n.kind === 'at-rule') {
+            for(const child of n.nodes) q.push(child);
         }
     }
     return out;
@@ -266,22 +273,23 @@ function breadthFirstProperties(nodes) {
 function depthFirstProperties(nodes) {
     const out = [];
     const stack = nodes.slice().reverse();
-    while (stack.length > 0) {
+    while(stack.length > 0) {
         const n = stack.pop();
-        if (n.kind === 'declaration') {
-            if (n.valuePresent) out.push(n.property);
-        } else if (n.kind === 'rule' || n.kind === 'at-rule') {
-            for (let i = n.nodes.length - 1; i >= 0; i--) stack.push(n.nodes[i]);
+        if(n.kind === 'declaration') {
+            if(n.valuePresent) out.push(n.property);
+        }
+        else if(n.kind === 'rule' || n.kind === 'at-rule') {
+            for(let i = n.nodes.length - 1; i >= 0; i--) stack.push(n.nodes[i]);
         }
     }
     return out;
 }
 
 const traversalCases = [];
-for (const testCase of cases) {
+for(const testCase of cases) {
     const bfs = breadthFirstProperties([testCase.node]);
     const dfs = depthFirstProperties([testCase.node]);
-    if (bfs.join('|') !== dfs.join('|')) {
+    if(bfs.join('|') !== dfs.join('|')) {
         traversalCases.push({ className: testCase.className, node: testCase.node, breadthFirst: bfs, depthFirst: dfs });
     }
 }
@@ -294,28 +302,30 @@ for (const testCase of cases) {
 let fullListCompiled = 0;
 let fullListDivergent = 0;
 let fullListAtRoot = 0;
-for (const name of classNames) {
+for(const name of classNames) {
     let candidates;
     try {
         candidates = design.parseCandidate(name);
-    } catch {
+    }
+    catch {
         continue;
     }
-    if (!candidates) continue;
-    for (const candidate of candidates) {
+    if(!candidates) continue;
+    for(const candidate of candidates) {
         let compiled;
         try {
             compiled = design.compileAstNodes(candidate);
-        } catch {
+        }
+        catch {
             continue;
         }
-        for (const entry of compiled) {
+        for(const entry of compiled) {
             fullListCompiled++;
             const serialized = serializeNode(entry.node);
-            if (JSON.stringify(serialized).includes('"at-root"')) fullListAtRoot++;
+            if(JSON.stringify(serialized).includes('"at-root"')) fullListAtRoot++;
             const bfs = breadthFirstProperties([serialized]).join('|');
             const dfs = depthFirstProperties([serialized]).join('|');
-            if (bfs !== dfs) fullListDivergent++;
+            if(bfs !== dfs) fullListDivergent++;
         }
     }
 }

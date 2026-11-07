@@ -1,12 +1,12 @@
 # `radix`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **172** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Yes**       |
+| Violations in ahra     | **172**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const hours = parseInt(match[1] || '0');
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

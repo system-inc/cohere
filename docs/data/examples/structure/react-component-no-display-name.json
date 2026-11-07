@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Field.tsx",
         "source": "export const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "noDisplayNameAssignment"
-    ]
+    "assertedMessageIds": ["noDisplayNameAssignment"]
 }

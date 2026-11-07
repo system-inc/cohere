@@ -19,8 +19,6 @@
         "file": "/repository/source/ParameterProperty.ts",
         "source": "\n        const foo = 'foo';\n        this.foo = foo;\n        "
     },
-    "assertedMessageIds": [
-        "unnecessaryAssign"
-    ],
+    "assertedMessageIds": ["unnecessaryAssign"],
     "assertsSuggestion": true
 }

@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "const element = <div title=\"flx\" />;\n"
     },
-    "assertedMessageIds": [
-        "unknownClass"
-    ]
+    "assertedMessageIds": ["unknownClass"]
 }

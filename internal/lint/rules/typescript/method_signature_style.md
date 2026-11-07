@@ -1,12 +1,12 @@
 # `@typescript-eslint/method-signature-style`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **39** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **39**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ validate(mimeType: string, data: ArrayBuffer): Promise<FileValidationResultInter
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

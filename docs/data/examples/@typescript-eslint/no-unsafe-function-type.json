@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export let handler: () => void;\n"
     },
-    "assertedMessageIds": [
-        "bannedFunctionType"
-    ]
+    "assertedMessageIds": ["bannedFunctionType"]
 }

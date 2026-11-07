@@ -22,18 +22,21 @@ function activate(context) {
             }
             const filePath = document.uri.fsPath;
             const workspaceFolder = Vscode.workspace.getWorkspaceFolder(document.uri);
-            const projectDirectory = workspaceFolder !== undefined ? workspaceFolder.uri.fsPath : NodePath.dirname(filePath);
+            const projectDirectory =
+                workspaceFolder !== undefined ? workspaceFolder.uri.fsPath : NodePath.dirname(filePath);
 
             const binary = resolveCohereBinary(projectDirectory);
             if(binary === undefined) {
                 if(!toldNotFound.has(projectDirectory)) {
                     toldNotFound.add(projectDirectory);
                     // Not awaited: the save goes ahead as typed while the message is up.
-                    Vscode.window.showErrorMessage(cohereNotFoundMessage(projectDirectory), copyInstallCommand).then(function(choice) {
-                        if(choice === copyInstallCommand) {
-                            Vscode.env.clipboard.writeText(installCommand);
-                        }
-                    });
+                    Vscode.window
+                        .showErrorMessage(cohereNotFoundMessage(projectDirectory), copyInstallCommand)
+                        .then(function(choice) {
+                            if(choice === copyInstallCommand) {
+                                Vscode.env.clipboard.writeText(installCommand);
+                            }
+                        });
                 }
                 return [];
             }
@@ -48,7 +51,9 @@ function activate(context) {
             if(result.error !== undefined) {
                 // A broken formatter is shown; the buffer saves as typed. A file cohere declines never
                 // reaches here: it comes back unchanged with no error.
-                Vscode.window.showErrorMessage(`cohere could not format ${NodePath.basename(filePath)}: ${result.error}`);
+                Vscode.window.showErrorMessage(
+                    `cohere could not format ${NodePath.basename(filePath)}: ${result.error}`,
+                );
                 return [];
             }
             if(result.text === text) {
@@ -59,9 +64,7 @@ function activate(context) {
         },
     };
 
-    context.subscriptions.push(
-        Vscode.languages.registerDocumentFormattingEditProvider({ scheme: 'file' }, provider),
-    );
+    context.subscriptions.push(Vscode.languages.registerDocumentFormattingEditProvider({ scheme: 'file' }, provider));
 }
 
 function deactivate() {}

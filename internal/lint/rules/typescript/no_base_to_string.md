@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-base-to-string`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **53** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **53**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(v
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

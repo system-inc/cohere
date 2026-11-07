@@ -3,13 +3,16 @@ package marker
 import (
 	"go/ast"
 	"go/token"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // Index is one file's comment groups found by line, built once so each node asks for its comments without a walk of
 // its own. Lines are the file's own, never those a //line directive names, since a comment and the code it speaks for
 // sit together in the file as written.
 type Index struct {
-	fileSet *token.FileSet
+	// table reads a position's line without the FileSet's lock, which every node of every file asks for.
+	table *positions.Table
 	// ownLinesEndingOn is each group that has its lines to itself, by the line it ends on: no code before it on its
 	// first line and none after it on its last.
 	ownLinesEndingOn map[int]*ast.CommentGroup
@@ -49,5 +52,5 @@ func (index *Index) ExcuseFor(node ast.Node, marker string) Excuse {
 
 // line is the file's own line of position, or 0 for no position.
 func (index *Index) line(position token.Pos) int {
-	return index.fileSet.PositionFor(position, false).Line
+	return index.table.Line(position)
 }

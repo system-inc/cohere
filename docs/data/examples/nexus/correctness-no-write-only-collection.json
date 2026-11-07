@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessNoWriteOnlyCollection.ts",
         "source": "interface RowInterface { rowid: number; id: string }\ndeclare const rows: RowInterface[];\ndeclare function use(value: unknown): void;\nexport function collect() {\n    const ids: string[] = [];\n}\n"
     },
-    "assertedMessageIds": [
-        "writeOnlyCollection"
-    ]
+    "assertedMessageIds": ["writeOnlyCollection"]
 }

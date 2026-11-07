@@ -18,7 +18,5 @@
         "file": "/repository/source/ShadowRestrictedNames.ts",
         "source": "let undefined\n"
     },
-    "assertedMessageIds": [
-        "shadowingRestrictedName"
-    ]
+    "assertedMessageIds": ["shadowingRestrictedName"]
 }

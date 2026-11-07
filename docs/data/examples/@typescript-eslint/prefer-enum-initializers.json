@@ -19,8 +19,6 @@
         "file": "/repository/source/Direction.ts",
         "source": "\nenum Direction {}\n    "
     },
-    "assertedMessageIds": [
-        "defineInitializer"
-    ],
+    "assertedMessageIds": ["defineInitializer"],
     "assertsSuggestion": true
 }

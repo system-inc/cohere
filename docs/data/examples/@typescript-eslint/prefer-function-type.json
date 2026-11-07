@@ -20,9 +20,6 @@
         "file": "/repository/source/FunctionTypes.ts",
         "source": "type Foo = {\n  (): void;\n  bar: number;\n};\n"
     },
-    "assertedMessageIds": [
-        "functionTypeOverCallableType",
-        "unexpectedThisOnFunctionOnlyInterface"
-    ],
+    "assertedMessageIds": ["functionTypeOverCallableType", "unexpectedThisOnFunctionOnlyInterface"],
     "assertsFix": true
 }

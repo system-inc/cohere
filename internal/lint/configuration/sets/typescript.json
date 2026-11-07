@@ -1,23 +1,12 @@
 {
-    "extends": [
-        "cohere:adamic",
-        "cohere:style"
-    ],
+    "extends": ["cohere:adamic", "cohere:style"],
     "format": {
         "tabWidth": 4,
         "useTabs": false,
         "semi": true,
         "singleQuote": true,
         "printWidth": 120,
-        "ignore": [
-            "next-env.d.ts",
-            "pnpm-lock.yaml",
-            "*.sqlite",
-            "*.sqlite3",
-            "*.db",
-            "*.db-wal",
-            "*.db-shm"
-        ]
+        "ignore": ["next-env.d.ts", "pnpm-lock.yaml", "*.sqlite", "*.sqlite3", "*.db", "*.db-wal", "*.db-shm"]
     },
     "departures": {
         "adamic/no-unchecked-cast": "Sets runtimeChecksEmitted false and keeps the error it inherits: every project on this set runs on tsc, which emits no check behind a cast, so a union downcast is as unchecked as any other narrowing and is reported with a type guard as its fix (#mdccedj)."

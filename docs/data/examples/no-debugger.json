@@ -20,8 +20,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Message = 'debugger';\n"
     },
-    "assertedMessageIds": [
-        "unexpectedDebugger"
-    ],
+    "assertedMessageIds": ["unexpectedDebugger"],
     "assertsFix": true
 }

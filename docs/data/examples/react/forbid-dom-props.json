@@ -1,6 +1,4 @@
 {
     "rule": "react/forbid-dom-props",
-    "assertedMessageIds": [
-        "propIsForbidden"
-    ]
+    "assertedMessageIds": ["propIsForbidden"]
 }

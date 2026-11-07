@@ -18,8 +18,5 @@
         "file": "clean.ts",
         "source": "foo({});"
     },
-    "assertedMessageIds": [
-        "unexpectedArray",
-        "unexpectedObject"
-    ]
+    "assertedMessageIds": ["unexpectedArray", "unexpectedObject"]
 }

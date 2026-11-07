@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export interface Point {\n    x: number;\n    y: number;\n}\n"
     },
-    "assertedMessageIds": [
-        "booleanOutcome"
-    ]
+    "assertedMessageIds": ["booleanOutcome"]
 }

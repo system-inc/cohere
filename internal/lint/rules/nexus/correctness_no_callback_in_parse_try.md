@@ -1,12 +1,12 @@
 # `nexus/correctness-no-callback-in-parse-try`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`.** ahra is clean today, so it can be enabled with nothing to fix; it exists to stop the shape coming back |
-| Findings | **ahra 0** (measured 2026-10-03). **2 on ahra at `1382cbe9^`**, the tree the research probe read, matching its count exactly |
-| Measured precision | 2 of 2 true on the pre-fix tree, both the real sites below |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`.** ahra is clean today, so it can be enabled with nothing to fix; it exists to stop the shape coming back        |
+| Findings               | **ahra 0** (measured 2026-10-03). **2 on ahra at `1382cbe9^`**, the tree the research probe read, matching its count exactly       |
+| Measured precision     | 2 of 2 true on the pre-fix tree, both the real sites below                                                                         |
+| Plugin                 | cohere-native, `nexus`                                                                                                             |
+| Auto-fixable           | no                                                                                                                                 |
 | Needs type information | yes, to resolve `JSON.parse`, nexus `parseJsonOrThrow`, parameters and `new Promise`; without a checker the rule registers nothing |
 
 ## What it checks
@@ -33,17 +33,17 @@ The callback call is reported, once per call.
 The own-history pass of the new-rules sweep (`#tevhg3f`, probe P5), built as `#hspse4v`:
 
 - `modules/claude/utilities/ClaudeUtilities.ts`, `parseStreamLines` (`#wv045mc`): `try { const message =
-  JSON.parse(line); onMessage(message); } catch { onUnparseable?.(line); }`. A handler that threw on a
+JSON.parse(line); onMessage(message); } catch { onUnparseable?.(line); }`. A handler that threw on a
   well-formed line was reported as an unparseable line.
 - `modules/x/XStreamApi.ts`, `consumeStream`: `try { const parsed = JSON.parse(line) as ...;
-  onEvent(parsed); } catch { // Heartbeat or partial frame; skip. }`. Every handler error vanished.
+onEvent(parsed); } catch { // Heartbeat or partial frame; skip. }`. Every handler error vanished.
 
 Both were fixed in the JSON waves (`1382cbe9`, `4e385b61`) by moving to `parseJson` and calling the
 callback on a `'Parsed'` outcome, outside any `try`.
 
 ## The design decision: what "a catch that reports a parse error" means
 
-The brief's precision line asks for a `catch` that *reports a parse error*. Whether a `catch` says
+The brief's precision line asks for a `catch` that _reports a parse error_. Whether a `catch` says
 "parse error" lives in its message text or its comment, and reading those is a name heuristic. So the
 rule reads the one thing the AST says exactly: whether the `catch` can tell the callback's error from
 the parse error at all. A `catch` that never reads its caught value treats every error as the failure it

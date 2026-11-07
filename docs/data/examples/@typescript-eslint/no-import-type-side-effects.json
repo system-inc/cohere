@@ -20,8 +20,6 @@
         "file": "/repository/source/ImportTypeSideEffects.ts",
         "source": "import 'mod';"
     },
-    "assertedMessageIds": [
-        "useTopLevelQualifier"
-    ],
+    "assertedMessageIds": ["useTopLevelQualifier"],
     "assertsFix": true
 }

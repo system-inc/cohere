@@ -307,79 +307,31 @@
         },
         {
             "reason": "Hardware, graphics, file system and numeric-library names, general technical vocabulary like `HTTP`, added when Swift's rule first read the apps' comments (#y8whqbe): the bus a camera hangs off, a vector instruction set, a pixel layout, Apple's 3D scene and file system formats, a GPU maker, the linear algebra library, a heads-up display, the color science commission, and the random sample consensus fit.",
-            "tokens": [
-                "APFS",
-                "BGRA",
-                "CIE",
-                "HUD",
-                "LAPACK",
-                "NVIDIA",
-                "RANSAC",
-                "SIMD",
-                "USB",
-                "USDZ"
-            ]
+            "tokens": ["APFS", "BGRA", "CIE", "HUD", "LAPACK", "NVIDIA", "RANSAC", "SIMD", "USB", "USDZ"]
         },
         {
             "reason": "Machine learning terms: the Gaussian error linear unit activation and byte pair encoding, named the way a sentence names a protocol (#y8whqbe).",
-            "tokens": [
-                "BPE",
-                "GELU"
-            ]
+            "tokens": ["BPE", "GELU"]
         },
         {
             "reason": "Acronyms a published paper defines, the bar for a name from one project's research: `AIST`, the AIST Dance Video Database (Tsuchida, Fukayama, Hamasaki and Goto, ISMIR 2019), and `MPJPE`, mean per-joint position error (Ionescu, Papava, Olaru and Sminchisescu, Human3.6M, IEEE TPAMI 2014). A name no standard or paper defines is a term to backtick instead (#y8whqbe).",
-            "tokens": [
-                "AIST",
-                "MPJPE"
-            ]
+            "tokens": ["AIST", "MPJPE"]
         },
         {
             "reason": "File formats, software and datasets the apps name, general vocabulary like `HTTP` (#97t3z3t, judged by @system_cohere_swift under @system_cohere's ruling on #y8whqbe): the `WAV` audio and `VRMA` VRM animation formats; `LUT`, a lookup table; `XYZ`, the coordinate order and the CIE color space; `ACK`, an acknowledgement; the `XNNPACK` inference library and `OBS` Studio; `COCO`, Microsoft's Common Objects in Context dataset (Lin et al., ECCV 2014); `CHI`, the ACM conference.",
-            "tokens": [
-                "ACK",
-                "CHI",
-                "COCO",
-                "LUT",
-                "OBS",
-                "VRMA",
-                "WAV",
-                "XNNPACK",
-                "XYZ"
-            ]
+            "tokens": ["ACK", "CHI", "COCO", "LUT", "OBS", "VRMA", "WAV", "XNNPACK", "XYZ"]
         },
         {
             "reason": "Anatomy's names for the finger joints, which hand-pose landmarks are named after: `PIP` and `DIP`, the proximal and distal interphalangeal joints (#97t3z3t).",
-            "tokens": [
-                "DIP",
-                "PIP"
-            ]
+            "tokens": ["DIP", "PIP"]
         },
         {
             "reason": "Networking, security, systems and color names, general vocabulary like `HTTP` (#d1senw3, judged by @system_cohere_swift under @system_cohere's ruling on #y8whqbe): `SAN` and `SNI`, a certificate's subject alternative name and TLS's server name indication; `MITM`, a man in the middle; `SOCKS`, the proxy protocol; `SPI`, Apple's system programming interface; `ARC`, automatic reference counting; `UTI`, Apple's uniform type identifier; `COW`, copy-on-write; `SIP`, Unicode's supplementary ideographic plane; `LAB`, the CIE color space.",
-            "tokens": [
-                "ARC",
-                "COW",
-                "LAB",
-                "MITM",
-                "SAN",
-                "SIP",
-                "SNI",
-                "SOCKS",
-                "SPI",
-                "UTI"
-            ]
+            "tokens": ["ARC", "COW", "LAB", "MITM", "SAN", "SIP", "SNI", "SOCKS", "SPI", "UTI"]
         },
         {
             "reason": "File and environment names, the one group that is not acronyms: every one is a pronounceable English word, which is why the vowel test reads them as shouting and why they are named rather than inferred. Backticks are the wrong repair, since a file named mid-sentence is the subject being discussed, not a literal to match character for character. `PATH` passes the same noun test; the home directory, shell and terminal variables are left out because a sentence reads those for their value rather than naming them as a thing.",
-            "tokens": [
-                "AGENTS",
-                "CHANGELOG",
-                "CLAUDE",
-                "LICENSE",
-                "PATH",
-                "README"
-            ]
+            "tokens": ["AGENTS", "CHANGELOG", "CLAUDE", "LICENSE", "PATH", "README"]
         },
         {
             "reason": "ISO 4217 currency codes, which a sentence names the way it names a protocol: \"amounts in KRW have no minor unit\" is prose about a currency, not a raised voice. A copy of the currency table the TypeScript original reads live, because a parenthetical once read \"(BIF, DJF, GNF, KMF, RWF, VUV, XPF)\" with only the vowel-bearing codes backticked. Update it from that table rather than by hand.",

@@ -294,11 +294,15 @@ func run() error {
 		if given["lint-config"] {
 			namedLintConfiguration = absoluteFrom(workingDirectory, *lintConfigFileName)
 		}
+		// A run formats unless it names only the type check or the lint rules, or leaves formatting out.
+		formats := !given["no-format"] && (given["format"] || given["format-all"] || given["format-only"] ||
+			given["fix"] || !(given["types"] || given["lint"]))
 		exitCode, checked, checkDiscoveredProjectsError := checkDiscoveredProjects(
 			location,
 			locateError,
 			workingDirectory,
 			namedLintConfiguration,
+			formats,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError
@@ -464,6 +468,16 @@ func run() error {
 			return locateError
 		}
 		return dumpCacheTable(location)
+	}
+
+	// The format project at a root no TypeScript project holds is formatting and nothing else: there is no
+	// program to type-check or lint, so whatever its parent was given, a bare run, `--fix` or `--no-fix`, it
+	// formats alone, writing or not as the parent's run does. Discovery adds it only to a run that formats.
+	if locateError == nil && location.Engine == engineFormat {
+		*fixOnly = false
+		*formatOnly = true
+		*unusedReport, *unusedAll, *unusedDeep = false, false, false
+		activeSummary.FormatProject = true
 	}
 
 	// A bare `cohere` runs the whole pipeline. The phase flags isolate one phase for someone

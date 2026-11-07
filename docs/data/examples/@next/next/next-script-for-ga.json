@@ -18,7 +18,5 @@
         "file": "pages/index.tsx",
         "source": "export const A = <script src={someUrl} />;\n"
     },
-    "assertedMessageIds": [
-        "nextScriptForGa"
-    ]
+    "assertedMessageIds": ["nextScriptForGa"]
 }

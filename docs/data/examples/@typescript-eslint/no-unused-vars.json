@@ -18,11 +18,7 @@
         "file": "/repository/source/TypeOnly.ts",
         "source": "import { foo } from 'foo';\nexport type Foo = typeof foo;\n"
     },
-    "assertedMessageIds": [
-        "noUnusedVars",
-        "usedIgnoredVar",
-        "usedOnlyAsType"
-    ],
+    "assertedMessageIds": ["noUnusedVars", "usedIgnoredVar", "usedOnlyAsType"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

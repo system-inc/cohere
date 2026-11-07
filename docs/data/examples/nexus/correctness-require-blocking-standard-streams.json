@@ -18,7 +18,5 @@
         "file": "/repository/modules/subject/Subject.ts",
         "source": "console.log(output);\nprocess.exitCode = 1;\n"
     },
-    "assertedMessageIds": [
-        "exitBeforeBlockingStandardStreams"
-    ]
+    "assertedMessageIds": ["exitBeforeBlockingStandardStreams"]
 }

@@ -1,14 +1,14 @@
 # `nexus/correctness-no-import-cycle-load-time-read`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, but registered `off` until the sites are fixed.** 8 findings on ahra, 0 false, all from two cycles in Nexus, each fixed by moving one helper to a file of its own |
-| Findings | **ahra 8** (measured 2026-10-03) |
-| Measured precision | 8 of 8 true: each is a binding read while its module loads, declared in a module of the same runtime import cycle, and each throws `Cannot access ... before initialization` when the cycle is entered at the declaring file |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, for symbol identity and for TypeScript's elision rule; reads other files (`ReadsOtherFiles`), so the findings cache never replays it |
-| Cost on ahra | the program's graph is built once per run: 24 to 124ms wall across five runs (20ms resolving every import, the rest asking the checker about the 70 files inside cycles). `--timing` sums it to 0.4 to 2.7s, because every other worker's wait on the build's lock is counted as its setup |
+|                        |                                                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Recommendation**     | **Yes, but registered `off` until the sites are fixed.** 8 findings on ahra, 0 false, all from two cycles in Nexus, each fixed by moving one helper to a file of its own                                                                                                                   |
+| Findings               | **ahra 8** (measured 2026-10-03)                                                                                                                                                                                                                                                           |
+| Measured precision     | 8 of 8 true: each is a binding read while its module loads, declared in a module of the same runtime import cycle, and each throws `Cannot access ... before initialization` when the cycle is entered at the declaring file                                                               |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                                                                                                     |
+| Auto-fixable           | no                                                                                                                                                                                                                                                                                         |
+| Needs type information | yes, for symbol identity and for TypeScript's elision rule; reads other files (`ReadsOtherFiles`), so the findings cache never replays it                                                                                                                                                  |
+| Cost on ahra           | the program's graph is built once per run: 24 to 124ms wall across five runs (20ms resolving every import, the rest asking the checker about the 70 files inside cycles). `--timing` sums it to 0.4 to 2.7s, because every other worker's wait on the build's lock is counted as its setup |
 
 ## What it checks
 
@@ -66,10 +66,10 @@ out of 20 cycles in all. The gap is two things, neither a false positive:
 
 ## The findings, read one by one
 
-| Site | Reading |
-|---|---|
-| `nexus/source/protocols/base/errors/BaseErrorIdentifiers.ts:62` | **Bug**: `...RateLimiterModuleErrors`, cycle `BaseErrorIdentifiers → RateLimiterModuleErrors → BaseErrorIdentifiers` (and through `BaseError.ts`) |
-| `nexus/source/validation/schema/{Array,Boolean,Date,File,Number,Object,String}Schema.ts` | **Bug** x7: `extends BaseSchema`, cycle `XSchema → BaseSchema → Schema → XSchema` |
+| Site                                                                                     | Reading                                                                                                                                           |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nexus/source/protocols/base/errors/BaseErrorIdentifiers.ts:62`                          | **Bug**: `...RateLimiterModuleErrors`, cycle `BaseErrorIdentifiers → RateLimiterModuleErrors → BaseErrorIdentifiers` (and through `BaseError.ts`) |
+| `nexus/source/validation/schema/{Array,Boolean,Date,File,Number,Object,String}Schema.ts` | **Bug** x7: `extends BaseSchema`, cycle `XSchema → BaseSchema → Schema → XSchema`                                                                 |
 
 **Recall spot check.** Every load-time read in all 20 cycles that matched an import from the same cycle
 and was declined was logged: one, `Tabs.tsx` reading `TabItem`, a `function` declaration, which is hoisted

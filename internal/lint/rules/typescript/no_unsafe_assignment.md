@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unsafe-assignment`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **387** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **387**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const basic = Buffer.from(`${creds.clientId}:${creds.clientSecret}`).toString('b
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

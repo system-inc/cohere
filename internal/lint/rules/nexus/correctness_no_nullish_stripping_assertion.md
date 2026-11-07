@@ -1,13 +1,13 @@
 # `nexus/correctness-no-nullish-stripping-assertion`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, registered `off` until the sites are fixed.** 87 findings on ahra, 0 false. Turning it on at `error` today puts 87 findings on ahra |
-| Findings | **ahra 87** (55 in `app/` and `modules/`, 32 in `libraries/structure/`, 11 of those in tests), measured 2026-10-03 |
-| Measured precision | 87 of 87 true by construction: in each, the checker's type for the asserted expression holds `undefined` or `null` and the asserted type cannot. Live bugs include the 21 `AnalyticsApi` / `GoogleAds*` flag reads and `AhraOsReactions.ts:837`; 30 sit in front of a `??` / `||` fallback and are harmless for the `undefined` itself |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes; without a checker the rule registers nothing |
+|                        |                                                                                                                                                                                                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Recommendation**     | **Yes, registered `off` until the sites are fixed.** 87 findings on ahra, 0 false. Turning it on at `error` today puts 87 findings on ahra                                                                                                                                     |
+| Findings               | **ahra 87** (55 in `app/` and `modules/`, 32 in `libraries/structure/`, 11 of those in tests), measured 2026-10-03                                                                                                                                                             |
+| Measured precision     | 87 of 87 true by construction: in each, the checker's type for the asserted expression holds `undefined` or `null` and the asserted type cannot. Live bugs include the 21 `AnalyticsApi` / `GoogleAds*` flag reads and `AhraOsReactions.ts:837`; 30 sit in front of a `??` / ` |     | `fallback and are harmless for the`undefined` itself |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                                                                                         |
+| Auto-fixable           | no                                                                                                                                                                                                                                                                             |
+| Needs type information | yes; without a checker the rule registers nothing                                                                                                                                                                                                                              |
 
 ## What it checks
 
@@ -34,11 +34,11 @@ The cross-language pass of the new-rules sweep (`#tevhg3f`, after clippy `unwrap
 built as `#c3afxe9`. Fixtures are taken from three real sites, before and after:
 
 - `modules/google/analytics/AnalyticsApi.ts:175` (`getDateRange`, `getDaysLabel`): `parseInt(options.days
-  as string, 10)`. The research's lead site, and a live bug: AnalyticsApi's own `parseOptions` stores
+as string, 10)`. The research's lead site, and a live bug: AnalyticsApi's own `parseOptions` stores
   `--days 30` (space form) as `true`, so `parseInt(true)` is NaN and the default silently wins. Fixed with
   `numberFlag`.
 - `modules/os/sensation/AhraOsReactions.ts:837`: `typeof x.configuration === 'object' ? (x.configuration as
-  Record<string, unknown>)`. `typeof null === 'object'`, so a null configuration passes as a record. The
+Record<string, unknown>)`. `typeof null === 'object'`, so a null configuration passes as a record. The
   outer read eight lines up guards with truthiness and is the silent counterpart in the same fixture.
 - `libraries/structure/source/components/dialogs/DialogMenu.tsx:53`: `event.target as HTMLElement` over
   `EventTarget | null`. Fixed with `instanceof`.

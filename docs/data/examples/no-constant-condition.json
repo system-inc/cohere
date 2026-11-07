@@ -18,7 +18,5 @@
         "file": "/repository/source/Condition.ts",
         "source": "declare let a: any, b: any;\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

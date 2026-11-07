@@ -18,7 +18,5 @@
         "file": "/repository/source/modules/thing/Service.ts",
         "source": "export function f(): void { throw 'a string'; }"
     },
-    "assertedMessageIds": [
-        "bareThrow"
-    ]
+    "assertedMessageIds": ["bareThrow"]
 }

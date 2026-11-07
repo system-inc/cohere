@@ -18,7 +18,5 @@
         "file": "/project/source/Thing.ts",
         "source": "export const outer: number = 1\n"
     },
-    "assertedMessageIds": [
-        "label"
-    ]
+    "assertedMessageIds": ["label"]
 }

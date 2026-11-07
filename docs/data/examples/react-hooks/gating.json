@@ -18,8 +18,5 @@
         "file": "gating.tsx",
         "source": "function Foo() {\n  'use memo';\n  return 1;\n}\n"
     },
-    "assertedMessageIds": [
-        "invalidGatingDirective",
-        "multipleGatingDirectives"
-    ]
+    "assertedMessageIds": ["invalidGatingDirective", "multipleGatingDirectives"]
 }

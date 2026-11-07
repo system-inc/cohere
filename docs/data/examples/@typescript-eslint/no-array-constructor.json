@@ -19,8 +19,6 @@
         "file": "/repository/source/ArrayConstructor.tsx",
         "source": "foo();\n"
     },
-    "assertedMessageIds": [
-        "noArrayConstructor"
-    ],
+    "assertedMessageIds": ["noArrayConstructor"],
     "assertsSuggestion": true
 }
