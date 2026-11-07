@@ -36,7 +36,7 @@
         "family": "shouting",
         "case": "sh25",
         "kind": "verdict",
-        "task": "xfa3q6w",
+        "task": "0n6zmqq",
         "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
     },
     {
@@ -44,7 +44,7 @@
         "family": "shouting",
         "case": "sh25",
         "kind": "verdict",
-        "task": "xfa3q6w",
+        "task": "gzwa8xr",
         "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
     }
 ]
