@@ -146,7 +146,12 @@ func applyProposedFixes(
 	if early != nil {
 		speculation = early.speculationOf()
 	}
-	if graph != nil && graph.FusedCheck != nil {
+	// Nothing else wants the cores now on a run whose walk did the type check, and on a run with no program, which
+	// has no walk to overlap and no type check beside it, so formatInParallel takes what the speculation has not
+	// begun on every core. Left running, a quarter of them set the run's end: on a copy of adamic,
+	// `--no-fix --no-cache --format-only` spent 61 CPU-seconds in 28 to 38s of wall (#9h6g0s3). A run with a
+	// program and no fused check keeps its speculation, since its type check is still running beside it.
+	if graph == nil || graph.FusedCheck != nil {
 		speculation.stop()
 	}
 

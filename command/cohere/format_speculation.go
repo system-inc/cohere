@@ -27,15 +27,16 @@ type formatSpeculation struct {
 	limit atomic.Int32
 }
 
-// stop has the workers finish the files they are on and begin no more. Called once the walk is over on a run
-// whose walk also did the type check (program.FusedCheck): nothing else then wants the cores, and a quarter of
-// them formatting the rest would set the run's end (#679s763).
 // narrow has all but the first workers finish the file they are on and take no more. The files left go to the
 // workers that remain, and what they have not begun when the walk ends goes to formatInParallel.
 func (speculation *formatSpeculation) narrow(workers int) {
 	speculation.limit.Store(int32(workers))
 }
 
+// stop has the workers finish the files they are on and begin no more. Called once the walk is over on a run
+// whose walk also did the type check (program.FusedCheck), and once the plan is taken on a run with no program,
+// such as `--format-only`, which has no walk: nothing else then wants the cores, and a quarter of them
+// formatting the rest would set the run's end (#679s763, #9h6g0s3).
 func (speculation *formatSpeculation) stop() {
 	speculation.stopOnce.Do(func() { close(speculation.stopped) })
 }
