@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unnecessary-type-conversion`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **73** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **73**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ href={constructHrefWithExistingUrlSearchParameters(Number(properties.page) - 1)}
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -20,9 +20,6 @@
         "file": "/repository/source/OperatorAssignment.ts",
         "source": "x = y"
     },
-    "assertedMessageIds": [
-        "replaced",
-        "unexpected"
-    ],
+    "assertedMessageIds": ["replaced", "unexpected"],
     "assertsFix": true
 }

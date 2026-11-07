@@ -20,8 +20,6 @@
         "file": "/repository/app/Thing.tsx",
         "source": "export const X = 1;\n"
     },
-    "assertedMessageIds": [
-        "importsNotOrganized"
-    ],
+    "assertedMessageIds": ["importsNotOrganized"],
     "assertsFix": true
 }

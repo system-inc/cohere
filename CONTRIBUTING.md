@@ -39,9 +39,9 @@ A perfectly coherent story can be entirely false. Coherence is a relation among 
 nothing about whether they touch reality, which is why a green run over a probe that never fired
 feels exactly like a green run over a clean tree.
 
-Those are two jobs rather than two features of one program. `cohere` answers *is this well-formed
-and in phase*, from the graph alone, which is what lets it be fast enough to leave on. A separate
-`verify` will answer *did it actually do the thing*, which cannot be answered from inside the code
+Those are two jobs rather than two features of one program. `cohere` answers _is this well-formed
+and in phase_, from the graph alone, which is what lets it be fast enough to leave on. A separate
+`verify` will answer _did it actually do the thing_, which cannot be answered from inside the code
 and needs running it and reading what came out. The oracles belong there: the fixture pairs, the
 mutation sweeps, the known-dirty controls, the differential against the gate this replaces. Today
 they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
@@ -94,10 +94,13 @@ first-parent line gains that one commit per landing, and the branch's own histor
 included, stays one hop off it. The branch itself doesn't move, and the worktree is left at the landing,
 detached. Nothing landed this way moves main during another's gate. A commit to main by hand does, and
 when one happens mid-gate, land merges onto it and gates again. A merge that conflicts is refused with its
-files named, and the worktree is left as it was. Every landing runs main's own land: when the worktree's
-`command/cohere-dev` differs from main's, land says so and runs main's from the main checkout, against the
-worktree (#8wpk5tp), so a worktree on older code can't land the old way. On a loaded morning a branch gated green eight times
-without landing, and every one of those gates compiled a merge that never existed again.
+files named, and the worktree is left as it was, unless every conflicted file is under `docs/data`, which the
+docs data generator writes whole: then land takes main's side of them, reruns the generator from the merged
+sources in a scratch worktree, requires a second run to change nothing, and gates that (#y84h1te).
+Every landing runs main's own land: when the worktree's `command/cohere-dev` differs from main's, land
+says so and runs main's from the main checkout, against the worktree (#8wpk5tp), so a worktree on older
+code can't land the old way. On a loaded morning a branch gated green eight times without landing, and
+every one of those gates compiled a merge that never existed again.
 
 A commit's subject reads `area: what changed (#task)`, up to 72 characters, and the story goes in the
 body. The area is a folder in the tree, by its name or its path (`go_engine`, `release/dispatch`), or a
@@ -526,7 +529,7 @@ results they would read as their own build's.
 Measured, because the answer decides how much this matters. An unsigned binary with no quarantine
 attribute runs normally, and that is what an `npm install` produces — package managers extract
 tarballs without setting `com.apple.quarantine`, so consumers installing from the registry are not
-blocked. The same binary *with* quarantine set is killed by the kernel: exit 137, SIGKILL, and zero
+blocked. The same binary _with_ quarantine set is killed by the kernel: exit 137, SIGKILL, and zero
 bytes on both stdout and stderr.
 
 That silent kill is the reason to sign. It is reached whenever the binary travels as a file rather

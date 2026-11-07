@@ -20,8 +20,6 @@
         "file": "file.ts",
         "source": "({})\n"
     },
-    "assertedMessageIds": [
-        "useHasOwn"
-    ],
+    "assertedMessageIds": ["useHasOwn"],
     "assertsFix": true
 }

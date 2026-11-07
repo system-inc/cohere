@@ -18,7 +18,5 @@
         "file": "/repository/source/MultiStr.ts",
         "source": "var a = 12;"
     },
-    "assertedMessageIds": [
-        "multilineString"
-    ]
+    "assertedMessageIds": ["multilineString"]
 }

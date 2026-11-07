@@ -1,13 +1,13 @@
 # `nexus/correctness-no-load-time-import-meta-path`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`, in `cohere:next`**, off for `**/*.test.*` and `**/eslint.config.*`, which Node or the test runner runs directly and never bundles |
-| Findings | **0** in ahra, www-phi-health-cohere-zero, www-ahra-ai-cohere-zero, www-phi-health and www-connected-app, in both engines, after ahra's fix wave (ahra f43214af, five sites) (measured 2026-10-05) |
-| Measured precision | every finding before the fix wave was a module-scope path in a module a bundle could import, or a test file or ESLint config the override now leaves alone |
-| Plugin | `nexus`, in both engines: cohere's rule and Nexus's ESLint twin hold the same rows |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                                                                                                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`, in `cohere:next`**, off for `**/*.test.*` and `**/eslint.config.*`, which Node or the test runner runs directly and never bundles                                               |
+| Findings               | **0** in ahra, www-phi-health-cohere-zero, www-ahra-ai-cohere-zero, www-phi-health and www-connected-app, in both engines, after ahra's fix wave (ahra f43214af, five sites) (measured 2026-10-05) |
+| Measured precision     | every finding before the fix wave was a module-scope path in a module a bundle could import, or a test file or ESLint config the override now leaves alone                                         |
+| Plugin                 | `nexus`, in both engines: cohere's rule and Nexus's ESLint twin hold the same rows                                                                                                                 |
+| Auto-fixable           | no                                                                                                                                                                                                 |
+| Needs type information | no                                                                                                                                                                                                 |
 
 ## What it checks
 

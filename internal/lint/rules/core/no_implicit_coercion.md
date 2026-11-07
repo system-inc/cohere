@@ -1,12 +1,12 @@
 # `no-implicit-coercion`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **52** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Maybe**     |
+| Violations in ahra     | **52**        |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -109,4 +109,3 @@ through `!!x` and through a comparison, aliased into a const or not, and never t
 narrowing changes nothing (a call, a `string`, an object), and declines the fix, reporting with a
 suggestion, when the type also holds `0`, `''` or `false` and no comparison means `!!x`. Both of
 the sites above are the declined case, since their types are `string | undefined` and `string | null`.
-

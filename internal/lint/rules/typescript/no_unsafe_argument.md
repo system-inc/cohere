@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unsafe-argument`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **90** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **90**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const imported = await importHmacKey(keyBase64);
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

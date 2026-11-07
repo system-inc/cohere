@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Toggle.tsx",
         "source": "let Button;\n"
     },
-    "assertedMessageIds": [
-        "requireMatchingFileName"
-    ]
+    "assertedMessageIds": ["requireMatchingFileName"]
 }

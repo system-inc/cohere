@@ -1,13 +1,13 @@
 {
-  "rules": {
-    "Go": "cohere-go/concurrency-no-buffered-wait-delay"
-  },
-  "messages": {
-    "bufferedWaitDelay": {
-      "text": "This command sets WaitDelay while its output goes to memory, here or in a caller it is returned to, so exec copies that output through a pipe of its own and Wait stops copying a fixed time after the process exits. A run slow to drain, or a descendant still holding the pipe, then fails with exec.ErrWaitDelay by chance, and the red lands on whoever runs next. Run it with Capture from `{{cure}}`, which reads each stream to its end with no timer, or, if the delay is meant, say why in a `// WaitDelay: <reason>` comment at the end of its line or directly above it."
+    "rules": {
+        "Go": "cohere-go/concurrency-no-buffered-wait-delay"
     },
-    "bufferedWaitDelayWithoutReason": {
-      "text": "This WaitDelay on a buffered command is marked and gives no reason. Say why the delay is safe after `WaitDelay:`, such as the child starting no descendant, or reach for Capture from `{{cure}}` instead, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    "messages": {
+        "bufferedWaitDelay": {
+            "text": "This command sets WaitDelay while its output goes to memory, here or in a caller it is returned to, so exec copies that output through a pipe of its own and Wait stops copying a fixed time after the process exits. A run slow to drain, or a descendant still holding the pipe, then fails with exec.ErrWaitDelay by chance, and the red lands on whoever runs next. Run it with Capture from `{{cure}}`, which reads each stream to its end with no timer, or, if the delay is meant, say why in a `// WaitDelay: <reason>` comment at the end of its line or directly above it."
+        },
+        "bufferedWaitDelayWithoutReason": {
+            "text": "This WaitDelay on a buffered command is marked and gives no reason. Say why the delay is safe after `WaitDelay:`, such as the child starting no descendant, or reach for Capture from `{{cure}}` instead, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+        }
     }
-  }
 }

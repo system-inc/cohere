@@ -1,12 +1,12 @@
 # `no-div-regex`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **1** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                |
+| ---------------------- | -------------- |
+| **Recommendation**     | **Strong Yes** |
+| Violations in ahra     | **1**          |
+| Plugin                 | `eslint core`  |
+| Auto-fixable           | yes            |
+| Needs type information | no             |
 
 ## What it checks
 
@@ -18,7 +18,7 @@ Catches a defect rather than a preference, and the cleanup is small enough to do
 
 ## Violations
 
-1 in the tree. 
+1 in the tree.
 
 **`modules/google/email/EmailApi.ts:455`**
 
@@ -31,4 +31,3 @@ return Buffer.from(message, 'utf-8').toString('base64').replace(/\+/g, '-').repl
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

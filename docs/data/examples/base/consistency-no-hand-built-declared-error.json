@@ -18,7 +18,5 @@
         "file": "/repository/source/Probe.ts",
         "source": "declare class BaseError { constructor(m: string, o?: object); }\nconst e = new BaseError('boom');\n"
     },
-    "assertedMessageIds": [
-        "consistencyNoHandBuiltDeclaredError"
-    ]
+    "assertedMessageIds": ["consistencyNoHandBuiltDeclaredError"]
 }

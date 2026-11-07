@@ -18,7 +18,5 @@
         "file": "/repository/source/Alert.ts",
         "source": "a[o.k](1)\n"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

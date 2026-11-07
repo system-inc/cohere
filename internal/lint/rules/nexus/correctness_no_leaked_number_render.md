@@ -1,13 +1,13 @@
 # `nexus/correctness-no-leaked-number-render`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` once the three Structure sites are fixed.** 3 findings in ahra, 0 false |
-| Findings | **ahra 3**, all in `libraries/structure/` (measured 2026-10-03) |
-| Measured precision | 3 of 3 true to the type. 2 are real bugs, 1 is true but harmless (a `Date.now()` timestamp that is never `0`) |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, the whole rule is a question about the operand's type; without a checker it registers nothing |
+|                        |                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error` once the three Structure sites are fixed.** 3 findings in ahra, 0 false                     |
+| Findings               | **ahra 3**, all in `libraries/structure/` (measured 2026-10-03)                                               |
+| Measured precision     | 3 of 3 true to the type. 2 are real bugs, 1 is true but harmless (a `Date.now()` timestamp that is never `0`) |
+| Plugin                 | cohere-native, `nexus`                                                                                        |
+| Auto-fixable           | no                                                                                                            |
+| Needs type information | yes, the whole rule is a question about the operand's type; without a checker it registers nothing            |
 
 ## What it checks
 
@@ -54,11 +54,11 @@ than by hand: the same rule with the decline removed counts 37 in ahra, 3 plus 3
 
 ## The findings, read one by one
 
-| Site | Type | Reading |
-|---|---|---|
-| `libraries/structure/source/components/forms/fields/multiple-checkbox-grid/FieldInputMultipleCheckboxGrid.tsx:118` | `number \| undefined` | **Bug**: `0` means no cap (the toggle handler at `:54` tests it the same way) and prints "0" under the grid |
-| `libraries/structure/source/components/navigation/pagination/PaginationControls.tsx:109` | `number \| undefined` | **Bug**: an empty table prints "0" where "0 records" or nothing was meant |
-| `libraries/structure/source/ops/developers/web-sockets/WebSocketsPage.tsx:181` | `number \| null` | **True, harmless**: disconnected is `null` and the value is `Date.now()`, so the `0` never occurs; `!== null` says what it means |
+| Site                                                                                                               | Type                  | Reading                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------ | --------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `libraries/structure/source/components/forms/fields/multiple-checkbox-grid/FieldInputMultipleCheckboxGrid.tsx:118` | `number \| undefined` | **Bug**: `0` means no cap (the toggle handler at `:54` tests it the same way) and prints "0" under the grid                      |
+| `libraries/structure/source/components/navigation/pagination/PaginationControls.tsx:109`                           | `number \| undefined` | **Bug**: an empty table prints "0" where "0 records" or nothing was meant                                                        |
+| `libraries/structure/source/ops/developers/web-sockets/WebSocketsPage.tsx:181`                                     | `number \| null`      | **True, harmless**: disconnected is `null` and the value is `Date.now()`, so the `0` never occurs; `!== null` says what it means |
 
 ## Verification
 
@@ -66,9 +66,9 @@ than by hand: the same rule with the decline removed counts 37 in ahra, 3 plus 3
   condition, silent). 21 firing shapes and 25 silent shapes beside them.
 - Mutation check, each mutant a copy through `go test -overlay -count=1`, each killed: a declining part read
   as silent (`a ReactNode`, `a string or a number`); the JSX-child test removed (`an attribute, not a
-  child`); non-zero literals read as leaking (`a number literal union with no zero`, `a non-zero
-  constant`, `a numeric enum with no zero member`); the left of a nested `&&` not followed (`both operands
-  of a chain`); the left of `||` followed when rendered (`an and that an or catches`) and when falsy (`a
-  number on the left of an or in the operand`); the intersection arm dropped (`a branded number`); the
+child`); non-zero literals read as leaking (`a number literal union with no zero`, `a non-zero
+constant`, `a numeric enum with no zero member`); the left of a nested `&&` not followed (`both operands
+of a chain`); the left of `||` followed when rendered (`an and that an or catches`) and when falsy (`a
+number on the left of an or in the operand`); the intersection arm dropped (`a branded number`); the
   constraint arm dropped (`a generic constrained to number`); a ternary's true branch not followed
   (`inside a ternary branch`); the spread test removed (`a spread child`).

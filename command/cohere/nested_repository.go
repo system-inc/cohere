@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/format_files"
 	"github.com/system-inc/cohere/internal/gitignore"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
 /*
@@ -185,6 +186,24 @@ func checkNestedRepositories(engine formatEngine, root string, formatAll bool) (
 	if declaredBelowError != nil {
 		return check, declaredBelowError
 	}
+	// A submodule the root's ignorePatterns name is somebody else's code the repository pins, such as cohere's
+	// TypeScript, typescript-go at a commit, and not its to format: it is not read, and the run says so.
+	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
+	if rootIgnorePatternsError != nil {
+		return check, rootIgnorePatternsError
+	}
+	kept := pending[:0:0]
+	for _, relative := range pending {
+		if configuration.MatchAny(patterns, filepath.ToSlash(relative)) {
+			check.Notes = append(check.Notes, fmt.Sprintf(
+				"note: nested repository %s not read: the root's ignorePatterns match it",
+				filepath.ToSlash(relative),
+			))
+			continue
+		}
+		kept = append(kept, relative)
+	}
+	pending = kept
 	for len(pending) > 0 {
 		relative := pending[0]
 		pending = pending[1:]

@@ -18,7 +18,5 @@
         "file": "/repository/source/Enums.ts",
         "source": "enum Fruit {}\n"
     },
-    "assertedMessageIds": [
-        "mixed"
-    ]
+    "assertedMessageIds": ["mixed"]
 }

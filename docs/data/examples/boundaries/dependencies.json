@@ -1,8 +1,4 @@
 {
     "rule": "boundaries/dependencies",
-    "assertedMessageIds": [
-        "noPolicyAllows",
-        "policyDisallows",
-        "policyMessage"
-    ]
+    "assertedMessageIds": ["noPolicyAllows", "policyDisallows", "policyMessage"]
 }

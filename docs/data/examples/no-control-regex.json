@@ -18,7 +18,5 @@
         "file": "/repository/source/ControlRegex.ts",
         "source": "export const r = /\\f/;"
     },
-    "assertedMessageIds": [
-        "noControlRegex"
-    ]
+    "assertedMessageIds": ["noControlRegex"]
 }

@@ -1,12 +1,12 @@
 # `nexus/correctness-no-discarded-pure-result`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` now.** 0 findings: a guard |
-| Findings | **ahra 0** (measured 2026-10-03; the coverage report lists it under "ran and found nothing" over all 3,795 files) |
-| Measured precision | nothing to measure on the tree; the fixtures carry it |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                 |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error` now.** 0 findings: a guard                                                                                                    |
+| Findings               | **ahra 0** (measured 2026-10-03; the coverage report lists it under "ran and found nothing" over all 3,795 files)                               |
+| Measured precision     | nothing to measure on the tree; the fixtures carry it                                                                                           |
+| Plugin                 | cohere-native, `nexus`                                                                                                                          |
+| Auto-fixable           | no                                                                                                                                              |
 | Needs type information | yes, to tie the method to its declaration in the default library and to read each argument's type; without a checker the rule registers nothing |
 
 ## What it checks

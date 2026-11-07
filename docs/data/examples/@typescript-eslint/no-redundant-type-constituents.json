@@ -18,11 +18,5 @@
         "file": "/repository/source/Types.ts",
         "source": "type T = 1 | 2;\n"
     },
-    "assertedMessageIds": [
-        "errorTypeOverrides",
-        "literalOverridden",
-        "overridden",
-        "overrides",
-        "primitiveOverridden"
-    ]
+    "assertedMessageIds": ["errorTypeOverrides", "literalOverridden", "overridden", "overrides", "primitiveOverridden"]
 }

@@ -18,8 +18,5 @@
         "file": "/repository/source/SecurityNoInterpolatedSqlString.ts",
         "source": "export function open(name: string) {\n    return `WHERE name = '${name}` + `'`;\n}\n"
     },
-    "assertedMessageIds": [
-        "interpolatedSqlString",
-        "interpolatedSqlValue"
-    ]
+    "assertedMessageIds": ["interpolatedSqlString", "interpolatedSqlValue"]
 }

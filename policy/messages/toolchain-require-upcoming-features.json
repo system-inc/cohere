@@ -1,19 +1,19 @@
 {
-  "rules": {
-    "Swift": "cohere-swift/toolchain-require-upcoming-features"
-  },
-  "phrases": {
-    "located": {
-      "found": "",
-      "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
-    }
-  },
-  "messages": {
-    "upcomingFeatureMissing": {
-      "text": "{{target}} does not enable {{features}}. Add {{settings}} to its swiftSettings. {{reasons}}."
+    "rules": {
+        "Swift": "cohere-swift/toolchain-require-upcoming-features"
     },
-    "upcomingFeatureMissingInXcode": {
-      "text": "{{target}} does not enable {{features}}. Set {{settings}} to YES in the target's build settings, in every configuration. {{reasons}}.<<located>>"
+    "phrases": {
+        "located": {
+            "found": "",
+            "notFound": " It points at the first line of {{definition}}, because the target's own line there was not found."
+        }
+    },
+    "messages": {
+        "upcomingFeatureMissing": {
+            "text": "{{target}} does not enable {{features}}. Add {{settings}} to its swiftSettings. {{reasons}}."
+        },
+        "upcomingFeatureMissingInXcode": {
+            "text": "{{target}} does not enable {{features}}. Set {{settings}} to YES in the target's build settings, in every configuration. {{reasons}}.<<located>>"
+        }
     }
-  }
 }

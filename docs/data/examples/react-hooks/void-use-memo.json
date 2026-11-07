@@ -18,8 +18,5 @@
         "file": "component.tsx",
         "source": "const x = useMemo(() => { foo(); }, []);\n"
     },
-    "assertedMessageIds": [
-        "useMemoCallbackReturnsNothing",
-        "useMemoResultUnused"
-    ]
+    "assertedMessageIds": ["useMemoCallbackReturnsNothing", "useMemoResultUnused"]
 }

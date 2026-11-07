@@ -1,13 +1,13 @@
 # `boundaries/dependencies`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, for Base projects: it is the last rule Base's ESLint config enables that cohere lacked |
-| Findings in api-phi-health | **0** under Base's own two blocks, matching ESLint's 0 over the same 2,241 files |
-| Differential | **5,449 of 5,449** identical (location and from/to layer pair) with every policy removed and `default: disallow` |
-| Plugin | eslint-plugin-boundaries 7.2.0, `@boundaries/elements` 3.1.1 (the installed build is the authority) |
-| Auto-fixable | no, and upstream has no fixer |
-| Needs type information | no; reads the program's module resolution |
+|                            |                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**         | **Yes**, for Base projects: it is the last rule Base's ESLint config enables that cohere lacked                  |
+| Findings in api-phi-health | **0** under Base's own two blocks, matching ESLint's 0 over the same 2,241 files                                 |
+| Differential               | **5,449 of 5,449** identical (location and from/to layer pair) with every policy removed and `default: disallow` |
+| Plugin                     | eslint-plugin-boundaries 7.2.0, `@boundaries/elements` 3.1.1 (the installed build is the authority)              |
+| Auto-fixable               | no, and upstream has no fixer                                                                                    |
+| Needs type information     | no; reads the program's module resolution                                                                        |
 
 ## What it checks
 

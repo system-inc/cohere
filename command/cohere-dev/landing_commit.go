@@ -261,6 +261,7 @@ func landingMessage(
 	mainCommit string,
 	commits []branchCommit,
 	gated string,
+	resolution string,
 ) string {
 	var message strings.Builder
 	fmt.Fprintf(&message, "%s\n\n", subject)
@@ -280,6 +281,9 @@ func landingMessage(
 	if merges > 0 {
 		fmt.Fprintf(&message, "- and %s of the branch's own\n", countedMerges(merges))
 	}
+	if resolution != "" {
+		fmt.Fprintf(&message, "\n%s\n", resolution)
+	}
 	fmt.Fprintf(&message, "\n%s\n", gated)
 	return message.String()
 }
@@ -292,7 +296,7 @@ func countedMerges(count int) string {
 }
 
 // mergeOntoMain is the tree a merge of head onto main makes, read without touching any working tree. A merge
-// that conflicts is refused, naming its files.
+// that conflicts is a *mergeConflict, naming its files and the tree git wrote with its markers.
 func mergeOntoMain(worktree string, mainCommit string, head string) (string, error) {
 	// --name-only: the tree, then one line per conflicted file, then a blank line and git's messages.
 	output, gitCombinedError := gitCombined(worktree, "merge-tree", "--write-tree", "--name-only", mainCommit, head)
@@ -309,12 +313,8 @@ func mergeOntoMain(worktree string, mainCommit string, head string) (string, err
 			conflicts = append(conflicts, line)
 		}
 	}
-	if len(conflicts) > 0 {
-		return "", fmt.Errorf(
-			"main at %s conflicts with this work in:\n%s\nmerge main and resolve them, then land again",
-			shortCommit(mainCommit),
-			strings.Join(conflicts, "\n"),
-		)
+	if len(conflicts) > 0 && len(lines) > 0 && lines[0] != "" {
+		return "", &mergeConflict{Main: mainCommit, Tree: strings.TrimSpace(lines[0]), Paths: conflicts}
 	}
 	return "", fmt.Errorf(
 		"merging this work onto main at %s: %w\n%s",

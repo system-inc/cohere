@@ -18,7 +18,5 @@
         "file": "/repository/source/NoContinue.ts",
         "source": "var sum = 0, i = 0; while(i < 10) { if(i > 5) { sum += i; } i++; }"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

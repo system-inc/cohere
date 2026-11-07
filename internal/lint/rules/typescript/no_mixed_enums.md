@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-mixed-enums`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **1** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong Yes**       |
+| Violations in ahra     | **1**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -18,7 +18,7 @@ Catches a defect rather than a preference, and the cleanup is small enough to do
 
 ## Violations
 
-1 in the tree. 
+1 in the tree.
 
 **`libraries/structure/libraries/nexus/source/types/EnumLike.test.ts:415`**
 
@@ -31,4 +31,3 @@ NUMERIC_VALUE = 42,
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

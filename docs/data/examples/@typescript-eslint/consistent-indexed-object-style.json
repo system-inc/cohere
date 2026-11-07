@@ -4,10 +4,7 @@
         "file": "/repository/source/Indexing.ts",
         "source": "type T = Record<string, number>;\n"
     },
-    "assertedMessageIds": [
-        "preferIndexSignature",
-        "preferRecord"
-    ],
+    "assertedMessageIds": ["preferIndexSignature", "preferRecord"],
     "assertsFix": true,
     "assertsSuggestion": true
 }

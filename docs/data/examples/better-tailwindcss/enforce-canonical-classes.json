@@ -20,9 +20,6 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"ml-2\" />;\n"
     },
-    "assertedMessageIds": [
-        "canonicalCollapse",
-        "canonicalSingle"
-    ],
+    "assertedMessageIds": ["canonicalCollapse", "canonicalSingle"],
     "assertsFix": true
 }

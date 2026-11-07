@@ -1,12 +1,12 @@
 # `@typescript-eslint/require-array-sort-compare`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **4** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **4**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -60,4 +60,3 @@ for(const [status, count] of Object.entries(byStatus).sort()) {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -143,6 +143,11 @@ var Thing = 1
 
 /* BUG(kirk): the block form of a note. */
 
+// A command in a one-line block comment is masked, since the comment is read without its delimiters (#0n6zmqq).
+/* git commit --amend NEVER */
+
+/** git push --force NEVER */
+
 // Deprecated: use Thing instead.
 var Older = 1
 

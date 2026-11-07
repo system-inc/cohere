@@ -18,8 +18,5 @@
         "file": "/repository/source/Spread.tsx",
         "source": "const a = <App />;\n"
     },
-    "assertedMessageIds": [
-        "jsxPropsNoSpreadMultiIdentifier",
-        "jsxPropsNoSpreadMultiMemberExpression"
-    ]
+    "assertedMessageIds": ["jsxPropsNoSpreadMultiIdentifier", "jsxPropsNoSpreadMultiMemberExpression"]
 }

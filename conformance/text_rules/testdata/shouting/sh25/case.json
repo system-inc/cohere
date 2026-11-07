@@ -1,0 +1,11 @@
+{
+    "why": "sh25: a command in a one-line block comment is masked, read without its `/*` and `*/` as ESLint reads a comment's value, so the word on it is not shouting",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

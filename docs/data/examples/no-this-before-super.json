@@ -18,7 +18,5 @@
         "file": "/repository/source/Derived.tsx",
         "source": "class A { }"
     },
-    "assertedMessageIds": [
-        "thisBeforeSuper"
-    ]
+    "assertedMessageIds": ["thisBeforeSuper"]
 }

@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unnecessary-type-arguments`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **79** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **79**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ expect(Array.isArray((deeplyNested[1] as NestedConstructorType<object>[])[1])).t
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

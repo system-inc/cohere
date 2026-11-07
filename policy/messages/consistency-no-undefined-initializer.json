@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-undefined-initializer"
-  },
-  "messages": {
-    "restatedZeroValue": {
-      "text": "`{{names}}` starts at `{{values}}`, the zero value Go already gives every `{{type}}`. The initializer adds a token and no meaning, and it costs the reader a moment deciding whether the author meant something by it. Write `var {{names}} {{type}}`, the form Go keeps for a variable that starts at its zero value, and save an initializer for a value that says something."
+    "rules": {
+        "Go": "cohere-go/consistency-no-undefined-initializer"
+    },
+    "messages": {
+        "restatedZeroValue": {
+            "text": "`{{names}}` starts at `{{values}}`, the zero value Go already gives every `{{type}}`. The initializer adds a token and no meaning, and it costs the reader a moment deciding whether the author meant something by it. Write `var {{names}} {{type}}`, the form Go keeps for a variable that starts at its zero value, and save an initializer for a value that says something."
+        }
     }
-  }
 }

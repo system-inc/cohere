@@ -18,8 +18,5 @@
         "file": "Component.tsx",
         "source": "export const A = (p) => <script {...p} />;"
     },
-    "assertedMessageIds": [
-        "noUnwantedPolyfillioDuplicate",
-        "noUnwantedPolyfillioSecurity"
-    ]
+    "assertedMessageIds": ["noUnwantedPolyfillioDuplicate", "noUnwantedPolyfillioSecurity"]
 }

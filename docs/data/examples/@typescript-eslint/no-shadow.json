@@ -18,9 +18,5 @@
         "file": "file.ts",
         "source": "{\n  let a;\n}\nlet a;\n"
     },
-    "assertedMessageIds": [
-        "noEnumShadow",
-        "noShadow",
-        "noShadowGlobal"
-    ]
+    "assertedMessageIds": ["noEnumShadow", "noShadow", "noShadowGlobal"]
 }

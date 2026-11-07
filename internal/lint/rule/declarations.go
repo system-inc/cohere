@@ -100,6 +100,49 @@ func IsDependencyDeclaration(declaration *ast.Node) bool {
 		strings.Contains(strings.ReplaceAll(file.FileName().AsString(), "\\", "/"), "/node_modules/"))
 }
 
+// IsDeclaredInPackage reports whether any declaration of symbol sits in a file of the installed package
+// named packageName, such as `@types/react`. A file's package is read from its path the way the
+// compiler's own modulespecifiers.GetPackageNameFromDirectory reads it, which the shim does not export:
+// the name after the last `/node_modules/`, two segments when scoped. The last one, so a pnpm store's
+// `node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react/index.d.ts` is `@types/react`, and
+// the whole name, so `@types/react-dom` is not `@types/react`. The compiler keeps no other map from a file
+// to its package (see checking.typeDeclaredInDeclarationFile). It answers about files and hands back no
+// node, which the type-reach guard trusts.
+func IsDeclaredInPackage(symbol *ast.Symbol, packageName string) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, declaration := range symbol.Declarations {
+		file := ast.GetSourceFileOfNode(declaration)
+		if file != nil && packageOfFileName(file.FileName().AsString()) == packageName {
+			return true
+		}
+	}
+	return false
+}
+
+// packageOfFileName is the installed package a file belongs to, or "" for a file under no node_modules.
+func packageOfFileName(fileName string) string {
+	normalized := strings.ReplaceAll(fileName, "\\", "/")
+	index := strings.LastIndex(normalized, "/node_modules/")
+	if index < 0 {
+		return ""
+	}
+	rest := normalized[index+len("/node_modules/"):]
+	if rest == "" || rest[0] == '.' {
+		return ""
+	}
+	name, path, _ := strings.Cut(rest, "/")
+	if name[0] != '@' {
+		return name
+	}
+	scope, _, _ := strings.Cut(path, "/")
+	if scope == "" {
+		return ""
+	}
+	return name + "/" + scope
+}
+
 // HasDeclarations reports whether the checker supplied any declarations, without exposing syntax.
 func HasDeclarations(symbol *ast.Symbol) bool {
 	return symbol != nil && len(symbol.Declarations) != 0

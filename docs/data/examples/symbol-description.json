@@ -18,7 +18,5 @@
         "file": "/repository/source/SymbolDescription.ts",
         "source": "Date();\n"
     },
-    "assertedMessageIds": [
-        "expected"
-    ]
+    "assertedMessageIds": ["expected"]
 }

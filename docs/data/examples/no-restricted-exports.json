@@ -1,7 +1,4 @@
 {
     "rule": "no-restricted-exports",
-    "assertedMessageIds": [
-        "restrictedDefault",
-        "restrictedNamed"
-    ]
+    "assertedMessageIds": ["restrictedDefault", "restrictedNamed"]
 }

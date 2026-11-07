@@ -1,12 +1,12 @@
 # `max-classes-per-file`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **18** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Maybe**     |
+| Violations in ahra     | **18**        |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## Where cohere differs from ESLint
 
@@ -67,4 +67,3 @@ import type { ConstructorType } from '@nexus/source/types/ClassTypes';
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

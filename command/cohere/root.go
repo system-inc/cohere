@@ -64,6 +64,11 @@ const (
 
 	// engineGo is the Go engine, over a workspace a go.work defines or a module a go.mod does.
 	engineGo projectEngine = "Go"
+
+	// engineFormat is this binary's format phase alone, at a repository root no TypeScript project holds: the
+	// JSON, Markdown and the rest the house formatter reads there, which no other engine formats. It has no
+	// marker, since discovery adds it (see addRootFormatProject).
+	engineFormat projectEngine = "Format"
 )
 
 // locationRequest is what the command line said, before anything was resolved.

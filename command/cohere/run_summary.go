@@ -29,6 +29,10 @@ type runSummary struct {
 	// Label is the project's path in a repository with several. Empty for a project checked on its own.
 	Label string
 
+	// FormatProject is whether this is the format project of a root no TypeScript project holds, which has no
+	// program, so the type check and the lint rules it never runs are no gap in it.
+	FormatProject bool
+
 	// Total is the run's wall clock, the number a developer waited for.
 	Total time.Duration
 	// Graph is how long reading, parsing and binding the program took, zero when no graph was built.

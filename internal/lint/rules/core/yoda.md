@@ -1,12 +1,12 @@
 # `yoda`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **7** |
-| Plugin | `eslint core` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Maybe**     |
+| Violations in ahra     | **7**         |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ else if(180 <= hue && hue < 240) {
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

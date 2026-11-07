@@ -19,10 +19,6 @@
         "file": "/repository/source/Await.ts",
         "source": "await using foo = 3 as any;\n\nexport {};\n"
     },
-    "assertedMessageIds": [
-        "await",
-        "awaitUsingOfNonAsyncDisposable",
-        "forAwaitOfNonAsyncIterable"
-    ],
+    "assertedMessageIds": ["await", "awaitUsingOfNonAsyncDisposable", "forAwaitOfNonAsyncIterable"],
     "assertsSuggestion": true
 }

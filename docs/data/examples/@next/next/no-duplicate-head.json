@@ -18,7 +18,5 @@
         "file": "components/Shell.tsx",
         "source": "const a = <div><Head/><Head/></div>\n"
     },
-    "assertedMessageIds": [
-        "noDuplicateHead"
-    ]
+    "assertedMessageIds": ["noDuplicateHead"]
 }

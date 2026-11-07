@@ -230,7 +230,15 @@ func beginRunCacheSession(
 	identity := cacheTableIdentity()
 	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
 	// table's bytes where the whole table was all of them (#45ekc65).
-	invocation := program.CacheTableInvocation(os.Args[1:])
+	//
+	// A child of discovery's is named by its engine too. A Go workspace and the format project at one root are
+	// given the same arguments, and they share this directory's table, so one name would hold whichever
+	// recorded last and each would miss the other's run every time.
+	invocationArguments := os.Args[1:]
+	if engine := os.Getenv(projectEngineVariable); engine != "" {
+		invocationArguments = append(slices.Clone(invocationArguments), projectEngineVariable+"="+engine)
+	}
+	invocation := program.CacheTableInvocation(invocationArguments)
 	table, readCacheTableError := program.ReadCacheTable(
 		directory,
 		identity,

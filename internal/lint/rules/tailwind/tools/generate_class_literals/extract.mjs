@@ -28,7 +28,7 @@ import * as NodeUrl from 'node:url';
 import { locate } from '../corpus.mjs';
 
 const [packagesArgument, casesArgument] = process.argv.slice(2);
-if (!packagesArgument || !casesArgument) {
+if(!packagesArgument || !casesArgument) {
     throw new Error('usage: node extract.mjs <packages> <cases.json>');
 }
 
@@ -39,8 +39,13 @@ const requireFromPackages = NodeModule.createRequire(NodePath.join(packagesRoot,
  * The plugin's exports map names neither its package.json nor its lib modules, so its directory is
  * found from its entry, lib/configs/config.js, and its modules are imported by path.
  */
-const pluginLibrary = NodePath.resolve(NodePath.dirname(requireFromPackages.resolve('eslint-plugin-better-tailwindcss')), '..');
-const pluginVersion = JSON.parse(NodeFileSystem.readFileSync(NodePath.join(pluginLibrary, '..', 'package.json'), 'utf8')).version;
+const pluginLibrary = NodePath.resolve(
+    NodePath.dirname(requireFromPackages.resolve('eslint-plugin-better-tailwindcss')),
+    '..',
+);
+const pluginVersion = JSON.parse(
+    NodeFileSystem.readFileSync(NodePath.join(pluginLibrary, '..', 'package.json'), 'utf8'),
+).version;
 const importFromLibrary = (path) => import(NodeUrl.pathToFileURL(NodePath.join(pluginLibrary, path)).href);
 
 const { createRule } = await importFromLibrary('utils/rule.js');
@@ -62,10 +67,10 @@ const probe = createRule({
 
 const cases = JSON.parse(NodeFileSystem.readFileSync(NodePath.resolve(casesArgument), 'utf8'));
 const results = [];
-for (const testCase of cases) {
+for(const testCase of cases) {
     const code = testCase.code.join('\n');
     // ESLint's ranges count UTF-16 units and typescript-go's count bytes. They agree on ASCII alone.
-    if (!/^[\x00-\x7f]*$/.test(code)) {
+    if(!/^[\x00-\x7f]*$/.test(code)) {
         throw new Error(`case "${testCase.name}" is not ASCII, so its ranges would not compare`);
     }
     captured = [];
@@ -83,7 +88,7 @@ for (const testCase of cases) {
         ],
         'Case.tsx',
     );
-    if (messages.length > 0) {
+    if(messages.length > 0) {
         throw new Error(`case "${testCase.name}": ${messages.map((message) => message.message).join('; ')}`);
     }
 
@@ -91,9 +96,9 @@ for (const testCase of cases) {
     // reach is linted twice. The comparison is of which strings are read, so it is a set.
     const seen = new Set();
     const literals = [];
-    for (const literal of captured) {
+    for(const literal of captured) {
         const key = `${literal.range[0]}:${literal.range[1]}`;
-        if (seen.has(key)) {
+        if(seen.has(key)) {
             continue;
         }
         seen.add(key);

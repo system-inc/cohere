@@ -19,8 +19,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "export let value!: number;\n"
     },
-    "assertedMessageIds": [
-        "noNonNullOptionalChain"
-    ],
+    "assertedMessageIds": ["noNonNullOptionalChain"],
     "assertsSuggestion": true
 }

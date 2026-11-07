@@ -18,7 +18,5 @@
         "file": "/repository/source/Entity.ts",
         "source": "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nnamespace N { export function OrmColumn(o?: any): any { return null; } }\nclass A { @N.OrmColumn({ nullable: true }) x!: string; }\n"
     },
-    "assertedMessageIds": [
-        "columnNullableButTypeNot"
-    ]
+    "assertedMessageIds": ["columnNullableButTypeNot"]
 }

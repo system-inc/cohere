@@ -4,6 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -316,5 +319,90 @@ func TestIsResolvedSymbolRequiresADeclaration(test *testing.T) {
 	}
 	if rule.IsResolvedSymbol(nil, own) {
 		test.Fatal("a missing checker established ownership")
+	}
+}
+
+// IsDeclaredInPackage names a file's package from the last node_modules on its path, whole and scoped, so
+// a pnpm store's copy of a package is that package and a package whose name only starts the same is not.
+// Each probe file declares one global, and a symbol is built over the declarations a case names, in both
+// orders where it holds two.
+func TestIsDeclaredInPackageReadsTheFilesPackage(test *testing.T) {
+	test.Parallel()
+	const typesReact = "node_modules/@types/react/index.d.ts"
+	const pnpmCopy = "node_modules/.pnpm/@types+react@19.3.0/node_modules/@types/react/global.d.ts"
+	const nestedCopy = "node_modules/kit/node_modules/@types/react/index.d.ts"
+	const typesReactDom = "node_modules/@types/react-dom/index.d.ts"
+	const fiber = "node_modules/@react-three/fiber/three-types.d.ts"
+	const react = "node_modules/react/index.d.ts"
+	const ours = "subject.ts"
+	directory := test.TempDir()
+	files := []string{typesReact, pnpmCopy, nestedCopy, typesReactDom, fiber, react, ours}
+	quoted := make([]string, 0, len(files))
+	for index, name := range files {
+		path := filepath.Join(directory, name)
+		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
+			test.Fatal(createDirectoryError)
+		}
+		contents := "declare const declaredIn" + strconv.Itoa(index) + ": number;\n"
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		quoted = append(quoted, strconv.Quote(name))
+	}
+	// Listed by name, since an include pattern skips node_modules.
+	configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, ` +
+		`"files": [` + strings.Join(quoted, ", ") + `]}`
+	configurationPath := filepath.Join(directory, "tsconfig.json")
+	if writeError := os.WriteFile(configurationPath, []byte(configuration), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   configurationPath,
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
+	if buildError != nil {
+		test.Fatal(buildError)
+	}
+	declarationIn := map[string]*ast.Node{}
+	for _, sourceFile := range graph.Program.SourceFiles() {
+		relative, relativeError := filepath.Rel(directory, sourceFile.FileName().AsString())
+		if relativeError == nil && slices.Contains(files, filepath.ToSlash(relative)) {
+			declarationIn[filepath.ToSlash(relative)] = sourceFile.Statements.Nodes[0]
+		}
+	}
+	if len(declarationIn) != len(files) {
+		test.Fatalf("the probe program holds %d of the %d files", len(declarationIn), len(files))
+	}
+
+	for _, testCase := range []struct {
+		name  string
+		files []string
+		want  bool
+	}{
+		{"the package's own directory", []string{typesReact}, true},
+		{"a pnpm store's copy", []string{pnpmCopy}, true},
+		{"a copy nested under another package", []string{nestedCopy}, true},
+		{"a package whose name starts the same", []string{typesReactDom}, false},
+		{"another scoped package", []string{fiber}, false},
+		{"the unscoped package of the same name", []string{react}, false},
+		{"our own source", []string{ours}, false},
+		{"merged, the package's first", []string{typesReact, fiber}, true},
+		{"merged, the package's last", []string{fiber, typesReact}, true},
+		{"no declarations", nil, false},
+	} {
+		symbol := &ast.Symbol{}
+		for _, name := range testCase.files {
+			symbol.Declarations = append(symbol.Declarations, declarationIn[name])
+		}
+		if got := rule.IsDeclaredInPackage(symbol, "@types/react"); got != testCase.want {
+			test.Errorf("%s: got %v, want %v", testCase.name, got, testCase.want)
+		}
+	}
+	if !rule.IsDeclaredInPackage(&ast.Symbol{Declarations: []*ast.Node{declarationIn[fiber]}}, "@react-three/fiber") {
+		test.Error("a scoped package other than @types/react was not named by its two segments")
+	}
+	if rule.IsDeclaredInPackage(nil, "@types/react") {
+		test.Error("a nil symbol was declared in a package")
 	}
 }

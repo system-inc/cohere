@@ -1,12 +1,12 @@
 # `nexus/consistency-no-iso-string-date-cut`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, registered `off` until the sites are fixed.** Turning it on at `error` today puts 80 findings on ahra |
-| Findings | **ahra 80** (measured 2026-10-03) |
-| Measured precision | 80 of 80: every finding is a `toISOString()` string cut to its date part, which is the violation by definition |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, registered `off` until the sites are fixed.** Turning it on at `error` today puts 80 findings on ahra                                            |
+| Findings               | **ahra 80** (measured 2026-10-03)                                                                                                                       |
+| Measured precision     | 80 of 80: every finding is a `toISOString()` string cut to its date part, which is the violation by definition                                          |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                  |
+| Auto-fixable           | no                                                                                                                                                      |
 | Needs type information | yes, to resolve `toISOString` to the default library's `Date` method and a `const` to its one declaration; without a checker the rule registers nothing |
 
 ## Name
@@ -48,12 +48,12 @@ meant UTC the fix is a rename to `dateIso8601(date, 'UTC')`.
 The rule was first built as a correctness rule, reporting only where the code itself proves local
 intent. That version found these, and they remain the motivation:
 
-| Site | Bug |
-|---|---|
-| `app/api/finance/route.ts:48` (`recentWindowSinceIso`) | `setDate(getDate() - 30)` in local days, then the UTC slice: the dashboard's 30-day feed starts a day late in the evening |
-| `modules/finance/FinanceApi.ts:474` (`computeMonthlyBurn`) | same; the burn window loses its first local day |
-| `modules/finance/FinanceAnalysisWindow.ts:45` | same, on a copy of the caller's `today`; the rolling founder window |
-| `modules/finance/FinanceTransactionsCommandLineInterface.ts:270` | same; `--window N` cashflow |
+| Site                                                                  | Bug                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/api/finance/route.ts:48` (`recentWindowSinceIso`)                | `setDate(getDate() - 30)` in local days, then the UTC slice: the dashboard's 30-day feed starts a day late in the evening                                                                                                                                                              |
+| `modules/finance/FinanceApi.ts:474` (`computeMonthlyBurn`)            | same; the burn window loses its first local day                                                                                                                                                                                                                                        |
+| `modules/finance/FinanceAnalysisWindow.ts:45`                         | same, on a copy of the caller's `today`; the rolling founder window                                                                                                                                                                                                                    |
+| `modules/finance/FinanceTransactionsCommandLineInterface.ts:270`      | same; `--window N` cashflow                                                                                                                                                                                                                                                            |
 | `modules/finance/FinanceCommandLineInterfaceShared.ts:56` (`today()`) | "the default as-of for every dated write verb": its six callers (`transactions add --date`, four `position` verbs, `holdings`, each `--as-of`) stamp an evening write with tomorrow's date. The intent is in its doc comment, not its code, which is why only a shape ban can reach it |
 
 The site-by-site pass for this rewrite (`sites.tsv` in the build scratch directory) found five more where
@@ -79,7 +79,7 @@ exact definition is not recorded, so why it landed on 77 rather than 75 or 80 ca
 - **Local, 10**: the 4 finance windows and `today()` above, plus the 5 local pairings.
 - **UTC, 22**: provably UTC (`T00:00:00Z` or UTC-noon anchors with `setUTCDate`, `getUTCFullYear` on the
   same Date, a UTC time from the same string) or documented UTC at the site. Fix: `dateIso8601(date,
-  'UTC')`. Three of these, the finance `isoDay` view helpers, are documented UTC but fed `new Date()` and
+'UTC')`. Three of these, the finance `isoDay` view helpers, are documented UTC but fed `new Date()` and
   date-picker ranges, so their end bound is worth a look in the fix pass.
 - **Unstated, 48**: the zone is never stated; 20 of them are `new Date()` as an as-of or today, the rest
   API timestamps and listing dates.

@@ -8,6 +8,7 @@
 package testing_no_timing_assertion
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -35,7 +36,8 @@ var Analyzer = &analysis.Analyzer{
 		"assertion: <reason> comment directly above the if says why it holds under load. A busy machine makes such " +
 		"a test fail by chance. Date math between times not read from the clock, context deadlines and benchmarks " +
 		"are not judged.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -60,12 +62,16 @@ var failureMethods = map[string]bool{
 }
 
 func run(pass *analysis.Pass) (any, error) {
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
-		comments := marker.NewIndex(pass.Fset, file)
+		comments := indexes.ForFile(file)
 		for _, declaration := range file.Decls {
 			function, isFunction := declaration.(*ast.FuncDecl)
 			if !isFunction || !isTest(pass, function) {

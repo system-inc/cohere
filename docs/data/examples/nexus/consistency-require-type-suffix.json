@@ -18,9 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const maximumRetries = 3;\n"
     },
-    "assertedMessageIds": [
-        "noConstEnumSuffix",
-        "noInterfaceSuffix",
-        "noTypeAliasSuffix"
-    ]
+    "assertedMessageIds": ["noConstEnumSuffix", "noInterfaceSuffix", "noTypeAliasSuffix"]
 }

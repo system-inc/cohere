@@ -4,8 +4,5 @@
         "file": "/repository/source/Declarations.ts",
         "source": "foo = true;"
     },
-    "assertedMessageIds": [
-        "initialized",
-        "notInitialized"
-    ]
+    "assertedMessageIds": ["initialized", "notInitialized"]
 }

@@ -1,12 +1,12 @@
 # `react/jsx-max-depth`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1111** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | **1111**              |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ It is an arbitrary structural-complexity cap, not formatting, so Prettier is not
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -30,7 +30,7 @@
 import { loadDesignSystem, parseCandidate } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: enumerate.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -78,28 +78,28 @@ const probes = [
 function flatten(node) {
     const declarations = [];
     const queue = [node];
-    while (queue.length > 0) {
+    while(queue.length > 0) {
         const current = queue.shift();
-        if (!current) continue;
-        if (current.kind === 'declaration') {
+        if(!current) continue;
+        if(current.kind === 'declaration') {
             declarations.push({ property: current.property, value: current.value ?? null });
             continue;
         }
-        if (current.kind === 'rule' || current.kind === 'at-rule') {
-            for (const child of current.nodes ?? []) queue.push(child);
+        if(current.kind === 'rule' || current.kind === 'at-rule') {
+            for(const child of current.nodes ?? []) queue.push(child);
         }
     }
     return declarations;
 }
 
 const entries = [];
-for (const probe of probes) {
+for(const probe of probes) {
     const candidate = parseCandidate(designSystem, probe.className);
     let declarations = null;
-    if (candidate) {
+    if(candidate) {
         try {
             const nodes = designSystem.compileAstNodes(candidate);
-            if (nodes && nodes.length > 0) declarations = flatten(nodes[0].node);
+            if(nodes && nodes.length > 0) declarations = flatten(nodes[0].node);
         }
         catch {
             declarations = null;
@@ -115,16 +115,25 @@ for (const probe of probes) {
 }
 
 const rejected = entries.filter((entry) => entry.declarations === null).length;
-if (rejected === 0) {
-    process.stderr.write('enumerate.mjs: no probe was rejected, so the branches that must produce nothing are unexercised and a passing comparison would mean nothing\n');
+if(rejected === 0) {
+    process.stderr.write(
+        'enumerate.mjs: no probe was rejected, so the branches that must produce nothing are unexercised and a passing comparison would mean nothing\n',
+    );
     process.exit(4);
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    groundTruth: 'compileAstNodes declarations; resolution is observed through its effect rather than read directly',
-    probeCount: entries.length,
-    rejectedCount: rejected,
-    probes: entries,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            groundTruth:
+                'compileAstNodes declarations; resolution is observed through its effect rather than read directly',
+            probeCount: entries.length,
+            rejectedCount: rejected,
+            probes: entries,
+        },
+        null,
+        2,
+    ) + '\n',
+);

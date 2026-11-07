@@ -18,7 +18,5 @@
         "file": "/repository/source/MaxClassesPerFile.ts",
         "source": "var x = 5;"
     },
-    "assertedMessageIds": [
-        "maximumExceeded"
-    ]
+    "assertedMessageIds": ["maximumExceeded"]
 }

@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-use-before-define"
-  },
-  "messages": {
-    "useBeforeDefinition": {
-      "text": "`{{name}}` is a package-level {{kind}} declared further down this file, so a reader meets the name here before they have seen what it holds, and has to scroll away to find out. Go accepts the order, but the next reader goes down the file. Move the declaration above its first use, near the top of the file with the other package-level values."
+    "rules": {
+        "Go": "cohere-go/consistency-no-use-before-define"
+    },
+    "messages": {
+        "useBeforeDefinition": {
+            "text": "`{{name}}` is a package-level {{kind}} declared further down this file, so a reader meets the name here before they have seen what it holds, and has to scroll away to find out. Go accepts the order, but the next reader goes down the file. Move the declaration above its first use, near the top of the file with the other package-level values."
+        }
     }
-  }
 }

@@ -34,7 +34,7 @@ import * as NodePath from 'node:path';
 import * as NodeUrl from 'node:url';
 
 const [, , entryPointArgument, projectRootArgument] = process.argv;
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: enumerate.mjs <theme.css> [projectRoot]\n');
     process.exit(2);
 }
@@ -85,17 +85,17 @@ function resolveModuleUrl(specifier, directory) {
  * package the caller named.
  */
 function resolveStylesheet(specifier, directory) {
-    if (specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
+    if(specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
         return NodePath.resolve(directory, specifier);
     }
     const requireFromDirectory = NodeModule.createRequire(NodePath.join(projectRoot, 'noop.js'));
-    if (specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
+    if(specifier.endsWith('.css')) return requireFromDirectory.resolve(specifier);
 
     const packageJsonPath = requireFromDirectory.resolve(specifier + '/package.json');
     const packageJson = JSON.parse(NodeFileSystem.readFileSync(packageJsonPath, 'utf8'));
     const rootExport = packageJson.exports?.['.'] ?? packageJson.exports;
     const styleEntry = (typeof rootExport === 'object' ? rootExport?.style : undefined) ?? packageJson.style;
-    if (!styleEntry) return requireFromDirectory.resolve(specifier);
+    if(!styleEntry) return requireFromDirectory.resolve(specifier);
     return NodePath.join(NodePath.dirname(packageJsonPath), styleEntry);
 }
 
@@ -106,7 +106,7 @@ const designSystem = await tailwindModule.__unstable__loadDesignSystem(
     NodeFileSystem.readFileSync(entryPointPath, 'utf8'),
     {
         base: entryDirectory,
-        loadModule: async function (specifier, base, resourceType) {
+        loadModule: async function(specifier, base, resourceType) {
             try {
                 const requireFromBase = NodeModule.createRequire(NodePath.join(base, 'noop.js'));
                 const resolved = requireFromBase.resolve(specifier);
@@ -117,7 +117,7 @@ const designSystem = await tailwindModule.__unstable__loadDesignSystem(
                 return { base, module: resourceType === 'config' ? {} : () => {} };
             }
         },
-        loadStylesheet: async function (specifier, base) {
+        loadStylesheet: async function(specifier, base) {
             try {
                 const resolved = resolveStylesheet(specifier, base);
                 return { base: NodePath.dirname(resolved), content: NodeFileSystem.readFileSync(resolved, 'utf8') };
@@ -200,9 +200,9 @@ function parseCandidate(className) {
 const classOrder = [];
 const functionalRoots = new Set();
 const staticUtilities = new Set();
-for (const entry of designSystem.getClassList?.() ?? []) {
+for(const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
+    if(typeof name !== 'string') continue;
 
     // A name can be BOTH, and choosing one loses the other. `flex` is the static utility
     // `display: flex` and also the functional root of `flex-4`, which is `flex: 4`; `block` is
@@ -212,12 +212,12 @@ for (const entry of designSystem.getClassList?.() ?? []) {
     // silently stopped `flex block` being reported as a display conflict, which is the headline
     // case of the rule this data feeds.
     const asStatic = parseCandidate(name);
-    if (asStatic?.kind === 'static') {
+    if(asStatic?.kind === 'static') {
         staticUtilities.add(name);
     }
 
     const asFunctional = parseCandidate(name + '-4');
-    if (asFunctional?.kind === 'functional' && asFunctional.root) {
+    if(asFunctional?.kind === 'functional' && asFunctional.root) {
         functionalRoots.add(asFunctional.root);
     }
 
@@ -248,8 +248,8 @@ for (const entry of designSystem.getClassList?.() ?? []) {
  * no class has no reading to carry, and `max-w-screen` is registered both ways and already reaches
  * the static table through the class list above.
  */
-for (const root of designSystem.utilities?.keys?.('functional') ?? []) {
-    if (typeof root !== 'string') continue;
+for(const root of designSystem.utilities?.keys?.('functional') ?? []) {
+    if(typeof root !== 'string') continue;
     functionalRoots.add(root);
 }
 
@@ -271,28 +271,28 @@ const roots = Array.from(functionalRoots).sort();
     const seenReading = new Map();
     const exceptions = [];
 
-    for (const entry of designSystem.getClassList?.() ?? []) {
+    for(const entry of designSystem.getClassList?.() ?? []) {
         const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-        if (typeof name !== 'string') continue;
+        if(typeof name !== 'string') continue;
 
         const candidate = parseCandidate(name);
-        if (!candidate) continue;
+        if(!candidate) continue;
         const properties = orderingProperties(name);
-        if (properties === null) continue;
+        if(properties === null) continue;
 
-        if (candidate.kind === 'static') {
+        if(candidate.kind === 'static') {
             orderingByStatic.push({ name, properties });
             continue;
         }
-        if (!candidate.root) continue;
+        if(!candidate.root) continue;
 
         const joined = properties.join(',');
-        if (!seenRoot.has(candidate.root)) {
+        if(!seenRoot.has(candidate.root)) {
             seenRoot.set(candidate.root, joined);
             orderingByRoot.push({ name: candidate.root, properties });
             continue;
         }
-        if (seenRoot.get(candidate.root) === joined) continue;
+        if(seenRoot.get(candidate.root) === joined) continue;
 
         /*
          * One entry per distinct reading, not per class that differs.
@@ -317,7 +317,7 @@ const roots = Array.from(functionalRoots).sort();
          * distinct reading per root rather than one per class, which is 65 rows rather than 24,161.
          */
         const readingKey = candidate.root + '\u0000' + joined;
-        if (seenReading.has(readingKey)) continue;
+        if(seenReading.has(readingKey)) continue;
         seenReading.set(readingKey, true);
         /*
          * Two key shapes, because two different things vary.
@@ -339,7 +339,6 @@ const roots = Array.from(functionalRoots).sort();
     exceptions.sort((left, right) => left.name.localeCompare(right.name));
     orderingByClass.push(...exceptions);
 }
-
 
 const propertyOrder = [];
 const variantOrder = [];
@@ -366,8 +365,8 @@ const variantOrder = [];
     }
 
     const orderMatch = bundleSource.match(/\["container-type","pointer-events"[^\]]*\]/);
-    if (orderMatch !== null) {
-        for (const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
+    if(orderMatch !== null) {
+        for(const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
     }
 
     /*
@@ -387,9 +386,9 @@ const variantOrder = [];
     {
         const variantNames = [];
         try {
-            for (const variant of designSystem.getVariants?.() ?? []) {
+            for(const variant of designSystem.getVariants?.() ?? []) {
                 const name = typeof variant === 'string' ? variant : variant?.name;
-                if (typeof name === 'string') variantNames.push(name);
+                if(typeof name === 'string') variantNames.push(name);
             }
         }
         catch {
@@ -402,7 +401,7 @@ const variantOrder = [];
          * are absent from it and fell to the unknown sentinel, which sorted every one of them after
          * every known variant instead of in its own place.
          */
-        for (const name of [...variantNames]) {
+        for(const name of [...variantNames]) {
             variantNames.push('group-' + name, 'peer-' + name);
         }
 
@@ -417,14 +416,13 @@ const variantOrder = [];
                 }
             });
 
-        for (const [className] of designSystem
+        for(const [className] of designSystem
             .getClassOrder(probes)
             .filter(([, position]) => position !== null)
             .sort((left, right) => (left[1] < right[1] ? -1 : left[1] > right[1] ? 1 : 0))) {
             variantOrder.push(className.slice(0, className.lastIndexOf(':') + 1));
         }
     }
-
 }
 
 const unreachableRoots = [];
@@ -443,7 +441,6 @@ const unreachableRoots = [];
  * `getClassList()` already enumerates.
  */
 
-
 /*
  * A real class for each root, taken from the design system's own class list.
  *
@@ -456,16 +453,15 @@ const unreachableRoots = [];
  * where a choice exists; this is the fallback that makes "unreachable" mean genuinely unreachable.
  */
 const exampleClassByRoot = new Map();
-for (const entry of designSystem.getClassList?.() ?? []) {
+for(const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
+    if(typeof name !== 'string') continue;
 
     const candidate = parseCandidate(name);
-    if (candidate?.kind !== 'functional' || !candidate.root) continue;
-    if (exampleClassByRoot.has(candidate.root)) continue;
+    if(candidate?.kind !== 'functional' || !candidate.root) continue;
+    if(exampleClassByRoot.has(candidate.root)) continue;
     exampleClassByRoot.set(candidate.root, name);
 }
-
 
 /*
  * The probe values.
@@ -493,10 +489,13 @@ const probeValues = ['4', '2', 'md', 'sm', 'lg', 'full', 'px'];
  *
  * Memoized because the loop asks about each root roughly 327 times, once per option set.
  */
-const soloRewrites = new Map([[canonicalizeOptions, new Map()], [physicalOnlyOptions, new Map()]]);
+const soloRewrites = new Map([
+    [canonicalizeOptions, new Map()],
+    [physicalOnlyOptions, new Map()],
+]);
 function rewritesAlone(className, options) {
     const memo = soloRewrites.get(options);
-    if (memo.has(className)) return memo.get(className);
+    if(memo.has(className)) return memo.get(className);
 
     let answer = false;
     try {
@@ -524,7 +523,7 @@ function collapseOf(rootA, rootB, value, options) {
 
     // A class that rewrites alone poisons the pair test, because its rewrite appears in the output
     // whether or not the other class had anything to do with it.
-    if (rewritesAlone(classA, options) || rewritesAlone(classB, options)) return null;
+    if(rewritesAlone(classA, options) || rewritesAlone(classB, options)) return null;
 
     let result;
     try {
@@ -537,12 +536,12 @@ function collapseOf(rootA, rootB, value, options) {
 
     const inputs = [classA, classB];
     const invented = result.filter((className) => !inputs.includes(className));
-    if (invented.length !== 1) return null;
+    if(invented.length !== 1) return null;
 
     // Both inputs must be load-bearing: removing either one has to stop the collapse happening.
     // Without this, a class that rewrites in company with anything would read as a family with
     // every root it was paired against.
-    for (const soleInput of inputs) {
+    for(const soleInput of inputs) {
         let alone;
         try {
             alone = designSystem.canonicalizeCandidates([soleInput], options);
@@ -550,13 +549,13 @@ function collapseOf(rootA, rootB, value, options) {
         catch {
             return null;
         }
-        if (alone.includes(invented[0])) return null;
+        if(alone.includes(invented[0])) return null;
     }
 
     // Read the output's own root back through the parser, so the table stores a root rather than a
     // root-plus-the-value-we-happened-to-probe-with.
     const outputCandidate = parseCandidate(invented[0]);
-    if (outputCandidate?.kind === 'functional' && outputCandidate.root) return outputCandidate.root;
+    if(outputCandidate?.kind === 'functional' && outputCandidate.root) return outputCandidate.root;
     return null;
 }
 
@@ -568,21 +567,25 @@ let pairsProbed = 0;
 
 // The first probe value at which a pair collapses under one option set, and what it becomes.
 function firstCollapse(rootA, rootB, options) {
-    for (const value of probeValues) {
+    for(const value of probeValues) {
         const outputRoot = collapseOf(rootA, rootB, value, options);
-        if (outputRoot !== null) return { output: outputRoot, value };
+        if(outputRoot !== null) return { output: outputRoot, value };
     }
     return null;
 }
 
-for (let indexA = 0; indexA < roots.length; indexA++) {
-    for (let indexB = indexA + 1; indexB < roots.length; indexB++) {
+for(let indexA = 0; indexA < roots.length; indexA++) {
+    for(let indexB = indexA + 1; indexB < roots.length; indexB++) {
         pairsProbed++;
         const withLogical = firstCollapse(roots[indexA], roots[indexB], canonicalizeOptions);
         const withoutLogical = firstCollapse(roots[indexA], roots[indexB], physicalOnlyOptions);
-        if (withLogical === null) {
-            if (withoutLogical !== null) {
-                physicalOnlyFamilies.push({ inputs: [roots[indexA], roots[indexB]], output: withoutLogical.output, discoveredAtValue: withoutLogical.value });
+        if(withLogical === null) {
+            if(withoutLogical !== null) {
+                physicalOnlyFamilies.push({
+                    inputs: [roots[indexA], roots[indexB]],
+                    output: withoutLogical.output,
+                    discoveredAtValue: withoutLogical.value,
+                });
             }
             continue;
         }
@@ -614,7 +617,7 @@ families.sort((left, right) => left.inputs.join(' ').localeCompare(right.inputs.
 // valueTextOf renders a candidate's value as the plain text a color name would match.
 function valueTextOf(candidate) {
     const value = candidate?.value;
-    if (!value || value.kind === 'arbitrary') return '';
+    if(!value || value.kind === 'arbitrary') return '';
     const text = String(value.value ?? '');
     const slash = text.indexOf('/');
     return slash >= 0 ? text.slice(0, slash) : text;
@@ -628,11 +631,11 @@ function orderingProperties(className) {
     catch {
         return null;
     }
-    if (!compiled || !compiled[0]) return null;
+    if(!compiled || !compiled[0]) return null;
 
     const beforeAtRules = compiled[0].split('@')[0];
     const bodies = Array.from(beforeAtRules.matchAll(/\{([^{}]*)\}/g)).map((match) => match[1]);
-    if (bodies.length === 0) return null;
+    if(bodies.length === 0) return null;
 
     const properties = bodies
         .flatMap((body) => Array.from(body.matchAll(/([-a-zA-Z]+)\s*:\s*[^;]+;/g)))

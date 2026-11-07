@@ -51,23 +51,116 @@ export const DataTypeNames = [
 // independently valid for the type it is hinted as, which keeps a hint from being the only thing
 // making the probe work.
 const representativeByType = {
-    'color': ['red', 'blue', 'rebeccapurple', '#fff', '#ffff', '#112233', '#11223344', 'rgb(1_2_3)', 'rgb(1_2_3_/_0.5)', 'rgba(1,2,3,0.5)', 'hsl(1_2%_3%)', 'hsla(1,2%,3%,0.5)', 'hwb(1_2%_3%)', 'lab(1_2_3)', 'lch(1_2_3)', 'oklab(0.5_0.1_0.2)', 'oklch(0.5_0.1_20)', 'color(display-p3_1_0_0)', 'color-mix(in_oklab,red,blue)', 'light-dark(red,blue)', 'transparent', 'currentcolor', 'canvastext', 'buttonface', 'accentcolor'],
-    'length': ['3px', '2rem', '0', '1.5em', '10vh', '10vw', '100vmax', '100vmin', '0.25ch', '2ex', '1lh', '1rlh', '5cm', '5mm', '5Q', '5in', '5pc', '5pt', '-3px', '.5rem', '1e2px', '2dvh', '2svw', '2lvh', '3cqw', '3cqi', '3cqmin'],
-    'percentage': ['50%', '0%', '100%', '12.5%', '-25%', '.5%', '1e2%'],
-    'ratio': ['16/9', '1/1', '4/3', '2.35/1', '0/1'],
-    'number': ['600', '0', '1', '-3', '1.5', '2e3', '.5', '-0.25', '1e-2'],
-    'integer': ['3', '0', '42', '-7', '1000'],
-    'url': ['url(a.png)', 'url("b.svg")', "url('c.gif')", 'url(data:image/png;base64,iVBOR)'],
-    'position': ['center', 'top', 'bottom', 'left', 'right', 'top_left', 'bottom_right', '3px_4px', '50%_50%', 'left_3px_top_4px', 'center_center'],
+    color: [
+        'red',
+        'blue',
+        'rebeccapurple',
+        '#fff',
+        '#ffff',
+        '#112233',
+        '#11223344',
+        'rgb(1_2_3)',
+        'rgb(1_2_3_/_0.5)',
+        'rgba(1,2,3,0.5)',
+        'hsl(1_2%_3%)',
+        'hsla(1,2%,3%,0.5)',
+        'hwb(1_2%_3%)',
+        'lab(1_2_3)',
+        'lch(1_2_3)',
+        'oklab(0.5_0.1_0.2)',
+        'oklch(0.5_0.1_20)',
+        'color(display-p3_1_0_0)',
+        'color-mix(in_oklab,red,blue)',
+        'light-dark(red,blue)',
+        'transparent',
+        'currentcolor',
+        'canvastext',
+        'buttonface',
+        'accentcolor',
+    ],
+    length: [
+        '3px',
+        '2rem',
+        '0',
+        '1.5em',
+        '10vh',
+        '10vw',
+        '100vmax',
+        '100vmin',
+        '0.25ch',
+        '2ex',
+        '1lh',
+        '1rlh',
+        '5cm',
+        '5mm',
+        '5Q',
+        '5in',
+        '5pc',
+        '5pt',
+        '-3px',
+        '.5rem',
+        '1e2px',
+        '2dvh',
+        '2svw',
+        '2lvh',
+        '3cqw',
+        '3cqi',
+        '3cqmin',
+    ],
+    percentage: ['50%', '0%', '100%', '12.5%', '-25%', '.5%', '1e2%'],
+    ratio: ['16/9', '1/1', '4/3', '2.35/1', '0/1'],
+    number: ['600', '0', '1', '-3', '1.5', '2e3', '.5', '-0.25', '1e-2'],
+    integer: ['3', '0', '42', '-7', '1000'],
+    url: ['url(a.png)', 'url("b.svg")', "url('c.gif')", 'url(data:image/png;base64,iVBOR)'],
+    position: [
+        'center',
+        'top',
+        'bottom',
+        'left',
+        'right',
+        'top_left',
+        'bottom_right',
+        '3px_4px',
+        '50%_50%',
+        'left_3px_top_4px',
+        'center_center',
+    ],
     'bg-size': ['cover', 'contain', 'auto', '10px_20px', 'auto_50%', '100%_auto'],
     'line-width': ['thin', 'medium', 'thick', '2px', '1', '0', 'thin_thick'],
-    'image': ['linear-gradient(red,blue)', 'radial-gradient(red,blue)', 'conic-gradient(red,blue)', 'repeating-linear-gradient(red,blue)', 'repeating-radial-gradient(red,blue)', 'repeating-conic-gradient(red,blue)', 'linear-gradient(to_right,red_0%,blue_100%)', 'image-set("a.png"_1x)', 'cross-fade(url(a.png)_50%)', 'element(#a)', 'image(url(a.png))', 'url(a.png),url(b.png)'],
+    image: [
+        'linear-gradient(red,blue)',
+        'radial-gradient(red,blue)',
+        'conic-gradient(red,blue)',
+        'repeating-linear-gradient(red,blue)',
+        'repeating-radial-gradient(red,blue)',
+        'repeating-conic-gradient(red,blue)',
+        'linear-gradient(to_right,red_0%,blue_100%)',
+        'image-set("a.png"_1x)',
+        'cross-fade(url(a.png)_50%)',
+        'element(#a)',
+        'image(url(a.png))',
+        'url(a.png),url(b.png)',
+    ],
     'family-name': ['Arial', '"Helvetica_Neue"', 'Inter,sans-serif', "'Times_New_Roman'", 'Foo,Bar,Baz'],
-    'generic-name': ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded', 'math', 'emoji', 'fangsong'],
+    'generic-name': [
+        'serif',
+        'sans-serif',
+        'monospace',
+        'cursive',
+        'fantasy',
+        'system-ui',
+        'ui-serif',
+        'ui-sans-serif',
+        'ui-monospace',
+        'ui-rounded',
+        'math',
+        'emoji',
+        'fangsong',
+    ],
     'absolute-size': ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large'],
     'relative-size': ['larger', 'smaller'],
-    'angle': ['45deg', '0.5turn', '1rad', '100grad', '-90deg', '0deg'],
-    'vector': ['1_2_3', '0_0_1', '1_0_0', '0.5_0.5_0.5'],
+    angle: ['45deg', '0.5turn', '1rad', '100grad', '-90deg', '0deg'],
+    vector: ['1_2_3', '0_0_1', '1_0_0', '0.5_0.5_0.5'],
 };
 
 /*
@@ -213,13 +306,13 @@ function buildShapes() {
     const seen = new Set();
 
     function push(syntax, claimedType, group) {
-        if (seen.has(syntax)) return;
+        if(seen.has(syntax)) return;
         seen.add(syntax);
         shapes.push({ syntax, claimedType, group });
     }
 
-    for (const typeName of DataTypeNames) {
-        for (const representative of representativeByType[typeName] ?? []) {
+    for(const typeName of DataTypeNames) {
+        for(const representative of representativeByType[typeName] ?? []) {
             // Bare: inference decides. The type it lands on may not be `typeName`, and that is the
             // point; `claimedType` is null so the sweep reads the engine rather than this file.
             push('[' + representative + ']', null, 'bare');
@@ -230,27 +323,82 @@ function buildShapes() {
         push('[' + typeName + ':var(--a)]', typeName, 'hint-var');
     }
 
-    for (const shape of varShapes) push('[' + shape + ']', null, 'var');
-    for (const shape of nonsenseShapes) push('[' + shape + ']', null, 'nonsense');
-    for (const shape of mathShapes) push('[' + shape + ']', null, 'math');
+    for(const shape of varShapes) push('[' + shape + ']', null, 'var');
+    for(const shape of nonsenseShapes) push('[' + shape + ']', null, 'nonsense');
+    for(const shape of mathShapes) push('[' + shape + ']', null, 'math');
 
     // Modifiers, applied to a small spanning subset rather than the cross product, which would be
     // four times the sweep for one extra axis.
-    for (const base of ['[red]', '[3px]', '[var(--a)]', '[anything]', '[50%]', '[16/9]', '[url(a.png)]', '[600]']) {
-        for (const suffix of modifierSuffixes) {
-            if (suffix === '') continue;
+    for(const base of ['[red]', '[3px]', '[var(--a)]', '[anything]', '[50%]', '[16/9]', '[url(a.png)]', '[600]']) {
+        for(const suffix of modifierSuffixes) {
+            if(suffix === '') continue;
             push(base + suffix, null, 'modifier');
         }
     }
 
     // Bare (non-arbitrary) values, which route through theme lookup rather than the arbitrary path.
     // A descriptor that only predicts arbitrary values predicts the smaller half of the registry.
-    for (const bare of ['1', '2', '3', '4', '8', '0', '0.5', '1.5', 'px', 'full', 'auto', 'none', 'sm', 'md', 'lg', 'xl', '2xl', 'xs', 'red-500', 'blue-200', 'black', 'white', 'current', 'transparent', 'inherit', 'initial', 'reverse', 'normal', 'bold', 'thin', 'center', 'start', 'end', 'left', 'right', 'top', 'bottom', 'x', 'y', 'b', 'l', 'r', 't', 'screen', 'min', 'max', 'fit', 'dvh', 'svw', 'lvh', '1/2', '1/3', '2/3', '11/12']) {
+    for(const bare of [
+        '1',
+        '2',
+        '3',
+        '4',
+        '8',
+        '0',
+        '0.5',
+        '1.5',
+        'px',
+        'full',
+        'auto',
+        'none',
+        'sm',
+        'md',
+        'lg',
+        'xl',
+        '2xl',
+        'xs',
+        'red-500',
+        'blue-200',
+        'black',
+        'white',
+        'current',
+        'transparent',
+        'inherit',
+        'initial',
+        'reverse',
+        'normal',
+        'bold',
+        'thin',
+        'center',
+        'start',
+        'end',
+        'left',
+        'right',
+        'top',
+        'bottom',
+        'x',
+        'y',
+        'b',
+        'l',
+        'r',
+        't',
+        'screen',
+        'min',
+        'max',
+        'fit',
+        'dvh',
+        'svw',
+        'lvh',
+        '1/2',
+        '1/3',
+        '2/3',
+        '11/12',
+    ]) {
         push('-' + bare, null, 'bare-theme');
     }
 
     // Negative bare values, which route through the negative branch.
-    for (const bare of ['1', '2', '4', '8', 'px', 'full', '1/2', '0.5']) push('--' + bare, null, 'negative');
+    for(const bare of ['1', '2', '4', '8', 'px', 'full', '1/2', '0.5']) push('--' + bare, null, 'negative');
 
     return shapes;
 }

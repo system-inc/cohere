@@ -18,7 +18,5 @@
         "file": "component.tsx",
         "source": "function Widget() {\n  const C = mk();\n  return C;\n}\n"
     },
-    "assertedMessageIds": [
-        "staticComponents"
-    ]
+    "assertedMessageIds": ["staticComponents"]
 }

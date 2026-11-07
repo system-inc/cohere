@@ -20,8 +20,6 @@
         "file": "/repository/source/components/Button.tsx",
         "source": "export function Button() {\n    return <button />;\n}\n"
     },
-    "assertedMessageIds": [
-        "noSeparateNamedExport"
-    ],
+    "assertedMessageIds": ["noSeparateNamedExport"],
     "assertsFix": true
 }

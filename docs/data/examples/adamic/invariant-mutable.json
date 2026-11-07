@@ -18,9 +18,5 @@
         "file": "Case.ts",
         "source": "declare const loose: any[]; const strict: string[] = loose;\n"
     },
-    "assertedMessageIds": [
-        "methodParameterNarrowed",
-        "mutableWidening",
-        "readonlyMadeWritable"
-    ]
+    "assertedMessageIds": ["methodParameterNarrowed", "mutableWidening", "readonlyMadeWritable"]
 }

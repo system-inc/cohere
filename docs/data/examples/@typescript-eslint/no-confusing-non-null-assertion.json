@@ -19,10 +19,6 @@
         "file": "/repository/source/Confusing.ts",
         "source": "a != b;"
     },
-    "assertedMessageIds": [
-        "confusingAssign",
-        "confusingEqual",
-        "confusingOperator"
-    ],
+    "assertedMessageIds": ["confusingAssign", "confusingEqual", "confusingOperator"],
     "assertsSuggestion": true
 }

@@ -20,8 +20,6 @@
         "file": "Styles.ts",
         "source": "const description = 'flex flex';"
     },
-    "assertedMessageIds": [
-        "duplicateClass"
-    ],
+    "assertedMessageIds": ["duplicateClass"],
     "assertsFix": true
 }

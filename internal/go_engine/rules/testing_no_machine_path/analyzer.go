@@ -10,6 +10,7 @@
 package testing_no_machine_path
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"regexp"
@@ -33,7 +34,8 @@ var Analyzer = &analysis.Analyzer{
 		"since a test reading one developer's machine covers nothing anywhere else, unless a comment opening with " +
 		"// Not a machine path: <reason> ends the literal's line or sits on lines of its own directly above the " +
 		"statement or declaration holding it.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry. It reads no types: a literal's text and the comments around
@@ -52,12 +54,16 @@ const notAMachinePathMarker = "Not a machine path:"
 var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
 
 func run(pass *analysis.Pass) (any, error) {
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
-		comments := marker.NewIndex(pass.Fset, file)
+		comments := indexes.ForFile(file)
 		coveredAbove := linesCoveredAbove(pass, file, comments)
 		ast.Inspect(file, func(node ast.Node) bool {
 			literal, isLiteral := node.(*ast.BasicLit)

@@ -1,12 +1,12 @@
 # `react/destructuring-assignment`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **6869** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Strong No**         |
+| Violations in ahra     | **6869**              |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | yes                   |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ const propertiesOnClose = properties.onClose;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

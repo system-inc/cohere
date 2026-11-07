@@ -1,12 +1,12 @@
 # `@typescript-eslint/explicit-function-return-type`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **3786** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong No**        |
+| Violations in ahra     | **3786**             |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ export function TasksCenter() {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-empty-function`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **45** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **45**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 

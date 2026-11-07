@@ -1,12 +1,12 @@
 # `nexus/correctness-require-child-process-error-listener`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, but registered `off` until the sites are fixed.** 19 findings on ahra, 0 false. Each is one added listener |
-| Findings | **ahra 19** (measured 2026-10-03) |
-| Measured precision | 19 of 19 true: every reported child has no `'error'` listener anywhere in its file and is never handed away |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                         |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, but registered `off` until the sites are fixed.** 19 findings on ahra, 0 false. Each is one added listener       |
+| Findings               | **ahra 19** (measured 2026-10-03)                                                                                       |
+| Measured precision     | 19 of 19 true: every reported child has no `'error'` listener anywhere in its file and is never handed away             |
+| Plugin                 | cohere-native, `nexus`                                                                                                  |
+| Auto-fixable           | no                                                                                                                      |
 | Needs type information | yes, to resolve `spawn` and `fork` to `node:child_process`'s declarations; without a checker the rule registers nothing |
 
 ## What it checks
@@ -38,7 +38,7 @@ event", which kills the process that spawned the child.
   missed finding.
 - **An event argument that is not a string literal type** (`string`, a spread) counts as `'error'`. A
   union of literals that excludes `'error'` does not.
-- **`shell: true`.** A child spawned through a shell gets a missing *program* as exit code 127, not an
+- **`shell: true`.** A child spawned through a shell gets a missing _program_ as exit code 127, not an
   `'error'`. It is still reported: the shell itself can fail to spawn (EAGAIN), `kill` can fail, and the
   child still has no listener. `FigmaMcpLauncher.ts:23` is the one such site.
 - **A process-wide `uncaughtException` handler** is not a listener on the child and is not looked for.
@@ -57,7 +57,7 @@ drifted lines: `PresenceApi.ts:222` is now `:226`, `PhiAnalyticsApi.ts:281` is n
 none false:
 
 - **+9, chained and unbound.** `NodeChildProcess.spawn('open', [path], { detached: true, stdio: 'ignore'
-  }).unref()` at `TasksAttachmentsCommandLineInterface.ts:255`, `FinanceDocumentsCommandLineInterface.ts:276`,
+}).unref()` at `TasksAttachmentsCommandLineInterface.ts:255`, `FinanceDocumentsCommandLineInterface.ts:276`,
   `ThingsCommandLineInterface.ts:421` and `MidjourneyApi.ts:543`, `:606`, `:634`, `:672`, `:736`, `:954`. The
   child is never stored, so nothing can ever attach a listener; the research probe ("discarded: 0")
   looked only at bound children.
@@ -70,12 +70,12 @@ The research's one escape is `OllamaApi.ts:187`, silent here too.
 
 All 19 read in context. Each child has no `'error'` listener and no escape in its file.
 
-| Shape | Sites | Reading |
-|---|---|---|
-| Long-lived daemon child | `AhraOsMonitors.ts:140` | **Bug**: the sensation daemon dies with the child |
-| Child awaited through a promise that resolves on `'close'`/`'exit'` only | `AhraOsBootCommandLineInterface.ts:218`, `OllamaCommandLineInterface.ts:19`, `:116`, `PhiAnalyticsApi.ts:285`, `PresenceApi.ts:226` | **Bug**: a failed spawn throws instead of settling the promise |
-| CLI child that only listens for `'close'` | `PlanetScaleCommandLineInterface.ts:56`, `FigmaMcpLauncher.ts:23` | **Bug**: crashes with an unhandled event instead of a message |
-| Detached child, unref'd | `OllamaCommandLineInterface.ts:65`, `FigmaMcpLauncher.ts:11`, the nine `open` sites above | **Bug**, low blast radius: a missing `open` cannot happen on macOS, but EAGAIN can, and it kills the command after its work is done |
+| Shape                                                                    | Sites                                                                                                                               | Reading                                                                                                                             |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Long-lived daemon child                                                  | `AhraOsMonitors.ts:140`                                                                                                             | **Bug**: the sensation daemon dies with the child                                                                                   |
+| Child awaited through a promise that resolves on `'close'`/`'exit'` only | `AhraOsBootCommandLineInterface.ts:218`, `OllamaCommandLineInterface.ts:19`, `:116`, `PhiAnalyticsApi.ts:285`, `PresenceApi.ts:226` | **Bug**: a failed spawn throws instead of settling the promise                                                                      |
+| CLI child that only listens for `'close'`                                | `PlanetScaleCommandLineInterface.ts:56`, `FigmaMcpLauncher.ts:23`                                                                   | **Bug**: crashes with an unhandled event instead of a message                                                                       |
+| Detached child, unref'd                                                  | `OllamaCommandLineInterface.ts:65`, `FigmaMcpLauncher.ts:11`, the nine `open` sites above                                           | **Bug**, low blast radius: a missing `open` cannot happen on macOS, but EAGAIN can, and it kills the command after its work is done |
 
 **Recall spot check**: ahra has 40 `spawn`/`fork` calls from `node:child_process`. The 21 not reported
 were each read: 19 attach `'error'` (`.on('error', ...)`, `.once('error', ...)`, or `on('error', reject)`),
