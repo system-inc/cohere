@@ -29,6 +29,7 @@
 package correctness_require_declared_walk
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -39,6 +40,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -101,7 +103,8 @@ func newAnalyzer() *analysis.Analyzer {
 			"that climbs out or a walk up to the directory holding go.mod, when no // Reads: <glob> comment on its " +
 			"line or just above it declares what it reads. Reports nothing until the readsFile option names the " +
 			"file of reads lines the planner checks those globs against.",
-		Run: run,
+		Requires: []*analysis.Analyzer{positions.Analyzer},
+		Run:      run,
 	}
 	analyzer.Flags.String(readsFileOption, "", "the file of reads lines a planner holds each // Reads: glob "+
 		"against, named in the finding; empty turns the rule off")
@@ -159,8 +162,13 @@ func run(pass *analysis.Pass) (any, error) {
 	if readsFile == "" || len(pass.Files) == 0 {
 		return nil, nil
 	}
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	walker := &walker{
-		pass: pass,
+		pass:  pass,
+		table: table,
 		// The file's own name, not one a //line directive gives it, since the walk runs from where the file sits.
 		directory:   filepath.Dir(pass.Fset.PositionFor(pass.Files[0].Package, false).Filename),
 		functions:   map[*types.Func]*function{},
@@ -195,8 +203,9 @@ func isPackageFunction(callee *types.Func, packagePath string) bool {
 // readsLines are the lines a // Reads: <glob> comment declares: its own, for a comment at the end of a line, and the
 // line just after its comment group, so a walk reading several globs carries a comment for each above the source.
 // globless are the lines a marker with nothing but spaces after it would have declared, so its finding can say the
-// glob is missing; a line another comment declares is declared all the same.
-func readsLines(fileSet *token.FileSet, file *ast.File) (declared map[int]bool, globless map[int]bool) {
+// glob is missing; a line another comment declares is declared all the same. Each comment's lines are read from table,
+// without the FileSet's lock.
+func readsLines(table *positions.Table, file *ast.File) (declared map[int]bool, globless map[int]bool) {
 	declared = map[int]bool{}
 	globless = map[int]bool{}
 	for _, group := range file.Comments {
@@ -206,8 +215,8 @@ func readsLines(fileSet *token.FileSet, file *ast.File) (declared map[int]bool, 
 				continue
 			}
 			covered := []int{
-				fileSet.PositionFor(comment.Pos(), false).Line,
-				fileSet.PositionFor(group.End(), false).Line + 1,
+				table.Line(comment.Pos()),
+				table.Line(group.End()) + 1,
 			}
 			glob, spaced := strings.CutPrefix(rest, " ")
 			// An empty glob names nothing for the planner to check, and a comment holds one glob, written as in
