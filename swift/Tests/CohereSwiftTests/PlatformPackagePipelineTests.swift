@@ -10,7 +10,7 @@ import Testing
  said "'Duration' is only available in macOS 13.0 or newer" of a package that claims no macOS at all.
 
  These need Xcode with the iOS SDK. Without it they fail and say so, since a skipped test reads like a passing one.
- Serialized, because each runs an xcodebuild or a swift build, and several at once only slow each other.
+ Serialized, because each runs a check, and several at once only slow each other.
  */
 @Suite(.serialized)
 struct PlatformPackagePipelineTests {
@@ -106,7 +106,6 @@ struct PlatformPackagePipelineTests {
             dumpPackageJson: dump,
         )
         #expect(model.platforms == ["ios", "macos"])
-        #expect(model.productNames == ["Kit"])
 
         let silent = Data(#"{"name":"Example","targets":[]}"#.utf8)
         #expect(
@@ -115,9 +114,9 @@ struct PlatformPackagePipelineTests {
         )
     }
 
-    /* Only a package that names platforms and leaves macOS out is taken off the host, and it is built for the first it names that this engine builds. */
+    /* Only a package that names platforms and leaves macOS out is taken off the host, and it is checked for the first it names that this engine checks for. */
     @Test func onlyAPackageLeavingOutMacOSLeavesTheHost() {
-        func model(_ platforms: [String], products: [String] = []) -> PackageModel {
+        func model(_ platforms: [String]) -> PackageModel {
             var model = PackageModel(
                 name: "Kit",
                 root: URL(fileURLWithPath: "/package"),
@@ -125,11 +124,10 @@ struct PlatformPackagePipelineTests {
                 targets: [],
             )
             model.platforms = platforms
-            model.productNames = products
             return model
         }
-        func phase(_ package: PackageModel) -> XcodePackageTypesPhase {
-            XcodePackageTypesPhase(
+        func phase(_ package: PackageModel) -> PlatformPackageTypesPhase {
+            PlatformPackageTypesPhase(
                 package: package,
                 files: [],
                 scratchPath: URL(fileURLWithPath: "/scratch"),
@@ -139,24 +137,23 @@ struct PlatformPackagePipelineTests {
             )
         }
         #expect(
-            !XcodePackageTypesPhase.leavesOutHost(model([])),
+            !PlatformPackageTypesPhase.leavesOutHost(model([])),
             "a package naming no platform supports macOS at its default",
         )
-        #expect(!XcodePackageTypesPhase.leavesOutHost(model(["macos", "ios"])))
-        #expect(!XcodePackageTypesPhase.leavesOutHost(model(["ios", "macos"])))
-        #expect(XcodePackageTypesPhase.leavesOutHost(model(["ios"])))
+        #expect(!PlatformPackageTypesPhase.leavesOutHost(model(["macos", "ios"])))
+        #expect(!PlatformPackageTypesPhase.leavesOutHost(model(["ios", "macos"])))
+        #expect(PlatformPackageTypesPhase.leavesOutHost(model(["ios"])))
         #expect(phase(model(["ios"])).destination == .init(sdkRoot: "iphoneos", platform: "iOS"))
         #expect(
             phase(model(["maccatalyst", "visionos", "ios"])).destination
                 == .init(sdkRoot: "xros", platform: "visionOS")
         )
         #expect(phase(model(["maccatalyst"])).destination == nil)
-        #expect(phase(model(["ios"])).schemes == ["Kit-Package", "Kit"])
-        #expect(phase(model(["ios"], products: ["One"])).schemes == ["Kit", "Kit-Package"])
-        #expect(phase(model(["ios"], products: ["One", "Two"])).schemes == ["Kit-Package", "Kit"])
+        #expect(phase(model(["ios"])).destination?.triple == "arm64-apple-ios")
+        #expect(phase(model(["visionos"])).destination?.triple == "arm64-apple-xros")
     }
 
-    /* The fixture: an iOS-only package using `Duration` has no type error, is checked by an iOS build, and is complete and green. */
+    /* The fixture: an iOS-only package using `Duration` has no type error, is checked for iOS, and is complete and green. */
     @Test func anIosOnlyPackageUsingDurationIsCheckedForIos() async throws {
         try Self.requireIosSdk()
         let root = try Self.fixture(files: [
@@ -171,7 +168,7 @@ struct PlatformPackagePipelineTests {
         #expect(run.findings.isEmpty, "\(run.findings)")
         #expect(
             run.typesBuild.hasPrefix(
-                "xcodebuild of the package for iOS, the first platform it names, since it names no macOS, scheme Control-Package"
+                "for iOS, the first platform the package names, since it names no macOS: checked without building"
             ),
             "\(run.typesBuild)",
         )
@@ -181,7 +178,7 @@ struct PlatformPackagePipelineTests {
         #expect(run.exitCode == 0)
     }
 
-    /* The iOS build is a real check: a type error planted in a test file is the compiler's finding at its line, and lint is not reached. */
+    /* The iOS check is a real one: a type error planted in a test file is the compiler's finding at its line, and lint is not reached. */
     @Test func aTypeErrorInAnIosOnlyPackageIsReported() async throws {
         try Self.requireIosSdk()
         let root = try Self.fixture(files: [
@@ -194,15 +191,14 @@ struct PlatformPackagePipelineTests {
         let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
 
         #expect(run.compilerFindings == ["ControlTests.swift:6:error"], "\(run.typesBuild)")
-        #expect(run.of("finding").count == 1, "the failed build is the type error's, not a second finding")
-        #expect(run.typesBuild.contains("; the build failed: "), "\(run.typesBuild)")
+        #expect(run.of("finding").count == 1, "the failed check is the type error's, not a second finding")
         #expect(run.phase("lint")?.outcome == "notReached")
         #expect(run.exitCode == 1)
     }
 
     /*
-     A package naming macOS beside iOS is built for the host as before, and the host still judges it: at macOS 12 the
-     same `Duration` is a true error, since that package does claim macOS 12.
+     A package naming macOS beside iOS is checked for the host as before, and the host still judges it: at macOS 12
+     the same `Duration` is a true error, since that package does claim macOS 12.
      */
     @Test func aPackageNamingMacOSAndIosIsBuiltForTheHost() async throws {
         let root = try Self.fixture(files: [
@@ -213,13 +209,13 @@ struct PlatformPackagePipelineTests {
 
         let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
 
-        #expect(run.typesBuild.hasPrefix("swift build --build-tests of 1 packages"), "\(run.typesBuild)")
+        #expect(run.typesBuild.hasPrefix("checked without building"), "\(run.typesBuild)")
         #expect(run.compilerFindings.contains("Pause.swift:3:error"), "\(run.of("finding"))")
         let messages = run.of("finding").compactMap { $0["message"] as? String }
         #expect(messages.contains { $0.contains("is only available in macOS 13.0 or newer") }, "\(messages)")
     }
 
-    /* A package naming no platform this engine builds for is a named gap: not built, every file without a record, never green. */
+    /* A package naming no platform this engine checks for is a named gap: not checked, every file without a record, never green. */
     @Test func aPackageNamingNoBuildablePlatformIsANamedGap() async throws {
         let root = try Self.fixture(files: [
             "Package.swift": Self.manifest(platforms: ".macCatalyst(.v18)"),
@@ -233,7 +229,7 @@ struct PlatformPackagePipelineTests {
         #expect(run.phase("types")?.outcome == "ran")
         #expect(
             run.typesBuild.hasPrefix(
-                "not built: the package's platforms (maccatalyst) leave out macOS and name none this engine builds for"
+                "not checked: the package's platforms (maccatalyst) leave out macOS and name none this engine checks for"
             ),
             "\(run.typesBuild)",
         )
@@ -259,13 +255,13 @@ struct PlatformPackagePipelineTests {
 
         let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
 
-        #expect(run.typesBuild.hasPrefix("xcodebuild of the package for iOS"), "\(run.typesBuild)")
-        #expect(run.filesWithoutRecord.isEmpty, "the build ran, so the check below covers what it writes")
+        #expect(run.typesBuild.hasPrefix("for iOS"), "\(run.typesBuild)")
+        #expect(run.filesWithoutRecord.isEmpty, "the check ran, so the comparison below covers what it writes")
         let after = try XcodeProjectPipelineTests.snapshot(of: root)
         #expect(after == before, "written: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
         #expect(
             try XcodeProjectPipelineTests.derivedDataFolders(named: name) == derivedDataBefore,
-            "xcodebuild wrote DerivedData",
+            "the check wrote DerivedData",
         )
     }
 }

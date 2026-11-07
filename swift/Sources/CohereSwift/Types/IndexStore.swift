@@ -289,11 +289,11 @@ import Synchronization
             .path
     }
 
-    /* The store a build into this layout writes: the folder holding its `v5`. */
+    /* The store a check or a build into this layout writes: the folder holding its `v5`. */
     static func storePath(layout: BuildLayout) -> URL {
         switch layout {
-            case .swiftPackage(let scratchPath):
-                return scratchPath.appendingPathComponent("out", isDirectory: true)
+            case .check(let scratchPath):
+                return scratchPath.appendingPathComponent("index-store", isDirectory: true)
             case .xcode(let derivedData):
                 return derivedData.appendingPathComponent("Index.noindex/DataStore", isDirectory: true)
         }

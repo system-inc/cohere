@@ -122,19 +122,23 @@ struct CompileCommandsTests {
         #expect(commands.modules(compiling: files) == ["Capture"])
     }
 
-    @Test func aScratchWithNoBuildDescriptionIsAFailure() {
+    /* A scratch no check kept commands in, and a derived data with no build description, are failures, never empty tables. */
+    @Test func aLayoutWithNothingRecordedIsAFailure() {
         let empty = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-no-build-\(UUID().uuidString)",
             isDirectory: true,
         )
         #expect(throws: CompileCommands.ReadFailure.self) {
-            try CompileCommands.read(layout: .swiftPackage(scratchPath: empty))
+            try CompileCommands.read(layout: .check(scratchPath: empty))
+        }
+        #expect(throws: CompileCommands.ReadFailure.self) {
+            try CompileCommands.read(layout: .xcode(derivedData: empty))
         }
     }
 
-    /* A build description `name` holding `store`, written where the layout's build system writes one. */
-    static func writeBuildDescription(_ store: [UInt8], named name: String, in layout: BuildLayout) throws {
-        let buildData = CompileCommands.buildData(in: layout)
+    /* A build description `name` holding `store`, written where an xcodebuild into this derived data writes one. */
+    static func writeBuildDescription(_ store: [UInt8], named name: String, derivedData: URL) throws {
+        let buildData = CompileCommands.buildData(derivedData: derivedData)
         try FileManager.default.createDirectory(
             at: buildData.appendingPathComponent("\(name).xcbuilddata"),
             withIntermediateDirectories: true,
@@ -148,10 +152,11 @@ struct CompileCommandsTests {
     }
 
     /*
-     The same store read from both roots it was measured at: SwiftPM's `<scratch>/out/`, and an xcodebuild's
-     `<derivedData>/Build/`, whose index store is `Index.noindex/DataStore` rather than SwiftPM's `out`.
+     Each layout's commands and index store: a check's commands are the ones it kept in its scratch, and its store the
+     `index-store` the build server names; an xcodebuild's are its task store under `<derivedData>/Build/`, and its
+     store `Index.noindex/DataStore`.
      */
-    @Test func bothLayoutsResolveTheirBuildDescriptionAndIndexStore() throws {
+    @Test func eachLayoutResolvesItsCommandsAndIndexStore() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-layouts-\(UUID().uuidString)",
             isDirectory: true,
@@ -165,14 +170,18 @@ struct CompileCommandsTests {
 
         let scratch = directory.appendingPathComponent("scratch", isDirectory: true)
         let derivedData = scratch.appendingPathComponent("xcode-build", isDirectory: true)
-        try Self.writeBuildDescription(store, named: "package", in: .swiftPackage(scratchPath: scratch))
-        try Self.writeBuildDescription(store, named: "project", in: .xcode(derivedData: derivedData))
-
-        #expect(
-            FileManager.default.fileExists(
-                atPath: scratch.appendingPathComponent("out/Intermediates.noindex/XCBuildData/package.xcbuilddata").path
+        CompileCommands(commands: [
+            CompileCommands.Command(
+                moduleName: "Shape",
+                arguments: [source.path],
+                files: [source.path],
+                testable: false,
             )
-        )
+        ])
+        .store(scratchPath: scratch)
+        try Self.writeBuildDescription(store, named: "project", derivedData: derivedData)
+
+        #expect(FileManager.default.fileExists(atPath: scratch.appendingPathComponent("check-commands.json").path))
         #expect(
             FileManager.default.fileExists(
                 atPath: derivedData.appendingPathComponent(
@@ -180,13 +189,13 @@ struct CompileCommandsTests {
                 ).path
             )
         )
-        for layout in [BuildLayout.swiftPackage(scratchPath: scratch), .xcode(derivedData: derivedData)] {
+        for layout in [BuildLayout.check(scratchPath: scratch), .xcode(derivedData: derivedData)] {
             let commands = try CompileCommands.read(layout: layout)
             #expect(commands.command(for: source)?.moduleName == "Shape")
         }
         #expect(
-            IndexStore.storePath(layout: .swiftPackage(scratchPath: scratch)).path
-                == scratch.appendingPathComponent("out").path
+            IndexStore.storePath(layout: .check(scratchPath: scratch)).path
+                == scratch.appendingPathComponent("index-store").path
         )
         #expect(
             IndexStore.storePath(layout: .xcode(derivedData: derivedData)).path
@@ -298,13 +307,9 @@ struct CompileCommandsTests {
             "cohere-swift-empty-store-\(UUID().uuidString)",
             isDirectory: true,
         )
-        try Self.writeBuildDescription(
-            Self.array(["something", "else"]),
-            named: "abc",
-            in: .swiftPackage(scratchPath: scratch),
-        )
+        try Self.writeBuildDescription(Self.array(["something", "else"]), named: "abc", derivedData: scratch)
         #expect(throws: CompileCommands.ReadFailure.self) {
-            try CompileCommands.read(layout: .swiftPackage(scratchPath: scratch))
+            try CompileCommands.read(layout: .xcode(derivedData: scratch))
         }
     }
 }

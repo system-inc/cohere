@@ -826,7 +826,7 @@ struct SecurityNoInterpolatedSqlStringTests {
             )
         }
         var provider = SymbolProvider(
-            layouts: [.swiftPackage(scratchPath: Pipeline.scratchPath(for: root))],
+            layouts: [.check(scratchPath: Pipeline.scratchPath(for: root))],
             runner: ProcessRunner(),
         )
         provider.ownedModules = ["Control"]

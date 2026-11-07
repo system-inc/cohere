@@ -118,7 +118,8 @@ struct ScratchPruneTests {
             )
             try #require(built.succeeded, "the fixture package must build: \(built.standardError)")
         }
-        let storePath = IndexStore.storePath(layout: .swiftPackage(scratchPath: scratch))
+        /* A real build's store, `<scratch>/out`: the prune reads any store it is handed, a check's or a build's. */
+        let storePath = scratch.appendingPathComponent("out", isDirectory: true)
         return (
             scratch, try IndexStore(libraryPath: IndexStore.toolchainLibraryPath(), storePath: storePath), storePath,
         )

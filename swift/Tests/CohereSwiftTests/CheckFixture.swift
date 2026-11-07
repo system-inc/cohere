@@ -194,19 +194,28 @@ enum CheckFixture {
     }
 
     /* The whole check as wave 2 will run it: the server describes and prepares, then the Swift and C checks run. */
-    static func check(_ root: URL, scratch: URL, batchSize: Int = 25) throws -> Checked {
+    static func check(
+        _ root: URL,
+        scratch: URL,
+        batchSize: Int = 25,
+        parallelism: Int = ProcessInfo.processInfo.activeProcessorCount,
+    ) throws -> Checked {
         let description = try BuildServerClient.describe(
             configuration: .init(packageRoot: root, scratchPath: scratch, resolutionAllowed: false)
         )
-        let diagnosticsRoot = scratch.appendingPathComponent("check", isDirectory: true)
+        let diagnosticsRoot = TypesPhase.checkDirectory(scratchPath: scratch)
         let frontend = FrontendCheck(
             swiftc: try FrontendCheck.toolchainExecutable(named: "swiftc"),
             diagnosticsRoot: diagnosticsRoot,
             indexStorePath: description.indexStorePath,
             workingDirectory: root,
+            parallelism: parallelism,
             batchSize: batchSize,
         )
-        let swift = try frontend.check(FrontendCheck.modules(from: description.options))
+        let modules = FrontendCheck.modules(from: description.options)
+        let swift = try frontend.check(modules)
+        /* Kept as the types phase keeps them, so a `.check(scratchPath:)` layout reads this check's commands. */
+        CompileCommands(commands: modules.compactMap(CompileCommands.command(checking:))).store(scratchPath: scratch)
         let cFamily = try CSyntaxCheck(
             clang: try FrontendCheck.toolchainExecutable(named: "clang"),
             diagnosticsRoot: diagnosticsRoot,
@@ -216,11 +225,11 @@ enum CheckFixture {
         return Checked(description: description, swift: swift, cFamily: cFamily)
     }
 
-    /* `swift build --build-tests` of the package into its own scratch, as the types phase builds today. */
+    /* `swift build --build-tests` of the package into its own scratch, as the types phase built before it checked. */
     static func build(_ root: URL, scratch: URL) throws -> ProcessRunner.Result {
         try ProcessRunner().run(
             "swift",
-            ["build", "--build-tests", "--scratch-path", scratch.path] + TypesPhase.swiftBuildArguments,
+            ["build", "--build-tests", "--scratch-path", scratch.path, "--build-system", "swiftbuild"],
             in: root,
         )
     }
@@ -268,7 +277,12 @@ enum CheckFixture {
                 "\(finding.line):\(finding.column): \(finding.severity): \(finding.message)"
             )
         }
-        return (byFile.mapValues { $0.sorted() }, reading.filesWithoutRecord.map { relative($0, to: root) }.sorted())
+        /*
+         Coverage is judged for the Swift files alone: `CompilerRecords` matches a file to its record by stem, and a C
+         file's record is named for its path too (`CSyntaxCheck.recordPath`), since a C target's files may share a stem.
+         */
+        let withoutRecord = reading.filesWithoutRecord.filter { $0.hasSuffix(".swift") }
+        return (byFile.mapValues { $0.sorted() }, withoutRecord.map { relative($0, to: root) }.sorted())
     }
 
     /*

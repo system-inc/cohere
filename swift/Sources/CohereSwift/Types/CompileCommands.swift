@@ -1,10 +1,15 @@
 import Foundation
 
 /*
- The compiler arguments the last build passed for each Swift file, read back from what the build recorded,
- so sourcekitd checks a file exactly as `swift build` compiled it.
+ The compiler arguments the last check or build used for each Swift file, so sourcekitd checks a file exactly as
+ the types phase did.
 
- Swift 6.4's build system offers no supported way to ask for them: SwiftPM has no compile-commands output,
+ A package's come from its check (#11fs5xp): the build server's `sourceKitOptions` for each module, the arguments
+ SourceKit-LSP hands sourcekitd, kept in the scratch after every check (`store(scratchPath:)`) with prepare's own
+ flags and the index unit taken off, as the frontend check runs them (`FrontendCheck.cleaned`). A run that does not
+ check, the bodies-only path or a `--lint`, reads them back without starting the server.
+
+ An Xcode root's come from its build. Swift 6.4's build system offers no supported way to ask for them: SwiftPM has no compile-commands output,
  and the build manifest names each compile without its arguments. The arguments are kept in the build
  description's `task-store.msgpack`, one MessagePack array per compile, shaped
  `["builtin-SwiftDriver", "--", <swiftc>, <arguments>...]`. That file is undocumented, so this reader
@@ -19,7 +24,7 @@ import Foundation
  */
 struct CompileCommands {
     /* One module's compile, reduced to what sourcekitd needs to type-check a file of it. */
-    struct Command: Equatable {
+    struct Command: Codable, Equatable {
         var moduleName: String
         /* Every argument for sourcekitd, the module's files included, driver-only flags removed. */
         var arguments: [String]
@@ -57,19 +62,72 @@ struct CompileCommands {
         Set(files.compactMap { command(for: $0)?.moduleName })
     }
 
-    /* The folder holding the build descriptions a build into this layout writes, in the one format both build systems share. */
-    static func buildData(in layout: BuildLayout) -> URL {
+    /* The folder holding the build descriptions an xcodebuild into this derived data writes. */
+    static func buildData(derivedData: URL) -> URL {
+        derivedData.appendingPathComponent("Build/Intermediates.noindex/XCBuildData", isDirectory: true)
+    }
+
+    /* The commands the last check into this layout kept, or those of the newest build description an xcodebuild wrote. */
+    static func read(layout: BuildLayout) throws -> CompileCommands {
         switch layout {
-            case .swiftPackage(let scratchPath):
-                return scratchPath.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
+            case .check(let scratchPath):
+                return try stored(scratchPath: scratchPath)
             case .xcode(let derivedData):
-                return derivedData.appendingPathComponent("Build/Intermediates.noindex/XCBuildData", isDirectory: true)
+                return try readTaskStore(buildData: buildData(derivedData: derivedData))
         }
     }
 
-    /* The commands of the newest build description in this layout. */
-    static func read(layout: BuildLayout) throws -> CompileCommands {
-        let buildData = buildData(in: layout)
+    /* Where a check keeps its modules' arguments, beside its records. */
+    static func storeFile(scratchPath: URL) -> URL {
+        scratchPath.appendingPathComponent("check-commands.json")
+    }
+
+    /* The commands the last check into this scratch kept. None is a failure, never an empty table, as for a task store. */
+    static func stored(scratchPath: URL) throws -> CompileCommands {
+        let file = storeFile(scratchPath: scratchPath)
+        let commands: [Command]
+        do {
+            commands = try JSONDecoder().decode([Command].self, from: Data(contentsOf: file))
+        }
+        catch {
+            throw ReadFailure(description: "no check kept its compile arguments at \(file.path): \(error)")
+        }
+        guard !commands.isEmpty else {
+            throw ReadFailure(description: "the check that kept \(file.path) kept no module")
+        }
+        return CompileCommands(commands: commands)
+    }
+
+    /* Kept after a check, so the next run's in-process checks and typed rules read the arguments it checked with. */
+    func store(scratchPath: URL) {
+        do {
+            try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
+            try JSONEncoder().encode(commands).write(to: Self.storeFile(scratchPath: scratchPath), options: .atomic)
+        }
+        catch {
+            /* Not kept, so the next run that needs them checks again: slower, and still right. */
+        }
+    }
+
+    /*
+     The compile of one checked module as sourcekitd should receive it: the server's arguments without prepare's flags
+     and outputs, its files resolved, testable when it carries an executable's test entry point.
+     */
+    static func command(checking module: FrontendCheck.Module) -> Command? {
+        let arguments = FrontendCheck.cleaned(module.arguments)
+        guard let flag = arguments.firstIndex(of: "-module-name"), arguments.indices.contains(flag + 1) else {
+            return nil
+        }
+        return Command(
+            moduleName: arguments[flag + 1],
+            arguments: arguments,
+            files: module.sources.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path },
+            testable: arguments.contains("-entry-point-function-name"),
+        )
+    }
+
+    /* The commands of the newest build description in this folder. */
+    static func readTaskStore(buildData: URL) throws -> CompileCommands {
         let priors = buildData.appendingPathComponent("prior-build-descriptions.txt")
         let listing: String
         do {

@@ -1,15 +1,17 @@
 import Foundation
 
 /*
- The root a build wrote into, and which build system wrote it, so the readers of what it recorded (`CompileCommands`,
- `IndexStore`) can find their files under it. The two build systems write the same formats under different roots,
- measured 2026-11-05 on copies of ahraos-presence: SwiftPM 6.4's swiftbuild keeps its build description and its
- index store's `v5` under `<scratch>/out/`, and xcodebuild with `-derivedDataPath` keeps the build description under
- `<derivedData>/Build/` and the index store under `<derivedData>/Index.noindex/DataStore`.
+ The root a check or a build wrote into, and which wrote it, so the readers of what it recorded (`CompileCommands`,
+ `IndexStore`) can find their files under it. A package is checked, never built (#11fs5xp): the build server
+ prepares its dependencies into the scratch, and the frontend check writes its index store into
+ `<scratch>/index-store`, the store the server names, and keeps the server's compile arguments in the scratch
+ (`CompileCommands.store`). An Xcode root is built, the named exception: xcodebuild with `-derivedDataPath` keeps
+ its build description under `<derivedData>/Build/` and its index store under `<derivedData>/Index.noindex/DataStore`,
+ measured 2026-11-05 on copies of ahraos-presence.
  */
 enum BuildLayout: Equatable {
-    /* A `swift build --scratch-path` into this scratch. */
-    case swiftPackage(scratchPath: URL)
+    /* A check of a package into this scratch (`TypesPhase`). */
+    case check(scratchPath: URL)
     /* An xcodebuild into this derived data (`XcodeTypesPhase.derivedData`). */
     case xcode(derivedData: URL)
 }

@@ -4,8 +4,9 @@ import Testing
 @testable import CohereSwift
 
 /*
- Reusing the last build's compiler records, on one real package across several runs, so the build cache is
- warm the way a developer's is.
+ Reusing the last check's compiler records, on one real package across several runs, so the cache is warm the
+ way a developer's is. The tests and their names still say build where the check now stands in for one: every
+ change a build would see must end a reuse just the same.
 
  A reuse is proven by the types record's own words, and every change a build would see must end it: a planted
  type error after a warm run must be found (the failure a cache that never invalidates would hide), and a
@@ -17,7 +18,7 @@ import Testing
  */
 @Suite
 struct BuildInputSnapshotTests {
-    static let reusedWords = "no input changed since the last successful build"
+    static let reusedWords = TypesPhase.reusedWords
 
     final class Package {
         let root: URL
@@ -277,20 +278,24 @@ struct BuildInputSnapshotTests {
         try package.write(Self.warnedSource)
         let undone = try await package.run()
         #expect(undone.build.contains(Self.reusedWords), "an undone edit was not read from the build: \(undone.build)")
-        #expect(undone.build.contains("again the bytes it compiled"), "\(undone.build)")
+        #expect(undone.build.contains(TypesPhase.restoredWords), "\(undone.build)")
         #expect(undone.compilerFindings == built.compilerFindings)
     }
 
-    /* The builds these tests run plan their modules explicitly, so the in-process checks above use the build's own modules. */
-    @Test func theBuildsCommandsCarryTheModulesItCompiled() async throws {
+    /*
+     A check keeps the build server's arguments for each module, so the in-process checks above are asked with what
+     the check ran: the module named, its file listed, and prepare's own flags and the index unit taken off.
+     */
+    @Test func theCheckKeepsTheArgumentsItCheckedWith() async throws {
         let package = try Package()
         _ = try await package.run()
-        let commands = try CompileCommands.read(
-            layout: .swiftPackage(scratchPath: Pipeline.scratchPath(for: package.root))
-        )
-        let command = try #require(commands.command(for: package.sources.appendingPathComponent("Control.swift")))
-        #expect(command.arguments.contains("-explicit-swift-module-map-file"), "\(command.arguments)")
-        #expect(command.arguments.contains("-disable-implicit-swift-modules"))
+        let commands = try CompileCommands.read(layout: .check(scratchPath: Pipeline.scratchPath(for: package.root)))
+        let source = package.sources.appendingPathComponent("Control.swift")
+        let command = try #require(commands.command(for: source))
+        #expect(command.moduleName == "Control")
+        #expect(command.files == [source.resolvingSymlinksInPath().path])
+        #expect(!command.arguments.contains("-experimental-allow-module-with-compiler-errors"), "\(command.arguments)")
+        #expect(!command.arguments.contains("-index-unit-output-path"))
     }
 
     /* An edit another file could see, a signature here, is never checked alone: it builds. */

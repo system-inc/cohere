@@ -50,6 +50,22 @@ struct CSyntaxCheckTests {
         }
     }
 
+    /*
+     Two files of one C target may share a name in different folders, as mlx-swift's Cmlx's two `conv` files do, and
+     each still has a record of its own, named for its stem and its path, in the target's record directory.
+     */
+    @Test func sameNamedFilesOfOneTargetHaveRecordsOfTheirOwn() {
+        func source(_ path: String) -> CSyntaxCheck.Source {
+            CSyntaxCheck.Source(target: "Cmlx", file: URL(fileURLWithPath: path), options: Self.options(arguments: []))
+        }
+        let root = URL(fileURLWithPath: "/check")
+        let generated = CSyntaxCheck.recordPath(in: root, of: source("/package/Cmlx/mlx-generated/conv.cpp"))
+        let backend = CSyntaxCheck.recordPath(in: root, of: source("/package/Cmlx/mlx/backend/conv.cpp"))
+        #expect(generated != backend)
+        #expect(generated.deletingLastPathComponent().path == "/check/Cmlx.build/Objects-normal/check")
+        #expect(generated.lastPathComponent.hasPrefix("conv-") && generated.pathExtension == "dia")
+    }
+
     /* Only C-family files that are not headers are checked, each with its target's options for its language. */
     @Test func onlyCFamilySourcesAreChecked() {
         let target = BuildServerClient.Target(

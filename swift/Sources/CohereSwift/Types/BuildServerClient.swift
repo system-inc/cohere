@@ -133,6 +133,28 @@ final class BuildServerClient {
         var indexStorePath: URL
         var targets: [Target]
         var options: [TargetOptions]
+        /* What prepare did, nil when it was not asked to. */
+        var prepared: Prepared?
+    }
+
+    /*
+     What one prepare did: how long it took, and the plugin host tools it built and linked, the one kind of build a
+     check allows (ruled on #nkk91tv): tools a build-tool plugin runs, never the project's code.
+     */
+    struct Prepared: Equatable, Sendable {
+        var seconds: Double
+        var toolsBuilt: [ToolBuilt]
+    }
+
+    /*
+     One host tool prepare linked, named as its `Link <tool> (<architecture>)` log message names it, and the seconds
+     from the first log message naming it to that link, which covers its own compile though not every dependency's.
+     Measured 2026-11-06 on ahraos-presence: mlx-swift's `CudaBuild` plugin links `encuda`, after partial links of
+     ArgumentParser's objects (`Link ArgumentParser.o`), which are part of the same tool and not counted apart.
+     */
+    struct ToolBuilt: Equatable, Sendable {
+        var name: String
+        var seconds: Double
     }
 
     /* Where `build/initialize` said the server writes. */
@@ -207,28 +229,35 @@ final class BuildServerClient {
     /*
      The whole session the check needs, in order: initialize, wait for the build description, list the buildable
      targets and their sources, ask each target's arguments of one file per language, prepare `prepare` of them (all
-     when nil, none when empty), and shut down.
+     when nil, none when empty), and shut down. `alongside`, when given, is started on another thread as soon as the
+     targets and their arguments are known, with no prepare yet, and is waited for before this returns or throws, so
+     work that needs no newly prepared module overlaps prepare.
      */
     static func describe(
         configuration: Configuration,
         prepare: Set<String>? = nil,
+        alongside: (@Sendable (Description) -> Void)? = nil,
     ) throws(Failure) -> Description {
         let client = try BuildServerClient(configuration: configuration)
         let locations = try client.initialize()
         try client.waitForUpdates()
         let targets = try client.sources(of: client.buildTargets())
-        let options = try client.sourceKitOptions(for: targets)
-        let prepared = targets.filter { prepare?.contains($0.displayName) ?? true }
-        if !prepared.isEmpty {
-            try client.prepare(prepared)
-        }
-        try client.shutdown()
-        return Description(
+        var description = Description(
             outputPath: locations.outputPath,
             indexStorePath: locations.indexStorePath,
             targets: targets,
-            options: options,
+            options: try client.sourceKitOptions(for: targets),
         )
+        let group = DispatchGroup()
+        defer { group.wait() }
+        if let alongside {
+            let known = description
+            DispatchQueue.global().async(group: group) { alongside(known) }
+        }
+        let preparing = targets.filter { prepare?.contains($0.displayName) ?? true }
+        description.prepared = preparing.isEmpty ? nil : try client.prepare(preparing)
+        try client.shutdown()
+        return description
     }
 
     /*
@@ -269,10 +298,45 @@ final class BuildServerClient {
         let _: Ignored? = try request(.waitForUpdates, Empty())
     }
 
-    /* Every target the server can build, the package manifest left out. */
-    func buildTargets() throws(Failure) -> [Target] {
-        let result: BuildTargetsResult = try request(.buildTargets, Empty())
-        return result.targets.filter { !$0.tags.contains("not-buildable") }.map { target in
+    /*
+     Every target the server can build, the package manifest left out. None is a failure, never an empty package: a
+     server whose build description could not be generated still answers, with the manifest alone, and says why only
+     in its log and on standard error. Measured 2026-11-06 with a dependency and no Package.resolved under
+     `--disable-automatic-resolution`: "Error generating build description", and SwiftPM's "a resolved file is
+     required when automatic dependency resolution is disabled" on standard error.
+
+     A description that failed once is generated again by the server itself, so the request is asked again after
+     waiting for it, up to `attempts` times in all. Measured 2026-11-06 on ahraos-presence: right after a file was
+     removed, the first description failed ("Error generating build description: No such file or directory (2)"),
+     `workspace/buildTargets` answered -32001, and the description generated next was whole.
+     */
+    func buildTargets(attempts: Int = 3) throws(Failure) -> [Target] {
+        var attempt = 1
+        while true {
+            do throws(Failure) {
+                let result: BuildTargetsResult = try request(.buildTargets, Empty())
+                let buildable = result.targets.filter { !$0.tags.contains("not-buildable") }
+                if buildable.isEmpty {
+                    throw failure(.buildTargets, .unusable("it lists no target it can build: \(standardErrorTail())"))
+                }
+                return Self.targets(from: buildable)
+            }
+            catch {
+                /* A server that went silent or exited will not answer better the next time. */
+                switch error.reason {
+                    case .serverError, .unusable:
+                        guard attempt < attempts else { throw error }
+                    case .timedOut, .serverExited:
+                        throw error
+                }
+                attempt += 1
+                try waitForUpdates()
+            }
+        }
+    }
+
+    private static func targets(from buildable: [BuildTargetsResult.BuildTarget]) -> [Target] {
+        buildable.map { target in
             Target(
                 identifier: target.id.uri,
                 displayName: target.displayName ?? target.id.uri,
@@ -336,13 +400,35 @@ final class BuildServerClient {
         return options
     }
 
-    /* Swift Build's prepare-for-indexing of these targets: their dependencies' modules, bodies skipped, no objects. */
-    func prepare(_ targets: [Target]) throws(Failure) {
+    /*
+     Swift Build's prepare-for-indexing of these targets: their dependencies' modules, bodies skipped, no objects, and
+     the host tools their build-tool plugins run, which it says it built.
+     */
+    func prepare(_ targets: [Target]) throws(Failure) -> Prepared {
+        let start = Date()
+        let logStart = inbox.logCount
         let _: Ignored? = try request(
             .prepare,
             TargetsParameters(targets: targets.map { .init(uri: $0.identifier) }),
             timeout: configuration.timeouts.prepare,
         )
+        return Prepared(
+            seconds: Date().timeIntervalSince(start),
+            toolsBuilt: Self.toolsBuilt(in: inbox.log(from: logStart)),
+        )
+    }
+
+    /* The host tools a prepare's log says it linked, in the order it linked them (`ToolBuilt`). */
+    static func toolsBuilt(in log: [(arrived: Date, message: String)]) -> [ToolBuilt] {
+        var tools: [ToolBuilt] = []
+        for (index, entry) in log.enumerated() where entry.message.hasPrefix("Link ") {
+            let linked = entry.message.dropFirst("Link ".count)
+            let name = String(linked.split(separator: " (").first ?? linked)
+            guard !name.hasSuffix(".o"), !name.isEmpty, !tools.contains(where: { $0.name == name }) else { continue }
+            let first = log[...index].first { $0.message.contains(name) }?.arrived ?? entry.arrived
+            tools.append(ToolBuilt(name: name, seconds: entry.arrived.timeIntervalSince(first)))
+        }
+        return tools
     }
 
     /* `build/shutdown`, then `build/exit`, then waits for the process to end. A server that does not end is stopped. */
@@ -522,13 +608,15 @@ final class BuildServerClient {
     }
 
     /*
-     What the reading thread has framed, held for the thread that asked: responses by identifier, the server's recent
-     log messages, and whether its output has ended. Each arrival signals, and the asker looks again.
+     What the reading thread has framed, held for the thread that asked: responses by identifier, the server's log
+     messages with when each arrived, and whether its output has ended. Each arrival signals, and the asker looks again.
+     A session's log is a few thousand short lines (4,864 for a cold prepare of ahraos-presence), kept whole so prepare
+     can say what it built.
      */
     private final class Inbox: Sendable {
         private struct State {
             var responses: [Int: Data] = [:]
-            var recentLog: [String] = []
+            var log: [(arrived: Date, message: String)] = []
             var ended = false
             var unreadable: String?
         }
@@ -551,7 +639,13 @@ final class BuildServerClient {
         private let state = Mutex(State())
         private let arrived = DispatchSemaphore(value: 0)
 
-        var recentLog: [String] { state.withLock { $0.recentLog } }
+        var recentLog: [String] { state.withLock { $0.log.suffix(5).map(\.message) } }
+        var logCount: Int { state.withLock { $0.log.count } }
+
+        /* Every log message since the `logCount` given, with when it arrived. */
+        func log(from start: Int) -> [(arrived: Date, message: String)] {
+            state.withLock { Array($0.log.dropFirst(start)) }
+        }
         var ended: Bool { state.withLock { $0.ended } }
         var unreadable: String? { state.withLock { $0.unreadable } }
 
@@ -563,7 +657,7 @@ final class BuildServerClient {
                     state.responses[identifier] = body
                 }
                 else if envelope.method == "build/logMessage", let message = envelope.parameters?.message {
-                    state.recentLog = Array((state.recentLog + [message]).suffix(5))
+                    state.log.append((Date(), message))
                 }
             }
             arrived.signal()

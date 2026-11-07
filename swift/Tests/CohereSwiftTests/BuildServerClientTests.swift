@@ -33,6 +33,24 @@ struct BuildServerClientTests {
         #expect(throws: BuildServerClient.MessageFramer.FramingError.self) { try headless.next() }
     }
 
+    /*
+     Prepare's log names each host tool it linked, timed from the first message that names it. A partial link of a
+     library's objects (`Link ArgumentParser.o`) is part of a tool, not one, and a tool linked twice is counted once.
+     The words are the ones measured on ahraos-presence, mlx-swift's `encuda`.
+     */
+    @Test func prepareNamesTheToolsItLinked() {
+        let start = Date()
+        let log: [(arrived: Date, message: String)] = [
+            (start, "Write encuda-OutputFileMap.json (arm64)"),
+            (start.addingTimeInterval(1), "Link ArgumentParser.o (arm64)"),
+            (start.addingTimeInterval(2), "Compiling encuda-compile.swift, encuda.swift"),
+            (start.addingTimeInterval(9.75), "Link encuda (arm64)"),
+            (start.addingTimeInterval(10), "Link encuda (arm64)"),
+        ]
+        #expect(BuildServerClient.toolsBuilt(in: log) == [.init(name: "encuda", seconds: 9.75)])
+        #expect(BuildServerClient.toolsBuilt(in: [(start, "Compiling Count.swift, Welcome.swift")]).isEmpty)
+    }
+
     /* A location is inside the scratch whether or not it exists yet, and whichever spelling of a linked folder each uses. */
     @Test func aLocationIsJudgedInsideTheScratchThroughLinks() {
         let scratch = URL(fileURLWithPath: "/var/folders/scratch")
