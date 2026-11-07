@@ -157,6 +157,10 @@ func (session *CacheSession) Restore(
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
 	session.opened = true
+	// Every map starts empty, the keys too, since the engine restores a second load when the long-line wrap wrote a
+	// file, and keys this restore could not compute must not leave the first load's in their place, which the lint
+	// phase would save entries under, for packages it never analyzed.
+	session.keys, session.own = nil, nil
 	session.hits = map[*packages.Package]*restoredPackage{}
 	session.stored = map[*packages.Package]cache.Key{}
 	session.secondKeyHits = map[*packages.Package]bool{}
