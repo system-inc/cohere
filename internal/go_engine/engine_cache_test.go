@@ -101,11 +101,12 @@ func TestTheFindingsCacheChangesNoRecord(test *testing.T) {
 		cold.counts.Written+cold.counts.Unstorable > cold.counts.Missed {
 		test.Fatalf("want a cold run that hit nothing and wrote what it missed, got %+v", cold.counts)
 	}
-	// Each entry has its export data beside it, but unsafe's, whose types are the type checker's own, and go list's
-	// answer and gofmt's verdicts are kept beside them.
+	// Each entry has its export data beside it, but unsafe's, whose types are the type checker's own, and an alias
+	// under its second key, since every output below each package is known on a cold run, and go list's answer and
+	// gofmt's verdicts are kept beside them.
 	written := entriesIn(test, root)
-	if len(written) != 2*cold.counts.Written+1 {
-		test.Fatalf("want the %d entries written in the store with their export data, found %d files",
+	if len(written) != 3*cold.counts.Written+1 {
+		test.Fatalf("want the %d entries written in the store with their export data and aliases, found %d files",
 			cold.counts.Written, len(written))
 	}
 

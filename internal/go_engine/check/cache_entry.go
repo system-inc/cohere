@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/token"
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
@@ -24,7 +25,7 @@ import (
 // CacheFormatVersion is the version of the cache entry's format, which the engine hashes into every key as the
 // cache's own, so an entry written in another format is never read. It changes whenever cacheEntry or anything it
 // holds changes shape, Finding included.
-const CacheFormatVersion = "go-engine-cache-3"
+const CacheFormatVersion = "go-engine-cache-4"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or types export data cannot carry, so it
 // gets no entry, and is counted.
@@ -48,6 +49,10 @@ type cacheEntry struct {
 	// Files are the package's files as the rules were given them, for a package Analyze was given, whose walk the
 	// lint record counts and whose generated and copied files withhold a house rule's findings.
 	Files []storedFile
+
+	// Output is the package's output digest (see outputDigest), what an importer can read of it, or nil for an entry
+	// that holds no facts, which therefore cannot say what an importer would inherit.
+	Output []byte
 }
 
 // storedFile is one file of a package Analyze was given: its name as the syntax names it, the nodes of one
@@ -87,6 +92,27 @@ type restoredPackage struct {
 	analyses map[*analysis.Analyzer]restoredAnalysis
 	types    *load.Restored
 	files    []storedFile
+
+	// output is the entry's Output, and hasOutput whether it had one.
+	output    cache.Key
+	hasOutput bool
+}
+
+// encodedEntry is one package's entry as encodeEntry makes it, with what the session needs of it beside the bytes.
+type encodedEntry struct {
+	entry      []byte
+	exportData []byte
+
+	// dropped counts the facts left out because their object has no objectpath.
+	dropped int
+
+	// output is the package's output digest, and hasOutput whether it has one: an entry without facts has none.
+	output    cache.Key
+	hasOutput bool
+
+	// positionDependent is set when a finding of the package names a file outside it, so its findings can change
+	// with a line of another package (see positionDependent).
+	positionDependent bool
 }
 
 // restoredAnalysis is a storedAnalysis decoded.
@@ -113,10 +139,10 @@ func factTypeName(factType reflect.Type) string {
 }
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
-// error, its types, what the load withheld of it, and, for a package Analyze was given, its files' walk, and how many
-// facts it left out because their object has no objectpath, with its export data beside it. It returns
-// errorUnstorable, wrapped, when gob refuses a fact the package exported or its types cannot be written as export
-// data.
+// error, its types, what the load withheld of it, and, for a package Analyze was given, its files' walk, with its
+// export data beside it, its output digest, and whether a finding of it names a file outside it, among knownFiles,
+// every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported or its
+// types cannot be written as export data.
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -124,13 +150,15 @@ func encodeEntry(
 	actions []*checker.Action,
 	withheld load.PackageWithheld,
 	files []storedFile,
-) (entryBytes []byte, exportData []byte, dropped int, encodeError error) {
+	knownFiles map[string]bool,
+) (encodedEntry, error) {
 	entry := cacheEntry{
 		Version:   CacheFormatVersion,
 		Analyzers: map[string]storedAnalysis{},
 		Withheld:  withheld,
 		Files:     files,
 	}
+	encoded := encodedEntry{}
 	var encoder objectpath.Encoder
 	for _, action := range actions {
 		slot, held := known.slot(action.Analyzer)
@@ -155,12 +183,12 @@ func encodeEntry(
 				// deprecated call it: purity and nilness hold facts only on functions, which are package-level and
 				// have a path, and deprecated keys by the declared objects an importer meets. So leaving the fact
 				// out changes no finding. A new caller of AllObjectFacts is a reason to look at this again.
-				dropped++
+				encoded.dropped++
 				continue
 			}
 			fact, factError := encodeFact(objectFact.Fact)
 			if factError != nil {
-				return nil, nil, 0, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name,
+				return encodedEntry{}, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name,
 					objectFact.Object, factError)
 			}
 			stored.ObjectFacts = append(stored.ObjectFacts, storedObjectFact{Path: path, Fact: fact})
@@ -168,26 +196,48 @@ func encodeEntry(
 		for _, packageFact := range packageFacts {
 			fact, factError := encodeFact(packageFact.Fact)
 			if factError != nil {
-				return nil, nil, 0, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
+				return encodedEntry{}, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
 			}
 			stored.PackageFacts = append(stored.PackageFacts, fact)
 		}
 		entry.Analyzers[slot] = stored
 	}
-	exportData, exportError := writeExportData(saved)
+	exportData, exportError := writeExportData(saved, saved.Fset)
 	if exportError != nil {
-		return nil, nil, 0, exportError
+		return encodedEntry{}, exportError
 	}
+	encoded.exportData = exportData
 	if saved.Types != nil {
 		for _, imported := range saved.Types.Imports() {
 			entry.Imports = append(entry.Imports, imported.Path())
 		}
 	}
-	var encoded bytes.Buffer
-	if gobError := gob.NewEncoder(&encoded).Encode(entry); gobError != nil {
-		return nil, nil, 0, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, gobError)
+	if holdsFacts(known, entry.Analyzers) {
+		withoutPositions, writeError := writeExportData(saved, nil)
+		if writeError != nil {
+			return encodedEntry{}, writeError
+		}
+		encoded.output, encoded.hasOutput = outputDigest(withoutPositions, entry.Analyzers), true
+		entry.Output = encoded.output[:]
 	}
-	return encoded.Bytes(), exportData, dropped, nil
+	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
+	var entryBytes bytes.Buffer
+	if gobError := gob.NewEncoder(&entryBytes).Encode(entry); gobError != nil {
+		return encodedEntry{}, fmt.Errorf("encoding the entry: %w: %w", errorUnstorable, gobError)
+	}
+	encoded.entry = entryBytes.Bytes()
+	return encoded, nil
+}
+
+// holdsFacts reports whether stored holds every analyzer that learns facts, without which an entry cannot say what
+// an importer inherits from its package.
+func holdsFacts(known *cacheAnalyzers, stored map[string]storedAnalysis) bool {
+	for _, analyzer := range known.facts {
+		if _, held := stored[known.slots[analyzer]]; !held {
+			return false
+		}
+	}
+	return true
 }
 
 // exportDataKey is where the store keeps the export data of the package whose entry is under key, beside the entry
@@ -196,10 +246,11 @@ func exportDataKey(key cache.Key) cache.Key {
 	return sha256.Sum256(append([]byte("export data "), key[:]...))
 }
 
-// writeExportData is a package's types as gcexportdata writes them, nothing for unsafe, whose types are the type
-// checker's own. The writer panics on what it cannot carry, as types a faked package "C" left invalid may be, so a
-// panic is a package the entry cannot hold.
-func writeExportData(saved *packages.Package) (exportData []byte, exportError error) {
+// writeExportData is a package's types as gcexportdata writes them with positions from fileSet, or every position
+// written as none when fileSet is nil, nothing for unsafe, whose types are the type checker's own. The writer panics
+// on what it cannot carry, as types a faked package "C" left invalid may be, so a panic is a package the entry cannot
+// hold.
+func writeExportData(saved *packages.Package, fileSet *token.FileSet) (exportData []byte, exportError error) {
 	if saved.PkgPath == "unsafe" {
 		return nil, nil
 	}
@@ -213,7 +264,7 @@ func writeExportData(saved *packages.Package) (exportData []byte, exportError er
 		}
 	}()
 	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, saved.Fset, saved.Types); writeError != nil {
+	if writeError := gcexportdata.Write(&written, fileSet, saved.Types); writeError != nil {
 		return nil, fmt.Errorf("writing the export data of %s: %w: %w", saved.ID, errorUnstorable, writeError)
 	}
 	return written.Bytes(), nil
@@ -275,6 +326,10 @@ func decodeEntry(
 			Withheld:       entry.Withheld,
 		},
 		files: entry.Files,
+	}
+	if len(entry.Output) == len(restored.output) {
+		copy(restored.output[:], entry.Output)
+		restored.hasOutput = true
 	}
 	for analyzer, slot := range known.slots {
 		stored, held := entry.Analyzers[slot]

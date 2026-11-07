@@ -5,9 +5,10 @@ import "fmt"
 // packageCacheUse is what the Go engine's per-package findings cache did in the lint phase, by package, as the lint
 // record's `cache` object says it (swift/Contract.md): hit, restored from an entry with nothing run on it; missed,
 // analyzed from source, of which written got an entry and unstorable held a fact no entry can hold; the facts the
-// written entries left out, since nothing outside their package can name their object; and the restored facts
-// skipped, whose object the package's export data does not hold. On is false under `--no-cache`. Only a Go run has
-// one; a Swift run's lint record carries none, so its output is as it was.
+// written entries left out, since nothing outside their package can name their object; the restored facts
+// skipped, whose object the package's export data does not hold; and the waves the lint phase analyzed packages in, at
+// most two. On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its
+// output is as it was.
 type packageCacheUse struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -16,6 +17,7 @@ type packageCacheUse struct {
 	Unstorable   int  `json:"unstorable"`
 	FactsDropped int  `json:"factsDropped"`
 	FactsSkipped int  `json:"factsSkipped"`
+	Waves        int  `json:"waves"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones

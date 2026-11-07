@@ -74,12 +74,12 @@ func printKeys() error {
 	if loadError != nil {
 		return loadError
 	}
-	keys, keysError := Keys(loaded.Packages, fixtureContext, nil)
+	keyed, keysError := Keys(loaded.Packages, fixtureContext, nil)
 	if keysError != nil {
 		return keysError
 	}
 	var lines strings.Builder
-	for id, key := range keysById(keys) {
+	for id, key := range keysById(keyed.Keys) {
 		lines.WriteString(id + "\t" + key.String() + "\n")
 	}
 	if _, writeError := os.Stdout.WriteString(lines.String()); writeError != nil {
@@ -119,8 +119,12 @@ func loadedFixture(test *testing.T) (*load.Loaded, map[string]Key) {
 		if fixture.failure != nil {
 			return
 		}
-		keys, keysError := Keys(fixture.loaded.Packages, fixtureContext, nil)
-		fixture.keys, fixture.failure = keysById(keys), keysError
+		keyed, keysError := Keys(fixture.loaded.Packages, fixtureContext, nil)
+		if keysError != nil {
+			fixture.failure = keysError
+			return
+		}
+		fixture.keys = keysById(keyed.Keys)
 	})
 	if fixture.failure != nil {
 		test.Fatalf("keying the chain: %v", fixture.failure)
@@ -222,11 +226,11 @@ func keyClone(
 	loaded, _ := loadedFixture(test)
 	roots, byId := cloneGraph(loaded.Packages)
 	change(byId)
-	keys, keysError := Keys(roots, shared, extraInputs)
+	keyed, keysError := Keys(roots, shared, extraInputs)
 	if keysError != nil {
 		test.Fatalf("keying a changed clone of the chain: %v", keysError)
 	}
-	return keysById(keys)
+	return keysById(keyed.Keys)
 }
 
 // Every package the analyzed ones reach is keyed, the standard library included, each differently, and keying the
@@ -257,7 +261,7 @@ func TestKeysCoverEveryPackageReachedAndAreTheSameAcrossCalls(test *testing.T) {
 	if keysError != nil {
 		test.Fatalf("keying the chain again: %v", keysError)
 	}
-	expectChanged(test, "keying twice", keys, keysById(again))
+	expectChanged(test, "keying twice", keys, keysById(again.Keys))
 }
 
 // Another process keying the same files under the same context gives the same keys: nothing in a key depends on
@@ -354,18 +358,20 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 	if keysError != nil {
 		test.Fatal(keysError)
 	}
-	before := keysById(keyed)
+	before, ownBefore := keysById(keyed.Keys), keysById(keyed.Own)
+	// A file's own package changes its own digest, and only it: an importer's key changes, its own digest does not.
 	for _, step := range []struct {
-		file string
-		want []string
+		file    string
+		want    []string
+		wantOwn []string
 	}{
-		{"bottom/bottom.go", []string{bottomId, middleId, topId, topExternalId}},
-		{"bottom/notes.s", []string{bottomId, middleId, topId, topExternalId}},
-		{"bottom/data.txt", []string{bottomId, middleId, topId, topExternalId}},
-		{"bottom/ignored.go", []string{bottomId, middleId, topId, topExternalId}},
-		{"middle/middle.go", []string{middleId, topId, topExternalId}},
-		{"top/top.go", []string{topId, topExternalId}},
-		{"top/top_external_test.go", []string{topExternalId}},
+		{"bottom/bottom.go", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
+		{"bottom/notes.s", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
+		{"bottom/data.txt", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
+		{"bottom/ignored.go", []string{bottomId, middleId, topId, topExternalId}, []string{bottomId}},
+		{"middle/middle.go", []string{middleId, topId, topExternalId}, []string{middleId}},
+		{"top/top.go", []string{topId, topExternalId}, []string{topId}},
+		{"top/top_external_test.go", []string{topExternalId}, []string{topExternalId}},
 	} {
 		path := filepath.Join(directory, filepath.FromSlash(step.file))
 		contents, readError := os.ReadFile(path)
@@ -380,9 +386,10 @@ func TestAByteOfAFileChangesItsPackageAndItsImportersOnly(test *testing.T) {
 		if keysError != nil {
 			test.Fatal(keysError)
 		}
-		after := keysById(keyed)
+		after, ownAfter := keysById(keyed.Keys), keysById(keyed.Own)
 		expectChanged(test, "a byte of "+step.file, before, after, step.want...)
-		before = after
+		expectChanged(test, "the own digests on a byte of "+step.file, ownBefore, ownAfter, step.wantOwn...)
+		before, ownBefore = after, ownAfter
 	}
 }
 

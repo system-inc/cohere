@@ -21,8 +21,9 @@ type keyer struct {
 	// fileDigests is every file of every package keyed, by path.
 	fileDigests map[string]fileDigest
 
-	// keys are the packages keyed so far.
+	// keys are the packages keyed so far, and own each one's own digest, its key but for its dependencies' keys.
 	keys map[*packages.Package]Key
+	own  map[*packages.Package]Key
 
 	// visiting are the packages whose keys wait on their dependencies', so an import cycle is an error rather
 	// than a hang.
@@ -50,14 +51,32 @@ func (keyer *keyer) key(keyed *packages.Package) (Key, error) {
 		dependencyKeys[index] = dependencyKey
 	}
 
+	own, ownError := keyer.ownDigest(keyed, importPaths)
+	if ownError != nil {
+		return Key{}, ownError
+	}
+	parts := newPartHash()
+	parts.bytes(own[:])
+	parts.count(len(importPaths))
+	for index, importPath := range importPaths {
+		parts.text(importPath)
+		parts.bytes(dependencyKeys[index][:])
+	}
+	key := parts.sum()
+	keyer.keys[keyed] = key
+	keyer.own[keyed] = own
+	return key, nil
+}
+
+// ownDigest is the part of a package's key that is its own: the context, then its path alone for a package keyed so,
+// else its identity, module, files, import map and extra inputs, everything but its dependencies' keys.
+func (keyer *keyer) ownDigest(keyed *packages.Package, importPaths []string) (Key, error) {
 	parts := newPartHash()
 	parts.bytes(keyer.context[:])
 	if pathOnly(keyed) {
 		parts.text("path only")
 		parts.text(keyed.PkgPath)
-		key := parts.sum()
-		keyer.keys[keyed] = key
-		return key, nil
+		return parts.sum(), nil
 	}
 	parts.text("package")
 	parts.texts([]string{keyed.ID, keyed.PkgPath, keyed.Name})
@@ -75,11 +94,6 @@ func (keyer *keyer) key(keyed *packages.Package) (Key, error) {
 		parts.text(importPath)
 		parts.text(keyed.Imports[importPath].ID)
 	}
-	parts.count(len(importPaths))
-	for index, importPath := range importPaths {
-		parts.text(importPath)
-		parts.bytes(dependencyKeys[index][:])
-	}
 	var extra []string
 	if keyer.extraInputs != nil {
 		inputs, extraError := keyer.extraInputs(keyed)
@@ -89,8 +103,5 @@ func (keyer *keyer) key(keyed *packages.Package) (Key, error) {
 		extra = inputs
 	}
 	parts.texts(extra)
-
-	key := parts.sum()
-	keyer.keys[keyed] = key
-	return key, nil
+	return parts.sum(), nil
 }

@@ -174,26 +174,42 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded}
 	session := options.Cache
 	roots := analyzed
+	var graphs []*checker.Graph
 	if session != nil {
 		if !session.opened {
 			var reachable []*packages.Package
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { reachable = append(reachable, visited) })
 			session.Restore(load.LoaderSource, reachable, analyzed)
 		}
-		checkerOptions.Restored, checkerOptions.Restore = session.restored, session.restore
-		roots = slices.DeleteFunc(slices.Clone(analyzed), session.restored)
+		checkerOptions.Restored, checkerOptions.Restore = session.restoredInWave, session.restore
+		firstGraph, waveError := session.firstWave(analyzers, checkerOptions, options.Withheld)
+		if waveError != nil {
+			return nil, waveError
+		}
+		if firstGraph != nil {
+			graphs = append(graphs, firstGraph)
+		}
+		roots = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
+		if len(roots) > 0 {
+			session.counts.Waves++
+		}
 	}
 	graph, analyzeError := checker.Analyze(analyzers, roots, checkerOptions)
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
 	}
+	graphs = append(graphs, graph)
 	type rootKey struct {
 		analyzer        *analysis.Analyzer
 		analyzedPackage *packages.Package
 	}
-	actionOf := make(map[rootKey]*checker.Action, len(graph.Roots))
-	for _, action := range graph.Roots {
-		actionOf[rootKey{action.Analyzer, action.Package}] = action
+	// A later wave's action on a package is the one that counts: the second wave analyzes again a package of the first
+	// that it could not restore.
+	actionOf := map[rootKey]*checker.Action{}
+	for _, waveGraph := range graphs {
+		for _, action := range waveGraph.Roots {
+			actionOf[rootKey{action.Analyzer, action.Package}] = action
+		}
 	}
 
 	result := &Result{

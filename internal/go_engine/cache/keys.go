@@ -28,20 +28,30 @@ type Context struct {
 	RuleSet []string
 }
 
+// Keyed is every package's key, and the part of each that is the package's own.
+type Keyed struct {
+	Keys map[*packages.Package]Key
+
+	// Own is each package's own digest: its key but for its dependencies' keys, which the findings cache's second
+	// key joins with what its dependencies' analyses came out as rather than with what went into them.
+	Own map[*packages.Package]Key
+}
+
 // Keys computes every package's key, for the packages given and everything they import, reading each file once.
 // extraInputs, when non-nil, returns more inputs for one package (a rule's reads outside the pass), each hashed in.
 //
-// A key is a sha256 over, in this order and each part length-prefixed: the context (its format version, engine
-// identity, rule set and build, hashed once for every package); the package's ID, PkgPath and Name; its Module's
-// path, version and go version, and its replacement's; each of its GoFiles, CompiledGoFiles, OtherFiles,
-// EmbedFiles and IgnoredFiles as its path and the sha256 of its bytes; its import map, path to ID, sorted by path;
-// the keys of the packages it imports, sorted by import path; and its extra inputs. Since a package's key holds
-// its dependencies' keys, a change anywhere below it changes it, and a change in it leaves them alone.
+// A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
+// imports, sorted by import path. The own digest is a sha256 over, in this order and each part length-prefixed: the
+// context (its format version, engine identity, rule set and build, hashed once for every package); the package's
+// ID, PkgPath and Name; its Module's path, version and go version, and its replacement's; each of its GoFiles,
+// CompiledGoFiles, OtherFiles, EmbedFiles and IgnoredFiles as its path and the sha256 of its bytes; its import map,
+// path to ID, sorted by path; and its extra inputs. Since a package's key holds its dependencies' keys, a change
+// anywhere below it changes it, and a change in it leaves them alone.
 func Keys(
 	given []*packages.Package,
 	shared Context,
 	extraInputs func(*packages.Package) ([]string, error),
-) (map[*packages.Package]Key, error) {
+) (*Keyed, error) {
 	reachable, reachableError := reachableFrom(given)
 	if reachableError != nil {
 		return nil, reachableError
@@ -55,6 +65,7 @@ func Keys(
 		extraInputs: extraInputs,
 		fileDigests: digests,
 		keys:        make(map[*packages.Package]Key, len(reachable)),
+		own:         make(map[*packages.Package]Key, len(reachable)),
 		visiting:    map[*packages.Package]bool{},
 	}
 	for _, root := range given {
@@ -62,7 +73,7 @@ func Keys(
 			return nil, keyError
 		}
 	}
-	return computing.keys, nil
+	return &Keyed{Keys: computing.keys, Own: computing.own}, nil
 }
 
 // contextDigest is the run's Context hashed once, in the key's order: format version, engine identity, rule set,

@@ -54,3 +54,13 @@ func (partHash *partHash) sum() Key {
 	copy(key[:], partHash.digest.Sum(nil))
 	return key
 }
+
+// DigestOf is the sha256 of parts, each length-prefixed as a key's parts are, for a digest the findings cache makes
+// of something other than a package's inputs.
+func DigestOf(parts ...[]byte) Key {
+	digest := newPartHash()
+	for _, part := range parts {
+		digest.bytes(part)
+	}
+	return digest.sum()
+}
