@@ -74,6 +74,15 @@ engine generates a spec's project into its own scratch, never beside the spec, a
 their Swift files from the project file. A root holding two projects, or a workspace and no project, is
 refused with exit 2 and a sentence, as is a spec xcodegen refuses and a machine without xcodegen.
 
+A root holding no project at all is a scripts-only root (#wpd36zj): discovery gives one to the Swift files no
+project claims, at the repository's root, as ahra's four scripts under `modules/` are. It has no target, so no
+package or Xcode check runs, and its files are its standalone scripts (see `project`), each checked alone. Its
+walk skips what discovery never enters (`node_modules`, `.build`, `.cache`, `.git`, `testdata`), and a file
+below a project of its own is left out entirely, since that project runs or is covered by one that does. Its
+inputs record names no walk of the root, only the scripts and the file set's listings and ignore files.
+Outside a repository there are no ignore rules to walk by, so discovery names such files as the gap it always
+did, `Swift files no package checks`.
+
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
 the run, prints a sentence on stderr naming both versions, and exits 2. The first record the engine
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
@@ -155,7 +164,8 @@ nothing else.
   the graph, because it is the step nothing can skip.
 - Written on every run that checks anything, since every such run describes the package first.
 - `projectKind` says what `package` was read from: `SwiftPackage`, `XcodeGen` (a spec, generated into the
-  engine's scratch) or `XcodeProject` (a committed project, read where it stands). It is additive within
+  engine's scratch), `XcodeProject` (a committed project, read where it stands) or `Scripts` (a scripts-only
+  root, whose `package` is its directory's name and which reads nothing). It is additive within
   contract 3, and an engine from before it writes none. For an Xcode project, `package` is the project's
   name, and each native target's kind is Xcode's product type in SwiftPM's words: an app or an extension
   is `application`, a unit-test or interface-test bundle `test`, a framework or library `library`, a

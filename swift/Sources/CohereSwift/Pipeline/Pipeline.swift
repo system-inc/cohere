@@ -73,14 +73,17 @@ public struct Pipeline {
         let configurationRoot = options.root ?? workingDirectory
         /*
          The file the config is looked for beside, which its note names: the Package.swift that wins below, else the
-         Xcode project's definition. A root that holds neither, or two projects, is refused below before any note prints.
+         Xcode project's definition, else, at a scripts-only root, its scripts. A root holding two projects is refused
+         below before any note prints.
          */
         let definition: String
-        if case let .xcode(source) = try? XcodeProject.rootProject(at: configurationRoot) {
-            definition = source.fileName
-        }
-        else {
-            definition = "Package.swift"
+        switch try? XcodeProject.rootProject(at: configurationRoot) {
+            case let .xcode(source):
+                definition = source.fileName
+            case .swiftPackage:
+                definition = "Package.swift"
+            case nil:
+                definition = "the scripts"
         }
         let configuration = try RuleConfiguration.load(
             packageRoot: configurationRoot,
@@ -102,6 +105,8 @@ public struct Pipeline {
             throw RunFailure(description: "no --root was given, so there is no package to check")
         }
         let xcodeSource: XcodeProject.Source?
+        /* A root holding no project is the scripts-only root discovery gives the Swift files no project claims (#wpd36zj). */
+        var scriptsOnly = false
         do {
             switch try XcodeProject.rootProject(at: root) {
                 case .swiftPackage:
@@ -109,10 +114,8 @@ public struct Pipeline {
                 case let .xcode(source):
                     xcodeSource = source
                 case nil:
-                    throw RunFailure(
-                        description:
-                            "\(root.path) holds no Package.swift, project.yml or .xcodeproj, so there is nothing to check"
-                    )
+                    xcodeSource = nil
+                    scriptsOnly = true
             }
         }
         catch let ambiguous as XcodeProject.AmbiguousRoot {
@@ -121,7 +124,13 @@ public struct Pipeline {
 
         /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
         if options.listCoveredPackages {
-            let package = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain).package
+            let package = try loadProject(
+                root: root,
+                xcodeSource: xcodeSource,
+                scriptsOnly: scriptsOnly,
+                toolchain: toolchain,
+            )
+            .package
             let inside = package.localPackages.filter { PackageModel.isInside($0.root, root) }
             let path = { (model: PackageModel) in model.root.standardizedFileURL.path }
             try writer.write(
@@ -212,7 +221,12 @@ public struct Pipeline {
         )
 
         let describeStart = Date()
-        let (package, xcodeProject) = try loadProject(root: root, xcodeSource: xcodeSource, toolchain: toolchain)
+        let (package, xcodeProject) = try loadProject(
+            root: root,
+            xcodeSource: xcodeSource,
+            scriptsOnly: scriptsOnly,
+            toolchain: toolchain,
+        )
         let fileSet = try FileSet.build(package: package)
         let scope = try FileScope.resolve(options: options, fileSet: fileSet, workingDirectory: workingDirectory)
         /*
@@ -566,7 +580,11 @@ public struct Pipeline {
          */
         func build() throws -> TypesPhase.Result {
             let targets: TypesPhase.Result
-            if let xcodeProject {
+            if package.projectKind == .scripts {
+                /* No target, so no package or Xcode check: a scripts-only root's files are its scripts alone. */
+                targets = ScriptTypesPhase.noTargets
+            }
+            else if let xcodeProject {
                 targets = try XcodeTypesPhase(
                     package: package,
                     project: xcodeProject,
@@ -796,13 +814,17 @@ public struct Pipeline {
 
     /*
      The run's project: SwiftPM's answer for a package, or an Xcode project read into the same model, with the
-     bundle and project file its types phase builds from.
+     bundle and project file its types phase builds from, or a scripts-only root's model, which nothing is read for.
      */
     private func loadProject(
         root: URL,
         xcodeSource: XcodeProject.Source?,
+        scriptsOnly: Bool,
         toolchain: String,
     ) throws -> (package: PackageModel, xcode: XcodeProject.Loaded?) {
+        if scriptsOnly {
+            return (PackageModel.scriptsOnly(root: root), nil)
+        }
         if let xcodeSource {
             let loaded = try XcodeProject.load(
                 source: xcodeSource,

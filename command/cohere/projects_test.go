@@ -367,15 +367,15 @@ func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 // Swift files no package holds, here an app's App/ beside apple/Toy, the shape of ahraos-presence's
 // CapturePhone, are named in the notes, on the summary line and on the verdict line, and change nothing
 // else: a clean run stays green and a failing one exits as it would without them (#ybspptb). The package's
-// own files are no gap.
+// own files are no gap. Outside a repository, since inside one they are a scripts-only root's (#wpd36zj).
 func TestSwiftFilesNoPackageChecksAreSaidAndFailNothing(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
 	findings := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Findings.jsonl")+"\nexit 1")
 
-	without := mixedRepository(test, "apple/Toy")
-	with := mixedRepository(test, "apple/Toy")
+	without := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
+	with := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
 	writeTree(test, filepath.Join(with, "App"), map[string]string{
 		"Sources/App/App.swift":    "let app = 1\n",
 		"Sources/App/Screen.swift": "let screen = 1\n",
@@ -445,12 +445,12 @@ func TestSwiftACoveredPackageHoldsIsNoGap(test *testing.T) {
 
 // Swift the walk never enters, under node_modules, or that .gitignore or the root's ignorePatterns match, is
 // no gap, since nobody expects it checked. App/, beside them, is the control: the same walk does name
-// unclaimed Swift.
+// unclaimed Swift, outside a repository (#wpd36zj).
 func TestSwiftIgnoredOrInADependencyIsNoGap(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	root := mixedRepository(test, "apple/Toy")
+	root := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
 	writeTree(test, root, map[string]string{
 		".gitignore":                         "tsconfig.tsbuildinfo\nGenerated/\n*.generated.swift\n",
 		"CohereSettings.json":                "{ \"rules\": {}, \"ignorePatterns\": [\"Legacy/**\"] }\n",
@@ -479,12 +479,12 @@ func TestSwiftIgnoredOrInADependencyIsNoGap(test *testing.T) {
 
 // Unclaimed Swift at any depth is named by the top directory holding it, its files counted together, and a
 // directory holding a package names only the files outside it. Past three directories the verdict line
-// names three and counts the rest, while the notes name every one.
+// names three and counts the rest, while the notes name every one. Outside a repository (#wpd36zj).
 func TestUnclaimedSwiftIsNamedByItsTopDirectoryAndCountedPastThree(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	root := mixedRepository(test, "Tools/Sim")
+	root := outsideAnyRepository(test, mixedRepository(test, "Tools/Sim"))
 	writeTree(test, root, map[string]string{
 		"Root.swift":                                 "let root = 1\n",
 		"CapturePhone/Sources/App/App.swift":         "let app = 1\n",
@@ -518,18 +518,19 @@ func TestUnclaimedSwiftIsNamedByItsTopDirectoryAndCountedPastThree(test *testing
 
 // A root with one TypeScript program and an app's Swift beside it finds one project, which runs in this
 // process with no report of projects. Its own footer says the gap, a replay of that run says it too, and once
-// the Swift is gone the next run says nothing of it.
+// the Swift is gone the next run says nothing of it. Outside a repository, since inside one the Swift is a
+// scripts-only root's, a project of its own (#wpd36zj).
 func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
 	// The cache is ignored, so the second run's inputs are the first's and it replays.
-	root := newRepository(test, map[string]string{
+	root := outsideAnyRepository(test, newRepository(test, map[string]string{
 		"tsconfig.json":         incrementalFixtureConfiguration + "\n",
 		"CohereSettings.json":   "{ \"rules\": {} }\n",
 		"index.ts":              "export const value = 1;\n",
 		".gitignore":            ".cache/\ntsconfig.tsbuildinfo\n",
 		"App/Sources/App.swift": "let app = 1\n",
-	})
+	}))
 
 	for _, run := range []string{"fresh", "replayed"} {
 		output, exitCode := runWithEngine(test, binary, "", root, "--no-fix")
@@ -563,7 +564,8 @@ func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
 // it is a Swift project when it is the nearest Swift marker above some Swift file: inside a package's
 // directory, as ahraos-presence's CapturePhone is, or outside every package, where its files are then no gap.
 // A candidate claiming nothing is no project, Package.swift beside one is the package alone, two .xcodeproj or
-// a workspace alone is no candidate, and nested markers each claim their nearest files (#ybspptb).
+// a workspace alone is no candidate, and nested markers each claim their nearest files (#ybspptb). Outside a
+// repository, so what no marker claims is the gap it names (see TestUnclaimedSwiftInARepositoryIsAScriptsOnlyRoot).
 func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range []struct {
@@ -669,7 +671,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			root := newRepository(test, testCase.files)
+			root := outsideAnyRepository(test, newRepository(test, testCase.files))
 			found, discoverProjectsError := discoverProjects(root, testCase.ignorePatterns)
 			if discoverProjectsError != nil {
 				test.Fatal(discoverProjectsError)
@@ -687,6 +689,68 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				test.Errorf("refused %v, want %v", found.Refused, testCase.refused)
 			}
 		})
+	}
+}
+
+// Inside a repository the Swift no project claims is a Swift project of its own at the root, a scripts-only
+// root, and no gap (#wpd36zj): the engine checks each standalone script there alone, as `swift <file>` runs it,
+// and names every other file. A package's own files stay its own.
+func TestUnclaimedSwiftInARepositoryIsAScriptsOnlyRoot(test *testing.T) {
+	test.Parallel()
+	root := newRepository(test, map[string]string{
+		"modules/ebay/EbayVision.swift": "print(1)\n",
+		"Kit/Package.swift":             discoveryPackage,
+		"Kit/Sources/Kit/Kit.swift":     "let kit = 1\n",
+	})
+	found, discoverProjectsError := discoverProjects(root, nil)
+	if discoverProjectsError != nil {
+		test.Fatal(discoverProjectsError)
+	}
+	want := []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "Kit", Engine: engineSwift}}
+	if !reflect.DeepEqual(found.Projects, want) {
+		test.Errorf("found the projects %+v, want %+v", found.Projects, want)
+	}
+	if len(found.UnclaimedSwift) != 0 {
+		test.Errorf("found the unclaimed Swift %+v, want none: the scripts-only root holds it", found.UnclaimedSwift)
+	}
+}
+
+// ahra's shape: a TypeScript program at the root, a package below it, and a script under no Swift project. The
+// script's Swift run is the engine's at the repository's root, through the --directory and engine a discovered
+// project's run is given, labelled beside the TypeScript project there, and the verdict names no gap (#wpd36zj).
+func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := mixedRepository(test, "apple/Toy")
+	writeTree(test, root, map[string]string{"modules/ebay/EbayVision.swift": "print(1)\n"})
+	engine, log := coveringSwiftEngine(test, "echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
+		"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
+
+	output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+	if exitCode != 0 {
+		test.Errorf("a clean repository with a script exited %d, want 0:\n%s", exitCode, output)
+	}
+	if !strings.Contains(output, "== . (Swift) ==") || strings.Contains(output, "no package checks") {
+		test.Errorf("the script is not checked by a Swift run at the root, or is named as a gap:\n%s", output)
+	}
+	logged, readError := os.ReadFile(log)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	resolvedRoot, resolveSymlinksError := filepath.EvalSymlinks(root)
+	if resolveSymlinksError != nil {
+		test.Fatal(resolveSymlinksError)
+	}
+	checkedAtRoot := false
+	for _, line := range strings.Split(string(logged), "\n") {
+		if !strings.Contains(line, "--covered-packages") &&
+			(strings.HasSuffix(line, "--root "+root) || strings.Contains(line, "--root "+root+" ") ||
+				strings.HasSuffix(line, "--root "+resolvedRoot) || strings.Contains(line, "--root "+resolvedRoot+" ")) {
+			checkedAtRoot = true
+		}
+	}
+	if !checkedAtRoot {
+		test.Errorf("no check run's --root is the repository's root %s; the engine was run with:\n%s", root, logged)
 	}
 }
 

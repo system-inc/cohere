@@ -23,6 +23,9 @@ import Foundation
    every ignore file and git config file it consulted, there or absent, since a line in any of them moves files in
    or out of the run. A `.git` in each directory from a package up to its repository is named absent, since one
    appearing moves the repository's boundary, and a `.git` file a worktree points through is named as a file;
+ - every Swift file no target compiles that the walk read to tell whether it is a script (`FileSet.filesRead`), a file
+   of declarations among them, since an edit can make it one. At a scripts-only root, where no root is walked, these,
+   the scripts and the walk's listings are the whole of what decides which files it checks and what it finds there;
  - a `.swift-format` in each directory from each file of ours up to the repository, absent, since one appearing
    refuses the run;
  - the settings file, there or absent;
@@ -57,7 +60,15 @@ struct RunInputs {
         environment: [String: String] = ProcessInfo.processInfo.environment,
     ) -> InputsRecord {
         var inputs = RunInputs()
-        for root in [package.root] + TypesPhase.inputRoots(of: package) + linkedPackageRoots {
+        /*
+         A scripts-only root has no build to walk the inputs of: each script is checked alone, from its own bytes, which
+         `owned` names, and the file set's listings name every directory whose contents decide which files are scripts.
+         Walked whole, the root of a repository like ahra would name every file under it, `node_modules` included.
+         */
+        let walkedRoots =
+            package.projectKind == .scripts
+            ? [] : [package.root] + TypesPhase.inputRoots(of: package) + linkedPackageRoots
+        for root in walkedRoots {
             inputs.walk(Self.path(root))
         }
         for directory in fileSet.directoriesListed {
@@ -78,6 +89,10 @@ struct RunInputs {
         for owned in fileSet.owned {
             inputs.fileOrAbsent(owned.url)
             inputs.listing(owned.url.deletingLastPathComponent())
+        }
+        /* At a scripts-only root, which walks no root, these are what say which files are its scripts. */
+        for read in fileSet.filesRead {
+            inputs.fileOrAbsent(URL(fileURLWithPath: read))
         }
         for consulted in fileSet.ignoreFilesConsulted {
             inputs.fileOrAbsent(URL(fileURLWithPath: consulted))
@@ -122,7 +137,7 @@ struct RunInputs {
                 return [phase.keptResolved]
             case .xcodeProject:
                 return [phase.resolvedInBuild]
-            case .swiftPackage:
+            case .swiftPackage, .scripts:
                 return []
         }
     }
