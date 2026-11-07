@@ -18,8 +18,5 @@
         "file": "/repository/source/DisplayName.tsx",
         "source": "const C = React.createContext();\n"
     },
-    "assertedMessageIds": [
-        "noContextDisplayName",
-        "noDisplayName"
-    ]
+    "assertedMessageIds": ["noContextDisplayName", "noDisplayName"]
 }

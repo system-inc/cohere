@@ -20,8 +20,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "let a: '2' = 2;"
     },
-    "assertedMessageIds": [
-        "preferAsConst"
-    ],
+    "assertedMessageIds": ["preferAsConst"],
     "assertsFix": true
 }

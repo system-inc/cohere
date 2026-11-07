@@ -16,9 +16,6 @@
         ],
         "fixedSource": " var a = 123;"
     },
-    "assertedMessageIds": [
-        "expected",
-        "unexpected"
-    ],
+    "assertedMessageIds": ["expected", "unexpected"],
     "assertsFix": true
 }

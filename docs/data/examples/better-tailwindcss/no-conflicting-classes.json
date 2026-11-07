@@ -26,7 +26,5 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"flex\" />;\n"
     },
-    "assertedMessageIds": [
-        "conflictingClasses"
-    ]
+    "assertedMessageIds": ["conflictingClasses"]
 }

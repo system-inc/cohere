@@ -18,7 +18,5 @@
         "file": "/repository/source/DangerWithChildren.tsx",
         "source": "shallow(\"div\");\n"
     },
-    "assertedMessageIds": [
-        "noDangerWithChildren"
-    ]
+    "assertedMessageIds": ["noDangerWithChildren"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/app/account/page.ts",
         "source": "import React from 'react';\ndeclare function useState(initial?: unknown): [unknown, (value: unknown) => void];\ndeclare function useReducer(reducer: unknown, initial?: unknown): [unknown, unknown];\nexport function run() {\n    return React.useState(1);\n}\n"
     },
-    "assertedMessageIds": [
-        "pageStateRemounts"
-    ]
+    "assertedMessageIds": ["pageStateRemounts"]
 }

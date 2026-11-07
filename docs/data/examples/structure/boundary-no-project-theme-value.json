@@ -18,7 +18,5 @@
         "file": "/repository/libraries/structure/source/components/buttons/UseButton.tsx",
         "source": "export const a = <Button variant />;\n"
     },
-    "assertedMessageIds": [
-        "forbiddenThemeValue"
-    ]
+    "assertedMessageIds": ["forbiddenThemeValue"]
 }

@@ -18,8 +18,5 @@
         "file": "content.ts",
         "source": "class C {}"
     },
-    "assertedMessageIds": [
-        "unexpectedBlock",
-        "unexpectedSwitch"
-    ]
+    "assertedMessageIds": ["unexpectedBlock", "unexpectedSwitch"]
 }

@@ -20,8 +20,6 @@
         "file": "/repository/source/Namespaces.ts",
         "source": "module \"foo\" {}"
     },
-    "assertedMessageIds": [
-        "preferNamespaceKeyword"
-    ],
+    "assertedMessageIds": ["preferNamespaceKeyword"],
     "assertsFix": true
 }

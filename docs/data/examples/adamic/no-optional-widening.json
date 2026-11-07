@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "const wide: { x: number; y?: number } = { x: 1 };\n"
     },
-    "assertedMessageIds": [
-        "optionalWidening"
-    ]
+    "assertedMessageIds": ["optionalWidening"]
 }

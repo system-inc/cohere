@@ -20,10 +20,6 @@
         "file": "probe.ts",
         "source": "import react from 'react';\n"
     },
-    "assertedMessageIds": [
-        "requireCorrectAlias",
-        "requireNamespaceImport",
-        "requireNodePrefix"
-    ],
+    "assertedMessageIds": ["requireCorrectAlias", "requireNamespaceImport", "requireNodePrefix"],
     "assertsFix": true
 }

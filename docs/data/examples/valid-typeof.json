@@ -18,9 +18,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "declare const value: string;\nexport const Ok = value === 'array';\n"
     },
-    "assertedMessageIds": [
-        "invalidTypeofValue",
-        "notString"
-    ],
+    "assertedMessageIds": ["invalidTypeofValue", "notString"],
     "assertsSuggestion": true
 }

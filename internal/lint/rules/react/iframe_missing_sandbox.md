@@ -1,12 +1,12 @@
 # `react/iframe-missing-sandbox`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Yes**               |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | yes                   |
 
 ## What it checks
 
@@ -23,4 +23,3 @@ Stylistic, but the tree already satisfies it, so enabling costs nothing and prev
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

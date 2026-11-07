@@ -1,21 +1,19 @@
 {
-  "rules": {
-    "TypeScript": "nexus/consistency-no-utils-folder",
-    "Swift": "cohere-swift/consistency-no-utils-folder",
-    "Go": "cohere-go/consistency-no-utils-folder"
-  },
-  "messages": {
-    "noUnderscoreUtils": {
-      "text": "Folder name \"{{folder}}\" is not allowed. Use \"{{replacement}}\" instead."
+    "rules": {
+        "TypeScript": "nexus/consistency-no-utils-folder",
+        "Swift": "cohere-swift/consistency-no-utils-folder",
+        "Go": "cohere-go/consistency-no-utils-folder"
     },
-    "noUtils": {
-      "text": "Folder name \"{{folder}}\" is not allowed. Use \"{{replacement}}\" instead."
-    },
-    "utilsPackageName": {
-      "text": "Package name \"{{package}}\" is not allowed. Use \"{{replacement}}\" instead, the spelling the house settled on, or a name for what the package holds, since a caller reads the package name before every exported name it uses.",
-      "languages": [
-        "Go"
-      ]
+    "messages": {
+        "noUnderscoreUtils": {
+            "text": "Folder name \"{{folder}}\" is not allowed. Use \"{{replacement}}\" instead."
+        },
+        "noUtils": {
+            "text": "Folder name \"{{folder}}\" is not allowed. Use \"{{replacement}}\" instead."
+        },
+        "utilsPackageName": {
+            "text": "Package name \"{{package}}\" is not allowed. Use \"{{replacement}}\" instead, the spelling the house settled on, or a name for what the package holds, since a caller reads the package name before every exported name it uses.",
+            "languages": ["Go"]
+        }
     }
-  }
 }

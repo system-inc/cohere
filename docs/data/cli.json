@@ -142,10 +142,7 @@
     "verbs": [
         {
             "name": "rename",
-            "usage": [
-                "cohere rename <file>:<line>:<column> <newName>",
-                "cohere rename <name> <newName>"
-            ],
+            "usage": ["cohere rename <file>:<line>:<column> <newName>", "cohere rename <name> <newName>"],
             "summary": "Renames a symbol everywhere the type graph says it is used. The position form is primary; a bare name is refused when it is ambiguous. Nothing is written without --write. Text mentions in comments and markdown are listed; --comments rewrites the ones a distinctive name makes likely, never one in a string or code fence.",
             "flags": [
                 {

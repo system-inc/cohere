@@ -18,7 +18,5 @@
         "file": "/repository/libraries/nexus/source/time/FormatTime.ts",
         "source": "export function dateIso8601(date: Date, timeZone?: string): string {\n    if(timeZone) {\n        return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);\n    }\n    return dateIso8601(date, 'UTC');\n}\n"
     },
-    "assertedMessageIds": [
-        "isoStringCutToDate"
-    ]
+    "assertedMessageIds": ["isoStringCutToDate"]
 }

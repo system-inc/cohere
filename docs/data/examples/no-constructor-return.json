@@ -18,7 +18,5 @@
         "file": "/repository/source/ConstructorReturn.ts",
         "source": "class C {  }"
     },
-    "assertedMessageIds": [
-        "noConstructorReturn"
-    ]
+    "assertedMessageIds": ["noConstructorReturn"]
 }

@@ -1,12 +1,12 @@
 # `@typescript-eslint/strict-void-return`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **85** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **85**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const timeout = new Promise((resolve) => setTimeout(resolve, 50));
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

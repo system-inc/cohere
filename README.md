@@ -49,6 +49,13 @@ per project, a line per project and one summary, and the exit code is the worst 
 only when every project is. A run that finds no project fails, and so does one whose every project was
 skipped, such as a Swift package alone under `--format-only`: it checked nothing.
 
+A TypeScript project at the root formats every JSON, Markdown, YAML and CSS file the repository holds, as
+well as its TypeScript. A root that's a Go workspace or a Swift package has nothing that would, since gofmt
+and the Swift engine format their own languages, so when such a root holds those files outside every
+TypeScript project's directory, the run adds one more project there: `Format`, the format phase alone, with
+the house format, leaving each TypeScript project's directory to that project. It needs no file of its own.
+`--types` and `--lint` don't run it, and `--no-format` leaves it out.
+
 Finding projects never enters what `.gitignore` ignores, at any level, nor `node_modules`, `.build`,
 `.cache` or `testdata`, nor a directory that is a repository of its own: a submodule stays part of the
 program above it, as it always was. `--directory`, `--tsconfig` or a path narrows the run to one
@@ -192,44 +199,45 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 
 ## Flags
 
-| Flag | What it does |
-| --- | --- |
-| `--fix` | apply fixes and format, running no other phase (`--no-format` to leave formatting out) |
-| `--fix-passes N` | how many times a file may be re-linted while fixes keep landing (default 10) |
-| `--no-fix` | write nothing to your source; report what fixing and formatting would change, and exit nonzero if anything would |
-| `--no-format` | leave formatting out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only |
-| `--format` | format the files not on record as formatted, or the paths you name; a bare run, `--fix` and `--no-fix` already do, so naming it there changes nothing |
-| `--format-all` | format every file, not only the ones not already on record as formatted (implies `--format`) |
-| `--format-only` | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
-| `--lint` | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics |
-| `--types` | report TypeScript's diagnostics only, running no rules and fixing nothing |
-| `--open` | open files with remaining findings in `code`, once in report order; combines with `--types` and `--lint`, preserves the run's exit status |
-| `--unused` | report code that is never used: unreferenced exports and unreachable statements |
-| `--unused-all` | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`) |
-| `--unused-deep` | also group the unused code into islands by what reaches what (implies `--unused`) |
-| `--directory PATH` | the project root (default: the nearest `tsconfig.json` or `Package.swift` above you) |
-| `--tsconfig PATH` | the tsconfig that defines the program (default: the nearest `tsconfig.json`) |
-| `--lint-config PATH` | the settings file, relative to `--directory` if given, else to where you run it (default: `CohereSettings.json` at the project root) |
-| `--no-cache` | read and write no cache, so every phase computes from source |
-| `--stdin-filepath PATH` | with `--fix`, read one file from stdin and print the fixed text, writing nothing |
-| `--explain FILE` | report what every rule did on one file, and why it ran or did not, writing nothing |
-| `--print-config` | print each rule's resolved severity and options for one file (`index.ts` unless you name one), as JSON, and exit |
-| `--rules` | print the rules cohere implements for your project's language, and exit |
-| `--rules-enabled` | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit |
-| `--verbose` | print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total |
-| `--phases` | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses |
-| `--json` | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output)) |
-| `--coverage` | name every rule under the coverage fact that describes it, not only count them |
-| `--adamic-readiness` | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output)) |
-| `--timing` | report what building the graph cost and the CPU each rule cost, most expensive rule first |
-| `--single-threaded` | use one type checker instead of several |
-| `--profile FILE` | write a Go CPU profile of the run to FILE |
-| `--cache-dump` | print what this project's cache holds, and exit |
-| `--version` | print the version, what this binary was built from, and the Swift contract it speaks, and exit |
+| Flag                    | What it does                                                                                                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--fix`                 | apply fixes and format, running no other phase (`--no-format` to leave formatting out)                                                                                         |
+| `--fix-passes N`        | how many times a file may be re-linted while fixes keep landing (default 10)                                                                                                   |
+| `--no-fix`              | write nothing to your source; report what fixing and formatting would change, and exit nonzero if anything would                                                               |
+| `--no-format`           | leave formatting out of a bare run, `--fix` or `--no-fix`: fix, type-check and lint only                                                                                       |
+| `--format`              | format the files not on record as formatted, or the paths you name; a bare run, `--fix` and `--no-fix` already do, so naming it there changes nothing                          |
+| `--format-all`          | format every file, not only the ones not already on record as formatted (implies `--format`)                                                                                   |
+| `--format-only`         | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
+| `--lint`                | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics                                                                      |
+| `--types`               | report TypeScript's diagnostics only, running no rules and fixing nothing                                                                                                      |
+| `--open`                | open files with remaining findings in `code`, once in report order; combines with `--types` and `--lint`, preserves the run's exit status                                      |
+| `--unused`              | report code that is never used: unreferenced exports and unreachable statements                                                                                                |
+| `--unused-all`          | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`)                                                                                |
+| `--unused-deep`         | also group the unused code into islands by what reaches what (implies `--unused`)                                                                                              |
+| `--directory PATH`      | the project root (default: the nearest `tsconfig.json` or `Package.swift` above you)                                                                                           |
+| `--tsconfig PATH`       | the tsconfig that defines the program (default: the nearest `tsconfig.json`)                                                                                                   |
+| `--lint-config PATH`    | the settings file, relative to `--directory` if given, else to where you run it (default: `CohereSettings.json` at the project root)                                           |
+| `--no-cache`            | read and write no cache, so every phase computes from source                                                                                                                   |
+| `--stdin-filepath PATH` | with `--fix`, read one file from stdin and print the fixed text, writing nothing                                                                                               |
+| `--explain FILE`        | report what every rule did on one file, and why it ran or did not, writing nothing                                                                                             |
+| `--print-config`        | print each rule's resolved severity and options for one file (`index.ts` unless you name one), as JSON, and exit                                                               |
+| `--rules`               | print the rules cohere implements for your project's language, and exit                                                                                                        |
+| `--rules-enabled`       | print the rules your settings turn on for one file (`index.ts` unless you name one), with severity, and exit                                                                   |
+| `--verbose`             | print everything a run can say: each phase, the coverage summary, overrides, skips, notes, memory and the total                                                                |
+| `--phases`              | put where the time went (graph, fix, format, types, lint) first in the footer's parentheses                                                                                    |
+| `--json`                | print newline-delimited JSON for a program to read instead of the human view (see [Output](#output))                                                                           |
+| `--coverage`            | name every rule under the coverage fact that describes it, not only count them                                                                                                 |
+| `--adamic-readiness`    | say what share of the files are Adamic-ready, in the footer and in `--json` (see [Output](#output))                                                                            |
+| `--timing`              | report what building the graph cost and the CPU each rule cost, most expensive rule first                                                                                      |
+| `--single-threaded`     | use one type checker instead of several                                                                                                                                        |
+| `--profile FILE`        | write a Go CPU profile of the run to FILE                                                                                                                                      |
+| `--cache-dump`          | print what this project's cache holds, and exit                                                                                                                                |
+| `--version`             | print the version, what this binary was built from, and the Swift contract it speaks, and exit                                                                                 |
 
 ## Output
 
 A run prints three things, in order:
+
 - **The files it rewrote.** Each line has a 🪄 if fixes were applied and a 💅 if it was formatted, then
   the path, then the rules whose fixes it took, with a count past one. Past 20 files it says how many
   more, and `--verbose` lists them all.
@@ -250,6 +258,7 @@ A run prints three things, in order:
 The last line is a run with `--adamic-readiness`.
 
 The words mean exactly this:
+
 - **cohered:** files cohere rewrote, fixed or formatted, which are the files listed above the footer.
   Shown only when there were any.
 - **checked:** files examined fresh in this run.
@@ -317,11 +326,11 @@ run did not check, which a program deciding whether to trust a passing run shoul
 
 ## Exit codes
 
-| Code | Meaning |
-| --- | --- |
-| `0` | no problems found |
-| `1` | it found problems, cohere crashed on a file, cohere itself could not run, for example on a settings error, or there was nothing to check: no project found, or every one skipped |
-| `2` | the command line was wrong, such as an unknown flag |
+| Code | Meaning                                                                                                                                                                          |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | no problems found                                                                                                                                                                |
+| `1`  | it found problems, cohere crashed on a file, cohere itself could not run, for example on a settings error, or there was nothing to check: no project found, or every one skipped |
+| `2`  | the command line was wrong, such as an unknown flag                                                                                                                              |
 
 `1` covers both findings and failures, so in CI the output says which one it was.
 
@@ -343,7 +352,10 @@ fixes, no type check and no lint, so a lint finding has no say in it.
 Only declared submodules are read. A git repository inside yours that `.gitmodules` does not name (a
 clone in an ignored directory, say) is skipped and nothing in it is checked: the scope line lists it
 under `skipped nested repositories`, and `nested repositories:` does not count it. Declare it as a
-submodule, or run the gate inside it.
+submodule, or run the gate inside it. A submodule your root's `ignorePatterns` name is someone else's code
+pinned at a commit, and isn't read either, with a note that says so.
+
+The format walk never enters `testdata`, whose fixtures are what tests read, byte for byte.
 
 Drop `--format-all` to check only the files not on record as formatted at their current bytes, or name
 paths to check only those. Without `--no-fix`, `cohere --format-only` formats and writes nothing else.

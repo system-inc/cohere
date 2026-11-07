@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-require-operator-assignment"
-  },
-  "messages": {
-    "longFormAssignment": {
-      "text": "This assignment names `{{target}}` twice, once as the place it writes and once as a value it reads, when `{{operator}}=` says the same thing naming it once. A reader has to check that the two spellings are the same place, and a later edit that changes one and not the other is a bug the shorthand cannot have. Write it with `{{operator}}=`."
+    "rules": {
+        "Go": "cohere-go/consistency-require-operator-assignment"
+    },
+    "messages": {
+        "longFormAssignment": {
+            "text": "This assignment names `{{target}}` twice, once as the place it writes and once as a value it reads, when `{{operator}}=` says the same thing naming it once. A reader has to check that the two spellings are the same place, and a later edit that changes one and not the other is a bug the shorthand cannot have. Write it with `{{operator}}=`."
+        }
     }
-  }
 }

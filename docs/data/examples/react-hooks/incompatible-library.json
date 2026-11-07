@@ -18,7 +18,5 @@
         "file": "/repository/source/IncompatibleLibrary.tsx",
         "source": "\nfunction Component(props) {\n  return <div>{props.text}</div>;\n}\n"
     },
-    "assertedMessageIds": [
-        "incompatibleLibrary"
-    ]
+    "assertedMessageIds": ["incompatibleLibrary"]
 }

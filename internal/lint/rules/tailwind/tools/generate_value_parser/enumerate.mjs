@@ -39,7 +39,7 @@ import * as NodeUrl from 'node:url';
 import * as NodeOs from 'node:os';
 
 const [, , packageRootArgument] = process.argv;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root>\n');
     process.exit(2);
 }
@@ -54,11 +54,17 @@ const bundleSource = NodeFileSystem.readFileSync(bundlePath, 'utf8');
  * Locate the three node constructors. They sit adjacent in the bundle because they are adjacent in
  * the source, and each is small enough that the minifier left the shape intact.
  */
-const wordConstructor = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{return\{kind:"word",value:\2\}\}/.exec(bundleSource);
-const functionConstructor = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{return\{kind:"function",value:\2,nodes:\3\}\}/.exec(bundleSource);
-const separatorConstructor = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{return\{kind:"separator",value:\2\}\}/.exec(bundleSource);
+const wordConstructor = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{return\{kind:"word",value:\2\}\}/.exec(
+    bundleSource,
+);
+const functionConstructor =
+    /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*),([A-Za-z_$][\w$]*)\)\{return\{kind:"function",value:\2,nodes:\3\}\}/.exec(
+        bundleSource,
+    );
+const separatorConstructor =
+    /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{return\{kind:"separator",value:\2\}\}/.exec(bundleSource);
 
-if (!wordConstructor || !functionConstructor || !separatorConstructor) {
+if(!wordConstructor || !functionConstructor || !separatorConstructor) {
     process.stderr.write('could not locate the value-parser node constructors in dist/lib.mjs\n');
     process.exit(1);
 }
@@ -69,8 +75,10 @@ if (!wordConstructor || !functionConstructor || !separatorConstructor) {
  * the constructors rather than from the top of the file.
  */
 const afterConstructors = bundleSource.slice(wordConstructor.index);
-const parseDeclaration = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{\2=\2\.replaceAll\(/.exec(afterConstructors);
-if (!parseDeclaration) {
+const parseDeclaration = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{\2=\2\.replaceAll\(/.exec(
+    afterConstructors,
+);
+if(!parseDeclaration) {
     process.stderr.write('could not locate the parse function after the node constructors\n');
     process.exit(1);
 }
@@ -84,24 +92,24 @@ function endOfFunctionBody(source, searchFrom) {
     const bodyStart = source.indexOf('{', searchFrom);
     let depth = 0;
     let openQuote = null;
-    for (let index = bodyStart; index < source.length; index++) {
+    for(let index = bodyStart; index < source.length; index++) {
         const character = source[index];
-        if (openQuote !== null) {
-            if (character === '\\') {
+        if(openQuote !== null) {
+            if(character === '\\') {
                 index++;
                 continue;
             }
-            if (character === openQuote) openQuote = null;
+            if(character === openQuote) openQuote = null;
             continue;
         }
-        if (character === '"' || character === "'" || character === '`') {
+        if(character === '"' || character === "'" || character === '`') {
             openQuote = character;
             continue;
         }
-        if (character === '{') depth++;
-        else if (character === '}') {
+        if(character === '{') depth++;
+        else if(character === '}') {
             depth--;
-            if (depth === 0) return index;
+            if(depth === 0) return index;
         }
     }
     return -1;
@@ -115,7 +123,7 @@ const parseAbsoluteIndex = wordConstructor.index + parseDeclaration.index;
  * just before the closing `return`.
  */
 const bodyEnd = endOfFunctionBody(bundleSource, parseAbsoluteIndex);
-if (bodyEnd === -1) {
+if(bodyEnd === -1) {
     process.stderr.write('could not find the end of the parse function body\n');
     process.exit(1);
 }
@@ -124,15 +132,19 @@ if (bodyEnd === -1) {
  * `toCss` is also wanted, so that round-tripping can be measured rather than assumed. It is the
  * function taking an ast and concatenating, and it sits between the constructors and parse.
  */
-const toCssDeclaration = /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)="";for\(let ([A-Za-z_$][\w$]*) of \2\)switch\(\4\.kind\)/.exec(afterConstructors);
-if (!toCssDeclaration) {
+const toCssDeclaration =
+    /function ([A-Za-z_$][\w$]*)\(([A-Za-z_$][\w$]*)\)\{let ([A-Za-z_$][\w$]*)="";for\(let ([A-Za-z_$][\w$]*) of \2\)switch\(\4\.kind\)/.exec(
+        afterConstructors,
+    );
+if(!toCssDeclaration) {
     process.stderr.write('could not locate toCss after the node constructors\n');
     process.exit(1);
 }
 
-const moduleSource = bundleSource.slice(wordConstructor.index, bodyEnd + 1)
-    + `\nexport const parse = ${parseDeclaration[1]};`
-    + `\nexport const toCss = ${toCssDeclaration[1]};\n`;
+const moduleSource =
+    bundleSource.slice(wordConstructor.index, bodyEnd + 1) +
+    `\nexport const parse = ${parseDeclaration[1]};` +
+    `\nexport const toCss = ${toCssDeclaration[1]};\n`;
 
 const temporaryModulePath = NodePath.join(
     NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'tailwind-value-parser-')),
@@ -151,35 +163,37 @@ const { parse, toCss } = await import(NodeUrl.pathToFileURL(temporaryModulePath)
 function assertIdentity(description, actual, expected) {
     const actualJson = JSON.stringify(actual);
     const expectedJson = JSON.stringify(expected);
-    if (actualJson !== expectedJson) {
-        process.stderr.write(`extracted function failed identity check (${description})\n  got:  ${actualJson}\n  want: ${expectedJson}\n`);
+    if(actualJson !== expectedJson) {
+        process.stderr.write(
+            `extracted function failed identity check (${description})\n  got:  ${actualJson}\n  want: ${expectedJson}\n`,
+        );
         process.exit(1);
     }
 }
 
 assertIdentity('nested function call', parse('foo(bar, baz)'), [
-    { kind: 'function', value: 'foo', nodes: [
-        { kind: 'word', value: 'bar' },
-        { kind: 'separator', value: ', ' },
-        { kind: 'word', value: 'baz' },
-    ] },
+    {
+        kind: 'function',
+        value: 'foo',
+        nodes: [
+            { kind: 'word', value: 'bar' },
+            { kind: 'separator', value: ', ' },
+            { kind: 'word', value: 'baz' },
+        ],
+    },
 ]);
 assertIdentity('slash is its own word', parse('a/b'), [
     { kind: 'word', value: 'a' },
     { kind: 'word', value: '/' },
     { kind: 'word', value: 'b' },
 ]);
-assertIdentity('buffer before an unmatched close paren is dropped', parse('a)b'), [
-    { kind: 'word', value: 'b' },
-]);
-assertIdentity('trailing backslash reads one past the end', parse('\\'), [
-    { kind: 'word', value: '\\undefined' },
-]);
+assertIdentity('buffer before an unmatched close paren is dropped', parse('a)b'), [{ kind: 'word', value: 'b' }]);
+assertIdentity('trailing backslash reads one past the end', parse('\\'), [{ kind: 'word', value: '\\undefined' }]);
 assertIdentity('remainder of an unclosed function lands at top level', parse('foo(bar'), [
     { kind: 'function', value: 'foo', nodes: [] },
     { kind: 'word', value: 'bar' },
 ]);
-if (toCss(parse('calc(var(--a) * 2)')) !== 'calc(var(--a) * 2)') {
+if(toCss(parse('calc(var(--a) * 2)')) !== 'calc(var(--a) * 2)') {
     process.stderr.write('extracted toCss failed its identity check\n');
     process.exit(1);
 }
@@ -199,24 +213,24 @@ const corpus = JSON.parse(NodeFileSystem.readFileSync(new URL('./corpus.json', i
 const exhaustiveAlphabet = ['\\', 'a', ' ', ',', '(', ')', '"', "'", '/', ':', 'é', '日', '\u{1F600}'];
 const exhaustive = [];
 (function enumerateStrings(prefix, remaining) {
-    if (remaining === 0) {
-        if (prefix !== '') exhaustive.push(prefix);
+    if(remaining === 0) {
+        if(prefix !== '') exhaustive.push(prefix);
         return;
     }
-    for (const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
+    for(const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
 })('', 1);
-for (let length = 2; length <= 3; length++) {
+for(let length = 2; length <= 3; length++) {
     (function enumerateStrings(prefix, remaining) {
-        if (remaining === 0) {
+        if(remaining === 0) {
             exhaustive.push(prefix);
             return;
         }
-        for (const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
+        for(const character of exhaustiveAlphabet) enumerateStrings(prefix + character, remaining - 1);
     })('', length);
 }
 
 const cases = [];
-for (const value of corpus) {
+for(const value of corpus) {
     const ast = parse(value);
     cases.push({
         value,
@@ -232,17 +246,23 @@ for (const value of corpus) {
 }
 
 const exhaustiveCases = [];
-for (const value of exhaustive) {
+for(const value of exhaustive) {
     const ast = parse(value);
     exhaustiveCases.push({ value, ast, css: toCss(ast) });
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion: packageJson.version,
-    bundle: NodePath.basename(bundlePath),
-    parseSymbol: parseDeclaration[1],
-    toCssSymbol: toCssDeclaration[1],
-    exhaustiveAlphabet,
-    cases,
-    exhaustiveCases,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion: packageJson.version,
+            bundle: NodePath.basename(bundlePath),
+            parseSymbol: parseDeclaration[1],
+            toCssSymbol: toCssDeclaration[1],
+            exhaustiveAlphabet,
+            cases,
+            exhaustiveCases,
+        },
+        null,
+        2,
+    ) + '\n',
+);

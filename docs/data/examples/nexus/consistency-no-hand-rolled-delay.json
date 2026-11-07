@@ -18,7 +18,5 @@
         "file": "/repository/source/ConsistencyNoHandRolledDelay.ts",
         "source": "const done = new Promise(startTimer);\n"
     },
-    "assertedMessageIds": [
-        "handRolledDelay"
-    ]
+    "assertedMessageIds": ["handRolledDelay"]
 }

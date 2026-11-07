@@ -18,7 +18,5 @@
         "file": "/repository/source/Loop.ts",
         "source": "export function run() { for(;;) { break; } }\n"
     },
-    "assertedMessageIds": [
-        "incorrectDirection"
-    ]
+    "assertedMessageIds": ["incorrectDirection"]
 }

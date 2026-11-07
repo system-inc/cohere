@@ -195,8 +195,9 @@ func uncheckedMarkers(summary runSummary) []string {
 				markers = append(markers, fmt.Sprintf("⚠ %s %s did not run", phaseGlyphs[name], name))
 			// A reporting phase skipped is a gap, and it is said even when the caller narrowed the run on
 			// purpose, since the line must not read like a whole check. Fix withholds no finding when
-			// skipped, and an opt-in phase is skipped on every ordinary run.
-			case record.Outcome == outcomeSkipped && name != phaseFix && !optInPhases[name]:
+			// skipped, an opt-in phase is skipped on every ordinary run, and the format project has no
+			// program to type-check or lint.
+			case record.Outcome == outcomeSkipped && name != phaseFix && !optInPhases[name] && !summary.FormatProject:
 				markers = append(markers, fmt.Sprintf("⚠ %s %s not checked", phaseGlyphs[name], name))
 			}
 		}

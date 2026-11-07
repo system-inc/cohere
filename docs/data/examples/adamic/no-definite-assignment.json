@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "class Account { balance = 0; }\n"
     },
-    "assertedMessageIds": [
-        "definiteAssignment"
-    ]
+    "assertedMessageIds": ["definiteAssignment"]
 }

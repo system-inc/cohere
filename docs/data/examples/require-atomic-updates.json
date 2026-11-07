@@ -18,8 +18,5 @@
         "file": "escape.ts",
         "source": "async function f(foo) { foo = await bar; }\n"
     },
-    "assertedMessageIds": [
-        "nonAtomicObjectUpdate",
-        "nonAtomicUpdate"
-    ]
+    "assertedMessageIds": ["nonAtomicObjectUpdate", "nonAtomicUpdate"]
 }

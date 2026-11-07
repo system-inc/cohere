@@ -18,7 +18,5 @@
         "file": "foo.tsx",
         "source": "export const C = () => (<a href=\"/contact\">Contact</a>);\n"
     },
-    "assertedMessageIds": [
-        "noHtmlLinkForPages"
-    ]
+    "assertedMessageIds": ["noHtmlLinkForPages"]
 }

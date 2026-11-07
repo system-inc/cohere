@@ -20,8 +20,6 @@
         "file": "/repository/source/DivRegex.ts",
         "source": "if (/) {}"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ],
+    "assertedMessageIds": ["unexpected"],
     "assertsFix": true
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/OctalEscape.ts",
         "source": "'0'"
     },
-    "assertedMessageIds": [
-        "octalEscapeSequence"
-    ]
+    "assertedMessageIds": ["octalEscapeSequence"]
 }

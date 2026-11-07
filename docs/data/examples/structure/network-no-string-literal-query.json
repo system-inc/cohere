@@ -18,7 +18,5 @@
         "file": "/repository/source/api/UserRequest.ts",
         "source": "declare const networkService: {\n    useGraphQlQuery(document: unknown, variables?: unknown): unknown;\n    useGraphQlMutation(document: unknown): unknown;\n    useSuspenseGraphQlQuery(document: unknown): unknown;\n    graphQlRequest(document: unknown): unknown;\n    other(document: unknown): unknown;\n};\ndeclare function gql(document: unknown): unknown;\ndeclare const identifier: string;\nexport const Value = 1;\n"
     },
-    "assertedMessageIds": [
-        "noStringLiteralGraphQlQuery"
-    ]
+    "assertedMessageIds": ["noStringLiteralGraphQlQuery"]
 }

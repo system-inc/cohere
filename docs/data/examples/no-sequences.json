@@ -18,7 +18,5 @@
         "file": "/repository/source/Sequences.ts",
         "source": "[a, b]"
     },
-    "assertedMessageIds": [
-        "unexpectedCommaExpression"
-    ]
+    "assertedMessageIds": ["unexpectedCommaExpression"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/RenderReturnValue.tsx",
         "source": "var foo = render(<div />, root)"
     },
-    "assertedMessageIds": [
-        "noRenderReturnValue"
-    ]
+    "assertedMessageIds": ["noRenderReturnValue"]
 }

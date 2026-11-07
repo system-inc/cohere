@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.tsx",
         "source": "const $Foo = (props) => this.props.a;\n"
     },
-    "assertedMessageIds": [
-        "noThisInSfc"
-    ]
+    "assertedMessageIds": ["noThisInSfc"]
 }

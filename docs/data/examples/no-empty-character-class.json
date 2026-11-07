@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export const Pattern = /[[]/;\n"
     },
-    "assertedMessageIds": [
-        "unexpectedEmptyCharacterClass"
-    ]
+    "assertedMessageIds": ["unexpectedEmptyCharacterClass"]
 }

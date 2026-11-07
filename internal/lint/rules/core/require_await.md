@@ -1,11 +1,11 @@
 # `require-await`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, enabled** |
-| Violations in ahra | **3** (cohere, 2026-10-01); ESLint reports 89 |
-| Plugin | `eslint core` |
-| Auto-fixable | no (a suggestion, never a fix) |
+|                        |                                                                 |
+| ---------------------- | --------------------------------------------------------------- |
+| **Recommendation**     | **Yes, enabled**                                                |
+| Violations in ahra     | **3** (cohere, 2026-10-01); ESLint reports 89                   |
+| Plugin                 | `eslint core`                                                   |
+| Auto-fixable           | no (a suggestion, never a fix)                                  |
 | Needs type information | no upstream; cohere asks the checker for the contract exemption |
 
 ## What it checks
@@ -26,11 +26,11 @@ reports here.
 
 Re-measured 2026-10-01 against the ahra tree, `cohere --no-fix --lint` beside ESLint:
 
-| | count | |
-|---|---|---|
-| both report | 1 | `modules/replicate/ReplicateApi.ts:193`, `listVersions` awaits nothing |
-| ESLint only, cohere right | 86 | the position's declared type demands a promise: 54 pensieve test doubles, 12 `AdsRegistry` collectors, 10 `AhraOsReactions`/`AhraOsTriggers` conditions, 5 finance adapters, and 5 more implementing or overriding a promise-returning member |
-| ESLint only, ESLint right | 0 | was 2 before the generic self-inference fix; see below |
+|                           | count |                                                                                                                                                                                                                                               |
+| ------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| both report               | 1     | `modules/replicate/ReplicateApi.ts:193`, `listVersions` awaits nothing                                                                                                                                                                        |
+| ESLint only, cohere right | 86    | the position's declared type demands a promise: 54 pensieve test doubles, 12 `AdsRegistry` collectors, 10 `AhraOsReactions`/`AhraOsTriggers` conditions, 5 finance adapters, and 5 more implementing or overriding a promise-returning member |
+| ESLint only, ESLint right | 0     | was 2 before the generic self-inference fix; see below                                                                                                                                                                                        |
 
 cohere's 3 are the `ReplicateApi` site and `useMetricsExportMenu.tsx:74` and `:92`.
 
@@ -50,4 +50,3 @@ and is right about. The rule now replays a generic call's DECLARED parameter typ
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

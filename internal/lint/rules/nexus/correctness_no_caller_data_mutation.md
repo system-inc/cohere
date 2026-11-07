@@ -1,10 +1,10 @@
 # `nexus/correctness-no-caller-data-mutation`
 
-| | |
-|---|---|
-| **Recommendation** | `error` |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | `error`                                                                                                                                                                     |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                      |
+| Auto-fixable           | no                                                                                                                                                                          |
 | Needs type information | yes, to tie the written chain to a parameter by symbol and to say where each written property and mutating method is declared; without a checker the rule registers nothing |
 
 ## What it checks
@@ -40,19 +40,19 @@ out-parameter exemptions retain their boundaries through aliases.
 
 Examples below assume `entries` is caller data and `queue` is a shallow copy of it:
 
-| Kind | Example reported write |
-|---|---|
-| Local alias of caller data | `const alias = entries; alias.push(entry)` |
-| Filtered elements | `entries.filter(keep)[0]!.status = 'done'` |
-| Sliced elements | `entries.slice()[0]!.status = 'done'` |
-| Identity-mapped elements | `entries.map(entry => entry)[0]!.status = 'done'` |
-| Spread or ordinary array elements | `[...entries][0]!.status = 'done'`; `[entries[0]!][0]!.status = 'done'` |
-| Concatenated receiver or arguments | `entries.concat([])[0]!.status = 'done'`; `for (const entry of local.concat(entries)) entry.status = 'done'` |
-| Copies sorted or reversed before selection | `entries.slice().sort(compare)[0]!.status = 'done'`; `entries.slice().reverse()[0]!.status = 'done'` |
-| Removed elements and arrays | `queue.shift()!.status = 'done'`; `queue.pop()!.status = 'done'`; `queue.splice(i, 1)[0]!.status = 'done'` |
-| Found or positional elements | `entries.find(keep)!.status = 'done'`; `entries.at(0)!.position++` |
-| Aliased selection or iteration | `const entry = entries.slice()[0]!; entry.status = 'done'`; `for (const entry of entries.slice()) entry.position++` |
-| Record or collection elements | `records.slice()[0]![key] = 1`; `arrays.slice().at(0)!.push(1)` |
+| Kind                                       | Example reported write                                                                                              |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Local alias of caller data                 | `const alias = entries; alias.push(entry)`                                                                          |
+| Filtered elements                          | `entries.filter(keep)[0]!.status = 'done'`                                                                          |
+| Sliced elements                            | `entries.slice()[0]!.status = 'done'`                                                                               |
+| Identity-mapped elements                   | `entries.map(entry => entry)[0]!.status = 'done'`                                                                   |
+| Spread or ordinary array elements          | `[...entries][0]!.status = 'done'`; `[entries[0]!][0]!.status = 'done'`                                             |
+| Concatenated receiver or arguments         | `entries.concat([])[0]!.status = 'done'`; `for (const entry of local.concat(entries)) entry.status = 'done'`        |
+| Copies sorted or reversed before selection | `entries.slice().sort(compare)[0]!.status = 'done'`; `entries.slice().reverse()[0]!.status = 'done'`                |
+| Removed elements and arrays                | `queue.shift()!.status = 'done'`; `queue.pop()!.status = 'done'`; `queue.splice(i, 1)[0]!.status = 'done'`          |
+| Found or positional elements               | `entries.find(keep)!.status = 'done'`; `entries.at(0)!.position++`                                                  |
+| Aliased selection or iteration             | `const entry = entries.slice()[0]!; entry.status = 'done'`; `for (const entry of entries.slice()) entry.position++` |
+| Record or collection elements              | `records.slice()[0]![key] = 1`; `arrays.slice().at(0)!.push(1)`                                                     |
 
 For example, `runJunkDeleteWindows` builds a queue with `state.windows.filter(...).sort(...)`,
 then repeatedly calls `queue.shift()` in a `for` header and update. Writes to `window.rowsDeleted`

@@ -1,12 +1,12 @@
 # `max-lines-per-function`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1980** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **1980**      |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ export function TasksNewTaskDialog(properties: TasksNewTaskDialogProperties) {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

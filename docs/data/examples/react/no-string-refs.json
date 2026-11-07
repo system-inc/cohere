@@ -18,8 +18,5 @@
         "file": "/repository/source/StringRefs.tsx",
         "source": "const a = <div ref />;\n"
     },
-    "assertedMessageIds": [
-        "stringInRefDeprecated",
-        "thisRefsDeprecated"
-    ]
+    "assertedMessageIds": ["stringInRefDeprecated", "thisRefsDeprecated"]
 }

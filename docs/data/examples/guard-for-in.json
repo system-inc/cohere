@@ -18,7 +18,5 @@
         "file": "/repository/source/GuardForIn.ts",
         "source": "for (var x in o);"
     },
-    "assertedMessageIds": [
-        "wrap"
-    ]
+    "assertedMessageIds": ["wrap"]
 }

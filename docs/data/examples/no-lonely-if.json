@@ -20,8 +20,6 @@
         "file": "/repository/source/NoLonelyIf.ts",
         "source": "if (a) { if (b) {} }"
     },
-    "assertedMessageIds": [
-        "unexpectedLonelyIf"
-    ],
+    "assertedMessageIds": ["unexpectedLonelyIf"],
     "assertsFix": true
 }

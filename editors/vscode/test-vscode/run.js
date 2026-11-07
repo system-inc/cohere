@@ -36,22 +36,35 @@ if(cohereBinary === undefined) {
 }
 
 function freshProfile() {
-    const root = NodeFileSystem.realpathSync(NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-gate-')));
+    const root = NodeFileSystem.realpathSync(
+        NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-gate-')),
+    );
     const userData = NodePath.join(root, 'user-data');
     const extensions = NodePath.join(root, 'extensions');
     NodeFileSystem.mkdirSync(NodePath.join(userData, 'User'), { recursive: true });
     NodeFileSystem.mkdirSync(extensions);
-    NodeFileSystem.writeFileSync(NodePath.join(userData, 'User', 'settings.json'), JSON.stringify({
-        'editor.defaultFormatter': 'system-inc.cohere',
-        'editor.formatOnSave': true,
-        // A project's .vscode/settings.json outranks the user's, and ahra's still names Prettier until
-        // `s doctor` rewrites it. A language's own setting outranks any setting for every language, at
-        // any scope, so this stands in for the project's for the probe's language.
-        '[typescript]': { 'editor.defaultFormatter': 'system-inc.cohere' },
-    }, null, 4));
-    const install = NodeChildProcess.spawnSync(cli, ['--user-data-dir', userData, '--extensions-dir', extensions, '--install-extension', vsix], {
-        encoding: 'utf8',
-    });
+    NodeFileSystem.writeFileSync(
+        NodePath.join(userData, 'User', 'settings.json'),
+        JSON.stringify(
+            {
+                'editor.defaultFormatter': 'system-inc.cohere',
+                'editor.formatOnSave': true,
+                // A project's .vscode/settings.json outranks the user's, and ahra's still names Prettier until
+                // `s doctor` rewrites it. A language's own setting outranks any setting for every language, at
+                // any scope, so this stands in for the project's for the probe's language.
+                '[typescript]': { 'editor.defaultFormatter': 'system-inc.cohere' },
+            },
+            null,
+            4,
+        ),
+    );
+    const install = NodeChildProcess.spawnSync(
+        cli,
+        ['--user-data-dir', userData, '--extensions-dir', extensions, '--install-extension', vsix],
+        {
+            encoding: 'utf8',
+        },
+    );
     if(install.status !== 0) {
         throw new Error(`installing ${vsix} failed: ${install.stdout}${install.stderr}`);
     }
@@ -60,28 +73,41 @@ function freshProfile() {
 
 function runCase(name, folder, environment) {
     const profile = freshProfile();
-    const result = NodeChildProcess.spawnSync(electron, [
-        folder,
-        '--user-data-dir', profile.userData,
-        '--extensions-dir', profile.extensions,
-        `--extensionDevelopmentPath=${NodePath.join(__dirname, 'host')}`,
-        `--extensionTestsPath=${NodePath.join(__dirname, 'suite.js')}`,
-        '--disable-workspace-trust',
-        '--skip-welcome',
-        '--skip-release-notes',
-        '--new-window',
-    ], {
-        encoding: 'utf8',
-        env: { ...environment, COHERE_GATE_CASE: name, COHERE_GATE_FOLDER: folder, COHERE_GATE_EXTENSIONS: profile.extensions },
-        timeout: 900000,
-    });
+    const result = NodeChildProcess.spawnSync(
+        electron,
+        [
+            folder,
+            '--user-data-dir',
+            profile.userData,
+            '--extensions-dir',
+            profile.extensions,
+            `--extensionDevelopmentPath=${NodePath.join(__dirname, 'host')}`,
+            `--extensionTestsPath=${NodePath.join(__dirname, 'suite.js')}`,
+            '--disable-workspace-trust',
+            '--skip-welcome',
+            '--skip-release-notes',
+            '--new-window',
+        ],
+        {
+            encoding: 'utf8',
+            env: {
+                ...environment,
+                COHERE_GATE_CASE: name,
+                COHERE_GATE_FOLDER: folder,
+                COHERE_GATE_EXTENSIONS: profile.extensions,
+            },
+            timeout: 900000,
+        },
+    );
     const output = `${result.stdout}${result.stderr}`;
     const said = output.split('\n').filter(function(line) {
         return line.includes('cohere gate:') || line.includes('AssertionError') || line.includes('Error:');
     });
     console.log(said.join('\n'));
     if(result.status !== 0) {
-        console.error(`${name}: VS Code exited ${result.status}${result.signal !== null ? ` on ${result.signal}` : ''}`);
+        console.error(
+            `${name}: VS Code exited ${result.status}${result.signal !== null ? ` on ${result.signal}` : ''}`,
+        );
         console.error(output.slice(-4000));
         return false;
     }
@@ -92,7 +118,9 @@ const withCohere = { ...process.env, COHERE_GATE_BINARY: cohereBinary, COHERE_GA
 delete withCohere.COHERE_BINARY;
 delete withCohere.ELECTRON_RUN_AS_NODE;
 
-const empty = NodeFileSystem.realpathSync(NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-absent-')));
+const empty = NodeFileSystem.realpathSync(
+    NodeFileSystem.mkdtempSync(NodePath.join(NodeOs.tmpdir(), 'cohere-vscode-absent-')),
+);
 const withoutCohere = {
     HOME: process.env.HOME,
     PATH: '/usr/bin:/bin:/usr/sbin:/sbin',

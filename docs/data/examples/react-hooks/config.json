@@ -18,7 +18,5 @@
         "file": "/repository/source/Config.tsx",
         "source": "import 'ReactCompilerTest';\n"
     },
-    "assertedMessageIds": [
-        "invalidTypeConfiguration"
-    ]
+    "assertedMessageIds": ["invalidTypeConfiguration"]
 }

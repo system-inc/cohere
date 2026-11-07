@@ -6,6 +6,7 @@
 package testing_require_parallel
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 	"strings"
@@ -28,7 +29,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a test or subtest in a _test.go file whose first statement is not Parallel on its own *testing.T, " +
 		"unless a // Not parallel: <reason> comment directly above it says why. A subtest whose function is not a " +
 		"literal or a function declared in the same package is not judged, because its body cannot be seen.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -43,6 +45,10 @@ var notParallelWithoutReasonMessage = policy.MessageOf(Name, "notParallelWithout
 const notParallelMarker = "Not parallel:"
 
 func run(pass *analysis.Pass) (any, error) {
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	// A subtest may name a function rather than spell a literal, and a function declared in this package has a body
 	// the rule can judge the same way, so every declaration is found by its object.
 	declarations := map[*types.Func]*ast.FuncDecl{}
@@ -71,14 +77,18 @@ func run(pass *analysis.Pass) (any, error) {
 			}
 			report(pass, function.Name, marker.Read(function.Doc, notParallelMarker))
 		}
-		judgeSubtests(pass, file, declarations)
+		judgeSubtests(pass, file, indexes.ForFile(file), declarations)
 	}
 	return nil, nil
 }
 
 // judgeSubtests reports every (*testing.T).Run in file whose subtest is serial and does not say why.
-func judgeSubtests(pass *analysis.Pass, file *ast.File, declarations map[*types.Func]*ast.FuncDecl) {
-	comments := marker.NewIndex(pass.Fset, file)
+func judgeSubtests(
+	pass *analysis.Pass,
+	file *ast.File,
+	comments *marker.Index,
+	declarations map[*types.Func]*ast.FuncDecl,
+) {
 	ast.Inspect(file, func(node ast.Node) bool {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall || len(call.Args) != 2 {

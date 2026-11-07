@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export function run() {\n    return 1;\n}\n"
     },
-    "assertedMessageIds": [
-        "unexpectedDeleteVar"
-    ]
+    "assertedMessageIds": ["unexpectedDeleteVar"]
 }

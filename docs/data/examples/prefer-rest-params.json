@@ -18,7 +18,5 @@
         "file": "/repository/source/PreferRestParams.ts",
         "source": "arguments;\n"
     },
-    "assertedMessageIds": [
-        "preferRestParams"
-    ]
+    "assertedMessageIds": ["preferRestParams"]
 }

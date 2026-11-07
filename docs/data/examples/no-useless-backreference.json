@@ -18,11 +18,5 @@
         "file": "/repository/source/Backreference.ts",
         "source": "/\\1/\n"
     },
-    "assertedMessageIds": [
-        "backward",
-        "disjunctive",
-        "forward",
-        "intoNegativeLookaround",
-        "nested"
-    ]
+    "assertedMessageIds": ["backward", "disjunctive", "forward", "intoNegativeLookaround", "nested"]
 }

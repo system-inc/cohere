@@ -20,8 +20,6 @@
         "file": "/repository/source/UselessEscape.tsx",
         "source": "/]/"
     },
-    "assertedMessageIds": [
-        "noUselessEscape"
-    ],
+    "assertedMessageIds": ["noUselessEscape"],
     "assertsFix": true
 }

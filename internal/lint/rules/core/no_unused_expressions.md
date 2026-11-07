@@ -1,12 +1,12 @@
 # `no-unused-expressions`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | none |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | none          |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -24,4 +24,3 @@ Misfiled as a Prettier formatting concern; it is a correctness rule and verify a
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

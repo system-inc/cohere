@@ -18,7 +18,5 @@
         "file": "/repository/source/DirectMutationState.tsx",
         "source": "\nvar H = createClass({ m: function() { this.state.x = 1; } });"
     },
-    "assertedMessageIds": [
-        "noDirectMutationState"
-    ]
+    "assertedMessageIds": ["noDirectMutationState"]
 }

@@ -44,7 +44,7 @@ import { loadDesignSystem, parseCandidate, readingKey, readingOf, surveyOwnContr
 import { DataTypeNames, probeClassName, Shapes } from './shapes.mjs';
 
 const [, , entryPointArgument, ...restArguments] = process.argv;
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write(
         'usage: extract.mjs <theme.css> [--json <path>] [--resolve-root <dir>] [--corpus-root <dir> | --no-corpus]\n',
     );
@@ -79,12 +79,10 @@ const resolveRootArgument = flagValue('--resolve-root');
 const corpusRootArgument = flagValue('--corpus-root');
 const skipsCorpus = restArguments.includes('--no-corpus');
 
-const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot, inferDataType } = await loadDesignSystem(
-    entryPointArgument,
-    resolveRootArgument,
-);
+const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRoot, inferDataType } =
+    await loadDesignSystem(entryPointArgument, resolveRootArgument);
 
-if (typeof inferDataType !== 'function') {
+if(typeof inferDataType !== 'function') {
     process.stderr.write(
         'extract.mjs: could not recover inferDataType from the installed Tailwind.\n' +
             'The descriptor model is a claim about that function, so without it there is nothing to test.\n' +
@@ -109,19 +107,19 @@ const modifierClassNames = [];
 const functionalRoots = new Set();
 const staticNames = new Set();
 
-for (const entry of designSystem.getClassList?.() ?? []) {
+for(const entry of designSystem.getClassList?.() ?? []) {
     const name = Array.isArray(entry) ? entry[0] : typeof entry === 'string' ? entry : entry?.name;
-    if (typeof name !== 'string') continue;
+    if(typeof name !== 'string') continue;
     registryClassNames.push(name);
 
     const asWritten = parseCandidate(designSystem, name);
-    if (asWritten?.kind === 'static') staticNames.add(name);
-    if (asWritten?.kind === 'functional' && asWritten.root) functionalRoots.add(asWritten.root);
+    if(asWritten?.kind === 'static') staticNames.add(name);
+    if(asWritten?.kind === 'functional' && asWritten.root) functionalRoots.add(asWritten.root);
 
     // `from-black/70` parses as root `from` and `from` never appears with a numeric probe, while
     // `flex` only reveals its functional root under one. Both routes are needed.
     const asFunctional = parseCandidate(designSystem, name + '-4');
-    if (asFunctional?.kind === 'functional' && asFunctional.root) functionalRoots.add(asFunctional.root);
+    if(asFunctional?.kind === 'functional' && asFunctional.root) functionalRoots.add(asFunctional.root);
 
     /*
      * Modifiers are a second axis and are kept out of the registry count.
@@ -132,8 +130,8 @@ for (const entry of designSystem.getClassList?.() ?? []) {
      * number unrecognisable against the 37,643 measured in the analysis. They are replayed
      * separately, sampled, so the modifier axis is still tested.
      */
-    if (Array.isArray(entry) && entry[1] && typeof entry[1] === 'object') {
-        for (const modifier of entry[1].modifiers ?? []) modifierClassNames.push(name + '/' + modifier);
+    if(Array.isArray(entry) && entry[1] && typeof entry[1] === 'object') {
+        for(const modifier of entry[1].modifiers ?? []) modifierClassNames.push(name + '/' + modifier);
     }
 }
 
@@ -164,8 +162,8 @@ for (const entry of designSystem.getClassList?.() ?? []) {
  * records the static, the registry route records the functional, and dropping either loses a real
  * reading.
  */
-for (const root of designSystem.utilities?.keys?.('functional') ?? []) {
-    if (typeof root === 'string') functionalRoots.add(root);
+for(const root of designSystem.utilities?.keys?.('functional') ?? []) {
+    if(typeof root === 'string') functionalRoots.add(root);
 }
 
 const roots = Array.from(functionalRoots).sort();
@@ -183,12 +181,12 @@ const roots = Array.from(functionalRoots).sort();
  * the utility's own handler, and a table is what a literal becomes.
  */
 const registryValuesByRoot = new Map();
-for (const className of registryClassNames) {
+for(const className of registryClassNames) {
     const candidate = parseCandidate(designSystem, className);
-    if (candidate?.kind !== 'functional' || !candidate.root) continue;
-    if (candidate.modifier != null) continue;
+    if(candidate?.kind !== 'functional' || !candidate.root) continue;
+    if(candidate.modifier != null) continue;
     const value = candidate.value;
-    if (!value || value.kind === 'arbitrary') continue;
+    if(!value || value.kind === 'arbitrary') continue;
     const list = registryValuesByRoot.get(candidate.root) ?? new Set();
     list.add(String(value.value ?? ''));
     registryValuesByRoot.set(candidate.root, list);
@@ -206,13 +204,13 @@ for (const className of registryClassNames) {
 const themeKeysByNamespace = new Map();
 {
     const candidatePrefixes = new Set();
-    for (const [key] of designSystem.theme.entries()) {
+    for(const [key] of designSystem.theme.entries()) {
         const segments = key.slice(2).split('-');
-        for (let length = 1; length <= segments.length - 1; length++) {
+        for(let length = 1; length <= segments.length - 1; length++) {
             candidatePrefixes.add('--' + segments.slice(0, length).join('-'));
         }
     }
-    for (const prefix of candidatePrefixes) {
+    for(const prefix of candidatePrefixes) {
         let keys;
         try {
             keys = designSystem.theme.keysInNamespaces([prefix]);
@@ -220,7 +218,7 @@ const themeKeysByNamespace = new Map();
         catch {
             continue;
         }
-        if (!keys || keys.length === 0) continue;
+        if(!keys || keys.length === 0) continue;
         themeKeysByNamespace.set(prefix, keys);
     }
 }
@@ -254,12 +252,14 @@ const propertyOrder = [];
         bundleSource = '';
     }
     const orderMatch = bundleSource.match(/\["container-type","pointer-events"[^\]]*\]/);
-    if (orderMatch !== null) {
-        for (const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
+    if(orderMatch !== null) {
+        for(const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
     }
 }
 
-const themeNamespaces = Array.from(themeKeysByNamespace.keys()).sort((left, right) => right.length - left.length || (left < right ? -1 : 1));
+const themeNamespaces = Array.from(themeKeysByNamespace.keys()).sort(
+    (left, right) => right.length - left.length || (left < right ? -1 : 1),
+);
 
 /*
  * The keys that belong to exactly one namespace.
@@ -272,11 +272,14 @@ const themeNamespaces = Array.from(themeKeysByNamespace.keys()).sort((left, righ
 const uniqueThemeKeysByNamespace = new Map();
 {
     const namespacesByKey = new Map();
-    for (const [namespace, keys] of themeKeysByNamespace) {
-        for (const key of keys) namespacesByKey.set(key, (namespacesByKey.get(key) ?? 0) + 1);
+    for(const [namespace, keys] of themeKeysByNamespace) {
+        for(const key of keys) namespacesByKey.set(key, (namespacesByKey.get(key) ?? 0) + 1);
     }
-    for (const [namespace, keys] of themeKeysByNamespace) {
-        uniqueThemeKeysByNamespace.set(namespace, keys.filter((key) => namespacesByKey.get(key) === 1));
+    for(const [namespace, keys] of themeKeysByNamespace) {
+        uniqueThemeKeysByNamespace.set(
+            namespace,
+            keys.filter((key) => namespacesByKey.get(key) === 1),
+        );
     }
 }
 
@@ -295,11 +298,11 @@ const uniqueThemeKeysByNamespace = new Map();
  */
 function inferredTypeOf(className, typeList) {
     const candidate = parseCandidate(designSystem, className);
-    if (!candidate) return undefined;
+    if(!candidate) return undefined;
     const value = candidate.value;
-    if (!value) return '@empty';
-    if (value.kind !== 'arbitrary') return '@bare:' + String(value.value ?? '');
-    if (value.dataType) return value.dataType;
+    if(!value) return '@empty';
+    if(value.kind !== 'arbitrary') return '@bare:' + String(value.value ?? '');
+    if(value.dataType) return value.dataType;
     const inferred = inferDataType(String(value.value ?? ''), typeList);
     return inferred ?? null;
 }
@@ -322,27 +325,27 @@ function inferredTypeOf(className, typeList) {
  * them.
  */
 function orderTypeList(root, types, readingByType, fallbackReading) {
-    if (types.length < 2) return types;
+    if(types.length < 2) return types;
 
     // Probe values that several predicates accept. Drawn from the shape corpus rather than a
     // separate list, so a shape added for the sweep also sharpens the ordering.
     const ambiguousProbes = new Set();
-    for (const shape of Shapes) {
-        if (!shape.syntax.startsWith('[') || shape.syntax.includes(':')) continue;
+    for(const shape of Shapes) {
+        if(!shape.syntax.startsWith('[') || shape.syntax.includes(':')) continue;
         const inner = shape.syntax.slice(1, -1);
         let matches = 0;
-        for (const typeName of types) {
-            if (inferDataType(inner, [typeName]) !== null) matches++;
-            if (matches > 1) break;
+        for(const typeName of types) {
+            if(inferDataType(inner, [typeName]) !== null) matches++;
+            if(matches > 1) break;
         }
-        if (matches > 1) ambiguousProbes.add(inner);
+        if(matches > 1) ambiguousProbes.add(inner);
     }
 
     // `earlier.get(a)` holds every type observed to lose to `a`.
     const earlier = new Map(types.map((typeName) => [typeName, new Set()]));
-    for (const probe of ambiguousProbes) {
+    for(const probe of ambiguousProbes) {
         const actual = readingOf(designSystem, root + '-[' + probe + ']');
-        if (actual === null) continue;
+        if(actual === null) continue;
 
         const accepting = types.filter((typeName) => inferDataType(probe, [typeName]) !== null);
         // The winners: types whose reading matches what the engine produced. More than one can match
@@ -359,11 +362,13 @@ function orderTypeList(root, types, readingByType, fallbackReading) {
          * What the probe proves is that every winner precedes every loser. It says nothing about the
          * order within either group, and nothing is recorded about that.
          */
-        const winners = accepting.filter((typeName) => sameReading(readingByType.get(typeName) ?? fallbackReading, actual));
-        if (winners.length === 0 || winners.length === accepting.length) continue;
-        for (const winner of winners) {
-            for (const loser of accepting) {
-                if (!winners.includes(loser)) earlier.get(winner).add(loser);
+        const winners = accepting.filter((typeName) =>
+            sameReading(readingByType.get(typeName) ?? fallbackReading, actual),
+        );
+        if(winners.length === 0 || winners.length === accepting.length) continue;
+        for(const winner of winners) {
+            for(const loser of accepting) {
+                if(!winners.includes(loser)) earlier.get(winner).add(loser);
             }
         }
     }
@@ -371,12 +376,14 @@ function orderTypeList(root, types, readingByType, fallbackReading) {
     // Stable topological sort: repeatedly take the first type nothing unplaced beats.
     const ordered = [];
     const remaining = types.slice();
-    while (remaining.length > 0) {
-        let index = remaining.findIndex((typeName) => !remaining.some((other) => other !== typeName && earlier.get(other).has(typeName)));
+    while(remaining.length > 0) {
+        let index = remaining.findIndex(
+            (typeName) => !remaining.some((other) => other !== typeName && earlier.get(other).has(typeName)),
+        );
         // A cycle means two probes disagree about precedence, which the descriptor model cannot
         // express. Taking the first entry keeps the sort total; the sweep then reports the failures
         // rather than hiding them behind an arbitrary order.
-        if (index === -1) index = 0;
+        if(index === -1) index = 0;
         ordered.push(remaining[index]);
         remaining.splice(index, 1);
     }
@@ -394,10 +401,10 @@ function discoverDescriptor(root) {
      * fallback at all and predicted null for four probes it should have answered.
      */
     let fallbackReading = readingOf(designSystem, root + '-[var(--tw-probe)]');
-    if (fallbackReading === null) {
-        for (const probeValue of ['[anything]', '-1', '1', '4', 'none', 'full']) {
+    if(fallbackReading === null) {
+        for(const probeValue of ['[anything]', '-1', '1', '4', 'none', 'full']) {
             const reading = readingOf(designSystem, root + '-' + probeValue);
-            if (reading === null) continue;
+            if(reading === null) continue;
             fallbackReading = reading;
             break;
         }
@@ -424,11 +431,11 @@ function discoverDescriptor(root) {
      */
     const readingByType = new Map();
     const acceptedTypes = [];
-    for (const typeName of DataTypeNames) {
+    for(const typeName of DataTypeNames) {
         const reading = readingOf(designSystem, root + '-[' + typeName + ':var(--tw-probe)]');
-        if (reading === null) continue;
+        if(reading === null) continue;
         acceptedTypes.push(typeName);
-        if (sameReading(reading, fallbackReading)) continue;
+        if(sameReading(reading, fallbackReading)) continue;
         readingByType.set(typeName, reading);
     }
 
@@ -445,12 +452,14 @@ function discoverDescriptor(root) {
      * ordering constraints nothing observes, and each one costs a row in the generated table.
      */
     const shadowingTypes = acceptedTypes.filter((typeName) => {
-        if (readingByType.has(typeName)) return false;
-        return Array.from(readingByType.keys()).some((other) => Shapes.some((shape) => {
-            if (!shape.syntax.startsWith('[') || shape.syntax.includes(':')) return false;
-            const inner = shape.syntax.slice(1, -1);
-            return inferDataType(inner, [typeName]) !== null && inferDataType(inner, [other]) !== null;
-        }));
+        if(readingByType.has(typeName)) return false;
+        return Array.from(readingByType.keys()).some((other) =>
+            Shapes.some((shape) => {
+                if(!shape.syntax.startsWith('[') || shape.syntax.includes(':')) return false;
+                const inner = shape.syntax.slice(1, -1);
+                return inferDataType(inner, [typeName]) !== null && inferDataType(inner, [other]) !== null;
+            }),
+        );
     });
 
     /*
@@ -473,9 +482,9 @@ function discoverDescriptor(root) {
      * than guessing at it from key prefixes.
      */
     const readingByNamespace = new Map();
-    for (const namespace of themeNamespaces) {
+    for(const namespace of themeNamespaces) {
         const keys = uniqueThemeKeysByNamespace.get(namespace);
-        if (!keys || keys.length === 0) continue;
+        if(!keys || keys.length === 0) continue;
         /*
          * Several keys, because one key can be absent from the root's own accepted set while another
          * in the same namespace is present, and only keys unique to this namespace, because a shared
@@ -487,9 +496,9 @@ function discoverDescriptor(root) {
          * longest-first lookup still resolved `bold` correctly but `font-sans` did not — `--font` is
          * shorter than the spurious entries above it. Eight registry classes turned on this.
          */
-        for (const key of keys) {
+        for(const key of keys) {
             const reading = readingOf(designSystem, root + '-' + key);
-            if (reading === null) continue;
+            if(reading === null) continue;
             readingByNamespace.set(namespace, reading);
             break;
         }
@@ -502,9 +511,9 @@ function discoverDescriptor(root) {
      * (`w-1/2`), keywords the root itself defines (`w-full`), and bare numbers all land here. Probed
      * with a spread of shapes rather than one, since a root accepts only some of them.
      */
-    for (const bareValue of ['4', '1', '0', '0.5', '2.5', 'full', '1/2', '3', '96']) {
+    for(const bareValue of ['4', '1', '0', '0.5', '2.5', 'full', '1/2', '3', '96']) {
         const reading = readingOf(designSystem, root + '-' + bareValue);
-        if (reading === null) continue;
+        if(reading === null) continue;
         readingByNamespace.set('@none', reading);
         break;
     }
@@ -522,9 +531,9 @@ function discoverDescriptor(root) {
      * listed even though it does infer as a color, so the bucket is the whole keyword set rather
      * than the subset inference happens to miss.
      */
-    for (const keyword of ['current', 'inherit', 'transparent']) {
+    for(const keyword of ['current', 'inherit', 'transparent']) {
         const reading = readingOf(designSystem, root + '-' + keyword);
-        if (reading === null) continue;
+        if(reading === null) continue;
         readingByNamespace.set('@colorKeyword', reading);
         break;
     }
@@ -537,9 +546,15 @@ function discoverDescriptor(root) {
      * probed this is two entries in total, `transition-none` and `ease-initial`.
      */
     const readingByLiteral = new Map();
-    for (const bareValue of registryValuesByRoot.get(root) ?? []) {
-        if (ColorKeywords.has(bareValue)) continue;
-        if (themeNamespaces.some((namespace) => readingByNamespace.has(namespace) && themeKeysByNamespace.get(namespace).includes(bareValue))) continue;
+    for(const bareValue of registryValuesByRoot.get(root) ?? []) {
+        if(ColorKeywords.has(bareValue)) continue;
+        if(
+            themeNamespaces.some(
+                (namespace) =>
+                    readingByNamespace.has(namespace) && themeKeysByNamespace.get(namespace).includes(bareValue),
+            )
+        )
+            continue;
         /*
          * Tested against the types this root discriminates on, not against all of them.
          *
@@ -549,10 +564,10 @@ function discoverDescriptor(root) {
          * has explains this value.
          */
         const inferredHere = inferDataType(bareValue, [...readingByType.keys()]);
-        if (inferredHere !== null && readingByType.has(inferredHere)) continue;
+        if(inferredHere !== null && readingByType.has(inferredHere)) continue;
         const reading = readingOf(designSystem, root + '-' + bareValue);
-        if (reading === null) continue;
-        if (sameReading(reading, readingByNamespace.get('@none') ?? fallbackReading)) continue;
+        if(reading === null) continue;
+        if(sameReading(reading, readingByNamespace.get('@none') ?? fallbackReading)) continue;
         readingByLiteral.set(bareValue, reading);
     }
 
@@ -597,9 +612,9 @@ function discoverDescriptor(root) {
      * modifier while carrying no information without one.
      */
     const readingByTypeWithModifier = new Map();
-    for (const typeName of acceptedTypes) {
+    for(const typeName of acceptedTypes) {
         const reading = readingOf(designSystem, root + '-[' + typeName + ':var(--tw-probe)]/50');
-        if (reading !== null) readingByTypeWithModifier.set(typeName, reading);
+        if(reading !== null) readingByTypeWithModifier.set(typeName, reading);
     }
     const fallbackReadingWithModifier = readingOf(designSystem, root + '-[var(--tw-probe)]/50');
 
@@ -617,28 +632,29 @@ function discoverDescriptor(root) {
      * the axis is `{absent, alpha, themed}` instead of `{absent, present}`.
      */
     const readingByTypeWithThemedModifier = new Map();
-    for (const typeName of acceptedTypes) {
+    for(const typeName of acceptedTypes) {
         const reading = readingOf(designSystem, root + '-[' + typeName + ':var(--tw-probe)]/none');
-        if (reading !== null) readingByTypeWithThemedModifier.set(typeName, reading);
+        if(reading !== null) readingByTypeWithThemedModifier.set(typeName, reading);
     }
     const fallbackReadingWithThemedModifier = readingOf(designSystem, root + '-[var(--tw-probe)]/none');
     const readingByNamespaceWithModifier = new Map();
     const readingByNamespaceWithThemedModifier = new Map();
-    for (const [namespace] of readingByNamespace) {
-        const keys = namespace === '@none'
-            ? ['4', '1', '0', '0.5', '2.5', 'full', '1/2', '3', '96']
-            : namespace === '@colorKeyword'
-              ? ['current', 'inherit', 'transparent']
-              : (uniqueThemeKeysByNamespace.get(namespace) ?? []);
-        for (const key of keys) {
+    for(const [namespace] of readingByNamespace) {
+        const keys =
+            namespace === '@none'
+                ? ['4', '1', '0', '0.5', '2.5', 'full', '1/2', '3', '96']
+                : namespace === '@colorKeyword'
+                  ? ['current', 'inherit', 'transparent']
+                  : (uniqueThemeKeysByNamespace.get(namespace) ?? []);
+        for(const key of keys) {
             const reading = readingOf(designSystem, root + '-' + key + '/50');
-            if (reading === null) continue;
+            if(reading === null) continue;
             readingByNamespaceWithModifier.set(namespace, reading);
             break;
         }
-        for (const key of keys) {
+        for(const key of keys) {
             const reading = readingOf(designSystem, root + '-' + key + '/none');
-            if (reading === null) continue;
+            if(reading === null) continue;
             readingByNamespaceWithThemedModifier.set(namespace, reading);
             break;
         }
@@ -669,14 +685,21 @@ function discoverDescriptor(root) {
      * any axis has to be on it.
      */
     const modifierDiscriminatingTypes = acceptedTypes.filter((typeName) => {
-        if (readingByType.has(typeName) || shadowingTypes.includes(typeName)) return false;
+        if(readingByType.has(typeName) || shadowingTypes.includes(typeName)) return false;
         const modified = readingByTypeWithModifier.get(typeName);
         const themed = readingByTypeWithThemedModifier.get(typeName);
-        return (modified !== undefined && !sameReading(modified, fallbackReadingWithModifier))
-            || (themed !== undefined && !sameReading(themed, fallbackReadingWithThemedModifier));
+        return (
+            (modified !== undefined && !sameReading(modified, fallbackReadingWithModifier)) ||
+            (themed !== undefined && !sameReading(themed, fallbackReadingWithThemedModifier))
+        );
     });
 
-    const typeList = orderTypeList(root, [...readingByType.keys(), ...shadowingTypes, ...modifierDiscriminatingTypes], readingByType, fallbackReading);
+    const typeList = orderTypeList(
+        root,
+        [...readingByType.keys(), ...shadowingTypes, ...modifierDiscriminatingTypes],
+        readingByType,
+        fallbackReading,
+    );
 
     return {
         root,
@@ -742,7 +765,7 @@ const ThemedModifierValues = new Set(['none']);
 
 function predictReading(descriptor, className) {
     const inferred = inferredTypeOf(className, descriptor.typeList);
-    if (inferred === undefined) return undefined;
+    if(inferred === undefined) return undefined;
     /*
      * A modifier selects a parallel set of readings rather than adjusting one.
      *
@@ -754,25 +777,33 @@ function predictReading(descriptor, className) {
     const candidate = parseCandidate(designSystem, className);
     const modifier = candidate?.modifier ?? null;
     // `none` is a theme key rather than an alpha; anything else is an alpha and they all behave alike.
-    const modifierAxis = modifier === null ? 'absent' : modifier.kind === 'named' && ThemedModifierValues.has(modifier.value) ? 'themed' : 'alpha';
+    const modifierAxis =
+        modifier === null
+            ? 'absent'
+            : modifier.kind === 'named' && ThemedModifierValues.has(modifier.value)
+              ? 'themed'
+              : 'alpha';
 
-    const readingByType = modifierAxis === 'absent'
-        ? descriptor.readingByType
-        : modifierAxis === 'themed'
-          ? descriptor.readingByTypeWithThemedModifier
-          : descriptor.readingByTypeWithModifier;
-    const readingByNamespace = modifierAxis === 'absent'
-        ? descriptor.readingByNamespace
-        : modifierAxis === 'themed'
-          ? descriptor.readingByNamespaceWithThemedModifier
-          : descriptor.readingByNamespaceWithModifier;
-    const fallbackReading = modifierAxis === 'absent'
-        ? descriptor.fallbackReading
-        : modifierAxis === 'themed'
-          ? descriptor.fallbackReadingWithThemedModifier
-          : descriptor.fallbackReadingWithModifier;
+    const readingByType =
+        modifierAxis === 'absent'
+            ? descriptor.readingByType
+            : modifierAxis === 'themed'
+              ? descriptor.readingByTypeWithThemedModifier
+              : descriptor.readingByTypeWithModifier;
+    const readingByNamespace =
+        modifierAxis === 'absent'
+            ? descriptor.readingByNamespace
+            : modifierAxis === 'themed'
+              ? descriptor.readingByNamespaceWithThemedModifier
+              : descriptor.readingByNamespaceWithModifier;
+    const fallbackReading =
+        modifierAxis === 'absent'
+            ? descriptor.fallbackReading
+            : modifierAxis === 'themed'
+              ? descriptor.fallbackReadingWithThemedModifier
+              : descriptor.fallbackReadingWithModifier;
 
-    if (inferred === '@empty') {
+    if(inferred === '@empty') {
         return modifierAxis === 'absent'
             ? descriptor.emptyReading
             : modifierAxis === 'themed'
@@ -780,7 +811,7 @@ function predictReading(descriptor, className) {
               : descriptor.emptyReadingWithModifier;
     }
 
-    if (inferred !== null && inferred.startsWith('@bare:')) {
+    if(inferred !== null && inferred.startsWith('@bare:')) {
         /*
          * The bare path, in the precedence the engine applies.
          *
@@ -801,53 +832,57 @@ function predictReading(descriptor, className) {
          */
         const bareValue = inferred.slice('@bare:'.length);
 
-        if (modifierAxis === 'absent' && descriptor.readingByLiteral.has(bareValue)) {
+        if(modifierAxis === 'absent' && descriptor.readingByLiteral.has(bareValue)) {
             return descriptor.readingByLiteral.get(bareValue);
         }
 
-        if (readingByNamespace.has('@colorKeyword') && ColorKeywords.has(bareValue)) {
+        if(readingByNamespace.has('@colorKeyword') && ColorKeywords.has(bareValue)) {
             return readingByNamespace.get('@colorKeyword');
         }
 
-        for (const namespace of themeNamespaces) {
-            if (!readingByNamespace.has(namespace)) continue;
-            if (!themeKeysByNamespace.get(namespace).includes(bareValue)) continue;
+        for(const namespace of themeNamespaces) {
+            if(!readingByNamespace.has(namespace)) continue;
+            if(!themeKeysByNamespace.get(namespace).includes(bareValue)) continue;
             return readingByNamespace.get(namespace);
         }
 
         const inferredBareType = inferDataType(bareValue, descriptor.typeList);
-        if (inferredBareType !== null && readingByType.has(inferredBareType)) {
+        if(inferredBareType !== null && readingByType.has(inferredBareType)) {
             return readingByType.get(inferredBareType);
         }
 
         return readingByNamespace.get('@none') ?? fallbackReading;
     }
-    if (inferred !== null && readingByType.has(inferred)) {
+    if(inferred !== null && readingByType.has(inferred)) {
         return readingByType.get(inferred);
     }
     return fallbackReading;
 }
 
 function sameReading(left, right) {
-    if (left === null || right === null || left === undefined || right === undefined) {
+    if(left === null || right === null || left === undefined || right === undefined) {
         return left === right;
     }
-    return left.count === right.count && left.order.length === right.order.length && left.order.every((value, index) => value === right.order[index]);
+    return (
+        left.count === right.count &&
+        left.order.length === right.order.length &&
+        left.order.every((value, index) => value === right.order[index])
+    );
 }
 
 // ---------------------------------------------------------------------------------------------
 // Pass 1 — extract
 
 const descriptors = new Map();
-for (const root of roots) descriptors.set(root, discoverDescriptor(root));
+for(const root of roots) descriptors.set(root, discoverDescriptor(root));
 
 // Static utilities are not a model at all: they take no value, so their reading is a constant. They
 // are extracted so the table Phase 3 consumes is complete, and they are replayed like everything
 // else so a constant that is not constant would show up.
 const staticReadings = new Map();
-for (const name of staticNames) {
+for(const name of staticNames) {
     const reading = readingOf(designSystem, name);
-    if (reading !== null) staticReadings.set(name, reading);
+    if(reading !== null) staticReadings.set(name, reading);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -861,15 +896,15 @@ const registryResult = {
     disagreed: [],
 };
 
-for (const className of registryClassNames) {
+for(const className of registryClassNames) {
     const candidate = parseCandidate(designSystem, className);
-    if (!candidate) {
+    if(!candidate) {
         registryResult.unparsed++;
         continue;
     }
 
     const actual = readingOf(designSystem, className);
-    if (actual === null) {
+    if(actual === null) {
         // No reading at all. Not an agreement, and counted on its own line so a run cannot look
         // clean by measuring nothing.
         registryResult.nullReading++;
@@ -877,10 +912,10 @@ for (const className of registryClassNames) {
     }
 
     let predicted;
-    if (candidate.kind === 'arbitrary') {
+    if(candidate.kind === 'arbitrary') {
         predicted = arbitraryPropertyReading(candidate);
     }
-    else if (candidate.kind === 'static') {
+    else if(candidate.kind === 'static') {
         predicted = staticReadings.get(className) ?? null;
     }
     else {
@@ -889,7 +924,7 @@ for (const className of registryClassNames) {
     }
 
     registryResult.measured++;
-    if (sameReading(predicted, actual)) {
+    if(sameReading(predicted, actual)) {
         registryResult.agreed++;
         continue;
     }
@@ -914,26 +949,31 @@ for (const className of registryClassNames) {
 const modifierResult = { measured: 0, agreed: 0, nullReading: 0, disagreed: [] };
 {
     const stride = Math.max(1, Math.floor(modifierClassNames.length / 40000));
-    for (let index = 0; index < modifierClassNames.length; index += stride) {
+    for(let index = 0; index < modifierClassNames.length; index += stride) {
         const className = modifierClassNames[index];
         const candidate = parseCandidate(designSystem, className);
-        if (!candidate) continue;
+        if(!candidate) continue;
 
         const actual = readingOf(designSystem, className);
-        if (actual === null) {
+        if(actual === null) {
             modifierResult.nullReading++;
             continue;
         }
 
         const descriptor = candidate.kind === 'functional' ? descriptors.get(candidate.root) : null;
-        const predicted = candidate.kind === 'static' ? (staticReadings.get(className.split('/')[0]) ?? null) : descriptor ? predictReading(descriptor, className) : undefined;
+        const predicted =
+            candidate.kind === 'static'
+                ? (staticReadings.get(className.split('/')[0]) ?? null)
+                : descriptor
+                  ? predictReading(descriptor, className)
+                  : undefined;
 
         modifierResult.measured++;
-        if (sameReading(predicted, actual)) {
+        if(sameReading(predicted, actual)) {
             modifierResult.agreed++;
             continue;
         }
-        if (modifierResult.disagreed.length < 5000) {
+        if(modifierResult.disagreed.length < 5000) {
             modifierResult.disagreed.push({
                 className,
                 root: candidate.root ?? null,
@@ -957,16 +997,16 @@ const sweepResult = {
     readingsPerRoot: new Map(),
 };
 
-for (const root of roots) {
+for(const root of roots) {
     const descriptor = descriptors.get(root);
     const distinctReadings = new Set();
 
-    for (const shape of Shapes) {
+    for(const shape of Shapes) {
         const className = probeClassName(root, shape);
         sweepResult.probed++;
 
         const actual = readingOf(designSystem, className);
-        if (actual === null) {
+        if(actual === null) {
             sweepResult.nullReading++;
             continue;
         }
@@ -1004,24 +1044,26 @@ for (const root of roots) {
          * rather than wrong. They exist because the sweep composes `root + shape` and two shapes
          * happen to spell a name Tailwind's parser recognises.
          */
-        if (probeCandidate?.kind === 'static' && !staticReadings.has(className)) {
+        if(probeCandidate?.kind === 'static' && !staticReadings.has(className)) {
             sweepResult.skippedUnregistered++;
             continue;
         }
-        const probeDescriptor = probeCandidate?.kind === 'functional' && probeCandidate.root !== root
-            ? descriptors.get(probeCandidate.root)
-            : descriptor;
-        const predicted = probeCandidate?.kind === 'static'
-            ? (staticReadings.get(className) ?? null)
-            : probeDescriptor
-              ? predictReading(probeDescriptor, className)
-              : undefined;
+        const probeDescriptor =
+            probeCandidate?.kind === 'functional' && probeCandidate.root !== root
+                ? descriptors.get(probeCandidate.root)
+                : descriptor;
+        const predicted =
+            probeCandidate?.kind === 'static'
+                ? (staticReadings.get(className) ?? null)
+                : probeDescriptor
+                  ? predictReading(probeDescriptor, className)
+                  : undefined;
         sweepResult.measured++;
-        if (sameReading(predicted, actual)) {
+        if(sameReading(predicted, actual)) {
             sweepResult.agreed++;
             continue;
         }
-        if (sweepResult.disagreed.length < 20000) {
+        if(sweepResult.disagreed.length < 20000) {
             sweepResult.disagreed.push({
                 className,
                 root,
@@ -1055,7 +1097,15 @@ for (const root of roots) {
  * template literals, `clsx` calls and conditional classes — and it is sufficient, because the
  * question here is whether the null population is non-empty and named, not how large it is.
  */
-const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullReading: 0, disagreed: [], nullExamples: [] };
+const corpusResult = {
+    scanned: 0,
+    distinct: 0,
+    measured: 0,
+    agreed: 0,
+    nullReading: 0,
+    disagreed: [],
+    nullExamples: [],
+};
 {
     const corpusRoot = corpusRootArgument
         ? NodePath.resolve(corpusRootArgument)
@@ -1063,7 +1113,7 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
     const distinctClasses = new Set();
 
     function scanDirectory(directory, depth) {
-        if (depth > 8) return;
+        if(depth > 8) return;
         let entries;
         try {
             entries = NodeFileSystem.readdirSync(directory, { withFileTypes: true });
@@ -1071,14 +1121,14 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
         catch {
             return;
         }
-        for (const entry of entries) {
-            if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        for(const entry of entries) {
+            if(entry.name.startsWith('.') || entry.name === 'node_modules') continue;
             const fullPath = NodePath.join(directory, entry.name);
-            if (entry.isDirectory()) {
+            if(entry.isDirectory()) {
                 scanDirectory(fullPath, depth + 1);
                 continue;
             }
-            if (!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
+            if(!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
             let contents;
             try {
                 contents = NodeFileSystem.readFileSync(fullPath, 'utf8');
@@ -1086,27 +1136,27 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
             catch {
                 continue;
             }
-            for (const match of contents.matchAll(/className="([^"]*)"/g)) {
-                for (const className of match[1].split(/\s+/)) {
-                    if (className.length === 0) continue;
+            for(const match of contents.matchAll(/className="([^"]*)"/g)) {
+                for(const className of match[1].split(/\s+/)) {
+                    if(className.length === 0) continue;
                     corpusResult.scanned++;
                     distinctClasses.add(className);
                 }
             }
         }
     }
-    if (!skipsCorpus) scanDirectory(corpusRoot, 0);
+    if(!skipsCorpus) scanDirectory(corpusRoot, 0);
     corpusResult.distinct = distinctClasses.size;
 
-    for (const className of distinctClasses) {
+    for(const className of distinctClasses) {
         const actual = readingOf(designSystem, className);
-        if (actual === null) {
+        if(actual === null) {
             corpusResult.nullReading++;
-            if (corpusResult.nullExamples.length < 25) corpusResult.nullExamples.push(className);
+            if(corpusResult.nullExamples.length < 25) corpusResult.nullExamples.push(className);
             continue;
         }
         const candidate = parseCandidate(designSystem, className);
-        if (!candidate) continue;
+        if(!candidate) continue;
 
         /*
          * The variant prefix is stripped before lookup.
@@ -1118,21 +1168,27 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
          * model failure.
          */
         const utilityName = className.slice(className.lastIndexOf(':') + 1);
-        const predicted = candidate.kind === 'arbitrary'
-            ? arbitraryPropertyReading(candidate)
-            : candidate.kind === 'static'
-              ? (staticReadings.get(utilityName) ?? null)
-              : descriptors.has(candidate.root)
-                ? predictReading(descriptors.get(candidate.root), utilityName)
-                : undefined;
+        const predicted =
+            candidate.kind === 'arbitrary'
+                ? arbitraryPropertyReading(candidate)
+                : candidate.kind === 'static'
+                  ? (staticReadings.get(utilityName) ?? null)
+                  : descriptors.has(candidate.root)
+                    ? predictReading(descriptors.get(candidate.root), utilityName)
+                    : undefined;
 
         corpusResult.measured++;
-        if (sameReading(predicted, actual)) {
+        if(sameReading(predicted, actual)) {
             corpusResult.agreed++;
             continue;
         }
-        if (corpusResult.disagreed.length < 200) {
-            corpusResult.disagreed.push({ className, root: candidate.root ?? null, predicted: readingKey(predicted ?? null), actual: readingKey(actual) });
+        if(corpusResult.disagreed.length < 200) {
+            corpusResult.disagreed.push({
+                className,
+                root: candidate.root ?? null,
+                predicted: readingKey(predicted ?? null),
+                actual: readingKey(actual),
+            });
         }
     }
 }
@@ -1151,22 +1207,22 @@ const corpusResult = { scanned: 0, distinct: 0, measured: 0, agreed: 0, nullRead
 const controlResult = { root: null, plantedProbes: 0, flagged: 0, proven: false };
 {
     const classesByRoot = new Map();
-    for (const className of registryClassNames) {
+    for(const className of registryClassNames) {
         const candidate = parseCandidate(designSystem, className);
-        if (candidate?.kind !== 'functional' || !candidate.root) continue;
-        if (!descriptors.has(candidate.root)) continue;
-        if (readingOf(designSystem, className) === null) continue;
+        if(candidate?.kind !== 'functional' || !candidate.root) continue;
+        if(!descriptors.has(candidate.root)) continue;
+        if(readingOf(designSystem, className) === null) continue;
         const list = classesByRoot.get(candidate.root) ?? [];
         list.push(className);
         classesByRoot.set(candidate.root, list);
     }
 
     let bestRoot = null;
-    for (const [root, list] of classesByRoot) {
-        if (bestRoot === null || list.length > classesByRoot.get(bestRoot).length) bestRoot = root;
+    for(const [root, list] of classesByRoot) {
+        if(bestRoot === null || list.length > classesByRoot.get(bestRoot).length) bestRoot = root;
     }
 
-    if (bestRoot !== null) {
+    if(bestRoot !== null) {
         const original = descriptors.get(bestRoot);
         // Shift every order index by one and add a declaration. A wrong-but-plausible reading, not
         // an obviously broken one, because the check under test is exact structural comparison.
@@ -1174,40 +1230,97 @@ const controlResult = { root: null, plantedProbes: 0, flagged: 0, proven: false 
             root: original.root,
             typeList: original.typeList,
             readingByType: new Map(
-                Array.from(original.readingByType, ([type, reading]) => [type, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByType, ([type, reading]) => [
+                    type,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
-            fallbackReading: original.fallbackReading === null ? null : { order: original.fallbackReading.order.map((value) => value + 1), count: original.fallbackReading.count + 1 },
+            fallbackReading:
+                original.fallbackReading === null
+                    ? null
+                    : {
+                          order: original.fallbackReading.order.map((value) => value + 1),
+                          count: original.fallbackReading.count + 1,
+                      },
             readingByNamespace: new Map(
-                Array.from(original.readingByNamespace, ([namespace, reading]) => [namespace, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByNamespace, ([namespace, reading]) => [
+                    namespace,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
             readingByLiteral: new Map(
-                Array.from(original.readingByLiteral, ([literal, reading]) => [literal, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByLiteral, ([literal, reading]) => [
+                    literal,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
-            emptyReadingWithModifier: original.emptyReadingWithModifier === null ? null : { order: original.emptyReadingWithModifier.order.map((value) => value + 1), count: original.emptyReadingWithModifier.count + 1 },
-            emptyReadingWithThemedModifier: original.emptyReadingWithThemedModifier === null ? null : { order: original.emptyReadingWithThemedModifier.order.map((value) => value + 1), count: original.emptyReadingWithThemedModifier.count + 1 },
+            emptyReadingWithModifier:
+                original.emptyReadingWithModifier === null
+                    ? null
+                    : {
+                          order: original.emptyReadingWithModifier.order.map((value) => value + 1),
+                          count: original.emptyReadingWithModifier.count + 1,
+                      },
+            emptyReadingWithThemedModifier:
+                original.emptyReadingWithThemedModifier === null
+                    ? null
+                    : {
+                          order: original.emptyReadingWithThemedModifier.order.map((value) => value + 1),
+                          count: original.emptyReadingWithThemedModifier.count + 1,
+                      },
             readingByTypeWithModifier: new Map(
-                Array.from(original.readingByTypeWithModifier, ([type, reading]) => [type, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByTypeWithModifier, ([type, reading]) => [
+                    type,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
-            fallbackReadingWithModifier: original.fallbackReadingWithModifier === null ? null : { order: original.fallbackReadingWithModifier.order.map((value) => value + 1), count: original.fallbackReadingWithModifier.count + 1 },
+            fallbackReadingWithModifier:
+                original.fallbackReadingWithModifier === null
+                    ? null
+                    : {
+                          order: original.fallbackReadingWithModifier.order.map((value) => value + 1),
+                          count: original.fallbackReadingWithModifier.count + 1,
+                      },
             readingByNamespaceWithModifier: new Map(
-                Array.from(original.readingByNamespaceWithModifier, ([namespace, reading]) => [namespace, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByNamespaceWithModifier, ([namespace, reading]) => [
+                    namespace,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
             readingByTypeWithThemedModifier: new Map(
-                Array.from(original.readingByTypeWithThemedModifier, ([type, reading]) => [type, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByTypeWithThemedModifier, ([type, reading]) => [
+                    type,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
-            fallbackReadingWithThemedModifier: original.fallbackReadingWithThemedModifier === null ? null : { order: original.fallbackReadingWithThemedModifier.order.map((value) => value + 1), count: original.fallbackReadingWithThemedModifier.count + 1 },
+            fallbackReadingWithThemedModifier:
+                original.fallbackReadingWithThemedModifier === null
+                    ? null
+                    : {
+                          order: original.fallbackReadingWithThemedModifier.order.map((value) => value + 1),
+                          count: original.fallbackReadingWithThemedModifier.count + 1,
+                      },
             readingByNamespaceWithThemedModifier: new Map(
-                Array.from(original.readingByNamespaceWithThemedModifier, ([namespace, reading]) => [namespace, { order: reading.order.map((value) => value + 1), count: reading.count + 1 }]),
+                Array.from(original.readingByNamespaceWithThemedModifier, ([namespace, reading]) => [
+                    namespace,
+                    { order: reading.order.map((value) => value + 1), count: reading.count + 1 },
+                ]),
             ),
-            emptyReading: original.emptyReading === null ? null : { order: original.emptyReading.order.map((value) => value + 1), count: original.emptyReading.count + 1 },
+            emptyReading:
+                original.emptyReading === null
+                    ? null
+                    : {
+                          order: original.emptyReading.order.map((value) => value + 1),
+                          count: original.emptyReading.count + 1,
+                      },
         };
 
         controlResult.root = bestRoot;
-        for (const className of classesByRoot.get(bestRoot)) {
+        for(const className of classesByRoot.get(bestRoot)) {
             const actual = readingOf(designSystem, className);
-            if (actual === null) continue;
+            if(actual === null) continue;
             controlResult.plantedProbes++;
-            if (!sameReading(predictReading(dirty, className), actual)) controlResult.flagged++;
+            if(!sameReading(predictReading(dirty, className), actual)) controlResult.flagged++;
         }
         controlResult.proven = controlResult.plantedProbes > 0 && controlResult.flagged === controlResult.plantedProbes;
     }
@@ -1231,7 +1344,7 @@ const publicApiResult = { ranked: 0, comparedPairs: 0, mismatched: 0, sample: []
      */
     const stride = Math.max(1, Math.floor(registryClassNames.length / 3000));
     const sample = [];
-    for (let index = 0; index < registryClassNames.length; index += stride) sample.push(registryClassNames[index]);
+    for(let index = 0; index < registryClassNames.length; index += stride) sample.push(registryClassNames[index]);
 
     const engineOrder = new Map(
         designSystem
@@ -1243,14 +1356,17 @@ const publicApiResult = { ranked: 0, comparedPairs: 0, mismatched: 0, sample: []
     // Only classes the descriptor model can predict at all. A class it declines to predict is not
     // evidence about the public API either way.
     const predicted = new Map();
-    for (const className of sample) {
-        if (!engineOrder.has(className)) continue;
+    for(const className of sample) {
+        if(!engineOrder.has(className)) continue;
         const candidate = parseCandidate(designSystem, className);
-        if (!candidate) continue;
-        const reading = candidate.kind === 'static'
-            ? (staticReadings.get(className) ?? null)
-            : (descriptors.has(candidate.root) ? predictReading(descriptors.get(candidate.root), className) : undefined);
-        if (reading === null || reading === undefined) continue;
+        if(!candidate) continue;
+        const reading =
+            candidate.kind === 'static'
+                ? (staticReadings.get(className) ?? null)
+                : descriptors.has(candidate.root)
+                  ? predictReading(descriptors.get(candidate.root), className)
+                  : undefined;
+        if(reading === null || reading === undefined) continue;
         predicted.set(className, reading);
     }
 
@@ -1266,19 +1382,19 @@ const publicApiResult = { ranked: 0, comparedPairs: 0, mismatched: 0, sample: []
      * engine does. Pairs whose predicted readings are identical are skipped, since those fall to the
      * variant and alphabetical tiebreaks this control does not model.
      */
-    for (let leftIndex = 0; leftIndex < ranked.length; leftIndex++) {
-        for (let rightIndex = leftIndex + 1; rightIndex < ranked.length; rightIndex++) {
+    for(let leftIndex = 0; leftIndex < ranked.length; leftIndex++) {
+        for(let rightIndex = leftIndex + 1; rightIndex < ranked.length; rightIndex++) {
             const left = ranked[leftIndex];
             const right = ranked[rightIndex];
             const leftReading = predicted.get(left);
             const rightReading = predicted.get(right);
             const comparison = compareReadings(leftReading, rightReading);
-            if (comparison === 0) continue;
+            if(comparison === 0) continue;
             publicApiResult.comparedPairs++;
             const engineSaysLeftFirst = engineOrder.get(left) < engineOrder.get(right);
-            if (engineSaysLeftFirst !== comparison < 0) {
+            if(engineSaysLeftFirst !== comparison < 0) {
                 publicApiResult.mismatched++;
-                if (publicApiResult.sample.length < 20) {
+                if(publicApiResult.sample.length < 20) {
                     publicApiResult.sample.push({
                         left,
                         right,
@@ -1310,12 +1426,12 @@ function compareReadings(left, right) {
      * being checked, which is exactly the failure mode a control is supposed to be immune to.
      */
     const length = Math.max(left.order.length, right.order.length);
-    for (let index = 0; index < length; index++) {
+    for(let index = 0; index < length; index++) {
         const leftValue = left.order[index];
         const rightValue = right.order[index];
-        if (leftValue === rightValue) continue;
-        if (leftValue === undefined) return 1;
-        if (rightValue === undefined) return -1;
+        if(leftValue === rightValue) continue;
+        if(leftValue === undefined) return 1;
+        if(rightValue === undefined) return -1;
         return leftValue - rightValue;
     }
     return right.count - left.count;
@@ -1325,12 +1441,12 @@ function compareReadings(left, right) {
 // Report
 
 const readingCountHistogram = new Map();
-for (const readings of sweepResult.readingsPerRoot.values()) {
+for(const readings of sweepResult.readingsPerRoot.values()) {
     readingCountHistogram.set(readings.size, (readingCountHistogram.get(readings.size) ?? 0) + 1);
 }
 
 const disagreeingRoots = new Map();
-for (const entry of [...registryResult.disagreed, ...sweepResult.disagreed]) {
+for(const entry of [...registryResult.disagreed, ...sweepResult.disagreed]) {
     const list = disagreeingRoots.get(entry.root) ?? [];
     list.push(entry);
     disagreeingRoots.set(entry.root, list);
@@ -1394,7 +1510,9 @@ const report = {
         nullReading: sweepResult.nullReading,
         skippedUnregistered: sweepResult.skippedUnregistered,
     },
-    readingsPerRootHistogram: Object.fromEntries(Array.from(readingCountHistogram).sort((left, right) => left[0] - right[0])),
+    readingsPerRootHistogram: Object.fromEntries(
+        Array.from(readingCountHistogram).sort((left, right) => left[0] - right[0]),
+    ),
     controls: {
         plantedDirty: controlResult,
         publicApi: publicApiResult,
@@ -1419,26 +1537,42 @@ const report = {
  * design system, not to pin exact counts that a Tailwind upgrade would legitimately move.
  */
 const assertionFailures = [];
-if (report.population.registryClasses < 20000) {
-    assertionFailures.push('registry holds ' + report.population.registryClasses + ' classes; expected tens of thousands. The design system probably failed to load its @import graph.');
+if(report.population.registryClasses < 20000) {
+    assertionFailures.push(
+        'registry holds ' +
+            report.population.registryClasses +
+            ' classes; expected tens of thousands. The design system probably failed to load its @import graph.',
+    );
 }
-if (report.population.functionalRoots < 200) {
+if(report.population.functionalRoots < 200) {
     assertionFailures.push('only ' + report.population.functionalRoots + ' functional roots; expected 300 or so.');
 }
-if (report.sweep.probed < 100000) {
+if(report.sweep.probed < 100000) {
     assertionFailures.push('sweep probed ' + report.sweep.probed + ' classes; expected six figures.');
 }
-if (report.sweep.measured < 50000) {
-    assertionFailures.push('sweep measured only ' + report.sweep.measured + ' readings out of ' + report.sweep.probed + ' probes.');
+if(report.sweep.measured < 50000) {
+    assertionFailures.push(
+        'sweep measured only ' + report.sweep.measured + ' readings out of ' + report.sweep.probed + ' probes.',
+    );
 }
-if (propertyOrder.length < 300) {
-    assertionFailures.push('the property order has ' + propertyOrder.length + ' entries; expected around 359. Arbitrary properties cannot be predicted without it.');
+if(propertyOrder.length < 300) {
+    assertionFailures.push(
+        'the property order has ' +
+            propertyOrder.length +
+            ' entries; expected around 359. Arbitrary properties cannot be predicted without it.',
+    );
 }
-if (!skipsCorpus && report.corpus.distinctClasses < 100) {
-    assertionFailures.push('the corpus scan found only ' + report.corpus.distinctClasses + ' distinct classes; it probably scanned the wrong directory, so its null count means nothing.');
+if(!skipsCorpus && report.corpus.distinctClasses < 100) {
+    assertionFailures.push(
+        'the corpus scan found only ' +
+            report.corpus.distinctClasses +
+            ' distinct classes; it probably scanned the wrong directory, so its null count means nothing.',
+    );
 }
-if (!report.controls.plantedDirty.proven) {
-    assertionFailures.push('the planted-dirty control did not flag every probe, so this harness has not been shown to be able to fail.');
+if(!report.controls.plantedDirty.proven) {
+    assertionFailures.push(
+        'the planted-dirty control did not flag every probe, so this harness has not been shown to be able to fail.',
+    );
 }
 
 /*
@@ -1453,17 +1587,21 @@ if (!report.controls.plantedDirty.proven) {
  *
  * Named per root rather than counted, because the point is which one is missing.
  */
-const registryFunctionalRoots = Array.from(designSystem.utilities?.keys?.('functional') ?? [])
-    .filter((root) => typeof root === 'string');
+const registryFunctionalRoots = Array.from(designSystem.utilities?.keys?.('functional') ?? []).filter(
+    (root) => typeof root === 'string',
+);
 const rootsWithoutDescriptor = registryFunctionalRoots.filter((root) => !descriptors.has(root)).sort();
-if (registryFunctionalRoots.length === 0) {
-    assertionFailures.push('the registry reported no functional roots at all, so the coverage check below compared nothing and cannot have failed.');
-} else if (rootsWithoutDescriptor.length > 0) {
+if(registryFunctionalRoots.length === 0) {
+    assertionFailures.push(
+        'the registry reported no functional roots at all, so the coverage check below compared nothing and cannot have failed.',
+    );
+}
+else if(rootsWithoutDescriptor.length > 0) {
     assertionFailures.push(
         rootsWithoutDescriptor.length +
             ' of ' +
             registryFunctionalRoots.length +
-            ' registered functional roots have no descriptor, so a class naming one declines and reads as the model\'s boundary rather than as this gap: ' +
+            " registered functional roots have no descriptor, so a class naming one declines and reads as the model's boundary rather than as this gap: " +
             rootsWithoutDescriptor.join(', '),
     );
 }
@@ -1488,11 +1626,13 @@ if (registryFunctionalRoots.length === 0) {
  * repositories: ahra contributes 35 roots and 325 theme keys, the independent fixture contributes 2
  * and 4, and both are legitimate design systems. A floor tuned to ahra would refuse the fixture.
  */
-if (report.ownContributions.ownUtilityRootCount < 1 && report.ownContributions.ownThemeKeyCount < 1) {
+if(report.ownContributions.ownUtilityRootCount < 1 && report.ownContributions.ownThemeKeyCount < 1) {
     assertionFailures.push(
         'this design system registers nothing a bare Tailwind install does not: ' +
-            report.population.registryClasses + ' registry classes against a baseline of ' +
-            report.ownContributions.baselineRegistryClasses + ', 0 own @utility roots and 0 own @theme keys. ' +
+            report.population.registryClasses +
+            ' registry classes against a baseline of ' +
+            report.ownContributions.baselineRegistryClasses +
+            ', 0 own @utility roots and 0 own @theme keys. ' +
             'The entry point loaded, and its @import graph reached no repository stylesheet, so this table ' +
             'describes the framework while claiming to describe a repository.',
     );
@@ -1501,32 +1641,49 @@ report.assertions = { passed: assertionFailures.length === 0, failures: assertio
 
 process.stdout.write(JSON.stringify(report, null, 2) + '\n');
 
-if (assertionFailures.length > 0) {
+if(assertionFailures.length > 0) {
     process.stderr.write('extract.mjs: volume assertions failed, so the agreement numbers above mean nothing:\n');
-    for (const failure of assertionFailures) process.stderr.write('  - ' + failure + '\n');
+    for(const failure of assertionFailures) process.stderr.write('  - ' + failure + '\n');
     process.exitCode = 4;
 }
 
-if (jsonOutputPath) {
+if(jsonOutputPath) {
     const table = {
         tailwindVersion,
         entryPoint: recordedEntryPoint,
         roots: Array.from(descriptors.values(), (descriptor) => ({
             root: descriptor.root,
             typeList: descriptor.typeList,
-            readingByType: Object.fromEntries(Array.from(descriptor.readingByType, ([type, reading]) => [type, reading])),
+            readingByType: Object.fromEntries(
+                Array.from(descriptor.readingByType, ([type, reading]) => [type, reading]),
+            ),
             fallback: descriptor.fallbackReading,
-            readingByNamespace: Object.fromEntries(Array.from(descriptor.readingByNamespace, ([namespace, reading]) => [namespace, reading])),
-            readingByLiteral: Object.fromEntries(Array.from(descriptor.readingByLiteral, ([literal, reading]) => [literal, reading])),
+            readingByNamespace: Object.fromEntries(
+                Array.from(descriptor.readingByNamespace, ([namespace, reading]) => [namespace, reading]),
+            ),
+            readingByLiteral: Object.fromEntries(
+                Array.from(descriptor.readingByLiteral, ([literal, reading]) => [literal, reading]),
+            ),
             empty: descriptor.emptyReading,
             emptyWithModifier: descriptor.emptyReadingWithModifier,
             emptyWithThemedModifier: descriptor.emptyReadingWithThemedModifier,
-            readingByTypeWithModifier: Object.fromEntries(Array.from(descriptor.readingByTypeWithModifier, ([type, reading]) => [type, reading])),
+            readingByTypeWithModifier: Object.fromEntries(
+                Array.from(descriptor.readingByTypeWithModifier, ([type, reading]) => [type, reading]),
+            ),
             fallbackWithModifier: descriptor.fallbackReadingWithModifier,
-            readingByNamespaceWithModifier: Object.fromEntries(Array.from(descriptor.readingByNamespaceWithModifier, ([namespace, reading]) => [namespace, reading])),
-            readingByTypeWithThemedModifier: Object.fromEntries(Array.from(descriptor.readingByTypeWithThemedModifier, ([type, reading]) => [type, reading])),
+            readingByNamespaceWithModifier: Object.fromEntries(
+                Array.from(descriptor.readingByNamespaceWithModifier, ([namespace, reading]) => [namespace, reading]),
+            ),
+            readingByTypeWithThemedModifier: Object.fromEntries(
+                Array.from(descriptor.readingByTypeWithThemedModifier, ([type, reading]) => [type, reading]),
+            ),
             fallbackWithThemedModifier: descriptor.fallbackReadingWithThemedModifier,
-            readingByNamespaceWithThemedModifier: Object.fromEntries(Array.from(descriptor.readingByNamespaceWithThemedModifier, ([namespace, reading]) => [namespace, reading])),
+            readingByNamespaceWithThemedModifier: Object.fromEntries(
+                Array.from(descriptor.readingByNamespaceWithThemedModifier, ([namespace, reading]) => [
+                    namespace,
+                    reading,
+                ]),
+            ),
         })).sort((left, right) => (left.root < right.root ? -1 : 1)),
         statics: Object.fromEntries(Array.from(staticReadings).sort((left, right) => (left[0] < right[0] ? -1 : 1))),
     };

@@ -20,8 +20,6 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"\" />;"
     },
-    "assertedMessageIds": [
-        "unnecessaryWhitespace"
-    ],
+    "assertedMessageIds": ["unnecessaryWhitespace"],
     "assertsFix": true
 }

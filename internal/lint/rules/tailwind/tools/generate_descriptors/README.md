@@ -35,13 +35,13 @@ utility roots and 325 theme keys. Two design systems that cannot differ cannot d
 varies, which is the trap `a0f8635` documented for the invariance claims. The independent control
 is `generate_descriptor_base/testdata/independent_theme.css`.
 
-| population | measured | agreed | exceptions |
-|---|---|---|---|
-| registry (`getClassList()`) | 37,643 / 37,795 | 37,625 / 37,777 | 18 |
-| — of which this repo's own | 35 roots, 325 theme keys | | |
-| corpus (classes the repo writes) | 1,233 / 971 | 1,233 / 970 | 0 / 1 |
-| modifier classes (sampled) | 40,110 / 40,325 | all | 0 |
-| arbitrary sweep (327 roots x 527 shapes) | 132,203 | 132,199 | 4 |
+| population                               | measured                 | agreed          | exceptions |
+| ---------------------------------------- | ------------------------ | --------------- | ---------- |
+| registry (`getClassList()`)              | 37,643 / 37,795          | 37,625 / 37,777 | 18         |
+| — of which this repo's own               | 35 roots, 325 theme keys |                 |            |
+| corpus (classes the repo writes)         | 1,233 / 971              | 1,233 / 970     | 0 / 1      |
+| modifier classes (sampled)               | 40,110 / 40,325          | all             | 0          |
+| arbitrary sweep (327 roots x 527 shapes) | 132,203                  | 132,199         | 4          |
 
 **The model holds.** The exceptions are two named mechanisms, both understood, both countable.
 
@@ -93,7 +93,7 @@ splits the arbitrary value on `/` looking for a color slot, and on a ratio it ma
 extra `@supports` block:
 
 ```css
---tw-shadow: 16var(--tw-shadow-color, /)9;
+--tw-shadow: 16var (--tw-shadow-color, /) 9;
 ```
 
 Garbage CSS from an upstream code path triggered by a `/` in the value, not by a data type. Four
@@ -116,23 +116,24 @@ probes, all `<shadow-root>-[16/9]/[<arbitrary>]`, none of which any registry con
   are met while the `@utility` and `@theme` content that makes a design system per-repository is
   entirely absent. The same defect was found independently in the candidate parser (`a219c8f`).
 
-  The check is the delta against a bare install built through the same borrowed engine: **35
-  utility roots and 325 theme keys** are ahra's own, and a system contributing zero of both is
-  refused by name. It is counted rather than named, because a hardcoded canary (`fade-in` on ahra,
-  `brand-hover` on connected) is the same baked-in assumption it exists to catch. The floor is 1,
-  since two roots is a real design system and a floor tuned to ahra's 35 would refuse one.
+    The check is the delta against a bare install built through the same borrowed engine: **35
+    utility roots and 325 theme keys** are ahra's own, and a system contributing zero of both is
+    refused by name. It is counted rather than named, because a hardcoded canary (`fade-in` on ahra,
+    `brand-hover` on connected) is the same baked-in assumption it exists to catch. The floor is 1,
+    since two roots is a real design system and a floor tuned to ahra's 35 would refuse one.
 
-  | design system | registry | own roots | own keys | exit |
-  |---|---|---|---|---|
-  | ahra / connected | 37,641 | 35 | 325 | 0 |
-  | `independent_theme.css` (borrowed install) | 23,391 | 2 | 4 | 0 |
-  | `@import "tailwindcss" source(none);` | 23,286 | 0 | 0 | **4** |
-  | real import that silently fails to resolve | 23,286 | 0 | 0 | **4** |
+    | design system                              | registry | own roots | own keys | exit  |
+    | ------------------------------------------ | -------- | --------- | -------- | ----- |
+    | ahra / connected                           | 37,641   | 35        | 325      | 0     |
+    | `independent_theme.css` (borrowed install) | 23,391   | 2         | 4        | 0     |
+    | `@import "tailwindcss" source(none);`      | 23,286   | 0         | 0        | **4** |
+    | real import that silently fails to resolve | 23,286   | 0         | 0        | **4** |
 
-  The last row is the one that matters: `loadStylesheet` swallows a missing `@import` and returns
-  empty content, so a broken graph produces a full-looking design system that met every volume
-  floor. Registry size cannot separate these — the fixture passes 105 classes *below* the bare
-  install that fails — so provenance is the only thing that does.
+    The last row is the one that matters: `loadStylesheet` swallows a missing `@import` and returns
+    empty content, so a broken graph produces a full-looking design system that met every volume
+    floor. Registry size cannot separate these — the fixture passes 105 classes _below_ the bare
+    install that fails — so provenance is the only thing that does.
+
 - **Nulls reported, never scored.** A class returning no reading is not an agreement. The registry
   has none by construction, which is why the corpus is scanned separately: that is the population the
   documented figure came from, and it holds 11 of 1,244 on ahra (`group`, `text-dark-4/70`,

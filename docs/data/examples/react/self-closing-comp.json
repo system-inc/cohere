@@ -15,8 +15,6 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "notSelfClosing"
-    ],
+    "assertedMessageIds": ["notSelfClosing"],
     "assertsFix": true
 }

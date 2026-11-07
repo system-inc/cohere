@@ -20,8 +20,6 @@
         "file": "/repository/source/UselessComputedKey.ts",
         "source": "({ [x]: 0 });"
     },
-    "assertedMessageIds": [
-        "unnecessarilyComputedProperty"
-    ],
+    "assertedMessageIds": ["unnecessarilyComputedProperty"],
     "assertsFix": true
 }

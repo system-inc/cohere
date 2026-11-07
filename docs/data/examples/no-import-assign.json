@@ -18,7 +18,5 @@
         "file": "/repository/source/ImportAssign.ts",
         "source": "import 'mod'\n"
     },
-    "assertedMessageIds": [
-        "noImportAssign"
-    ]
+    "assertedMessageIds": ["noImportAssign"]
 }

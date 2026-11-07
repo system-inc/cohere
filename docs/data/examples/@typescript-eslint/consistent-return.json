@@ -18,9 +18,5 @@
         "file": "/repository/source/ConsistentReturn.ts",
         "source": "function foo() {\n  return;\n}\n"
     },
-    "assertedMessageIds": [
-        "missingReturn",
-        "missingReturnValue",
-        "unexpectedReturnValue"
-    ]
+    "assertedMessageIds": ["missingReturn", "missingReturnValue", "unexpectedReturnValue"]
 }

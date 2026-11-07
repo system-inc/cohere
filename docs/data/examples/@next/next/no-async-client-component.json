@@ -18,7 +18,5 @@
         "file": "/repository/app/Component.tsx",
         "source": "\"use client\"\nlet MyThing: unknown\nexport default MyThing\n"
     },
-    "assertedMessageIds": [
-        "noAsyncClientComponent"
-    ]
+    "assertedMessageIds": ["noAsyncClientComponent"]
 }

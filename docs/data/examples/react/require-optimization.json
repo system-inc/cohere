@@ -18,7 +18,5 @@
         "file": "/repository/source/RequireOptimization.tsx",
         "source": "declare const React: any;\nclass C extends React.PureComponent {}\n"
     },
-    "assertedMessageIds": [
-        "noShouldComponentUpdate"
-    ]
+    "assertedMessageIds": ["noShouldComponentUpdate"]
 }

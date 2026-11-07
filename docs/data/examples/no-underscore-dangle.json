@@ -18,7 +18,5 @@
         "file": "/repository/source/NoUnderscoreDangle.ts",
         "source": "var a = b._;"
     },
-    "assertedMessageIds": [
-        "unexpectedUnderscore"
-    ]
+    "assertedMessageIds": ["unexpectedUnderscore"]
 }

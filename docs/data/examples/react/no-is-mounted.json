@@ -18,7 +18,5 @@
         "file": "/repository/source/IsMounted.tsx",
         "source": "this.isMounted();"
     },
-    "assertedMessageIds": [
-        "noIsMounted"
-    ]
+    "assertedMessageIds": ["noIsMounted"]
 }

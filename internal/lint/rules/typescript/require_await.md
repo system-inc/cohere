@@ -1,12 +1,12 @@
 # `@typescript-eslint/require-await`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **436** when audited; not re-measured since, see below |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                                                        |
+| ---------------------- | ------------------------------------------------------ |
+| **Recommendation**     | **No**                                                 |
+| Violations in ahra     | **436** when audited; not re-measured since, see below |
+| Plugin                 | `@typescript-eslint`                                   |
+| Auto-fixable           | no                                                     |
+| Needs type information | yes                                                    |
 
 ## What it checks
 
@@ -75,4 +75,3 @@ export async function generateMetadata(): Promise<Metadata> {
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

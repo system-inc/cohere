@@ -19,9 +19,6 @@
         "file": "/repository/source/Types.ts",
         "source": "type T = A | A;\ntype A = string;"
     },
-    "assertedMessageIds": [
-        "duplicate",
-        "unnecessary"
-    ],
+    "assertedMessageIds": ["duplicate", "unnecessary"],
     "assertsFix": true
 }

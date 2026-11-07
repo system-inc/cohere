@@ -18,8 +18,5 @@
         "file": "/repository/source/Entity.ts",
         "source": "declare function OrmColumn(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nnamespace N { export function SerializableField(o?: any): any { return null; } }\nclass A { @N.SerializableField({ optional: true }) x!: string; }\n"
     },
-    "assertedMessageIds": [
-        "decoratorOptionalButTypeNot",
-        "typeOptionalButDecoratorNot"
-    ]
+    "assertedMessageIds": ["decoratorOptionalButTypeNot", "typeOptionalButDecoratorNot"]
 }

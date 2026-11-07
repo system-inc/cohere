@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "function put(cell: { n: number | string }): void { cell.n = 'text'; }\n"
     },
-    "assertedMessageIds": [
-        "unionWrite"
-    ]
+    "assertedMessageIds": ["unionWrite"]
 }

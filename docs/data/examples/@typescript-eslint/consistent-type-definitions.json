@@ -1,8 +1,5 @@
 {
     "rule": "@typescript-eslint/consistent-type-definitions",
-    "assertedMessageIds": [
-        "interfaceOverType",
-        "typeOverInterface"
-    ],
+    "assertedMessageIds": ["interfaceOverType", "typeOverInterface"],
     "assertsFix": true
 }

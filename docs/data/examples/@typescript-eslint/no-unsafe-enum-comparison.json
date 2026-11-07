@@ -18,8 +18,5 @@
         "file": "/repository/source/NoUnsafeEnumComparison.ts",
         "source": "1 < 2;\n"
     },
-    "assertedMessageIds": [
-        "mismatchedCase",
-        "mismatchedCondition"
-    ]
+    "assertedMessageIds": ["mismatchedCase", "mismatchedCondition"]
 }

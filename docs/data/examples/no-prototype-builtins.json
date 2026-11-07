@@ -18,7 +18,5 @@
         "file": "/repository/source/PrototypeBuiltins.ts",
         "source": "foo[1]('bar')"
     },
-    "assertedMessageIds": [
-        "noPrototypeBuiltins"
-    ]
+    "assertedMessageIds": ["noPrototypeBuiltins"]
 }

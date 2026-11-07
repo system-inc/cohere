@@ -1,12 +1,12 @@
 # `@typescript-eslint/explicit-member-accessibility`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1942** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **1942**             |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ override aliases: Record<string, string> = {
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

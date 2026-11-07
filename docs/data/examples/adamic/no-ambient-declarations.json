@@ -18,8 +18,5 @@
         "file": "Case.cts",
         "source": "declare const missing: number;\n"
     },
-    "assertedMessageIds": [
-        "ambientDeclaration",
-        "ambientField"
-    ]
+    "assertedMessageIds": ["ambientDeclaration", "ambientField"]
 }

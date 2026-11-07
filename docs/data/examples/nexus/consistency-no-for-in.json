@@ -18,7 +18,5 @@
         "file": "/repository/source/ConsistencyNoForIn.ts",
         "source": "for(const key of Object.keys(object)) use(key);\n"
     },
-    "assertedMessageIds": [
-        "forIn"
-    ]
+    "assertedMessageIds": ["forIn"]
 }

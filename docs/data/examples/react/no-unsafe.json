@@ -14,9 +14,5 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "unsafeComponentWillMount",
-        "unsafeComponentWillReceiveProps",
-        "unsafeComponentWillUpdate"
-    ]
+    "assertedMessageIds": ["unsafeComponentWillMount", "unsafeComponentWillReceiveProps", "unsafeComponentWillUpdate"]
 }

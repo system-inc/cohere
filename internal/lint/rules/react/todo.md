@@ -1,12 +1,12 @@
 # `react-hooks/todo`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **61** |
-| Plugin | `react-hooks` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Strong No** |
+| Violations in ahra     | **61**        |
+| Plugin                 | `react-hooks` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -28,4 +28,3 @@ Its own description is 'Unimplemented features' — it is an internal React Comp
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

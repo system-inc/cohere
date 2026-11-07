@@ -1,12 +1,12 @@
 # `nexus/consistency-no-shouting`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at error |
-| Findings in ahra | 37 on the morning of 2026-10-01 (32 true, 5 acronyms misread); 7 after the site sweep and the safe-list additions, all true; 0 that evening, the last one a wrapped quote now masked |
-| Plugin | Nexus house rule, ported from `nexus/code-quality/lint/rules/ConsistencyNoShoutingRule.ts` and `nexus/source/text/Shouting.ts` |
-| Auto-fixable | no, deliberately (the repair is a reason, which a rule cannot write) |
-| Needs type information | no |
+|                        |                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Recommendation**     | **Yes**, at error                                                                                                                                                                    |
+| Findings in ahra       | 37 on the morning of 2026-10-01 (32 true, 5 acronyms misread); 7 after the site sweep and the safe-list additions, all true; 0 that evening, the last one a wrapped quote now masked |
+| Plugin                 | Nexus house rule, ported from `nexus/code-quality/lint/rules/ConsistencyNoShoutingRule.ts` and `nexus/source/text/Shouting.ts`                                                       |
+| Auto-fixable           | no, deliberately (the repair is a reason, which a rule cannot write)                                                                                                                 |
+| Needs type information | no                                                                                                                                                                                   |
 
 ## What it checks
 
@@ -23,6 +23,12 @@ marker, `// Code generated ... DO NOT EDIT.` before the file's first token, is n
 are fixed by go.dev/s/generatedcode, which tools match exactly. Each finding covers one shouted word,
 each occurrence, and names it. The text rules corpus holds all three (`sh04`, `sh05`, `sh10`, and the
 span cases), task #34fejeq.
+
+A comment is read without its delimiters, as ESLint reads a comment's value: a `//` line loses its
+slashes and the one space after them, as the Go and Swift engines read one, and a block comment its
+`/*` and `*/`. The command patterns anchor at a line's start, so read whole, a command on a `//` line
+or in a one-line block comment opened on its slashes and its capitals were read as shouting (#xfa3q6w,
+corpus cases `sh24` and `sh25`; `TestConsistencyNoShoutingReadsACommentWithoutItsDelimiters`).
 
 The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
 `internal/shouting/vocabulary.go` reads. The Go engine's `cohere-go/consistency-no-shouting` reads both

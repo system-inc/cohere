@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-promise-reject-errors`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **7** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Strong Yes**       |
+| Violations in ahra     | **7**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ reject(error);
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

@@ -18,7 +18,5 @@
         "file": "/repository/source/CorrectnessRequireChildProcessErrorListener.ts",
         "source": "import * as NodeChildProcess from 'node:child_process';\nimport * as NodeEvents from 'node:events';\ndeclare const path: string;\ndeclare const flag: boolean;\ndeclare const commandArguments: string[];\ndeclare const children: NodeChildProcess.ChildProcess[];\ndeclare function ignore(): void;\ndeclare function done(): void;\ndeclare function wire(child: NodeChildProcess.ChildProcess): void;\n\nNodeChildProcess.spawn('afplay', [path]);\n"
     },
-    "assertedMessageIds": [
-        "childProcessWithoutErrorListener"
-    ]
+    "assertedMessageIds": ["childProcessWithoutErrorListener"]
 }

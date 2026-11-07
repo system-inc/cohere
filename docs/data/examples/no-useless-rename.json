@@ -15,8 +15,6 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "unnecessarilyRenamed"
-    ],
+    "assertedMessageIds": ["unnecessarilyRenamed"],
     "assertsFix": true
 }

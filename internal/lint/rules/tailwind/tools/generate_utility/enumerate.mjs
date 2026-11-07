@@ -35,7 +35,7 @@ import NodeChildProcess from 'node:child_process';
 import { loadDesignSystem, readingOf, parseCandidate } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: enumerate.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -58,13 +58,13 @@ const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRo
 const keysByNamespace = {};
 {
     const candidatePrefixes = new Set();
-    for (const [key] of designSystem.theme.entries()) {
+    for(const [key] of designSystem.theme.entries()) {
         const segments = key.slice(2).split('-');
-        for (let length = 1; length <= segments.length - 1; length++) {
+        for(let length = 1; length <= segments.length - 1; length++) {
             candidatePrefixes.add('--' + segments.slice(0, length).join('-'));
         }
     }
-    for (const prefix of candidatePrefixes) {
+    for(const prefix of candidatePrefixes) {
         let keys;
         try {
             keys = designSystem.theme.keysInNamespaces([prefix]);
@@ -72,7 +72,7 @@ const keysByNamespace = {};
         catch {
             continue;
         }
-        if (!keys || keys.length === 0) continue;
+        if(!keys || keys.length === 0) continue;
         keysByNamespace[prefix] = keys;
     }
 }
@@ -94,7 +94,7 @@ const utilityBlocks = [];
 {
     const seen = new Set();
     const visit = (path) => {
-        if (seen.has(path)) return;
+        if(seen.has(path)) return;
         seen.add(path);
         let source;
         try {
@@ -106,33 +106,39 @@ const utilityBlocks = [];
 
         // Follow `@import`s so the whole graph is reached. Bare specifiers resolve through node,
         // relative ones against this file's directory.
-        for (const match of source.matchAll(/@import\s+(?:url\()?['"]([^'"]+)['"]\)?[^;]*;/g)) {
+        for(const match of source.matchAll(/@import\s+(?:url\()?['"]([^'"]+)['"]\)?[^;]*;/g)) {
             const specifier = match[1];
             let resolved = null;
-            if (specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
+            if(specifier.startsWith('.') || NodePath.isAbsolute(specifier)) {
                 resolved = NodePath.resolve(NodePath.dirname(path), specifier);
             }
             else {
                 continue;
             }
-            if (NodeFileSystem.existsSync(resolved)) visit(resolved);
+            if(NodeFileSystem.existsSync(resolved)) visit(resolved);
         }
 
         // `@utility <name> { ... }`, with brace matching so a nested rule does not end the block
         // early. The logical-direction utilities are exactly that shape.
-        for (let index = 0; index < source.length; index++) {
-            if (!source.startsWith('@utility', index)) continue;
+        for(let index = 0; index < source.length; index++) {
+            if(!source.startsWith('@utility', index)) continue;
             let cursor = index + '@utility'.length;
-            while (cursor < source.length && /\s/.test(source[cursor])) cursor++;
+            while(cursor < source.length && /\s/.test(source[cursor])) cursor++;
             const nameStart = cursor;
-            while (cursor < source.length && source[cursor] !== '{') cursor++;
-            if (cursor >= source.length) break;
+            while(cursor < source.length && source[cursor] !== '{') cursor++;
+            if(cursor >= source.length) break;
             const name = source.slice(nameStart, cursor).trim();
             const bodyStart = cursor;
             let depth = 0;
-            for (; cursor < source.length; cursor++) {
-                if (source[cursor] === '{') depth++;
-                else if (source[cursor] === '}') { depth--; if (depth === 0) { cursor++; break; } }
+            for(; cursor < source.length; cursor++) {
+                if(source[cursor] === '{') depth++;
+                else if(source[cursor] === '}') {
+                    depth--;
+                    if(depth === 0) {
+                        cursor++;
+                        break;
+                    }
+                }
             }
             utilityBlocks.push({ name, source: '@utility ' + name + ' ' + source.slice(bodyStart, cursor) });
             index = cursor - 1;
@@ -154,48 +160,92 @@ const functionalRootSet = new Set(functionalRoots);
  */
 const classNames = new Set();
 {
-    for (const entry of designSystem.getClassList()) {
+    for(const entry of designSystem.getClassList()) {
         const className = Array.isArray(entry) ? entry[0] : entry;
         const candidate = parseCandidate(designSystem, className);
-        if (candidate?.kind === 'functional' && functionalRootSet.has(candidate.root)) classNames.add(className);
+        if(candidate?.kind === 'functional' && functionalRootSet.has(candidate.root)) classNames.add(className);
         // The bare root too, which is a separate static `@utility` in this repository and is the
         // control for post-condition 1: a functional block with no `--default(…)` must not compile
         // bare.
-        if (candidate?.kind === 'static' && functionalRootSet.has(candidate.root)) classNames.add(className);
+        if(candidate?.kind === 'static' && functionalRootSet.has(candidate.root)) classNames.add(className);
     }
 
     const percentageKeys = [];
     const translateKeys = [];
-    for (const namespace of Object.keys(keysByNamespace)) {
-        if (namespace.startsWith('--percentage')) percentageKeys.push(...keysByNamespace[namespace]);
-        if (namespace === '--translate') translateKeys.push(...keysByNamespace[namespace]);
+    for(const namespace of Object.keys(keysByNamespace)) {
+        if(namespace.startsWith('--percentage')) percentageKeys.push(...keysByNamespace[namespace]);
+        if(namespace === '--translate') translateKeys.push(...keysByNamespace[namespace]);
     }
 
     const shapes = [
         // Bare integers, on and off the `--percentage` scale.
-        '0', '1', '2', '3', '4', '5', '7', '8', '11', '12', '16', '25', '50', '96', '100', '101',
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '7',
+        '8',
+        '11',
+        '12',
+        '16',
+        '25',
+        '50',
+        '96',
+        '100',
+        '101',
         // Decimals: `1.25` is a valid spacing multiplier and `1.3` is not, which is the only thing
         // separating a surviving `--value(number)` from a dropped one.
-        '0.5', '1.5', '2.5', '1.25', '1.3', '0.25', '0.75',
+        '0.5',
+        '1.5',
+        '2.5',
+        '1.25',
+        '1.3',
+        '0.25',
+        '0.75',
         // Fractions, which reach the ratio branch and the splice.
-        '1/2', '2/3', '3/4', '9/12', '1/1', '0/1', '1/0', '1.5/2', '16/9',
+        '1/2',
+        '2/3',
+        '3/4',
+        '9/12',
+        '1/1',
+        '0/1',
+        '1/0',
+        '1.5/2',
+        '16/9',
         // Percentages, integer and not.
-        '25%', '50%', '12.5%',
+        '25%',
+        '50%',
+        '12.5%',
         // Arbitrary values, with and without a typehint.
-        '[10px]', '[50%]', '[0.5]', '[1.5]', '[var(--a)]', '[length:var(--a)]', '[percentage:var(--a)]',
-        '[color:var(--a)]', '[integer:4]', '[*]', '[calc(100%-1rem)]',
+        '[10px]',
+        '[50%]',
+        '[0.5]',
+        '[1.5]',
+        '[var(--a)]',
+        '[length:var(--a)]',
+        '[percentage:var(--a)]',
+        '[color:var(--a)]',
+        '[integer:4]',
+        '[*]',
+        '[calc(100%-1rem)]',
         // Keywords that are theme keys on some roots and nothing on others.
-        'full', 'px', 'auto', 'none', 'translate-full',
+        'full',
+        'px',
+        'auto',
+        'none',
+        'translate-full',
     ];
     const modifierShapes = ['', '/50', '/none', '/[0.5]', '/[var(--a)]', '/2', '/3'];
 
-    for (const root of functionalRoots) {
-        for (const shape of shapes) {
-            for (const modifier of modifierShapes) {
+    for(const root of functionalRoots) {
+        for(const shape of shapes) {
+            for(const modifier of modifierShapes) {
                 classNames.add(root + '-' + shape + modifier);
             }
         }
-        for (const key of [...percentageKeys, ...translateKeys]) {
+        for(const key of [...percentageKeys, ...translateKeys]) {
             classNames.add(root + '-' + key);
             classNames.add(root + '-' + key + '/50');
         }
@@ -211,10 +261,10 @@ const classNames = new Set();
  */
 const cases = [];
 let nullReadings = 0;
-for (const className of Array.from(classNames).sort()) {
+for(const className of Array.from(classNames).sort()) {
     const candidate = parseCandidate(designSystem, className);
     const reading = readingOf(designSystem, className);
-    if (reading === null) nullReadings++;
+    if(reading === null) nullReadings++;
     cases.push({
         className,
         candidateKind: candidate?.kind ?? null,
@@ -238,17 +288,20 @@ for (const className of Array.from(classNames).sort()) {
 const perDeclarationRoots = [];
 {
     const percentageKeys = new Set();
-    for (const namespace of Object.keys(keysByNamespace)) {
-        if (!namespace.startsWith('--percentage')) continue;
-        for (const key of keysByNamespace[namespace]) percentageKeys.add(key);
+    for(const namespace of Object.keys(keysByNamespace)) {
+        if(!namespace.startsWith('--percentage')) continue;
+        for(const key of keysByNamespace[namespace]) percentageKeys.add(key);
     }
-    for (const root of [...functionalRoots].sort()) {
+    for(const root of [...functionalRoots].sort()) {
         const integerOnly = readingOf(designSystem, root + '-4');
-        if (integerOnly === null) continue;
-        for (const key of percentageKeys) {
+        if(integerOnly === null) continue;
+        for(const key of percentageKeys) {
             const both = readingOf(designSystem, root + '-' + key);
-            if (both === null) continue;
-            if (both.count !== integerOnly.count) { perDeclarationRoots.push(root); break; }
+            if(both === null) continue;
+            if(both.count !== integerOnly.count) {
+                perDeclarationRoots.push(root);
+                break;
+            }
         }
     }
 }
@@ -273,21 +326,32 @@ const perDeclarationRoots = [];
 const knownExceptions = [];
 const shadowQuirkProbes = [];
 {
-    const extractPath = NodePath.join(NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url)), '..', 'generate_descriptors', 'extract.mjs');
+    const extractPath = NodePath.join(
+        NodePath.dirname(NodeUrl.fileURLToPath(import.meta.url)),
+        '..',
+        'generate_descriptors',
+        'extract.mjs',
+    );
     // The same resolve root, so a theme borrowing an install is measured against that install here too.
     // No corpus: only the registry's disagreeing roots are read, and a public theme has no corpus to scan.
-    const report = JSON.parse(NodeChildProcess.execFileSync(process.execPath, [extractPath, entryPoint, '--resolve-root', resolveRoot, '--no-corpus'], {
-        encoding: 'utf8',
-        maxBuffer: 1024 * 1024 * 256,
-    }));
-    for (const root of report.disagreeingRoots ?? []) {
-        for (const example of root.examples ?? []) {
+    const report = JSON.parse(
+        NodeChildProcess.execFileSync(
+            process.execPath,
+            [extractPath, entryPoint, '--resolve-root', resolveRoot, '--no-corpus'],
+            {
+                encoding: 'utf8',
+                maxBuffer: 1024 * 1024 * 256,
+            },
+        ),
+    );
+    for(const root of report.disagreeingRoots ?? []) {
+        for(const example of root.examples ?? []) {
             // The sweep half of the report carries `group`; the registry half carries `kind`. Only
             // the registry classes are the 18. The four sweep probes are the other exception, the
             // upstream shadow quirk on `[16/9]`, captured separately below.
-            if (!example.kind) continue;
+            if(!example.kind) continue;
             const reading = readingOf(designSystem, example.className);
-            if (reading === null) continue;
+            if(reading === null) continue;
             knownExceptions.push({
                 className: example.className,
                 order: reading.order,
@@ -305,9 +369,9 @@ const shadowQuirkProbes = [];
      * block is involved, so they are outside this component; carried so the boundary is stated in
      * the fixture rather than only in prose.
      */
-    for (const root of report.disagreeingRoots ?? []) {
-        for (const example of root.examples ?? []) {
-            if (example.kind) continue;
+    for(const root of report.disagreeingRoots ?? []) {
+        for(const example of root.examples ?? []) {
+            if(example.kind) continue;
             shadowQuirkProbes.push({
                 className: example.className,
                 predicted: example.predicted,
@@ -353,7 +417,19 @@ const syntheticStylesheets = [
              --a: calc(--value(integer) * var(--spacing));
              --a: --value(--percentage-*);
          }`,
-        ['pct-50%', 'pct-12.5%', 'pct-25%', 'pct-0%', 'pct-100%', 'pct-4', 'pct-half', 'pct-1.5', 'pct-[10px]', 'pct-50%/2', 'pct'],
+        [
+            'pct-50%',
+            'pct-12.5%',
+            'pct-25%',
+            'pct-0%',
+            'pct-100%',
+            'pct-4',
+            'pct-half',
+            'pct-1.5',
+            'pct-[10px]',
+            'pct-50%/2',
+            'pct',
+        ],
     ],
     [
         'modifier',
@@ -480,7 +556,7 @@ const syntheticStylesheets = [
     ],
 ];
 
-for (const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
+for(const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
     // Written beside the repository's own entry point rather than in a temporary directory, so that
     // `@import "tailwindcss"` resolves against the same install the repository half measured, which
     // is the resolve root when one was given. A stylesheet in the system temp directory has no
@@ -496,32 +572,45 @@ for (const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
         NodeFileSystem.rmSync(temporaryPath, { force: true });
     }
     const blocks = [];
-    for (const match of stylesheet.matchAll(/@utility\s+([^\s{]+)\s*\{/g)) {
+    for(const match of stylesheet.matchAll(/@utility\s+([^\s{]+)\s*\{/g)) {
         const start = match.index;
         let depth = 0;
         let cursor = start;
-        for (; cursor < stylesheet.length; cursor++) {
-            if (stylesheet[cursor] === '{') depth++;
-            else if (stylesheet[cursor] === '}') { depth--; if (depth === 0) { cursor++; break; } }
+        for(; cursor < stylesheet.length; cursor++) {
+            if(stylesheet[cursor] === '{') depth++;
+            else if(stylesheet[cursor] === '}') {
+                depth--;
+                if(depth === 0) {
+                    cursor++;
+                    break;
+                }
+            }
         }
         blocks.push({ name: match[1], source: stylesheet.slice(start, cursor) });
     }
 
     const themeEntries = {};
-    for (const [key, value] of syntheticSystem.theme.entries()) themeEntries[key] = value.value ?? value;
+    for(const [key, value] of syntheticSystem.theme.entries()) themeEntries[key] = value.value ?? value;
 
     const cases = [];
-    for (const probe of probes) {
+    for(const probe of probes) {
         let candidate = null;
-        try { candidate = Array.from(syntheticSystem.parseCandidate(probe))[0] ?? null; } catch { candidate = null; }
+        try {
+            candidate = Array.from(syntheticSystem.parseCandidate(probe))[0] ?? null;
+        }
+        catch {
+            candidate = null;
+        }
         let reading = null;
-        if (candidate) {
+        if(candidate) {
             try {
                 const nodes = syntheticSystem.compileAstNodes(candidate);
                 const propertySort = nodes?.[0]?.propertySort;
-                if (propertySort) reading = { order: propertySort.order ?? [], count: propertySort.count ?? 0 };
+                if(propertySort) reading = { order: propertySort.order ?? [], count: propertySort.count ?? 0 };
             }
-            catch { reading = null; }
+            catch {
+                reading = null;
+            }
         }
         cases.push({
             className: probe,
@@ -537,18 +626,31 @@ for (const [name, stylesheet, probes, options = {}] of syntheticStylesheets) {
         });
     }
 
-    syntheticCases.push({ name, stylesheet, rejectionOnly: options.rejectionOnly === true, themeEntries, utilityBlocks: blocks, cases });
+    syntheticCases.push({
+        name,
+        stylesheet,
+        rejectionOnly: options.rejectionOnly === true,
+        themeEntries,
+        utilityBlocks: blocks,
+        cases,
+    });
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    keysByNamespace,
-    utilityBlocks,
-    perDeclarationRoots,
-    knownExceptions,
-    shadowQuirkProbes,
-    syntheticCases,
-    nullReadings,
-    cases,
-}, null, 2));
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            keysByNamespace,
+            utilityBlocks,
+            perDeclarationRoots,
+            knownExceptions,
+            shadowQuirkProbes,
+            syntheticCases,
+            nullReadings,
+            cases,
+        },
+        null,
+        2,
+    ),
+);

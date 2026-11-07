@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-lone-block"
-  },
-  "messages": {
-    "redundantBlock": {
-      "text": "These braces do nothing. A bare block scopes only what is declared directly inside it, and this one declares nothing, no `:=`, `var`, `const` or `type`, so the braces just indent the code and suggest a grouping the language does not keep. A `defer` inside still waits for the function to return, not for the block to end. Delete the braces and keep the statements, or if the grouping was the point, move it into a function whose name says what it groups."
+    "rules": {
+        "Go": "cohere-go/consistency-no-lone-block"
+    },
+    "messages": {
+        "redundantBlock": {
+            "text": "These braces do nothing. A bare block scopes only what is declared directly inside it, and this one declares nothing, no `:=`, `var`, `const` or `type`, so the braces just indent the code and suggest a grouping the language does not keep. A `defer` inside still waits for the function to return, not for the block to end. Delete the braces and keep the statements, or if the grouping was the point, move it into a function whose name says what it groups."
+        }
     }
-  }
 }

@@ -18,7 +18,5 @@
         "file": "components/Shell.tsx",
         "source": "export const C = () => <Foo.head />;"
     },
-    "assertedMessageIds": [
-        "noHeadElement"
-    ]
+    "assertedMessageIds": ["noHeadElement"]
 }

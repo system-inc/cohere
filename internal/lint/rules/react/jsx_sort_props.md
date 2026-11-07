@@ -1,12 +1,12 @@
 # `react/jsx-sort-props`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **8336** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | **8336**              |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | yes                   |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ className="p-2 text-sm font-medium transition-opacity hover:opacity-70"
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-
