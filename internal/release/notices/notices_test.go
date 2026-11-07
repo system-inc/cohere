@@ -60,6 +60,11 @@ func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 func TestEveryGoModRequirementIsCredited(test *testing.T) {
 	test.Parallel()
 
+	// go mod edit reads go.mod in a process of its own, so Go's test cache keys on it only through this read
+	// (#4p82x8d).
+	if _, readError := os.ReadFile(filepath.Join(moduleRoot(test), "go.mod")); readError != nil {
+		test.Fatal(readError)
+	}
 	command := exec.Command("go", "mod", "edit", "-json")
 	command.Dir = moduleRoot(test)
 	output, outputError := command.Output()

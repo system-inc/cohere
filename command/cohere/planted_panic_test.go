@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A rule's crash is cohere's bug, and the run that meets one fails, names it in every view, and finishes
@@ -20,6 +22,7 @@ import (
 func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	test.Parallel()
 	binary := filepath.Join(test.TempDir(), "cohere")
+	build_inputs.Record(test, ".", "-tags", "cohere_planted_panic", ".")
 	build := exec.Command("go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", binary, ".")
 	if output, outputError := build.CombinedOutput(); outputError != nil {
 		test.Fatalf("cannot build cohere with the planted rule: %v\n%s", outputError, output)

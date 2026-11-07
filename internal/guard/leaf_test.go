@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // allowedRuleImports are the packages of ours a rule package may depend on.
@@ -181,6 +183,9 @@ func hasAllowedPrefix(imported string) bool {
 // listPackages returns the import paths matching a pattern.
 func listPackages(test *testing.T, pattern string) []string {
 	test.Helper()
+	// go list reads the packages' sources in a process of its own, so Go's test cache keys on them, and on
+	// those of every package listImports then asks about, only through this (#4p82x8d).
+	build_inputs.Record(test, filepath.Join("..", ".."), pattern)
 	return runGoList(test, "-f", "{{.ImportPath}}", pattern)
 }
 
