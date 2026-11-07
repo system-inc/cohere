@@ -184,7 +184,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 304,
+        "rulesOn": 305,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -956,7 +956,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -1738,7 +1738,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 369,
+        "rulesOn": 370,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2422,7 +2422,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -3539,7 +3539,7 @@
     },
     {
         "name": "cohere:style",
-        "rulesOn": 141,
+        "rulesOn": 142,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3942,7 +3942,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -4297,7 +4297,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5236,7 +5236,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -6118,7 +6118,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 302,
+        "rulesOn": 303,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6931,7 +6931,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -7844,7 +7844,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8576,7 +8576,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",
@@ -9337,7 +9337,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 281,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -10021,7 +10021,7 @@
             },
             {
                 "name": "nexus/consistency-require-separated-folder-words",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "nexus/consistency-require-type-suffix",

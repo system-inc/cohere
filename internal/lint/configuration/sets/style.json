@@ -38,7 +38,7 @@
         "nexus/consistency-no-single-line-jsdoc": "error",
         "nexus/consistency-no-stuttering-name": "error",
         "nexus/consistency-no-utils-folder": "error",
-        "nexus/consistency-require-separated-folder-words": "off",
+        "nexus/consistency-require-separated-folder-words": "error",
         "nexus/consistency-require-type-suffix": "error",
         "nexus/import-require-module-alias": "error",
         "nexus/import-require-node-namespace": "error",
@@ -229,8 +229,7 @@
         "id-denylist": "It does nothing without a list, and the house's name bans live in nexus/ rules (#e4cn6wq Block 4).",
         "id-match": "It does nothing without a pattern, and casing is ruled by nexus/consistency-require-constant-casing (#e4cn6wq Block 4).",
         "no-restricted-exports": "It does nothing without a list, and no export name is banned (#e4cn6wq Block 4).",
-        "no-restricted-imports": "It does nothing without a list: api writes one where it needs one, and ahra and www ban sources through nexus/import-no-forbidden-source (#e4cn6wq Block 4).",
-        "nexus/consistency-require-separated-folder-words": "Off until policy's words hold the brands and words its census flagged, Cloudflare and lifecycle among them, and each consumer's rename wave lands, so the rule turns on at zero (#narw7aq)."
+        "no-restricted-imports": "It does nothing without a list: api writes one where it needs one, and ahra and www ban sources through nexus/import-no-forbidden-source (#e4cn6wq Block 4)."
     },
     "overrides": [
         {
