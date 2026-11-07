@@ -7,9 +7,13 @@ import Synchronization
 
  The driver plans each module's jobs as `-typecheck` with `-driver-print-jobs`, so it runs nothing, because it
  crashes when asked to plan `SIL` output (the probe's finding). Each planned frontend job is then rewritten:
- - `-typecheck` becomes `-emit-sil`, each primary's `SIL` going to /dev/null. Plain `-typecheck` stops before the
-   passes that report missing returns, constant overflow, infinite recursion, use before initialization,
-   exclusivity violations and Swift 6's sending data races, all of which a build reports;
+ - `-typecheck` becomes `-emit-sib`, each primary's serialized `SIL` going to /dev/null. Plain `-typecheck` stops
+   before the passes that report missing returns, constant overflow, infinite recursion, use before initialization,
+   exclusivity violations and Swift 6's sending data races, all of which a build reports. `-emit-sib` and
+   `-emit-sil` take the same path through those passes and differ only in what they write after (the frontend's
+   `performCompileStepsPostSILGen`, which has no action that runs them and writes nothing), and `-emit-sil` printed
+   every primary's whole `SIL` as text: measured 2026-11-06 on ahraos-macos's 170 files, the same jobs took 4.6 to
+   5.3s of wall time and 10.8 to 14.7s of system time with `-emit-sil`, 2.6 to 4.0s and 1.9 to 3.0s with `-emit-sib`;
  - each primary gets its own `-serialize-diagnostics-path`, laid out as a build lays its records out
    (`<root>/<Module>.build/Objects-normal/check/<File>.dia`), so `CompilerRecords` reads them unchanged;
  - each primary gets its own `-index-unit-output-path`, and the job `-index-store-path` and `-index-system-modules`,
@@ -311,10 +315,10 @@ struct FrontendCheck {
     }
 
     /*
-     The planned job as the check runs it: `-emit-sil` in place of `-typecheck`, and per primary, in the driver's
-     order, `SIL` to /dev/null, a diagnostics record and an index unit. Whatever outputs the driver planned are dropped
-     first, so only these are written. Indexing a dependency's declarations keeps `-typecheck`, skips every function
-     body, and writes only the index units.
+     The planned job as the check runs it: `-emit-sib` in place of `-typecheck`, and per primary, in the driver's
+     order, serialized `SIL` to /dev/null, a diagnostics record and an index unit. Whatever outputs the driver planned
+     are dropped first, so only these are written. Indexing a dependency's declarations keeps `-typecheck`, skips every
+     function body, and writes only the index units.
      */
     func frontendArguments(of job: Job) -> [String] {
         var arguments: [String] = []
@@ -327,7 +331,7 @@ struct FrontendCheck {
             if argument == "-index-system-modules" {
                 continue
             }
-            arguments.append(argument == "-typecheck" && mode == .check ? "-emit-sil" : argument)
+            arguments.append(argument == "-typecheck" && mode == .check ? "-emit-sib" : argument)
         }
         if mode == .indexDeclarations {
             arguments.append("-experimental-skip-all-function-bodies")

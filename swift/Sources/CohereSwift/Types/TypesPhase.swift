@@ -14,7 +14,7 @@ import Synchronization
  - `swift package experimental-build-server` (`BuildServerClient`) gives every target's compiler arguments and
    prepares the dependencies' modules, bodies skipped and no object written. Its one allowed build is a
    build-tool plugin's host tool, which the types record names with how long it took;
- - `FrontendCheck` runs each owned module's frontend jobs as `-emit-sil` to /dev/null, with a serialized
+ - `FrontendCheck` runs each owned module's frontend jobs as `-emit-sib` to /dev/null, with a serialized
    diagnostics record and an index unit per file, so the passes that report missing returns, overflow and data
    races run as in a build;
  - `CSyntaxCheck` runs `clang -fsyntax-only` over each owned C, C++ and Objective-C file, whose errors a build
@@ -240,7 +240,7 @@ struct TypesPhase {
          */
         func words(scratchPath: URL) -> String {
             var words =
-                "checked without building: the build server prepared the dependencies in \(Self.seconds(prepareSeconds)), and \(jobs) frontend jobs checked \(files) files of \(modules) modules with -emit-sil in \(Self.seconds(checkSeconds))"
+                "checked without building: the build server prepared the dependencies in \(Self.seconds(prepareSeconds)), and \(jobs) frontend jobs checked \(files) files of \(modules) modules with -emit-sib in \(Self.seconds(checkSeconds))"
             if rerunFiles > 0 {
                 words += ", \(rerunFiles) of them again alone after their batch failed"
             }
