@@ -350,10 +350,16 @@ struct TypesPhase {
              The root's session prepares only the edited modules' own dependencies when the scope holds Swift edits
              alone, and the check emits the interfaces the scoped modules import (`InterfaceEmit`). A local package's
              session, or a scope with a C-family edit, prepares everything as before: a header reaches modules only the
-             build server can name. Without a ledger to say which `Products` copies are older than their sources,
-             prepare emits everything too, and nothing is checked before it is done.
+             build server can name. Without a ledger to say which `Products` copies are older than their sources, or
+             when a module this check reads is one the ledger holds no current copy of, prepare emits everything too,
+             and nothing is checked before it is done. The ledger is read and kept under its lock.
              */
-            let ledger = sessionIndex == 0 ? InterfaceEmit.Ledger.stored(scratchPath: session.scratchPath) : nil
+            let interfacesLock = sessionIndex == 0 ? InterfaceEmit.Ledger.Lock(scratchPath: session.scratchPath) : nil
+            defer { withExtendedLifetime(interfacesLock) {} }
+            let stored = interfacesLock == nil ? nil : InterfaceEmit.Ledger.stored(scratchPath: session.scratchPath)
+            let ledger = stored.flatMap { stored in
+                Self.readsStale(stored, scope: scope, checking: checkedCandidates(recorded: recorded)) ? nil : stored
+            }
             let emittedBefore = (ledger?.targets ?? []).sorted().map {
                 InterfaceEmit.Ledger.moduleDirectory(scratchPath: session.scratchPath, target: $0)
             }
@@ -412,6 +418,17 @@ struct TypesPhase {
                         let checkingNow = Set(
                             owned.filter { scope.targets.contains($0.name) || !recorded.contains($0.name) }.map(\.name)
                         )
+                        /* A scoped module a checked one imports that this session cannot emit is prepared instead. */
+                        let ownedNames = Set(owned.map(\.name))
+                        let importedScoped = scope.targets.filter { target in
+                            checkingNow.contains {
+                                scope.imports[$0, default: []].contains(Self.moduleName(of: target))
+                            }
+                        }
+                        guard importedScoped.isSubset(of: ownedNames) else {
+                            narrowed = false
+                            return nil
+                        }
                         let order = Self.interfacesToEmit(
                             owned: Set(owned.map(\.name)),
                             checking: checkingNow,
@@ -511,9 +528,14 @@ struct TypesPhase {
                     throw TypesFailure(description: "\(error)")
                 }
                 do {
-                    try InterfaceEmit.Ledger(targets: held.union(emits.targets).sorted()).store(
-                        scratchPath: session.scratchPath
+                    let current = held.union(emits.targets)
+                    let left = Set(ledger?.stale ?? []).union(
+                        scope.map { $0.targets.intersection(described.map(\.name)) } ?? []
                     )
+                    try InterfaceEmit.Ledger(targets: current.sorted(), stale: left.subtracting(current).sorted())
+                        .store(
+                            scratchPath: session.scratchPath
+                        )
                 }
                 catch {
                     InterfaceEmit.Ledger.forget(scratchPath: session.scratchPath)
@@ -820,6 +842,21 @@ struct TypesPhase {
     }
 
     /*
+     Whether a module this check could read is one a narrowed prepare left stale with no current copy: one the ledger
+     lists as stale, outside the scope, that a module the check takes imports. Such a check prepares everything.
+     */
+    static func readsStale(_ ledger: InterfaceEmit.Ledger, scope: Scope?, checking: Set<String>) -> Bool {
+        guard let scope else { return false }
+        let stale = Set(ledger.stale).subtracting(scope.targets).map(moduleName(of:))
+        return checking.union(scope.targets).contains { !scope.imports[$0, default: []].isDisjoint(with: stale) }
+    }
+
+    /* The owned targets the last check left no records for, which this check takes whatever the scope. */
+    private func checkedCandidates(recorded: Set<String>) -> Set<String> {
+        Set(files.map(\.targetName)).subtracting(recorded)
+    }
+
+    /*
      The interfaces to emit after a narrowed prepare, in the order they can be: each scoped module a checked module
      imports, and each scoped one the ledger holds, so its copy in the check's folder stays its current interface.
      */
@@ -1116,6 +1153,9 @@ struct TypesPhase {
             files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
             uniquingKeysWith: { first, _ in first },
         )
+        /* The compile arguments search the check's emitted interfaces, which a run checking alongside may be emitting. */
+        let interfacesLock = InterfaceEmit.Ledger.Lock(scratchPath: scratchPath)
+        defer { withExtendedLifetime(interfacesLock) {} }
         var edited: [(path: String, file: FileSet.OwnedFile)] = []
         var interfaces: [String: String] = [:]
         for path in changes.edited {
@@ -1126,6 +1166,19 @@ struct TypesPhase {
             guard interface == before else { return nil }
             edited.append((resolved, file))
             interfaces[resolved] = interface
+        }
+        /*
+         The compile arguments the last check kept search only current interfaces, but a module the ledger lists as
+         stale has none anywhere: an edited module that imports one is checked, and that check prepares everything.
+         */
+        if let stale = InterfaceEmit.Ledger.stored(scratchPath: scratchPath)?.stale, !stale.isEmpty {
+            let staleNames = Set(stale.map(Self.moduleName(of:)))
+            let editedTargets = Set(edited.map(\.file.targetName))
+            for file in files where editedTargets.contains(file.targetName) {
+                guard let tree = tree(of: file), Self.importedModules(of: tree).isDisjoint(with: staleNames) else {
+                    return nil
+                }
+            }
         }
         do {
             var tables = [try CompileCommands.read(layout: .check(scratchPath: scratchPath))]

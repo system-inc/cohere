@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /*
  The interface of an edited module, emitted by the check itself for the scoped modules that import it, so prepare
@@ -29,14 +30,17 @@ struct InterfaceEmit {
     var runner = ProcessRunner()
 
     /*
-     The owned modules, by target, whose interface the check emitted and no prepare of everything has emitted since,
-     kept beside the interfaces. A module in it has its current interface only in its folder here; one edited again
-     is in the scope again, and emitted again (`TypesPhase`). A scratch without the file, an older engine's or one a
-     failed emit left, cannot say which `Products` copies are older than their sources, so prepare emits everything
+     What a narrowed prepare left older in `Products` than its sources, kept beside the interfaces until a prepare of
+     everything. `targets` are the owned modules, by target, whose current interface is in their folder here, since
+     the check emitted it; one edited again is in the scope again, and emitted again (`TypesPhase`). `stale` are the
+     scoped modules the check did not emit, since nothing it checked imported them, so no current copy exists
+     anywhere: a check that would read one prepares everything (cache's review of 04d698c1f). A scratch without the
+     file, an older engine's or one a failed emit left, cannot say which copies are older, so prepare emits everything
      and the file starts empty.
      */
     struct Ledger: Codable, Equatable {
         var targets: [String]
+        var stale: [String] = []
 
         static func directory(scratchPath: URL) -> URL {
             TypesPhase.checkDirectory(scratchPath: scratchPath).appendingPathComponent("interfaces", isDirectory: true)
@@ -70,6 +74,38 @@ struct InterfaceEmit {
             try JSONEncoder().encode(self).write(to: Self.file(scratchPath: scratchPath), options: .atomic)
         }
 
+        /*
+         The lock a run holds on the interfaces from reading the ledger to the end of its check, or of its in-process
+         check of bodies, so a second run on the same root waits: one run clearing a folder before its emit would
+         otherwise send the other's importers to the older `Products` copy, and two ledger writes would lose one
+         (cache's review of 04d698c1f). An exclusive `flock`, which the kernel drops however the holder ends, as
+         TypeScript's `table.lock` does. Nil when the scratch cannot hold one, and then nothing reads the ledger.
+         */
+        final class Lock {
+            private let descriptor: Int32
+
+            init?(scratchPath: URL) {
+                let directory = Ledger.directory(scratchPath: scratchPath)
+                do {
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                }
+                catch {
+                    return nil
+                }
+                let opened = unsafe open(directory.appendingPathComponent("lock").path, O_CREAT | O_RDWR, 0o644)
+                guard opened >= 0 else { return nil }
+                guard flock(opened, LOCK_EX) == 0 else {
+                    close(opened)
+                    return nil
+                }
+                descriptor = opened
+            }
+
+            deinit {
+                close(descriptor)
+            }
+        }
+
         /* Removed when an emit failed, so the next check prepares everything. One already gone is what was wanted. */
         static func forget(scratchPath: URL) {
             do {
@@ -80,6 +116,13 @@ struct InterfaceEmit {
             }
         }
     }
+
+    /*
+     Called with each folder right after its earlier interface is removed and before the emit writes the new one: the
+     seam a test pauses one run at, to show a second run on the same scratch waits for it rather than read the folder
+     empty. Nil, and so nothing, outside that test.
+     */
+    static let cleared = Mutex<(@Sendable (URL) -> Void)?>(nil)
 
     /* The files an emit writes beside the module, each named by the module. */
     static let outputExtensions = ["swiftmodule", "swiftdoc", "swiftsourceinfo", "abi.json"]
@@ -119,6 +162,7 @@ struct InterfaceEmit {
                 detail: "its interface's folder could not be made ready: \(error)",
             )
         }
+        Self.cleared.withLock { $0 }?(directory)
         return Planned(
             moduleName: moduleName,
             interface: interface,
