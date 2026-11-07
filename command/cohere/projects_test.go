@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -365,54 +366,37 @@ func TestOneSwiftPackageAsksNoCoverage(test *testing.T) {
 }
 
 // Swift files no package holds, here an app's App/ beside apple/Toy, the shape of ahraos-presence's
-// CapturePhone, are named in the notes, on the summary line and on the verdict line, and change nothing
-// else: a clean run stays green and a failing one exits as it would without them (#ybspptb). The package's
-// own files are no gap. Outside a repository, since inside one they are a scripts-only root's (#wpd36zj).
-func TestSwiftFilesNoPackageChecksAreSaidAndFailNothing(test *testing.T) {
+// CapturePhone, are a scripts-only root's, inside a repository or not (#wpd36zj, #13nbb1s): its Swift run stands at
+// the root beside the TypeScript project there, the package runs as before, and a clean run stays green.
+func TestSwiftNoPackageHoldsIsAScriptsOnlyRootsInOrOutOfARepository(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	findings := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Findings.jsonl")+"\nexit 1")
-
-	without := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
-	with := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
-	writeTree(test, filepath.Join(with, "App"), map[string]string{
-		"Sources/App/App.swift":    "let app = 1\n",
-		"Sources/App/Screen.swift": "let screen = 1\n",
-		"Tests/AppTests.swift":     "let tests = 1\n",
-	})
-
-	for _, engine := range []string{clean, findings} {
-		output, exitCode := runWithEngine(test, binary, engine, with, "--no-fix")
-		_, exitCodeWithout := runWithEngine(test, binary, engine, without, "--no-fix")
-		if exitCode != exitCodeWithout {
-			test.Errorf(
-				"Swift no package checks moved the exit code to %d from %d:\n%s",
-				exitCode,
-				exitCodeWithout,
-				output,
-			)
-		}
-		for _, want := range []string{
-			"  App/: 3 Swift files no Swift package checks",
-			"; not checked: 3 Swift files no Swift package checks, in 1 directory;",
-			"⚠ Swift files no package checks: App/",
-		} {
-			if !strings.Contains(output, want) {
-				test.Errorf("the report lacks %q:\n%s", want, output)
+	for _, inRepository := range []bool{true, false} {
+		test.Run(fmt.Sprintf("in a repository: %t", inRepository), func(test *testing.T) {
+			test.Parallel()
+			root := mixedRepository(test, "apple/Toy")
+			if !inRepository {
+				outsideAnyRepository(test, root)
 			}
-		}
-		if strings.Contains(output, "apple/: ") || strings.Contains(output, "checks: apple/") {
-			test.Errorf("the package's own files were named as checked by no package:\n%s", output)
-		}
-	}
-	// The verdict line is the run's last, the one every view prints.
-	output, _ := runWithEngine(test, binary, clean, with, "--no-fix")
-	lines := strings.Split(strings.TrimSpace(output), "\n")
-	if last := lines[len(
-		lines,
-	)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
-		test.Errorf("the verdict line is %q, want it green and ending on the gap", last)
+			writeTree(test, filepath.Join(root, "App"), map[string]string{
+				"Sources/App/App.swift":    "let app = 1\n",
+				"Sources/App/Screen.swift": "let screen = 1\n",
+				"Tests/AppTests.swift":     "let tests = 1\n",
+			})
+			engine, _ := coveringSwiftEngine(test,
+				"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\","+
+					"\\\"checked\\\":[\\\"$root\\\"],\\\"vendored\\\":[]}\"\nexit 0")
+
+			output, exitCode := runWithEngine(test, binary, engine, root, "--no-fix")
+			if exitCode != 0 {
+				test.Errorf("a clean repository with an app's Swift exited %d, want 0:\n%s", exitCode, output)
+			}
+			for _, want := range []string{"== . (Swift) ==", "== apple/Toy (Swift) =="} {
+				if !strings.Contains(output, want) {
+					test.Errorf("the report lacks %q:\n%s", want, output)
+				}
+			}
+		})
 	}
 }
 
@@ -438,125 +422,48 @@ func TestSwiftACoveredPackageHoldsIsNoGap(test *testing.T) {
 	if exitCode != 0 || !strings.Contains(output, "B not run: checked as part of A") {
 		test.Fatalf("A's run did not cover B, so this does not test a covered package (exit %d):\n%s", exitCode, output)
 	}
-	if strings.Contains(output, "no Swift package checks") || strings.Contains(output, "no package checks") {
-		test.Errorf("a covered package's files were named as checked by no package:\n%s", output)
+	if strings.Contains(output, "== . (Swift) ==") {
+		test.Errorf("a covered package's files were given a scripts-only root, as though no package held them:\n%s",
+			output)
 	}
 }
 
-// Swift the walk never enters, under node_modules, or that .gitignore or the root's ignorePatterns match, is
-// no gap, since nobody expects it checked. App/, beside them, is the control: the same walk does name
-// unclaimed Swift, outside a repository (#wpd36zj).
-func TestSwiftIgnoredOrInADependencyIsNoGap(test *testing.T) {
+// Swift the walk never enters, under node_modules, or that .gitignore or the root's ignorePatterns match, gives no
+// scripts-only root, since nobody expects it checked, inside a repository or not: discovery reads .gitignore either
+// way. App/, beside them, is the control: one file the walk keeps gives the root its Swift run (#wpd36zj).
+func TestSwiftIgnoredOrInADependencyGivesNoScriptsOnlyRoot(test *testing.T) {
 	test.Parallel()
-	binary := buildCohere(test)
-	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	root := outsideAnyRepository(test, mixedRepository(test, "apple/Toy"))
-	writeTree(test, root, map[string]string{
-		".gitignore":                         "tsconfig.tsbuildinfo\nGenerated/\n*.generated.swift\n",
-		"CohereSettings.json":                "{ \"rules\": {}, \"ignorePatterns\": [\"Legacy/**\"] }\n",
-		"Generated/Sources/Generated.swift":  "let generated = 1\n",
-		"node_modules/dependency/Lib.swift":  "let dependency = 1\n",
-		"Scripts/Made.generated.swift":       "let made = 1\n",
-		"Legacy/Old.swift":                   "let old = 1\n",
-		"App/Sources/App.swift":              "let app = 1\n",
-		"App/Sources/Screen.generated.swift": "let screen = 1\n",
-	})
-
-	output, exitCode := runWithEngine(test, binary, clean, root, "--no-fix")
-	if exitCode != 0 {
-		test.Errorf("the run exited %d:\n%s", exitCode, output)
-	}
-	if !strings.Contains(output, "  App/: 1 Swift file no Swift package checks") ||
-		!strings.Contains(output, "⚠ Swift files no package checks: App/\n") {
-		test.Errorf("the control, App/ with its one file .gitignore keeps, is not named alone:\n%s", output)
-	}
-	for _, passedOver := range []string{"Generated/", "node_modules/", "Scripts/", "Legacy/"} {
-		if strings.Contains(output, passedOver+": ") || strings.Contains(output, ", "+passedOver) {
-			test.Errorf("%s was named as Swift no package checks:\n%s", passedOver, output)
-		}
-	}
-}
-
-// Unclaimed Swift at any depth is named by the top directory holding it, its files counted together, and a
-// directory holding a package names only the files outside it. Past three directories the verdict line
-// names three and counts the rest, while the notes name every one. Outside a repository (#wpd36zj).
-func TestUnclaimedSwiftIsNamedByItsTopDirectoryAndCountedPastThree(test *testing.T) {
-	test.Parallel()
-	binary := buildCohere(test)
-	clean := fakeSwiftEngine(test, "cat "+filepath.Join(contractDirectory(test), "Clean.jsonl"))
-	root := outsideAnyRepository(test, mixedRepository(test, "Tools/Sim"))
-	writeTree(test, root, map[string]string{
-		"Root.swift":                                 "let root = 1\n",
-		"CapturePhone/Sources/App/App.swift":         "let app = 1\n",
-		"CapturePhone/Sources/App/Deep/Screen.swift": "let screen = 1\n",
-		"CapturePhone/Tests/CaptureTests.swift":      "let tests = 1\n",
-		"Beta/Beta.swift":                            "let beta = 1\n",
-		"Alpha/One/Two/Alpha.swift":                  "let alpha = 1\n",
-		"Tools/script.swift":                         "let script = 1\n",
-	})
-
-	output, _ := runWithEngine(test, binary, clean, root, "--no-fix")
-	for _, want := range []string{
-		"  .: 1 Swift file no Swift package checks",
-		"  Alpha/: 1 Swift file no Swift package checks",
-		"  Beta/: 1 Swift file no Swift package checks",
-		"  CapturePhone/: 3 Swift files no Swift package checks",
-		"  Tools/: 1 Swift file no Swift package checks",
-		"; not checked: 7 Swift files no Swift package checks, in 5 directories;",
-		"⚠ Swift files no package checks: ., Alpha/, Beta/ and 2 more\n",
-	} {
-		if !strings.Contains(output, want) {
-			test.Errorf("the report lacks %q:\n%s", want, output)
-		}
-	}
-	for _, nested := range []string{"CapturePhone/Sources", "CapturePhone/Tests", "Alpha/One", "Tools/Sim"} {
-		if strings.Contains(output, nested+"/: ") || strings.Contains(output, nested+": ") {
-			test.Errorf("%s was named rather than the top directory holding it:\n%s", nested, output)
-		}
-	}
-}
-
-// A root with one TypeScript program and an app's Swift beside it finds one project, which runs in this
-// process with no report of projects. Its own footer says the gap, a replay of that run says it too, and once
-// the Swift is gone the next run says nothing of it. Outside a repository, since inside one the Swift is a
-// scripts-only root's, a project of its own (#wpd36zj).
-func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
-	test.Parallel()
-	binary := buildCohere(test)
-	// The cache is ignored, so the second run's inputs are the first's and it replays.
-	root := outsideAnyRepository(test, newRepository(test, map[string]string{
-		"tsconfig.json":         incrementalFixtureConfiguration + "\n",
-		"CohereSettings.json":   "{ \"rules\": {} }\n",
-		"index.ts":              "export const value = 1;\n",
-		".gitignore":            ".cache/\ntsconfig.tsbuildinfo\n",
-		"App/Sources/App.swift": "let app = 1\n",
-	}))
-
-	for _, run := range []string{"fresh", "replayed"} {
-		output, exitCode := runWithEngine(test, binary, "", root, "--no-fix")
-		if exitCode != 0 || strings.Contains(output, "projects under ") {
-			test.Fatalf("the %s run of the one project did not run here, green (exit %d):\n%s", run, exitCode, output)
-		}
-		if replayed := strings.Contains(output, "cached: no input has changed"); replayed != (run == "replayed") {
-			test.Fatalf("the %s run replayed: %t, so this does not test both paths:\n%s", run, replayed, output)
-		}
-		lines := strings.Split(strings.TrimSpace(output), "\n")
-		if last := lines[len(
-			lines,
-		)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
-			test.Errorf("the %s run's footer is %q, want it green and ending on the gap", run, last)
-		}
-		if !strings.Contains(output, "cohere: App/: 1 Swift file no Swift package checks") {
-			test.Errorf("the %s run's notes do not name App/:\n%s", run, output)
-		}
-	}
-
-	if removeError := os.Remove(filepath.Join(root, "App", "Sources", "App.swift")); removeError != nil {
-		test.Fatal(removeError)
-	}
-	output, exitCode := runWithEngine(test, binary, "", root, "--no-fix")
-	if exitCode != 0 || strings.Contains(output, "no package checks") {
-		test.Errorf("with the Swift gone the run still names it (exit %d):\n%s", exitCode, output)
+	for _, inRepository := range []bool{true, false} {
+		test.Run(fmt.Sprintf("in a repository: %t", inRepository), func(test *testing.T) {
+			test.Parallel()
+			root := mixedRepository(test, "apple/Toy")
+			if !inRepository {
+				outsideAnyRepository(test, root)
+			}
+			writeTree(test, root, map[string]string{
+				".gitignore":                         "tsconfig.tsbuildinfo\nGenerated/\n*.generated.swift\n",
+				"Generated/Sources/Generated.swift":  "let generated = 1\n",
+				"node_modules/dependency/Lib.swift":  "let dependency = 1\n",
+				"Scripts/Made.generated.swift":       "let made = 1\n",
+				"Legacy/Old.swift":                   "let old = 1\n",
+				"App/Sources/Screen.generated.swift": "let screen = 1\n",
+			})
+			scriptsRoot := func() bool {
+				test.Helper()
+				found, discoverProjectsError := discoverProjects(root, []string{"Legacy/**"})
+				if discoverProjectsError != nil {
+					test.Fatal(discoverProjectsError)
+				}
+				return slices.Contains(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
+			}
+			if scriptsRoot() {
+				test.Errorf("Swift nobody expects checked gave the root a scripts-only Swift run")
+			}
+			writeTree(test, root, map[string]string{"App/Sources/App.swift": "let app = 1\n"})
+			if !scriptsRoot() {
+				test.Errorf("the control, App/ with one file .gitignore keeps, gave the root no scripts-only Swift run")
+			}
+		})
 	}
 }
 
@@ -564,8 +471,8 @@ func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
 // it is a Swift project when it is the nearest Swift marker above some Swift file: inside a package's
 // directory, as ahraos-presence's CapturePhone is, or outside every package, where its files are then no gap.
 // A candidate claiming nothing is no project, Package.swift beside one is the package alone, two .xcodeproj or
-// a workspace alone is no candidate, and nested markers each claim their nearest files (#ybspptb). Outside a
-// repository, so what no marker claims is the gap it names (see TestUnclaimedSwiftInARepositoryIsAScriptsOnlyRoot).
+// a workspace alone is no candidate, and nested markers each claim their nearest files (#ybspptb). What no marker
+// claims is the scripts-only root's, a Swift project at `.` (#wpd36zj).
 func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 	test.Parallel()
 	for _, testCase := range []struct {
@@ -573,7 +480,6 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 		files          map[string]string
 		ignorePatterns []string
 		projects       []discoveredProject
-		unclaimed      []unclaimedSwiftDirectory
 		refused        []string
 	}{
 		{
@@ -609,7 +515,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Work/App.xcworkspace/contents.xcworkspace": "<Workspace/>\n",
 				"Work/Work.swift":                           "let work = 1\n",
 			},
-			unclaimed: []unclaimedSwiftDirectory{{Directory: "App/", Files: 1}, {Directory: "Work/", Files: 1}},
+			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}},
 		},
 		{
 			name: "Package.swift beside project.yml is the package alone",
@@ -631,7 +537,7 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Lib/Sources/Lib/Lib.swift": "let lib = 1\n",
 			},
 			ignorePatterns: []string{"Lib/Package.swift"},
-			unclaimed:      []unclaimedSwiftDirectory{{Directory: "Lib/", Files: 1}},
+			projects:       []discoveredProject{{Directory: ".", Engine: engineSwift}},
 			refused:        []string{"Lib/Package.swift"},
 		},
 		{
@@ -665,13 +571,13 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"Refused/App.swift":   "let app = 1\n",
 			},
 			ignorePatterns: []string{"Refused/project.yml"},
-			unclaimed:      []unclaimedSwiftDirectory{{Directory: "Refused/", Files: 1}},
+			projects:       []discoveredProject{{Directory: ".", Engine: engineSwift}},
 			refused:        []string{"Refused/project.yml"},
 		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			root := outsideAnyRepository(test, newRepository(test, testCase.files))
+			root := newRepository(test, testCase.files)
 			found, discoverProjectsError := discoverProjects(root, testCase.ignorePatterns)
 			if discoverProjectsError != nil {
 				test.Fatal(discoverProjectsError)
@@ -679,10 +585,6 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 			if len(found.Projects) != len(testCase.projects) ||
 				len(found.Projects) > 0 && !reflect.DeepEqual(found.Projects, testCase.projects) {
 				test.Errorf("found the projects %+v, want %+v", found.Projects, testCase.projects)
-			}
-			if len(found.UnclaimedSwift) != len(testCase.unclaimed) ||
-				len(found.UnclaimedSwift) > 0 && !reflect.DeepEqual(found.UnclaimedSwift, testCase.unclaimed) {
-				test.Errorf("found the unclaimed Swift %+v, want %+v", found.UnclaimedSwift, testCase.unclaimed)
 			}
 			if len(found.Refused) != len(testCase.refused) ||
 				len(found.Refused) > 0 && !reflect.DeepEqual(found.Refused, testCase.refused) {
@@ -692,32 +594,37 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 	}
 }
 
-// Inside a repository the Swift no project claims is a Swift project of its own at the root, a scripts-only
-// root, and no gap (#wpd36zj): the engine checks each standalone script there alone, as `swift <file>` runs it,
-// and names every other file. A package's own files stay its own.
-func TestUnclaimedSwiftInARepositoryIsAScriptsOnlyRoot(test *testing.T) {
+// The Swift no project claims is a Swift project of its own at the root, a scripts-only root, inside a repository
+// or not (#wpd36zj, #13nbb1s): the engine checks each standalone script there alone, as `swift <file>` runs it, and
+// names every other file. A package's own files stay its own.
+func TestUnclaimedSwiftIsAScriptsOnlyRootInOrOutOfARepository(test *testing.T) {
 	test.Parallel()
-	root := newRepository(test, map[string]string{
-		"modules/ebay/EbayVision.swift": "print(1)\n",
-		"Kit/Package.swift":             discoveryPackage,
-		"Kit/Sources/Kit/Kit.swift":     "let kit = 1\n",
-	})
-	found, discoverProjectsError := discoverProjects(root, nil)
-	if discoverProjectsError != nil {
-		test.Fatal(discoverProjectsError)
-	}
-	want := []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "Kit", Engine: engineSwift}}
-	if !reflect.DeepEqual(found.Projects, want) {
-		test.Errorf("found the projects %+v, want %+v", found.Projects, want)
-	}
-	if len(found.UnclaimedSwift) != 0 {
-		test.Errorf("found the unclaimed Swift %+v, want none: the scripts-only root holds it", found.UnclaimedSwift)
+	for _, inRepository := range []bool{true, false} {
+		test.Run(fmt.Sprintf("in a repository: %t", inRepository), func(test *testing.T) {
+			test.Parallel()
+			root := newRepository(test, map[string]string{
+				"modules/ebay/EbayVision.swift": "print(1)\n",
+				"Kit/Package.swift":             discoveryPackage,
+				"Kit/Sources/Kit/Kit.swift":     "let kit = 1\n",
+			})
+			if !inRepository {
+				outsideAnyRepository(test, root)
+			}
+			found, discoverProjectsError := discoverProjects(root, nil)
+			if discoverProjectsError != nil {
+				test.Fatal(discoverProjectsError)
+			}
+			want := []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "Kit", Engine: engineSwift}}
+			if !reflect.DeepEqual(found.Projects, want) {
+				test.Errorf("found the projects %+v, want %+v", found.Projects, want)
+			}
+		})
 	}
 }
 
 // ahra's shape: a TypeScript program at the root, a package below it, and a script under no Swift project. The
 // script's Swift run is the engine's at the repository's root, through the --directory and engine a discovered
-// project's run is given, labelled beside the TypeScript project there, and the verdict names no gap (#wpd36zj).
+// project's run is given, labelled beside the TypeScript project there (#wpd36zj).
 func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
@@ -730,8 +637,8 @@ func TestAScriptsOnlyRootRunsTheSwiftEngineAtTheRepositoryRoot(test *testing.T) 
 	if exitCode != 0 {
 		test.Errorf("a clean repository with a script exited %d, want 0:\n%s", exitCode, output)
 	}
-	if !strings.Contains(output, "== . (Swift) ==") || strings.Contains(output, "no package checks") {
-		test.Errorf("the script is not checked by a Swift run at the root, or is named as a gap:\n%s", output)
+	if !strings.Contains(output, "== . (Swift) ==") {
+		test.Errorf("the script is not checked by a Swift run at the root:\n%s", output)
 	}
 	logged, readError := os.ReadFile(log)
 	if readError != nil {
@@ -861,7 +768,6 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		"CapturePhone/App/App.swift",
 		"Tools/Sim/Package.swift",
 		"Tools/Sim/Sources/Toy/Toy.swift",
-		"no package checks",
 	} {
 		if strings.Contains(output, unwanted) {
 			test.Errorf("the report names %q, which a run of its own accounts for:\n%s", unwanted, output)

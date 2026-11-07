@@ -167,10 +167,8 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
-	// After the record, since it is what this invocation's discovery found and not part of the run: Swift
-	// added or given a package since would otherwise be said, or left out, by every replay, and so would
-	// discovery's ignores and their counts (see ignore_account.go).
-	summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
+	// After the record, since it is what this invocation's discovery found and not part of the run: discovery's
+	// ignores and their counts would otherwise be said, or left out, by every replay (see ignore_account.go).
 	summary.IgnorePatterns = discoveredIgnores
 	summary.EngineBuilds = builtEngines()
 

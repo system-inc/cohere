@@ -358,25 +358,6 @@
                             "type": "boolean",
                             "description": "Lint fixes were held because an input the program was told to load is missing: a generated file, or an import, reference or types entry that resolves to nothing. None was proposed or written, and formatting ran alone. Absent otherwise."
                         },
-                        "unclaimedSwift": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "required": ["directory", "files"],
-                                "properties": {
-                                    "directory": {
-                                        "type": "string",
-                                        "description": "The shallowest directory under the discovery root holding the files, ending in a slash, or \".\" for files directly in the root."
-                                    },
-                                    "files": {
-                                        "type": "integer",
-                                        "description": "The .swift files below it that no Swift package holds."
-                                    }
-                                }
-                            },
-                            "description": "Directories of .swift files beside the project that no Swift package holds, so nothing checked them, found by a run from the repository that discovered this one project. They fail nothing. Absent when there are none."
-                        },
                         "uncheckedSwift": {
                             "type": "array",
                             "items": {
