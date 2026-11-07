@@ -218,7 +218,7 @@
         "@typescript-eslint/prefer-promise-reject-errors": "error",
         "array-callback-return": "error",
         "no-unreachable-loop": "error",
-        "@typescript-eslint/no-redeclare": "error",
+        "@typescript-eslint/no-redeclare": "off",
         "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
         "no-loop-func": "off",
         "@typescript-eslint/restrict-plus-operands": "error",
@@ -237,6 +237,7 @@
         "no-implied-eval": "off"
     },
     "reasons": {
+        "@typescript-eslint/no-redeclare": "Ruled by Kirk on 2026-11-07: tsc reports every real redeclaration (TS2300, TS2451); what this rule adds is a type and a value sharing a name, which is valid declaration merging, as lib.es5.d.ts's own `interface Array<T>` plus `declare var Array: ArrayConstructor` and a zod schema's `const User` plus `type User` (#3vfxajt).",
         "@typescript-eslint/no-unsafe-type-assertion": "adamic/no-unchecked-cast reports a superset under tsc: with its runtimeChecksEmitted option false it reports every assertion this rule does (measured on ahra, www-phi-health, api-phi-health and www-ahra-ai: 2,752 sites both, 71 this rule alone, all union downcasts the strict option reports) (#mdccedj).",
         "nexus/correctness-no-process-exit-after-output": "Off on purpose, by @system_cohere's ruling of 2026-10-03 (#h1jwmmz). Its findings are true, but every process entry blocks stdout and stderr, which correctness-require-blocking-standard-streams requires, so an exit after a write has nothing queued to lose. Turn it on only for a project whose entries don't block.",
         "no-unused-private-class-members": "The core rule sees only #private names. @typescript-eslint/no-unused-private-class-members, on here, is the typed rule that supersedes it.",
