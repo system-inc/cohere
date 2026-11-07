@@ -38,6 +38,8 @@ func TestAGoRuleHasARowInRulesJson(test *testing.T) {
 			Analyzer:     placeholderAnalyzer,
 		},
 	}
+	// The registry's fixing rules are not among these two, and a fix claimed for an unlisted rule refuses the build.
+	inputs.GoFixingRules = nil
 	var rules Rules
 	if decodeError := json.Unmarshal(built(test, inputs)[RulesPath], &rules); decodeError != nil {
 		test.Fatal(decodeError)
@@ -60,6 +62,47 @@ func TestAGoRuleHasARowInRulesJson(test *testing.T) {
 	if ported.Namespace != "cohere-go" || ported.Origin != "vet" || ported.UpstreamName != "printf" ||
 		ported.Category != "" || !ported.TypeAware {
 		test.Errorf("the ported rule's row is %+v", ported)
+	}
+}
+
+// TestAGoRuleARunFixesIsMarkedFix: the rule a run without --no-fix fixes reads fixKind "fix" in rules.json, as a
+// TypeScript rule whose tests show a fix does, and one it does not fix reads none.
+func TestAGoRuleARunFixesIsMarkedFix(test *testing.T) {
+	test.Parallel()
+	inputs := sourceInputs(test)
+	inputs.GoRules = []goenginerule.Rule{
+		{Name: "cohere-go/consistency-no-long-line", Origin: goenginerule.OriginHouse, Analyzer: placeholderAnalyzer},
+		{Name: "cohere-go/performance-require-parallel-test", Origin: goenginerule.OriginHouse,
+			Analyzer: placeholderAnalyzer},
+	}
+	inputs.GoFixingRules = []string{"cohere-go/consistency-no-long-line"}
+	var rules Rules
+	if decodeError := json.Unmarshal(built(test, inputs)[RulesPath], &rules); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	fixKinds := map[string]string{}
+	for _, row := range rules.Rules {
+		if row.Language == "Go" {
+			fixKinds[row.Name] = row.FixKind
+		}
+	}
+	if fixKinds["cohere-go/consistency-no-long-line"] != "fix" ||
+		fixKinds["cohere-go/performance-require-parallel-test"] != "" {
+		test.Errorf("the Go rows' fix kinds are %v", fixKinds)
+	}
+}
+
+// A fix claimed for a rule the registry does not hold refuses the build, so the docs never say a run fixes what they
+// do not list.
+func TestAFixingRuleTheRegistryDoesNotHoldRefusesTheBuild(test *testing.T) {
+	test.Parallel()
+	registered := []goenginerule.Rule{
+		{Name: "cohere-go/performance-require-parallel-test", Origin: goenginerule.OriginHouse,
+			Analyzer: placeholderAnalyzer},
+	}
+	_, buildError := buildGoRows(registered, []string{"cohere-go/consistency-no-long-line"})
+	if buildError == nil || !strings.Contains(buildError.Error(), "cohere-go/consistency-no-long-line") {
+		test.Fatalf("buildGoRows refused with %v, expected an error naming the unregistered rule", buildError)
 	}
 }
 
@@ -103,7 +146,7 @@ func TestAMalformedGoRuleRefusesTheBuild(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			_, buildError := buildGoRows([]goenginerule.Rule{testCase.goRule})
+			_, buildError := buildGoRows([]goenginerule.Rule{testCase.goRule}, nil)
 			if buildError == nil || !strings.Contains(buildError.Error(), testCase.expected) {
 				test.Fatalf("buildGoRows refused with %v, expected an error naming %q", buildError, testCase.expected)
 			}

@@ -3,6 +3,7 @@ package docs_data
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -83,9 +84,10 @@ var ruleSourceNotes = map[string]string{
 	"category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
 	"typeAware": "the rule's NeedsTypeChecker declaration, or for Swift the typeAware swift/Rules.json declares, " +
 		"or for Go the TypeAware its registration declares",
-	"options":         "the rule's registration: which decoder it carries and whether it requires options",
-	"messageIds":      "the message ids the rule's own tests assert (examples/<rule>.json)",
-	"fixKind":         "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
+	"options":    "the rule's registration: which decoder it carries and whether it requires options",
+	"messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
+	"fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json); for Go, " +
+		"\"fix\" when a run without --no-fix fixes the rule's findings (internal/go_engine's FixingRules)",
 	"sets":            "each carried rule set as the loader resolves it, at warn or error, top-level rules only",
 	"swift":           "swift/HouseRuleVerdicts.json",
 	"typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
@@ -185,7 +187,7 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 		return Rules{}, buildSwiftRowsError
 	}
 	rows = append(rows, swiftRows...)
-	goRows, buildGoRowsError := buildGoRows(inputs.GoRules)
+	goRows, buildGoRowsError := buildGoRows(inputs.GoRules, inputs.GoFixingRules)
 	if buildGoRowsError != nil {
 		return Rules{}, buildGoRowsError
 	}
@@ -257,10 +259,12 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 	return rows, nil
 }
 
-// buildGoRows renders one row per Go engine rule. The registry's own Validate refuses a rule outside the
-// namespace, with an origin it does not know, or with an upstream name its origin forbids or lacks, and a
-// house rule outside the naming scheme refuses the build here, as a TypeScript or Swift one does.
-func buildGoRows(registered []goenginerule.Rule) ([]RuleRow, error) {
+// buildGoRows renders one row per Go engine rule, with fixKind "fix" for each rule fixing names, the rules a run
+// without --no-fix fixes. The registry's own Validate refuses a rule outside the namespace, with an origin it does
+// not know, or with an upstream name its origin forbids or lacks, a house rule outside the naming scheme refuses the
+// build here, as a TypeScript or Swift one does, and so does a fixing rule the registry does not hold, so the docs
+// never claim a fix for a rule they do not list.
+func buildGoRows(registered []goenginerule.Rule, fixing []string) ([]RuleRow, error) {
 	namespace := strings.TrimSuffix(goenginerule.Namespace, "/")
 	rows := make([]RuleRow, 0, len(registered))
 	for _, goRule := range registered {
@@ -283,7 +287,15 @@ func buildGoRows(registered []goenginerule.Rule) ([]RuleRow, error) {
 			}
 			row.Category = parsed.Category
 		}
+		if slices.Contains(fixing, goRule.Name) {
+			row.FixKind = "fix"
+		}
 		rows = append(rows, row)
+	}
+	for _, name := range fixing {
+		if !slices.ContainsFunc(rows, func(row RuleRow) bool { return row.Name == name }) {
+			return nil, fmt.Errorf("docs_data: %s is fixed by a run, and the Go registry holds no such rule", name)
+		}
 	}
 	return rows, nil
 }

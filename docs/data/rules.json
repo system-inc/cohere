@@ -1,7 +1,7 @@
 {
     "sourceNotes": {
         "category": "a house rule's name, split by the naming scheme's closed lists (policy/RuleNaming.json)",
-        "fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json)",
+        "fixKind": "whether the rule's own tests show a fix, a suggestion, or both (examples/<rule>.json); for Go, \"fix\" when a run without --no-fix fixes the rule's findings (internal/go_engine's FixingRules)",
         "language": "the registry the row comes from: the TypeScript engine's (internal/lint/registry), the Go engine's (internal/go_engine/rules), swift/Rules.json for Swift",
         "messageIds": "the message ids the rule's own tests assert (examples/<rule>.json)",
         "name": "the rule registry (internal/lint/registry), as `cohere --rules` lists it",
@@ -6389,7 +6389,8 @@
             "namespace": "cohere-go",
             "origin": "house",
             "category": "consistency",
-            "typeAware": true
+            "typeAware": true,
+            "fixKind": "fix"
         },
         {
             "name": "cohere-go/consistency-no-ambiguous-identifier",
@@ -6493,7 +6494,8 @@
             "namespace": "cohere-go",
             "origin": "house",
             "category": "consistency",
-            "typeAware": false
+            "typeAware": false,
+            "fixKind": "fix"
         },
         {
             "name": "cohere-go/consistency-no-parameter-reassignment",
@@ -6557,7 +6559,8 @@
             "namespace": "cohere-go",
             "origin": "house",
             "category": "consistency",
-            "typeAware": true
+            "typeAware": true,
+            "fixKind": "fix"
         },
         {
             "name": "cohere-go/consistency-no-use-before-define",
