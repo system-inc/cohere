@@ -26,9 +26,13 @@ type node struct {
 	// or one that closes a cycle.
 	importErrors map[string]error
 
-	// withholds is set for a package outside the workspace with cgo files, whose type errors and function bodies
-	// that reach them are withheld (see cgo_reach.go).
+	// withholds is set for a package outside the workspace with cgo files the cgo tool did not translate, whose type
+	// errors and function bodies that reach them are withheld (see cgo_reach.go).
 	withholds bool
+
+	// translated is set for a package whose cgo files the cgo tool translated, so its CompiledGoFiles are the cgo
+	// tool's outputs and nothing of it is faked.
+	translated bool
 
 	// done is closed once the package is type-checked.
 	done chan struct{}
@@ -39,14 +43,20 @@ type node struct {
 type graph struct {
 	nodes map[string]*node
 	roots []*node
+
+	// compiled is go list -compiled's answer for each package with cgo files by import path, on the load of a
+	// project with cgo of its own, and nil on the load that translates nothing (see listCompiled).
+	compiled map[string]*compiledPackage
 }
 
 // newGraph is the listing's packages and the test variants go test would build of each root, without go test's
-// synthesized main, which is generated and imports nothing a rule reads.
-func newGraph(listed *listing, workspace string) *graph {
-	built := &graph{nodes: map[string]*node{}}
+// synthesized main, which is generated and imports nothing a rule reads. compiled is the cgo tool's translation of the
+// packages with cgo files, or nil when nothing is translated.
+func newGraph(listed *listing, workspace string, compiled map[string]*compiledPackage) *graph {
+	built := &graph{nodes: map[string]*node{}, compiled: compiled}
 	for _, listedPackage := range listed.packages {
-		added := built.add(newNode(listedPackage, listedPackage.ImportPath, workspace))
+		added := built.add(newNode(listedPackage, listedPackage.ImportPath, workspace,
+			compiled[listedPackage.ImportPath]))
 		if listed.roots[listedPackage.ImportPath] {
 			built.roots = append(built.roots, added)
 		}
@@ -70,12 +80,13 @@ func (graph *graph) add(added *node) *node {
 }
 
 // newNode is a listed package as id, its files, imports and module as go list gave them, shaped as go/packages
-// shapes a package: GoFiles holds the cgo files after the rest, absolute, and CompiledGoFiles is the same files, the
-// ones type-checked, since no cgo tool runs. EmbedFiles are the package's own embedded files: go list resolves a
+// shapes a package: GoFiles holds the cgo files after the rest, absolute, and CompiledGoFiles, the files
+// type-checked, is the same files, or, when compiled holds the cgo tool's translation of them, go list -compiled's
+// files, the cgo tool's outputs among them. EmbedFiles are the package's own embedded files: go list resolves a
 // test's `//go:embed` patterns only under -test, so "p [p.test]" lists p's and "p_test [p.test]" none, where
 // go/packages would add the tests'. No rule reads an embedded file's bytes, and the patterns are in the test files,
 // so nothing a verdict depends on is missing from a package's files.
-func newNode(listedPackage *listedPackage, id string, workspace string) *node {
+func newNode(listedPackage *listedPackage, id string, workspace string, compiled *compiledPackage) *node {
 	directory := listedPackage.Directory
 	loaded := &packages.Package{
 		ID:      id,
@@ -99,7 +110,19 @@ func newNode(listedPackage *listedPackage, id string, workspace string) *node {
 			packages.Error{Pos: listedPackage.Error.Position, Msg: message, Kind: packages.ListError})
 		addFileFromError(loaded, listedPackage, workspace)
 	}
-	if loaded.PkgPath != "unsafe" {
+	if compiled != nil && compiled.Error != nil && listedPackage.Error == nil {
+		// The cgo tool failed where go list without -compiled saw nothing wrong, so the failure is the package's own
+		// error, in go/packages' words, never silent. The package is then checked as written, its package "C"
+		// faked as on the load that translates nothing.
+		loaded.Errors = append(loaded.Errors, packages.Error{
+			Pos: compiled.Error.Position, Msg: strings.TrimSpace(compiled.Error.Message), Kind: packages.ListError,
+		})
+	}
+	translated := compiled.translated(listedPackage)
+	switch {
+	case translated:
+		loaded.CompiledGoFiles = compiled.CompiledGoFiles
+	case loaded.PkgPath != "unsafe":
 		loaded.CompiledGoFiles = loaded.GoFiles
 	}
 	imports := resolvedImports(listedPackage, listedPackage.Imports)
@@ -113,11 +136,14 @@ func newNode(listedPackage *listedPackage, id string, workspace string) *node {
 		}
 	}
 	return &node{
-		listed:    listedPackage,
-		loaded:    loaded,
-		imports:   imports,
-		withholds: len(listedPackage.CgoFiles) > 0 && !inside(workspace, directory+string(filepath.Separator)),
-		done:      make(chan struct{}),
+		listed:  listedPackage,
+		loaded:  loaded,
+		imports: imports,
+		// A translated package fakes nothing, so it withholds nothing.
+		withholds: len(listedPackage.CgoFiles) > 0 && !translated &&
+			!inside(workspace, directory+string(filepath.Separator)),
+		translated: translated,
+		done:       make(chan struct{}),
 	}
 }
 
@@ -166,9 +192,11 @@ func resolvedImports(listedPackage *listedPackage, imported []string) map[string
 }
 
 // addTestVariants adds what go test builds of a root with tests, and returns those to analyze. "p [p.test]" is p
-// with its in-package tests, built when it has some (or is a command). Every package the tests reach that imports
-// p is built again against it, "q [p.test]", so the tests see one p; one the in-package tests import is a cycle,
-// which go test refuses. "p_test [p.test]" is the external tests, against "p [p.test]" when there is one.
+// with its in-package tests, built when it has some (or is a command), its tests' files before the cgo tool's
+// outputs when p is translated. Every package the tests reach that imports p is built again against it,
+// "q [p.test]", so the tests see one p, from q's own compiled files; one the in-package tests import is a cycle,
+// which go test refuses. "p_test [p.test]" is the external tests, against "p [p.test]" when there is one, and has
+// no cgo, since go refuses import "C" in a test file.
 func (graph *graph) addTestVariants(listed *listing, root *listedPackage, workspace string) []*node {
 	path := root.ImportPath
 	suffix := " [" + path + ".test]"
@@ -179,7 +207,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 	if len(root.TestGoFiles) > 0 || root.Name == "main" {
 		withTests := *root
 		withTests.GoFiles = slices.Concat(root.GoFiles, root.TestGoFiles)
-		inPackage = newNode(&withTests, path+suffix, workspace)
+		inPackage = newNode(&withTests, path+suffix, workspace, graph.compiled[path].withTests(root))
 		inPackage.loaded.ForTest = path
 		for written, resolved := range resolvedImports(root, root.TestImports) {
 			inPackage.imports[written] = resolved
@@ -225,7 +253,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 			if between.ImportPath == path || !reached[between.ImportPath] || !slices.Contains(between.Deps, path) {
 				continue
 			}
-			rebuilt := newNode(between, between.ImportPath+suffix, workspace)
+			rebuilt := newNode(between, between.ImportPath+suffix, workspace, graph.compiled[between.ImportPath])
 			rebuilt.loaded.ForTest = path
 			for written, resolved := range rebuilt.imports {
 				if variant, found := variantOf[resolved]; found {
@@ -251,7 +279,7 @@ func (graph *graph) addTestVariants(listed *listing, root *listedPackage, worksp
 			GoFiles:    root.XTestGoFiles,
 			ImportMap:  root.ImportMap,
 		}
-		externalNode := newNode(external, path+"_test"+suffix, workspace)
+		externalNode := newNode(external, path+"_test"+suffix, workspace, nil)
 		externalNode.loaded.ForTest = path
 		externalNode.imports = resolvedImports(root, root.XTestImports)
 		for written, resolved := range externalNode.imports {

@@ -20,7 +20,7 @@ var cgoPackageFiles = map[string]string{
 
 // A cgo package's compiled files are go's translation of its raw files, and their `//line` directives are
 // what every position in the package, and cgocall's reading of the raw file, resolves to, when the project's own
-// cgo sends the load through go/packages. Loaded twice from two directories under `GOFLAGS=-trimpath`, as the
+// cgo has the load translate it. Loaded twice from two directories under `GOFLAGS=-trimpath`, as the
 // pool runs every go command, each load's positions must name its own directory's native.go, one that exists,
 // and never the other's.
 //
@@ -67,11 +67,11 @@ func TestACgoPackageLoadedUnderTrimpathNamesItsOwnFiles(test *testing.T) {
 	}
 }
 
-// Every spelling of -trimpath leaves the translated load's `GOFLAGS`, every other flag stays in order, and
+// Every spelling of -trimpath leaves the `GOFLAGS` of go list -compiled, every other flag stays in order, and
 // -trimpath=false comes last, so the value is never empty: an empty one would hand go the go env file's flags,
 // which on this machine hold -trimpath.
 //
-// It is the translated load's, so it runs only where that load can, and skips, named, where it cannot: Loom's
+// It is the cgo translation's, so it runs only where that translation can, and skips, named, where it cannot: Loom's
 // runner refuses the go env it runs under the spellings `--trimpath` and `-trimpathy` besides.
 func TestTranslatedEnvironmentTakesTrimpathOutOfGoFlags(test *testing.T) {
 	test.Parallel()

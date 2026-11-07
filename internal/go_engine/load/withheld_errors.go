@@ -12,15 +12,15 @@ import (
 
 // Withheld is the type errors withheld in one file of a dependency the cgo tool would translate.
 //
-// The load runs no cgo tool, so the type checker fakes package "C" and every C name is of an invalid type. In a
-// package that wraps its C calls in `_C_` functions, as the standard library's net and os/user do on linux, a
-// caller of a wrapper then reads an invalid type and the checker says so, in a plain file. That is not the
-// dependency's fault and not the project's to fix, so a type error in a package outside the workspace whose
-// expression reaches the package's cgo files (see cgoReach) is no diagnostic. It is counted here instead, so the
-// types record shows what the load could not check. A parse or list error is never withheld, nor a type error that
-// reaches no cgo file, nor anything in the project's own packages. A withheld error does not make its package
-// ill-typed either, so the rules still run over it for the facts the project's packages read, as they did when
-// cgo translated it.
+// A load that translates nothing, as of a project with no cgo of its own, runs no cgo tool, so the type checker fakes
+// package "C" and every C name is of an invalid type. In a package that wraps its C calls in `_C_` functions, as the
+// standard library's net and os/user do on linux, a caller of a wrapper then reads an invalid type and the checker
+// says so, in a plain file. That is not the dependency's fault and not the project's to fix, so a type error in a
+// package outside the workspace whose expression reaches the package's cgo files (see cgoReach) is no diagnostic. It
+// is counted here instead, so the types record shows what the load could not check. A parse or list error is never
+// withheld, nor a type error that reaches no cgo file, nor anything in the project's own packages. A withheld error
+// does not make its package ill-typed either, so the rules still run over it for the facts the project's packages
+// read, as they did when cgo translated it.
 type Withheld struct {
 	// Package is the dependency's import path.
 	Package string

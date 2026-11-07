@@ -51,8 +51,9 @@ var processEnvironment = []string{"GOOS", "GOARCH", "BURNTSUSHI_TOML_110"}
 
 // cacheBuild is the build context every key shares, in a fixed order: what go env reports in root for the target,
 // cgo, the flags with their build tags, the toolchain and its experiments, then the process's own variables an
-// analyzer reads. The cache session adds which loader ran, which only the load knows: a cgo project is loaded through
-// go/packages with its cgo translated, which gives its packages other files than the load from source does.
+// analyzer reads. The cache session adds which loader ran, which only the load knows: a project with cgo of its own
+// has every package with cgo files type-checked from the cgo tool's outputs, other files than the load that
+// translates nothing gives them.
 func cacheBuild(root string, environment []string) ([]string, error) {
 	names := []string{"GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOVERSION", "GOEXPERIMENT"}
 	command := exec.Command("go", append([]string{"env", "-json"}, names...)...)

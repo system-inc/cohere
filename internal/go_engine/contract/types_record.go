@@ -26,14 +26,15 @@ type TypesRecord struct {
 	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations"`
 
 	// CgoTranslation is additive within contract 3 too. The engine type-checks and never builds, but for one
-	// exception: a project with cgo files of its own is loaded through go/packages, whose cgo tool translates every
-	// package with cgo files, the project's and its dependencies'. CgoTranslation says how much of that a run had, so
-	// the exception is never invisible: how many packages the cgo tool translated, and how long that load took. On
-	// the load from source, which runs no cgo tool, it is written as 0 and 0, never left out.
+	// exception: for a project with cgo files of its own, go list -compiled has the cgo tool translate every package
+	// with cgo files, the project's and its dependencies'. CgoTranslation says how much of that a run had, so the
+	// exception is never invisible: how many packages the cgo tool translated, and how long that took. On a load that
+	// translates nothing it is written as 0 and 0, never left out.
 	CgoTranslation CgoTranslation `json:"cgoTranslation"`
 }
 
-// CgoTranslation is how many packages a run's cgo tool translated, and the milliseconds the load that ran it took.
+// CgoTranslation is how many packages a run's cgo tool translated, and the milliseconds the go list that ran it
+// took.
 type CgoTranslation struct {
 	Packages     int `json:"packages"`
 	Milliseconds int `json:"milliseconds"`

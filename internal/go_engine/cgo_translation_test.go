@@ -52,8 +52,8 @@ func TestTheSourceLoadCountsNoCgoTranslation(test *testing.T) {
 	}
 }
 
-// A project with cgo of its own goes through go/packages, whose cgo tool translates its package and every
-// dependency with cgo files, so its types record counts at least the project's package and the time that load took.
+// A project with cgo of its own has go list -compiled's cgo tool translate its package and every dependency with cgo
+// files, so its types record counts at least the project's package and the time that took.
 func TestTheCgoLoadCountsItsTranslation(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)

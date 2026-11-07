@@ -1,6 +1,6 @@
-// Package cgo_testing is for the Go engine's tests that load a project with cgo of its own, which goes through
-// go/packages and needs a go that compiles and a toolchain with cgo. Where either is missing such a test skips,
-// with the reason, and never fails: a toolchain without cgo, or a runner of prebuilt tests, as Loom's is, whose
+// Package cgo_testing is for the Go engine's tests that load a project with cgo of its own, whose cgo go list
+// -compiled translates, which needs a go that compiles and a toolchain with cgo. Where either is missing such a test
+// skips, with the reason, and never fails: a toolchain without cgo, or a runner of prebuilt tests, as Loom's is, whose
 // stand-in go refuses every command that compiles. Any other failure of go fails the test, so a broken toolchain
 // never reads as a skip.
 package cgo_testing
@@ -39,8 +39,7 @@ func RequireTranslation(test *testing.T) {
 // translationUnavailable is why go here cannot translate cgo, or empty when it can. go reports `CGO_ENABLED` 0
 // when it finds no C compiler. A runner's stand-in go answers a read-only query and refuses one that compiles,
 // saying so on standard error, and Loom fails a unit over a refused command only when a test failed too, so asking
-// for one compiled package is a safe probe: go list -compiled is what go/packages runs first that such a runner
-// refuses.
+// for one compiled package is a safe probe: go list -compiled is what the load runs that such a runner refuses.
 func translationUnavailable() (string, error) {
 	enabled, goEnvironmentError := exec.Command("go", "env", "CGO_ENABLED").Output()
 	if goEnvironmentError != nil {

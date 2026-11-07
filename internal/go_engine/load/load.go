@@ -9,8 +9,10 @@
 // for -compiled, -test, -export and -pgo, and compiling is what such a runner refuses. So the test variants go
 // test would build are built here (graph.go), and no cgo tool runs: a dependency's cgo file is type-checked as
 // written, with package "C" faked (withheld_errors.go and cgo_reach.go say what that costs). A project with cgo
-// files of its own is checked as written, always: its load goes through go/packages, whose cgo tool translates
-// them (translated.go), and so does not run where go may not build.
+// files of its own is checked as it builds, always: one more go list, with -compiled, has the cgo tool translate
+// every package with cgo files (listCompiled), and those packages are type-checked from its outputs, so that load
+// does not run where go may not build. Every other package of it loads as on any other project, the findings
+// cache's export data and go list's kept answer included.
 //
 // It takes and returns plain values; the engine turns them into contract records.
 package load
@@ -33,10 +35,10 @@ import (
 type Loaded struct {
 	// Packages are the ones to analyze: each package with its in-package tests ("p [p.test]") in place of the
 	// package alone, each external test package ("p_test [p.test]"), and never go test's synthesized main.
-	// Their Imports reach the whole graph as go/packages loaded it.
+	// Their Imports reach the whole graph, as go/packages would have loaded it.
 	Packages []*packages.Package
 
-	// Roots are what go/packages returns with Tests set: each package the patterns matched, and each test variant
+	// Roots are what go/packages would return with Tests set: each package the patterns matched, and each test variant
 	// go test builds of it, "p [p.test]" beside p and "p_test [p.test]", less go test's synthesized main. Packages
 	// are chosen from them; a driver that analyzes every variant, as the copy of analysistest does, takes them all.
 	Roots []*packages.Package
@@ -75,18 +77,18 @@ type Loaded struct {
 	ListingKept bool
 
 	// FilesParsed counts the files the load parsed, and PackagesFromExportData the packages whose types it read
-	// from the findings cache's export data rather than checking them; both are 0 on the go/packages load, which
-	// counts neither.
+	// from the findings cache's export data rather than checking them.
 	FilesParsed            int
 	PackagesFromExportData int
 
-	// CgoTranslated is set when a package of the project has cgo files, so the load went through go/packages and
-	// the cgo tool translated every cgo file, rather than from source (see translated).
+	// CgoTranslated is set when a package of the project has cgo files, so go list -compiled had the cgo tool
+	// translate every package with cgo files, and those were type-checked from its outputs rather than with package
+	// "C" faked (see listCompiled).
 	CgoTranslated bool
 
 	// CgoTranslatedPackages counts the packages whose cgo files the cgo tool translated, and CgoTranslationElapsed is
-	// how long the go/packages load that ran it took. cgo's preprocessing is the one thing the engine has go build,
-	// so every run says how much there was: both are 0 on the load from source, which runs no cgo tool.
+	// how long the go list -compiled that ran it took. cgo's preprocessing is the one thing the engine has go build,
+	// so every run says how much there was: both are 0 on a load that translates nothing.
 	CgoTranslatedPackages int
 	CgoTranslationElapsed time.Duration
 
@@ -115,7 +117,7 @@ func Packages(directory string, patterns []string, environment []string, census 
 // what is on disk, so a rewrite is type-checked before it is written. Only the parse reads the overlay. go list, the
 // constraints and the census read the disk, which is right for a rewrite that changes no file's imports, package
 // clause or build lines, as a rename does not: go list's answer for the overlaid tree is its answer for the tree on
-// disk. A project with cgo of its own, whose load goes through the cgo tool, takes no overlay.
+// disk. A project with cgo of its own, whose cgo files the cgo tool translates from disk, takes no overlay.
 func PackagesWithOverlay(
 	directory string,
 	patterns []string,
@@ -126,8 +128,8 @@ func PackagesWithOverlay(
 	return loadWorkspace(directory, patterns, environment, census, true, Caching{}, overlay)
 }
 
-// Caching is what the findings cache gives a load: a Restorer, whose packages the load from source parses and
-// type-checks none of, and a store for go list's answer, kept until something it reads moves. Either may be nil.
+// Caching is what the findings cache gives a load: a Restorer, whose packages the load parses and type-checks none
+// of, and a store for go list's answer, kept until something it reads moves. Either may be nil.
 type Caching struct {
 	Restorer Restorer
 	Listings ListingStore
@@ -144,9 +146,9 @@ func PackagesCached(
 	return loadWorkspace(directory, patterns, environment, census, true, caching, nil)
 }
 
-// loadWorkspace is PackagesCached, and PackagesWithOverlay when overlay is set. With translateOwnCgo unset it loads
-// from source even a project with cgo files of its own, which only the tests ask for, to judge the load from source on
-// such a package.
+// loadWorkspace is PackagesCached, and PackagesWithOverlay when overlay is set. With translateOwnCgo unset it
+// translates nothing even for a project with cgo files of its own, which only the tests ask for, to judge the load
+// with package "C" faked on such a package.
 func loadWorkspace(
 	directory string,
 	patterns []string,
@@ -173,30 +175,43 @@ func loadWorkspace(
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
-	var roots []*packages.Package
-	var loaded *Loaded
-	var loadError error
+	// compiled stays nil, and nothing is translated, unless the project has cgo files of its own.
+	var compiled map[string]*compiledPackage
+	var translationElapsed time.Duration
 	if translateOwnCgo && hasOwnCgo(listed, workspace) {
 		if len(overlay) > 0 {
 			// The cgo tool reads its files from disk, so an overlay would prove some of the rewrite and not the rest.
 			return nil, fmt.Errorf("loading %s with an overlay: the project has cgo files of its own, which the cgo "+
 				"tool reads from disk", workspace)
 		}
-		translationStarted := time.Now()
-		roots, loaded, loadError = translated(workspace, patterns, environment, caching.Restorer)
-		if loadError == nil {
-			loaded.CgoTranslationElapsed = time.Since(translationStarted)
-			loaded.CgoTranslatedPackages = withCgoFiles(listed)
+		compiledEnvironment, environmentError := translatedEnvironment(workspace, environment)
+		if environmentError != nil {
+			return nil, environmentError
 		}
-	} else {
-		roots, loaded, loadError = fromSource(workspace, listed, buildContext, caching.Restorer, overlay)
+		translationStarted := time.Now()
+		var compiledError error
+		compiled, compiledError = listCompiled(workspace, compiledEnvironment, listed)
+		if compiledError != nil {
+			return nil, compiledError
+		}
+		translationElapsed = time.Since(translationStarted)
 	}
+	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching.Restorer, overlay, compiled)
 	if loadError != nil {
 		return nil, loadError
 	}
 
+	if compiled != nil {
+		loaded.CgoTranslated = true
+		loaded.CgoTranslationElapsed = translationElapsed
+		for path, each := range compiled {
+			if each.translated(listed.byPath[path]) {
+				loaded.CgoTranslatedPackages++
+			}
+		}
+	}
 	loaded.ListingKept = listingKept
-	loaded.Roots = withoutTestMain(roots)
+	loaded.Roots = roots
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })
@@ -211,18 +226,6 @@ func loadWorkspace(
 	return loaded, nil
 }
 
-// withCgoFiles counts the listed packages with cgo files, each of which the cgo tool translates on the go/packages
-// load, the project's and its dependencies' alike.
-func withCgoFiles(listed *listing) int {
-	count := 0
-	for _, listedPackage := range listed.packages {
-		if len(listedPackage.CgoFiles) > 0 {
-			count++
-		}
-	}
-	return count
-}
-
 // hasOwnCgo reports whether a listed package inside workspace has cgo files, which go list lists only when cgo is
 // on for the target.
 func hasOwnCgo(listed *listing, workspace string) bool {
@@ -235,27 +238,34 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 }
 
 // fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, and
-// returns its roots and what the load knows of them before the diagnostics and the counts. The declarations of
-// dependencies that reach their cgo files lose what reaches it only once every package is type-checked.
+// each package compiled holds the cgo tool's translation of from its outputs, and returns its roots and what the load
+// knows of them before the diagnostics and the counts. The declarations of dependencies that reach their cgo files
+// lose what reaches it only once every package is type-checked. The Restorer is told which loader ran, since a
+// translated package has other files than one checked with package "C" faked.
 func fromSource(
 	workspace string,
 	listed *listing,
 	buildContext *build.Context,
 	restorer Restorer,
 	overlay map[string][]byte,
+	compiled map[string]*compiledPackage,
 ) ([]*packages.Package, *Loaded, error) {
 	sizes := types.SizesFor("gc", buildContext.GOARCH)
 	if sizes == nil {
 		return nil, nil, fmt.Errorf("loading %s: go/types knows no sizes for GOARCH %s", workspace,
 			buildContext.GOARCH)
 	}
-	built := newGraph(listed, workspace)
+	built := newGraph(listed, workspace, compiled)
 	withheld := newWithheldErrors()
 	typeChecker := newLoader(built, sizes, withheld, overlay)
 	reachable := typeChecker.connect()
 	analyzedPackages := analyzedOfGraph(built)
 	if restorer != nil {
-		typeChecker.restored = restorer.Restore(LoaderSource, loadedOf(reachable), analyzedPackages)
+		loaderName := LoaderSource
+		if compiled != nil {
+			loaderName = LoaderCgoTranslated
+		}
+		typeChecker.restored = restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
 	}
 	typeChecker.load(reachable)
 
@@ -288,8 +298,8 @@ func fromSource(
 	}, nil
 }
 
-// analyzedOfGraph is the roots of the load from source to analyze, as analyzed chooses them from go/packages'
-// roots, in the graph's order: each package with tests as "p [p.test]", which holds every file of p, in place of p,
+// analyzedOfGraph is the roots of the load to analyze, as a driver of go/packages would choose them from its roots,
+// in the graph's order: each package with tests as "p [p.test]", which holds every file of p, in place of p,
 // so no file of p is analyzed and reported twice; each external test package, "p_test [p.test]"; and each package
 // with no in-package tests as itself. A package go test builds again for another's tests, "q [p.test]", is no
 // root: it is q, analyzed already.
@@ -320,20 +330,20 @@ func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) in
 	return len(seen)
 }
 
-// sourceEnvironment is the whole environment every go command of the load from source runs with in workspace:
-// `GOFLAGS` as go reads it there (see withGoFlags), every flag kept, with -pgo=off last, as go/packages lists: a
-// command with a default.pgo profile would otherwise have go list print a second variant of every package the
-// command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
+// sourceEnvironment is the whole environment every go command of the load runs with in workspace but go list
+// -compiled: `GOFLAGS` as go reads it there (see withGoFlags), every flag kept, with -pgo=off last, as go/packages
+// lists: a command with a default.pgo profile would otherwise have go list print a second variant of every package
+// the command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
 func sourceEnvironment(workspace string, environment []string) ([]string, error) {
 	return withGoFlags(workspace, environment, func(flags []string) []string { return append(flags, "-pgo=off") })
 }
 
-// translatedEnvironment is the whole environment go/packages runs with in workspace when it translates the
-// project's cgo files: `GOFLAGS` as go reads it there (see withGoFlags) with every `-trimpath` taken out and
-// `-trimpath=false` put last. Analysis needs real source paths: under -trimpath go keys a cgo package's
-// translation without its directory, so a load is served the translation cached for the same bytes in another
-// directory, whose `//line` paths name that directory's files, gone once it is, and cgocall, which reads the raw
-// file those paths name, fails. The value is never empty, since an empty `GOFLAGS` would hand go the go env file's
+// translatedEnvironment is the whole environment go list -compiled runs with in workspace when it translates the
+// cgo files of a project with cgo of its own: `GOFLAGS` as go reads it there (see withGoFlags) with every
+// `-trimpath` taken out and `-trimpath=false` put last. Analysis needs real source paths: under -trimpath go keys a
+// cgo package's translation without its directory, so a load is served the translation cached for the same bytes in
+// another directory, whose `//line` paths name that directory's files, gone once it is, and cgocall, which reads the
+// raw file those paths name, fails. The value is never empty, since an empty `GOFLAGS` would hand go the go env file's
 // flags, -trimpath among them.
 func translatedEnvironment(workspace string, environment []string) ([]string, error) {
 	return withGoFlags(workspace, environment, func(flags []string) []string {
