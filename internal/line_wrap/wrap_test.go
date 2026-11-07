@@ -238,6 +238,41 @@ func Parse() {}
 `,
 	},
 	{
+		name: "a paragraph written straight above a rule's own marker stops before it, though the marker is two words or more",
+		source: `package p
+
+func TestHoldsTheLock(test *testing.T) {
+	// The runner holds the machine's only lock for the length of the whole suite, so no other test may take it while this one runs.
+	// Not parallel: the runner takes the machine-wide lock
+	run(test)
+}
+
+func TestReadsTheFixture(test *testing.T) {
+	test.Parallel()
+	// The fixture names the home directory of the account the suite was first written under, so the parser is handed a real one.
+	// Not a machine path: the parser reads it as text and never opens it
+	read(fixture)
+}
+`,
+		want: `package p
+
+func TestHoldsTheLock(test *testing.T) {
+	// The runner holds the machine's only lock for the length of the whole suite, so no other test may take it while
+	// this one runs.
+	// Not parallel: the runner takes the machine-wide lock
+	run(test)
+}
+
+func TestReadsTheFixture(test *testing.T) {
+	test.Parallel()
+	// The fixture names the home directory of the account the suite was first written under, so the parser is handed a
+	// real one.
+	// Not a machine path: the parser reads it as text and never opens it
+	read(fixture)
+}
+`,
+	},
+	{
 		name: "a long struct tag is left whole",
 		source: `package p
 
