@@ -18,7 +18,6 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -27,6 +26,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/tools/go/types/typeutil"
 )
@@ -55,7 +55,7 @@ func runCommandLine() int {
 	vocabularyPath := flag.String(
 		"vocabulary",
 		"",
-		"the abbreviation vocabulary (default: <root>/policy/Abbreviations.json)",
+		"the abbreviation vocabulary (default: the one built into the pass, from the tree it is built in)",
 	)
 	global := flag.Bool(
 		"global",
@@ -82,9 +82,6 @@ func runCommandLine() int {
 	var skips skipFlags
 	flag.Var(&skips, "skip", "a path prefix, relative to the root, never edited (repeatable)")
 	flag.Parse()
-	if *vocabularyPath == "" {
-		*vocabularyPath = filepath.Join(*root, "policy", "Abbreviations.json")
-	}
 	if *global {
 		var libraries []string
 		if *renameLibraryExports != "" {
@@ -1131,7 +1128,7 @@ func nonLocalKind(object types.Object, packageTypes *types.Package) string {
 }
 
 func run(root string, vocabularyPath string, skips []string, dryRun bool) int {
-	vocabularyData, readError := os.ReadFile(vocabularyPath)
+	vocabularyData, readError := readVocabulary(vocabularyPath)
 	if readError != nil {
 		fmt.Fprintf(streams.Errors, "wordnames: reading the vocabulary: %v\n", readError)
 		return 1
@@ -1451,4 +1448,14 @@ func sortedKeys[Value any](values map[string]Value) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// readVocabulary is the vocabulary file at path, or the one built into the pass when path is empty: policy's
+// Abbreviations.json from the cohere tree the pass was built in, so a pass run over another repository, which holds
+// no policy of its own, judges words as it does over cohere.
+func readVocabulary(path string) ([]byte, error) {
+	if path == "" {
+		return policy.AbbreviationsFile(), nil
+	}
+	return os.ReadFile(path)
 }
