@@ -24,6 +24,12 @@ are fixed by go.dev/s/generatedcode, which tools match exactly. Each finding cov
 each occurrence, and names it. The text rules corpus holds all three (`sh04`, `sh05`, `sh10`, and the
 span cases), task #34fejeq.
 
+A comment is read without its delimiters, as ESLint reads a comment's value: a `//` line loses its
+slashes and the one space after them, as the Go and Swift engines read one, and a block comment its
+`/*` and `*/`. The command patterns anchor at a line's start, so read whole, a command on a `//` line
+or in a one-line block comment opened on its slashes and its capitals were read as shouting (#xfa3q6w,
+corpus cases `sh24` and `sh25`; `TestConsistencyNoShoutingReadsACommentWithoutItsDelimiters`).
+
 The masks live in `internal/shouting/shouting.go`, and the safe list in `policy/Shouting.json`, which
 `internal/shouting/vocabulary.go` reads. The Go engine's `cohere-go/consistency-no-shouting` reads both
 too, and Swift compiles in the same list, so every engine agrees on what an acronym is.
