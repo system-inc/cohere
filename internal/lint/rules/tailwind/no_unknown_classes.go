@@ -108,11 +108,30 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 
 		report := func(node *ast.Node) {
 			for _, literal := range reader.ClassLiteralsIn(node) {
-				for _, className := range SplitClasses(literal.Text) {
+				classes := SplitClasses(literal.Text)
+				for index, className := range classes {
+					if isConcatenatedEdgeClass(literal, index, len(classes)) {
+						continue
+					}
 					if isIgnored(className, ignored) || classExistsIn(className, designSystem.System) {
 						continue
 					}
 					ruleContext.ReportRange(literal.Range, messageUnknownClass(className))
+				}
+			}
+			// The static runs of a template with holes, each class judged as upstream judges it, except
+			// a class a hole touches: `notaclass${x}` is half of a class the hole completes, and upstream
+			// skips it for the reason isConcatenatedEdgeClass gives.
+			sourceText := ruleContext.SourceFile.Text()
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				for _, class := range TemplateClassesOf(sourceText, segments) {
+					if class.GluedLeading || class.GluedTrailing {
+						continue
+					}
+					if isIgnored(class.Text, ignored) || classExistsIn(class.Text, designSystem.System) {
+						continue
+					}
+					ruleContext.ReportRange(class.Range, messageUnknownClass(class.Text))
 				}
 			}
 		}
@@ -123,4 +142,24 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 		}
 		return listeners
 	},
+}
+
+// isConcatenatedEdgeClass says a literal's first or last class is joined to another value with no
+// whitespace between, so it is only part of a class: `'text-' + size` holds `text-`, which the value
+// completes.
+//
+// Upstream 4.9.1's no-unknown-classes skips exactly these, through isConcatenatedLeft and
+// isConcatenatedRight, measured under ESLint with ahra's theme: `'notaclass' + x` and
+// `x + 'notaclass'` are silent, `'notaclass ' + x` reports. Reporting them would call a class
+// unknown because the linter could not see the rest of it. The literal's Edges are those two
+// questions already, since they say which end touches class text once the value is joined.
+func isConcatenatedEdgeClass(literal ClassLiteral, index int, count int) bool {
+	text := literal.Text
+	if index == 0 && literal.Edges.Leading && text != "" && !isSpace(rune(text[0])) {
+		return true
+	}
+	if index == count-1 && literal.Edges.Trailing && text != "" && !isSpace(rune(text[len(text)-1])) {
+		return true
+	}
+	return false
 }
