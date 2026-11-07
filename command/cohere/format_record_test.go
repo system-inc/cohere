@@ -537,8 +537,9 @@ func sourceSnapshot(test *testing.T) string {
 	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 		copySnapshotFile(test, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
 	}
-	// Every directory holding source go builds: the module's own, and the modules go.work names beside
-	// it. A module left out is one the snapshot's go.work names and cannot find.
+	// Every directory holding source go builds: the module's own, the modules go.work names beside it, and
+	// third_party, whose vendored copies go.mod replaces dependencies with (#j3bfnyt). A module left out is
+	// one the snapshot's go.work or go.mod names and cannot find.
 	for _, directory := range []string{
 		"command",
 		"internal",
@@ -547,6 +548,7 @@ func sourceSnapshot(test *testing.T) string {
 		"static_single_assignment",
 		"mutation_aliasing",
 		"unicode_properties",
+		"third_party",
 	} {
 		source := filepath.Join(moduleRoot, directory)
 		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, pathError error) error {

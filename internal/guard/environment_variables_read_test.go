@@ -272,6 +272,7 @@ func mentionedOutsideTests(test *testing.T, module string, names map[string][]st
 		}
 		if entry.IsDir() {
 			if path != module && (path == filepath.Join(module, "TypeScript") ||
+				path == filepath.Join(module, "third_party") ||
 				strings.HasPrefix(entry.Name(), ".") || entry.Name() == "node_modules" ||
 				entry.Name() == "testdata") {
 				return filepath.SkipDir
