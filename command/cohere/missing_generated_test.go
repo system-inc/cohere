@@ -186,3 +186,130 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		}
 	})
 }
+
+// TestAnInputThatDoesNotLoadHoldsEveryFix is #4jxsbzr end to end, both ways. Loom's wire project had no
+// node_modules: its tsconfig's types entries and its package imports resolved to nothing, and a bare run
+// still rewrote two files. A writing run over a project whose types entry, or whose package import, the
+// compiler cannot resolve writes nothing, says the fixes were held and names the input. With the input
+// installed, the same run applies the fix. An ambient declaration answers an import as a package does, and
+// a type error in code that loaded holds nothing.
+func TestAnInputThatDoesNotLoadHoldsEveryFix(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	inferrable := "export const answer: number = 1;\n"
+	fixed := "export const answer = 1;\n"
+	project := func(test *testing.T, types string, page string) string {
+		test.Helper()
+		root := test.TempDir()
+		writeTree(test, root, map[string]string{
+			"tsconfig.json": `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022",` +
+				`"module":"esnext","moduleResolution":"bundler","types":[` + types + `],` +
+				`"lib":["es2022"],"skipLibCheck":true},"include":["app"]}`,
+			"CohereSettings.json": `{"rules":{}}`,
+			".gitignore":          "node_modules/\n",
+			"app/page.ts":         page,
+		})
+		command := exec.Command("git", "init", "--quiet")
+		command.Dir = root
+		if output, outputError := command.CombinedOutput(); outputError != nil {
+			test.Fatalf("git init: %v\n%s", outputError, output)
+		}
+		return root
+	}
+	write := func(test *testing.T, root string) string {
+		test.Helper()
+		command := exec.Command(binary, "--no-format", "--no-cache")
+		command.Dir = root
+		output, runError := command.CombinedOutput()
+		requireChildRan(test, runError)
+		return string(output)
+	}
+	page := func(test *testing.T, root string) string {
+		test.Helper()
+		contents, readError := os.ReadFile(filepath.Join(root, "app/page.ts"))
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		return string(contents)
+	}
+
+	test.Run("a types entry that resolves to nothing, then installed", func(test *testing.T) {
+		test.Parallel()
+		root := project(test, `"fixture-globals"`, inferrable)
+
+		output := write(test, root)
+		if page(test, root) != inferrable ||
+			!strings.Contains(output, "⚠ 🪄 fixes held") ||
+			!strings.Contains(output, "unresolved-input fixture-globals resolves to no type library") ||
+			!strings.Contains(output, "tsconfig.json:1:") {
+			test.Errorf(
+				"a writing run with a types entry missing changed the page to %q, or did not say why:\n%s",
+				page(test, root),
+				output,
+			)
+		}
+		if strings.Contains(output, "missing-generated-file") || strings.Contains(output, "generated file missing") {
+			test.Errorf("a missing package is called a generated file:\n%s", output)
+		}
+
+		writeTree(test, root, map[string]string{
+			"node_modules/@types/fixture-globals/index.d.ts": "declare const fixtureGlobal: number;\n",
+		})
+		output = write(test, root)
+		if page(test, root) != fixed || strings.Contains(output, "fixes held") ||
+			strings.Contains(output, "unresolved-input") {
+			test.Errorf("with the types entry installed, the fix did not apply, page %q:\n%s", page(test, root), output)
+		}
+	})
+
+	test.Run("a package import that resolves to nothing, then installed", func(test *testing.T) {
+		test.Parallel()
+		importing := "import type { Shape } from \"fixture-package\";\n\nexport type Local = Shape;\n"
+		root := project(test, "", importing+inferrable)
+
+		output := write(test, root)
+		if page(test, root) != importing+inferrable ||
+			!strings.Contains(output, "⚠ 🪄 fixes held") ||
+			!strings.Contains(output, "app/page.ts:1:28 warning unresolved-input fixture-package resolves to nothing") {
+			test.Errorf(
+				"a writing run with a package missing changed the page to %q, or did not say why:\n%s",
+				page(test, root),
+				output,
+			)
+		}
+
+		writeTree(test, root, map[string]string{
+			"node_modules/fixture-package/package.json": `{"name":"fixture-package","types":"index.d.ts"}`,
+			"node_modules/fixture-package/index.d.ts":   "export type Shape = { side: number };\n",
+		})
+		output = write(test, root)
+		if page(test, root) != importing+fixed || strings.Contains(output, "fixes held") ||
+			strings.Contains(output, "unresolved-input") {
+			test.Errorf("with the package installed, the fix did not apply, page %q:\n%s", page(test, root), output)
+		}
+	})
+
+	test.Run("an ambient declaration answers the import", func(test *testing.T) {
+		test.Parallel()
+		importing := "import type { Shape } from \"fixture-package\";\n\nexport type Local = Shape;\n"
+		root := project(test, "", importing+inferrable)
+		writeTree(test, root, map[string]string{
+			"app/ambient.d.ts": "declare module \"fixture-package\" {\n    export type Shape = { side: number };\n}\n",
+		})
+		output := write(test, root)
+		if page(test, root) != importing+fixed || strings.Contains(output, "fixes held") {
+			test.Errorf("an import an ambient module declares held the fixes, page %q:\n%s", page(test, root), output)
+		}
+	})
+
+	test.Run("a type error in code that loaded holds nothing", func(test *testing.T) {
+		test.Parallel()
+		wrong := "export const wrong: string = 1;\n"
+		root := project(test, "", wrong+inferrable)
+		output := write(test, root)
+		if page(test, root) != wrong+fixed || strings.Contains(output, "fixes held") ||
+			!strings.Contains(output, "TS2322") {
+			test.Errorf("a type error held the fixes, page %q:\n%s", page(test, root), output)
+		}
+	})
+}

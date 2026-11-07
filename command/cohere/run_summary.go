@@ -192,8 +192,9 @@ type runGaps struct {
 	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
 	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
 	MissingGenerated []string `json:"missingGenerated,omitempty"`
-	// FixesHeld is a run whose lint fixes were held because a generated file is missing (#46ern7e): none was
-	// proposed or written, and formatting ran alone.
+	// FixesHeld is a run whose lint fixes were held because an input the program was told to load is missing
+	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
+	// None was proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
 	// UnclaimedSwift is the directories of Swift files no package holds that discovery found beside the one
 	// project it ran here (#ybspptb). Nothing checked them, and the run neither fails nor passes on them. It
