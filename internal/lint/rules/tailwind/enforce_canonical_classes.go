@@ -300,34 +300,18 @@ func reportTemplateCanonical(
 		return
 	}
 	// The rule declines a file with no source before it listens, so the source is always here.
-	classes := TemplateClassesOf(ruleContext.SourceFile.Text(), segments)
-
-	for start := 0; start < len(classes); {
-		end := start
-		for end < len(classes) && classes[end].Run == classes[start].Run {
-			end++
-		}
-		run := classes[start:end]
-		start = end
-
+	for _, run := range TemplateRunsOf(ruleContext.SourceFile.Text(), segments) {
 		var merged map[string]bool
 		if collapse.enabled {
-			texts := make([]string, len(run))
-			for index, class := range run {
-				texts[index] = class.Text
-			}
 			var collapses []canonicalCollapse
-			collapses, merged = collapsesIn(texts, ignored, designSystem, collapse)
+			collapses, merged = collapsesIn(run.Texts(), ignored, designSystem, collapse)
 			for _, found := range collapses {
-				ruleContext.ReportRange(
-					segments[run[0].Run].Range,
-					messageCanonicalCollapse(found.inputs, found.output),
-				)
+				ruleContext.ReportRange(run.Range, messageCanonicalCollapse(found.inputs, found.output))
 			}
 		}
 
 		seenInRun := map[string]bool{}
-		for _, class := range run {
+		for _, class := range run.Classes {
 			glued := class.GluedLeading || class.GluedTrailing
 			repeated := !glued && seenInRun[class.Text]
 			if !glued {
