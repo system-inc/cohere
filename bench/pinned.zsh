@@ -9,11 +9,14 @@
 # editing can move a number, and the project's own caches are never read or written. A copy is reused
 # by later invocations at the same commits, and refused if its files no longer match what was extracted.
 #
-# The copy keeps the checkout's repository shape, because cohere reads it: a `.git` file in each submodule
-# makes it a nested repository the format walk skips and discovery treats as linked, and the root's `.git`
-# directory carries the project's own `info/exclude`, which the format walk applies. Without them the copy
-# formatted libraries/structure as part of ahra, 5,269 files where a developer's run formats 3,198
-# (#679s763). git itself never runs on the copy, so the markers hold nothing else.
+# The copy is a repository at its commits, as a checkout is, because cohere reads it. The Go engine lists a
+# workspace's files with `git ls-files --stage`, and the Swift engine reads its inputs at the commit, so on a
+# copy that was only the tree both refused to run, and a benchmark timed a run that checked nothing (#7z52pqf).
+# A `.git` file in each submodule makes it a nested repository the format walk skips and discovery treats as
+# linked, and the root's `.git` directory carries the project's own `info/exclude`, which the format walk
+# applies; without those the copy formatted libraries/structure as part of ahra, 5,269 files where a
+# developer's run formats 3,198 (#679s763). Each repository's index is its commit's tree, a submodule a
+# gitlink at its pin, and its objects are the project's, read through an alternate rather than copied.
 #
 # The engine. The launcher rebuilds whenever a cohere commit lands, which during a working session is
 # every few minutes, so a benchmark run through it can measure two binaries and report one number. The
@@ -34,15 +37,39 @@ wait_for_quiet() {
   until under_ceiling $(load) || (( EPOCHREALTIME > deadline )); do sleep 5; done
 }
 
-# extract writes the tree of <repository> at <commit> into <destination>, then each submodule at the
-# commit that tree records. A submodule commit the local clone does not have stops the benchmark rather
-# than leaving a hole in the program. Each submodule is marked a repository of its own, as a checkout's is.
+# make_repository makes <destination>, which holds <repository>'s tree at <commit>, a repository at that
+# commit. Its objects are <repository>'s, through an alternate; its index is the commit's tree, read rather
+# than built from the files, so a submodule is a gitlink at exactly the commit the parent records; and its
+# HEAD is the commit. The root's git directory is the copy's `.git`. A submodule's is under `.git/modules`,
+# named by a `.git` file with a relative path, as a checkout's is, so a clone of the copy (the first runs'
+# template) is a repository of its own rather than one reaching back into the copy.
+make_repository() {
+  local repository=$1 commit=$2 destination=$3
+  local within=${destination#$copy}
+  within=${within#/}
+  local git_directory=$copy/.git${within:+/modules/$within}
+  if [[ -z $within ]]; then
+    git init --quiet $destination || fail "making $destination a repository"
+  else
+    mkdir -p ${git_directory:h}
+    git init --quiet --separate-git-dir=$git_directory $destination || fail "making $destination a repository"
+    local up=${(j::)${(s:/:)within}/*/../}
+    print "gitdir: $up.git/modules/$within" > $destination/.git
+  fi
+  local objects=$(git -C $repository rev-parse --path-format=absolute --git-common-dir)/objects
+  print $objects > $git_directory/objects/info/alternates
+  git -C $destination read-tree $commit && git -C $destination update-ref --no-deref HEAD $commit ||
+    fail "pointing the repository at $destination at $commit"
+}
+
+# extract writes the tree of <repository> at <commit> into <destination>, makes it a repository at that
+# commit, then does the same for each submodule at the commit that tree records. A submodule commit the
+# local clone does not have stops the benchmark rather than leaving a hole in the program.
 extract() {
   local repository=$1 commit=$2 destination=$3
   mkdir -p $destination
   git -C $repository archive $commit | tar -x -C $destination || fail "extracting $repository at $commit"
-  [[ $destination != $copy ]] &&
-    print "gitdir: none, a benchmark copy of $repository at $commit" > $destination/.git
+  make_repository $repository $commit $destination
   git -C $repository ls-tree -r $commit | awk '$2 == "commit" { print $3 "\t" $4 }' |
     while IFS=$'\t' read -r submodule_commit submodule_path; do
       git -C $repository/$submodule_path cat-file -e "$submodule_commit^{commit}" 2> /dev/null ||
@@ -55,9 +82,11 @@ extract() {
 }
 
 # tree_hash is one hash over every file in the copy, the caches and linked node_modules aside, so a
-# copy that moved by a byte is caught.
+# copy that moved by a byte is caught. The git directory is left out but for the excludes the format walk
+# applies: git rewrites its own index whenever a command refreshes it, which says nothing about the tree.
 tree_hash() {
-  (cd $copy && find . -type f -not -path './.cache/*' -not -path './bench-ready' -print0 | sort -z |
+  (cd $copy && find . -type f -not -path './.cache/*' -not -path './bench-ready' \
+    -not \( -path './.git/*' -not -path './.git/info/exclude' \) -print0 | sort -z |
     xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
 }
 
@@ -66,8 +95,8 @@ prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
   project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
-  # The layout is in the name, so a copy extracted before the repository markers is never reused.
-  copy=$work/${project:t}-${project_commit[1,12]}-repositories
+  # The layout is in the name, so a copy extracted before it was a repository is never reused.
+  copy=$work/${project:t}-${project_commit[1,12]}-git
   if [[ -f $copy/bench-ready ]]; then
     print -u2 "reusing the copy at $copy"
     [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
@@ -84,6 +113,16 @@ prepare_copy() {
     (cd $copy && find . -name package.json -not -path '*/node_modules/*') | while read -r manifest; do
       local package=${manifest:h}
       [[ -d $project/$package/node_modules ]] && ln -s $project/$package/node_modules $copy/$package/node_modules
+    done
+    # Each index learns its files' stats once, here, as a checkout's has them, so the first git command a
+    # measured run makes does not hash the whole tree to find out that nothing changed. Then each repository
+    # must show no change against its commit, or the copy is not the commits it is named by.
+    local repositories=($copy) submodule repository
+    [[ -f $copy/bench-submodules ]] &&
+      for submodule in ${(f)"$(< $copy/bench-submodules)"}; do repositories+=($copy/${submodule%% at *}); done
+    for repository in $repositories; do
+      git -C $repository update-index -q --refresh > /dev/null
+      git -C $repository diff --quiet || fail "$repository differs from the commit it was extracted at"
     done
     tree_hash > $copy/bench-ready
   fi

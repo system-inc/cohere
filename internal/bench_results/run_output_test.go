@@ -52,6 +52,107 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 	}
 }
 
+// A run that did less than a developer's is refused, never timed (#7z52pqf). Both logs are real. On cohere's
+// root, a benchmark copy with no git: the Go engine refused to run and the Swift engine read no input, and
+// only the format project between them checked anything, so a reader of the last summary alone saw the
+// Swift error but would have timed a pass had the projects printed in another order. On ahra, a copy without
+// the route types Next's dev server generates: 161 type errors, fixes held, and no rule run. And the cohere
+// root's log again with the reasons taken out of its failed projects (`error` and `phasesNotRun`), so a
+// refusal that forgets to say why is still never timed.
+func TestRunOutputRefusesARunThatCheckedLess(test *testing.T) {
+	test.Parallel()
+	for name, wantReason := range map[string]string{
+		"no-git-cohere-root.txt":         `the project "." did less than a developer's run: The Go engine did not run`,
+		"missing-generated-ahra.txt":     `the project "." did less than a developer's run: generated files it asks for are missing`,
+		"failed-unnamed-cohere-root.txt": `the project "." did less than a developer's run: it failed with nothing reported`,
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			output, readError := os.ReadFile(filepath.Join("testdata", "run-output", name))
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			run, parseRunOutputError := ParseRunOutput(output)
+			if parseRunOutputError == nil {
+				test.Fatalf("read %+v", run)
+			}
+			if !strings.Contains(parseRunOutputError.Error(), wantReason) {
+				test.Fatalf("refused with %q, want it to say %q", parseRunOutputError, wantReason)
+			}
+		})
+	}
+}
+
+// Every gap that means less was checked refuses the run, and the ones a developer's run meets as well do
+// not. Each case is one project's summary with one gap set, beside a whole one, so the refusal is seen to
+// come from that gap and from whichever project carries it.
+func TestRunOutputRefusesEachGapThatChecksLess(test *testing.T) {
+	test.Parallel()
+	const whole = `{"kind":"summary","schemaVersion":1,"label":"whole","seconds":1,"filesInScope":3,"checked":3,` +
+		`"gaps":{"programFiles":0,"crashedFiles":0,"ruleCrashes":0,"rulesSkippingEverything":0,` +
+		`"formattingNotChecked":false,"nothingToCheck":false,"modifiedBuild":false}}`
+	// The gapped project's summary, with `top` added to its fields and `gaps` to its gaps. A gap the whole
+	// summary already holds is set by repeating its key, since the decoder keeps a repeated key's last value.
+	summary := func(top string, gaps string) string {
+		return `{"kind":"summary","schemaVersion":1,"label":"gapped","seconds":1,"filesInScope":3,"checked":3` + top +
+			`,"gaps":{"programFiles":0,"crashedFiles":0,"ruleCrashes":0,"rulesSkippingEverything":0,` +
+			`"formattingNotChecked":false,"nothingToCheck":false,"modifiedBuild":false` + gaps + `}}`
+	}
+	for name, testCase := range map[string]struct {
+		line    string
+		refused bool
+	}{
+		"an error":                    {line: summary(`,"error":"no engine"`, ""), refused: true},
+		"phases not run":              {line: summary("", `,"phasesNotRun":["lint"]`), refused: true},
+		"a crashed file":              {line: summary("", `,"crashedFiles":1`), refused: true},
+		"a rule crash":                {line: summary("", `,"ruleCrashes":1`), refused: true},
+		"nothing to check":            {line: summary("", `,"nothingToCheck":true`), refused: true},
+		"unread files":                {line: summary("", `,"unread":"2 files"`), refused: true},
+		"a narrowed program":          {line: summary("", `,"programFiles":9`), refused: true},
+		"formatting not checked":      {line: summary("", `,"formattingNotChecked":true`), refused: true},
+		"a missing generated file":    {line: summary("", `,"missingGenerated":["gen.d.ts"]`), refused: true},
+		"fixes held":                  {line: summary("", `,"fixesHeld":true`), refused: true},
+		"rules with nothing to do":    {line: summary("", `,"rulesSkippingEverything":4`)},
+		"a modified build":            {line: summary("", `,"modifiedBuild":true`)},
+		"nested files unchecked":      {line: summary("", `,"nestedUnchecked":2`)},
+		"Swift no target compiles":    {line: summary("", `,"uncheckedSwift":[{"file":"a.swift","reason":"none"}]`)},
+		"a dependency's cgo withheld": {line: summary("", `,"withheldDependencyCgoDeclarations":3`)},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			for _, order := range [][]string{{whole, testCase.line}, {testCase.line, whole}} {
+				run, parseRunOutputError := ParseRunOutput([]byte(strings.Join(order, "\n") + "\n"))
+				if testCase.refused && parseRunOutputError == nil {
+					test.Fatalf("read %+v", run)
+				}
+				if !testCase.refused && parseRunOutputError != nil {
+					test.Fatalf("refused: %v", parseRunOutputError)
+				}
+				if testCase.refused && !strings.Contains(parseRunOutputError.Error(), `"gapped"`) {
+					test.Fatalf("refused without naming the project that carries the gap: %v", parseRunOutputError)
+				}
+			}
+		})
+	}
+}
+
+// A root of several projects is all of them, which run side by side: the longest engine time, every
+// finding, and the files every project took from the cache. The longest project is printed first here, so
+// a reader of the last summary alone reads 1.5s and 1 finding.
+func TestRunOutputReadsEveryProjectOfARoot(test *testing.T) {
+	test.Parallel()
+	output := `{"kind":"summary","schemaVersion":1,"label":".","seconds":3.25,"findings":2,"typeErrors":1,"filesInScope":10,"cached":4,"gaps":{}}
+{"kind":"summary","schemaVersion":1,"label":"swift","seconds":1.5,"findings":1,"filesInScope":5,"cached":5,"gaps":{}}
+`
+	run, parseRunOutputError := ParseRunOutput([]byte(output))
+	if parseRunOutputError != nil {
+		test.Fatal(parseRunOutputError)
+	}
+	if run.EngineSeconds != 3.25 || run.Findings != 4 || run.Cache != "files 9/15" {
+		test.Fatalf("read %+v, want 3.25s, 4 findings and files 9/15", run)
+	}
+}
+
 // A log the reader cannot read is refused, not read as zeroes: the human footer alone, which is what the
 // first record's instrument read, and a summary of a contract version it does not know.
 func TestRunOutputRefusesWhatItCannotRead(test *testing.T) {
