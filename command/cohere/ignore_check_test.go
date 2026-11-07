@@ -84,7 +84,8 @@ func TestAnIgnoreKeepsTheTypeCheckOnlyWhereAnEntryNamesIt(test *testing.T) {
 						kept, output)
 				}
 			}
-			if strings.Contains(output, "plainBroken") || strings.Contains(output, filepath.Join(root, "plain/Broken.ts")) {
+			if strings.Contains(output, "plainBroken") ||
+				strings.Contains(output, filepath.Join(root, "plain/Broken.ts")) {
 				test.Errorf("the type error in plain/Broken.ts, which only a plain entry matched, was reported:\n%s",
 					output)
 			}
@@ -102,7 +103,8 @@ func TestAnIgnoreKeepsTheTypeCheckOnlyWhereAnEntryNamesIt(test *testing.T) {
 			output, _ = runCohere(test, binary, root, append(arguments, "--json")...)
 			summary := checkIgnoreSummary(test, output)
 			if summary.FilesInScope != 1 || summary.Checked != 1 || summary.TypesOnly != 2 || summary.TypeErrors != 2 {
-				test.Errorf("the summary reads %d in scope, %d checked, %d types-only, %d type errors, want 1, 1, 2, 2:\n%s",
+				test.Errorf("the summary reads %d in scope, %d checked, %d types-only, %d type errors, "+
+					"want 1, 1, 2, 2:\n%s",
 					summary.FilesInScope, summary.Checked, summary.TypesOnly, summary.TypeErrors, output)
 			}
 		})

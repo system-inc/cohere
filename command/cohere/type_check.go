@@ -188,6 +188,33 @@ func finishTypeCheck(
 	return diagnostics
 }
 
+// finishScopedTypeCheck finishes the check over the files the settings leave type-checked, and returns them with
+// their diagnostics (#cxeq6jw). The settings say which files a plain ignore keeps out of every check, so a run
+// that neither fixes nor lints, lintConfiguration nil, loads them here: `--types` reported the type errors of
+// files the settings never check. Until lint counts its own, the summary counts here as in a run lint reaches:
+// a file a plain ignore matched is not checked, and one an entry keeping the type check matched is types-only.
+func finishScopedTypeCheck(
+	callerContext context.Context,
+	check *typeCheck,
+	graph *program.Graph,
+	location projectLocation,
+	lintConfiguration *configuration.Configuration,
+	projectFiles []*ast.SourceFile,
+	persist bool,
+) ([]*ast.SourceFile, []*ast.Diagnostic, error) {
+	if lintConfiguration == nil {
+		loaded, loadError := loadLintConfiguration(graph, location)
+		if loadError != nil {
+			return nil, nil, fmt.Errorf("loading the lint config: %w", loadError)
+		}
+		lintConfiguration = loaded
+	}
+	typeChecked, typesOnly := typeCheckedFiles(projectFiles, lintConfiguration)
+	activeSummary.FilesInScope = len(typeChecked) - typesOnly
+	activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
+	return typeChecked, finishTypeCheck(callerContext, check, typeChecked, persist), nil
+}
+
 // typeCheckedFiles is files less those a plain ignore matched, the files the type check reports on, and how many
 // of those kept an entry naming `"check": "types"` matched (#cxeq6jw). A plain ignore means never checked at all,
 // so the files it matched are left out here and finishTypeCheck drops their type errors as it drops a

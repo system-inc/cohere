@@ -1320,22 +1320,11 @@ func run() error {
 		if check == nil {
 			check = startTypeCheck(backgroundContext, graph, !cacheOff)
 		}
-		// The settings say which files a plain ignore keeps out of every check, so a run that neither fixes nor
-		// lints reads them here: `--types` reported the type errors of files the settings never check (#cxeq6jw).
-		typesConfiguration := lintConfiguration
-		if typesConfiguration == nil {
-			loaded, loadError := loadLintConfiguration(graph, location)
-			if loadError != nil {
-				return fmt.Errorf("loading the lint config: %w", loadError)
-			}
-			typesConfiguration = loaded
+		typeChecked, typeDiagnostics, scopeError := finishScopedTypeCheck(
+			backgroundContext, check, graph, location, lintConfiguration, projectFiles, !*noFix)
+		if scopeError != nil {
+			return scopeError
 		}
-		typeChecked, typesOnly := typeCheckedFiles(projectFiles, typesConfiguration)
-		// Until lint counts its own: a file a plain ignore matched is not checked, and one an entry keeping the type
-		// check matched is types-only, here as in a run lint reaches.
-		activeSummary.FilesInScope = len(typeChecked) - typesOnly
-		activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
-		typeDiagnostics := finishTypeCheck(backgroundContext, check, typeChecked, !*noFix)
 		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
 		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
 		finishing := check.finished
@@ -1361,11 +1350,8 @@ func run() error {
 		replayedClause := ""
 		if check.replayed > 0 {
 			if inScope := check.reuse.ReplayedAmong(typeChecked); inScope > 0 {
-				replayedClause = fmt.Sprintf(
-					"; %d of %d files' semantic diagnostics replayed from cache",
-					inScope,
-					len(typeChecked),
-				)
+				replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache",
+					inScope, len(typeChecked))
 			}
 		}
 		printInvocation(accountOutput(streams.Output),
