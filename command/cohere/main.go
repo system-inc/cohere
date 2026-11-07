@@ -1320,7 +1320,22 @@ func run() error {
 		if check == nil {
 			check = startTypeCheck(backgroundContext, graph, !cacheOff)
 		}
-		typeDiagnostics := finishTypeCheck(backgroundContext, check, projectFiles, !*noFix)
+		// The settings say which files a plain ignore keeps out of every check, so a run that neither fixes nor
+		// lints reads them here: `--types` reported the type errors of files the settings never check (#cxeq6jw).
+		typesConfiguration := lintConfiguration
+		if typesConfiguration == nil {
+			loaded, loadError := loadLintConfiguration(graph, location)
+			if loadError != nil {
+				return fmt.Errorf("loading the lint config: %w", loadError)
+			}
+			typesConfiguration = loaded
+		}
+		typeChecked, typesOnly := typeCheckedFiles(projectFiles, typesConfiguration)
+		// Until lint counts its own: a file a plain ignore matched is not checked, and one an entry keeping the type
+		// check matched is types-only, here as in a run lint reaches.
+		activeSummary.FilesInScope = len(typeChecked) - typesOnly
+		activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
+		typeDiagnostics := finishTypeCheck(backgroundContext, check, typeChecked, !*noFix)
 		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
 		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
 		finishing := check.finished
@@ -1345,17 +1360,17 @@ func run() error {
 		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""
 		if check.replayed > 0 {
-			if inScope := check.reuse.ReplayedAmong(projectFiles); inScope > 0 {
+			if inScope := check.reuse.ReplayedAmong(typeChecked); inScope > 0 {
 				replayedClause = fmt.Sprintf(
 					"; %d of %d files' semantic diagnostics replayed from cache",
 					inScope,
-					len(projectFiles),
+					len(typeChecked),
 				)
 			}
 		}
 		printInvocation(accountOutput(streams.Output),
 			"types: %d diagnostics over %d files in %s%s\n",
-			len(typeDiagnostics), len(projectFiles), round(typesDuration), replayedClause,
+			len(typeDiagnostics), len(typeChecked), round(typesDuration), replayedClause,
 		)
 		// The types phase's line is out before the lint phase's wait.
 		streams.Show(streams.Output)

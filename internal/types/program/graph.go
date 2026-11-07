@@ -571,7 +571,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 	offeredCounts := make(map[string]int, len(rules))
 	nodesVisited, nodesReplayed := 0, 0
 	suppressed := suppressionTally{}
-	filesIgnored := 0
+	filesIgnored, filesTypesOnly := 0, 0
 	scopedOff := map[string]int{}
 	unconfigured := map[string]int{}
 	unrunRuleReferences := map[string]int{}
@@ -633,7 +633,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 			localOffered := make(map[string]int, len(rules))
 			localNodes, localNodesReplayed := 0, 0
 			localSuppressed := suppressionTally{}
-			localIgnored := 0
+			localIgnored, localTypesOnly := 0, 0
 			localScopedOff := map[string]int{}
 			localUnconfigured := map[string]int{}
 			// The rule selection for each distinct resolution this worker has met. See rulesFor.
@@ -686,6 +686,9 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 				)
 				if resolution.Ignored {
 					localIgnored++
+					if resolution.TypesOnly {
+						localTypesOnly++
+					}
 					return
 				}
 				if selection.decodeError != nil {
@@ -1021,6 +1024,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 			nodesReplayed += localNodesReplayed
 			suppressed.add(localSuppressed)
 			filesIgnored += localIgnored
+			filesTypesOnly += localTypesOnly
 			for name, count := range localScopedOff {
 				scopedOff[name] += count
 			}
@@ -1098,6 +1102,7 @@ func (graph *Graph) Walk(callerContext context.Context, files []*ast.SourceFile,
 			FilesCrashed:      fileCrashes,
 			RulesCrashed:      ruleCrashesAll,
 			FilesIgnored:      filesIgnored,
+			FilesTypesOnly:    filesTypesOnly,
 			RulesScopedOff:    scopedOff,
 			RulesUnconfigured: unconfigured,
 

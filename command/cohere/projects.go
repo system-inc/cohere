@@ -119,7 +119,10 @@ func checkDiscoveredProjects(
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
 	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
-	discoveredIgnores = ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root)
+	discoveredIgnores = append(
+		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
+		defaultIgnoreAccounts(found.DefaultMatched)...,
+	)
 	if found.isTheLocatedProject(location, locateError) {
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings

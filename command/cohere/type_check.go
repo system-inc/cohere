@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -185,4 +186,29 @@ func finishTypeCheck(
 		diagnostics = append(diagnostics, diagnostic)
 	}
 	return diagnostics
+}
+
+// typeCheckedFiles is files less those a plain ignore matched, the files the type check reports on, and how many
+// of those kept an entry naming `"check": "types"` matched (#cxeq6jw). A plain ignore means never checked at all,
+// so the files it matched are left out here and finishTypeCheck drops their type errors as it drops a
+// dependency's: the whole program is still checked, since our files' types depend on theirs, and nothing found in
+// them is said. An entry keeping the type check keeps them, never linted or formatted, and counted apart.
+// ignores is the run's settings, nil when there are none, which ignores nothing.
+func typeCheckedFiles(files []*ast.SourceFile, ignores *configuration.Configuration) ([]*ast.SourceFile, int) {
+	if ignores == nil {
+		return files, 0
+	}
+	checked := make([]*ast.SourceFile, 0, len(files))
+	typesOnly := 0
+	for _, sourceFile := range files {
+		resolved := ignores.Resolve(sourceFile.FileName().AsString())
+		if resolved.Ignored && !resolved.TypesOnly {
+			continue
+		}
+		if resolved.TypesOnly {
+			typesOnly++
+		}
+		checked = append(checked, sourceFile)
+	}
+	return checked, typesOnly
 }

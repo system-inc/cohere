@@ -88,6 +88,11 @@ func TestVerboseListsEveryIgnoreWithItsCount(test *testing.T) {
 			},
 			{Pattern: "build/**", Reason: "Build output, not built yet.", Kind: "generated", File: settings},
 		}
+		// cohere's defaults follow the root's own entries, as a decoded summary carries them.
+		for _, account := range defaultIgnoreAccounts(nil) {
+			account.shownFile = ""
+			want = append(want, account)
+		}
 		if !reflect.DeepEqual(summary.IgnorePatterns, want) {
 			test.Errorf("the summary's ignorePatterns are\n  %+v\nwant\n  %+v\n%s",
 				summary.IgnorePatterns, want, output)
@@ -197,8 +202,11 @@ func TestSeveralProjectsCarryTheIgnoresOnce(test *testing.T) {
 			continue
 		}
 		records++
-		if len(record.IgnorePatterns) != 2 || record.IgnorePatterns[1].Matched != 0 {
-			test.Errorf("the record holds %+v, want both entries, the second at 0", record.IgnorePatterns)
+		// The root's two entries, then cohere's defaults.
+		if len(record.IgnorePatterns) != 2+len(defaultIgnores) || record.IgnorePatterns[1].Matched != 0 ||
+			!record.IgnorePatterns[2].Default {
+			test.Errorf("the record holds %+v, want both entries, the second at 0, then the defaults",
+				record.IgnorePatterns)
 		}
 	}
 	if records != 1 {

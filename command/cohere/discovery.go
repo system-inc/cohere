@@ -109,6 +109,11 @@ type discovery struct {
 	// So a pattern whose paths exist counts, and one at zero matched nothing the run could have checked.
 	IgnoreMatched []int
 
+	// DefaultMatched is how many directories each of cohere's default ignores matched, by directory name: every
+	// testdata and Vendor directory among the entries the walk read, the same entries IgnoreMatched counts in
+	// (see defaultIgnores).
+	DefaultMatched map[string]int
+
 	// UnusedModules are Go modules below a discovered workspace whose go.work does not use them, each run as
 	// a module of its own, for the notes to say why.
 	UnusedModules []unusedModule
@@ -254,7 +259,12 @@ func repositoryKind(directory string) nestedRepository {
 // discoverProjects walks root and returns every project it finds. ignorePatterns are the root's, as lint
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
-	found := discovery{Root: root, Listings: program.NewDirectoryListings(), Formattable: map[string]int{}}
+	found := discovery{
+		Root:           root,
+		Listings:       program.NewDirectoryListings(),
+		Formattable:    map[string]int{},
+		DefaultMatched: map[string]int{},
+	}
 	ignoreTally := configuration.NewIgnoreTally(ignorePatterns)
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
@@ -349,8 +359,12 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		// After the check above, since a repository of its own is counted where its parent lists it and its
 		// entries are never this walk's to consider.
 		directoryTally := ignoreTally.Fresh()
+		directoryDefaults := map[string]int{}
 		for _, entry := range entries {
 			directoryTally.Count(path.Join(relative, entry.Name()), entry.IsDir())
+			if entry.IsDir() && isDefaultIgnore(entry.Name()) {
+				directoryDefaults[entry.Name()]++
+			}
 		}
 		directoryScope := scope
 		if relative != "." {
@@ -384,6 +398,9 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		}
 		lock.Lock()
 		ignoreTally.Add(directoryTally)
+		for name, count := range directoryDefaults {
+			found.DefaultMatched[name] += count
+		}
 		if swiftFileCount > 0 {
 			swiftFiles[relative] = swiftFileCount
 		}
