@@ -26,8 +26,9 @@ import Synchronization
 
  Never kept, so computed every run: the package rules, which read the package; a typed verdict from symbols
  sourcekitd gave, since no record stands for what it would say; a typed verdict for a file no source of symbols
- described (a lint crash); any verdict holding a rule's failure (`incumbentFailed`), so the failure is tried and said
- again; and a verdict for a file whose text on disk is no longer the text linted. A run that stopped before lint
+ described (a lint crash); a typed verdict that asked of a symbol the demangler places in no module whether it is the
+ standard library's (#awb2ykk), which judged that part by nobody; any verdict holding a rule's failure (`incumbentFailed`),
+ so the failure is tried and said again; and a verdict for a file whose text on disk is no longer the text linted. A run that stopped before lint
  keeps nothing, since only lint stores.
 
  The store is one file, replaced whole after each run that linted, as `FormatVerdictCache`'s is. A file this run did
@@ -120,7 +121,8 @@ struct LintVerdictCache: Sendable {
     func entry(fileKey: String, verdict: Linter.Verdict, typedKey: String?) -> Entry? {
         guard Self.isKeepable(verdict.fileRules) else { return nil }
         var typed: Typed?
-        if let typedKey, let found = verdict.typedFindings, Self.isKeepable(found) {
+        /* A typed verdict that hinged on a symbol the demangler placed nowhere judged that part by nobody (#awb2ykk), so it is asked again. */
+        if let typedKey, let found = verdict.typedFindings, Self.isKeepable(found), verdict.typedUnplaced.isEmpty {
             typed = Typed(key: typedKey, findings: found.filter { !$0.value.isEmpty })
         }
         return Entry(

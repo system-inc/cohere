@@ -33,6 +33,8 @@ struct SymbolProvider {
     let runner: ProcessRunner
     /* Handed to every file's symbols, so a rule can tell our declarations from a dependency's. */
     var ownedModules: Set<String> = []
+    /* How the demangler is loaded: the process's own, or a test's loader that fails, to drive the path where none loads. */
+    var loadDemangler: (ProcessRunner) throws -> SwiftDemangler = { try SwiftDemangler.shared(runner: $0) }
 
     /*
      `replaying` is asked, for each file the index can vouch for, whether the caller holds the file's verdict under the
@@ -50,8 +52,9 @@ struct SymbolProvider {
          (`FileSymbols.Occurrence.isStandardLibrary`), so a file is judged only once it is loaded. Without it, no file
          is: each says why, as a file no source could describe does.
          */
+        let demangler: SwiftDemangler
         do {
-            _ = try SwiftDemangler.shared(runner: runner)
+            demangler = try loadDemangler(runner)
         }
         catch {
             for file in files {
@@ -94,6 +97,7 @@ struct SymbolProvider {
             if let read {
                 var found = read.symbols
                 found.ownedModules = ownedModules
+                found.demangler = demangler
                 result.symbols[file.url.path] = found
                 result.records[file.url.path] = read.record.identity
                 result.fromIndex += 1
@@ -140,6 +144,7 @@ struct SymbolProvider {
                     arguments: command.arguments,
                 )
                 found.ownedModules = ownedModules
+                found.demangler = demangler
                 result.symbols[file.url.path] = found
                 result.fromSourcekitd += 1
             }

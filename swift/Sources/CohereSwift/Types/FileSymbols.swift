@@ -1,3 +1,5 @@
+import Synchronization
+
 /*
  Which declaration each name in one file resolves to, as the compiler decided it: the input a typed rule reads
  instead of guessing from a name's spelling.
@@ -23,6 +25,37 @@ public struct FileSymbols: Sendable {
          getter at the same place. A rule asks about what the source names, so implicit occurrences never answer.
          */
         public var isImplicit: Bool
+        /*
+         The demangler that places the declaration's module, and the log a symbol it cannot place goes to, from the
+         `FileSymbols` that handed this occurrence out (`occurrences(line:column:)`). Nil for one made elsewhere, which
+         asks the process's demangler and logs nowhere.
+         */
+        var context: Context?
+
+        /* What an occurrence needs from the `FileSymbols` it came from. */
+        final class Context: Sendable {
+            let demangler: SwiftDemangler?
+            let unplaced: UnplacedSymbols?
+
+            init(demangler: SwiftDemangler?, unplaced: UnplacedSymbols?) {
+                self.demangler = demangler
+                self.unplaced = unplaced
+            }
+        }
+
+        /* Where a declaration comes from, as far as a typed rule asks: the standard library, anywhere else, or nobody can say. */
+        enum Origin: Equatable, Sendable {
+            case standardLibrary
+            case elsewhere
+            /* The symbol names a standard library type, and the demangler places its declaration in no module. */
+            case unplaced
+        }
+
+        public static func == (left: Occurrence, right: Occurrence) -> Bool {
+            left.line == right.line && left.column == right.column && left.symbol == right.symbol
+                && left.name == right.name && left.isReference == right.isReference
+                && left.isImplicit == right.isImplicit
+        }
 
         public init(line: Int, column: Int, symbol: String, name: String, isReference: Bool, isImplicit: Bool = false) {
             self.line = line
@@ -58,18 +91,34 @@ public struct FileSymbols: Sendable {
          signature sits between the module and the `E` that marks it, `s:Sa7ControlSiRszlE5count` for our `count` in an
          `extension Array where Element == Int` (#awb2ykk), and an earlier reading took that for the standard library's.
          The standard library's underscored companion modules ship with it and are its own (`_Concurrency` adds
-         AsyncSequence's `filter`). A symbol the demangler cannot place is not the standard library's, so a rule that
-         asks says nothing of it rather than flag our code. `SymbolProvider` loads the demangler before any typed rule
-         reads a file's symbols, and a file it cannot load for is unchecked, never judged without it.
+         AsyncSequence's `filter`).
          */
-        public var isStandardLibrary: Bool {
-            guard symbol.hasPrefix("s:") else { return false }
+        var origin: Origin {
+            guard symbol.hasPrefix("s:") else { return .elsewhere }
             let rest = symbol.utf8.dropFirst(2)
             guard !rest.starts(with: "So".utf8), !rest.starts(with: "SC".utf8),
-                rest.first == UInt8(ascii: "S") || rest.first == UInt8(ascii: "s"),
-                let module = (try? SwiftDemangler.shared())?.module(ofSymbol: symbol)
-            else { return false }
-            return module == "Swift" || module.hasPrefix("_")
+                rest.first == UInt8(ascii: "S") || rest.first == UInt8(ascii: "s")
+            else { return .elsewhere }
+            let demangler = context.map(\.demangler) ?? (try? SwiftDemangler.shared())
+            guard let module = demangler?.module(ofSymbol: symbol) else { return .unplaced }
+            return module == "Swift" || module.hasPrefix("_") ? .standardLibrary : .elsewhere
+        }
+
+        /*
+         Declared by the Swift standard library (`origin`), as a typed rule asks it. A symbol the demangler cannot place
+         is not the standard library's, so the rule says nothing of it, and it is logged where the occurrence came from,
+         so the linter reports what hinged on it as unchecked rather than clean (`Linter`).
+         */
+        public var isStandardLibrary: Bool {
+            switch origin {
+                case .standardLibrary:
+                    return true
+                case .elsewhere:
+                    return false
+                case .unplaced:
+                    context?.unplaced?.record(symbol)
+                    return false
+            }
         }
     }
 
@@ -78,8 +127,26 @@ public struct FileSymbols: Sendable {
         var column: Int
     }
 
+    /* The symbols the demangler placed in no module while one typed rule judged a file, each once. */
+    final class UnplacedSymbols: Sendable {
+        private let symbols = Mutex<Set<String>>([])
+
+        func record(_ symbol: String) {
+            symbols.withLock { _ = $0.insert(symbol) }
+        }
+
+        var recorded: [String] { symbols.withLock { $0.sorted() } }
+    }
+
     private let byPosition: [Position: [Occurrence]]
     public let count: Int
+    /*
+     The demangler this file's occurrences are placed with: the one `SymbolProvider` loaded, or the process's when the
+     symbols were made by hand. Nil only when none could load, and then nothing is standard library's to anyone.
+     */
+    var demangler: SwiftDemangler? = try? SwiftDemangler.shared()
+    /* Where the occurrences handed out log a symbol the demangler cannot place, nil when nobody is listening. */
+    private var unplaced: UnplacedSymbols?
     /*
      The modules the checked package owns, as the compiler names them (a target's name with anything that is not
      an identifier character made `_`). Vendored packages' modules are not in it. Lets a rule tell a declaration
@@ -98,9 +165,23 @@ public struct FileSymbols: Sendable {
         occurrence.declaringModule.map(ownedModules.contains) ?? false
     }
 
+    /* These symbols, logging into `log` every symbol the demangler cannot place for a rule that asks. */
+    func watching(_ log: UnplacedSymbols) -> FileSymbols {
+        var watched = self
+        watched.unplaced = log
+        return watched
+    }
+
     /* Every occurrence that starts at this place: usually one, more where one name both declares and refers. */
     public func occurrences(line: Int, column: Int) -> [Occurrence] {
-        byPosition[Position(line: line, column: column)] ?? []
+        let found = byPosition[Position(line: line, column: column)] ?? []
+        guard !found.isEmpty else { return [] }
+        let context = Occurrence.Context(demangler: demangler, unplaced: unplaced)
+        return found.map { occurrence in
+            var placed = occurrence
+            placed.context = context
+            return placed
+        }
     }
 
     /* The declaration a name at this place refers to, when the compiler recorded exactly one written reference there. */

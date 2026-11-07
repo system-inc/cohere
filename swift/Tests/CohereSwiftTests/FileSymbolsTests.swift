@@ -1,3 +1,5 @@
+import Foundation
+import SwiftParser
 import Testing
 
 @testable import CohereSwift
@@ -78,5 +80,60 @@ struct FileSymbolsTests {
             isReference: true,
         )
         #expect(standard.declaringModule == nil)
+    }
+    /*
+     A symbol that names a standard library type and that the demangler places in no module (a hand-made one here) is
+     of unknown origin. empty-count, which asks of it, says nothing of the comparison it decides, and the file is
+     reported unchecked by that rule, naming the symbol: never clean and never flagged. The comparison beside it on
+     the standard library's own `count` is still flagged. Red under a reading that takes an unplaced symbol for one
+     not the standard library's without saying so.
+     */
+    @Test func aSymbolNobodyCanPlaceIsUncheckedNeverClean() async throws {
+        let source = "func checks(items: [Int], tally: [Int]) -> Bool {\n    items.count == 0 || tally.count == 0\n}\n"
+        let url = URL(fileURLWithPath: "/package/Sources/A/Checks.swift")
+        let file = ParsedFile(
+            url: url,
+            targetName: "A",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 1,
+        )
+        let unplaceable = "s:Sa_unplaceable"
+        #expect(
+            FileSymbols.Occurrence(line: 2, column: 11, symbol: unplaceable, name: "count", isReference: true).origin
+                == .unplaced,
+            "the control: the demangler places this symbol nowhere",
+        )
+        var linter = Linter(configuration: RuleConfiguration(severities: [:], note: ""), fileRules: [])
+        linter.typedRules = [EmptyCount()]
+        linter.symbols = SymbolProvider.Result(
+            symbols: [
+                url.path: FileSymbols([
+                    FileSymbols.Occurrence(line: 2, column: 11, symbol: unplaceable, name: "count", isReference: true),
+                    FileSymbols.Occurrence(
+                        line: 2,
+                        column: 31,
+                        symbol: "s:Sa5countSivp",
+                        name: "count",
+                        isReference: true,
+                    ),
+                ])
+            ],
+            unavailable: [:],
+            fromIndex: 1,
+            fromSourcekitd: 0,
+        )
+        let package = try PackageModel(
+            root: PackageModelTests.root,
+            describeJson: PackageModelTests.describe(targets: ["A"]),
+            dumpPackageJson: PackageModelTests.dump(tools: "6.4.0"),
+        )
+        let result = await linter.run(package: package, manifests: [:], files: [file])
+        let flagged = result.findings.filter { $0.rule == EmptyCount().name }.map { "\($0.line):\($0.column)" }
+        #expect(flagged == ["2:25"], "only the standard library's count is flagged: \(flagged)")
+        let crash = try #require(result.record.crashes.first { $0.file == url.path }, "the file was reported clean")
+        #expect(crash.error.contains(EmptyCount().name) && crash.error.contains(unplaceable), "\(crash.error)")
+        #expect(result.verdicts[url.path]?.typedUnplaced == [EmptyCount().name: [unplaceable]])
     }
 }

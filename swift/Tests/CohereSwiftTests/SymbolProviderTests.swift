@@ -112,4 +112,24 @@ struct SymbolProviderTests {
         #expect(result.fromIndex == 2, "the touched file is not the index's to describe: \(result.unavailable)")
         #expect(result.fromSourcekitd + result.unavailable.count == 1)
     }
+    /*
+     A demangler that cannot load leaves every file a typed rule would read unchecked, with that reason, rather than
+     judged with the standard library told from ours by nobody (#awb2ykk). Red under a provider that judges without it.
+     */
+    @Test func aDemanglerThatCannotLoadLeavesEveryFileUnchecked() async throws {
+        let (layouts, files) = try await Self.checkedPackages()
+        struct Refused: Error, CustomStringConvertible {
+            var description: String { "no demangler for this test" }
+        }
+        var provider = SymbolProvider(layouts: layouts, runner: ProcessRunner())
+        provider.loadDemangler = { _ in throw Refused() }
+        let result = provider.symbols(for: files)
+        #expect(result.symbols.isEmpty, "a file was handed symbols with no demangler to place them")
+        #expect(Set(result.unavailable.keys) == Set(files.map(\.url.path)))
+        #expect(
+            result.unavailable.values.allSatisfy {
+                $0.contains("demangler") && $0.contains("no demangler for this test")
+            }
+        )
+    }
 }
