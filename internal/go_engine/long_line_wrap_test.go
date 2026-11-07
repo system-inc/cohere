@@ -97,7 +97,7 @@ func TestTheWrapNeverTakesAFilePastTheLongFileLimit(test *testing.T) {
 	} {
 		held := heldToLongFileLimit(testCase.file, formatted, wrapping, testCase.limit)
 		if testCase.declined {
-			if held.Output != nil || !strings.Contains(held.Declined, "past the long-file limit") {
+			if held.Output != nil || !strings.Contains(held.Declined, "consistency-no-long-file's limit of") {
 				test.Errorf("%s: want the wrap declined past the limit, got %d lines, %q", testCase.name, held.Lines,
 					held.Declined)
 			}

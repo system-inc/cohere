@@ -65,7 +65,10 @@ func wrapLongLines(formatted []byte) format.Wrapping {
 // past the long-file rule's limit: when the rule, asked through its own judgment (consistency_no_long_file.Reports),
 // does not report the file before the wrap and would after it. A fix whose output trips another rule is no fix, and
 // where the file splits is a person's call. A file the rule already reports may still be wrapped: its finding is
-// there either way, so the wrap creates none.
+// there either way, so the wrap creates none. The limit is judged as the rule's own run judges it, without the file's
+// directives: a file under the limit that withholds the rule holds a directive with nothing to cover, which the
+// lint phase reports as unused, and a wrap past the limit would give it something to cover and so hide that finding.
+// So the decline holds there too, and its reason names only the line count and the limit, true either way.
 func heldToLongFileLimit(file string, formatted []byte, wrapping format.Wrapping, limit int) format.Wrapping {
 	if wrapping.Output == nil {
 		return wrapping
@@ -79,8 +82,8 @@ func heldToLongFileLimit(file string, formatted []byte, wrapping format.Wrapping
 	if before || !after {
 		return wrapping
 	}
-	return format.Wrapping{Declined: fmt.Sprintf("the wrap would take it to %d lines, past the long-file limit of %d "+
-		"that %s holds it to", afterCount, limit, consistency_no_long_file.Name)}
+	return format.Wrapping{Declined: fmt.Sprintf("the wrap would take it to %d lines, past %s's limit of %d lines",
+		afterCount, consistency_no_long_file.Name, limit)}
 }
 
 // reportedCount is how many of the long lines a ReportedOnly wrap counted are lines the rule reports.
