@@ -5,7 +5,9 @@
 // A root is the directory of a go.work or of a go.mod. A go.work's modules are its use directives, read with
 // the parser `go work edit` uses rather than by running go, so the land fixture's stand-in go doesn't answer
 // for it. A module inside a submodule (a gitlink in the index, by rule, never by name) is not owned: its
-// tests and its findings are its upstream's.
+// tests and its findings are its upstream's. Nor is a module copied into the tree whole and wired in by a
+// directory replace in a module go.work uses, as third_party's staticcheck is: it is somebody else's code
+// built as a dependency, so its tests are its upstream's too.
 package project
 
 import (
@@ -34,6 +36,11 @@ type Workspace struct {
 
 	Modules     []Module
 	InSubmodule []string
+
+	// Replaced are the directories inside Root that a module go.work uses replaces a module with, relative
+	// to Root and slash separated. Each is a dependency vendored into the tree, built through the module that
+	// replaces with it and never gated as one of the repository's own.
+	Replaced []string
 
 	// Submodules are the gitlinks of the index, relative to Root. Only a go.work root in a repository reads
 	// them.
@@ -94,11 +101,50 @@ func ReadWorkspace(root string) (Workspace, error) {
 		}
 		covered.Modules = append(covered.Modules, module)
 	}
+	for _, module := range covered.Modules {
+		replaced, replacedError := replacedDirectories(absoluteRoot, module.Directory)
+		if replacedError != nil {
+			return Workspace{}, replacedError
+		}
+		covered.Replaced = append(covered.Replaced, replaced...)
+	}
 	return covered, nil
 }
 
-// RefuseUnlistedModules walks the tree for go.mod files and refuses any that go.work doesn't use and that
-// isn't inside a submodule, naming each with the use line that would list it. A testdata directory holds
+// replacedDirectories are the directories inside root that the go.mod in directory replaces a module with,
+// relative to root and slash separated. Only a replace by a directory counts: one by a module and version
+// names no directory of the tree, and one that resolves outside root is no module the walk would meet.
+func replacedDirectories(root string, directory string) ([]string, error) {
+	path := filepath.Join(root, filepath.FromSlash(directory), "go.mod")
+	contents, readError := os.ReadFile(path)
+	if readError != nil {
+		return nil, fmt.Errorf("reading the replaces of %s: %w", path, readError)
+	}
+	parsed, parseError := modfile.Parse(path, contents, nil)
+	if parseError != nil {
+		return nil, fmt.Errorf("reading the replaces of %s: %w", path, parseError)
+	}
+	var replaced []string
+	for _, replace := range parsed.Replace {
+		if replace.New.Version != "" || !modfile.IsDirectoryPath(replace.New.Path) {
+			continue
+		}
+		target := filepath.Join(root, filepath.FromSlash(directory), filepath.FromSlash(replace.New.Path))
+		if filepath.IsAbs(replace.New.Path) {
+			target = filepath.Clean(replace.New.Path)
+		}
+		relative, relativeError := filepath.Rel(root, target)
+		if relativeError != nil || relative == ".." || strings.HasPrefix(relative, "../") {
+			continue
+		}
+		replaced = append(replaced, filepath.ToSlash(relative))
+	}
+	return replaced, nil
+}
+
+// RefuseUnlistedModules walks the tree for go.mod files and refuses any that go.work doesn't use, that isn't
+// inside a submodule and that no used module replaces a module with, naming each with the use line that would
+// list it. A testdata directory holds
 // fixtures, not modules, and a dot directory or .cache holds nothing the repository builds, so neither is
 // walked; nor is a submodule, whose modules are its upstream's. A root without a go.work lists nothing, so
 // it refuses nothing.
@@ -111,6 +157,10 @@ func (workspace Workspace) RefuseUnlistedModules() error {
 		used[module.Directory] = true
 	}
 	for _, directory := range workspace.InSubmodule {
+		used[directory] = true
+	}
+	// A vendored copy's own go.mod, and only that one: a go.mod elsewhere in the copy is still refused.
+	for _, directory := range workspace.Replaced {
 		used[directory] = true
 	}
 	var unlisted []string
