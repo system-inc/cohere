@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 )
 
 // Package is one type-checked package, with the files the engine may read and edit. Files left out (generated,
@@ -501,11 +503,8 @@ func Edits(loadedPackage Package, accepted map[types.Object]string) []Edit {
 	return edits
 }
 
-// mutatesMarker opens a doc comment line that makes a parameter an out-parameter by contract
-// (correctness-no-caller-data-mutation): `// Mutates: <parameter> <why>`.
-const mutatesMarker = "Mutates:"
-
-// docCommentEdits renames a renamed parameter where its function's doc comment names it: in a Mutates line, and
+// docCommentEdits renames a renamed parameter where its function's doc comment names it: in a Mutates line (the
+// marker correctness-no-caller-data-mutation reads, `// Mutates: <parameter> <why>`, read here from its one home), and
 // in a code span that holds exactly its name.
 func docCommentEdits(loadedPackage Package, accepted map[types.Object]string) []Edit {
 	edits := mutatesEdits(loadedPackage, accepted)
@@ -609,7 +608,7 @@ func mutatesEdits(loadedPackage Package, accepted map[types.Object]string) []Edi
 				lineStart := 0
 				for _, line := range strings.SplitAfter(comment.Text, "\n") {
 					trimmed := strings.TrimLeft(line, " \t/*")
-					if tag, hasMarker := strings.CutPrefix(trimmed, mutatesMarker); hasMarker {
+					if tag, hasMarker := strings.CutPrefix(trimmed, marker.Mutates); hasMarker {
 						word := strings.TrimLeft(tag, " \t")
 						if end := strings.IndexFunc(word, unicode.IsSpace); end >= 0 {
 							word = word[:end]
@@ -617,7 +616,7 @@ func mutatesEdits(loadedPackage Package, accepted map[types.Object]string) []Edi
 						if newName, renamed := renamedParameters[strings.TrimSuffix(word, "*/")]; renamed {
 							wordStart := lineStart +
 								(len(line) - len(trimmed)) +
-								len(mutatesMarker) +
+								len(marker.Mutates) +
 								(len(tag) - len(strings.TrimLeft(tag, " \t")))
 							edits = append(edits, Edit{
 								Filename: commentOffset.Filename,

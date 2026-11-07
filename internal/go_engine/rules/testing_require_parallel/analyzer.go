@@ -40,10 +40,6 @@ var notParallelMessage = policy.MessageOf(Name, "notParallel")
 
 var notParallelWithoutReasonMessage = policy.MessageOf(Name, "notParallelWithoutReason")
 
-// notParallelMarker opens the comment that excuses a test from running in parallel. It is matched as written, the
-// spelling every excused test in cohere already uses.
-const notParallelMarker = "Not parallel:"
-
 func run(pass *analysis.Pass) (any, error) {
 	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
 	if !isIndexes {
@@ -75,7 +71,7 @@ func run(pass *analysis.Pass) (any, error) {
 			if parameter == nil || firstStatementCallsParallel(pass, function.Body, parameter) {
 				continue
 			}
-			report(pass, function.Name, marker.Read(function.Doc, notParallelMarker))
+			report(pass, function.Name, marker.Read(function.Doc, marker.NotParallel))
 		}
 		judgeSubtests(pass, file, indexes.ForFile(file), declarations)
 	}
@@ -112,8 +108,8 @@ func judgeSubtests(
 		}
 		// A named function may carry the reason on its own doc comment, which then excuses every Run that names
 		// it; the comment directly above the call speaks for this one subtest.
-		above := marker.Read(comments.Above(call), notParallelMarker)
-		report(pass, selector, max(above, marker.Read(doc, notParallelMarker)))
+		above := marker.Read(comments.Above(call), marker.NotParallel)
+		report(pass, selector, max(above, marker.Read(doc, marker.NotParallel)))
 		return true
 	})
 }
