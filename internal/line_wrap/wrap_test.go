@@ -530,3 +530,39 @@ func TestCuredOnlyLeavesWhatItCannotCure(test *testing.T) {
 		}
 	}
 }
+
+// TestKeepCommentsLeavesEveryComment pins Options.KeepComments: a long prose comment stays byte for byte and counts as
+// CategoryComment, a call whose break would leave a block comment ending its line, where code followed it before,
+// stays whole, and a call with a trailing marker comment is still wrapped, its comment's text kept after the closing
+// parenthesis. Without the option the comment is reflowed and the first call broken.
+func TestKeepCommentsLeavesEveryComment(test *testing.T) {
+	test.Parallel()
+	prose := "// " + strings.Repeat("word ", 26) + "end\n"
+	moved := "\tsend( /* the context */ context, \"" + strings.Repeat("word ", 20) + "\", first)\n"
+	source := "package p\n\n" + prose + "func report() {\n" + moved + "\tsend(context, \"" +
+		strings.Repeat("word ", 20) + "\", first, second) // Serial: a marker line reads this\n}\n"
+	for _, testCase := range []struct {
+		options Options
+		kept    bool
+	}{
+		{options: Options{}, kept: false},
+		{options: Options{KeepComments: true}, kept: true},
+	} {
+		result, wrapError := Wrap([]byte(source), testCase.options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", testCase.options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if strings.Contains(output, prose) != testCase.kept || strings.Contains(output, moved) != testCase.kept {
+			test.Errorf("with %+v, want the comment and the first call kept whole %v, got:\n%s", testCase.options,
+				testCase.kept, output)
+		}
+		if !strings.Contains(output, "\t) // Serial: a marker line reads this\n") {
+			test.Errorf("with %+v, want the second call wrapped and its marker kept after it, got:\n%s",
+				testCase.options, output)
+		}
+		if testCase.kept && (result.After[CategoryComment] != 1 || result.After[CategoryActionable] != 0) {
+			test.Errorf("want the comment counted as a comment and nothing left actionable, got %v", result.After)
+		}
+	}
+}
