@@ -30,3 +30,8 @@ func Deliverable(sender string, recipient string, street string, city string) bo
 var Notices = []string{
 	"the parcel is fragile, so carry it upright and set it down gently on a flat surface", // read this one out first, please
 }
+
+// Signature is how a courier signs off, a wording no break brings within the limit, so it stays as it was written.
+func Signature(name string) string {
+	return "with thanks from the whole depot, who wish your parcel a safe, dry and gentle journey all the way to its new door, " + name
+}

@@ -31,6 +31,9 @@ const (
 	CategoryImport        Category = "Import"
 	// CategoryNotReported is a long line consistency_no_long_line leaves alone, only with Options.ReportedOnly.
 	CategoryNotReported Category = "NotReported"
+	// CategoryNotCured is a long line no wrap brings within the limit, left as gofmt printed it, only with
+	// Options.CuredOnly.
+	CategoryNotCured Category = "NotCured"
 )
 
 // Categories lists every category in report order.
@@ -43,6 +46,7 @@ var Categories = []Category{
 	CategoryDirective,
 	CategoryImport,
 	CategoryNotReported,
+	CategoryNotCured,
 }
 
 // Options are the choices a run makes that a ruling may still change.
@@ -56,6 +60,18 @@ type Options struct {
 	// CategoryNotReported, so a wrap that fixes the rule's findings never rewrites a line the rule leaves alone. The
 	// fix phase sets it; the command line does not, and judges by the categories above alone.
 	ReportedOnly bool
+
+	// CuredOnly keeps a wrap only where it cures: every long line the wrap touches, past CategoryNotReported, must
+	// end with each of its pieces within the limit. A long line a wrap would touch and leave long is left as it was,
+	// and so is every construct around it, and the wrap is tried again without them; when that cannot be done, the
+	// file is left as it was. A wrap that breaks a line and leaves it long is churn with no cure. The fix phase sets
+	// it.
+	CuredOnly bool
+
+	// uncured are the spans of the source, in kept bytes (see keptByte), of the lines a CuredOnly wrap leaves alone.
+	// Wrap sets it between its tries; a byte's kept index is the same in every pass, since a wrap only moves
+	// whitespace, commas and comment slashes.
+	uncured []keptSpan
 }
 
 // commentSpan is one comment of the file, `//` or `/* */`, with byte offsets.
@@ -86,7 +102,10 @@ type sourceFile struct {
 	importLines map[int]bool
 	// reportedLines are the lines consistency_no_long_line reports, read only with Options.ReportedOnly.
 	reportedLines map[int]bool
-	options       Options
+	// keptStarts holds, for each line from the first and then for the end of the source, how many kept bytes come
+	// before it, read only with Options.CuredOnly.
+	keptStarts []int
+	options    Options
 }
 
 func parseSource(source []byte, options Options) (*sourceFile, error) {
@@ -109,6 +128,9 @@ func parseSource(source []byte, options Options) (*sourceFile, error) {
 		options:          options,
 	}
 	sourceFile.lineStarts = sourceFile.tokenFile.Lines()
+	if options.CuredOnly {
+		sourceFile.keptStarts = keptStarts(source, sourceFile.lineStarts)
+	}
 	if options.ReportedOnly {
 		for _, line := range consistency_no_long_line.ReportedLines(file, sourceFile.tokenFile, source) {
 			sourceFile.reportedLines[line] = true
@@ -372,6 +394,9 @@ func (sourceFile *sourceFile) classify(line int) Category {
 	if sourceFile.options.ReportedOnly && !sourceFile.reportedLines[line] {
 		return CategoryNotReported
 	}
+	if sourceFile.isUncured(line) {
+		return CategoryNotCured
+	}
 	if sourceFile.rawBodyLines[line] {
 		return CategoryRawStringBody
 	}
@@ -435,7 +460,11 @@ func (sourceFile *sourceFile) pass() []edit {
 	}
 	type claim struct{ start, end int }
 	var claims []claim
+	// A line left uncured is claimed from the start, so no construct around it is broken or laid out again.
 	overlaps := func(start, end int) bool {
+		if sourceFile.spansUncured(start, end) {
+			return true
+		}
 		for _, existing := range claims {
 			if start < existing.end && existing.start < end {
 				return true

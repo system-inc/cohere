@@ -21,8 +21,9 @@ const longLineRuleWord = "consistency-no-long-line"
 // wraps gofmt's output with line_wrap, acting only on the lines the rule reports, and says how many of them the wrap
 // brought within the limit. It leaves alone every file the rule's findings never reach (a generated file, which the
 // fix phase skips before asking, and a `cohere:copied` file, whose findings the driver withholds) and every file with
-// a directive that withholds the rule, since a wrap moves the lines a directive covers. A wrap that brings no reported
-// line within the limit is not kept.
+// a directive that withholds the rule, since a wrap moves the lines a directive covers. The wrap is CuredOnly: a
+// reported line it would break and leave long stays as gofmt printed it, construct and all, since a break that cures
+// nothing is churn. A wrap that brings no reported line within the limit is not kept.
 func wrapLongLines(formatted []byte) format.Wrapping {
 	if !consistency_no_long_line.HasLongLine(formatted) {
 		return format.Wrapping{}
@@ -40,7 +41,7 @@ func wrapLongLines(formatted []byte) format.Wrapping {
 	if withholdsTheRule(formatted) {
 		return format.Wrapping{}
 	}
-	result, wrapError := line_wrap.Wrap(formatted, line_wrap.Options{ReportedOnly: true})
+	result, wrapError := line_wrap.Wrap(formatted, line_wrap.Options{ReportedOnly: true, CuredOnly: true})
 	if wrapError != nil {
 		return format.Wrapping{Declined: fmt.Sprintf("the wrap failed: %v", wrapError)}
 	}

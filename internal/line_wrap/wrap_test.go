@@ -500,3 +500,33 @@ func TestReportedOnlyWrapsOnlyTheRulesLines(test *testing.T) {
 		}
 	}
 }
+
+// TestCuredOnlyLeavesWhatItCannotCure pins Options.CuredOnly: a return of a long string and a name, which a break after
+// the + would leave long, stays byte for byte as it was, while a call beside it is still wrapped. Without the option
+// the return is broken and left long.
+func TestCuredOnlyLeavesWhatItCannotCure(test *testing.T) {
+	test.Parallel()
+	uncured := "\treturn \"" + strings.Repeat("word ", 24) + "\" + name\n"
+	source := "package p\n\nfunc signature(name string) string {\n" + uncured + "}\n\n" +
+		"func report() {\n\tsend(context, \"" + strings.Repeat("word ", 20) + "\", first, second, third)\n}\n"
+	for _, testCase := range []struct {
+		options Options
+		kept    bool
+	}{
+		{options: Options{}, kept: false},
+		{options: Options{CuredOnly: true}, kept: true},
+	} {
+		result, wrapError := Wrap([]byte(source), testCase.options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", testCase.options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if strings.Contains(output, uncured) != testCase.kept || !strings.Contains(output, "\tsend(\n") {
+			test.Errorf("with %+v, want the return kept whole %v and the call wrapped, got:\n%s", testCase.options,
+				testCase.kept, output)
+		}
+		if testCase.kept && (result.After[CategoryNotCured] != 1 || result.After[CategoryActionable] != 0) {
+			test.Errorf("want the return counted as not cured and nothing left actionable, got %v", result.After)
+		}
+	}
+}
