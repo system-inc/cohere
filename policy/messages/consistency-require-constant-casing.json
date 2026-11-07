@@ -18,6 +18,9 @@
         "requireCamelCaseFunction": {
             "text": "Constant \"{{name}}\" holds a function and should be camelCase (\"{{suggestion}}\"), even though it is exported. A function is named for what it does and it is called, so \"{{suggestion}}(...)\" reads as an action while \"{{name}}(...)\" reads as a constructor. PascalCase is reserved for exported data and for components, which JSX needs capitalized."
         },
+        "noLeadingUnderscore": {
+            "text": "Constant \"{{name}}\" opens with an underscore and should be spelled without it (\"{{suggestion}}\"). A leading underscore is a convention for private or for unused, and neither needs it: a constant nothing imports is already private to its file, and one nothing reads is deleted. <<reasoning>>"
+        },
         "requireCamelCaseInstance": {
             "text": "Constant \"{{name}}\" holds an instance and should be camelCase (\"{{suggestion}}\"), even though it is exported. Casing carries two signals and they collide here: PascalCase is the older, louder claim that a name is a type, so a PascalCase instance reads as its own class. An instance is a thing that acts, and \"{{suggestion}}.method()\" says so at the call site. Exported data structures like Map and Set keep PascalCase, because they hold rather than act."
         }

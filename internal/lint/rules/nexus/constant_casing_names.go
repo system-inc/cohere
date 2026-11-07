@@ -17,12 +17,12 @@ import (
 // Two converters that do almost the same thing is worse than one of the wrong shape, so the
 // difference is stated rather than shared.
 
-// isPascalCase and isCamelCase each allow a leading underscore.
-//
-// A leading underscore marks a binding that is declared and knowingly unused, which every linter in
-// this stack reads that way, so it is orthogonal to casing rather than a violation of it. Rejecting
-// it made "_results" report as not-camelCase while the converter handed back "_results", an error
-// with no edit that satisfies it. The underscore is skipped and the rest is judged.
+// isPascalCase and isCamelCase each refuse a leading underscore, as both casing rules and the Go and
+// Swift engines do: a leading underscore is flagged on every name we declare (Kirk, 2026-11-06,
+// #4b337jk, case us05). It is a convention for private or for unused, and TypeScript says private with
+// `#` or `private`, which the compiler checks, while an unused name is deleted, or written as the bare
+// `_`, which is no name and is never judged. The converters below drop the underscore, so the advice is
+// always a name these predicates accept.
 func isPascalCase(name string) bool {
 	return matchesCasing(name, unicode.IsUpper)
 }
@@ -31,16 +31,15 @@ func isCamelCase(name string) bool {
 	return matchesCasing(name, unicode.IsLower)
 }
 
-// matchesCasing checks the shared shape: leading underscores, then a first letter the caller judges,
-// then letters and digits only. An underscore after the first letter disqualifies the name, which is
-// what sends snake_case to a converter rather than letting it pass as either casing.
+// matchesCasing checks the shared shape: a first letter the caller judges, then letters and digits
+// only. An underscore anywhere disqualifies the name, which is what sends snake_case and `_cache` to a
+// converter rather than letting either pass as a casing.
 func matchesCasing(name string, firstLetterMatches func(rune) bool) bool {
-	body := strings.TrimLeft(name, "_")
-	if body == "" {
+	if name == "" {
 		return false
 	}
 
-	for index, character := range body {
+	for index, character := range name {
 		if index == 0 {
 			if !unicode.IsLetter(character) || !firstLetterMatches(character) {
 				return false
@@ -57,18 +56,13 @@ func matchesCasing(name string, firstLetterMatches func(rune) bool) bool {
 // constantNameWords folds the separators a name carries into word boundaries, so a suggestion is a
 // name the predicates above would actually accept.
 //
-// Both predicates reject an underscore anywhere in the body, so a converter that did not remove one
-// would report a name and then hand back its own spelling: `Constant "user_id" should be camelCase
-// ("user_id")`. That is an error no edit can satisfy, and a reader who tries the suggestion gets the
-// same report again.
-//
-// The leading underscores are kept and returned separately, because they carry the unused-binding
-// claim rather than a casing one, and that is not this rule's to overrule.
-func constantNameWords(name string) (leadingUnderscores string, words []string) {
-	body := strings.TrimLeft(name, "_")
-	leadingUnderscores = name[:len(name)-len(body)]
-
-	for _, part := range strings.Split(body, "_") {
+// Both predicates reject an underscore anywhere, so a converter that did not remove one would report a
+// name and then hand back its own spelling: `Constant "user_id" should be camelCase ("user_id")`. That
+// is an error no edit can satisfy, and a reader who tries the suggestion gets the same report again. A
+// leading underscore is removed with the rest, so `_cache` is told `cache`.
+func constantNameWords(name string) []string {
+	var words []string
+	for _, part := range strings.Split(name, "_") {
 		if part == "" {
 			continue
 		}
@@ -79,7 +73,7 @@ func constantNameWords(name string) (leadingUnderscores string, words []string) 
 		}
 		words = append(words, part)
 	}
-	return leadingUnderscores, words
+	return words
 }
 
 // isAllUppercase reports whether a word carries no lowercase letter, so it has no boundary to keep.
@@ -95,13 +89,12 @@ func isAllUppercase(part string) bool {
 // constantNameToPascalCase raises the first character of each word, so numberAbsentPlaceholder
 // suggests NumberAbsentPlaceholder and apple_root_ca suggests AppleRootCa.
 func constantNameToPascalCase(name string) string {
-	leadingUnderscores, words := constantNameWords(name)
+	words := constantNameWords(name)
 	if len(words) == 0 {
 		return name
 	}
 
 	var builder strings.Builder
-	builder.WriteString(leadingUnderscores)
 	for _, word := range words {
 		builder.WriteString(raiseFirstCharacter(word))
 	}
@@ -110,8 +103,8 @@ func constantNameToPascalCase(name string) string {
 
 // isUpperCamelCaseName reports a name both casing rules read as UpperCamelCase: one opening on a capital, or on a
 // brand policy/Brands.json lists, spelled exactly as listed, with nothing after it or an UpperCamelCase
-// rest. The rest opens on its capital, never on an underscore, which the converter's own predicate would
-// skip, so `iMessage_Thing` is not read as `iMessageThing`.
+// rest. The rest opens on its capital, never on an underscore, which isPascalCase refuses, so
+// `iMessage_Thing` is not read as `iMessageThing`.
 func isUpperCamelCaseName(name string) bool {
 	if isPascalCase(name) {
 		return true
@@ -121,7 +114,7 @@ func isUpperCamelCaseName(name string) bool {
 		return false
 	}
 	rest := strings.TrimPrefix(name, brand)
-	return rest == "" || (!strings.HasPrefix(rest, "_") && isPascalCase(rest))
+	return rest == "" || isPascalCase(rest)
 }
 
 // upperCamelCaseSuggestion is the UpperCamelCase form the advice names. A name opening on a listed brand
@@ -129,7 +122,7 @@ func isUpperCamelCaseName(name string) bool {
 // `iMessageCommandLineInterface` rather than to respell the brand, and any other name is the converter's.
 func upperCamelCaseSuggestion(name string) string {
 	if brand, opensOnBrand := policy.Brands.LeadingBrand(name); opensOnBrand {
-		rest := strings.TrimLeft(strings.TrimPrefix(name, brand), "_")
+		rest := strings.TrimPrefix(name, brand)
 		if suggestion := brand + constantNameToPascalCase(rest); isUpperCamelCaseName(suggestion) {
 			return suggestion
 		}
@@ -139,13 +132,12 @@ func upperCamelCaseSuggestion(name string) string {
 
 // constantNameToCamelCase is the mirror: the first word starts lowercase, every later one is raised.
 func constantNameToCamelCase(name string) string {
-	leadingUnderscores, words := constantNameWords(name)
+	words := constantNameWords(name)
 	if len(words) == 0 {
 		return name
 	}
 
 	var builder strings.Builder
-	builder.WriteString(leadingUnderscores)
 	builder.WriteString(lowerFirstCharacter(words[0]))
 	for _, word := range words[1:] {
 		builder.WriteString(raiseFirstCharacter(word))
@@ -192,8 +184,9 @@ var reservedWords = map[string]bool{
 	"yield": true,
 }
 
-// escapesAReservedWord reports a name that only escapes a keyword, so recasing it would produce
-// something unusable.
+// escapesAReservedWord reports a name that only escapes a keyword, with an underscore after it or before
+// it, `do_` and `_default` alike, so recasing it would produce something unusable. The Go engine leaves
+// `type_` alone for the same reason: a suggestion that cannot be typed is worse than none.
 func escapesAReservedWord(name string) bool {
-	return reservedWords[strings.ToLower(strings.TrimRight(name, "_"))]
+	return reservedWords[strings.ToLower(strings.Trim(name, "_"))]
 }

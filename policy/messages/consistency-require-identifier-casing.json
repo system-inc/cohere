@@ -14,6 +14,9 @@
         },
         "requireUpperCamelCaseCapital": {
             "text": "The {{declaration}} \"{{name}}\" keeps its capital, as a component, a constructor or a decorator does, so spell it in UpperCamelCase: \"{{suggestion}}\". <<reasoning>>"
+        },
+        "noLeadingUnderscore": {
+            "text": "The {{declaration}} \"{{name}}\" opens with an underscore; spell it \"{{suggestion}}\". A leading underscore is a convention for private or for unused, and TypeScript says private with `#` or the `private` modifier, which the compiler checks. A name nothing reads is deleted, or written as the bare `_` where its position has to be held."
         }
     }
 }

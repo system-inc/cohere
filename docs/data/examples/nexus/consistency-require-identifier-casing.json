@@ -20,6 +20,11 @@
         "file": "subject.tsx",
         "source": "export function OrderList() { return <ul />; }\n"
     },
-    "assertedMessageIds": ["requireLowerCamelCaseValue", "requireUpperCamelCaseCapital", "requireUpperCamelCaseType"],
+    "assertedMessageIds": [
+        "noLeadingUnderscore",
+        "requireLowerCamelCaseValue",
+        "requireUpperCamelCaseCapital",
+        "requireUpperCamelCaseType"
+    ],
     "assertsFix": true
 }
