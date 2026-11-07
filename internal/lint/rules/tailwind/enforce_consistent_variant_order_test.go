@@ -107,6 +107,62 @@ func TestEnforceConsistentVariantOrderReports(test *testing.T) {
 	}
 }
 
+// TestEnforceConsistentVariantOrderInTemplateRuns reads the static runs of a template with holes.
+//
+// Measured on eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-07, with ahra's theme:
+// each piece of a template is judged as a literal, the class glued to a hole included, and each
+// finding lands on its own class.
+//
+//	`hover:sm:flex ${x}`          reports hover:sm:flex
+//	`hover:sm:flex${x} block`     reports hover:sm:flex
+//	`block ${x}hover:sm:flex`     reports hover:sm:flex
+//	`sm:hover:flex ${x} block`    silent
+func TestEnforceConsistentVariantOrderInTemplateRuns(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		classes []string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`block hover:sm:flex ${size}`} />;",
+			classes: []string{"hover:sm:flex"},
+		},
+		{
+			name:    "glued before a hole",
+			source:  "const element = <div className={`hover:sm:flex${size} block`} />;",
+			classes: []string{"hover:sm:flex"},
+		},
+		{
+			name:    "glued after a hole, in the last run",
+			source:  "const element = <div className={`block ${size}hover:sm:flex`} />;",
+			classes: []string{"hover:sm:flex"},
+		},
+		{
+			name:    "in order",
+			source:  "const element = <div className={`sm:hover:flex ${size} block`} />;",
+			classes: []string{},
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runVariantOrderFixture(test, "Component.tsx", testCase.source)
+			if len(result.Diagnostics) != len(testCase.classes) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.classes))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				reported := text[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if reported != testCase.classes[index] {
+					test.Errorf("finding %d covers %q, want the class %q", index, reported, testCase.classes[index])
+				}
+			}
+		})
+	}
+}
+
 // TestEnforceConsistentVariantOrderStaysSilent covers what upstream leaves alone.
 //
 // The first two are the restraint the rule is built around, and a version of this file that used
