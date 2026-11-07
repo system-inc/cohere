@@ -229,6 +229,43 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	}
 }
 
+// A go flag no verdict reads stays out of the build context, so two runs that differ only in it key every package
+// alike: cohere-dev's pool sets -p to each token's share, and a run under another share missed everything. A flag a
+// verdict can read, as -tags, still keys apart.
+func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
+	test.Parallel()
+
+	root, absoluteError := filepath.Abs(filepath.Join("testdata", "vet-finding"))
+	if absoluteError != nil {
+		test.Fatalf("resolving the fixture: %v", absoluteError)
+	}
+	contextUnder := func(goFlags string) []string {
+		test.Helper()
+		build, buildError := cacheBuild(root, []string{"GOFLAGS=" + goFlags})
+		if buildError != nil {
+			test.Fatalf("reading the build context under %q: %v", goFlags, buildError)
+		}
+		return build
+	}
+	threeThreads := contextUnder("-trimpath -p=3 -tags=probe -buildvcs=false -v")
+	if !slices.Contains(threeThreads, "GOFLAGS=-trimpath -tags=probe -buildvcs=false") {
+		test.Errorf("want GOFLAGS keyed as -trimpath -tags=probe -buildvcs=false, got %q", threeThreads)
+	}
+	sameShareOtherThreads := contextUnder("-trimpath --p=9 -tags=probe -buildvcs=false -x -work")
+	if !slices.Equal(threeThreads, sameShareOtherThreads) {
+		test.Errorf("want -p, -v, -x and -work left out, got %q and %q", threeThreads, sameShareOtherThreads)
+	}
+	// -buildvcs can decide whether go builds a main package at all, so it keys apart, as -n would.
+	withoutStamping := contextUnder("-trimpath -p=3 -tags=probe")
+	if slices.Equal(threeThreads, withoutStamping) {
+		test.Errorf("want -buildvcs=false to key apart from no -buildvcs, got %q for both", threeThreads)
+	}
+	otherTags := contextUnder("-trimpath -p=3 -tags=other")
+	if slices.Equal(threeThreads, otherTags) {
+		test.Errorf("want -tags to key apart, got %q for both", threeThreads)
+	}
+}
+
 // The inputs record, which the front door's replay keys on, is byte for byte the same whether the load asked go list
 // or kept its answer from an earlier run: the cached run that keeps it writes the record a --no-cache run writes.
 func TestTheInputsRecordIsTheSameWithAKeptListing(test *testing.T) {
