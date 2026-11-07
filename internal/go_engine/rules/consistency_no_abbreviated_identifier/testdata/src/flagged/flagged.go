@@ -25,10 +25,10 @@ type srcFile struct { // want `Identifier "srcFile" should not be abbreviated\. 
 	ownerRef string // want `Identifier "ownerRef" should not end with "Ref"\. Use "ownerReference"\.`
 }
 
-// A method; a parameter whose bare expansion is a package this one imports; a named result whose bare expansion is
-// predeclared. Both get the descriptive advice instead of the expansion.
+// A method; a parameter whose bare expansion is a package this one imports, a context, named for its caller instead;
+// a named result whose bare expansion is predeclared, which gets the descriptive advice instead of the expansion.
 func (file *srcFile) readBuf( // want `Identifier "readBuf" abbreviates "Buf"\. Use "readBuffer"\.`
-	ctx context.Context, // want `Identifier "ctx" should not be abbreviated\. Use a descriptive name ending in "Context", since "context" is already Go's name for something else\.`
+	ctx context.Context, // want `Identifier "ctx" should not be abbreviated\. Use "callerContext", named for where the context came from\.`
 ) (err error) { // want `Identifier "err" should not be abbreviated\. Use a descriptive name ending in "Error", since "error" is already Go's name for something else\.`
 	return ctx.Err()
 }
