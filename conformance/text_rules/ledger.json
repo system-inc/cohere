@@ -52,11 +52,5 @@
         "kind": "verdict",
         "task": "78b6gw0",
         "reason": "a numeric function's `s`, `t` and `d` are exempt as kernel letters, so none is reported"
-    },
-    {
-        "engine": "swift",
-        "family": "separated-folder-words",
-        "task": "2fnqe2h",
-        "reason": "Swift has no separated-folder-words rule"
     }
 ]
