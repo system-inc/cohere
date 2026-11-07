@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none

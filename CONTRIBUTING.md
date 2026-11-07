@@ -148,8 +148,8 @@ Cohere's own Go went from 37,889 findings to 0 in two days, and this is how, so 
 way. The names, the line lengths and the file layout went through typed codemods, written once and checked to
 the end. What was left went through waves of light agents, each holding one package's judgment.
 
-**The codemods are in `tools/go_codemods`.** Every rename goes through the rename engines in `rename` (one
-package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
+**The codemods are in `tools/go_codemods`.** Every rename goes through the rename engines, a library
+in `internal/go_rename`: `rename` (one package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
 the same object under the new names, checked to a fixpoint. The rewrite is reloaded in memory and compared
 before anything is written, and checked again from disk. A name someone else owns (a field an encoder reads by
 name, a method an interface of another package requires, an export outside the repository) is found by type and

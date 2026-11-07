@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 
 // docCommentEdits respells a renamed receiver, parameter or named result where its function's doc comment

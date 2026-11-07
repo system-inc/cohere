@@ -108,3 +108,11 @@ func (halfReader) Src() int { return 0 } // want `Identifier "Src" abbreviates "
 type wideReader struct{}
 
 func (wideReader) Src(name string) int { return 0 } // want `Identifier "Src" abbreviates "Src"\. Use "Source"\.`
+
+// A segment keeps the name's case shape, so an unexported name stays unexported and an exported one exported.
+func parseCfgFile() {} // want `Identifier "parseCfgFile" abbreviates "Cfg"\. Use "parseConfigurationFile"\.`
+
+var MaxLen = 3 // want `Identifier "MaxLen" abbreviates "Len"\. Use "MaxLength"\.`
+
+// The prefix form keeps the rest of the name.
+var cfgPath = "" // want `Identifier "cfgPath" should not be abbreviated\. Use "configurationPath"\.`

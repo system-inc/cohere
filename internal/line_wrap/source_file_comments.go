@@ -22,7 +22,7 @@ func ProseComment(comment string) bool {
 	if !strings.HasPrefix(comment, "// ") || len(comment) < 4 {
 		return false
 	}
-	if comment[3] == ' ' || comment[3] == '\t' || isDirective(comment) {
+	if comment[3] == ' ' || comment[3] == '\t' || IsDirective(comment) {
 		return false
 	}
 	fields := strings.Fields(comment[3:])

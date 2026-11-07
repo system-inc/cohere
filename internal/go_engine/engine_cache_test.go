@@ -287,3 +287,60 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 		test.Fatalf("the run that writes left %s as it was (%v)", file, readError)
 	}
 }
+
+// A renaming run leaves the findings cache as a hand edit of the same bytes would. Its lint runs without the cache,
+// whose keys are of the bytes it replaced, so it reads no entry and writes none for the renamed tree. The next cached
+// run then hits on every package whose key the rename left alone and misses on the packages it wrote and on every
+// package whose key reaches them: a package's key holds the keys of the packages it imports (see cache.Keys), so the
+// command and the external tests, which import the renamed package, miss with it, and the second key can't restore
+// them either, since the renamed package's export data now spells ParseUrl. A copy edited by hand to the renamed bytes
+// hits and misses exactly as many, and the renamed copy's findings are a --no-cache run's.
+func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
+	test.Parallel()
+
+	renamed := copyFixture(test, filepath.Join("testdata", "rename"))
+	edited := copyFixture(test, filepath.Join("testdata", "rename"))
+	runCachedEngine(test, renamed)
+	runCachedEngine(test, edited)
+
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
+	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput, &standardError,
+		rules.All())
+	var record contract.FixRecord
+	for line := range strings.Lines(standardOutput.String()) {
+		if strings.HasPrefix(line, `{"kind":"fix"`) {
+			if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+				test.Fatalf("reading the fix record %s: %v", line, decodeError)
+			}
+		}
+	}
+	if record.FilesRewritten == 0 {
+		test.Fatalf("want the run to rename, got\n%s\n%s", standardOutput.String(), standardError.String())
+	}
+	for _, changed := range record.ChangedFiles {
+		contents, readError := os.ReadFile(changed.File)
+		if readError != nil {
+			test.Fatalf("reading %s: %v", changed.File, readError)
+		}
+		relative, relativeError := filepath.Rel(renamed, changed.File)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(edited, relative), contents, 0o644); writeError != nil {
+			test.Fatalf("editing %s by hand: %v", relative, writeError)
+		}
+	}
+
+	next := runCachedEngine(test, renamed)
+	byHand := runCachedEngine(test, edited)
+	if next.counts.Hit == 0 || next.counts.Missed == 0 || next.counts.Hit != byHand.counts.Hit ||
+		next.counts.Missed != byHand.counts.Missed {
+		test.Fatalf("want the run after the rename to hit and miss as the run after the same edit by hand, after the "+
+			"rename %+v, by hand %+v", next.counts, byHand.counts)
+	}
+	uncached := runCachedEngine(test, renamed, "--no-cache")
+	if next.withoutCounts != uncached.withoutCounts {
+		test.Fatalf("after the rename, cached\n%s\nunder --no-cache\n%s", next.withoutCounts, uncached.withoutCounts)
+	}
+}
