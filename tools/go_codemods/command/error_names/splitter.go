@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 
 	"golang.org/x/tools/go/cfg"
 )
@@ -97,7 +98,7 @@ type splitter struct {
 	info         *types.Info
 	functions    *functionIndex
 	occurrences  map[*types.Var][]*ast.Ident
-	words        vocabulary
+	words        go_origin_names.Vocabulary
 	// files are the package's editable files, for their comments and their text.
 	files   []*ast.File
 	sources map[string]string
@@ -488,7 +489,7 @@ func (analysis *splitter) nameWeb(each *web) {
 			each.category = "a write is not a call"
 			return
 		}
-		newName, category, callName := producerName(analysis.info, call, analysis.words)
+		newName, category, callName := go_origin_names.CallErrorName(analysis.info, call, analysis.words)
 		if newName == "" {
 			each.category = category
 			return

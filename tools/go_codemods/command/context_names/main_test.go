@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -95,7 +96,7 @@ func checkFile(test *testing.T, packagePath string, source string, packageImport
 	return fixture{fileSet: fileSet, packageTypes: packageTypes, info: info, files: []*ast.File{file}}
 }
 
-// optionSchemaPackageSource is a sibling package whose all-lowercase name qualifierWords spells in camel
+// optionSchemaPackageSource is a sibling package whose all-lowercase name QualifierSpelling spells in camel
 // words, with a type named exactly Context.
 const optionSchemaPackageSource = "package optionschema\n\ntype Context struct{}\n"
 
@@ -120,7 +121,7 @@ func typeCheckAs(test *testing.T, packagePath string, source string) fixture {
 	})
 }
 
-func fixtureWords(test *testing.T) vocabulary {
+func fixtureWords(test *testing.T) go_origin_names.Vocabulary {
 	test.Helper()
 	words, vocabularyError := parseVocabulary([]byte(fixtureVocabulary))
 	if vocabularyError != nil {
@@ -378,7 +379,7 @@ func compose(ctx *composeContext) *composeContext {
 // TestContextOverrides names the ctx of each overridden type by the table, and confirms the engine accepts the
 // override where the type-derived name was refused for shadowing the type. The same type name in another
 // package takes the type-derived name, which the engine refuses where the function reads the type after the
-// local's declaration, and an exact Context in a package qualifierWords spells takes that spelling.
+// local's declaration, and an exact Context in a package QualifierSpelling spells takes that spelling.
 func TestContextOverrides(test *testing.T) {
 	test.Parallel()
 	testCases := []struct {
@@ -408,7 +409,7 @@ func TestContextOverrides(test *testing.T) {
 			refused:     true,
 		},
 		{
-			name:        "an exact Context in optionschema takes the qualifierWords spelling",
+			name:        "an exact Context in optionschema takes its camel spelling",
 			packagePath: fixtureModule + "/fixture",
 			source:      "package fixture\n\nimport \"example.com/own/optionschema\"\n\nfunc check(ctx optionschema.Context) {\n\t_ = ctx\n}\n",
 			newName:     "optionSchemaContext",

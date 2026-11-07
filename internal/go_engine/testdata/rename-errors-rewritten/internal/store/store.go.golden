@@ -1,0 +1,23 @@
+// Package store reads the files a caller names.
+package store
+
+import "os"
+
+// Load reads one file. Its error is written once, by os.ReadFile, so it is named for that call.
+func Load(path string) ([]byte, error) {
+	data, readError := os.ReadFile(path)
+	if readError != nil {
+		return nil, readError
+	}
+	return data, nil
+}
+
+// Both reads two files into one error, written twice, which a single rename can't split.
+func Both(first string, second string) error {
+	_, err := os.ReadFile(first)
+	if err != nil {
+		return err
+	}
+	_, err = os.ReadFile(second)
+	return err
+}

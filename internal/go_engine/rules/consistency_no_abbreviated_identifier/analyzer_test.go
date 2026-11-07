@@ -29,9 +29,19 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 //
 // flagged.go.golden is flagged.go with every offered rename applied to its declaring identifier, the engine's
 // part, renaming each reference, left out. So it shows exactly which findings offer a rename and to what: a whole
-// word, a prefix, a suffix, the millisecond word and a segment in both cases, each to its one spelling. `err`, `ctx`
-// and `str`, whose advice asks for a descriptive name, a word with several meanings, and an advice-style word offer
-// none.
+// word, a prefix, a suffix, the millisecond word and a segment in both cases, each to its one spelling, and `ctx`, a
+// context parameter, to its caller's name. `err`, a named result, and `str`, whose advice asks for a descriptive name,
+// a word with several meanings, and an advice-style word offer none.
+//
+// errorcalls.go.golden is the same for local errors named err: one written once by a single call is told the name
+// that call gives it and offered it, a table call, a function value and a declared function, while one written twice,
+// one whose name is taken there or in a scope nested in it, a constructed error, one whose address is taken, and an
+// err that isn't an error keep the advice and offer nothing.
+//
+// contextcalls.go.golden is the same for contexts named ctx, matched by type: a parameter, a method's among them, is
+// offered callerContext and a local from context.WithCancel cancelContext, while one written twice, one from a call
+// outside the table, one whose name is taken there or in a nested scope, a parameter the body writes, and a ctx that
+// is a string or a type of ours named Context keep the advice and offer nothing.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.RunWithSuggestedFixes(
@@ -41,6 +51,8 @@ func TestAnalyzer(test *testing.T) {
 		"flagged",
 		"allowed",
 		"lookalike",
+		"errorcalls",
+		"contextcalls",
 	)
 }
 
@@ -59,7 +71,7 @@ func TestRenameExportsChangesNoFinding(test *testing.T) {
 		test.Fatal("renameExports set to true reads as off")
 	}
 	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), analyzer, "flagged", "allowed",
-		"lookalike")
+		"lookalike", "errorcalls", "contextcalls")
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

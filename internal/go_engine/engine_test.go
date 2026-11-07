@@ -362,6 +362,20 @@ var endToEndCases = []endToEndCase{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
 		verify: renamedTree("rename", "rename-exports"),
 	},
+	// A local error written once by a single call is renamed for that call at every reference: Load's err becomes
+	// readError, in its definition, its check and its return. Both's err, written by two reads, keeps the advice, and
+	// is still a finding. A second run changes nothing.
+	{
+		name: "rename-errors-rewritten", fixture: "rename-errors", exitCode: 1,
+		verify: renamedTree("rename-errors", "rename-errors-rewritten"),
+	},
+	// A context.Context parameter is renamed for its caller at every use: Run's ctx becomes callerContext in its
+	// signature, both checks and the call it hands it to. Detach's ctx, written by two calls, keeps the advice, and is
+	// still a finding. A second run changes nothing.
+	{
+		name: "rename-contexts-rewritten", fixture: "rename-contexts", exitCode: 1,
+		verify: renamedTree("rename-contexts", "rename-contexts-rewritten"),
+	},
 }
 
 // renameExports writes settings beside the copy's go.mod that set renameExports on the initialism rule.
