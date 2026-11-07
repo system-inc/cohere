@@ -183,3 +183,80 @@ func TestAGroupStartsOnlyOnceEveryActionItInheritsFactsFromHasFinished(test *tes
 			observer.started)
 	}
 }
+
+// A group waits on the prerequisites of every action in it, not only its first. Upper imports lower and is the
+// larger. Its group holds quietAnalyzer's action, which has no prerequisite on another package, and then the fact
+// analyzer's, which inherits from lower's. Upper's actions run in the order Analyze grouped them, the depth-first
+// postorder of the roots, which it builds analyzer by analyzer, so quiet's action comes first; the test asserts that
+// order from the root's group rather than trusting it. With one slot, a group that waited on its first action alone
+// would start upper before lower, and the fact analyzer's pass would find lower's group unfinished. A deadline turns
+// a scheduler that never returns into a failure rather than a stalled run.
+func TestAGroupWaitsOnEveryActionsPrerequisitesNotOnlyItsFirsts(test *testing.T) {
+	test.Parallel()
+
+	roots := writeModule(test, "every", map[string]string{
+		"lower/lower.go": packageOf("lower", 10),
+		"upper/upper.go": "package upper\n\nimport \"example.com/every/lower\"\n\n// " + strings.Repeat("x", 1000) +
+			"\n\nfunc Upper() { lower.Lower() }\n",
+	}, "./upper")
+	observer := &groupObserver{finished: map[string]bool{}}
+	var lowerUnfinished bool
+	var upperRan bool
+	facts := &analysis.Analyzer{
+		Name: "facts",
+		Doc: "facts reports upper's call to lower's function and asks, from upper's pass, whether lower's group " +
+			"has finished",
+		FactTypes: []analysis.Fact{new(declaredFact)},
+		Run: func(pass *analysis.Pass) (any, error) {
+			if pass.Pkg.Name() == "upper" {
+				upperRan = true
+				lowerUnfinished = !observer.hasFinished("lower")
+			}
+			return declaredAnalyzer.Run(pass)
+		},
+	}
+	analyzed := make(chan *Graph, 1)
+	go func() {
+		graph, analyzeError := Analyze([]*analysis.Analyzer{quietAnalyzer, facts}, roots,
+			&Options{slots: 1, observeGroup: observer.observe})
+		if analyzeError != nil {
+			test.Errorf("analyzing: %v", analyzeError)
+		}
+		analyzed <- graph
+	}()
+	var graph *Graph
+	select {
+	case graph = <-analyzed:
+	case <-time.After(30 * time.Second):
+		test.Fatalf("want the graph analyzed, and it had not returned after 30 seconds, with groups started %v",
+			observer.started)
+	}
+	if graph == nil {
+		test.Fatalf("want a graph, got none")
+	}
+	var factsOnUpper *Action
+	for _, root := range graph.Roots {
+		if root.Analyzer == facts {
+			factsOnUpper = root
+		}
+	}
+	if factsOnUpper == nil {
+		test.Fatalf("want the fact analyzer's action on upper among the roots, got %v", graph.Roots)
+	}
+	if order := factsOnUpper.syntax.actions; len(order) != 2 || order[0].Analyzer != quietAnalyzer ||
+		order[1].Analyzer != facts {
+		test.Fatalf("want upper's group to hold quiet's action, then the fact analyzer's, got %v", order)
+	}
+	if !upperRan {
+		test.Fatalf("want upper analyzed, and the fact analyzer's pass on it never ran")
+	}
+	if factsOnUpper.Err != nil || len(factsOnUpper.Diagnostics) != 1 ||
+		factsOnUpper.Diagnostics[0].Message != "calls Lower, which a dependency declared" {
+		test.Errorf("want one finding on upper from lower's fact, got %v %+v", factsOnUpper.Err,
+			factsOnUpper.Diagnostics)
+	}
+	if lowerUnfinished {
+		test.Errorf("want lower's group finished in its own slot before upper's fact pass, and it had not, with "+
+			"groups started %v", observer.started)
+	}
+}

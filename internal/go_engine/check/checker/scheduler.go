@@ -63,11 +63,12 @@ type scheduler struct {
 // schedule runs every action of groups, the groups Analyze made by package, a package's actions together. Upstream's
 // execAll(roots) starts every action at once, about 950 on cohere's own root, so every package's syntax, types and
 // staticcheck IR are live together, and the collector marks all of it on every cycle under the engine's memory cap;
-// and the largest packages, started no earlier than the rest, finish last. Here a group waits until every action it
-// inherits facts from has finished, then for a slot, of which there are slotsPerProcessor times `GOMAXPROCS`, one
-// under Options.Sequential. Slots go to the ready group with the largest cost first, ties by package ID, so the long
-// packages start early and fewer packages are live at once. A group gives its slot back once its last action has
-// finished, which is where releaseSyntax lets its syntax go.
+// and the largest packages, started no earlier than the rest, finish last. Here a group waits until every action
+// that any of its actions inherits facts from has finished: the count covers every action of the group, since its
+// actions are not ordered so that the first's prerequisites cover the rest. Then it waits for a slot, of which there
+// are slotsPerProcessor times `GOMAXPROCS`, one under Options.Sequential. Slots go to the ready group with the largest
+// cost first, ties by package ID, so the long packages start early and fewer packages are live at once. A group gives
+// its slot back once its last action has finished, which is where releaseSyntax lets its syntax go.
 //
 // A slot holder never waits on another package: every action it inherits facts from finished before it was granted,
 // so exec on those returns at once, and its horizontal dependencies are on its own package, in its own group. So the
@@ -87,6 +88,9 @@ func schedule(groups []*syntaxReaders, options *Options) {
 		// Every group holds at least the action that made it.
 		group := &packageGroup{analyzedPackage: shared.actions[0].Package, actions: shared.actions,
 			cost: packageCost(shared.actions[0].Package)}
+		// Every action counts, not only the first: a group's actions are in postorder, which does not put first the
+		// one whose prerequisites cover the rest. A plain analyzer with none may come first, and a fact analyzer that
+		// inherits from another package after it.
 		inherited := map[*Action]bool{}
 		for _, action := range shared.actions {
 			for _, dependency := range action.Deps {
