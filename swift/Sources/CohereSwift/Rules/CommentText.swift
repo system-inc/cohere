@@ -58,17 +58,26 @@ enum CommentText {
 
      `droppingOneSpace` leaves out the one space after a line comment's slashes too, as go/doc reads a `//` line, so a
      rule that measures a line's indentation measures the writer's and not the space every comment opens with.
+
+     `cuttingBlockDelimiters` leaves out a block comment's opening slash and star and its closing star and slash, as
+     ESLint's comment value and the TypeScript rule read one (#gzwa8xr, #xfa3q6w): a mask anchored at a line's start,
+     such as a command line's, then sees a one-line block comment's first word where it would have seen the slash. Only
+     the outer pair is cut, so a comment nested inside one is read as it stands. They are cut, never blanked to
+     spaces: a blanked opening is two spaces of indentation, so a comment opened with two spaces after it would read
+     as an indented code block. Every byte keeps its own offset, so nothing has to be added back.
      */
     static func texts(
         of comments: [Comment],
         source: [UInt8],
         droppingOneSpace: Bool = false,
+        cuttingBlockDelimiters: Bool = false,
     ) -> [[(byte: UInt8, offset: Int)]] {
         var texts: [[(byte: UInt8, offset: Int)]] = []
         var previousLineCommentEnd: Int?
         for comment in comments {
             var bytes: [(byte: UInt8, offset: Int)] = []
             var skip = 0
+            var bodyEnd = comment.bytes.count
             if comment.isLineComment {
                 while skip < comment.bytes.count, comment.bytes[skip] == UInt8(ascii: "/") {
                     skip += 1
@@ -77,7 +86,16 @@ enum CommentText {
                     skip += 1
                 }
             }
-            for index in skip..<comment.bytes.count {
+            else if cuttingBlockDelimiters {
+                if comment.bytes.starts(with: Array("/*".utf8)) {
+                    skip = 2
+                }
+                /* An unterminated comment at the end of a file has no closing pair to cut. */
+                if bodyEnd - skip >= 2, comment.bytes[(bodyEnd - 2)..<bodyEnd].elementsEqual(Array("*/".utf8)) {
+                    bodyEnd -= 2
+                }
+            }
+            for index in skip..<bodyEnd {
                 bytes.append((comment.bytes[index], comment.offset + index))
             }
             if comment.isLineComment, let end = previousLineCommentEnd, end <= comment.offset,
