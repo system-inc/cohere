@@ -216,15 +216,51 @@
         "boundaries/dependencies": "It needs a map of which folder is which layer, and no Structure project has written one (#e4cn6wq Block 4)."
     },
     "ignorePatterns": [
-        "code-quality/fixtures/**",
-        "node_modules/**",
-        "public/**",
-        "**/.wrangler/**",
-        "**/build/**",
-        "**/dist/**",
-        "**/*.code.js",
-        ".vscode/**",
-        ".claude/worktrees/**"
+        {
+            "pattern": "code-quality/fixtures/**",
+            "reason": "Fixtures for a project's own lint rules, written to break the rules they test.",
+            "kind": "input"
+        },
+        {
+            "pattern": "node_modules/**",
+            "reason": "Installed packages: somebody else's code, checked by its own authors.",
+            "kind": "thirdParty"
+        },
+        {
+            "pattern": "public/**",
+            "reason": "Static files Next serves as they are, kept as they were given.",
+            "kind": "input"
+        },
+        {
+            "pattern": "**/.wrangler/**",
+            "reason": "Wrangler's local state and build output.",
+            "kind": "generated"
+        },
+        {
+            "pattern": "**/build/**",
+            "reason": "Build output, written by the build from sources that are checked.",
+            "kind": "generated"
+        },
+        {
+            "pattern": "**/dist/**",
+            "reason": "Build output, written by the build from sources that are checked.",
+            "kind": "generated"
+        },
+        {
+            "pattern": "**/*.code.js",
+            "reason": "A shared worker's script, bundled by a build script from its TypeScript source, which is checked.",
+            "kind": "generated"
+        },
+        {
+            "pattern": ".vscode/**",
+            "reason": "Editor settings, written by each developer's editor.",
+            "kind": "generated"
+        },
+        {
+            "pattern": ".claude/worktrees/**",
+            "reason": "Claude Code's agent worktrees, each a checkout of this repository that its own run checks.",
+            "kind": "generated"
+        }
     ],
     "overrides": [
         {

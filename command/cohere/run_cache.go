@@ -501,6 +501,8 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	streams.Show(streams.Output)
 	streams.Errors.Write(spelledOutput(stored.Errors, anchor))
 	streams.Show(streams.Errors)
+	// This invocation's, never the recording's (see ignore_account.go).
+	writeDiscoveredIgnores(streams.Output)
 	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(
 		account,
@@ -518,6 +520,7 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 		summary = replayedSummary(summary, time.Since(processStart))
 		// The run on record kept none, since what discovery found beside the project is this run's to say.
 		summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
+		summary.IgnorePatterns = discoveredIgnores
 		switch activeOutput.Mode {
 		case outputVerbose:
 			fmt.Fprintln(

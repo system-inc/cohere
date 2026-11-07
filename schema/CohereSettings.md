@@ -41,7 +41,7 @@ never something it silently ignores.
 | [`extends`](#extends)               | string or array of strings | any settings file                                                                                      |
 | [`format`](#format)                 | object                     | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
 | [`go`](#go)                         | object                     | the file beside go.work or go.mod, or the one --lint-config names                                      |
-| [`ignorePatterns`](#ignorepatterns) | array of strings           | any settings file                                                                                      |
+| [`ignorePatterns`](#ignorepatterns) | array of globs or entries  | any settings file                                                                                      |
 | [`jsPlugins`](#jsplugins)           | array                      | any settings file                                                                                      |
 | [`output`](#output)                 | object                     | the file cohere reads first                                                                            |
 | [`overrides`](#overrides)           | array of blocks            | any settings file                                                                                      |
@@ -129,10 +129,17 @@ Which of the Go engine's rules run, and how strictly, read from the file beside 
 
 ### `ignorePatterns`
 
-Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends.
+Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere carries each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, and --json carries the same.
+
+An entry written as an object takes:
+
+- `pattern`: The paths the entry ignores, as a glob.
+- `reason`: Why these paths are never checked, in a sentence. Required in cohere's sets.
+- `kind`: What the paths are: input, data a program reads as it was given; generated, written by a tool; thirdParty, somebody else's code.
+- `check`: A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet acted on.
 
 ```json
-{ "ignorePatterns": ["dist/**", "data/**", "modules/*/data/**"] }
+{ "ignorePatterns": ["dist/**", { "pattern": "data/**", "reason": "Exports, kept as given.", "kind": "input" }] }
 ```
 
 ### `jsPlugins`

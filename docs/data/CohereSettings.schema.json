@@ -1716,9 +1716,40 @@
             "type": "object"
         },
         "ignorePatterns": {
-            "description": "Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends.",
+            "description": "Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere carries each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, and --json carries the same.",
             "items": {
-                "type": "string"
+                "oneOf": [
+                    {
+                        "type": "string"
+                    },
+                    {
+                        "additionalProperties": false,
+                        "properties": {
+                            "check": {
+                                "description": "A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet acted on.",
+                                "enum": ["types"],
+                                "type": "string"
+                            },
+                            "kind": {
+                                "description": "What the paths are: input, data a program reads as it was given; generated, written by a tool; thirdParty, somebody else's code.",
+                                "enum": ["input", "generated", "thirdParty"],
+                                "type": "string"
+                            },
+                            "pattern": {
+                                "description": "The paths the entry ignores, as a glob.",
+                                "minLength": 1,
+                                "type": "string"
+                            },
+                            "reason": {
+                                "description": "Why these paths are never checked, in a sentence. Required in cohere's sets.",
+                                "pattern": "[^\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+                                "type": "string"
+                            }
+                        },
+                        "required": ["pattern"],
+                        "type": "object"
+                    }
+                ]
             },
             "type": "array"
         },

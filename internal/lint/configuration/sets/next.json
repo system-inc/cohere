@@ -35,5 +35,21 @@
             }
         }
     ],
-    "ignorePatterns": ["**/.next/**", "**/.open-next/**", "**/.worker-next/**"]
+    "ignorePatterns": [
+        {
+            "pattern": "**/.next/**",
+            "reason": "Next's build output and the types it generates.",
+            "kind": "generated"
+        },
+        {
+            "pattern": "**/.open-next/**",
+            "reason": "OpenNext's build output, Next's adapted for Cloudflare.",
+            "kind": "generated"
+        },
+        {
+            "pattern": "**/.worker-next/**",
+            "reason": "The worker build's output.",
+            "kind": "generated"
+        }
+    ]
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path"
@@ -98,6 +99,13 @@ type discovery struct {
 
 	// Refused are markers the root's ignorePatterns match, relative to Root.
 	Refused []string
+
+	// IgnoreMatched is how many paths each of the root's ignorePatterns matched, by the pattern's index: every
+	// entry of every directory the walk read, asked before .gitignore or any other ignore applies, a directory
+	// counted only by a pattern that takes it whole (#cxeq6jw). Inside a repository of its own too (see
+	// countIgnoredBelow), and, for a pattern still at zero, at and below the path it names (see countNamedPaths).
+	// So a pattern whose paths exist counts, and one at zero matched nothing the run could have checked.
+	IgnoreMatched []int
 
 	// UnusedModules are Go modules below a discovered workspace whose go.work does not use them, each run as
 	// a module of its own, for the notes to say why.
@@ -249,6 +257,7 @@ func repositoryKind(directory string) nestedRepository {
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found := discovery{Root: root, Listings: program.NewDirectoryListings(), Formattable: map[string]int{}}
+	ignoreTally := configuration.NewIgnoreTally(ignorePatterns)
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
@@ -315,7 +324,16 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		names := map[string]bool{}
 		for _, entry := range entries {
 			if entry.Name() == ".git" && relative != "." {
+				// Counted though not searched for projects: see countIgnoredBelow.
+				nestedTally := ignoreTally.Fresh()
+				if len(ignorePatterns) > 0 && !ignoreTally.TakesWhole(relative) {
+					if countError := countIgnoredBelow(root, relative, entries, nestedTally); countError != nil {
+						fail(countError)
+						return
+					}
+				}
 				lock.Lock()
+				ignoreTally.Add(nestedTally)
 				if entry.IsDir() {
 					found.NestedRepositories = append(found.NestedRepositories, relative)
 				} else {
@@ -329,6 +347,12 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			if !entry.IsDir() {
 				names[entry.Name()] = true
 			}
+		}
+		// After the check above, since a repository of its own is counted where its parent lists it and its
+		// entries are never this walk's to consider.
+		directoryTally := ignoreTally.Fresh()
+		for _, entry := range entries {
+			directoryTally.Count(path.Join(relative, entry.Name()), entry.IsDir())
 		}
 		directoryScope := scope
 		if relative != "." {
@@ -361,6 +385,7 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 		}
 		lock.Lock()
+		ignoreTally.Add(directoryTally)
 		if swiftFileCount > 0 {
 			swiftFiles[relative] = swiftFileCount
 		}
@@ -434,6 +459,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, firstError
 	}
 
+	if countNamedPathsError := countNamedPaths(root, ignoreTally); countNamedPathsError != nil {
+		return discovery{}, countNamedPathsError
+	}
+	found.IgnoreMatched = ignoreTally.Matched
 	xcodeProjects, unclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
 	found.UnclaimedSwift = unclaimed
@@ -442,6 +471,114 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	sort.Strings(found.NestedRepositories)
 	found.claimWorkspaceModules(workspaces)
 	return found, nil
+}
+
+// countIgnoredBelow counts, against the root's ignorePatterns, every entry of a directory inside a repository
+// of its own, which discovery does not search for projects, and of each directory below it the walk would
+// enter (#cxeq6jw). A submodule or a clone inside a program is checked as part of that program, as Structure is
+// in ahra, so an ignore that keeps its files out of the run is live: api-phi-health's `**/graphql/schemas/**`
+// matches only inside its libraries/nexus-project.
+//
+// It descends as discovery does, under each repository's own ignore files and never into a dependency, build,
+// cache or fixture directory, and it does not enter a directory a pattern takes whole, which it counts once:
+// cohere's TypeScript, typescript-go pinned whole under `TypeScript/**`, would otherwise be walked on every run.
+// directory is relative to root and the root of a repository of its own, and entries its listing.
+func countIgnoredBelow(
+	root string,
+	directory string,
+	entries []os.DirEntry,
+	tally *configuration.IgnoreTally,
+) error {
+	scope, newIgnoreScopeError := newIgnoreScope(filepath.Join(root, directory))
+	if newIgnoreScopeError != nil {
+		return newIgnoreScopeError
+	}
+	return countIgnoredIn(root, directory, directory, entries, scope, tally)
+}
+
+// countIgnoredIn is countIgnoredBelow within one repository, whose directory relative to root is repository:
+// directory's entries, and below them, scope being the ignore scope that has entered directory.
+func countIgnoredIn(
+	root string,
+	repository string,
+	directory string,
+	entries []os.DirEntry,
+	scope ignoreScope,
+	tally *configuration.IgnoreTally,
+) error {
+	for _, entry := range entries {
+		tally.Count(path.Join(directory, entry.Name()), entry.IsDir())
+	}
+	for _, entry := range entries {
+		child := path.Join(directory, entry.Name())
+		if !entry.IsDir() || neverDescended[entry.Name()] || tally.TakesWhole(child) {
+			continue
+		}
+		inRepository := strings.TrimPrefix(child, repository+"/")
+		if scope.Ignored(inRepository, true) {
+			continue
+		}
+		childEntries, readDirectoryError := os.ReadDir(filepath.Join(root, child))
+		if readDirectoryError != nil {
+			return fmt.Errorf("reading %s: %w", filepath.Join(root, child), readDirectoryError)
+		}
+		if slices.ContainsFunc(childEntries, func(childEntry os.DirEntry) bool { return childEntry.Name() == ".git" }) {
+			if countError := countIgnoredBelow(root, child, childEntries, tally); countError != nil {
+				return countError
+			}
+			continue
+		}
+		entered, enterError := scope.Enter(inRepository)
+		if enterError != nil {
+			return enterError
+		}
+		if countError := countIgnoredIn(root, repository, child, childEntries, entered, tally); countError != nil {
+			return countError
+		}
+	}
+	return nil
+}
+
+// countNamedPaths counts, for each pattern the walk found nothing for, the paths at and below the path its literal
+// leading segments name, whether or not the walk went there (#cxeq6jw). The walk never enters testdata or
+// node_modules, nor what .gitignore ignores, and a program's include reaches files there all the same: adamic's
+// `internal/load/testdata/0.1/refuse/**` keeps fixtures out of a TypeScript program that includes them, and
+// would read as dead. A pattern that begins with a wildcard names no path and stays as the walk left it, so this
+// never walks a tree the pattern does not name, and a directory the pattern takes whole is counted once.
+func countNamedPaths(root string, tally *configuration.IgnoreTally) error {
+	for _, index := range tally.Unmatched() {
+		prefix := tally.LiteralPrefix(index)
+		if prefix == "" {
+			continue
+		}
+		named := filepath.Join(root, filepath.FromSlash(prefix))
+		walkError := filepath.WalkDir(
+			named,
+			func(walked string, entry fs.DirEntry, pathError error) error {
+				// A path the pattern names that is not there, or cannot be read, is what leaves it at zero.
+				if pathError != nil || entry == nil {
+					return nil
+				}
+				// Below the named path, never into a dependency, build, cache or fixture directory, as the walk keeps
+				// out of them: the one the pattern names is where the walk starts, so it is still read.
+				if entry.IsDir() && neverDescended[entry.Name()] && walked != named {
+					return fs.SkipDir
+				}
+				relative, relativePathError := filepath.Rel(root, walked)
+				if relativePathError != nil {
+					return relativePathError
+				}
+				if tally.CountOne(index, filepath.ToSlash(relative), entry.IsDir()) {
+					return fs.SkipDir
+				}
+				return nil
+			},
+		)
+		if walkError != nil {
+			return walkError
+		}
+	}
+	return nil
 }
 
 // claimWorkspaceModules removes from Projects each Go module a discovered workspace's go.work uses, since the
@@ -683,11 +820,20 @@ func pathBefore(left string, right string) bool {
 // rootIgnorePatterns reads the ignorePatterns of the settings file at the root, as globs relative to it.
 // A root with no settings file has none.
 func rootIgnorePatterns(root string) ([]string, error) {
+	entries, rootIgnoreEntriesError := rootIgnoreEntries(root)
+	if rootIgnoreEntriesError != nil {
+		return nil, rootIgnoreEntriesError
+	}
+	return configuration.IgnorePatternsFrom(entries), nil
+}
+
+// rootIgnoreEntries is rootIgnorePatterns with each entry whole, its reason and the file that wrote it.
+func rootIgnoreEntries(root string) ([]configuration.IgnoreEntry, error) {
 	settings := filepath.Join(root, "CohereSettings.json")
 	if !isRegularFile(settings) {
 		return nil, nil
 	}
-	return configuration.IgnorePatternsOf(settings)
+	return configuration.IgnoreEntriesOf(settings)
 }
 
 // isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which

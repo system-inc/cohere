@@ -214,6 +214,8 @@ func typeShape(name string, fieldType reflect.Type) (*schemaNode, error) {
 			source,
 			{Type: "array", MinItems: 1, Items: source},
 		}}, nil
+	case fieldType == configuration.IgnoreEntryListType:
+		return &schemaNode{Type: "array", Items: ignoreEntryShape()}, nil
 	case fieldType.Kind() == reflect.String:
 		return &schemaNode{Type: "string"}, nil
 	case fieldType == stringSliceType:
@@ -243,6 +245,35 @@ func typeShape(name string, fieldType reflect.Type) (*schemaNode, error) {
 // strings.TrimSpace trims, which is what the Go engine's loader refuses a departure's reason by. A plain `\S` would
 // differ from it on `U+0085` and `U+FEFF`, since JavaScript's whitespace is not the same set.
 const goReasonPattern = `[^\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]`
+
+// ignoreEntryShape is one `ignorePatterns` entry, as configuration.IgnoreEntry reads it: a glob, or an object
+// naming the glob and why, its kind and check from the loader's own lists, and no other key. The reason is held
+// to goReasonPattern, since the loader trims it by the same set before refusing a blank one. In a set cohere
+// carries the loader also refuses an entry with no reason, which a project's own file is not held to.
+func ignoreEntryShape() *schemaNode {
+	kinds := make([]string, 0, len(configuration.IgnoreKinds))
+	for _, kind := range configuration.IgnoreKinds {
+		kinds = append(kinds, string(kind))
+	}
+	checks := make([]string, 0, len(configuration.IgnoreChecks))
+	for _, check := range configuration.IgnoreChecks {
+		checks = append(checks, string(check))
+	}
+	return &schemaNode{OneOf: []*schemaNode{
+		{Type: "string"},
+		{
+			Type:                 "object",
+			AdditionalProperties: noAdditionalProperties,
+			Required:             []string{"pattern"},
+			Properties: map[string]*schemaNode{
+				"pattern": {Type: "string", MinLength: 1, Description: ignoreEntryDescriptions["pattern"]},
+				"reason":  {Type: "string", Pattern: goReasonPattern, Description: ignoreEntryDescriptions["reason"]},
+				"kind":    {Type: "string", Enum: kinds, Description: ignoreEntryDescriptions["kind"]},
+				"check":   {Type: "string", Enum: checks, Description: ignoreEntryDescriptions["check"]},
+			},
+		},
+	}}
+}
 
 // goShape is the Go engine's block, as internal/go_engine/settings reads it: rules, each a severity or
 // [severity] or [severity, options object], and departures, each rule's reason for loosening it past the house.

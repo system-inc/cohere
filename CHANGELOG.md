@@ -8,7 +8,37 @@ changed in cohere outside the sets is written under the same heading.
 
 ## 0.2.0 (unreleased)
 
-No rule set changed.
+### `cohere:next`
+
+- Setting changed: `ignorePatterns`
+
+### `cohere:style`
+
+- On: `nexus/consistency-no-label (error)`
+- On: `nexus/consistency-no-warning-comment (error)`
+- On: `nexus/consistency-require-separated-folder-words (error)`
+- Off: `no-labels`
+- Off: `no-warning-comments`
+- Setting changed: `reasons`
+
+### `cohere:system-inc/base`
+
+- On: `nexus/consistency-require-identifier-casing (error)`
+- Setting changed: `departures`
+- Setting changed: `ignorePatterns`
+- Setting changed: `overrides`
+
+### `cohere:system-inc/structure`
+
+- On: `nexus/consistency-require-identifier-casing (error)`
+- Setting changed: `departures`
+- Setting changed: `ignorePatterns`
+
+### `cohere:typescript`
+
+- On: `adamic/no-unchecked-cast (error)`
+- Setting changed: `departures`
+- Setting changed: `reasons`
 
 ### Added
 
@@ -22,6 +52,13 @@ No rule set changed.
   YAML or anything else the house formatter reads, outside every TypeScript project's directory, the run
   adds a `Format` project there, the format phase alone, so a misformatted file in it fails the commit gate
   as one in a TypeScript project always did. It needs no file of its own, and the summary counts it.
+- An `ignorePatterns` entry says why. It's a glob, as before, or an object,
+  `{ "pattern": "dist/**", "reason": "Build output.", "kind": "generated" }`, whose `kind` is `input`,
+  `generated` or `thirdParty`, and whose optional `check`, `types`, is carried and not yet acted on. In
+  every set cohere carries, an entry with no reason is refused at load, as an off with none is, and the
+  sets' own entries each say why; a project's own file may still write a glob alone. `--verbose` lists every
+  entry with its reason, kind, file and how many paths it matched, a count of 0 included, and `--json`
+  carries the same, on the summary, or as an `ignorePatterns` record when several projects run.
 
 ### Changed
 

@@ -7,6 +7,7 @@
         { "$ref": "#/$defs/changedFile" },
         { "$ref": "#/$defs/crash" },
         { "$ref": "#/$defs/engineBuild" },
+        { "$ref": "#/$defs/ignorePatterns" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -62,6 +63,46 @@
                 "seconds": { "type": "number", "description": "How long the build took." }
             }
         },
+        "ignoreEntry": {
+            "description": "One entry of the root settings' ignorePatterns, as this run's discovery counted it.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern", "file", "matched"],
+            "properties": {
+                "pattern": { "type": "string", "description": "The glob." },
+                "reason": {
+                    "type": "string",
+                    "description": "Why the paths are never checked. Absent when none was given."
+                },
+                "kind": {
+                    "enum": ["input", "generated", "thirdParty"],
+                    "description": "What the paths are. Absent when none was given."
+                },
+                "check": {
+                    "enum": ["types"],
+                    "description": "A check that still reads the paths. Absent when none was named."
+                },
+                "file": {
+                    "type": "string",
+                    "description": "The settings file that wrote the entry, as an absolute path, or the set's name, such as cohere:next."
+                },
+                "matched": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The paths it matched, files and directories it takes whole, among every entry of every directory discovery read before any ignore applied, inside repositories of their own too, and, for an entry the walk found nothing for, at and below the path it names."
+                }
+            }
+        },
+        "ignorePatterns": {
+            "description": "The root settings' ignorePatterns, in a run of several projects, whose summaries are each a project's: the list a run of one carries on its summary. Written once, before the projects' lines.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ignorePatterns"],
+            "properties": {
+                "kind": { "const": "ignorePatterns" },
+                "ignorePatterns": { "type": "array", "items": { "$ref": "#/$defs/ignoreEntry" } }
+            }
+        },
         "crash": {
             "description": "A rule that could not finish a file, or a file nothing could check, because cohere crashed. A bug in cohere, not in the code checked, and it fails the run.",
             "type": "object",
@@ -115,6 +156,11 @@
                 "error": {
                     "type": "string",
                     "description": "Why the run stopped before it could judge anything, such as a tsconfig that does not load, in the words the human view prints. Present only then, and the verdict is fail."
+                },
+                "ignorePatterns": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/ignoreEntry" },
+                    "description": "The root settings' ignorePatterns, when the run discovered its project and the root has any."
                 },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },

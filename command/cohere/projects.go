@@ -76,9 +76,9 @@ func checkDiscoveredProjects(
 	formats bool,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
-	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
-	if rootIgnorePatternsError != nil {
-		return 0, false, rootIgnorePatternsError
+	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(root)
+	if rootIgnoreEntriesError != nil {
+		return 0, false, rootIgnoreEntriesError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
@@ -93,7 +93,7 @@ func checkDiscoveredProjects(
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, discoverProjectsError := discoverProjects(root, patterns)
+	found, discoverProjectsError := discoverProjects(root, configuration.IgnorePatternsFrom(ignoreEntries))
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
 	}
@@ -123,6 +123,8 @@ func checkDiscoveredProjects(
 			projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, root, solutions, found.Ignored,
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
+	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
+	discoveredIgnores = ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root)
 	if found.isTheLocatedProject(location, locateError) {
 		// The project runs here, and its build lists the directories discovery just did. Its footer says the
 		// Swift no package checks, since a TypeScript program at the root beside an app's Swift is this path.
@@ -134,6 +136,13 @@ func checkDiscoveredProjects(
 		showWarning()
 		return 0, false, nil
 	}
+	// The one project's summary carries the list under `--json`. With several, each project's summary is its own,
+	// so the list is a record of this run's, once.
+	writeDiscoveredIgnores(streams.Output)
+	if activeOutput.Mode == outputJson && len(discoveredIgnores) > 0 {
+		writeJsonLine(streams.Output, ignorePatternsJson{Kind: "ignorePatterns", IgnorePatterns: discoveredIgnores})
+	}
+	showWarning()
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), streams.Output), true, nil
 }
 

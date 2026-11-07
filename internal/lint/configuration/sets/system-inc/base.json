@@ -1,6 +1,17 @@
 {
     "extends": "cohere:typescript",
-    "ignorePatterns": ["**/wasm/photon/core/photon_rs_bg.js", "**/wasm/photon/core/photon_rs_bg.d.ts"],
+    "ignorePatterns": [
+        {
+            "pattern": "**/wasm/photon/core/photon_rs_bg.js",
+            "reason": "wasm-bindgen's bindings for the Photon image library, vendored as Photon builds them, so their shape is Photon's to keep.",
+            "kind": "thirdParty"
+        },
+        {
+            "pattern": "**/wasm/photon/core/photon_rs_bg.d.ts",
+            "reason": "wasm-bindgen's bindings for the Photon image library, vendored as Photon builds them, so their shape is Photon's to keep.",
+            "kind": "thirdParty"
+        }
+    ],
     "departures": {
         "@typescript-eslint/ban-ts-comment": "Allows @ts-expect-error with a description, and @ts-check, as before the cohere:adamic split, which bans all four directives: api-phi-health has 7 at cohere 5f65dd9d, so this holds until its fix wave reads 0 in every consumer (#cwycf2h).",
         "@typescript-eslint/unbound-method": "Measured, not a gap: 79 findings across the repos, none a defect. 52 are expect(mock.method) in tests, where the method is passed to the assertion, never called unbound (#smnjh4c). cohere:adamic turns it on for outsiders.",

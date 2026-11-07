@@ -107,6 +107,16 @@ type summaryJson struct {
 	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
 	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
 	Error string `json:"error,omitempty"`
+	// IgnorePatterns is the root's ignorePatterns, each with its reason, kind, file and the paths it matched,
+	// present when the run discovered its project and the root has any (#cxeq6jw).
+	IgnorePatterns []ignoreAccount `json:"ignorePatterns,omitempty"`
+}
+
+// ignorePatternsJson is the root's ignorePatterns as a record of its own, for a run of several projects, whose
+// summaries are each a project's: the list summaryJson carries for a run of one.
+type ignorePatternsJson struct {
+	Kind           string          `json:"kind"`
+	IgnorePatterns []ignoreAccount `json:"ignorePatterns"`
 }
 
 // phaseJson is one phase's outcome.
@@ -160,6 +170,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		Nodes:             summary.Nodes,
 		Gaps:              summary.Gaps,
 		Adamic:            adamic,
+		IgnorePatterns:    summary.IgnorePatterns,
 	}
 }
 
