@@ -323,6 +323,7 @@ func TestNoUnknownClassesStaysSilent(test *testing.T) {
 //	`block ${x}notaclass`               silent
 //	`block ${x}notaclass${y} flex`      silent
 //	'notaclass ' + x, x + ' notaclass'  reports notaclass
+//	'notaclass\u00a0' + x, x + '\u3000notaclass'   report notaclass, JavaScript's whitespace
 //	'notaclass' + x, x + 'notaclass'    silent
 //	'block notaclass' + x               silent
 func TestNoUnknownClassesAtHolesAndConcatenation(test *testing.T) {
@@ -373,6 +374,18 @@ func TestNoUnknownClassesAtHolesAndConcatenation(test *testing.T) {
 			name:    "a concatenated literal that starts with whitespace",
 			source:  "const element = (size: string) => <div className={size + ' notaclass'} />;",
 			classes: []string{" notaclass"},
+		},
+		{
+			// JavaScript's whitespace, not ASCII's: a no-break space before the join sets the class
+			// apart, and an ideographic space after it does too.
+			name:    "a concatenated literal that ends in a no-break space",
+			source:  "const element = (size: string) => <div className={'notaclass\u00a0' + size} />;",
+			classes: []string{"notaclass\u00a0"},
+		},
+		{
+			name:    "a concatenated literal that starts with an ideographic space",
+			source:  "const element = (size: string) => <div className={size + '\u3000notaclass'} />;",
+			classes: []string{"\u3000notaclass"},
 		},
 		{
 			name:    "a literal concatenated on its right",

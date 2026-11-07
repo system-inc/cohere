@@ -1,7 +1,10 @@
 package tailwind
 
 import (
+	"unicode/utf8"
+
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/ecmascript/text"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -153,13 +156,26 @@ var NoUnknownClasses = rule.Rule[NoUnknownClassesOptions]{
 // `x + 'notaclass'` are silent, `'notaclass ' + x` reports. Reporting them would call a class
 // unknown because the linter could not see the rest of it. The literal's Edges are those two
 // questions already, since they say which end touches class text once the value is joined.
+//
+// Whitespace here is JavaScript's, decoded a rune at a time, because that is what SplitClasses splits
+// on and what upstream's `\s` means: `'notaclass\u00a0' + x` and `x + '\u3000notaclass'` report on
+// 4.9.1. Reading one byte against an ASCII set took the no-break space's last byte for class text and
+// skipped a class that the split had already set apart.
 func isConcatenatedEdgeClass(literal ClassLiteral, index int, count int) bool {
-	text := literal.Text
-	if index == 0 && literal.Edges.Leading && text != "" && !isSpace(rune(text[0])) {
-		return true
+	if literal.Text == "" {
+		return false
 	}
-	if index == count-1 && literal.Edges.Trailing && text != "" && !isSpace(rune(text[len(text)-1])) {
-		return true
+	if index == 0 && literal.Edges.Leading {
+		first, _ := utf8.DecodeRuneInString(literal.Text)
+		if !text.IsWhitespace(first) {
+			return true
+		}
+	}
+	if index == count-1 && literal.Edges.Trailing {
+		last, _ := utf8.DecodeLastRuneInString(literal.Text)
+		if !text.IsWhitespace(last) {
+			return true
+		}
 	}
 	return false
 }
