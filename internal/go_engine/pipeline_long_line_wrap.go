@@ -12,9 +12,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
-// loadWorkspace loads the workspace's packages, through the findings cache when the run has one, and says on stderr
-// when the load fails.
-func (engine *pipeline) loadWorkspace() (*load.Loaded, error) {
+// loadWorkspace loads the workspace's packages, through the findings cache when the run has one. When a phase reads
+// the types it says on stderr that the load failed; a load made for the wrap alone leaves that to the wrap's own held
+// note, since that run asked for no type-check or lint to miss.
+func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
 	var loaded *load.Loaded
 	var loadError error
@@ -25,7 +26,7 @@ func (engine *pipeline) loadWorkspace() (*load.Loaded, error) {
 		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
 			engine.described.readableOurs)
 	}
-	if loadError != nil {
+	if loadError != nil && typesRead {
 		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
 	}
 	return loaded, loadError
@@ -36,9 +37,10 @@ func (engine *pipeline) loadWorkspace() (*load.Loaded, error) {
 // gofmt's output stands. It wraps, in memory, each file gofmt formatted that holds a long line, through the hook the
 // fix phase has always used (longLineWrap) and format's checks that the wrap is the same program and gofmt's own
 // layout, writes each wrap it keeps, rereads the file, and adds what it did to the held fix record, under the
-// long-line rule. When it wrote a file it loads again and returns that load, since every phase after it must read the
-// bytes on disk. It returns the load it was given otherwise.
-func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error) (*load.Loaded, error) {
+// long-line rule. When it wrote a file and a phase reads the types (typesRead), it loads again and returns that load,
+// since every phase after it must read the bytes on disk. It returns the load it was given otherwise: a run that asked
+// for no types reads none, so a second load would feed nothing.
+func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, typesRead bool) (*load.Loaded, error) {
 	if engine.fix == nil || !engine.fix.wraps {
 		return loaded, loadError
 	}
@@ -55,7 +57,7 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error) (*lo
 		return loaded, loadError
 	}
 	if loadError != nil {
-		engine.note("the long-line fix was held, since the load failed and a fix waits for sound types")
+		engine.note("the long-line fix was held, since the load failed and a fix waits for sound types: %v", loadError)
 		return loaded, loadError
 	}
 	if len(loaded.Diagnostics) > 0 {
@@ -78,13 +80,13 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error) (*lo
 		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
 	}
 	engine.fix.elapsed += time.Since(started)
-	if len(result.Changed) == 0 {
+	if len(result.Changed) == 0 || !typesRead {
 		return loaded, loadError
 	}
 	// The findings cache stays sound across the write: every package's key hashes the bytes of its files as they are on
 	// disk, which now hold the wrap, so this load misses on the packages the wrap wrote and those that import them,
 	// and restores every other one, as the next run would.
-	return engine.loadWorkspace()
+	return engine.loadWorkspace(typesRead)
 }
 
 // addWrapped adds the files the wrap wrote to the held fix record, each once: a file gofmt also rewrote keeps its entry

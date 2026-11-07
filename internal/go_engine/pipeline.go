@@ -91,11 +91,12 @@ func (engine *pipeline) run() int {
 	engine.runFix(wraps)
 	var loaded *load.Loaded
 	var loadError error
-	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file.
+	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a phase
+	// reads the types.
 	if needsTypes || wraps {
-		loaded, loadError = engine.loadWorkspace()
+		loaded, loadError = engine.loadWorkspace(needsTypes)
 	}
-	loaded, loadError = engine.wrapAfterLoad(loaded, loadError)
+	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The fix phase's records come before any of the types phase's, so the stream reads in phase order.
 	engine.writeFix()
 	if !needsTypes {
