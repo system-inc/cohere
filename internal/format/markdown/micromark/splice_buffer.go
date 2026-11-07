@@ -5,39 +5,42 @@ import (
 	"slices"
 )
 
-// spliceBuffer is micromark-util-subtokenize's SpliceBuffer, a gap buffer over events. It keeps a cursor:
+// SpliceBuffer is micromark-util-subtokenize's SpliceBuffer, a gap buffer over events. It keeps a cursor:
 // the items before it sit in left in order, and the items from it on sit in right reversed, so the item
 // at the cursor is the last of right. Moving the cursor costs the distance it moves, and a splice at the
-// cursor costs only what it removes and inserts. Subtokenize splices content in as it sweeps forward, so
-// each splice lands near the last one, where a plain slice would copy every event after it each time.
+// cursor costs only what it removes and inserts. Subtokenize splices content in as it sweeps forward, and
+// mdast's compile splices list items in as it sweeps each list, so each splice lands near the last one,
+// where a plain slice would copy every event after it each time.
 //
 // Upstream hands its arithmetic straight to Array#splice, which reads a negative number from the end, so
 // a negative cursor or a removal past the end does not do what its documentation says. Here each is
-// clamped as documented. Micromark never passes such numbers, so the two agree wherever it calls them.
-type spliceBuffer struct {
+// clamped as documented. Neither caller passes such numbers, so the two agree wherever it is called.
+type SpliceBuffer struct {
 	left  []Event
 	right []Event
 }
 
-// newSpliceBuffer is a buffer holding initial, the cursor at its end. Upstream copies initial; here the
+// NewSpliceBuffer is a buffer holding initial, the cursor at its end. Upstream copies initial; here the
 // buffer takes it over, since every caller replaces its events with what the buffer gives back. Only what
-// subtokenize calls is ported: upstream's push, pop, shift and unshift families are left out.
-func newSpliceBuffer(initial []Event) *spliceBuffer {
-	return &spliceBuffer{left: initial}
+// subtokenize and mdast's compile call is ported: upstream's push, pop, shift and unshift families are left
+// out.
+func NewSpliceBuffer(initial []Event) *SpliceBuffer {
+	return &SpliceBuffer{left: initial}
 }
 
-// length is one more than the largest index.
-func (buffer *spliceBuffer) length() int {
+// Length is one more than the largest index.
+func (buffer *SpliceBuffer) Length() int {
 	return len(buffer.left) + len(buffer.right)
 }
 
-// get is the item at index, without moving the cursor.
-func (buffer *spliceBuffer) get(index int) Event {
-	if index < 0 || index >= buffer.length() {
-		// Invariant: subtokenize reads only below the length it loops to, and subcontent's search stops at
-		// the event of a linked token, which every linked token has after the one it started from. Upstream
-		// throws a RangeError here too; reading on would hand back a wrong event in place of stopping.
-		panic(fmt.Sprintf("micromark: cannot access index %d in a splice buffer of size %d", index, buffer.length()))
+// Get is the item at index, without moving the cursor.
+func (buffer *SpliceBuffer) Get(index int) Event {
+	if index < 0 || index >= buffer.Length() {
+		// Invariant: subtokenize and compile read only below the length they loop to, prepareList's walk
+		// back stops at zero, and subcontent's search stops at the event of a linked token, which every
+		// linked token has after the one it started from. Upstream throws a RangeError here too; reading
+		// on would hand back a wrong event in place of stopping.
+		panic(fmt.Sprintf("micromark: cannot access index %d in a splice buffer of size %d", index, buffer.Length()))
 	}
 	if index < len(buffer.left) {
 		return buffer.left[index]
@@ -47,17 +50,17 @@ func (buffer *spliceBuffer) get(index int) Event {
 
 // clampIndex reads index the way Array#slice and Array#splice do: a negative one counts back from the end,
 // and the result lies between zero and the length.
-func (buffer *spliceBuffer) clampIndex(index int) int {
+func (buffer *SpliceBuffer) clampIndex(index int) int {
 	if index < 0 {
-		return max(buffer.length()+index, 0)
+		return max(buffer.Length()+index, 0)
 	}
-	return min(index, buffer.length())
+	return min(index, buffer.Length())
 }
 
 // setCursor moves the cursor to position, clamped between the start and the end, moving the items it
 // passes from one stack to the other.
-func (buffer *spliceBuffer) setCursor(position int) {
-	clampedPosition := min(max(position, 0), buffer.length())
+func (buffer *SpliceBuffer) setCursor(position int) {
+	clampedPosition := min(max(position, 0), buffer.Length())
 
 	if clampedPosition < len(buffer.left) {
 		// Move the cursor back: the items after it go onto right, last first.
@@ -78,8 +81,8 @@ func (buffer *spliceBuffer) setCursor(position int) {
 	}
 }
 
-// slice is a fresh copy of the items from start up to end, without moving the cursor.
-func (buffer *spliceBuffer) slice(start int, end int) []Event {
+// Slice is a fresh copy of the items from start up to end, without moving the cursor.
+func (buffer *SpliceBuffer) Slice(start int, end int) []Event {
 	clampedStart := buffer.clampIndex(start)
 	clampedEnd := buffer.clampIndex(end)
 	if clampedEnd <= clampedStart {
@@ -104,9 +107,9 @@ func (buffer *spliceBuffer) slice(start int, end int) []Event {
 	return result
 }
 
-// splice is Array#splice: remove `remove` items at start, insert items there, and return the removed ones.
+// Splice is Array#splice: remove `remove` items at start, insert items there, and return the removed ones.
 // The cursor ends after the inserted items. items is copied, never kept.
-func (buffer *spliceBuffer) splice(start int, remove int, items []Event) []Event {
+func (buffer *SpliceBuffer) Splice(start int, remove int, items []Event) []Event {
 	buffer.setCursor(buffer.clampIndex(start))
 
 	clampedRemove := min(max(remove, 0), len(buffer.right))
