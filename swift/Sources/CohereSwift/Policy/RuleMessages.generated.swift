@@ -10,7 +10,7 @@ enum RuleMessages {
     }
 
     /* SHA-256 of the messages that reach Swift, resolved, which a test recomputes from policy/messages/ on disk. */
-    static let sourceDigest = "4a8dd092ed4ee6c50354e15787899021d7c4744aaf3876c52186e55e168ed0f4"
+    static let sourceDigest = "29d0d17465be2420e828e0a7b4bb24158becfc87742941a7cf3db80ed5360e88"
 
     /* Every message here, as `Rule.id`, for the test that fails on one no rule renders. */
     static let all = [
@@ -41,6 +41,7 @@ enum RuleMessages {
         "ConsistencyNoUtilsFolder.noUtils",
         "ConsistencyRequireMatchingFileName.extensionOutsideItsFile",
         "ConsistencyRequireMatchingFileName.requireMatchingFileName",
+        "ConsistencyRequireSeparatedFolderWords.runTogetherFolderWords",
         "CorrectnessNoDefaultForOwnedEnum.noDefaultForOwnedEnum",
         "CorrectnessNoDiscardedTryOptional.discardedTryOptional",
         "CorrectnessNoDiscardedTryOptional.discardedTryOptionalInClosure",
@@ -384,6 +385,17 @@ enum RuleMessages {
                 id: "requireMatchingFileName",
                 text:
                     #"`\#(typeName)` is the first type declared in `\#(fileName)`, and the file is not named for it. Name it `\#(typeName).swift`, so a reader looking for `\#(typeName)` opens it without a search\#(alternativeText)."#,
+            )
+        }
+    }
+
+    /* cohere-swift/consistency-require-separated-folder-words */
+    enum ConsistencyRequireSeparatedFolderWords {
+        static func runTogetherFolderWords(folder: String, replacement: String) -> Message {
+            Message(
+                id: "runTogetherFolderWords",
+                text:
+                    #"Folder name "\#(folder)" runs its words together. Use "\#(replacement)" instead. A mind reading cold reads `FormatOptions` at a glance and has to stop and parse `Formatoptions`, and a folder's name is read on every path, so its words are separated: by capitals in a capitalized name, by underscores or hyphens in a lowercase one."#,
             )
         }
     }

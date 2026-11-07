@@ -1,6 +1,6 @@
 /*
  Generated from cohere's policy/Shouting.json by `go run ./policy/tools/generate`. Do not edit it here:
- edit the JSON and run that again. While the two differ, a test in each engine fails.
+ edit the file and run that again. While the two differ, a test in each engine fails.
  */
 enum PolicyShouting {
     /* policy/Shouting.json, byte for byte. */

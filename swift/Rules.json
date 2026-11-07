@@ -86,6 +86,11 @@
     "typeAware": false
   },
   {
+    "name": "cohere-swift/consistency-require-separated-folder-words",
+    "origin": "house",
+    "typeAware": false
+  },
+  {
     "name": "cohere-swift/contains-over-filter",
     "origin": "swiftlint",
     "upstreamName": "contains_over_filter_count",

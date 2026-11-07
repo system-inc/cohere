@@ -40,9 +40,7 @@
             "missing": true
         },
         "go": "cohere-go/consistency-require-separated-folder-words",
-        "swift": {
-            "missing": true
-        }
+        "swift": "cohere-swift/consistency-require-separated-folder-words"
     },
     "shouting": {
         "typescript": "nexus/consistency-no-shouting",

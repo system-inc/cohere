@@ -49,6 +49,9 @@ var swiftPolicyFiles = []struct {
 	{"Shouting.json", "PolicyShouting", func() ([]byte, error) {
 		return swiftSource("Shouting.json", "PolicyShouting", shoutingFile)
 	}},
+	{"Words.txt", "PolicyWords", func() ([]byte, error) {
+		return swiftSource("Words.txt", "PolicyWords", wordsFile)
+	}},
 	{"messages/", "RuleMessages", func() ([]byte, error) {
 		return swiftMessagesSource(Messages, swiftMessagesDigest(Messages))
 	}},
@@ -73,7 +76,7 @@ func SwiftFiles() ([]SwiftFile, error) {
 // swiftSource is a Swift enum whose `file` is the policy file's text, byte for byte.
 //
 // The text sits in a multi-line raw string, so nothing in it is escaped and the generated file reads as
-// the JSON it carries. Two things could make the string differ from the file, and each is ruled out:
+// the policy file it carries. Two things could make the string differ from the file, and each is ruled out:
 //   - A raw string ends at `"""` followed by its own number of `#`, and treats `\` followed by that many as
 //     an escape. The delimiter takes one more `#` than the longest run in the text, so neither can occur.
 //   - A multi-line literal reads every line ending as `\n`. A file with a carriage return is refused rather
@@ -95,7 +98,7 @@ func swiftSource(name string, typeName string, contents []byte) ([]byte, error) 
 		"/*\n Generated from cohere's policy/%s by `go run ./policy/tools/generate`. Do not edit it here:\n",
 		name,
 	)
-	source.WriteString(" edit the JSON and run that again. While the two differ, a test in each engine fails.\n */\n")
+	source.WriteString(" edit the file and run that again. While the two differ, a test in each engine fails.\n */\n")
 	fmt.Fprintf(&source, "enum %s {\n", typeName)
 	fmt.Fprintf(&source, "    /* policy/%s, byte for byte. */\n", name)
 	fmt.Fprintf(&source, "    static let file = %s\"\"\"\n", delimiter)

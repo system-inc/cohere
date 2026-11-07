@@ -1,6 +1,6 @@
 /*
  Generated from cohere's policy/Abbreviations.json by `go run ./policy/tools/generate`. Do not edit it here:
- edit the JSON and run that again. While the two differ, a test in each engine fails.
+ edit the file and run that again. While the two differ, a test in each engine fails.
  */
 enum PolicyAbbreviations {
     /* policy/Abbreviations.json, byte for byte. */

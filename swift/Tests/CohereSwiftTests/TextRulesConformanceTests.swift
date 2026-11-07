@@ -356,6 +356,7 @@ struct TextRulesConformanceTests {
                 vocabulary: try AbbreviationVocabulary.compiledIn(),
                 shoutingVocabulary: try ShoutingVocabulary.compiledIn(),
                 brandVocabulary: try BrandVocabulary.compiledIn(),
+                words: try WordList.compiledIn(),
                 configuration: configuration,
             )
             guard let found = registered.first(where: { $0.name == name }) else {

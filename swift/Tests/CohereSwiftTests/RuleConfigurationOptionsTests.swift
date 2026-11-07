@@ -31,6 +31,7 @@ struct RuleConfigurationOptionsTests {
             vocabulary: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
             brandVocabulary: BrandVocabulary(),
+            words: WordList(),
             configuration: configuration,
         )
         return rules.filter { $0.name == FileLength().name }.flatMap { $0.findings(in: file) }
