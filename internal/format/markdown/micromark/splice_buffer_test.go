@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// spliceBufferModel is a plain slice that does what spliceBuffer should, so each operation on the buffer
+// spliceBufferModel is a plain slice that does what SpliceBuffer should, so each operation on the buffer
 // can be checked against it. Its splice is chunked.go's, the one subtokenize used before the buffer.
 type spliceBufferModel struct {
 	events  []Event
@@ -61,18 +61,18 @@ func tokenNames(events []Event) string {
 }
 
 // checkSpliceBuffer fails unless buffer holds exactly what model does, read through get and through slice.
-func checkSpliceBuffer(test *testing.T, step string, buffer *spliceBuffer, model *spliceBufferModel) {
+func checkSpliceBuffer(test *testing.T, step string, buffer *SpliceBuffer, model *spliceBufferModel) {
 	test.Helper()
-	if buffer.length() != len(model.events) {
-		test.Fatalf("%s: length %d, expected %d", step, buffer.length(), len(model.events))
+	if buffer.Length() != len(model.events) {
+		test.Fatalf("%s: length %d, expected %d", step, buffer.Length(), len(model.events))
 	}
 	for index, expected := range model.events {
-		if actual := buffer.get(index); actual != expected {
+		if actual := buffer.Get(index); actual != expected {
 			test.Fatalf("%s: get(%d) is token %s, expected token %s", step, index, actual.Token.Type,
 				expected.Token.Type)
 		}
 	}
-	if actual := buffer.slice(0, buffer.length()); !slices.Equal(actual, model.events) {
+	if actual := buffer.Slice(0, buffer.Length()); !slices.Equal(actual, model.events) {
 		test.Fatalf("%s: slice(0, length) is %s, expected %s", step, tokenNames(actual), tokenNames(model.events))
 	}
 }
@@ -86,7 +86,7 @@ func TestSpliceBufferMatchesPlainSlice(test *testing.T) {
 	for round := range 200 {
 		model := &spliceBufferModel{}
 		model.events = model.newEvents(random.IntN(12))
-		buffer := newSpliceBuffer(slices.Clone(model.events))
+		buffer := NewSpliceBuffer(slices.Clone(model.events))
 
 		for operation := range 300 {
 			length := len(model.events)
@@ -106,7 +106,7 @@ func TestSpliceBufferMatchesPlainSlice(test *testing.T) {
 				expectedRemoved := model.spliceRemoved(start, remove)
 				step += ": splice(" + strconv.Itoa(start) + ", " + strconv.Itoa(remove) + ", " +
 					strconv.Itoa(len(items)) + " items)"
-				removed := buffer.splice(start, remove, items)
+				removed := buffer.Splice(start, remove, items)
 				model.events = splice(model.events, start, remove, items)
 				if !slices.Equal(removed, expectedRemoved) {
 					test.Fatalf("%s: removed %s, expected %s", step, tokenNames(removed), tokenNames(expectedRemoved))
@@ -121,7 +121,7 @@ func TestSpliceBufferMatchesPlainSlice(test *testing.T) {
 			case 4:
 				start, end := position(), position()
 				step += ": slice(" + strconv.Itoa(start) + ", " + strconv.Itoa(end) + ")"
-				if actual := buffer.slice(start, end); !slices.Equal(actual, model.sliceExpected(start, end)) {
+				if actual := buffer.Slice(start, end); !slices.Equal(actual, model.sliceExpected(start, end)) {
 					test.Fatalf("%s: differs from Array#slice", step)
 				}
 			}
@@ -150,7 +150,7 @@ func TestSpliceBufferEdges(test *testing.T) {
 		for _, cursorBefore := range []int{-3, 0, 2, 5, 8} {
 			model := &spliceBufferModel{}
 			model.events = model.newEvents(5)
-			buffer := newSpliceBuffer(slices.Clone(model.events))
+			buffer := NewSpliceBuffer(slices.Clone(model.events))
 			buffer.setCursor(cursorBefore)
 			if expected := min(max(cursorBefore, 0), 5); len(buffer.left) != expected {
 				test.Fatalf("%s: setCursor(%d) left the cursor at %d", testCase.name, cursorBefore, len(buffer.left))
@@ -159,7 +159,7 @@ func TestSpliceBufferEdges(test *testing.T) {
 			items := model.newEvents(2)
 			step := testCase.name + ", cursor first at " + strconv.Itoa(cursorBefore)
 			expectedRemoved := model.spliceRemoved(testCase.start, testCase.remove)
-			removed := buffer.splice(testCase.start, testCase.remove, items)
+			removed := buffer.Splice(testCase.start, testCase.remove, items)
 			model.events = splice(model.events, testCase.start, testCase.remove, items)
 			if !slices.Equal(removed, expectedRemoved) {
 				test.Fatalf("%s: removed %s, expected %s", step, tokenNames(removed), tokenNames(expectedRemoved))

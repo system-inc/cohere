@@ -243,24 +243,25 @@ func compile(events []micromark.Event, configuration *configuration, offsets []i
 	var listStack []int
 
 	// preparedEvents is events with the listItem tokens prepareList splices in, as upstream splices them
-	// into its own events.
-	preparedEvents := events
-	for index := 0; index < len(preparedEvents); index++ {
+	// into its own events. It is a gap buffer; prepareList says why.
+	preparedEvents := micromark.NewSpliceBuffer(events)
+	for index := 0; index < preparedEvents.Length(); index++ {
 		// We preprocess lists to add `listItem` tokens, and to infer whether items the list itself are
 		// spread out.
-		if preparedEvents[index].Token.Type == micromark.TypeListOrdered ||
-			preparedEvents[index].Token.Type == micromark.TypeListUnordered {
-			if preparedEvents[index].Enter {
+		if preparedEvents.Get(index).Token.Type == micromark.TypeListOrdered ||
+			preparedEvents.Get(index).Token.Type == micromark.TypeListUnordered {
+			if preparedEvents.Get(index).Enter {
 				listStack = append(listStack, index)
 			} else {
 				tail := listStack[len(listStack)-1]
 				listStack = listStack[:len(listStack)-1]
-				index = prepareList(&preparedEvents, tail, index)
+				index = prepareList(preparedEvents, tail, index)
 			}
 		}
 	}
 
-	for _, event := range preparedEvents {
+	for index := range preparedEvents.Length() {
+		event := preparedEvents.Get(index)
 		handlers := configuration.exit
 		if event.Enter {
 			handlers = configuration.enter
@@ -283,10 +284,10 @@ func compile(events []micromark.Event, configuration *configuration, offsets []i
 	}
 
 	// Figure out `root` position.
-	if len(preparedEvents) > 0 {
+	if preparedEvents.Length() > 0 {
 		tree.Position = &Position{
-			Start: context.point(preparedEvents[0].Token.Start),
-			End:   context.point(preparedEvents[len(preparedEvents)-2].Token.End),
+			Start: context.point(preparedEvents.Get(0).Token.Start),
+			End:   context.point(preparedEvents.Get(preparedEvents.Length() - 2).Token.End),
 		}
 	} else {
 		tree.Position = &Position{Start: Point{Line: 1, Column: 1}, End: Point{Line: 1, Column: 1}}
@@ -297,10 +298,16 @@ func compile(events []micromark.Event, configuration *configuration, offsets []i
 
 // prepareList adds listItem tokens and infers spread. Returns the (moved) index of the list's exit.
 //
-// Mutates: eventsPointer the list's items are spliced into the caller's events and its tokens retyped and
+// Upstream splices each item's enter and exit into a plain array, and every splice moves all the events
+// after it to the end of the document, not of the list, so its cost is list items times events. A 1.5 MB
+// ledger with 4,698 list items, doubled to 3 MB, spent 3.56 of 5.80 profiled seconds in those two
+// splices. Here the events sit in a gap buffer: a list's inserts go forward through it next to the index
+// being read, so the cursor moves no further than the reads do, and that 3 MB format went from 4.7 to 1.1
+// user-s. The inserts are upstream's, in its order, so the events come out the same.
+//
+// Mutates: events the list's items are spliced into the caller's events and its tokens retyped and
 // marked spread in place, as upstream's prepareList edits the events it is handed.
-func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
-	events := *eventsPointer
+func prepareList(events *micromark.SpliceBuffer, start int, length int) int {
 	exitIndex := length
 	index := start - 1
 	containerBalance := -1
@@ -312,7 +319,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 
 	for index+1 <= exitIndex {
 		index++
-		event := events[index]
+		event := events.Get(index)
 
 		switch event.Token.Type {
 		case micromark.TypeListUnordered, micromark.TypeListOrdered, micromark.TypeBlockQuote:
@@ -350,7 +357,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 
 				for tailIndex > 0 {
 					tailIndex--
-					tailEvent := events[tailIndex]
+					tailEvent := events.Get(tailIndex)
 
 					if tailEvent.Token.Type == micromark.TypeLineEnding ||
 						tailEvent.Token.Type == micromark.TypeLineEndingBlank {
@@ -359,7 +366,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 						}
 
 						if lineIndex != 0 {
-							events[lineIndex].Token.Type = micromark.TypeLineEndingBlank
+							events.Get(lineIndex).Token.Type = micromark.TypeLineEndingBlank
 							listSpread = true
 						}
 
@@ -382,7 +389,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 
 				// Fix position.
 				if lineIndex != 0 {
-					listItem.End = events[lineIndex].Token.Start
+					listItem.End = events.Get(lineIndex).Token.Start
 				} else {
 					listItem.End = event.Token.End
 				}
@@ -391,11 +398,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 				if lineIndex != 0 {
 					at = lineIndex
 				}
-				events = slices.Insert(
-					events,
-					at,
-					micromark.Event{Enter: false, Token: listItem, Context: event.Context},
-				)
+				events.Splice(at, 0, []micromark.Event{{Enter: false, Token: listItem, Context: event.Context}})
 				index++
 				exitIndex++
 			}
@@ -404,7 +407,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 			if event.Token.Type == micromark.TypeListItemPrefix {
 				item := &micromark.Token{Type: "listItem", Spread: false, Start: event.Token.Start}
 				listItem = item
-				events = slices.Insert(events, index, micromark.Event{Enter: true, Token: item, Context: event.Context})
+				events.Splice(index, 0, []micromark.Event{{Enter: true, Token: item, Context: event.Context}})
 				index++
 				exitIndex++
 				firstBlankLineIndex = 0
@@ -413,8 +416,7 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 		}
 	}
 
-	events[start].Token.Spread = listSpread
-	*eventsPointer = events
+	events.Get(start).Token.Spread = listSpread
 	return exitIndex
 }
 
