@@ -107,6 +107,8 @@ func subtokenize(eventsArray []Event) ([]Event, bool) {
 }
 
 // subcontent tokenizes embedded tokens, splices them in, and returns the gaps to jump over.
+//
+// Mutates: events splicing the content's own events in place of its chunks is the job, as upstream's does
 func subcontent(events *spliceBuffer, eventIndex int) map[int]int {
 	token := events.get(eventIndex).Token
 	context := events.get(eventIndex).Context

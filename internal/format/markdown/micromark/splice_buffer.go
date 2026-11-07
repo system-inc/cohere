@@ -20,7 +20,8 @@ type spliceBuffer struct {
 }
 
 // newSpliceBuffer is a buffer holding initial, the cursor at its end. Upstream copies initial; here the
-// buffer takes it over, since every caller replaces its events with what the buffer gives back.
+// buffer takes it over, since every caller replaces its events with what the buffer gives back. Only what
+// subtokenize calls is ported: upstream's push, pop, shift and unshift families are left out.
 func newSpliceBuffer(initial []Event) *spliceBuffer {
 	return &spliceBuffer{left: initial}
 }
@@ -33,6 +34,9 @@ func (buffer *spliceBuffer) length() int {
 // get is the item at index, without moving the cursor.
 func (buffer *spliceBuffer) get(index int) Event {
 	if index < 0 || index >= buffer.length() {
+		// Invariant: subtokenize reads only below the length it loops to, and subcontent's search stops at
+		// the event of a linked token, which every linked token has after the one it started from. Upstream
+		// throws a RangeError here too; reading on would hand back a wrong event in place of stopping.
 		panic(fmt.Sprintf("micromark: cannot access index %d in a splice buffer of size %d", index, buffer.length()))
 	}
 	if index < len(buffer.left) {
@@ -114,57 +118,4 @@ func (buffer *spliceBuffer) splice(start int, remove int, items []Event) []Event
 
 	buffer.left = append(buffer.left, items...)
 	return removed
-}
-
-// pop removes and returns the last item, false when there is none. The cursor moves to the end.
-func (buffer *spliceBuffer) pop() (Event, bool) {
-	buffer.setCursor(buffer.length())
-	if len(buffer.left) == 0 {
-		return Event{}, false
-	}
-	last := len(buffer.left) - 1
-	item := buffer.left[last]
-	buffer.left[last] = Event{}
-	buffer.left = buffer.left[:last]
-	return item, true
-}
-
-// push adds item at the end. The cursor moves to the end.
-func (buffer *spliceBuffer) push(item Event) {
-	buffer.setCursor(buffer.length())
-	buffer.left = append(buffer.left, item)
-}
-
-// pushMany adds items at the end, in order. The cursor moves to the end.
-func (buffer *spliceBuffer) pushMany(items []Event) {
-	buffer.setCursor(buffer.length())
-	buffer.left = append(buffer.left, items...)
-}
-
-// shift removes and returns the first item, false when there is none. The cursor moves to the start.
-func (buffer *spliceBuffer) shift() (Event, bool) {
-	buffer.setCursor(0)
-	if len(buffer.right) == 0 {
-		return Event{}, false
-	}
-	last := len(buffer.right) - 1
-	item := buffer.right[last]
-	buffer.right[last] = Event{}
-	buffer.right = buffer.right[:last]
-	return item, true
-}
-
-// unshift adds item at the start. The cursor moves to the start.
-func (buffer *spliceBuffer) unshift(item Event) {
-	buffer.setCursor(0)
-	buffer.right = append(buffer.right, item)
-}
-
-// unshiftMany adds items at the start, in order. The cursor moves to the start. Upstream reverses items
-// in place to push them; here they are read backwards, so the caller's slice is left as it was.
-func (buffer *spliceBuffer) unshiftMany(items []Event) {
-	buffer.setCursor(0)
-	for index := len(items) - 1; index >= 0; index-- {
-		buffer.right = append(buffer.right, items[index])
-	}
 }

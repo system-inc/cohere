@@ -94,10 +94,14 @@ func TestSpliceBufferMatchesPlainSlice(test *testing.T) {
 			position := func() int { return random.IntN(2*length+7) - length - 3 }
 			step := "round " + strconv.Itoa(round) + ", operation " + strconv.Itoa(operation)
 
-			switch random.IntN(10) {
+			switch random.IntN(5) {
 			case 0, 1, 2:
 				start := position()
-				remove := random.IntN(length+6) - 2
+				// Mostly a few, as subtokenize removes, so the buffer grows; now and then past either end.
+				remove := random.IntN(4)
+				if random.IntN(4) == 0 {
+					remove = random.IntN(length+6) - 2
+				}
 				items := model.newEvents(random.IntN(5))
 				expectedRemoved := model.spliceRemoved(start, remove)
 				step += ": splice(" + strconv.Itoa(start) + ", " + strconv.Itoa(remove) + ", " +
@@ -119,44 +123,6 @@ func TestSpliceBufferMatchesPlainSlice(test *testing.T) {
 				step += ": slice(" + strconv.Itoa(start) + ", " + strconv.Itoa(end) + ")"
 				if actual := buffer.slice(start, end); !slices.Equal(actual, model.sliceExpected(start, end)) {
 					test.Fatalf("%s: differs from Array#slice", step)
-				}
-			case 5:
-				step += ": push"
-				items := model.newEvents(1)
-				buffer.push(items[0])
-				model.events = append(model.events, items[0])
-			case 6:
-				step += ": pushMany"
-				items := model.newEvents(random.IntN(5))
-				buffer.pushMany(items)
-				model.events = append(model.events, items...)
-			case 7:
-				step += ": unshift and unshiftMany"
-				items := model.newEvents(1 + random.IntN(4))
-				given := slices.Clone(items)
-				buffer.unshift(items[0])
-				buffer.unshiftMany(items[1:])
-				model.events = slices.Concat(items[1:], items[:1], model.events)
-				if !slices.Equal(items, given) {
-					test.Fatalf("%s: changed the items it was given", step)
-				}
-			case 8:
-				step += ": pop"
-				item, present := buffer.pop()
-				if present != (length > 0) || present && item != model.events[length-1] {
-					test.Fatalf("%s: returned the wrong item", step)
-				}
-				if present {
-					model.events = model.events[:length-1]
-				}
-			case 9:
-				step += ": shift"
-				item, present := buffer.shift()
-				if present != (length > 0) || present && item != model.events[0] {
-					test.Fatalf("%s: returned the wrong item", step)
-				}
-				if present {
-					model.events = model.events[1:]
 				}
 			}
 
