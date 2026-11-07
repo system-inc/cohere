@@ -17,21 +17,64 @@ type IdentifierRecord struct {
 	Key  string
 }
 
-// Fingerprint records, for every file of pkg, each identifier in source order and the declaration it
-// resolves to. A declaration in the same package is keyed by the ordinal of its declaring identifier in its
-// file, which a rename cannot move; anything else by its package path and description. Two fingerprints of a
-// file taken before and after a rename must have the same keys in the same order, and names that differ
-// only where an edit was made.
+// FileKey is the name a fingerprint keys a file by, and false for a file it leaves out. sources are the files of the
+// file's package as written (go/packages' GoFiles), which for a cgo package lists each cgo file beside the translation
+// CompiledGoFiles holds. A file under root is keyed by its own name. A file outside it, as cgo's translation of one of
+// those sources in the build cache, is named by a hash of the build's inputs, which a rewrite can change, so the same
+// translation would read as gone in one load and new in the other. It is keyed by the source under root whose base
+// name its //line directives name at its package clause, whatever directory they name: under -trimpath go serves a
+// translation cached for the same bytes in another directory, whose //line names that directory, and one load may get
+// that copy while another runs cgo here, so only the base name is the same in every load. A file outside root whose
+// directives name no source of its package, as cgo's _cgo_gotypes.go, has no name that survives a changed hash, and
+// is left out (see Fingerprint). With root empty every file is keyed by its own name, for a caller that compares a load
+// with a check of the same files.
+func FileKey(fileSet *token.FileSet, file *ast.File, root string, sources []string) (string, bool) {
+	filename := fileSet.PositionFor(file.Pos(), false).Filename
+	if root == "" || under(root, filename) {
+		return filename, true
+	}
+	named := fileSet.PositionFor(file.Package, true).Filename
+	if named == filename {
+		return "", false
+	}
+	// A package's files are in one directory, so a base name names at most one of them.
+	for _, source := range sources {
+		if under(root, source) && filepath.Base(source) == filepath.Base(named) {
+			return filepath.Clean(source), true
+		}
+	}
+	return "", false
+}
+
+// under reports whether path is in directory or below it.
+func under(directory string, path string) bool {
+	return strings.HasPrefix(filepath.Clean(path), filepath.Clean(directory)+string(filepath.Separator))
+}
+
+// Fingerprint records, for every file of pkg FileKey keeps, each identifier in source order and the declaration it
+// resolves to. A declaration in the same package is keyed by the ordinal of its declaring identifier in its file,
+// which a rename cannot move. One in a file FileKey leaves out is keyed by kind, owner and name, which no rename
+// changes either: such a file is generated outside the root, a rename never edits it (workspace.Editable reads it as
+// generated or outside), and what C reads of the package the //export guard keeps. Anything else is keyed by its
+// package path and description. Two fingerprints of a file taken before and after a rename must have the same keys
+// in the same order, and names that differ only where an edit was made. root and sources are FileKey's.
 func Fingerprint(
 	fileSet *token.FileSet,
 	packageTypes *types.Package,
 	info *types.Info,
 	files []*ast.File,
+	root string,
+	sources []string,
 ) map[string][]IdentifierRecord {
 	ordinals := map[token.Pos]string{}
 	identifiersByFile := map[string][]*ast.Ident{}
+	leftOut := map[*token.File]bool{}
 	for _, file := range files {
-		filename := fileSet.PositionFor(file.Pos(), false).Filename
+		filename, kept := FileKey(fileSet, file, root, sources)
+		if !kept {
+			leftOut[fileSet.File(file.Pos())] = true
+			continue
+		}
 		ordinal := 0
 		ast.Inspect(file, func(node ast.Node) bool {
 			if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
@@ -52,6 +95,9 @@ func Fingerprint(
 		if object.Pkg() == packageTypes {
 			if ordinal, found := ordinals[object.Pos()]; found {
 				return "here:" + ordinal
+			}
+			if leftOut[fileSet.File(object.Pos())] {
+				return "here:generated " + objectKind(object) + " " + ownerOf(object) + object.Name()
 			}
 			return "here:" + describe(fileSet, object)
 		}
@@ -197,12 +243,17 @@ func Expect(
 	}
 }
 
-// IdentifierOffsets lists, per file, the byte offset of each identifier in the same order Fingerprint uses,
-// so the expected names after a rename can be derived from the edits.
-func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File) map[string][]int {
+// IdentifierOffsets lists, per file Fingerprint keeps and under the same key, root and sources being FileKey's, the
+// byte offset of each identifier in the same order Fingerprint uses, so the expected names after a rename can be
+// derived from the edits. An offset is into the file as read: an edit is only ever made in a file under root, whose
+// key is its own name, and that is where an edit's offset is matched.
+func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File, root string, sources []string) map[string][]int {
 	offsets := map[string][]int{}
 	for _, file := range files {
-		filename := fileSet.PositionFor(file.Pos(), false).Filename
+		filename, kept := FileKey(fileSet, file, root, sources)
+		if !kept {
+			continue
+		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
 				offsets[filename] = append(offsets[filename], fileSet.PositionFor(identifier.Pos(), false).Offset)
@@ -219,14 +270,24 @@ func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File) map[string][]i
 // spells its parameter names, which a rename changes. The renames these passes make are locals, which never
 // cross a package, so an object reached from another package keeps its name, owner and file.
 func describe(fileSet *token.FileSet, object types.Object) string {
-	position := fileSet.PositionFor(object.Pos(), false)
-	owner := ""
-	if function, isFunction := object.(*types.Func); isFunction {
-		if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-			owner = types.TypeString(signature.Recv().Type(), func(*types.Package) string { return "" }) + "."
-		}
-	}
+	// Adjusted by //line directives: a cgo package is read from cgo's translation in the build cache by one load and
+	// from its source by another, and the translation names its source file in those directives.
+	position := fileSet.PositionFor(object.Pos(), true)
 	// The file's base name only: export data and a source load spell the same file's path differently
 	// (module-relative against absolute), and the package path beside it already says which file it is.
-	return fmt.Sprintf("%s %s%s @%s", objectKind(object), owner, object.Name(), filepath.Base(position.Filename))
+	return fmt.Sprintf("%s %s%s @%s", objectKind(object), ownerOf(object), object.Name(),
+		filepath.Base(position.Filename))
+}
+
+// ownerOf is a method's receiver type without its package, and a dot, and empty for anything else.
+func ownerOf(object types.Object) string {
+	function, isFunction := object.(*types.Func)
+	if !isFunction {
+		return ""
+	}
+	signature, isSignature := function.Type().(*types.Signature)
+	if !isSignature || signature.Recv() == nil {
+		return ""
+	}
+	return types.TypeString(signature.Recv().Type(), func(*types.Package) string { return "" }) + "."
 }
