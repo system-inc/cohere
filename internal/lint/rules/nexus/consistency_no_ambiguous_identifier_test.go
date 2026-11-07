@@ -45,6 +45,33 @@ func TestConsistencyNoAmbiguousIdentifierFires(test *testing.T) {
 		// A label binds no symbol, so TypeScript does not count it as a declaration. The labeled
 		// statement is still where the name is chosen, and `continue` is its read.
 		{"a label", "l: for (const value of values) {\n    continue l;\n}\n", []string{"noSingleLetter"}},
+		// No comparator exemption and no numeric-kernel exemption, in any language (Kirk, 2026-11-06,
+		// #4b337jk, call 3). `a` and `b` in a comparator are reported at their declarations, as any
+		// single letter is, and so are a numeric function's letters (am03, am04, am05).
+		{"sort comparator parameters", "const sorted = items.sort((a, b) => a - b);\n",
+			[]string{"noSingleLetter", "noSingleLetter"}},
+		{"sort comparator with a body", "const sorted = items.sort((a, b) => {\n    return a - b;\n});\n",
+			[]string{"noSingleLetter", "noSingleLetter"}},
+		{
+			"sort comparator as a function expression",
+			"const sorted = items.sort(function (a, b) {\n    return a - b;\n});\n",
+			[]string{"noSingleLetter", "noSingleLetter"},
+		},
+		{
+			"a sort comparator (am03)",
+			"export function sortNumbers(values: number[]): number[] {\n  return values.sort((a, b) => a - b)\n}\n",
+			[]string{"noSingleLetter", "noSingleLetter"},
+		},
+		{
+			"a toSorted comparator (am04)",
+			"export function sortedCopy(values: number[]): number[] {\n  return values.toSorted((a, b) => a - b)\n}\n",
+			[]string{"noSingleLetter", "noSingleLetter"},
+		},
+		{
+			"a numeric kernel (am05)",
+			"export function mix(s: number, t: number): number {\n  const d = s - t\n  return d * t\n}\n",
+			[]string{"noSingleLetter", "noSingleLetter", "noSingleLetter"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -66,11 +93,9 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(test *testing.T) {
 	}{
 		{"coordinates", "const x = 1;\nconst y = 2;\nconst z = 3;\n"},
 		{"descriptive names", "const count = 1;\ntry {\n    run();\n} catch (error) {\n    report(error);\n}\n"},
-		{"sort comparator parameters", "const sorted = items.sort((a, b) => a - b);\n"},
-		{"sort comparator with a body", "const sorted = items.sort((a, b) => {\n    return a - b;\n});\n"},
 		{
-			"sort comparator as a function expression",
-			"const sorted = items.sort(function (a, b) {\n    return a - b;\n});\n",
+			"sort comparator parameters named for their side",
+			"const sorted = items.sort((left, right) => left - right);\n",
 		},
 		// The bare `_` is the discard, the language's spelling for a value deliberately not named, so
 		// it names nothing a reader has to track (am02).

@@ -65,10 +65,11 @@ func messageNoSingleLetter(name string) rule.Message {
 //
 //	valid:   catch (error) { }
 //	valid:   const x = 1
-//	valid:   items.sort((a, b) => a - b)
+//	valid:   items.sort((left, right) => left - right)
 //	valid:   values.map((_, index) => index)
 //	invalid: catch (e) { }
 //	invalid: const n = 1
+//	invalid: items.sort((a, b) => a - b)
 //
 // A name is reported once, at its declaration, and never at its reads. The declaration is where the
 // name was chosen and the only place a rename starts, so a finding at every read repeated one defect
@@ -80,10 +81,15 @@ func messageNoSingleLetter(name string) rule.Message {
 // it one by grammar, and TypeScript spells it the same way by convention (am02).
 //
 // The exemptions carry the judgment. Coordinates keep x, y, and z, where the single letter is the
-// conventional spelling. A sort comparator keeps a and b, because that is the shape everyone reads
-// and naming them would be noise. Property names, object keys, import specifiers, and type property
+// conventional spelling. Property names, object keys, import specifiers, and type property
 // signatures are skipped entirely: those are not bindings the reader has to track, they are names
 // somebody else chose.
+//
+// A comparator gets no exemption, and neither does a numeric kernel. Kirk ruled it on 2026-11-06
+// (#4b337jk, call 3) for every language at once: `a` and `b` in a `.sort` callback are reported like
+// any other single letter, and `left` and `right` say which side of the comparison each one is. The
+// exemption was keyed to one method name, so `toSorted` was already reported while `sort` was not, one
+// comparator judged two ways (am03, am04, and am05 for the numeric kernel).
 //
 // `e` gets its own message because it is the ambiguous one: it could be an error or an event, and
 // which one it is decides the right name. The rule infers from context and says what it inferred.
@@ -139,11 +145,6 @@ var ConsistencyNoAmbiguousIdentifier = rule.Rule[rule.NoOptions]{
 					ruleContext.ReportNode(node, messageNoAmbiguousE(context, suggestedName))
 					return
 				}
-				// A sort comparator is the one place a and b read correctly.
-				if (name == "a" || name == "b") && isInsideSortComparator(node) {
-					return
-				}
-
 				ruleContext.ReportNode(node, messageNoSingleLetter(name))
 			},
 		}
@@ -244,38 +245,6 @@ func thisPropertyDeclarationOwner(node *ast.Node) (*ast.Node, bool, bool) {
 		}
 	}
 	return nil, false, false
-}
-
-// isInsideSortComparator reports whether an identifier sits in a function passed as the first
-// argument to a `.sort(...)` call.
-func isInsideSortComparator(node *ast.Node) bool {
-	for current := node.Parent; current != nil; current = current.Parent {
-		if current.Kind != ast.KindArrowFunction && current.Kind != ast.KindFunctionExpression {
-			continue
-		}
-
-		call := current.Parent
-		if call == nil || call.Kind != ast.KindCallExpression {
-			return false
-		}
-		callExpression := call.AsCallExpression()
-		if callExpression == nil || callExpression.Arguments == nil ||
-			len(callExpression.Arguments.Nodes) == 0 || callExpression.Arguments.Nodes[0] != current {
-			return false
-		}
-
-		callee := callExpression.Expression
-		if callee == nil || callee.Kind != ast.KindPropertyAccessExpression {
-			return false
-		}
-		access := callee.AsPropertyAccessExpression()
-		if access == nil {
-			return false
-		}
-		calleeName := access.Name()
-		return calleeName != nil && calleeName.Text() == "sort"
-	}
-	return false
 }
 
 // inferEventOrErrorContext guesses whether an `e` is an error or an event, and says which it
