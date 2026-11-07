@@ -27,9 +27,10 @@ var kindsNotWritten = map[Kind]string{
 }
 
 // fieldsNotWritten are contract fields this engine leaves out on purpose, by kind. ProvenanceRecord's
-// comment says why.
+// comment says why for its two, and LintRecord.FilesReplayed's for filesReplayed.
 var fieldsNotWritten = map[Kind][]string{
 	KindProvenance: {"swiftSyntax", "swiftFormat"},
+	KindLint:       {"filesReplayed"},
 }
 
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
