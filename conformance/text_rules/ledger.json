@@ -14,13 +14,5 @@
         "kind": "verdict",
         "task": "bjxkmf8",
         "reason": "neither casing rule judges a leading underscore, so `_cache` is not reported"
-    },
-    {
-        "engine": "typescript",
-        "family": "console",
-        "case": "co05",
-        "kind": "verdict",
-        "task": "p5hm8xm",
-        "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
     }
 ]

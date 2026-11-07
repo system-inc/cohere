@@ -374,6 +374,51 @@ func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
 	}
 }
 
+// TestNoConsoleExemptsATestFile pins call 6 (Kirk, 2026-11-06, #4b337jk): a console call in a test file
+// is clean, a test file being `source_name.IsTestFile`'s `.test` name before a script extension or
+// Adamic's `.test.a`. Every extension's own row is in source_name's test; here is one of each kind. The
+// reporting rows are the near misses, each a name that resembles a test and is not one by the house's
+// notion, so the silent rows measure the exemption rather than a rule that went quiet everywhere.
+func TestNoConsoleExemptsATestFile(test *testing.T) {
+	test.Parallel()
+
+	const sourceText = "console.log('x');"
+	silent := []string{
+		"/repository/source/Thing.test.ts",
+		"/repository/Tests/AnnounceTests/announce.test.ts",
+		"/repository/source/Dog.test.a",
+		"/repository/source/Thing.test.tsx",
+		"/repository/source/Thing.test.js",
+	}
+	for index, fileName := range silent {
+		test.Run("silent"+strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoConsole, fileName, sourceText))
+		})
+	}
+
+	reporting := []string{
+		"/repository/source/Thing.spec.ts",
+		"/repository/source/test/Thing.ts",
+		"/repository/source/Thing.test.helpers.ts",
+		"/repository/source/ThingTest.ts",
+		"/repository/source/Dog.a",
+		"/repository/source/Thing.spec.tsx",
+		"/repository/source/Thing.test.helpers.tsx",
+		"/repository/source/Thing.tsx",
+	}
+	for index, fileName := range reporting {
+		test.Run("reports"+strconv.Itoa(index), func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, ConsistencyNoConsole, fileName, sourceText),
+				"consistencyNoConsole",
+			)
+		})
+	}
+}
+
 // The whole-repository comparison, recorded once.
 //
 // This is the check a base rule gets instead of an imported corpus, and it is stronger than one: the
