@@ -1,0 +1,10 @@
+package store
+
+import "testing"
+
+func TestParseUrlKeepsAShortText(test *testing.T) {
+	test.Parallel()
+	if len(ParseUrl("short")) > maximumLength {
+		test.Fatal("a short text came back long")
+	}
+}

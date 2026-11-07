@@ -90,14 +90,16 @@ func (engine *pipeline) renamingRulesOn() map[string]rule.Rule {
 	return on
 }
 
-// renamesNames is whether the run renames what the naming rules ask: only a run that writes, formats and lints, so
-// neither `--no-fix`, `--format-only` nor `--no-format` renames, as none of them wraps either, and only while the
-// registry holds a naming rule and the settings leave it on.
+// renamesNames is whether the run renames what the naming rules ask: only a run that writes and lints, so neither
+// `--no-fix` nor `--format-only` renames, and only while the registry holds a naming rule and the settings leave it on.
+// `--no-format` still renames: it leaves formatting out, and a rename is a rule's fix, as its help says. A file the
+// rename rewrites is still printed by gofmt, since a longer name moves gofmt's alignment and leaving it would trade
+// one finding for another, but the long-line wrap, which is formatting, does not run (wrapsLongLines).
 func (engine *pipeline) renamesNames() bool {
 	if engine.fix == nil || !engine.request.requests(contract.PhaseLint) {
 		return false
 	}
-	for _, mode := range []string{"no-fix", "format-only", "no-format"} {
+	for _, mode := range []string{"no-fix", "format-only"} {
 		if engine.request.switches[mode] {
 			return false
 		}
