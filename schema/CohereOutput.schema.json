@@ -286,9 +286,22 @@
                             "type": "string",
                             "description": "Files the run could not check for any other reason, as the run said it."
                         },
+                        "nestedUnread": {
+                            "type": "string",
+                            "description": "Why the nested repositories could not be read for drift. Their files are never the run's to check, so the run went on. Absent when they were read."
+                        },
+                        "phasesNotRun": {
+                            "type": "array",
+                            "items": { "enum": ["fix", "types", "lint"] },
+                            "description": "The check's phases the run has no record of, because it stopped before them, such as a run that formatted and never type-checked or linted. Absent when every phase was reached."
+                        },
                         "adamicIgnored": {
                             "type": "integer",
                             "description": "Adamic .a files the program holds that git's ignore rules leave out of the format walk: type-checked and linted, never formatted. Absent when there are none."
+                        },
+                        "nestedUnchecked": {
+                            "type": "integer",
+                            "description": "Files in the nested repositories the run reads that the formatter could not check, each named in the account. A gap, never the verdict: the nested repository's own run fails on them. Absent when there are none."
                         },
                         "missingGenerated": {
                             "type": "array",

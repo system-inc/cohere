@@ -1167,10 +1167,7 @@ func run() error {
 		// a failed walk, or a file the formatter declined because it does not parse, or broke on, would
 		// otherwise read as a clean tree. Other runs leave those to the phases that report them.
 		if *formatOnly {
-			unchecked := formatOnlyUnchecked(fixSummary, scope)
-			printUnchecked(streams.Output, unchecked)
-			findings += len(unchecked)
-			activeSummary.Findings += len(unchecked)
+			findings += reportFormatOnly(streams.Output, fixSummary, scope, recordUniverse)
 		}
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")
@@ -1187,30 +1184,31 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
+				// A nested repository's drift is reported, never this project's to check, so a failure reading one is a
+				// gap the footer names, never a stop: at adamic's root one stopped the run before lint (#71njcj8).
 				if answer.checkError != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
+					activeSummary.Gaps.NestedUnread = sentence.FromError(answer.checkError)
+				} else {
+					nested := answer.check
+					for _, walk := range nested.Walks {
+						declareFormatWalk(walk)
+					}
+					for _, note := range nested.Notes {
+						fmt.Fprintln(accountOutput(streams.Errors), note)
+					}
+					showWarning()
+					printNestedDrift(streams.Output, nested)
+					findings += len(nested.Drift)
+					activeSummary.WouldChange += len(nested.Drift)
+					// A nested file the formatter could not check is named in every mode and counted as a gap, never as
+					// a finding: the nested repository is read-only here, and its own run fails on it (#zmt3tv5).
+					for _, file := range nestedUnchecked(nested) {
+						fmt.Fprintf(accountOutput(streams.Errors), "note: %s not checked: %s\n", file.FileName,
+							file.Reason)
+					}
+					activeSummary.Gaps.NestedUnchecked = len(nested.Unchecked)
+					printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 				}
-				nested := answer.check
-				for _, walk := range nested.Walks {
-					declareFormatWalk(walk)
-				}
-				for _, note := range nested.Notes {
-					fmt.Fprintln(accountOutput(streams.Errors), note)
-				}
-				showWarning()
-				printNestedDrift(streams.Output, nested)
-				findings += len(nested.Drift)
-				activeSummary.WouldChange += len(nested.Drift)
-				if *formatOnly {
-					printUnchecked(streams.Output, nestedUnchecked(nested))
-					findings += len(nested.Unchecked)
-					activeSummary.Findings += len(nested.Unchecked)
-				}
-				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
-			}
-			if *formatOnly {
-				activeSummary.FilesInScope, activeSummary.FilesChecked, activeSummary.FilesCached =
-					formatOnlyCounts(scope, recordUniverse)
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}

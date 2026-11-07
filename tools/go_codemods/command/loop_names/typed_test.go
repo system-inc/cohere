@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 )
 
 // typedPrelude opens every fixture of the type and use rules: the imports their bodies call, each read once so

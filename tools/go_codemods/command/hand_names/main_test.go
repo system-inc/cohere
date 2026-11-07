@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
 // fixtureSource is one file holding each case: two names swapped in one list (a local renamed to free its name

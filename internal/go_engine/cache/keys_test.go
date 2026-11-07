@@ -202,9 +202,11 @@ func changedIds(before, after map[string]Key) []string {
 func expectChanged(test *testing.T, what string, before, after map[string]Key, want ...string) {
 	test.Helper()
 
-	slices.Sort(want)
-	if changed := changedIds(before, after); !slices.Equal(changed, want) {
-		test.Errorf("%s: want the keys of\n%q\nchanged, and only those, got\n%q", what, want, changed)
+	// Sorted as a copy: the parallel subtests share one slice of every package, and sorting it in place let one
+	// subtest reorder another's expectation while it was being read (#xja4mef).
+	sortedWant := slices.Sorted(slices.Values(want))
+	if changed := changedIds(before, after); !slices.Equal(changed, sortedWant) {
+		test.Errorf("%s: want the keys of\n%q\nchanged, and only those, got\n%q", what, sortedWant, changed)
 	}
 }
 

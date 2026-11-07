@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/policy"
 )
@@ -25,9 +26,15 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // the descriptive advice where the bare expansion is already Go's. analysistest fails on a finding no want expects as
 // much as on a want nothing found, so the allowed and lookalike fixtures prove the rule stays quiet on full words,
 // uses, imported package names, embedded fields, and methods another package's interface or type fixes.
+//
+// flagged.go.golden is flagged.go with every offered rename applied to its declaring identifier, the engine's
+// part, renaming each reference, left out. So it shows exactly which findings offer a rename and to what: a whole
+// word, a prefix, a suffix, the millisecond word and a segment in both cases, each to its one spelling. `err`, `ctx`
+// and `str`, whose advice asks for a descriptive name, a word with several meanings, and an advice-style word offer
+// none.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(
+	analysistest.RunWithSuggestedFixes(
 		errorsOnly{test},
 		analysistest.TestData(),
 		consistency_no_abbreviated_identifier.Analyzer,
@@ -35,6 +42,24 @@ func TestAnalyzer(test *testing.T) {
 		"allowed",
 		"lookalike",
 	)
+}
+
+// renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the
+// same fixtures, wants and golden pass with it set.
+func TestRenameExportsChangesNoFinding(test *testing.T) {
+	test.Parallel()
+	analyzer := consistency_no_abbreviated_identifier.NewAnalyzer()
+	if rule.RenamesExports(analyzer) {
+		test.Fatal("renameExports is on by default, so the fix would rename exports nobody asked it to")
+	}
+	if setError := analyzer.Flags.Set(rule.RenameExportsOption, "true"); setError != nil {
+		test.Fatal(setError)
+	}
+	if !rule.RenamesExports(analyzer) {
+		test.Fatal("renameExports set to true reads as off")
+	}
+	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), analyzer, "flagged", "allowed",
+		"lookalike")
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

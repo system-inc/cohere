@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 
 	"golang.org/x/tools/go/packages"
 )

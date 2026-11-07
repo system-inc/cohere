@@ -337,7 +337,12 @@ func formatNestedFiles(transform edit.Transform, fileNames []string) []nestedOut
 						unchecked: strings.TrimPrefix(transformError.Error(), edit.ErrSkipped.Error()+": "),
 					}
 				case transformError != nil:
-					outcomes[index] = nestedOutcome{fileError: transformError}
+					// A file the formatter could not print is a gap in what the check read, named as the top level
+					// names it, never an error that ends the check: the nested repository is read-only here, and its
+					// own run is the one that fails on it (#zmt3tv5).
+					outcomes[index] = nestedOutcome{
+						unchecked: fmt.Sprintf("%s (%s)", edit.ReasonTransformFailed, transformError),
+					}
 				default:
 					outcomes[index] = nestedOutcome{drifted: formatted != string(contents)}
 				}

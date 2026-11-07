@@ -281,7 +281,9 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			failureLine(out, unfinished)
 			// Under `--json` the project's record says it too, since a run that never finished printed none.
 			if activeOutput.Mode == outputJson {
-				line := summaryAsJson(runSummary{Label: checked.label, Total: checked.elapsed})
+				unfinishedSummary := runSummary{Label: checked.label, Total: checked.elapsed}
+				unfinishedSummary.Gaps.PhasesNotRun = unfinishedSummary.phasesNotRun()
+				line := summaryAsJson(unfinishedSummary)
 				line.Verdict = "fail"
 				line.Error = sentence.FromError(unfinished)
 				writeJsonLine(out, line)
