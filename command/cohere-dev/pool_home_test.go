@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A run with `HOME` set to a scratch directory still uses the machine's pool, the one under the account's own
@@ -20,6 +22,7 @@ import (
 func TestARunUnderAScratchHomeUsesTheMachinesPool(test *testing.T) {
 	test.Parallel()
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -53,6 +56,7 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}

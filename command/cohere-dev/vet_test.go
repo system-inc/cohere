@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // unkeyedLiteral is a module whose package user builds another package's struct with unkeyed fields, which
@@ -77,6 +79,7 @@ func TestTheGateRefusesWhatPlainGoVetReports(test *testing.T) {
 func TestCohereDevTestVetsWithEveryCheck(test *testing.T) {
 	test.Parallel()
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
