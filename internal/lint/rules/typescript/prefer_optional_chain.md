@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-optional-chain`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **238** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **238**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,7 +63,6 @@ if(!pending || pending.taskId !== taskId) return null;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-
 
 ## Sized and declined 2026-09-06, with the decomposition premise measured and rejected
 

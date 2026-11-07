@@ -18,7 +18,5 @@
         "file": "probe.ts",
         "source": "const directory = paths.dirname;\n"
     },
-    "assertedMessageIds": [
-        "loadTimeImportMetaPath"
-    ]
+    "assertedMessageIds": ["loadTimeImportMetaPath"]
 }

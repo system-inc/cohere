@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/format_options"
+	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
@@ -81,6 +82,14 @@ func Build(ruleNames []string) (map[string][]byte, error) {
 		files[path] = encoded
 	}
 	files[ReferencePath] = []byte(reference(ruleNames))
+	// In the house format, as the format check at cohere's root reads every file there (#4wjhppw).
+	for path, contents := range files {
+		formatted, formatHouseError := native.FormatHouse(path, contents)
+		if formatHouseError != nil {
+			return nil, formatHouseError
+		}
+		files[path] = formatted
+	}
 	return files, nil
 }
 
@@ -407,7 +416,9 @@ func severityPattern() string {
 	return "^(" + strings.Join(spellings, "|") + ")$"
 }
 
-// encode writes a schema with sorted keys and four-space indentation, so a regeneration diffs cleanly.
+// encode writes a schema with sorted keys and four-space indentation, so a regeneration diffs cleanly. Build then
+// lays it out in the house format, which keeps an object expanded where its source was, so the indentation is what
+// keeps every object expanded as the committed file has it.
 func encode(schema *schemaNode) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)

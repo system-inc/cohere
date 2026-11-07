@@ -18,7 +18,5 @@
         "file": "source/Subject.ts",
         "source": "import * as NodeFileSystem from 'node:fs';\nimport * as NodePath from 'node:path';\ndeclare function existsSync(path: string): boolean;\nexport function save(directory: string, bytes: Uint8Array): void {\n    let index = 0;\n    while(existsSync(NodePath.join(directory, `${index}.png`))) index++;\n    NodeFileSystem.writeFileSync(NodePath.join(directory, `${index}.png`), bytes);\n}\n"
     },
-    "assertedMessageIds": [
-        "checkThenWrite"
-    ]
+    "assertedMessageIds": ["checkThenWrite"]
 }

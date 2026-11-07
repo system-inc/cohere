@@ -1,25 +1,25 @@
 # `nexus/correctness-no-collection-misuse`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`.** Zero findings today; it guards four shapes that run without throwing and quietly do nothing |
-| Findings | **ahra 0** (measured 2026-10-03; research count 0 for each shape) |
-| Measured precision | no findings to read |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, every check rests on an operand's type; without a checker the rule registers nothing |
+|                        |                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`.** Zero findings today; it guards four shapes that run without throwing and quietly do nothing |
+| Findings               | **ahra 0** (measured 2026-10-03; research count 0 for each shape)                                                |
+| Measured precision     | no findings to read                                                                                              |
+| Plugin                 | cohere-native, `nexus`                                                                                           |
+| Auto-fixable           | no                                                                                                               |
+| Needs type information | yes, every check rests on an operand's type; without a checker the rule registers nothing                        |
 
 ## What it checks
 
 Four message ids, one rule, because each is a built-in collection used in a way its default-library type
 says cannot work:
 
-| Id | Shape | Why it is always wrong |
-|---|---|---|
-| `inOnArray` | `'Admin' in roles` on an array or tuple, the left side a string literal (or a union of them) that is neither a canonical index nor a property the array type declares | `in` asks for a property, never an element: always false |
-| `impossibleSizeComparison` | `.length` of an array, tuple, string or typed array, or `.size` of a Map or Set, typed `number` alone, compared with a literal so that `< 0`, `<= -1`, `=== -1`, `== -1` (always false) or `>= 0`, `> -1`, `!== -1`, `!= -1` (always true), either way round | a length or size is never negative |
-| `bracketAccessOnCollection` | `map[key]` read or written on a Map, ReadonlyMap, WeakMap, Set, ReadonlySet or WeakSet, the key typed so it cannot name a member (a string literal that is not one, a number, a boolean, a bigint, `null`, `undefined`) | brackets reach own properties, not entries |
-| `objectMethodOnCollection` | `Object.keys`, `values`, `entries` or `getOwnPropertyNames` on one of those six, with `Object` and the method resolving to the default library | a collection's entries are not properties: always empty |
+| Id                          | Shape                                                                                                                                                                                                                                                        | Why it is always wrong                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| `inOnArray`                 | `'Admin' in roles` on an array or tuple, the left side a string literal (or a union of them) that is neither a canonical index nor a property the array type declares                                                                                        | `in` asks for a property, never an element: always false |
+| `impossibleSizeComparison`  | `.length` of an array, tuple, string or typed array, or `.size` of a Map or Set, typed `number` alone, compared with a literal so that `< 0`, `<= -1`, `=== -1`, `== -1` (always false) or `>= 0`, `> -1`, `!== -1`, `!= -1` (always true), either way round | a length or size is never negative                       |
+| `bracketAccessOnCollection` | `map[key]` read or written on a Map, ReadonlyMap, WeakMap, Set, ReadonlySet or WeakSet, the key typed so it cannot name a member (a string literal that is not one, a number, a boolean, a bigint, `null`, `undefined`)                                      | brackets reach own properties, not entries               |
+| `objectMethodOnCollection`  | `Object.keys`, `values`, `entries` or `getOwnPropertyNames` on one of those six, with `Object` and the method resolving to the default library                                                                                                               | a collection's entries are not properties: always empty  |
 
 The collection types are matched by the symbol the default library declares, so a subclass (which may carry
 fields of its own), a project class named `Map` and an intersection are left alone.

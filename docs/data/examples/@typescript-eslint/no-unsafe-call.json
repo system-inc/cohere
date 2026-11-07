@@ -18,12 +18,5 @@
         "file": "/repository/source/Calling.ts",
         "source": "new Map();\n"
     },
-    "assertedMessageIds": [
-        "errorCall",
-        "errorNew",
-        "errorTemplateTag",
-        "unsafeCall",
-        "unsafeNew",
-        "unsafeTemplateTag"
-    ]
+    "assertedMessageIds": ["errorCall", "errorNew", "errorTemplateTag", "unsafeCall", "unsafeNew", "unsafeTemplateTag"]
 }

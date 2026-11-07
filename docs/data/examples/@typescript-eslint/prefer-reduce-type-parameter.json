@@ -20,8 +20,6 @@
         "file": "/repository/source/Reducing.ts",
         "source": "[1, 2, 3][null]((sum, num) => sum + num, 0);\n"
     },
-    "assertedMessageIds": [
-        "preferTypeParameter"
-    ],
+    "assertedMessageIds": ["preferTypeParameter"],
     "assertsFix": true
 }

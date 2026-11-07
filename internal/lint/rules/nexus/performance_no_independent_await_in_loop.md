@@ -1,13 +1,13 @@
 # `nexus/performance-no-independent-await-in-loop`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, in place of `no-await-in-loop` |
-| Findings in ahra | **56** (measured 2026-10-01), against 379 for upstream `no-await-in-loop` in the same run |
-| Measured precision | 53 of 56 true (94.6%): 38 plain, 15 sequential on purpose and worth a suppression |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, for binding resolution and the callee scan |
+|                        |                                                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, in place of `no-await-in-loop`                                                   |
+| Findings in ahra       | **56** (measured 2026-10-01), against 379 for upstream `no-await-in-loop` in the same run |
+| Measured precision     | 53 of 56 true (94.6%): 38 plain, 15 sequential on purpose and worth a suppression         |
+| Plugin                 | cohere-native, `nexus`                                                                    |
+| Auto-fixable           | no                                                                                        |
+| Needs type information | yes, for binding resolution and the callee scan                                           |
 
 ## What it checks
 
@@ -64,12 +64,12 @@ against its own directory. 3,605 files linted, 0 crashed, summary line present.
 
 Three passes:
 
-| pass | findings | change |
-|---|---|---|
-| first | 65 | 13 false positives (20%) on hand classification |
-| item-itself, prefix sinks, callee scan counting every ordered call | 44 | lost the 8 intended plus 13 true positives: callees print from `catch` blocks |
-| callee scan limited to progress output and pacing outside `catch` | 55 | exactly the 8 intended, plus 2 test loops whose callee prints progress |
-| body `catch` narrowed the same way, after a recall sample | 56 | adds GmailApi.ts:583, silenced before only by a `console.warn` in its catch |
+| pass                                                               | findings | change                                                                        |
+| ------------------------------------------------------------------ | -------- | ----------------------------------------------------------------------------- |
+| first                                                              | 65       | 13 false positives (20%) on hand classification                               |
+| item-itself, prefix sinks, callee scan counting every ordered call | 44       | lost the 8 intended plus 13 true positives: callees print from `catch` blocks |
+| callee scan limited to progress output and pacing outside `catch`  | 55       | exactly the 8 intended, plus 2 test loops whose callee prints progress        |
+| body `catch` narrowed the same way, after a recall sample          | 56       | adds GmailApi.ts:583, silenced before only by a `console.warn` in its catch   |
 
 ## The 56, classified
 

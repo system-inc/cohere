@@ -20,8 +20,6 @@
         "file": "/repository/source/ExtraBind.ts",
         "source": "var a = f.bind(a)"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ],
+    "assertedMessageIds": ["unexpected"],
     "assertsFix": true
 }

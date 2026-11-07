@@ -217,6 +217,8 @@ struct TypesPhase {
         var modulesKept = 0
         /* The scoped modules checked while prepare ran, since they import no module it emitted again. */
         var modulesAlongsidePrepare = 0
+        /* The local packages whose session this run skipped, by folder name, since its scope held none of their modules. */
+        var sessionsSkipped: [String] = []
         var files = 0
         var jobs = 0
         var rerunFiles = 0
@@ -251,6 +253,10 @@ struct TypesPhase {
             if modulesKept > 0 {
                 words +=
                     ", \(modulesKept == 1 ? "1 module" : "\(modulesKept) modules") no edit could change read from the last check's records"
+            }
+            if !sessionsSkipped.isEmpty {
+                words +=
+                    ", and no build server started for \(sessionsSkipped.count == 1 ? "the local package" : "the local packages") \(sessionsSkipped.joined(separator: ", ")), since no edit could change \(sessionsSkipped.count == 1 ? "it" : "them")"
             }
             if cFiles > 0 {
                 words += "; clang -fsyntax-only checked \(cFiles) C-family files"
@@ -299,6 +305,25 @@ struct TypesPhase {
         let swiftc = try FrontendCheck.toolchainExecutable(named: "swiftc", runner: runner)
         let clang = try FrontendCheck.toolchainExecutable(named: "clang", runner: runner)
         for (sessionIndex, session) in checks.enumerated() {
+            /* A target outside the scope keeps its records only when the last check left them. */
+            let recordedDirectories = try recordDirectories(under: session.scratchPath)
+            let recorded = Set(recordedDirectories.map(\.0))
+            /* The root's session always starts: its server names the targets an edited C-family file widens the scope by. */
+            if sessionIndex > 0, let scope,
+                let kept = Self.recordsWithoutSession(
+                    last: SessionRecord.stored(scratchPath: session.scratchPath),
+                    scope: scope,
+                    recorded: recordedDirectories,
+                    alreadyChecked: checkedTargets,
+                )
+            {
+                checkedTargets.formUnion(kept.map(\.0))
+                run.targetDirectories += kept
+                run.modulesKept += kept.count
+                run.sessionsSkipped.append(session.root.lastPathComponent)
+                ScratchPrune.markUsed(session.scratchPath)
+                continue
+            }
             let prepareStart = Date()
             let diagnosticsRoot = Self.checkDirectory(scratchPath: session.scratchPath)
             let frontend = FrontendCheck(
@@ -308,8 +333,6 @@ struct TypesPhase {
                 workingDirectory: session.root,
                 runner: runner,
             )
-            /* A target outside the scope keeps its records only when the last check left them. */
-            let recorded = Set(try recordDirectories(under: session.scratchPath).map(\.0))
             let independent = (scope?.independent ?? []).intersection(recorded)
             let alreadyChecked = checkedTargets
             let early = EarlyCheck()
@@ -449,7 +472,10 @@ struct TypesPhase {
                     || (!ownedCPaths.contains(path) && !indexed.contains(path)))
                     && checkedTargets.insert("C/\(path)").inserted
             }
+            /* The owned C-family files this session took, kept or checked, which an earlier session had not. */
+            var ownedCTaken = cSources.filter { ownedCPaths.contains(resolved($0.file.path)) }.count
             for source in keptC where checkedTargets.insert("C/\(resolved(source.file.path))").inserted {
+                ownedCTaken += 1
                 if !run.targetDirectories.contains(where: { $0.0 == source.target }) {
                     run.targetDirectories.append(
                         (source.target, FrontendCheck.moduleDirectory(in: diagnosticsRoot, module: source.target))
@@ -497,8 +523,76 @@ struct TypesPhase {
                     .map(\.standardError)
             }
             run.indexSeconds += Date().timeIntervalSince(indexStart)
+            if sessionIndex > 0 {
+                SessionRecord(targets: ownedModules.map(\.name).sorted(), ownsCFamily: ownedCTaken > 0)
+                    .store(scratchPath: session.scratchPath)
+            }
         }
         return run
+    }
+
+    /*
+     What a local package's session took the last time it started, kept in its scratch beside its records: the owned
+     modules it checked or kept, by target, and whether it took any owned C-family file.
+     */
+    struct SessionRecord: Codable, Equatable {
+        var targets: [String]
+        var ownsCFamily: Bool
+
+        static func file(scratchPath: URL) -> URL {
+            scratchPath.appendingPathComponent("check-session.json")
+        }
+
+        /* The record the last session into this scratch kept, nil when there is none it can read. */
+        static func stored(scratchPath: URL) -> SessionRecord? {
+            do {
+                return try JSONDecoder().decode(
+                    SessionRecord.self,
+                    from: Data(contentsOf: file(scratchPath: scratchPath)),
+                )
+            }
+            catch {
+                /* Nothing to go by, so the session starts. */
+                return nil
+            }
+        }
+
+        func store(scratchPath: URL) {
+            do {
+                try JSONEncoder().encode(self).write(to: Self.file(scratchPath: scratchPath), options: .atomic)
+            }
+            catch {
+                /* Not kept, so the next run starts this session: slower, and still right. */
+            }
+        }
+    }
+
+    /*
+     The records a local package's session would only read again, so a run can leave the session out, or nil when it
+     must start. It can when its last session took no owned C-family file, the scope reaches no C-family file, and
+     every module the last session took is outside the scope, not taken by an earlier session of this run, and has
+     the record directory that check left. A scope exists only when every edit since the last check that recorded
+     every file was to an owned file, so a module outside it, and every module it imports, is as that check saw it,
+     and its records stand. An edit to any module of the package, or to one it imports, puts it in the scope and
+     starts the session. Measured 2026-11-06 on ahraos-presence: an interface edit to AhraOSPresence started four
+     local packages' sessions with nothing in scope, one after another, 6.1s.
+     */
+    static func recordsWithoutSession(
+        last: SessionRecord?,
+        scope: Scope,
+        recorded: [(String, URL)],
+        alreadyChecked: Set<String>,
+    ) -> [(String, URL)]? {
+        guard let last, !last.ownsCFamily, !scope.cFamily, !last.targets.isEmpty else { return nil }
+        let directories = Dictionary(recorded, uniquingKeysWith: { first, _ in first })
+        var kept: [(String, URL)] = []
+        for target in last.targets {
+            guard !scope.targets.contains(target), !alreadyChecked.contains(target),
+                let directory = directories[target]
+            else { return nil }
+            kept.append((target, directory))
+        }
+        return kept
     }
 
     /*

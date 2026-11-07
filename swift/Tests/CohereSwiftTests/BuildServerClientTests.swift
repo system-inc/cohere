@@ -51,6 +51,39 @@ struct BuildServerClientTests {
         #expect(BuildServerClient.toolsBuilt(in: [(start, "Compiling Count.swift, Welcome.swift")]).isEmpty)
     }
 
+    /*
+     Two runs of one check hand the server the same environment, so SwiftPM's key for a build-tool plugin's compile,
+     which hashes every variable, holds between them: cohere's own variables are left out, the yield file and the
+     resolving pid among them, which the front door makes new each run, and so is `OLDPWD`. `PWD` is the folder the
+     server runs in, and everything else passes through as it was.
+     */
+    @Test func theServerEnvironmentHoldsBetweenRuns() {
+        let root = URL(fileURLWithPath: "/work/Package", isDirectory: true)
+        let first = BuildServerClient.environment(
+            inheriting: [
+                "PATH": "/usr/bin", "HOME": "/Users/someone", "DEVELOPER_DIR": "/Applications/Xcode.app",
+                "COHERE_PROJECT_YIELD": "/tmp/cohere-yield-1/yield-2.json", "COHERE_SWIFT_RESOLVED_BY": "29427",
+                "PWD": "/work", "OLDPWD": "/elsewhere",
+            ],
+            workingDirectory: root,
+        )
+        let second = BuildServerClient.environment(
+            inheriting: [
+                "PATH": "/usr/bin", "HOME": "/Users/someone", "DEVELOPER_DIR": "/Applications/Xcode.app",
+                "COHERE_PROJECT_YIELD": "/tmp/cohere-yield-3/yield-4.json", "COHERE_SWIFT_RESOLVED_BY": "32788",
+                "PWD": "/work/Sources", "OLDPWD": "/another",
+            ],
+            workingDirectory: root,
+        )
+        #expect(first == second)
+        #expect(
+            first == [
+                "PATH": "/usr/bin", "HOME": "/Users/someone", "DEVELOPER_DIR": "/Applications/Xcode.app",
+                "PWD": "/work/Package",
+            ]
+        )
+    }
+
     /* A location is inside the scratch whether or not it exists yet, and whichever spelling of a linked folder each uses. */
     @Test func aLocationIsJudgedInsideTheScratchThroughLinks() {
         let scratch = URL(fileURLWithPath: "/var/folders/scratch")

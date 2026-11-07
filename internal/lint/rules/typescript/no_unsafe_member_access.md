@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-unsafe-member-access`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **395** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **395**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -86,9 +86,8 @@ Removing `@cloudflare/workers-types` from the `types` array was measured on the 
 (`Uint8Array` passed where `Buffer` is required, in ThingsApi and the see/look route), which is the
 rule doing its job one level up.
 
-The general lesson, and the reason this section exists: **on any of the four unsafe-* rules, count
-by the type that is `any` before touching a single call site.** A broken ambient declaration
+The general lesson, and the reason this section exists: _*on any of the four unsafe-* rules, count
+by the type that is `any` before touching a single call site._* A broken ambient declaration
 concentrates hundreds of findings behind one cause, and sweeping them individually is not just slow
 but wrong, because it treats a configuration defect as a code defect. Sample the sites, group them
 by the value whose type is `any`, and fix the declaration if one dominates.
-

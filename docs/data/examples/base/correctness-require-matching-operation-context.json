@@ -18,8 +18,5 @@
         "file": "/repository/source/Resolving.ts",
         "source": "declare class GraphQlOperationContext<K> { key: K; }\ndeclare function InjectGraphQlOperationContext(): ParameterDecorator;\ndeclare function GraphQlQuery(fn?: unknown): MethodDecorator;\ndeclare function GraphQlMutation(fn?: unknown): MethodDecorator;\ndeclare function GraphQlFieldResolver(fn?: unknown): MethodDecorator;\ndeclare function SomethingElse(fn?: unknown): MethodDecorator;\nclass ThingOne { one!: string; }\nclass ThingTwo { two!: string; }\nclass Derived extends ThingOne { extra!: number; }\nclass R {\n  async find(@InjectGraphQlOperationContext() c: GraphQlOperationContext<ThingTwo>): Promise<ThingOne> {\n    void c;\n    return new ThingOne();\n  }\n}\n"
     },
-    "assertedMessageIds": [
-        "mismatch",
-        "wrongBaseType"
-    ]
+    "assertedMessageIds": ["mismatch", "wrongBaseType"]
 }

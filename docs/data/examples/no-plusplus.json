@@ -14,7 +14,5 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "unexpectedUnaryOp"
-    ]
+    "assertedMessageIds": ["unexpectedUnaryOp"]
 }

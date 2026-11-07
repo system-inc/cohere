@@ -73,7 +73,9 @@ async function run() {
             NodeAssert.equal(gate.status, 0, gate.stdout + gate.stderr);
             const written = NodeFileSystem.readFileSync(probe, 'utf8');
             NodeAssert.equal(saved, written, 'the save and the gate wrote different bytes');
-            console.log(`cohere gate: present: the save wrote ${Buffer.byteLength(saved)} bytes, identical to cohere --fix --format`);
+            console.log(
+                `cohere gate: present: the save wrote ${Buffer.byteLength(saved)} bytes, identical to cohere --fix --format`,
+            );
         }
         finally {
             NodeFileSystem.rmSync(probe, { force: true });
@@ -107,25 +109,43 @@ async function checkSettingsSchema(folder) {
     const schemaPath = './node_modules/@system-inc/cohere/schema/CohereSettings.schema.json';
     const settingsPath = NodePath.join(folder, 'CohereSettings.json');
     try {
-        const flagged = await settingsDiagnostics(settingsPath, JSON.stringify({ $schema: schemaPath, ignorPatterns: ['dist/**'] }, null, 4) + '\n');
+        const flagged = await settingsDiagnostics(
+            settingsPath,
+            JSON.stringify({ $schema: schemaPath, ignorPatterns: ['dist/**'] }, null, 4) + '\n',
+        );
         const messages = flagged.map(function(diagnostic) {
             return diagnostic.message;
         });
-        NodeAssert.ok(!messages.some(function(message) {
-            return /load|resolve/i.test(message);
-        }), `VS Code could not load the installed schema: ${messages.join(' | ')}`);
-        NodeAssert.ok(messages.some(function(message) {
-            return message.includes('ignorPatterns');
-        }), `the misspelled key was not flagged: ${messages.join(' | ') || 'no diagnostics'}`);
+        NodeAssert.ok(
+            !messages.some(function(message) {
+                return /load|resolve/i.test(message);
+            }),
+            `VS Code could not load the installed schema: ${messages.join(' | ')}`,
+        );
+        NodeAssert.ok(
+            messages.some(function(message) {
+                return message.includes('ignorPatterns');
+            }),
+            `the misspelled key was not flagged: ${messages.join(' | ') || 'no diagnostics'}`,
+        );
         await Vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 
         // The control: the same file spelled right has nothing to flag, so the flag above came from the
         // schema's rules rather than from anything else about the file.
-        const clean = await settingsDiagnostics(settingsPath, JSON.stringify({ $schema: schemaPath, ignorePatterns: ['dist/**'] }, null, 4) + '\n');
-        NodeAssert.deepEqual(clean.map(function(diagnostic) {
-            return diagnostic.message;
-        }), [], 'a correct settings file was flagged');
-        console.log(`cohere gate: schema: VS Code flagged the misspelled key (${messages.join(' | ')}) and nothing in the correct file`);
+        const clean = await settingsDiagnostics(
+            settingsPath,
+            JSON.stringify({ $schema: schemaPath, ignorePatterns: ['dist/**'] }, null, 4) + '\n',
+        );
+        NodeAssert.deepEqual(
+            clean.map(function(diagnostic) {
+                return diagnostic.message;
+            }),
+            [],
+            'a correct settings file was flagged',
+        );
+        console.log(
+            `cohere gate: schema: VS Code flagged the misspelled key (${messages.join(' | ')}) and nothing in the correct file`,
+        );
     }
     finally {
         NodeFileSystem.rmSync(settingsPath, { force: true });

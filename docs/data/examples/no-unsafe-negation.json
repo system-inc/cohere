@@ -19,8 +19,6 @@
         "file": "/repository/source/UnsafeNegation.ts",
         "source": "!a + b"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ],
+    "assertedMessageIds": ["unexpected"],
     "assertsSuggestion": true
 }

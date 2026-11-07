@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-duplicate-type-constituents`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **3** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Yes**              |
+| Violations in ahra     | **3**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -52,4 +52,3 @@ options?: NextUseQueryStateOptions | undefined,
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

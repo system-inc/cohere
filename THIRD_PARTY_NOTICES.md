@@ -16,7 +16,7 @@ In the `cohere` binary every platform package ships.
 - License: `BSD-3-Clause`
 - In cohere: The runtime and standard library linked into every Go binary.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### TypeScript (typescript-go)
 
@@ -52,12 +52,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `Apache-2.0`
 - In cohere: The TypeScript compiler, built from System, Inc.'s modified fork https://github.com/system-inc/TypeScript, and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).
 
-````text
+```text
 Apache License
 
 Version 2.0, January 2004
 
-http://www.apache.org/licenses/ 
+http://www.apache.org/licenses/
 
 TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
 
@@ -108,7 +108,7 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
 
 END OF TERMS AND CONDITIONS
-````
+```
 
 ### github.com/BurntSushi/toml
 
@@ -117,7 +117,7 @@ END OF TERMS AND CONDITIONS
 - License: `MIT`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2013 TOML authors
@@ -139,7 +139,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
+```
 
 ### github.com/Microsoft/go-winio
 
@@ -148,7 +148,7 @@ THE SOFTWARE.
 - License: `MIT`
 - In cohere: A Go module in cohere's build graph. Linked on windows/arm64, windows/amd64 only.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2015 Microsoft
@@ -170,7 +170,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### github.com/dlclark/regexp2/v2
 
@@ -179,7 +179,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) Doug Clark
@@ -201,7 +201,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### github.com/klauspost/cpuid/v2
 
@@ -210,7 +210,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: A Go module in cohere's build graph. Linked on darwin/amd64, linux/amd64, windows/amd64 only.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2015 Klaus Post
@@ -232,7 +232,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### github.com/zeebo/xxh3
 
@@ -241,7 +241,7 @@ SOFTWARE.
 - License: `BSD-2-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 BSD 2-Clause License
 
 Copyright (c) 2012-2014, Yann Collet
@@ -270,7 +270,7 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/exp/typeparams
 
@@ -279,7 +279,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright (c) 2009 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -307,7 +307,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/mod
 
@@ -316,7 +316,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -344,7 +344,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/sync
 
@@ -353,7 +353,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -381,7 +381,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/sys
 
@@ -390,7 +390,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -418,7 +418,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/text
 
@@ -427,7 +427,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -455,7 +455,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### golang.org/x/tools
 
@@ -464,7 +464,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `BSD-3-Clause`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -492,7 +492,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### honnef.co/go/tools
 
@@ -501,7 +501,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `MIT`
 - In cohere: A Go module in cohere's build graph.
 
-````text
+```text
 Copyright (c) 2016 Dominik Honnef
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -522,11 +522,11 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 The module's own credit for code it includes, from its LICENSE-THIRD-PARTY:
 
-````text
+```text
 Staticcheck and its related tools make use of third party projects,
 either by reusing their code, or by statically linking them into
 resulting binaries. These projects are:
@@ -648,7 +648,7 @@ resulting binaries. These projects are:
     THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
     (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### Ported or vendored into cohere's source
 
@@ -660,7 +660,7 @@ Code adapted from these projects, translated to Go or copied in, compiled into t
 - License: `MIT`
 - In cohere: The shim generator behind TypeScript-shim/ and the checker helpers vendored in internal/lint/checking.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2025 typescript-eslint and other contributors
@@ -682,7 +682,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### rslint
 
@@ -690,7 +690,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The control-flow graph vendored in internal/lint/ecmascript/control_flow_graph.
 
-````text
+```text
 MIT License
 Copyright (c) 2025 July-present Bytedance Inc and its affiliates.
 Copyright (c) 2025 July typescript-eslint and other contributors
@@ -712,7 +712,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### golang.org/x/tools go/analysis/checker
 
@@ -721,7 +721,7 @@ SOFTWARE.
 - License: `BSD-3-Clause`
 - In cohere: The analysis driver copied into internal/go_engine/check/checker, with the helpers it calls from internal/analysis/driverutil, and the analyzers' test driver go/analysis/analysistest copied into internal/go_engine/check/analysistest, with what it calls: go/analysis/internal in internal/go_engine/check/internal, driverutil's fix.go beside the checker's, and internal/diff, internal/diff/lcs and internal/astutil/free in internal/go_engine/check/diff and internal/go_engine/check/astutil/free.
 
-````text
+```text
 Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
@@ -749,7 +749,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### Prettier
 
@@ -757,7 +757,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `MIT`
 - In cohere: The formatter in internal/format: its document model and printers are ported from Prettier's.
 
-````text
+```text
 Copyright © James Long and contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -765,7 +765,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### yaml
 
@@ -774,7 +774,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - License: `ISC`
 - In cohere: The YAML parser in internal/format/yaml, ported.
 
-````text
+```text
 Copyright Eemeli Aro <eemeli@gmail.com>
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
@@ -788,7 +788,7 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
 OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
-````
+```
 
 ### yaml-unist-parser
 
@@ -797,7 +797,7 @@ THIS SOFTWARE.
 - License: `MIT`
 - In cohere: The YAML syntax tree in internal/format/yaml/unist, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) Ika <ikatyang@gmail.com> (https://github.com/ikatyang)
@@ -819,7 +819,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### postcss-values-parser
 
@@ -828,7 +828,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The CSS value parser in internal/format/css/values, ported from 2.0.1, which was MIT.
 
-````text
+```text
 Copyright (c) Andrew Powell <andrew@shellscape.org>
 
 Permission is hereby granted, free of charge, to any person
@@ -851,7 +851,7 @@ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark
 
@@ -859,7 +859,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: The Markdown tokenizer in internal/format/markdown/micromark, ported.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
@@ -882,7 +882,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-from-markdown
 
@@ -890,7 +890,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: The Markdown syntax tree builder in internal/format/markdown/mdast, ported.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
@@ -913,7 +913,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### emoji-regex
 
@@ -922,7 +922,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Emoji ranges captured into internal/format/doc/string_width_generated.go.
 
-````text
+```text
 Copyright Mathias Bynens <https://mathiasbynens.be/>
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -943,7 +943,7 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### get-east-asian-width
 
@@ -952,7 +952,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Character widths captured into internal/format/doc/string_width_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
@@ -962,7 +962,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### narrow-emojis
 
@@ -971,7 +971,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - License: `MIT`
 - In cohere: Narrow emoji ranges captured into internal/format/doc/string_width_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) fisker Cheung <lionkay@gmail.com> (https://www.fiskercheung.com/)
@@ -993,7 +993,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### PostCSS
 
@@ -1002,7 +1002,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The CSS parser and tokenizer in internal/format/css/postcss, ported.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright 2013 Andrey Sitnik <andrey@sitnik.es>
@@ -1023,7 +1023,7 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### postcss-scss
 
@@ -1032,7 +1032,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: The SCSS parser in internal/format/css/postcss, ported.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright 2013 Andrey Sitnik <andrey@sitnik.ru>
@@ -1053,7 +1053,7 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### postcss-selector-parser
 
@@ -1062,7 +1062,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: The selector parser in internal/format/css/selector, ported.
 
-````text
+```text
 Copyright (c) Ben Briggs <beneb.info@gmail.com> (http://beneb.info)
 
 Permission is hereby granted, free of charge, to any person
@@ -1085,7 +1085,7 @@ HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### flatten
 
@@ -1094,7 +1094,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: A helper of the selector parser, ported in internal/format/css/selector.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2016 Joshua Holbrook
@@ -1116,7 +1116,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
+```
 
 ### indexes-of
 
@@ -1125,30 +1125,30 @@ THE SOFTWARE.
 - License: `MIT`
 - In cohere: A helper of the selector parser, ported in internal/format/css/selector.
 
-````text
+```text
 Copyright (c) 2013 Dominic Tarr
 
-Permission is hereby granted, free of charge, 
-to any person obtaining a copy of this software and 
-associated documentation files (the "Software"), to 
-deal in the Software without restriction, including 
-without limitation the rights to use, copy, modify, 
-merge, publish, distribute, sublicense, and/or sell 
-copies of the Software, and to permit persons to whom 
-the Software is furnished to do so, 
+Permission is hereby granted, free of charge,
+to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to
+deal in the Software without restriction, including
+without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom
+the Software is furnished to do so,
 subject to the following conditions:
 
-The above copyright notice and this permission notice 
+The above copyright notice and this permission notice
 shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES 
-OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR 
-ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### uniq
 
@@ -1157,7 +1157,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: A helper of the selector parser, ported in internal/format/css/selector.
 
-````text
+```text
 
 The MIT License (MIT)
 
@@ -1180,7 +1180,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
+```
 
 ### postcss-media-query-parser
 
@@ -1198,7 +1198,7 @@ No license text is published with this package or in its repository. Its package
 - License: `MIT`
 - In cohere: The CSS unit list captured into internal/format/css/css_units.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) fisker Cheung <lionkay@gmail.com> (https://www.fiskercheung.com/)
@@ -1220,7 +1220,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### GraphQL.js
 
@@ -1229,7 +1229,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The GraphQL lexer and parser in internal/format/graphql, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) GraphQL Contributors
@@ -1251,7 +1251,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### typescript-estree
 
@@ -1260,7 +1260,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The TypeScript-to-ESTree conversion in internal/format/estree, ported, and its XHTML entity table, captured.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2019 typescript-eslint and other contributors
@@ -1282,7 +1282,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### @typescript-eslint/visitor-keys
 
@@ -1291,7 +1291,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Visitor keys captured, through Prettier's table, into internal/format/estree/visitor_keys_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2019 typescript-eslint and other contributors
@@ -1313,7 +1313,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### @babel/types
 
@@ -1322,7 +1322,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Visitor keys captured, through Prettier's table, into internal/format/estree/visitor_keys_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2014-present Sebastian McKenzie and other contributors
@@ -1345,7 +1345,7 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### angular-estree-parser
 
@@ -1354,7 +1354,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Visitor keys captured, through Prettier's table, into internal/format/estree/visitor_keys_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Ika <ikatyang@gmail.com> (https://github.com/ikatyang)
@@ -1376,7 +1376,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### Flow (flow-parser)
 
@@ -1385,7 +1385,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Visitor keys captured, through Prettier's table, into internal/format/estree/visitor_keys_generated.go. flow-parser ships no license file, so this is Flow's, at its v0.322.0 tag.
 
-````text
+```text
 MIT License
 
 Copyright (c) Meta Platforms, Inc. and affiliates.
@@ -1407,7 +1407,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### micromark-extension-gfm-autolink-literal
 
@@ -1416,7 +1416,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1439,7 +1439,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark-extension-gfm-footnote
 
@@ -1448,7 +1448,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2021 Titus Wormer <tituswormer@gmail.com>
@@ -1471,7 +1471,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark-extension-gfm-strikethrough
 
@@ -1480,7 +1480,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1503,7 +1503,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark-extension-gfm-table
 
@@ -1512,7 +1512,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
@@ -1535,7 +1535,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark-extension-gfm-task-list-item
 
@@ -1544,7 +1544,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1567,7 +1567,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### micromark-extension-math
 
@@ -1576,7 +1576,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1599,7 +1599,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### @braindb/micromark-extension-wiki-link
 
@@ -1617,7 +1617,7 @@ No license text is published with this package or in its repository. Its package
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1640,7 +1640,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-gfm-footnote
 
@@ -1649,7 +1649,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
@@ -1672,7 +1672,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-gfm-strikethrough
 
@@ -1681,7 +1681,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1704,7 +1704,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-gfm-table
 
@@ -1713,7 +1713,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1736,7 +1736,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-gfm-task-list-item
 
@@ -1745,7 +1745,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1768,7 +1768,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-math
 
@@ -1777,7 +1777,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2020 Titus Wormer <tituswormer@gmail.com>
@@ -1800,7 +1800,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### mdast-util-to-string
 
@@ -1809,7 +1809,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/mdast.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
@@ -1832,7 +1832,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### @braindb/mdast-util-wiki-link
 
@@ -1850,7 +1850,7 @@ No license text is published with this package or in its repository. Its package
 - License: `MIT`
 - In cohere: Ported in internal/format/markdown/micromark/decode.go.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) Titus Wormer <tituswormer@gmail.com>
@@ -1873,7 +1873,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### character-entities
 
@@ -1882,7 +1882,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: The named character references captured into internal/format/markdown/micromark/entities_generated.go.
 
-````text
+```text
 (The MIT License)
 
 Copyright (c) 2015 Titus Wormer <tituswormer@gmail.com>
@@ -1905,7 +1905,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### linguist-languages
 
@@ -1914,7 +1914,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: GitHub Linguist's language list, captured through Prettier into internal/format/markdown/languages_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Ika <ikatyang@gmail.com> (https://github.com/ikatyang)
@@ -1936,7 +1936,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### cjk-regex
 
@@ -1945,7 +1945,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Character classes captured through Prettier into internal/format/markdown/classes_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Ika <ikatyang@gmail.com> (https://github.com/ikatyang)
@@ -1967,7 +1967,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### unicode-regex
 
@@ -1976,7 +1976,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Character classes captured through Prettier into internal/format/markdown/classes_generated.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Ika <ikatyang@gmail.com> (https://github.com/ikatyang)
@@ -1998,7 +1998,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### Unicode Character Database
 
@@ -2006,7 +2006,7 @@ SOFTWARE.
 - License: `Unicode-3.0`
 - In cohere: Character properties behind the generated tables in internal/format/doc and internal/format/markdown.
 
-````text
+```text
 UNICODE LICENSE V3
 
 COPYRIGHT AND PERMISSION NOTICE
@@ -2046,7 +2046,7 @@ Except as contained in this notice, the name of a copyright holder shall
 not be used in advertising or otherwise to promote the sale, use or other
 dealings in these Data Files or Software without prior written
 authorization of the copyright holder.
-````
+```
 
 ### ESLint
 
@@ -2054,7 +2054,7 @@ authorization of the copyright holder.
 - License: `MIT`
 - In cohere: Core lint rules in internal/lint/rules/core, ported.
 
-````text
+```text
 Copyright OpenJS Foundation and other contributors, <www.openjsf.org>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -2074,7 +2074,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
+```
 
 ### eslint-utils
 
@@ -2082,7 +2082,7 @@ THE SOFTWARE.
 - License: `MIT`
 - In cohere: The reference tracker in internal/lint/ecmascript/reference, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2018 Toru Nagashima
@@ -2104,7 +2104,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### typescript-eslint
 
@@ -2112,7 +2112,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: TypeScript lint rules in internal/lint/rules/typescript, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2019 typescript-eslint and other contributors
@@ -2134,7 +2134,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### oxc
 
@@ -2142,7 +2142,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Lint rules ported from oxc's, across internal/lint/rules.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2024-present VoidZero Inc. & Contributors
@@ -2165,7 +2165,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### eslint-plugin-react
 
@@ -2173,7 +2173,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: React lint rules in internal/lint/rules/react, ported.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2014 Yannick Croissant
@@ -2195,7 +2195,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### React
 
@@ -2203,7 +2203,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: eslint-plugin-react-hooks and the React Compiler's rules, in internal/lint/rules/react and internal/lint/ecmascript/high_level_intermediate_representation, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) Meta Platforms, Inc. and affiliates.
@@ -2225,7 +2225,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### Next.js
 
@@ -2233,7 +2233,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: @next/eslint-plugin-next's rules in internal/lint/rules/next, ported.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2025 Vercel, Inc.
@@ -2255,7 +2255,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### Tailwind CSS
 
@@ -2263,7 +2263,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Tailwind's class model in internal/lint/rules/tailwind, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) Tailwind Labs, Inc.
@@ -2285,7 +2285,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### prettier-plugin-tailwindcss
 
@@ -2293,7 +2293,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Tailwind class ordering in internal/lint/rules/tailwind, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) Tailwind Labs Inc.
@@ -2315,7 +2315,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### eslint-plugin-better-tailwindcss
 
@@ -2323,7 +2323,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Tailwind lint rules in internal/lint/rules/tailwind, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2023 Roger Schönbächler
@@ -2345,7 +2345,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### ts-api-utils
 
@@ -2353,7 +2353,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Type predicates in internal/lint/checking, through tsgolint's port of them.
 
-````text
+```text
 # MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -2374,7 +2374,7 @@ IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
 CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### tsutils
 
@@ -2382,7 +2382,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - License: `MIT`
 - In cohere: A function in internal/lint/rules/typescript/no_floating_promises.go, ported and modified.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2017 Klaus Meinhardt
@@ -2404,7 +2404,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### TSLint
 
@@ -2412,7 +2412,7 @@ SOFTWARE.
 - License: `Apache-2.0`
 - In cohere: A regular expression in internal/lint/rules/typescript/ban_tslint_comment.go, copied.
 
-````text
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -2614,7 +2614,7 @@ SOFTWARE.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-````
+```
 
 ### eslint-plugin-boundaries
 
@@ -2622,7 +2622,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: The boundary rules in internal/lint/rules/boundaries, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2020 Javier Brea
@@ -2644,7 +2644,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### eslint-plugin-eslint-comments
 
@@ -2652,7 +2652,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: A rule in internal/lint/rules/core/require_description.go, ported.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2016 Toru Nagashima
@@ -2674,7 +2674,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### globals
 
@@ -2683,7 +2683,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Global names captured into internal/lint/rules/core/no_extend_native.go.
 
-````text
+```text
 MIT License
 
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
@@ -2693,7 +2693,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### confusing-browser-globals
 
@@ -2701,7 +2701,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 - License: `MIT`
 - In cohere: The restricted globals list embedded in internal/lint/configuration/sets/typescript.json.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2013-present, Facebook, Inc.
@@ -2723,7 +2723,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### cspell dict-en_us
 
@@ -2732,7 +2732,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: English words captured into policy/Words.txt, which cohere-go's separated-folder-words rule splits with.
 
-````text
+```text
 MIT License
 
 Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
@@ -2754,7 +2754,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-````
+```
 
 ### cspell dict-software-terms
 
@@ -2763,7 +2763,7 @@ SOFTWARE.
 - License: `MIT`
 - In cohere: Software terms captured into policy/Words.txt, which cohere-go's separated-folder-words rule splits with.
 
-````text
+```text
 The MIT License (MIT)
 
 Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
@@ -2785,7 +2785,7 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-````
+```
 
 ## In the Swift engine
 
@@ -2799,7 +2799,7 @@ In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages r
 - License: `Apache-2.0 WITH Swift-exception`
 - In cohere: A Swift package compiled into cohere-swift.
 
-````text
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -3011,7 +3011,7 @@ In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages r
     portions of this Software are embedded into the binary product as a result,
     you may redistribute such product without providing attribution as would
     otherwise be required by Sections 4(a), 4(b) and 4(d) of the License.
-````
+```
 
 ### swift-cmark
 
@@ -3020,7 +3020,7 @@ In `cohere-swift`, which the two macOS packages ship beside `cohere`. Packages r
 - License: `BSD-2-Clause AND MIT`
 - In cohere: A Swift package compiled into cohere-swift.
 
-````text
+```text
 Copyright (c) 2014, John MacFarlane
 
 All rights reserved.
@@ -3191,7 +3191,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### swift-format
 
@@ -3200,7 +3200,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `Apache-2.0 WITH Swift-exception`
 - In cohere: A Swift package compiled into cohere-swift.
 
-````text
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -3412,7 +3412,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     portions of this Software are embedded into the binary product as a result,
     you may redistribute such product without providing attribution as would
     otherwise be required by Sections 4(a), 4(b) and 4(d) of the License.
-````
+```
 
 ### swift-markdown
 
@@ -3421,7 +3421,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `Apache-2.0 WITH Swift-exception`
 - In cohere: A Swift package compiled into cohere-swift.
 
-````text
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -3633,7 +3633,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     portions of this Software are embedded into the binary product as a result,
     you may redistribute such product without providing attribution as would
     otherwise be required by Sections 4(a), 4(b) and 4(d) of the License.
-````
+```
 
 ### swift-syntax
 
@@ -3642,7 +3642,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `Apache-2.0 WITH Swift-exception`
 - In cohere: A Swift package compiled into cohere-swift.
 
-````text
+```text
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -3854,7 +3854,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     portions of this Software are embedded into the binary product as a result,
     you may redistribute such product without providing attribution as would
     otherwise be required by Sections 4(a), 4(b) and 4(d) of the License.
-````
+```
 
 ## In this repository only
 
@@ -3867,7 +3867,7 @@ Used by tests and tools, or kept for them. None of these ship in any package.
 - License: `MIT`
 - In cohere: A Go module that tests and tools import.
 
-````text
+```text
 Copyright (c) 2016 Dmitry Panov
 
 Copyright (c) 2012 Robert Krimen
@@ -3883,7 +3883,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```
 
 ### github.com/go-sourcemap/sourcemap
 
@@ -3892,7 +3892,7 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 - License: `BSD-2-Clause`
 - In cohere: A Go module that tests and tools import.
 
-````text
+```text
 Copyright (c) 2016 The github.com/go-sourcemap/sourcemap Contributors.
 All rights reserved.
 
@@ -3918,7 +3918,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-````
+```
 
 ### github.com/google/pprof
 
@@ -3927,7 +3927,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `Apache-2.0`
 - In cohere: A Go module that tests and tools import.
 
-````text
+```text
 
                                  Apache License
                            Version 2.0, January 2004
@@ -4130,7 +4130,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
-````
+```
 
 ### Prettier's bundled builds
 
@@ -4138,7 +4138,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 - License: `MIT`
 - In cohere: Built Prettier bundles vendored in internal/format/prettier/bundles, which tests compare the formatter against. They bundle many other projects, whose licenses are in internal/format/prettier/bundles/THIRD-PARTY-NOTICES.md.
 
-````text
+```text
 Copyright © James Long and contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
@@ -4146,4 +4146,4 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-````
+```

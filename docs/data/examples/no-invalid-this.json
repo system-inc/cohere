@@ -18,7 +18,5 @@
         "file": "/repository/source/NoInvalidThis.ts",
         "source": "class C { field = this }"
     },
-    "assertedMessageIds": [
-        "unexpectedThis"
-    ]
+    "assertedMessageIds": ["unexpectedThis"]
 }

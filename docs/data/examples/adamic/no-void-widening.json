@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "const f: () => void = () => 42;\nf();\n"
     },
-    "assertedMessageIds": [
-        "voidWidening"
-    ]
+    "assertedMessageIds": ["voidWidening"]
 }

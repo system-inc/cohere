@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-uppercase-initialism"
-  },
-  "messages": {
-    "uppercaseInitialism": {
-      "text": "Identifier \"{{name}}\" spells an initialism in capitals. Use \"{{suggestedName}}\": the house writes an initialism the way it writes any other word in a name, capitalized at its first letter only, as in Url, Id, Json and Http. A run of capitals hides where one word ends and the next begins, and a name spelled one way here and another way there is two names for the next reader to search for."
+    "rules": {
+        "Go": "cohere-go/consistency-no-uppercase-initialism"
+    },
+    "messages": {
+        "uppercaseInitialism": {
+            "text": "Identifier \"{{name}}\" spells an initialism in capitals. Use \"{{suggestedName}}\": the house writes an initialism the way it writes any other word in a name, capitalized at its first letter only, as in Url, Id, Json and Http. A run of capitals hides where one word ends and the next begins, and a name spelled one way here and another way there is two names for the next reader to search for."
+        }
     }
-  }
 }

@@ -18,8 +18,5 @@
         "file": "file.ts",
         "source": "function f() { throw error; }"
     },
-    "assertedMessageIds": [
-        "unnecessaryCatch",
-        "unnecessaryCatchClause"
-    ]
+    "assertedMessageIds": ["unnecessaryCatch", "unnecessaryCatchClause"]
 }

@@ -1,10 +1,28 @@
 {
     "rule": "react/no-unknown-property",
-    "assertedMessageIds": [
-        "dataLowercaseRequired",
-        "invalidPropOnTag",
-        "unknownProp",
-        "unknownPropWithStandardName"
-    ],
+    "firing": {
+        "file": "/repository/source/NoUnknownProperty.tsx",
+        "source": "<div position=\"x\" class=\"y\" />\n",
+        "findings": [
+            {
+                "line": 1,
+                "column": 6,
+                "endLine": 1,
+                "endColumn": 18,
+                "messageId": "unknownProp",
+                "message": "Unknown property 'position' found"
+            },
+            {
+                "line": 1,
+                "column": 19,
+                "endLine": 1,
+                "endColumn": 28,
+                "messageId": "unknownPropWithStandardName",
+                "message": "Unknown property 'class' found, use 'className' instead",
+                "fix": true
+            }
+        ]
+    },
+    "assertedMessageIds": ["dataLowercaseRequired", "invalidPropOnTag", "unknownProp", "unknownPropWithStandardName"],
     "assertsFix": true
 }

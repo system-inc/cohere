@@ -18,7 +18,5 @@
         "file": "probe.ts",
         "source": "const Color = { Red: 'Red' };\n"
     },
-    "assertedMessageIds": [
-        "noEnum"
-    ]
+    "assertedMessageIds": ["noEnum"]
 }

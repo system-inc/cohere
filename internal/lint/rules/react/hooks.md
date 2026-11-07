@@ -1,12 +1,12 @@
 # `react-hooks/hooks`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **21** |
-| Plugin | `react-hooks` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Yes**       |
+| Violations in ahra     | **21**        |
+| Plugin                 | `react-hooks` |
+| Auto-fixable           | yes           |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -28,4 +28,3 @@ It validates the rules of hooks, which is a correctness rule and not stylistic, 
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

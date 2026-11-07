@@ -18,7 +18,5 @@
         "file": "/repository/source/ClassAssign.ts",
         "source": "class A { } A = 0;"
     },
-    "assertedMessageIds": [
-        "noClassAssign"
-    ]
+    "assertedMessageIds": ["noClassAssign"]
 }

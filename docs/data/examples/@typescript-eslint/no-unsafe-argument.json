@@ -18,10 +18,5 @@
         "file": "/repository/source/Arguments.ts",
         "source": "doesNotExist(1 as any);\n"
     },
-    "assertedMessageIds": [
-        "unsafeArgument",
-        "unsafeArraySpread",
-        "unsafeSpread",
-        "unsafeTupleSpread"
-    ]
+    "assertedMessageIds": ["unsafeArgument", "unsafeArraySpread", "unsafeSpread", "unsafeTupleSpread"]
 }

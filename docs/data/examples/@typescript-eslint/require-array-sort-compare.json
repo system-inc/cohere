@@ -4,7 +4,5 @@
         "file": "/repository/source/Sorting.ts",
         "source": "['foo', 'bar', 'baz'].sort();\n"
     },
-    "assertedMessageIds": [
-        "requireCompare"
-    ]
+    "assertedMessageIds": ["requireCompare"]
 }

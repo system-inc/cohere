@@ -1,12 +1,12 @@
 # `no-template-curly-in-string`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **2** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                |
+| ---------------------- | -------------- |
+| **Recommendation**     | **Strong Yes** |
+| Violations in ahra     | **2**          |
+| Plugin                 | `eslint core`  |
+| Auto-fixable           | no             |
+| Needs type information | no             |
 
 ## What it checks
 
@@ -39,4 +39,3 @@ Catches a defect rather than a preference, and the cleanup is small enough to do
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

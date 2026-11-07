@@ -18,7 +18,5 @@
         "file": "/repository/source/A.ts",
         "source": "export const fromA = 1;\nexport type FromAType = number;\ndeclare function use(value: unknown): void;\nimport * as b from './B';\nuse(b);\n"
     },
-    "assertedMessageIds": [
-        "loadTimeReadInImportCycle"
-    ]
+    "assertedMessageIds": ["loadTimeReadInImportCycle"]
 }

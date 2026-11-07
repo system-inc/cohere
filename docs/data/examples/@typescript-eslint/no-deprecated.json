@@ -18,7 +18,5 @@
         "file": "/repository/source/Subject.ts",
         "source": "/** @deprecated Use b instead. */\ndeclare function a(): void;\ndeclare function b(): void;\n"
     },
-    "assertedMessageIds": [
-        "deprecatedWithReason"
-    ]
+    "assertedMessageIds": ["deprecatedWithReason"]
 }

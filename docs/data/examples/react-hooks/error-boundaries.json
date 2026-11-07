@@ -18,7 +18,5 @@
         "file": "component.tsx",
         "source": "let el;\ntry {\n  el = <div />;\n} catch {\n  el = null;\n}\n"
     },
-    "assertedMessageIds": [
-        "jsxInTryStatement"
-    ]
+    "assertedMessageIds": ["jsxInTryStatement"]
 }

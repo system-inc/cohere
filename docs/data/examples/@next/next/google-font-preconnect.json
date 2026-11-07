@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "export const Test = (props) => <link {...props} />;"
     },
-    "assertedMessageIds": [
-        "googleFontPreconnect"
-    ]
+    "assertedMessageIds": ["googleFontPreconnect"]
 }

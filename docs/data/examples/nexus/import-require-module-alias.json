@@ -18,9 +18,5 @@
         "file": "/repository/source/Thing.tsx",
         "source": "import 'react';\n"
     },
-    "assertedMessageIds": [
-        "requireAliasName",
-        "requireDefaultStyle",
-        "requireNamespaceStyle"
-    ]
+    "assertedMessageIds": ["requireAliasName", "requireDefaultStyle", "requireNamespaceStyle"]
 }

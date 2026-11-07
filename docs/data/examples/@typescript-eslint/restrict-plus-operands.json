@@ -18,9 +18,5 @@
         "file": "file.ts",
         "source": "let x = 5;\n"
     },
-    "assertedMessageIds": [
-        "bigintAndNumber",
-        "invalid",
-        "mismatched"
-    ]
+    "assertedMessageIds": ["bigintAndNumber", "invalid", "mismatched"]
 }

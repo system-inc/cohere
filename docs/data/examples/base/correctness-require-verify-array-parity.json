@@ -18,7 +18,5 @@
         "file": "/repository/source/Entity.ts",
         "source": "declare function VerifyIsArray(): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyArrayMinimumSize(size: number): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyIsNotEmpty(): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyIsString(): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyIsNumber(): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyIsOptional(): PropertyDecorator & ParameterDecorator;\ndeclare function VerifyBy(check: unknown): PropertyDecorator & ParameterDecorator;\ndeclare function VerifySomethingCustom(): PropertyDecorator & ParameterDecorator;\ndeclare function NotAVerifyDecorator(): PropertyDecorator & ParameterDecorator;\ndeclare function OrmColumn(): PropertyDecorator & ParameterDecorator;\nclass Entity { names: string[]; }\n"
     },
-    "assertedMessageIds": [
-        "missingArrayRule"
-    ]
+    "assertedMessageIds": ["missingArrayRule"]
 }

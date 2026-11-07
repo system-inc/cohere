@@ -18,9 +18,5 @@
         "file": "/repository/source/ImplicitGlobals.ts",
         "source": "const a = 1;"
     },
-    "assertedMessageIds": [
-        "globalLexicalBinding",
-        "globalNonLexicalBinding",
-        "globalVariableLeak"
-    ]
+    "assertedMessageIds": ["globalLexicalBinding", "globalNonLexicalBinding", "globalVariableLeak"]
 }

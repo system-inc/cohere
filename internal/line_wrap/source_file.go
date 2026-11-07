@@ -31,9 +31,11 @@ const (
 	CategoryImport        Category = "Import"
 	// CategoryNotReported is a long line consistency_no_long_line leaves alone, only with Options.ReportedOnly.
 	CategoryNotReported Category = "NotReported"
-	// CategoryNotCured is a long line no wrap brings within the limit, left as gofmt printed it, only with
-	// Options.CuredOnly.
+	// CategoryNotCured is a long line left as gofmt printed it: no wrap brings it within the limit, with
+	// Options.CuredOnly, or its wrap would move a comment, with Options.KeepComments.
 	CategoryNotCured Category = "NotCured"
+	// CategoryComment is a long line that opens inside a comment, left as it is, only with Options.KeepComments.
+	CategoryComment Category = "Comment"
 )
 
 // Categories lists every category in report order.
@@ -47,6 +49,7 @@ var Categories = []Category{
 	CategoryImport,
 	CategoryNotReported,
 	CategoryNotCured,
+	CategoryComment,
 }
 
 // Options are the choices a run makes that a ruling may still change.
@@ -68,9 +71,18 @@ type Options struct {
 	// it.
 	CuredOnly bool
 
-	// uncured are the spans of the source, in kept bytes (see keptByte), of the lines a CuredOnly wrap leaves alone.
-	// Wrap sets it between its tries; a byte's kept index is the same in every pass, since a wrap only moves
-	// whitespace, commas and comment slashes.
+	// KeepComments leaves every comment as it is: no prose comment is reflowed, a long line that opens inside a
+	// comment is CategoryComment, and a construct whose break would change a comment's text, move it onto a line of
+	// its own or off one, change the indentation of one alone on its line, or move what follows it onto another line
+	// is left as it was, and the wrap is tried again without it. Comments are data that line-based readers parse (an
+	// Example's `// Output:` block, a directive, a project's own marker lines), so a fix must not rewrite them, and a
+	// long comment stays a finding for a person. The fix phase sets it. The command line does not: whoever runs it
+	// reviews its diff, and taking a tree to zero by hand needs its prose comments reflowed.
+	KeepComments bool
+
+	// uncured are the spans of the source, in kept bytes (see keptByte), of the lines a CuredOnly or KeepComments wrap
+	// leaves alone. Wrap sets it between its tries; a byte's kept index is the same in every pass, since a wrap only
+	// moves whitespace, commas and comment slashes.
 	uncured []keptSpan
 }
 
@@ -103,7 +115,7 @@ type sourceFile struct {
 	// reportedLines are the lines consistency_no_long_line reports, read only with Options.ReportedOnly.
 	reportedLines map[int]bool
 	// keptStarts holds, for each line from the first and then for the end of the source, how many kept bytes come
-	// before it, read only with Options.CuredOnly.
+	// before it, read only with Options.CuredOnly or Options.KeepComments.
 	keptStarts []int
 	options    Options
 }
@@ -128,7 +140,7 @@ func parseSource(source []byte, options Options) (*sourceFile, error) {
 		options:          options,
 	}
 	sourceFile.lineStarts = sourceFile.tokenFile.Lines()
-	if options.CuredOnly {
+	if options.CuredOnly || options.KeepComments {
 		sourceFile.keptStarts = keptStarts(source, sourceFile.lineStarts)
 	}
 	if options.ReportedOnly {
@@ -374,6 +386,15 @@ func (sourceFile *sourceFile) commentOnlyLine(line int) (commentSpan, bool) {
 	return comment, true
 }
 
+// opensInComment is whether the first byte of a line past its indentation is inside a comment: a comment alone on its
+// line, or a line of a block comment that runs over several.
+func (sourceFile *sourceFile) opensInComment(line int) bool {
+	start, _ := sourceFile.lineBounds(line)
+	text := sourceFile.lineText(line)
+	_, inComment := sourceFile.commentAt(start + len(text) - len(strings.TrimLeft(text, " \t")))
+	return inComment
+}
+
 // commaBetween reports whether a comma sits between two offsets. Between a list's last element and its closing
 // bracket there is only whitespace, comments and an optional comma, so any comma byte outside a comment is it.
 func (sourceFile *sourceFile) commaBetween(start, end int) bool {
@@ -405,6 +426,9 @@ func (sourceFile *sourceFile) classify(line int) Category {
 	}
 	if comment, isComment := sourceFile.commentOnlyLine(line); isComment && isDirective(comment.text) {
 		return CategoryDirective
+	}
+	if sourceFile.options.KeepComments && sourceFile.opensInComment(line) {
+		return CategoryComment
 	}
 	if sourceFile.stringAloneLines[line] {
 		return CategoryStringAlone

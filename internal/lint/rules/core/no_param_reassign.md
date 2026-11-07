@@ -1,12 +1,12 @@
 # `no-param-reassign`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | **42** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                |
+| ---------------------- | -------------- |
+| **Recommendation**     | **Strong Yes** |
+| Violations in ahra     | **42**         |
+| Plugin                 | `eslint core`  |
+| Auto-fixable           | no             |
+| Needs type information | no             |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ if(typeof data == 'string') data = new TextEncoder().encode(data);
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

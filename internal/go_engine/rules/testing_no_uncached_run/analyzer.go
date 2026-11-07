@@ -6,6 +6,7 @@
 package testing_no_uncached_run
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
@@ -31,7 +32,8 @@ var Analyzer = &analysis.Analyzer{
 		"assigned that literal once, since -count=1 discards an honest test cache to rerun around a flaky test. " +
 		"Arguments the rule cannot read as constants, and those after -args, which go to the test binary, leave it " +
 		"quiet, as does a // Uncached: <reason> comment directly above the call's statement or at the end of it.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -54,11 +56,15 @@ type argument struct {
 }
 
 func run(pass *analysis.Pass) (any, error) {
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	known := gatherLocals(pass)
 	// A literal spread from a local reaches every command that spreads that local, and one finding at it is enough.
 	reported := map[token.Pos]bool{}
 	for _, file := range pass.Files {
-		comments := marker.NewIndex(pass.Fset, file)
+		comments := indexes.ForFile(file)
 		// The nodes from the file down to the one being visited, so a call finds the statement holding it.
 		var enclosing []ast.Node
 		ast.Inspect(file, func(node ast.Node) bool {

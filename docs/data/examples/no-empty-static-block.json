@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "export class Thing {}\n"
     },
-    "assertedMessageIds": [
-        "unexpectedEmptyStaticBlock"
-    ]
+    "assertedMessageIds": ["unexpectedEmptyStaticBlock"]
 }

@@ -20,9 +20,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "function f(a: string): void {\n  /bar/.test();\n}\n"
     },
-    "assertedMessageIds": [
-        "preferIncludes",
-        "preferStringIncludes"
-    ],
+    "assertedMessageIds": ["preferIncludes", "preferStringIncludes"],
     "assertsFix": true
 }

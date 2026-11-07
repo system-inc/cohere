@@ -18,7 +18,5 @@
         "file": "/repository/source/IrregularWhitespace.tsx",
         "source": "var any = '　';"
     },
-    "assertedMessageIds": [
-        "noIrregularWhitespace"
-    ]
+    "assertedMessageIds": ["noIrregularWhitespace"]
 }

@@ -33,16 +33,9 @@ func TestShoutingMaskGatesPreserveOutput(test *testing.T) {
 		test.Fatal("the structure corpus gave no comment texts, so there is nothing to compare the gates over")
 	}
 
-	// Ungated reference implementations, copied from before the gates.
-	referenceCommand := func(text string) string {
-		lines := strings.Split(text, "\n")
-		for index, line := range lines {
-			if commandLine.MatchString(jsDocGutter.ReplaceAllString(line, "")) {
-				lines[index] = strings.Repeat(" ", len(line))
-			}
-		}
-		return strings.Join(lines, "\n")
-	}
+	// Ungated reference implementations. The command one is the line pass itself, which the gate only
+	// decides whether to run; the example one is copied from before its gate.
+	referenceCommand := blankCommandLines
 	referenceExamples := func(text string) string {
 		lines := strings.Split(text, "\n")
 		insideExample := false

@@ -34,7 +34,7 @@ import NodePath from 'node:path';
 import { loadDesignSystem, parseCandidate, readingOf } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: context.mjs <theme.css> [--resolve-root <dir>]\n');
     process.exit(2);
 }
@@ -63,13 +63,13 @@ const { designSystem, tailwindVersion, entryPoint, recordedEntryPoint, resolveRo
 const keysByNamespace = {};
 {
     const candidatePrefixes = new Set();
-    for (const [key] of designSystem.theme.entries()) {
+    for(const [key] of designSystem.theme.entries()) {
         const segments = key.slice(2).split('-');
-        for (let length = 1; length <= segments.length - 1; length++) {
+        for(let length = 1; length <= segments.length - 1; length++) {
             candidatePrefixes.add('--' + segments.slice(0, length).join('-'));
         }
     }
-    for (const prefix of candidatePrefixes) {
+    for(const prefix of candidatePrefixes) {
         let keys;
         try {
             keys = designSystem.theme.keysInNamespaces([prefix]);
@@ -77,7 +77,7 @@ const keysByNamespace = {};
         catch {
             continue;
         }
-        if (!keys || keys.length === 0) continue;
+        if(!keys || keys.length === 0) continue;
         keysByNamespace[prefix] = keys;
     }
 }
@@ -104,13 +104,13 @@ const propertyOrder = [];
         bundleSource = '';
     }
     const orderMatch = bundleSource.match(/\["container-type","pointer-events"[^\]]*\]/);
-    if (orderMatch === null) {
+    if(orderMatch === null) {
         // Loud rather than empty. An empty property order silently reads every arbitrary property as
         // unknown, which sorts them all together and looks like a stable answer.
         process.stderr.write('context.mjs: could not locate the property order in the bundle\n');
         process.exit(3);
     }
-    for (const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
+    for(const property of JSON.parse(orderMatch[0])) propertyOrder.push(property);
 }
 
 /*
@@ -130,33 +130,33 @@ const propertyOrder = [];
 const perDeclarationRoots = [];
 {
     const registryClassNames = [];
-    for (const entry of designSystem.getClassList()) {
+    for(const entry of designSystem.getClassList()) {
         registryClassNames.push(Array.isArray(entry) ? entry[0] : entry);
     }
 
     const functionalRoots = new Set();
-    for (const className of registryClassNames) {
-        for (const probe of [className, className + '-4']) {
+    for(const className of registryClassNames) {
+        for(const probe of [className, className + '-4']) {
             const candidate = parseCandidate(designSystem, probe);
-            if (candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
+            if(candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
         }
     }
 
     // The values that separate the two resolution paths: one only an integer, and the theme keys of
     // every `--percentage*` namespace, which are what a value can additionally satisfy.
     const percentageKeys = new Set();
-    for (const namespace of namespaces) {
-        if (!namespace.startsWith('--percentage')) continue;
-        for (const key of keysByNamespace[namespace]) percentageKeys.add(key);
+    for(const namespace of namespaces) {
+        if(!namespace.startsWith('--percentage')) continue;
+        for(const key of keysByNamespace[namespace]) percentageKeys.add(key);
     }
 
-    for (const root of Array.from(functionalRoots).sort()) {
+    for(const root of Array.from(functionalRoots).sort()) {
         const integerOnly = readingOf(designSystem, root + '-4');
-        if (integerOnly === null) continue;
-        for (const key of percentageKeys) {
+        if(integerOnly === null) continue;
+        for(const key of percentageKeys) {
             const both = readingOf(designSystem, root + '-' + key);
-            if (both === null) continue;
-            if (both.count !== integerOnly.count) {
+            if(both === null) continue;
+            if(both.count !== integerOnly.count) {
                 perDeclarationRoots.push(root);
                 break;
             }
@@ -181,37 +181,43 @@ const perDeclarationRoots = [];
 const unlistedStatics = {};
 {
     const registry = new Set();
-    for (const entry of designSystem.getClassList()) {
+    for(const entry of designSystem.getClassList()) {
         registry.add(Array.isArray(entry) ? entry[0] : entry);
     }
 
     const functionalRoots = new Set();
-    for (const className of registry) {
-        for (const probe of [className, className + '-4']) {
+    for(const className of registry) {
+        for(const probe of [className, className + '-4']) {
             const candidate = parseCandidate(designSystem, probe);
-            if (candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
+            if(candidate?.kind === 'functional' && candidate.root) functionalRoots.add(candidate.root);
         }
     }
 
-    for (const root of Array.from(functionalRoots).sort()) {
-        for (const keyword of ['none', 'auto', 'full', 'first', 'last', 'initial', 'inherit']) {
+    for(const root of Array.from(functionalRoots).sort()) {
+        for(const keyword of ['none', 'auto', 'full', 'first', 'last', 'initial', 'inherit']) {
             const probe = root + '-' + keyword;
-            if (registry.has(probe)) continue;
+            if(registry.has(probe)) continue;
             const candidate = parseCandidate(designSystem, probe);
-            if (candidate?.kind !== 'static' || candidate.root !== probe) continue;
+            if(candidate?.kind !== 'static' || candidate.root !== probe) continue;
             const reading = readingOf(designSystem, probe);
-            if (reading === null) continue;
+            if(reading === null) continue;
             unlistedStatics[probe] = { order: reading.order, count: reading.count };
         }
     }
 }
 
-process.stdout.write(JSON.stringify({
-    tailwindVersion,
-    entryPoint: recordedEntryPoint,
-    namespaces,
-    keysByNamespace,
-    propertyOrder,
-    perDeclarationRoots,
-    unlistedStatics,
-}, null, 2) + '\n');
+process.stdout.write(
+    JSON.stringify(
+        {
+            tailwindVersion,
+            entryPoint: recordedEntryPoint,
+            namespaces,
+            keysByNamespace,
+            propertyOrder,
+            perDeclarationRoots,
+            unlistedStatics,
+        },
+        null,
+        2,
+    ) + '\n',
+);

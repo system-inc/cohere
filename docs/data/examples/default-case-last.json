@@ -18,7 +18,5 @@
         "file": "/repository/source/DefaultCaseLast.ts",
         "source": "switch (foo) {}"
     },
-    "assertedMessageIds": [
-        "notLast"
-    ]
+    "assertedMessageIds": ["notLast"]
 }

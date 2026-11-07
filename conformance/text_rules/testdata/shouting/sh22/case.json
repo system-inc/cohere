@@ -1,0 +1,10 @@
+{
+    "why": "sh22: a table of commands set in deeper than the sentence above it is not that sentence going on, so it stays masked though its first words read like prose",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}

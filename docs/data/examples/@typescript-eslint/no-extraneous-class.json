@@ -18,9 +18,5 @@
         "file": "/repository/source/Classes.ts",
         "source": "\nclass Foo {\n  [key: string]: string;\n}\n    "
     },
-    "assertedMessageIds": [
-        "empty",
-        "onlyConstructor",
-        "onlyStatic"
-    ]
+    "assertedMessageIds": ["empty", "onlyConstructor", "onlyStatic"]
 }

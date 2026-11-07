@@ -1,12 +1,12 @@
 # `nexus/correctness-no-discarded-outcome`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` once ahra's 4 sites are fixed.** 4 findings on ahra, 0 false |
-| Findings | **ahra 4**, all `writeJsonFile` state writes (measured 2026-10-03) |
-| Measured precision | 4 of 4 true: each drops a `JsonFileWriteOutcomeType` whose `Unwritable` arm is never read |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error` once ahra's 4 sites are fixed.** 4 findings on ahra, 0 false                                   |
+| Findings               | **ahra 4**, all `writeJsonFile` state writes (measured 2026-10-03)                                               |
+| Measured precision     | 4 of 4 true: each drops a `JsonFileWriteOutcomeType` whose `Unwritable` arm is never read                        |
+| Plugin                 | cohere-native, `nexus`                                                                                           |
+| Auto-fixable           | no                                                                                                               |
 | Needs type information | yes, to read the call's type and trace each arm to its declaration; without a checker the rule registers nothing |
 
 ## What it checks
@@ -16,13 +16,13 @@ types, so the outcome, failure arm included, is thrown away. The types are decid
 alias name and the Nexus file that declares it, never a name pattern or the presence of an `outcome` field.
 The five, which are every outcome union in Nexus on 2026-10-03:
 
-| Type | Declared in | Returned by |
-|---|---|---|
-| `JsonParseOutcomeType` | `nexus/source/structured-text/json/Json.ts` | `parseJson` |
-| `JsoncParseOutcomeType` | `nexus/source/structured-text/json/Jsonc.ts` | `parseJsonc` |
-| `JsonFileReadOutcomeType` | `nexus/source/structured-text/json/JsonFile.ts` | `readJsonFile` |
-| `JsonFileWriteOutcomeType` | `nexus/source/structured-text/json/JsonFile.ts` | `writeJsonFile` |
-| `PackageJsonReadOutcomeType` | `nexus/source/system/PackageJson.ts` | `readPackageJson` |
+| Type                         | Declared in                                     | Returned by       |
+| ---------------------------- | ----------------------------------------------- | ----------------- |
+| `JsonParseOutcomeType`       | `nexus/source/structured-text/json/Json.ts`     | `parseJson`       |
+| `JsoncParseOutcomeType`      | `nexus/source/structured-text/json/Jsonc.ts`    | `parseJsonc`      |
+| `JsonFileReadOutcomeType`    | `nexus/source/structured-text/json/JsonFile.ts` | `readJsonFile`    |
+| `JsonFileWriteOutcomeType`   | `nexus/source/structured-text/json/JsonFile.ts` | `writeJsonFile`   |
+| `PackageJsonReadOutcomeType` | `nexus/source/system/PackageJson.ts`            | `readPackageJson` |
 
 A project wrapper returning one of these is reported where its result is dropped, written or inferred
 return type alike. The test is on the arms, so an optional call's `JsonFileWriteOutcomeType | undefined`
@@ -46,14 +46,14 @@ keyed the way research was (any constituent with an `outcome` member) reproduces
 on today's tree, so the gap is the scope and nothing else: the other 11 discard outcome types ahra declares
 itself, which this rule does not recognize by design.
 
-| Site | Type, declared in ahra |
-|---|---|
-| `modules/os/wisdom/AhraOsWisdom.ts:4210` (`withdrawVerdict`) | `WithdrawVerdictOutcomeInterface` |
-| `modules/os/wisdom/AhraOsWisdomApi.ts:1054` (`flagTaskAsIntent`) | `FlagTaskIntentOutcomeType` |
-| `modules/os/lifecycle/AhraOsWake.ts:826` (`await wakePosition`) | `WakeOutcomeInterface` |
-| `modules/os/minds/runtime/MindRuntimeSupervisor.ts:980` | `DeliverAndWakeResultInterface` |
-| `app/(os-layout)/os/wisdom/_components/` x4 (`WisdomAcceptStrikeControls.tsx:41`, `:59`, `WisdomDecisionCard.tsx:68`, `WisdomFailedControls.tsx:38`) | `WisdomCompletionResponseInterface` |
-| `app/(os-layout)/_components/detail/TaskDetailActions.tsx:139`, `:152`, `os/wisdom/_components/WisdomHome.tsx:297` | anonymous unions with `outcome` arms |
+| Site                                                                                                                                                 | Type, declared in ahra               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `modules/os/wisdom/AhraOsWisdom.ts:4210` (`withdrawVerdict`)                                                                                         | `WithdrawVerdictOutcomeInterface`    |
+| `modules/os/wisdom/AhraOsWisdomApi.ts:1054` (`flagTaskAsIntent`)                                                                                     | `FlagTaskIntentOutcomeType`          |
+| `modules/os/lifecycle/AhraOsWake.ts:826` (`await wakePosition`)                                                                                      | `WakeOutcomeInterface`               |
+| `modules/os/minds/runtime/MindRuntimeSupervisor.ts:980`                                                                                              | `DeliverAndWakeResultInterface`      |
+| `app/(os-layout)/os/wisdom/_components/` x4 (`WisdomAcceptStrikeControls.tsx:41`, `:59`, `WisdomDecisionCard.tsx:68`, `WisdomFailedControls.tsx:38`) | `WisdomCompletionResponseInterface`  |
+| `app/(os-layout)/_components/detail/TaskDetailActions.tsx:139`, `:152`, `os/wisdom/_components/WisdomHome.tsx:297`                                   | anonymous unions with `outcome` arms |
 
 These are likely real too; a project naming its own outcome types to this rule is the follow-up, not a
 widening of the type test.

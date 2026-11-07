@@ -1,12 +1,12 @@
 # `@typescript-eslint/consistent-indexed-object-style`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **43** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **43**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ export type AddOptionalPropertyType<T, K extends string, V> = T & {
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

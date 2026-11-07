@@ -18,9 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "class C { new() {} }"
     },
-    "assertedMessageIds": [
-        "classNew",
-        "interfaceConstruct",
-        "interfaceConstructor"
-    ]
+    "assertedMessageIds": ["classNew", "interfaceConstruct", "interfaceConstructor"]
 }

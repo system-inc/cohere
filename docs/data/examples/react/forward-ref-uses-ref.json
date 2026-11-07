@@ -19,8 +19,6 @@
         "file": "input.tsx",
         "source": "forwardRef;"
     },
-    "assertedMessageIds": [
-        "forwardRefUsesRef"
-    ],
+    "assertedMessageIds": ["forwardRefUsesRef"],
     "assertsSuggestion": true
 }

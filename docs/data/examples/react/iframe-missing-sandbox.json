@@ -18,9 +18,5 @@
         "file": "/repository/source/IframeMissingSandbox.tsx",
         "source": "<Foo.iframe />;\n"
     },
-    "assertedMessageIds": [
-        "attributeMissing",
-        "invalidCombination",
-        "invalidValue"
-    ]
+    "assertedMessageIds": ["attributeMissing", "invalidCombination", "invalidValue"]
 }

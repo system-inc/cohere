@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "if ((a = b));"
     },
-    "assertedMessageIds": [
-        "condAssign"
-    ]
+    "assertedMessageIds": ["condAssign"]
 }

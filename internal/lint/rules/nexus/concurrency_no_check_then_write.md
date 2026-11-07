@@ -1,14 +1,14 @@
 # `nexus/concurrency-no-check-then-write`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at `error` once ahra's 8 findings are fixed (`#9erqsas`, one library helper for all eight). Registered `off` in ahra until then |
-| Findings | **ahra 8, www-phi-health 0, www-connected-app 0, api-phi-health 0** (measured 2026-10-02) |
-| Measured precision | 8 of 8 true: every finding is a free-name search whose name a later non-exclusive write claims |
-| Research count | 8, probe `P1c_freeNameProbeLoopThenNonExclusiveWrite`, the same 8 sites |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, every callee is resolved through the checker; without a checker the rule registers nothing |
+|                        |                                                                                                                                          |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, at `error` once ahra's 8 findings are fixed (`#9erqsas`, one library helper for all eight). Registered `off` in ahra until then |
+| Findings               | **ahra 8, www-phi-health 0, www-connected-app 0, api-phi-health 0** (measured 2026-10-02)                                                |
+| Measured precision     | 8 of 8 true: every finding is a free-name search whose name a later non-exclusive write claims                                           |
+| Research count         | 8, probe `P1c_freeNameProbeLoopThenNonExclusiveWrite`, the same 8 sites                                                                  |
+| Plugin                 | cohere-native, `nexus`                                                                                                                   |
+| Auto-fixable           | no                                                                                                                                       |
+| Needs type information | yes, every callee is resolved through the checker; without a checker the rule registers nothing                                          |
 
 ## What it checks
 
@@ -42,16 +42,16 @@ all nine, the fixed `IntelligenceMediaGenerationApi.ts` included.
 (`MagnificApi.ts:406` and `OpenAiApi.ts:309`): commits 4e385b61 and 1382cbe9 moved those files after
 the probe ran, and the reported line is the same `access` call.
 
-| Site | Write | Reading |
-|---|---|---|
-| `modules/kling/KlingApi.ts:253` | `writeFile` of the mp4, after a whole network download | **Bug.** In-process and cross-process race, with the widest window of the eight |
-| `modules/kling/KlingApi.ts:383` | `writeFile` of a png, inside `urls.map(async ...)` | **Bug.** Siblings of one call race each other: two downloads can settle on the same index |
-| `modules/magnific/MagnificApi.ts:416` | `writeFile` after a download | **Bug.** Same loop, same race |
-| `modules/openai/OpenAiApi.ts:310` | `writeFile` of decoded or downloaded bytes | **Bug.** Same loop, same race |
-| `modules/openai/OpenAiCommandLineInterface.ts:144` | `copyFile` from the generator's temporary file | **Bug.** Same loop; the copy replaces an existing file |
-| `modules/art/ArtApi.ts:231` | `writeFileSync` of the video | **Bug**, narrower: synchronous, so it races only across two CLI runs |
-| `modules/art/ArtLibrary.ts:65` | `copyFileSync` into the library | **Bug**, narrower, as above |
-| `modules/phi/social/PhiSocialLibrary.ts:210` | sharp's `toFile`, through two `const`s | **Bug**, narrower, as above. The write is matched because `toFile` resolves to the declaration file this file's `sharp` import resolved to |
+| Site                                               | Write                                                  | Reading                                                                                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `modules/kling/KlingApi.ts:253`                    | `writeFile` of the mp4, after a whole network download | **Bug.** In-process and cross-process race, with the widest window of the eight                                                            |
+| `modules/kling/KlingApi.ts:383`                    | `writeFile` of a png, inside `urls.map(async ...)`     | **Bug.** Siblings of one call race each other: two downloads can settle on the same index                                                  |
+| `modules/magnific/MagnificApi.ts:416`              | `writeFile` after a download                           | **Bug.** Same loop, same race                                                                                                              |
+| `modules/openai/OpenAiApi.ts:310`                  | `writeFile` of decoded or downloaded bytes             | **Bug.** Same loop, same race                                                                                                              |
+| `modules/openai/OpenAiCommandLineInterface.ts:144` | `copyFile` from the generator's temporary file         | **Bug.** Same loop; the copy replaces an existing file                                                                                     |
+| `modules/art/ArtApi.ts:231`                        | `writeFileSync` of the video                           | **Bug**, narrower: synchronous, so it races only across two CLI runs                                                                       |
+| `modules/art/ArtLibrary.ts:65`                     | `copyFileSync` into the library                        | **Bug**, narrower, as above                                                                                                                |
+| `modules/phi/social/PhiSocialLibrary.ts:210`       | sharp's `toFile`, through two `const`s                 | **Bug**, narrower, as above. The write is matched because `toFile` resolves to the declaration file this file's `sharp` import resolved to |
 
 **www-phi-health, www-connected-app, api-phi-health (0)**. None of the three has a free-name loop. The
 only other existence-check loop on the four trees is

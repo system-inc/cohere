@@ -1,0 +1,10 @@
+{
+    "why": "sh23: `sqlite3 db SELECT` continuing a sentence is a command, a word in capitals right after the command word being its argument, so the SQL stays masked",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}

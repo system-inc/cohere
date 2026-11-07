@@ -1,0 +1,11 @@
+// Package heldwrap holds a long line in a package that does not type-check, so its wrap waits for sound types.
+package heldwrap
+
+import "fmt"
+
+var  Spaced = 1
+
+// Describe says where a delivery goes, in one call a wrap breaks one argument per line once the types are sound.
+func Describe(sender string, recipient string, street string, city string) string {
+	return fmt.Sprintf("%s sends a parcel to %s, who lives at %s in %s, and it arrives soon", sender, recipient, street, city)
+}

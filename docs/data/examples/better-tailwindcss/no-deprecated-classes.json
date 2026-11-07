@@ -20,9 +20,6 @@
         "file": "Styles.ts",
         "source": "const description = 'flex-shrink-0';"
     },
-    "assertedMessageIds": [
-        "deprecatedClassIrreplaceable",
-        "deprecatedClassReplaceable"
-    ],
+    "assertedMessageIds": ["deprecatedClassIrreplaceable", "deprecatedClassReplaceable"],
     "assertsFix": true
 }

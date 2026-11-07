@@ -1,13 +1,13 @@
 {
-  "rules": {
-    "Go": "cohere-go/testing-no-machine-path"
-  },
-  "messages": {
-    "machinePath": {
-      "text": "This test names a home directory, so it reads a path that exists on one developer's machine and skips everywhere else, and its coverage lives on that machine alone without anyone being able to tell. Ask for code outside the repository by a name the environment resolves, or, if the literal only looks like a home path, say why in a `// Not a machine path: <reason>` comment at the end of its line or directly above its statement."
+    "rules": {
+        "Go": "cohere-go/testing-no-machine-path"
     },
-    "machinePathWithoutReason": {
-      "text": "This home directory is marked as not a machine path and gives no reason. Say what the literal is after `Not a machine path:`, such as the input a transform trims, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    "messages": {
+        "machinePath": {
+            "text": "This test names a home directory, so it reads a path that exists on one developer's machine and skips everywhere else, and its coverage lives on that machine alone without anyone being able to tell. Ask for code outside the repository by a name the environment resolves, or, if the literal only looks like a home path, say why in a `// Not a machine path: <reason>` comment at the end of its line or directly above its statement."
+        },
+        "machinePathWithoutReason": {
+            "text": "This home directory is marked as not a machine path and gives no reason. Say what the literal is after `Not a machine path:`, such as the input a transform trims, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+        }
     }
-  }
 }

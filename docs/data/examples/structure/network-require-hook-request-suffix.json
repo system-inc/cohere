@@ -26,8 +26,5 @@
         "file": "/repository/source/api/User.ts",
         "source": "import { networkService } from './NetworkService.ts';\ndeclare const gqlDocument: unknown;\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "fileShouldEndWithRequest",
-        "hookShouldEndWithRequest"
-    ]
+    "assertedMessageIds": ["fileShouldEndWithRequest", "hookShouldEndWithRequest"]
 }

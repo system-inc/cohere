@@ -31,3 +31,43 @@ func TestAnAdamicNameIsTreatedAsTypeScript(test *testing.T) {
 		}
 	}
 }
+
+// A test file is a `.test` name before each TypeScript or JavaScript script extension, or Adamic's
+// `.test.a`, and nothing that only resembles one: a `.spec` name, a name that holds `.test.` in its
+// middle, a `test` directory, a declaration file and a `.test` name before a non-script extension are
+// not. Each extension in the table has a row each way.
+func TestATestFileIsADotTestScriptName(test *testing.T) {
+	test.Parallel()
+	for name, want := range map[string]bool{
+		"/repo/Dog.test.ts":           true,
+		"/repo/Dog.test.tsx":          true,
+		"/repo/Dog.test.js":           true,
+		"/repo/Dog.test.jsx":          true,
+		"/repo/Dog.test.mts":          true,
+		"/repo/Dog.test.cts":          true,
+		"/repo/Dog.test.a":            true,
+		"Tests/announce.test.ts":      true,
+		"/repo/Dog.ts":                false,
+		"/repo/Dog.tsx":               false,
+		"/repo/Dog.js":                false,
+		"/repo/Dog.jsx":               false,
+		"/repo/Dog.mts":               false,
+		"/repo/Dog.cts":               false,
+		"/repo/Dog.a":                 false,
+		"/repo/Dog.spec.ts":           false,
+		"/repo/Dog.spec.tsx":          false,
+		"/repo/Dog.test.helpers.ts":   false,
+		"/repo/Dog.test.helpers.tsx":  false,
+		"/repo/test/Dog.ts":           false,
+		"/repo/Dog.test.d.ts":         false,
+		"/repo/DogTest.ts":            false,
+		"/repo/Dog.test.ts.snapshot":  false,
+		"/repo/Dog.test.json":         false,
+		"/repo/Dog.test.css":          false,
+		"/repo/Dog.test.mjs.snapshot": false,
+	} {
+		if got := source_name.IsTestFile(name); got != want {
+			test.Errorf("IsTestFile(%q) = %t, want %t", name, got, want)
+		}
+	}
+}

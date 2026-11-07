@@ -18,7 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "/// <reference lib=\"foo\" />\n"
     },
-    "assertedMessageIds": [
-        "tripleSlashReference"
-    ]
+    "assertedMessageIds": ["tripleSlashReference"]
 }

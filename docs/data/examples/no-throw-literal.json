@@ -18,8 +18,5 @@
         "file": "/repository/source/ThrowLiteral.ts",
         "source": "throw a;\n"
     },
-    "assertedMessageIds": [
-        "object",
-        "undef"
-    ]
+    "assertedMessageIds": ["object", "undef"]
 }

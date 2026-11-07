@@ -1619,10 +1619,7 @@
             "properties": {
                 "arrowParens": {
                     "description": "Parenthesize a sole arrow-function parameter always, or avoid it where possible.",
-                    "enum": [
-                        "always",
-                        "avoid"
-                    ],
+                    "enum": ["always", "avoid"],
                     "type": "string"
                 },
                 "bracketSameLine": {
@@ -1635,9 +1632,7 @@
                 },
                 "endOfLine": {
                     "description": "Line endings. Only lf is supported.",
-                    "enum": [
-                        "lf"
-                    ],
+                    "enum": ["lf"],
                     "type": "string"
                 },
                 "ignore": {
@@ -1667,11 +1662,7 @@
                 },
                 "trailingComma": {
                     "description": "Where multi-line lists keep a trailing comma.",
-                    "enum": [
-                        "all",
-                        "es5",
-                        "none"
-                    ],
+                    "enum": ["all", "es5", "none"],
                     "type": "string"
                 },
                 "useTabs": {
@@ -1698,12 +1689,7 @@
                         "description": "A severity, or [severity, options] with one options object.",
                         "oneOf": [
                             {
-                                "enum": [
-                                    "error",
-                                    "warn",
-                                    "warning",
-                                    "off"
-                                ],
+                                "enum": ["error", "warn", "warning", "off"],
                                 "type": "string"
                             },
                             {
@@ -1711,12 +1697,7 @@
                                 "minItems": 1,
                                 "prefixItems": [
                                     {
-                                        "enum": [
-                                            "error",
-                                            "warn",
-                                            "warning",
-                                            "off"
-                                        ],
+                                        "enum": ["error", "warn", "warning", "off"],
                                         "type": "string"
                                     },
                                     {
@@ -1731,9 +1712,7 @@
                     "type": "object"
                 }
             },
-            "required": [
-                "rules"
-            ],
+            "required": ["rules"],
             "type": "object"
         },
         "ignorePatterns": {
@@ -1808,11 +1787,7 @@
                     "additionalProperties": {
                         "oneOf": [
                             {
-                                "enum": [
-                                    "error",
-                                    "warning",
-                                    "off"
-                                ],
+                                "enum": ["error", "warning", "off"],
                                 "type": "string"
                             },
                             {
@@ -1820,11 +1795,7 @@
                                 "minItems": 1,
                                 "prefixItems": [
                                     {
-                                        "enum": [
-                                            "error",
-                                            "warning",
-                                            "off"
-                                        ],
+                                        "enum": ["error", "warning", "off"],
                                         "type": "string"
                                     },
                                     {
@@ -1839,15 +1810,11 @@
                     "type": "object"
                 }
             },
-            "required": [
-                "rules"
-            ],
+            "required": ["rules"],
             "type": "object"
         }
     },
-    "required": [
-        "format"
-    ],
+    "required": ["format"],
     "title": "NexusCohereSettings.json",
     "type": "object"
 }

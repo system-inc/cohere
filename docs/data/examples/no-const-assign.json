@@ -18,7 +18,5 @@
         "file": "/repository/source/ConstAssign.ts",
         "source": "var x = 0; x++;\n"
     },
-    "assertedMessageIds": [
-        "noConstAssign"
-    ]
+    "assertedMessageIds": ["noConstAssign"]
 }

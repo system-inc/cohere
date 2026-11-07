@@ -18,7 +18,5 @@
         "file": "components/Thing.tsx",
         "source": "import D from \"nextdocument\";\n"
     },
-    "assertedMessageIds": [
-        "noDocumentImportInPage"
-    ]
+    "assertedMessageIds": ["noDocumentImportInPage"]
 }

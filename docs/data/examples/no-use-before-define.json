@@ -18,7 +18,5 @@
         "file": "fixture.ts",
         "source": "Array\n"
     },
-    "assertedMessageIds": [
-        "usedBeforeDefined"
-    ]
+    "assertedMessageIds": ["usedBeforeDefined"]
 }

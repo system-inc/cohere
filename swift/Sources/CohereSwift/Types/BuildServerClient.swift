@@ -198,6 +198,10 @@ final class BuildServerClient {
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = arguments
         process.currentDirectoryURL = configuration.packageRoot
+        process.environment = Self.environment(
+            inheriting: ProcessInfo.processInfo.environment,
+            workingDirectory: configuration.packageRoot,
+        )
         process.standardInput = inputPipe
         process.standardOutput = outputPipe
         input = inputPipe.fileHandleForWriting
@@ -212,6 +216,21 @@ final class BuildServerClient {
             throw Failure(step: .launch, reason: .unusable("\(arguments.joined(separator: " ")): \(error)"))
         }
         Self.startReading(outputPipe.fileHandleForReading, into: inbox)
+    }
+
+    /*
+     The server's environment: this process's, less what differs between two runs of the same check. SwiftPM hashes
+     every variable into the key of each build-tool plugin's compile (`DefaultPluginScriptRunner` in 6.4.2), so one
+     that changes every run compiles every such plugin again every run. Measured 2026-11-06 on ahraos-presence:
+     mlx-swift's `CudaBuild` was compiled again on each check, 1.8s, though nothing had changed, because the front
+     door's `COHERE_PROJECT_YIELD` (a fresh file each run) and `COHERE_SWIFT_RESOLVED_BY` (its pid) had. Cohere's own
+     variables speak to cohere's processes and SwiftPM reads none of them; `OLDPWD` says only where a shell was
+     before, and `PWD` is made the folder the server runs in.
+     */
+    static func environment(inheriting inherited: [String: String], workingDirectory: URL) -> [String: String] {
+        var environment = inherited.filter { !$0.key.hasPrefix("COHERE_") && $0.key != "OLDPWD" }
+        environment["PWD"] = workingDirectory.path
+        return environment
     }
 
     deinit {

@@ -18,7 +18,5 @@
         "file": "/repository/source/Complexity.ts",
         "source": "function a(x) {}"
     },
-    "assertedMessageIds": [
-        "complex"
-    ]
+    "assertedMessageIds": ["complex"]
 }

@@ -103,6 +103,18 @@ var EnforceConsistentVariableSyntax = rule.Rule[EnforceConsistentVariableSyntaxO
 					ruleContext.ReportRange(literal.Range, messageVariableSyntax(className, corrected))
 				}
 			}
+			// The static runs of a template with holes, each class judged as upstream judges it, a class
+			// glued to a hole included: `bg-[var(--color-x)]${x}` reports. This rule offers no fix.
+			sourceText := ruleContext.SourceFile.Text()
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				for _, class := range TemplateClassesOf(sourceText, segments) {
+					corrected, isMisspelled := correctedVariableSyntax(class.Text, syntax)
+					if !isMisspelled {
+						continue
+					}
+					ruleContext.ReportRange(class.Range, messageVariableSyntax(class.Text, corrected))
+				}
+			}
 		}
 
 		listeners := rule.Listeners{}

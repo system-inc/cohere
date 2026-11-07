@@ -18,7 +18,5 @@
         "file": "/repository/source/JsxNoUndef.tsx",
         "source": "var React; React.render(<App />);"
     },
-    "assertedMessageIds": [
-        "jsxIdentifierNotDefined"
-    ]
+    "assertedMessageIds": ["jsxIdentifierNotDefined"]
 }

@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Thing.tsx",
         "source": "React.useEffect(() => {\n    run(properties.id);\n}, [properties]);\n"
     },
-    "assertedMessageIds": [
-        "extractPropertiesFirst"
-    ]
+    "assertedMessageIds": ["extractPropertiesFirst"]
 }

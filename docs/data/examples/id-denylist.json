@@ -1,7 +1,4 @@
 {
     "rule": "id-denylist",
-    "assertedMessageIds": [
-        "restricted",
-        "restrictedPrivate"
-    ]
+    "assertedMessageIds": ["restricted", "restrictedPrivate"]
 }

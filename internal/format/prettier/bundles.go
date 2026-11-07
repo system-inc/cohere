@@ -34,6 +34,11 @@ import (
  * against does the submodule track these (yes). If a path crosses a submodule boundary, `git
  * ls-files` from outside is answering about the pin rather than the contents, and `git submodule
  * status` names every boundary in one line.
+ *
+ * The house formatter never touches them. They are the fork's own output, the oracle every native printer
+ * is held to byte for byte, and a reformatted bundle is no longer what the fork built: the format check at
+ * cohere's root would have rewritten all eight. So cohere's CohereSettings.json names this directory in its
+ * ignorePatterns, by name rather than by any rule about generated or vendored files (#4wjhppw).
  */
 
 // bundleFileSystem holds the vendored bundles.

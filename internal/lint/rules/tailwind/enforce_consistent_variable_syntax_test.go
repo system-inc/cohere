@@ -86,6 +86,69 @@ func TestEnforceConsistentVariableSyntaxReports(test *testing.T) {
 	}
 }
 
+// TestEnforceConsistentVariableSyntaxInTemplateRuns reads the static runs of a template with holes.
+//
+// Measured on eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-07, with ahra's theme:
+// each piece of a template is judged as a literal, the class glued to a hole included, and each
+// finding lands on its own class.
+//
+//	`block bg-[var(--color-x)] ${x}`      reports bg-[var(--color-x)]
+//	`bg-[var(--color-x)]${x} block`       reports bg-[var(--color-x)]
+//	`block ${x}bg-[var(--color-x)]`       reports bg-[var(--color-x)]
+//	`bg-(--color-x) ${x} block`           silent
+func TestEnforceConsistentVariableSyntaxInTemplateRuns(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		classes []string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`block bg-[var(--color-x)] ${size}`} />;",
+			classes: []string{"bg-[var(--color-x)]"},
+		},
+		{
+			name:    "glued before a hole",
+			source:  "const element = <div className={`bg-[var(--color-x)]${size} block`} />;",
+			classes: []string{"bg-[var(--color-x)]"},
+		},
+		{
+			name:    "glued after a hole, in the last run",
+			source:  "const element = <div className={`block ${size}bg-[var(--color-x)]`} />;",
+			classes: []string{"bg-[var(--color-x)]"},
+		},
+		{
+			name:    "already shorthand",
+			source:  "const element = <div className={`bg-(--color-x) ${size} block`} />;",
+			classes: []string{},
+		},
+		{
+			// An escape makes the run's source differ from its decoded value, so the finding sits on
+			// the run.
+			name:    "a run holding an escape",
+			source:  "const element = <div className={`bg-[var(--color-x)]\\u0020block ${size}`} />;",
+			classes: []string{"bg-[var(--color-x)]\\u0020block "},
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runVariableSyntaxFixture(test, testCase.source)
+			if len(result.Diagnostics) != len(testCase.classes) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.classes))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				reported := text[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if reported != testCase.classes[index] {
+					test.Errorf("finding %d covers %q, want the class %q", index, reported, testCase.classes[index])
+				}
+			}
+		})
+	}
+}
+
 // TestEnforceConsistentVariableSyntaxStaysSilent covers what upstream leaves alone.
 func TestEnforceConsistentVariableSyntaxStaysSilent(test *testing.T) {
 	test.Parallel()

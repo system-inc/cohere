@@ -18,7 +18,5 @@
         "file": "/repository/source/ExtendNative.ts",
         "source": "Object.p = 0\n"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

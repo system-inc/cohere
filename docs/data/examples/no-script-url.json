@@ -18,7 +18,5 @@
         "file": "/repository/source/ScriptUrl.ts",
         "source": "var a = '';"
     },
-    "assertedMessageIds": [
-        "unexpectedScriptURL"
-    ]
+    "assertedMessageIds": ["unexpectedScriptURL"]
 }

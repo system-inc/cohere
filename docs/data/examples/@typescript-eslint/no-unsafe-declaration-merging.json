@@ -18,7 +18,5 @@
         "file": "/repository/source/Merged.ts",
         "source": "const Foo = class {};\n"
     },
-    "assertedMessageIds": [
-        "unsafeMerging"
-    ]
+    "assertedMessageIds": ["unsafeMerging"]
 }

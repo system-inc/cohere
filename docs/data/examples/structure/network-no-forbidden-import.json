@@ -18,9 +18,5 @@
         "file": "/repository/source/components/Thing.tsx",
         "source": "export const Value = 1;\n"
     },
-    "assertedMessageIds": [
-        "noDirectApollo",
-        "noDirectGraphqlImport",
-        "noDirectTanStackQuery"
-    ]
+    "assertedMessageIds": ["noDirectApollo", "noDirectGraphqlImport", "noDirectTanStackQuery"]
 }

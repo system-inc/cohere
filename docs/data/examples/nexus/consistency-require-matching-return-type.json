@@ -20,9 +20,6 @@
         "file": "/repository/source/ConsistencyRequireMatchingReturnType.ts",
         "source": "declare const ready: boolean;\ndeclare function work(): void;\ndeclare function name(): string;\ntype Destructor = () => void;\ntype EffectCallback = () => void | Destructor;\ndeclare function useEffect(effect: EffectCallback, dependencies?: unknown[]): void;\ndeclare function compute<T>(factory: () => T): T;\ndeclare function on(listener: (...values: any[]) => any): void;\ndeclare function mount(options: { onReady?: () => void; onClick?: (event: string) => void }): void;\ndeclare function choose(callback: () => string | undefined): void;\ntype Shape = 'Circle' | 'Square';\ndeclare function forEachChild<T>(node: string, callback: (child: string) => T | undefined): T | undefined;\ndeclare function log(text: string): void;\non(function() {\n    if (!ready) return;\n    work();\n});\n"
     },
-    "assertedMessageIds": [
-        "bareReturnInValueFunction",
-        "undefinedReturnInVoidFunction"
-    ],
+    "assertedMessageIds": ["bareReturnInValueFunction", "undefinedReturnInVoidFunction"],
     "assertsFix": true
 }

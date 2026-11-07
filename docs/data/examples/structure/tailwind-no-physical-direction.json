@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Thing.tsx",
         "source": "export const c = '';\n"
     },
-    "assertedMessageIds": [
-        "useLogicalClass"
-    ]
+    "assertedMessageIds": ["useLogicalClass"]
 }

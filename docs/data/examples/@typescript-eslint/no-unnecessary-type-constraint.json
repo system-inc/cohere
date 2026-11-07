@@ -19,8 +19,6 @@
         "file": "/repository/source/no_unnecessary_type_constraint.tsx",
         "source": "function data() {}"
     },
-    "assertedMessageIds": [
-        "noUnnecessaryTypeConstraint"
-    ],
+    "assertedMessageIds": ["noUnnecessaryTypeConstraint"],
     "assertsSuggestion": true
 }

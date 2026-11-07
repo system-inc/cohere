@@ -18,7 +18,5 @@
         "file": "/repository/source/SecurityNoInterpolatedShellCommand.ts",
         "source": "import { exec } from 'database';\nexport function drop(table: string) {\n    exec(`DROP TABLE ${table}`);\n}\n"
     },
-    "assertedMessageIds": [
-        "interpolatedShellCommand"
-    ]
+    "assertedMessageIds": ["interpolatedShellCommand"]
 }

@@ -19,6 +19,7 @@ package consistency_no_long_file
 
 import (
 	"fmt"
+	"go/token"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -74,10 +75,12 @@ var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Ana
 
 var tooManyLinesMessage = policy.MessageOf(Name, "tooManyLines")
 
-// limitOf is the max option of the analyzer running pass. NewAnalyzer is the only way the rule's analyzer is built,
-// but an analyzer assembled some other way has no limit of its own, so it runs at the house limit.
-func limitOf(pass *analysis.Pass) int {
-	option := pass.Analyzer.Flags.Lookup(maximumOption)
+// LimitOf is the max option of analyzer, the most lines the rule lets a file hold as the settings configure it, read
+// the way the rule's run reads it, so the fix phase's long-line wrap and the rule never disagree on the limit.
+// NewAnalyzer is the only way the rule's analyzer is built, but an analyzer assembled some other way has no limit of
+// its own, so it runs at the house limit.
+func LimitOf(analyzer *analysis.Analyzer) int {
+	option := analyzer.Flags.Lookup(maximumOption)
 	if option == nil {
 		return defaultLimit
 	}
@@ -88,22 +91,38 @@ func limitOf(pass *analysis.Pass) int {
 	return int(*limit)
 }
 
+// Reports is whether the rule reports a file named name that holds lineCount lines under limit: one past the limit
+// whose base name lacks the `*.generated.*` shape. The rule's run reports through it, and the fix phase's long-line
+// wrap asks it of a file before and after the wrap, so a wrap never takes a file past the limit the rule reads.
+func Reports(name string, lineCount int, limit int) (bool, error) {
+	hasGeneratedName, matchError := path.Match(generatedNamePattern, filepath.Base(name))
+	if matchError != nil {
+		return false, fmt.Errorf("matching %s against %s: %w", name, generatedNamePattern, matchError)
+	}
+	return !hasGeneratedName && lineCount > limit, nil
+}
+
+// LineCount is how many lines the rule counts in content: the lines of the token.File a parse of it gives, every
+// newline starting a line but one at the very end, which the scanner and SetLinesForContent read alike. The fix phase
+// counts a file it has not parsed with it.
+func LineCount(content []byte) int {
+	tokenFile := token.NewFileSet().AddFile("", -1, len(content))
+	tokenFile.SetLinesForContent(content)
+	return tokenFile.LineCount()
+}
+
 func run(pass *analysis.Pass) (any, error) {
-	limit := limitOf(pass)
+	limit := LimitOf(pass.Analyzer)
 	for _, file := range pass.Files {
 		// The line table counts every newline the scanner read, in comments and raw strings too, and a newline at
 		// the very end starts no line, which is the count an editor shows. It is the file as written, which a
 		// //line directive does not change.
 		tokenFile := pass.Fset.File(file.FileStart)
-		hasGeneratedName, matchError := path.Match(generatedNamePattern, filepath.Base(tokenFile.Name()))
-		if matchError != nil {
-			return nil, fmt.Errorf("matching %s against %s: %w", tokenFile.Name(), generatedNamePattern, matchError)
+		reported, reportsError := Reports(tokenFile.Name(), tokenFile.LineCount(), limit)
+		if reportsError != nil {
+			return nil, reportsError
 		}
-		if hasGeneratedName {
-			continue
-		}
-		lineCount := tokenFile.LineCount()
-		if lineCount <= limit {
+		if !reported {
 			continue
 		}
 		// The finding starts where the file goes past the limit, so a reader jumping to it lands on the first line
@@ -114,7 +133,7 @@ func run(pass *analysis.Pass) (any, error) {
 			End:      file.FileEnd,
 			Category: tooManyLinesMessage.Id,
 			Message: tooManyLinesMessage.Render(map[string]string{
-				"lineCount": strconv.Itoa(lineCount),
+				"lineCount": strconv.Itoa(tokenFile.LineCount()),
 				"max":       strconv.Itoa(limit),
 			}),
 		})

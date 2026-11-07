@@ -1,13 +1,13 @@
 # `nexus/security-no-interpolated-shell-command`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at `error` once ahra's 25 findings are moved to `execFileSync`/`spawn` with an argument list. Registered `off` in ahra until then |
-| Findings | **ahra 25, www-phi-health 0, www-connected-app 0, api-phi-health 0** (measured 2026-10-02) |
-| Measured precision | 25 of 25 true: in every finding a value the types do not prove literal reaches a shell parser. 6 are user-visible or latent bugs, 19 are harmless today |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, for the callee and for every value's literal-ness; without a checker the rule registers nothing |
+|                        |                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, at `error` once ahra's 25 findings are moved to `execFileSync`/`spawn` with an argument list. Registered `off` in ahra until then              |
+| Findings               | **ahra 25, www-phi-health 0, www-connected-app 0, api-phi-health 0** (measured 2026-10-02)                                                              |
+| Measured precision     | 25 of 25 true: in every finding a value the types do not prove literal reaches a shell parser. 6 are user-visible or latent bugs, 19 are harmless today |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                  |
+| Auto-fixable           | no                                                                                                                                                      |
+| Needs type information | yes, for the callee and for every value's literal-ness; without a checker the rule registers nothing                                                    |
 
 ## What it checks
 
@@ -51,27 +51,27 @@ unquoted on the opener line, still reports.
 
 **Real or latent bugs (6)**: a value from a person, an agent or a command line reaches the shell.
 
-| Site | Value | Reading |
-|---|---|---|
-| `modules/apple/contacts/ContactsApi.ts:79` | search words in `query` | **Bug** (`#5na28yw`): an apostrophe breaks the search, `$(...)` runs |
-| `modules/apple/imessage/iMessageApi.ts:135` | `parameters.sourcePath` in `"..."` | Latent: an attachment path with `"`, `$` or a backtick breaks or runs |
-| `modules/apple/macos/MacOsApi.ts:134` | `finalPath`, the caller's `customPath` | Latent, same shape |
-| `modules/midjourney/MidjourneyApi.ts:1004`, `:1021` | `inputPath` from the command line | Latent, same shape |
-| `modules/planetscale/PlanetScaleApi.ts:380` | `database`, `branch`, `org` unquoted on the heredoc opener | Latent: command-line arguments split and expanded by `bash` |
+| Site                                                | Value                                                      | Reading                                                               |
+| --------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------- |
+| `modules/apple/contacts/ContactsApi.ts:79`          | search words in `query`                                    | **Bug** (`#5na28yw`): an apostrophe breaks the search, `$(...)` runs  |
+| `modules/apple/imessage/iMessageApi.ts:135`         | `parameters.sourcePath` in `"..."`                         | Latent: an attachment path with `"`, `$` or a backtick breaks or runs |
+| `modules/apple/macos/MacOsApi.ts:134`               | `finalPath`, the caller's `customPath`                     | Latent, same shape                                                    |
+| `modules/midjourney/MidjourneyApi.ts:1004`, `:1021` | `inputPath` from the command line                          | Latent, same shape                                                    |
+| `modules/planetscale/PlanetScaleApi.ts:380`         | `database`, `branch`, `org` unquoted on the heredoc opener | Latent: command-line arguments split and expanded by `bash`           |
 
 **True but harmless today (19)**: the shell does parse a non-literal value, but where it comes from
 holds no shell syntax, or it is escaped correctly.
 
-| Site | Value | Why harmless now |
-|---|---|---|
-| `iMessageApi.ts:425`, `:713`, `:789`, `:857`, `:935`, `:1039`, `:1149`, `:1207`, `:1360`; `iMessageWatch.ts:185`; `MacOsApi.ts:71` | a script in `'...'` with every `'` escaped | Correct POSIX escaping (11 sites); still a shell string |
-| `ContactsApi.ts:131` | `databasePath`, `pkList` | AddressBook paths found on disk; integer keys from SQLite output |
-| `ContactsApi.ts:231` | `databasePath`, `digits` | `digits` is `\D` stripped |
-| `ContactsImport.ts:94` | `databasePath`, the query | Code-written queries with no `"` or `$` |
-| `iMessageApi.ts:668` | `scriptPath` with a `randomUUID()` | A UUID has no shell syntax |
-| `ConversationsBackup.ts:78`, `:87` | `JSON.stringify(destinationPath)` | Code-built path; note `JSON.stringify` leaves `$` and backticks live |
-| `PhiCustomerApi.ts:236` | `database` on the opener line | Every caller passes `'phi'`; the SQL is in a quoted heredoc |
-| `SpotifyApi.ts:220` | `authUrl` | `clientId` from the credentials file, the rest `encodeURIComponent` |
+| Site                                                                                                                               | Value                                      | Why harmless now                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------- |
+| `iMessageApi.ts:425`, `:713`, `:789`, `:857`, `:935`, `:1039`, `:1149`, `:1207`, `:1360`; `iMessageWatch.ts:185`; `MacOsApi.ts:71` | a script in `'...'` with every `'` escaped | Correct POSIX escaping (11 sites); still a shell string              |
+| `ContactsApi.ts:131`                                                                                                               | `databasePath`, `pkList`                   | AddressBook paths found on disk; integer keys from SQLite output     |
+| `ContactsApi.ts:231`                                                                                                               | `databasePath`, `digits`                   | `digits` is `\D` stripped                                            |
+| `ContactsImport.ts:94`                                                                                                             | `databasePath`, the query                  | Code-written queries with no `"` or `$`                              |
+| `iMessageApi.ts:668`                                                                                                               | `scriptPath` with a `randomUUID()`         | A UUID has no shell syntax                                           |
+| `ConversationsBackup.ts:78`, `:87`                                                                                                 | `JSON.stringify(destinationPath)`          | Code-built path; note `JSON.stringify` leaves `$` and backticks live |
+| `PhiCustomerApi.ts:236`                                                                                                            | `database` on the opener line              | Every caller passes `'phi'`; the SQL is in a quoted heredoc          |
+| `SpotifyApi.ts:220`                                                                                                                | `authUrl`                                  | `clientId` from the credentials file, the rest `encodeURIComponent`  |
 
 **False: 0.**
 

@@ -18,8 +18,5 @@
         "file": "/repository/source/api/UserRequest.ts",
         "source": "import { networkService } from './NetworkService.ts';\ndeclare const Document: unknown;\ntype UserQueryVariablesType = { identifier: string; slug: string };\ntype SaveMutationVariablesType = { input: string };\ntype InferUseGraphQlQueryOptions<T> = { enabled?: boolean; document?: T };\ntype UserProfileType = { displayName: string };\nexport const value = 1;\n"
     },
-    "assertedMessageIds": [
-        "inlineVariablesType",
-        "unnecessaryVariablesDestructuring"
-    ]
+    "assertedMessageIds": ["inlineVariablesType", "unnecessaryVariablesDestructuring"]
 }

@@ -15,9 +15,6 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "noTargetBlankWithoutNoopener",
-        "noTargetBlankWithoutNoreferrer"
-    ],
+    "assertedMessageIds": ["noTargetBlankWithoutNoopener", "noTargetBlankWithoutNoreferrer"],
     "assertsFix": true
 }

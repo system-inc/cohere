@@ -18,7 +18,5 @@
         "file": "/repository/source/New.ts",
         "source": "a, new Foo();"
     },
-    "assertedMessageIds": [
-        "noNewStatement"
-    ]
+    "assertedMessageIds": ["noNewStatement"]
 }

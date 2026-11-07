@@ -18,7 +18,5 @@
         "file": "/repository/source/Container.ts",
         "source": "const c = somethingElse();\n"
     },
-    "assertedMessageIds": [
-        "boundaryNoGlobalContainer"
-    ]
+    "assertedMessageIds": ["boundaryNoGlobalContainer"]
 }

@@ -12,6 +12,7 @@
 package concurrency_require_escape_hatch_reason
 
 import (
+	"fmt"
 	"go/ast"
 	"go/types"
 	"strings"
@@ -35,7 +36,8 @@ var Analyzer = &analysis.Analyzer{
 		"says why it is safe: for an expression, directly above it or above a statement or declaration holding it, " +
 		"or at the end of its line or its statement's; for a directive, directly above it. unsafe.Sizeof, " +
 		"unsafe.Alignof and unsafe.Offsetof are not judged, since they only measure a type.",
-	Run: run,
+	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -61,8 +63,12 @@ func run(pass *analysis.Pass) (any, error) {
 	for _, name := range pointerEscapingFunctions {
 		escaping[types.Unsafe.Scope().Lookup(name)] = true
 	}
+	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
+	if !isIndexes {
+		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	}
 	for _, file := range pass.Files {
-		judgeExpressions(pass, file, escaping)
+		judgeExpressions(pass, file, indexes.ForFile(file), escaping)
 		judgeLinknames(pass, file)
 	}
 	return nil, nil
@@ -70,8 +76,12 @@ func run(pass *analysis.Pass) (any, error) {
 
 // judgeExpressions reports every unsafe conversion and call in file whose comments give no reason. A hatch is judged
 // once with everything inside it, so `uintptr(unsafe.Pointer(&value))` is one finding and one reason covers it.
-func judgeExpressions(pass *analysis.Pass, file *ast.File, escaping map[types.Object]bool) {
-	comments := marker.NewIndex(pass.Fset, file)
+func judgeExpressions(
+	pass *analysis.Pass,
+	file *ast.File,
+	comments *marker.Index,
+	escaping map[types.Object]bool,
+) {
 	// enclosing is the path from the file down to the node being visited, so a hatch finds the statements and
 	// declarations that hold it.
 	enclosing := []ast.Node{}

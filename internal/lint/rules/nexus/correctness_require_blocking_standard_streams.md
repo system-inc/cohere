@@ -1,14 +1,14 @@
 # `nexus/correctness-require-blocking-standard-streams`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error`.** 1 finding on ahra today, 0 false. It replaces `nexus/correctness-no-process-exit-after-output`, which is registered `off` |
-| Findings | **ahra 1** at 11:16 on 2026-10-03, after step 1 landed (`modules/figma/FigmaMcpLauncher.ts:20`). **16** on the tree as it stood before step 1: the 15 unblocked entries of `ExitEntries.tsv` and the Figma launcher |
-| Measured precision | 16 of 16 true: each file runs as a process, and on some path its load-time code writes and then exits with nothing blocked before |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, for `process.exit`, the console and Nexus's `blockStandardStreams` by symbol; reads other files (`ReadsOtherFiles`), so the findings cache never replays it |
-| Cost on ahra | 403ms summed across workers, 51ms of it the program index; it listens on the 282 files that spell `exit` |
+|                        |                                                                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error`.** 1 finding on ahra today, 0 false. It replaces `nexus/correctness-no-process-exit-after-output`, which is registered `off`                                                                      |
+| Findings               | **ahra 1** at 11:16 on 2026-10-03, after step 1 landed (`modules/figma/FigmaMcpLauncher.ts:20`). **16** on the tree as it stood before step 1: the 15 unblocked entries of `ExitEntries.tsv` and the Figma launcher |
+| Measured precision     | 16 of 16 true: each file runs as a process, and on some path its load-time code writes and then exits with nothing blocked before                                                                                   |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                                                                              |
+| Auto-fixable           | no                                                                                                                                                                                                                  |
+| Needs type information | yes, for `process.exit`, the console and Nexus's `blockStandardStreams` by symbol; reads other files (`ReadsOtherFiles`), so the findings cache never replays it                                                    |
+| Cost on ahra           | 403ms summed across workers, 51ms of it the program index; it listens on the 282 files that spell `exit`                                                                                                            |
 
 ## What it checks
 
@@ -88,8 +88,8 @@ the test runner (not files that run their own process's top level, and nothing q
 
 ## The findings
 
-| Site | Reading |
-|---|---|
+| Site                                               | Reading                                                                                                                                                                                                                                                                                                             |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `modules/figma/FigmaMcpLauncher.ts:20` (and `:43`) | **True.** Nothing imports it, its top level forks the socket server and spawns the MCP, and both `on('error', ...)` callbacks print to stderr and exit. Launched with stderr piped (an MCP server is), the message can be cut. No invoker in the repo or `~/.claude.json`: block at the top, or delete the launcher |
 
 ## Verification

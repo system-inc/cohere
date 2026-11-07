@@ -18,10 +18,5 @@
         "file": "file.ts",
         "source": "f(\n(x)\n)"
     },
-    "assertedMessageIds": [
-        "division",
-        "function",
-        "property",
-        "taggedTemplate"
-    ]
+    "assertedMessageIds": ["division", "function", "property", "taggedTemplate"]
 }

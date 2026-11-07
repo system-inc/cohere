@@ -20,8 +20,6 @@
         "file": "/repository/source/ConsistencyNoReturnVoid.tsx",
         "source": "function run() {\n    return [void start(), 1];\n}\n"
     },
-    "assertedMessageIds": [
-        "returnVoid"
-    ],
+    "assertedMessageIds": ["returnVoid"],
     "assertsFix": true
 }

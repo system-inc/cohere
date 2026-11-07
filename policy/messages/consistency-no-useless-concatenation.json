@@ -1,10 +1,10 @@
 {
-  "rules": {
-    "Go": "cohere-go/consistency-no-useless-concatenation"
-  },
-  "messages": {
-    "uselessConcatenation": {
-      "text": "These two string literals are joined with `+` on one line, where the source could have written one literal. Nothing is computed between them, so the join only adds an operator for a reader to follow and a seam where the two halves can drift apart. Write them as one literal; a string too long for one line can still be wrapped, with the `+` ending the line."
+    "rules": {
+        "Go": "cohere-go/consistency-no-useless-concatenation"
+    },
+    "messages": {
+        "uselessConcatenation": {
+            "text": "These two string literals are joined with `+` on one line, where the source could have written one literal. Nothing is computed between them, so the join only adds an operator for a reader to follow and a seam where the two halves can drift apart. Write them as one literal; a string too long for one line can still be wrapped, with the `+` ending the line."
+        }
     }
-  }
 }

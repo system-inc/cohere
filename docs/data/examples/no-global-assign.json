@@ -18,7 +18,5 @@
         "file": "/repository/source/GlobalAssign.ts",
         "source": "a = 1\n"
     },
-    "assertedMessageIds": [
-        "noGlobalAssign"
-    ]
+    "assertedMessageIds": ["noGlobalAssign"]
 }

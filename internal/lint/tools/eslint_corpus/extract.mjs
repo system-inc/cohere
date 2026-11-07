@@ -46,10 +46,10 @@ import { parseArgs } from 'node:util';
 const { values: argumentValues } = parseArgs({
     options: {
         'eslint-home': { type: 'string' },
-        'out': { type: 'string' },
-        'cache': { type: 'string', default: NodeOperatingSystem.tmpdir() },
-        'rule': { type: 'string' },
-        'cohere': { type: 'string', default: 'cohere' },
+        out: { type: 'string' },
+        cache: { type: 'string', default: NodeOperatingSystem.tmpdir() },
+        rule: { type: 'string' },
+        cohere: { type: 'string', default: 'cohere' },
     },
 });
 if(!argumentValues['eslint-home'] || !argumentValues.out) {
@@ -70,7 +70,12 @@ const rulesDirectory = NodePath.join(sourceDirectory, 'tests', 'lib', 'rules');
 if(!existsSync(rulesDirectory)) {
     mkdirSync(argumentValues.cache, { recursive: true });
     const archive = NodePath.join(argumentValues.cache, `eslint-${eslintVersion}.tar.gz`);
-    execFileSync('curl', ['-sSfL', '-o', archive, `https://github.com/eslint/eslint/archive/refs/tags/v${eslintVersion}.tar.gz`]);
+    execFileSync('curl', [
+        '-sSfL',
+        '-o',
+        archive,
+        `https://github.com/eslint/eslint/archive/refs/tags/v${eslintVersion}.tar.gz`,
+    ]);
     execFileSync('tar', ['xzf', archive, '-C', argumentValues.cache, `eslint-${eslintVersion}/tests`]);
 }
 
@@ -82,7 +87,10 @@ const ruleNames = execFileSync(argumentValues.cohere, ['--rules'], { encoding: '
 // unIndent from ESLint's tests/_utils, which the test files build rows with
 function unIndent(strings, ...values) {
     const text = strings.map((part, index) => (index === 0 ? part : values[index - 1] + part)).join('');
-    const lines = text.replace(/^\n/u, '').replace(/\n\s*$/u, '').split('\n');
+    const lines = text
+        .replace(/^\n/u, '')
+        .replace(/\n\s*$/u, '')
+        .split('\n');
     const indents = lines.filter((line) => line.trim()).map((line) => line.match(/ */u)[0].length);
     const minimumIndent = Math.min(...indents);
     return lines.map((line) => line.slice(minimumIndent)).join('\n');
@@ -163,17 +171,20 @@ function eslintVerdict(ruleName, row, base) {
 
     // Lines as ESLint counts them, which ends one at \r, \u2028 and \u2029 as well as \n
     const lineStarts = [0];
-    for(const lineBreak of row.code.matchAll(/\r\n|[\r\n\u2028\u2029]/gu)) lineStarts.push(lineBreak.index + lineBreak[0].length);
+    for(const lineBreak of row.code.matchAll(/\r\n|[\r\n\u2028\u2029]/gu))
+        lineStarts.push(lineBreak.index + lineBreak[0].length);
     const offsetOf = (line, column) => lineStarts[line - 1] + column - 1;
     // Only the row's own rule. A row may turn another rule on with an inline `/*eslint ...*/` comment,
     // or name one ESLint cannot find, and either puts that rule's messages beside this one's: three of
     // prefer-const's rows recorded no-undef-init's finding and a missing-definition error as its own.
     return {
-        findings: messages.filter((message) => message.ruleId === ruleName).map(function(message) {
-            const start = offsetOf(message.line, message.column);
-            const end = message.endLine ? offsetOf(message.endLine, message.endColumn) : start;
-            return { messageId: message.messageId ?? null, start, end, text: row.code.slice(start, end) };
-        }),
+        findings: messages
+            .filter((message) => message.ruleId === ruleName)
+            .map(function(message) {
+                const start = offsetOf(message.line, message.column);
+                const end = message.endLine ? offsetOf(message.endLine, message.endColumn) : start;
+                return { messageId: message.messageId ?? null, start, end, text: row.code.slice(start, end) };
+            }),
     };
 }
 
@@ -208,11 +219,20 @@ for(const ruleName of ruleNames) {
                     summary.skipped += 1;
                 }
                 else {
-                    vendored.eslint = verdict.findings.map((finding) => [finding.messageId, finding.start, finding.end]);
+                    vendored.eslint = verdict.findings.map((finding) => [
+                        finding.messageId,
+                        finding.start,
+                        finding.end,
+                    ]);
                     summary.replayed += 1;
                 }
                 // Escaped to ASCII, because several unicode rules test lone surrogates on purpose
-                lines.push(JSON.stringify(vendored).replace(/[\u007f-\uffff]/gu, (character) => '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0')));
+                lines.push(
+                    JSON.stringify(vendored).replace(
+                        /[\u007f-\uffff]/gu,
+                        (character) => '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0'),
+                    ),
+                );
             }
         }
     }
