@@ -37,6 +37,7 @@ struct RulesJsonTests {
             vocabulary: AbbreviationVocabulary(),
             shoutingVocabulary: ShoutingVocabulary(),
             brandVocabulary: BrandVocabulary(),
+            words: WordList(),
         )
         .map { rule in
             Row(name: rule.name, origin: rule.origin, upstreamName: rule.upstreamName, typeAware: false)

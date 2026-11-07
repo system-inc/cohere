@@ -13,5 +13,6 @@ pensieve # the proper name of ahra's module, spelled as one word throughout
 pentair # Pentair, the pool and water equipment maker, https://www.pentair.com
 pinterest # Pinterest, the visual discovery platform, https://www.pinterest.com
 planetscale # PlanetScale, the hosted database platform, https://planetscale.com
+ragdoll # a limp physics body, as in ragdoll physics, https://en.wikipedia.org/wiki/Ragdoll_physics
 waitlist # an English word cspell's lists lack
 wattbox # WattBox, Snap One's power management brand, https://www.snapav.com/shop/en/snapav/brands/wattbox

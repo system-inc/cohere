@@ -14,7 +14,7 @@
         "typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
         "upstreamName": "for TypeScript, the registered name, for a rule ported from a plugin or ESLint core; for Swift, the id a ported rule declares (swift/Rules.json); for Go, the analyzer or check a ported rule names (internal/go_engine/rules)"
     },
-    "count": 788,
+    "count": 789,
     "rules": [
         {
             "name": "@eslint-community/eslint-comments/require-description",
@@ -7627,6 +7627,14 @@
             "typeScriptRules": [
                 "structure/consistency-require-matching-file-name"
             ]
+        },
+        {
+            "name": "cohere-swift/consistency-require-separated-folder-words",
+            "language": "Swift",
+            "namespace": "cohere-swift",
+            "origin": "house",
+            "category": "consistency",
+            "typeAware": false
         },
         {
             "name": "cohere-swift/contains-over-filter",

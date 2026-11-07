@@ -17,12 +17,13 @@ var consistencyRequireSeparatedFolderWordsText = policy.MessageOf(
 	"runTogetherProjectFolder",
 )
 
-// typeScriptFolderSpelling separates a folder's words with a hyphen, an underscore, or a capital after a lowercase
-// letter: serviceTypes and ProfileImages separate their words by case, and whether a folder should be kebab-case is
-// a casing question, not this rule's. A split takes the separator the folder already uses between two parts, by case
-// where it separates them by case, and a hyphen where it uses none, since every multi-word folder in the house's
-// TypeScript trees that uses no capitals is spelled with hyphens (net-worth, sign-in, social-media), and a Next.js
-// route folder is a URL segment, where the hyphen is the web's separator.
+// typeScriptFolderSpelling separates a folder's words with a hyphen, an underscore, or a case boundary, a capital
+// after a lowercase letter or an acronym's end: serviceTypes, ProfileImages and URLSession separate their words by
+// case, and whether a folder should be kebab-case is a casing question, not this rule's. A split takes the separator
+// the folder already uses between two parts, by case where it separates them by case, and a hyphen where it uses
+// none, since every multi-word folder in the house's TypeScript trees that uses no capitals is spelled with hyphens
+// (net-worth, sign-in, social-media), and a Next.js route folder is a URL segment, where the hyphen is the web's
+// separator.
 var typeScriptFolderSpelling = folder_words.Spelling{Separators: "-_", Joiner: "-", CaseSeparates: true}
 
 // nodeModulesFolder holds what Node's resolution installs. A file below one is a package's, and so are its folders.
@@ -31,9 +32,9 @@ const nodeModulesFolder = "node_modules"
 // ConsistencyRequireSeparatedFolderWords reports a folder inside the project whose name runs words together:
 // profileimages, not profile-images (#narw7aq, the text rules family `separated-folder-words`). It is the
 // TypeScript twin of cohere-go/consistency-require-separated-folder-words, and both read one judgment,
-// internal/folder_words: a name is cut into parts at its hyphens and underscores and where a capital follows a
-// lowercase letter, a part that is a word passes, and a part that splits into two or more words is the finding, with
-// the split as the name it asks for.
+// internal/folder_words: a name is cut into parts at its hyphens and underscores and at its case boundaries, a part
+// that is a word passes, and a part that splits into two or more words is the finding, with the split as the name it
+// asks for.
 //
 // A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's
 // name is read before anything in it, on every import line and every path.

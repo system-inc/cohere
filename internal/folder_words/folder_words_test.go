@@ -153,6 +153,10 @@ func TestSeparatedBySpelling(test *testing.T) {
 		{"Formatoptions", typeScriptSpelling, "FormatOptions"},
 		{"networthTypes", typeScriptSpelling, "netWorthTypes"},
 		{"Profile-formatoptions", typeScriptSpelling, "Profile-format-options"},
+		// An acronym is kept whole before the word after it, as Swift's rule keeps it.
+		{"URLSession", typeScriptSpelling, ""},
+		{"HTMLParser", typeScriptSpelling, ""},
+		{"JSONLINESReader", typeScriptSpelling, "JsonLinesReader"},
 		// Go's spelling reads case as nothing: the name is lowercased whole, as it always was.
 		{"serviceTypes", goSpelling, "service_types"},
 		{"ProfileImages", goSpelling, "profile_images"},
