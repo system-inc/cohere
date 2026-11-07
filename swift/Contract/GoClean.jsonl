@@ -4,7 +4,7 @@
 {"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":18,"detail":""}
 {"kind":"types","diagnostics":0,"files":3,"elapsedMilliseconds":240,"filesWithoutRecord":[],"build":"go/packages, loaded in process"}
 {"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":240,"detail":""}
-{"kind":"lint","findings":0,"rulesRun":5,"filesWalked":3,"nodesVisited":1408,"elapsedMilliseconds":0,"reusedFrom":"fix","rulesSilent":[],"rulesWatchedAndQuiet":5,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":"","filesReplayed":0}
+{"kind":"lint","findings":0,"rulesRun":5,"filesWalked":3,"nodesVisited":1408,"elapsedMilliseconds":0,"reusedFrom":"fix","rulesSilent":[],"rulesWatchedAndQuiet":5,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":""}
 {"kind":"phase","name":"lint","outcome":"reused","elapsedMilliseconds":0,"detail":"the fix phase's walk (nothing was rewritten)"}
 {"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested"}
 {"kind":"summary","findings":0,"complete":true,"exitCode":0}
