@@ -49,9 +49,17 @@ type pipeline struct {
 	// sat the run out.
 	session *check.CacheSession
 
-	// fix is the fix phase's record, held unwritten from gofmt until the long-line wrap after the load has added to it,
-	// nil when the phase was not requested.
+	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
+	// are of the bytes the rename replaced. gofmt's verdicts, kept by their bytes, are still kept.
+	renamed bool
+
+	// fix is the fix phase's record, held unwritten from gofmt until the long-line wrap and the rename after the load
+	// have added to it, nil when the phase was not requested.
 	fix *heldFix
+
+	// refusedRenames are the renames refused so far, by file, old name and new name, so a rename a round refused and
+	// whose finding still stands is not asked for, and counted, again by the next.
+	refusedRenames map[[3]string]bool
 }
 
 func newPipeline(
@@ -97,6 +105,9 @@ func (engine *pipeline) run() int {
 		loaded, loadError = engine.loadWorkspace(needsTypes)
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
+	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, the load that proved
+	// what it wrote is the one the types and lint phases read in place of this one.
+	loaded, linted := engine.runRename(loaded, loadError)
 	// The fix phase's records come before any of the types phase's, so the stream reads in phase order.
 	engine.writeFix()
 	if !needsTypes {
@@ -105,7 +116,7 @@ func (engine *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
-	engine.runLint(loaded, loadError)
+	engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
@@ -171,11 +182,12 @@ func (engine *pipeline) severityOf(name string) (contract.Severity, bool) {
 }
 
 // heldFix is the fix phase's record while the run holds it unwritten (pipeline.fix), from gofmt until the long-line
-// wrap after the load has added to it, with what the wrap needs.
+// wrap and the rename after the load have added to it, with what the wrap needs.
 type heldFix struct {
 	record contract.FixRecord
 
-	// elapsed is the fix phase's own time, gofmt's and then the wrap's, never the load's between them.
+	// elapsed is the fix phase's own time, gofmt's, the wrap's and the rename's, never the load's between them but the
+	// loads only a rename reads.
 	elapsed time.Duration
 
 	// wraps is whether the long-line wrap runs after the load: a run that writes, formats and has the rule on.
@@ -191,9 +203,8 @@ type heldFix struct {
 
 // runFix is the fix and format phase's gofmt: over every readable file in scope, written unless `--no-fix`, and
 // under `--no-fix` one finding per file gofmt would change, at the first line it would change. It holds the phase's
-// record unwritten in engine.fix, so the long-line wrap after the load (wrapAfterLoad) can add to it, and writeFix
-// writes it before the types phase. Analyzer fixes are not applied yet, since applying them means loading again after
-// the write.
+// record unwritten in engine.fix, so the long-line wrap after the load (wrapAfterLoad) and the renames the naming rules
+// ask for (runRename) can add to it, and writeFix writes it before the types phase. No other analyzer fix is applied.
 func (engine *pipeline) runFix(wraps bool) {
 	if !engine.request.requests(contract.PhaseFix) {
 		engine.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -273,8 +284,8 @@ func (engine *pipeline) runFix(wraps bool) {
 	held.elapsed = time.Since(started)
 }
 
-// writeFix writes the fix phase's record and its phase record, once the wrap after the load has added to them, and
-// keeps gofmt's verdicts and the wrap's for the next run.
+// writeFix writes the fix phase's record and its phase record, once the wrap and the rename after the load have added
+// to them, and keeps gofmt's verdicts and the wrap's for the next run.
 func (engine *pipeline) writeFix() {
 	if engine.fix == nil {
 		return

@@ -22,8 +22,9 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // type error. Findings outside the scope or in an excluded file are dropped, then the //cohere:ignore comments
 // in the files in scope withhold what they cover and report what is wrong with them. A generated file is in
 // scope like any other: the driver itself withholds a house rule's findings there and counts them, and a vet or
-// tools finding there is still a bug in what ships, so it is written.
-func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
+// tools finding there is still a bug in what ships, so it is written. earlier is the pass the rename already ran
+// over this load, written as it is, or nil to run one here.
+func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
 		return
@@ -43,30 +44,19 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 		return
 	}
 
+	pass := earlier
+	if pass == nil {
+		ran := engine.lint(loaded)
+		pass = &ran
+	}
 	started := time.Now()
-	enabled, turnedOff := engine.enabledRules()
-	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
-		SingleThreaded: engine.request.switches["single-threaded"],
-		Cache:          engine.session,
-		Withheld:       loaded.Withheld,
-	})
-	if checkError != nil {
-		engine.note("the rules could not run: %v", checkError)
-		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, "the rules could not run: "+oneLine(checkError))
+	if pass.checkError != nil {
+		engine.note("the rules could not run: %v", pass.checkError)
+		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
+			"the rules could not run: "+oneLine(pass.checkError))
 		return
 	}
-
-	inScope := make([]check.Finding, 0, len(result.Findings))
-	for _, found := range result.Findings {
-		if engine.described.inScopeSet[found.File] {
-			inScope = append(inScope, found)
-		}
-	}
-	ran := make([]string, 0, len(enabled))
-	for _, enabledRule := range enabled {
-		ran = append(ran, enabledRule.Name)
-	}
-	outcome := engine.suppress(ran, inScope)
+	result, outcome := pass.result, pass.outcome
 
 	findings := make([]contract.FindingRecord, 0, len(outcome.kept)+len(outcome.directiveFindings))
 	for _, kept := range outcome.kept {
@@ -103,7 +93,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 		engine.write(finding)
 	}
 
-	record := engine.lintCoverage(result, findings, turnedOff, notConfigured(enabled))
+	record := engine.lintCoverage(result, findings, pass.turnedOff, notConfigured(pass.enabled))
 	record.WithheldBySuppression = outcome.withheldByRule
 	record.WithheldAsGenerated = result.WithheldAsGenerated
 	record.WithheldAsCopied = result.WithheldAsCopied
@@ -123,9 +113,62 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error) {
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
 	}
-	record.ElapsedMilliseconds = int(time.Since(started).Milliseconds())
+	elapsed := pass.elapsed + time.Since(started)
+	record.ElapsedMilliseconds = int(elapsed.Milliseconds())
 	engine.write(record)
-	engine.phase(contract.PhaseLint, contract.OutcomeRan, time.Since(started), "")
+	engine.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
+}
+
+// lintPass is the lint phase's rules over one load before any record is written: what they found, the findings in
+// scope the //cohere:ignore comments left, and how long that took, or why the rules could not run.
+type lintPass struct {
+	result     *check.Result
+	enabled    []rule.Rule
+	turnedOff  []string
+	outcome    suppressedFindings
+	checkError error
+	elapsed    time.Duration
+}
+
+// lint runs the rules the settings leave on over loaded, through the findings cache when the run has one and has not
+// renamed, keeps the findings in scope, and applies the //cohere:ignore comments to them.
+func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
+	started := time.Now()
+	enabled, turnedOff := engine.enabledRules()
+	session := engine.session
+	if engine.renamed {
+		session = nil
+	}
+	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
+		SingleThreaded: engine.request.switches["single-threaded"],
+		Cache:          session,
+		Withheld:       loaded.Withheld,
+	})
+	if checkError != nil {
+		return lintPass{checkError: checkError, elapsed: time.Since(started)}
+	}
+	ran := make([]string, 0, len(enabled))
+	for _, enabledRule := range enabled {
+		ran = append(ran, enabledRule.Name)
+	}
+	return lintPass{
+		result:    result,
+		enabled:   enabled,
+		turnedOff: turnedOff,
+		outcome:   engine.suppress(ran, engine.inScope(result.Findings)),
+		elapsed:   time.Since(started),
+	}
+}
+
+// inScope are the findings in a file in scope, in order.
+func (engine *pipeline) inScope(found []check.Finding) []check.Finding {
+	inScope := make([]check.Finding, 0, len(found))
+	for _, each := range found {
+		if engine.described.inScopeSet[each.File] {
+			inScope = append(inScope, each)
+		}
+	}
+	return inScope
 }
 
 // enabledRules are the registered rules the settings leave on, which run, and the names of those they turn off.
@@ -201,10 +244,16 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding) suppress
 }
 
 // ruleFinding is one analyzer finding as a record. A suggestion is offered only when every edit is in the
-// finding's own file, since an edit's offsets are into the file the record names.
+// finding's own file, since an edit's offsets are into the file the record names. A naming rule's rename is never
+// offered: its one edit renames the declaration alone, so an editor applying it would leave every use of the old name
+// broken, and the engine applies it at every reference itself (see renameOf). The message already names the spelling.
 func ruleFinding(found check.Finding, severity contract.Severity) contract.FindingRecord {
 	suggestions := []contract.Suggestion{}
-	for _, suggestion := range found.Suggestions {
+	offered := found.Suggestions
+	if _, renames := renameOf(found); renames {
+		offered = nil
+	}
+	for _, suggestion := range offered {
 		edits := make([]contract.Edit, 0, len(suggestion.Edits))
 		for _, edit := range suggestion.Edits {
 			if edit.File != found.File {
