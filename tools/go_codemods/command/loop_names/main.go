@@ -28,13 +28,13 @@ import (
 	"go/token"
 	"go/types"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/streams"
+	"github.com/system-inc/cohere/policy"
 	"github.com/system-inc/cohere/tools/go_codemods/rename"
 	"github.com/system-inc/cohere/tools/go_codemods/workspace"
 
@@ -1067,12 +1067,9 @@ func run(root string, skips []string, dryRun bool) int {
 		fmt.Fprintf(streams.Errors, "%s: loading: %v\n", commandName, loadError)
 		return 1
 	}
-	vocabularyFile, readError := os.ReadFile(filepath.Join(loaded.Root, "policy", "Abbreviations.json"))
-	if readError != nil {
-		fmt.Fprintf(streams.Errors, "%s: %v\n", commandName, readError)
-		return 1
-	}
-	words, vocabularyError := parseVocabulary(vocabularyFile)
+	// The vocabulary is the one built into the pass, from the cohere tree it was built in, so a pass run over another
+	// repository judges words exactly as it does over cohere.
+	words, vocabularyError := parseVocabulary(policy.AbbreviationsFile())
 	if vocabularyError != nil {
 		fmt.Fprintf(streams.Errors, "%s: policy/Abbreviations.json: %v\n", commandName, vocabularyError)
 		return 1

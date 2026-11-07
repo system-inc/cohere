@@ -13,7 +13,6 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
-	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -51,7 +50,7 @@ const (
 
 func runGlobal(root string, vocabularyPath string, skips []string, dryRun bool, renameOwnedSpellings bool,
 	libraries []string, options global_rename.Options) int {
-	vocabularyData, readError := os.ReadFile(vocabularyPath)
+	vocabularyData, readError := readVocabulary(vocabularyPath)
 	if readError != nil {
 		fmt.Fprintf(streams.Errors, "wordnames: reading the vocabulary: %v\n", readError)
 		return 1
