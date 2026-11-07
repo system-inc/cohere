@@ -581,7 +581,8 @@ func TestAScriptsOnlyRootReplaysUntilAScriptMoves(test *testing.T) {
 			if scenario.walksDeps {
 				fixture.setVariable("COHERE_TEST_WALK_DEPENDENCIES", "1")
 			}
-			// As runProject starts a discovered project: its directory first, which the run cache takes off (runCacheArguments).
+			// As runProject starts a discovered project: its directory first, which the run cache takes off
+			// (runCacheArguments).
 			arguments := []string{"--directory", fixture.root, "--no-fix", "--verbose"}
 			fixture.establishHit(arguments...)
 			// The new modification time must differ from the recorded one at the file system's resolution.
