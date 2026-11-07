@@ -67,7 +67,7 @@ public struct SourceParser: Sendable {
         let tree = Parser.parse(source: source)
         let counter = NodeCounter(viewMode: .sourceAccurate)
         counter.walk(tree)
-        let file = ParsedFile(
+        var file = ParsedFile(
             url: owned.url,
             targetName: owned.targetName,
             targetKind: owned.targetKind,
@@ -76,6 +76,7 @@ public struct SourceParser: Sendable {
             nodeCount: counter.count,
             packageRoot: owned.packageRoot,
         )
+        file.scriptPlatform = owned.scriptPlatform
         guard tree.hasError else {
             return .parsed(file, [])
         }

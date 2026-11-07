@@ -134,9 +134,20 @@ nothing else.
 }
 ```
 
-- `filesInPackage` is every `.swift` file in a root target. `filesOurs` is the subset that is
-  not ignored by git and not excluded. Dependencies, including local ones like `Vendor/SwiftTerm`, are
-  never counted, because they are not root targets.
+- `filesInPackage` is every `.swift` file in a root target, and every standalone script the run checks.
+  `filesOurs` is the subset that is not ignored by git and not excluded. Dependencies, including local ones
+  like `Vendor/SwiftTerm`, are never counted, because they are not root targets.
+- A standalone script (#13nbb1s) is a file of ours: a `.swift` file git would list that no target compiles,
+  with a `#!` line or a statement at its top level, the code `swift <file>` runs, whose nearest project (a
+  `Package.swift`, a `project.yml` or one `.xcodeproj`) is the root or a local package the run covers. It is
+  in `targets` as a target of its own, kind `script`, one file, named for the module `swift <file>` compiles it
+  into (its file's stem, or `main`, numbered past the first when two scripts share one). This is additive within
+  contract 3. Every rule and the formatter judge it as they judge a `main.swift`. A file below a nested project is left
+  to that project's run, as `no target of this package compiles it`, which the front door leaves out under a
+  project it runs. Any other file no target compiles is excluded with a reason the front door counts as a gap:
+  `no target of this package compiles it, and it holds only declarations, so it is no script to check alone`, or,
+  for a script whose imports name both macOS (AppKit, Cocoa) and iOS (UIKit),
+  `a script whose imports do not settle its platform: it imports AppKit for macOS and UIKit for iOS, so neither SDK was guessed at`.
 - `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
   lower and describes the request in `scopeDescription`, which the front door prints in the
   parenthesis of `N in scope (…)`.
@@ -432,6 +443,18 @@ given `--triple arm64-apple-<system>` and that platform's SDK, and `build` begin
 `for <platform>, the first platform the package names, since it names no macOS: `. A package whose platforms name
 none of those (Mac Catalyst alone), or whose platform's SDK is not installed, is not checked: `build` begins
 `not checked:` and says why, and every file is in `filesWithoutRecord`, so the run is incomplete.
+
+Each standalone script (see `project`) is checked after the package or the Xcode project, alone, as `swift <file>`
+runs it, in the same record: its findings among the rest, `files` counting it. The check is a package's frontend
+job, `-emit-sib` to /dev/null with a record and an index unit for the script, into `<scratch>/scripts`, whose index
+and compile arguments the typed rules and `--unused` read beside the package's. Its arguments are the house's, in
+one shape for every script: `-swift-version 6`, each upcoming feature `toolchain-require-upcoming-features`
+requires, and `-strict-memory-safety` with `-Werror StrictMemorySafety`. Its imports choose the SDK: UIKit is iOS,
+checked with `-target arm64-apple-ios<version>` at the iOS SDK's `DefaultDeploymentTarget`, and anything else the
+macOS host. After the compiler's own words, each error in a script says in a parenthesis that it was checked alone,
+as `swift <name>` runs it, and that a script needing other files to compile belongs in a package with them, since a
+script needing companion files fails exactly so. `build` ends by counting the scripts checked alone with `-emit-sib`,
+by platform, and names each script kept unchecked because this Xcode lacks its SDK, which is in `filesWithoutRecord`.
 
 The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
 not read them yet loses only what they count. The Go engine type-checks every package from source and runs no

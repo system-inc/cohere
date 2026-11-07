@@ -348,7 +348,7 @@
                                     }
                                 }
                             },
-                            "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them, less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
+                            "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them and they are no standalone script the run checks alone (a file of declarations only, or a script whose imports name two platforms), less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
                         },
                         "withheldInDependencyCgo": {
                             "type": "array",

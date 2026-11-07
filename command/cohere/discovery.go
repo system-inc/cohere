@@ -53,9 +53,9 @@ import (
 // checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
-// directory claims it, and the engine knows which files it checks. Its run lists the file as not checked, and
-// that list, less what the runs of the Swift projects below it account for, is the run's own gap (see
-// engineRun.writeExcluded).
+// directory claims it, and the engine knows which files it checks. A standalone script there, one `swift <file>`
+// runs, its run checks alone (#13nbb1s). Any other such file its run lists as not checked, and that list, less
+// what the runs of the Swift projects below it account for, is the run's own gap (see engineRun.writeExcluded).
 
 // neverDescended are the directory names discovery never enters, whatever any ignore file says.
 var neverDescended = map[string]bool{

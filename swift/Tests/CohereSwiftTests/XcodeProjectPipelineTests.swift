@@ -343,7 +343,7 @@ struct XcodeProjectPipelineTests {
             "Sources/Greeter.swift": cleanSource,
             "Sources/Counter.swift": counter,
             "Sources/FixtureApp.swift": entry,
-            "Tools/Script.swift": "print(\"a script no target compiles\")\n",
+            "Tools/Stray.swift": "let stray = \"declarations only, which no target compiles\"\n",
             ".gitignore": "Info.plist\n*.xcodeproj\n",
         ]
         for (path, text) in files {
@@ -466,9 +466,14 @@ struct XcodeProjectPipelineTests {
                 ]
         )
         let excluded = (project["excluded"] as? [[String: Any]] ?? []).map {
-            "\(($0["file"] as? String ?? "").hasSuffix("/Tools/Script.swift")):\($0["reason"] ?? "")"
+            "\(($0["file"] as? String ?? "").hasSuffix("/Tools/Stray.swift")):\($0["reason"] ?? "")"
         }
-        #expect(excluded == ["true:no target of this package compiles it"], "the script beside the target is named")
+        #expect(
+            excluded == [
+                "true:no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+            ],
+            "the file of declarations beside the target is named",
+        )
         #expect(run.phase("types")?.outcome == "ran")
         #expect(run.filesWithoutRecord.isEmpty)
         #expect(run.phase("lint")?.outcome == "ran")
