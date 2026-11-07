@@ -202,14 +202,15 @@ func finishScopedTypeCheck(
 	projectFiles []*ast.SourceFile,
 	persist bool,
 ) ([]*ast.SourceFile, []*ast.Diagnostic, error) {
-	if lintConfiguration == nil {
+	settings := lintConfiguration
+	if settings == nil {
 		loaded, loadError := loadLintConfiguration(graph, location)
 		if loadError != nil {
 			return nil, nil, fmt.Errorf("loading the lint config: %w", loadError)
 		}
-		lintConfiguration = loaded
+		settings = loaded
 	}
-	typeChecked, typesOnly := typeCheckedFiles(projectFiles, lintConfiguration)
+	typeChecked, typesOnly := typeCheckedFiles(projectFiles, settings)
 	activeSummary.FilesInScope = len(typeChecked) - typesOnly
 	activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
 	return typeChecked, finishTypeCheck(callerContext, check, typeChecked, persist), nil
