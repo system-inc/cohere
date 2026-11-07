@@ -437,6 +437,13 @@ through another, and the owned C-family files when one of them or a header chang
 are the last check's, and `build` counts them, as `, 3 modules no edit could change read from the last check's records`.
 A scoped module that imports no other scoped module needs nothing prepare emits again, so it is checked while prepare
 runs, counted as `, 1 module of them alongside prepare, since they import no edited module`.
+When the edits are all to Swift files, prepare covers only the edited modules' own dependencies, and the check emits
+each interface a scoped module imports itself: one `-emit-module` job with the testable variant's arguments and bodies
+skipped, as prepare's, into `<scratch>/check/interfaces/<Target>`, which every module checked after searches first.
+Prepare emitted an owned module twice, its testable variant and its product's, and the check reads only the first.
+`build` says so after prepare's time, as `, only the edited modules' own, and the check emitted the interface of Core
+itself in 6.1s`. The scratch lists those interfaces, whose prepared copies are older than their sources, until a check
+that prepares everything, after a C-family edit or any other, empties the list.
 An edit to anything else, a manifest or a resource, checks everything.
 
 A local package that holds test files of ours is checked in a session of its own, under `<scratch>/local/<package>`,

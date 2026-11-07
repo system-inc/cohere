@@ -178,6 +178,91 @@ struct CheckProofTests {
         #expect(edited.filesWithoutRecord.isEmpty)
     }
 
+    /* When prepare last wrote a module's interface into `Products`, the newest of its files' times there. */
+    static func prepared(_ module: String, root: URL) -> Date? {
+        let folder = Pipeline.scratchPath(for: root).appendingPathComponent(
+            "out/Products/Debug/\(module).swiftmodule",
+            isDirectory: true,
+        )
+        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        return files.filter { $0.pathExtension == "swiftmodule" }.compactMap {
+            try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        }
+        .max()
+    }
+
+    /*
+     An importer sees the interface the check emitted, not the one prepare left. After an interface edit to Core,
+     prepare covers only Core's own dependencies and leaves `Products`' Core as it was, so Feature's Welcome.swift,
+     never edited, reports the renamed `text()` only by reading Core's interface from the check's own emit. The
+     revert is seen the same way. Red under the mutant that keeps the emitted interfaces off the importers' search
+     paths (`emittedAll` left empty): Feature reads the old Core and reports nothing.
+     */
+    @Test func anImporterSeesTheInterfaceTheCheckEmitted() async throws {
+        let root = try CheckFixture.package()
+        defer { XcodeProjectPipelineTests.remove(root) }
+        let first = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(first.compilerFindings.isEmpty, "\(first.of("finding"))")
+        let preparedCore = try #require(Self.prepared("Core", root: root))
+
+        let greeting = try #require(CheckFixture.files["Sources/Core/Greeting.swift"])
+        try CheckFixture.write(
+            greeting.replacingOccurrences(of: "public func text()", with: "public func spoken()"),
+            to: "Sources/Core/Greeting.swift",
+            in: root,
+        )
+        let renamed = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(
+            renamed.compilerFindings == ["Welcome.swift:5:error"],
+            "\(renamed.typesBuild) \(renamed.of("finding"))",
+        )
+        #expect(
+            renamed.typesBuild.contains("only the edited modules' own, and the check emitted the interfaces of Core"),
+            "\(renamed.typesBuild)",
+        )
+        #expect(Self.prepared("Core", root: root) == preparedCore, "prepare emitted Core's interface again")
+
+        try CheckFixture.write(greeting, to: "Sources/Core/Greeting.swift", in: root)
+        let reverted = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(reverted.compilerFindings.isEmpty, "\(reverted.typesBuild) \(reverted.of("finding"))")
+        #expect(reverted.filesWithoutRecord.isEmpty)
+    }
+
+    /*
+     A header edit prepares everything again, so prepare emits the interfaces a narrowed prepare left older than their
+     sources. After Core's interface edit was checked with prepare covering only Core's own dependencies, `Products`'
+     Core is the one from before the edit; CCore.h renaming `ccore_answer` must have prepare emit Core again, and
+     Greeting.swift report the call. Red under the mutant that narrows prepare for a C-family edit too (the
+     `cFamilyEdits.isEmpty` condition dropped): `Products`' Core stays as it was, and the words say prepare covered
+     only the edited modules' own dependencies.
+     */
+    @Test func aHeaderEditPreparesWhatANarrowedPrepareLeft() async throws {
+        let root = try CheckFixture.package()
+        defer { XcodeProjectPipelineTests.remove(root) }
+        _ = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        let greeting = try #require(CheckFixture.files["Sources/Core/Greeting.swift"])
+        try CheckFixture.write(
+            greeting + "\npublic func greeted() -> Bool { true }\n",
+            to: "Sources/Core/Greeting.swift",
+            in: root,
+        )
+        let widened = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(widened.typesBuild.contains("only the edited modules' own"), "\(widened.typesBuild)")
+        let leftByNarrowedPrepare = try #require(Self.prepared("Core", root: root))
+
+        try CheckFixture.write("int ccore_reply(void);\n", to: "Sources/CCore/include/CCore.h", in: root)
+        let edited = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(
+            edited.compilerFindings.contains("Greeting.swift:11:error"),
+            "\(edited.typesBuild) \(edited.of("finding"))",
+        )
+        #expect(!edited.typesBuild.contains("only the edited modules' own"), "\(edited.typesBuild)")
+        let preparedAgain = try #require(Self.prepared("Core", root: root))
+        #expect(preparedAgain > leftByNarrowedPrepare, "prepare left Core's interface from before the edit")
+        #expect(InterfaceEmit.Ledger.stored(scratchPath: Pipeline.scratchPath(for: root)) == .init(targets: []))
+        #expect(edited.filesWithoutRecord.isEmpty)
+    }
+
     /*
      A root that uses a local package whose tests are ours: App imports Shapes, and ShapesTests, which only Shapes'
      own session checks, holds a warning on line 6.
