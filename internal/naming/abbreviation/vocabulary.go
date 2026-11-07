@@ -1,7 +1,6 @@
 package abbreviation
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 )
@@ -20,10 +19,25 @@ type Vocabulary struct {
 	AllowedNames    map[string]bool
 	AllowedSegments []string
 
-	// prefixPatterns is `^<abbreviation>[A-Z]`, built once per entry rather than per name.
-	prefixPatterns map[string]*regexp.Regexp
-	// segmentPatterns are the two shapes a mid-name segment can take, plus the replacement form.
-	segmentPatterns map[string]wordSegmentPatterns
+	// segmentPatterns are the two shapes a mid-name segment can take, plus the replacement form, one per entry of
+	// Segments and in its order, so Find reaches an entry's patterns by its index rather than by a lookup per name.
+	segmentPatterns []wordSegmentPatterns
+}
+
+// beginsWithPrefix is `^<abbreviation>[A-Z]`, the prefix form, as a comparison: the name begins with the
+// abbreviation and an ASCII capital follows it. Load accepts only letters a to z in an abbreviation, so the pattern
+// holds no syntax and the two say the same.
+func beginsWithPrefix(name string, abbreviation string) bool {
+	return len(name) > len(abbreviation) && strings.HasPrefix(name, abbreviation) &&
+		name[len(abbreviation)] >= 'A' && name[len(abbreviation)] <= 'Z'
+}
+
+// endsWithCapitalized is whether a name ends with the abbreviation capitalized, the suffix form, without building
+// the capitalized word for every entry and every name. The abbreviation is letters a to z, so capitalizing it changes
+// its first byte alone.
+func endsWithCapitalized(name string, abbreviation string) bool {
+	start := len(name) - len(abbreviation)
+	return start >= 0 && name[start] == abbreviation[0]-'a'+'A' && name[start+1:] == abbreviation[1:]
 }
 
 // containsAllowedSegment reports whether a name contains a word that merely holds an abbreviation's letters, like
@@ -53,6 +67,11 @@ func (vocabulary *Vocabulary) allowedSegmentHolds(name string, abbreviation stri
 //
 // It knows nothing about where the name sits. An engine asks it only after its own skips, and then silences its own
 // exemptions by the form and word it returns.
+//
+// Every name an engine judges meets every entry, and nearly every name matches none, so each form is tested first
+// as the literal text its pattern holds, and only a name that passes costs a regular expression run. A literal test
+// that fails is a pattern that could not have matched, so the findings are the ones the patterns alone gave
+// (#300qvxj), and find_equivalence_test.go holds them to that over every name in this repository and the ahra tree.
 func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 	if vocabulary.AllowedNames[name] {
 		return Finding{}, false
@@ -63,17 +82,19 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 	}
 
 	for _, entry := range vocabulary.EarlyPrefixes {
+		if !beginsWithPrefix(name, entry.Abbreviation) {
+			continue
+		}
 		if vocabulary.allowedSegmentHolds(name, entry.Abbreviation) {
 			continue
 		}
-		if vocabulary.prefixPatterns[entry.Abbreviation].MatchString(name) {
-			return prefixFinding(entry, name), true
-		}
+		return prefixFinding(entry, name), true
 	}
 
 	for _, entry := range vocabulary.Suffixes {
 		if entry.Suffix.Matcher == "millisecondWord" {
-			if millisecondSegmentPattern.MatchString(name) {
+			// The pattern holds `Ms` literally, so a name without it cannot match.
+			if strings.Contains(name, "Ms") && millisecondSegmentPattern.MatchString(name) {
 				replacement := "${1}" + entry.Suffix.Replacement + "${2}"
 				suggestion := replaceFirst(millisecondSegmentPattern, name, replacement)
 				return Finding{
@@ -85,15 +106,14 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 			}
 			continue
 		}
-		suffix := Capitalize(entry.Abbreviation)
-		if !strings.HasSuffix(name, suffix) {
+		if !endsWithCapitalized(name, entry.Abbreviation) {
 			continue
 		}
-		return suffixFinding(entry, name, suffix), true
+		return suffixFinding(entry, name, Capitalize(entry.Abbreviation)), true
 	}
 
 	for _, entry := range vocabulary.LatePrefixes {
-		if !vocabulary.prefixPatterns[entry.Abbreviation].MatchString(name) {
+		if !beginsWithPrefix(name, entry.Abbreviation) {
 			continue
 		}
 		return prefixFinding(entry, name), true
@@ -103,8 +123,11 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 		return Finding{}, false
 	}
 
-	for _, entry := range vocabulary.Segments {
-		patterns := vocabulary.segmentPatterns[entry.Abbreviation]
+	for index, entry := range vocabulary.Segments {
+		patterns := vocabulary.segmentPatterns[index]
+		if !strings.Contains(name, patterns.word) {
+			continue
+		}
 		if !patterns.boundary.MatchString(name) && !patterns.camel.MatchString(name) {
 			continue
 		}

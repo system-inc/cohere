@@ -141,6 +141,9 @@ type allowedSegment struct {
 
 // wordSegmentPatterns are the two shapes a mid-name segment can take, plus the replacement form.
 type wordSegmentPatterns struct {
+	// word is the capitalized abbreviation every one of the patterns holds literally, so a name that does not contain
+	// it matches none of them.
+	word     string
 	boundary *regexp.Regexp
 	camel    *regexp.Regexp
 	replace  *regexp.Regexp
@@ -178,10 +181,8 @@ func Load(data []byte) (*Vocabulary, error) {
 	}
 
 	loaded := &Vocabulary{
-		WholeByName:     map[string]*Entry{},
-		AllowedNames:    map[string]bool{},
-		prefixPatterns:  map[string]*regexp.Regexp{},
-		segmentPatterns: map[string]wordSegmentPatterns{},
+		WholeByName:  map[string]*Entry{},
+		AllowedNames: map[string]bool{},
 	}
 	seen := map[string]bool{}
 	for index := range file.Abbreviations {
@@ -198,12 +199,6 @@ func Load(data []byte) (*Vocabulary, error) {
 			loaded.WholeByName[entry.Abbreviation] = entry
 		}
 		if entry.Prefix != nil {
-			// A bad entry is refused with its reason rather than panicking, so a malformed file reads as an error.
-			prefixPattern, compileError := regexp.Compile(`^` + entry.Abbreviation + `[A-Z]`)
-			if compileError != nil {
-				return nil, fmt.Errorf("entry %q's prefix pattern: %w", entry.Abbreviation, compileError)
-			}
-			loaded.prefixPatterns[entry.Abbreviation] = prefixPattern
 			if entry.Prefix.Phase == "early" {
 				loaded.EarlyPrefixes = append(loaded.EarlyPrefixes, entry)
 			} else {
@@ -219,14 +214,16 @@ func Load(data []byte) (*Vocabulary, error) {
 			boundary, boundaryError := regexp.Compile(`(^|[^a-zA-Z])` + word + `($|[A-Z0-9])`)
 			camel, camelError := regexp.Compile(`[a-z0-9]` + word + `($|[A-Z0-9])`)
 			replace, replaceError := regexp.Compile(word + `($|[A-Z0-9])`)
+			// A bad entry is refused with its reason rather than panicking, so a malformed file reads as an error.
 			if compileError := errors.Join(boundaryError, camelError, replaceError); compileError != nil {
 				return nil, fmt.Errorf("entry %q's segment patterns: %w", entry.Abbreviation, compileError)
 			}
-			loaded.segmentPatterns[entry.Abbreviation] = wordSegmentPatterns{
+			loaded.segmentPatterns = append(loaded.segmentPatterns, wordSegmentPatterns{
+				word:     word,
 				boundary: boundary,
 				camel:    camel,
 				replace:  replace,
-			}
+			})
 		}
 	}
 	for _, allowed := range file.AllowedNames {
@@ -240,8 +237,11 @@ func Load(data []byte) (*Vocabulary, error) {
 
 // validateEntry refuses an entry the engines would read as something other than meant.
 func validateEntry(entry *Entry) error {
-	if entry.Abbreviation == "" || strings.ToLower(entry.Abbreviation) != entry.Abbreviation {
-		return fmt.Errorf("the abbreviation must be lowercase and present")
+	// Letters alone, because Find tests the prefix, suffix and segment forms as literal text: `^db[A-Z]` is a name
+	// that begins with `db` and then an ASCII capital, which holds only while the abbreviation has nothing a pattern
+	// would read as syntax and nothing that capitalizes in more than one byte.
+	if entry.Abbreviation == "" || strings.TrimLeft(entry.Abbreviation, "abcdefghijklmnopqrstuvwxyz") != "" {
+		return fmt.Errorf("the abbreviation must be present and lowercase letters, a to z")
 	}
 	if entry.Whole == nil && entry.Prefix == nil && entry.Suffix == nil && entry.Segment == nil {
 		return fmt.Errorf("no form, so the entry judges nothing")
