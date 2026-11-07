@@ -541,6 +541,212 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(test *testing.T) {
 	}
 }
 
+// noUnknownPropertyReactTypes is a cut-down `@types/react` 19: React's own `IntrinsicElements` in its
+// `React.JSX` namespace, reached under `"jsx": "react-jsx"` through `react/jsx-runtime`, as the real one is.
+var noUnknownPropertyReactTypes = map[string]string{
+	"node_modules/@types/react/package.json": `{"name": "@types/react", "version": "19.0.0", "types": "index.d.ts"}`,
+	"node_modules/@types/react/index.d.ts": `
+export = React;
+export as namespace React;
+declare namespace React {
+	interface HTMLAttributes { className?: string; id?: string }
+	interface SVGAttributes { cx?: number; fill?: string; strokeWidth?: number; viewBox?: string }
+	namespace JSX {
+		interface Element {}
+		interface IntrinsicElements {
+			div: HTMLAttributes;
+			svg: SVGAttributes;
+			circle: SVGAttributes;
+		}
+	}
+}
+`,
+	"node_modules/@types/react/jsx-runtime.d.ts": `
+import * as React from "./";
+export { JSX } from "./";
+export function jsx(type: unknown, props: unknown, key?: string): React.JSX.Element;
+export function jsxs(type: unknown, props: unknown, key?: string): React.JSX.Element;
+`,
+	"tsconfig.json": `{
+	"compilerOptions": {
+		"strict": true, "target": "ES2022", "lib": ["ES2022"], "module": "ESNext", "moduleResolution": "Bundler",
+		"jsx": "react-jsx", "moduleDetection": "force", "types": []
+	},
+	"include": ["source/**/*.ts", "source/**/*.tsx"]
+}`,
+}
+
+// noUnknownPropertyFiberTypes is react-three-fiber's shape in miniature: three.js's classes, made JSX
+// intrinsics through a key-remapping mapped type and an augmentation of React's `IntrinsicElements`. The
+// remapping is the part that matters, since the checker links no declaration to a remapped property.
+const noUnknownPropertyFiberTypes = `
+declare class Mesh { position: [number, number, number] }
+declare class MeshBasicMaterial { transparent: boolean; toneMapped: boolean }
+declare const Three: { Mesh: typeof Mesh; MeshBasicMaterial: typeof MeshBasicMaterial };
+type ThreeElements = {
+	[K in keyof typeof Three & string as Uncapitalize<K>]: Partial<InstanceType<(typeof Three)[K]>> & { args?: unknown[] };
+};
+declare module 'react' {
+	namespace JSX {
+		interface IntrinsicElements extends ThreeElements {}
+	}
+}
+export {};
+`
+
+// noUnknownPropertyTypedFiles is the React types with the subject at source/Scene.tsx, plus any other files.
+func noUnknownPropertyTypedFiles(subject string, others map[string]string) map[string]string {
+	files := map[string]string{"source/Scene.tsx": subject}
+	for name, contents := range noUnknownPropertyReactTypes {
+		files[name] = contents
+	}
+	for name, contents := range others {
+		files[name] = contents
+	}
+	return files
+}
+
+// TestNoUnknownPropertyJudgesOnlyReactsOwnElements runs the rule against a real type graph, where the
+// checker says which declaration supplies an intrinsic element (#ccs1c9c).
+//
+// An intrinsic that `@types/react` declares is judged by React's tables on every one of the three paths
+// that report; one that any other file declares is not, on the same three paths. Each silent row was
+// reported before this, so the pairs are the fix seen both ways.
+func TestNoUnknownPropertyJudgesOnlyReactsOwnElements(test *testing.T) {
+	test.Parallel()
+
+	cases := []struct {
+		name    string
+		files   map[string]string
+		wantIds []string
+	}{
+		{
+			"an augmented intrinsic is silent",
+			noUnknownPropertyTypedFiles(`
+declare module 'react' {
+	namespace JSX {
+		interface IntrinsicElements {
+			mesh: { position?: [number, number, number] };
+		}
+	}
+}
+export const scene = <mesh position={[0, 0, 0]} />;
+`, nil),
+			nil,
+		},
+		{
+			"react-three-fiber's remapped intrinsics are silent on all three reporting paths",
+			noUnknownPropertyTypedFiles(`
+import 'fiber';
+export const scene = (
+	<mesh position={[0, 0, 0]} args={[1]} class="x" fill="red">
+		<meshBasicMaterial transparent toneMapped={false} />
+	</mesh>
+);
+`, map[string]string{
+				"node_modules/fiber/package.json": `{"name": "fiber", "version": "1.0.0", "types": "index.d.ts"}`,
+				"node_modules/fiber/index.d.ts":   noUnknownPropertyFiberTypes,
+			}),
+			nil,
+		},
+		{
+			"a div beside the augmentation still reports",
+			noUnknownPropertyTypedFiles(`
+import 'fiber';
+export const page = <div position="x" />;
+`, map[string]string{
+				"node_modules/fiber/package.json": `{"name": "fiber", "version": "1.0.0", "types": "index.d.ts"}`,
+				"node_modules/fiber/index.d.ts":   noUnknownPropertyFiberTypes,
+			}),
+			[]string{"unknownProp"},
+		},
+		{
+			"svg and circle still judge svg properties on all three reporting paths",
+			noUnknownPropertyTypedFiles(`
+export const icon = (
+	<svg viewBox="0 0 2 2" bogus="x">
+		<circle cx={1} fill="red" stroke-width="1" />
+		<circle viewBox="0 0 1 1" />
+	</svg>
+);
+`, nil),
+			[]string{"unknownProp", "unknownPropWithStandardName", "invalidPropOnTag"},
+		},
+		{
+			// The checker answers a tag `IntrinsicElements` does not list with no symbol, and the rule
+			// keeps judging rather than reading that as someone else's element.
+			"an unlisted tag fails closed",
+			noUnknownPropertyTypedFiles(`export const old = <blink bogus="x" />;`, nil),
+			[]string{"unknownProp"},
+		},
+		{
+			// The global `JSX` namespace, which `@types/react` declared before React 19 and which a
+			// package augmented with `declare global`. Without React in scope, `"jsx": "preserve"` takes
+			// its intrinsics from there.
+			"the global JSX augmentation form",
+			map[string]string{
+				"node_modules/@types/react/package.json": `{"name": "@types/react", "version": "18.0.0", "types": "index.d.ts"}`,
+				"node_modules/@types/react/index.d.ts": `
+interface HTMLAttributes { className?: string }
+declare global {
+	namespace JSX {
+		interface Element {}
+		interface IntrinsicElements {
+			div: HTMLAttributes;
+		}
+	}
+}
+export {};
+`,
+				"tsconfig.json": `{
+	"compilerOptions": {
+		"strict": true, "target": "ES2022", "lib": ["ES2022"], "module": "ESNext", "moduleResolution": "Bundler",
+		"jsx": "preserve", "moduleDetection": "force", "types": []
+	},
+	"include": ["source/**/*.ts", "source/**/*.tsx"]
+}`,
+				"source/Scene.tsx": `
+import 'react';
+declare global {
+	namespace JSX {
+		interface IntrinsicElements {
+			mesh: { position?: [number, number, number] };
+		}
+	}
+}
+export const scene = <mesh position={[0, 0, 0]} />;
+export const page = <div position="x" />;
+`,
+			},
+			[]string{"unknownProp"},
+		},
+	}
+
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.RunTypedFilesWithSetup(
+				test,
+				NoUnknownProperty,
+				testCase.files,
+				"source/Scene.tsx",
+				func(string) {
+					// It writes nothing: a setup at all is what keeps the fixture's own tsconfig.
+				},
+			)
+			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
+		})
+	}
+}
+
+// With no `JSX` namespace in reach, as in a JavaScript tree without `@types/react`, the checker has no
+// entry to resolve and the rule judges every lowercase tag as it did before it asked.
+func TestNoUnknownPropertyFailsClosedWithoutReactTypes(test *testing.T) {
+	test.Parallel()
+	result := rule_testing.RunTyped(test, NoUnknownProperty, noUnknownPropertyFile, `<div position="x" class="y" />`)
+	rule_testing.ExpectFindings(test, result, "unknownProp", "unknownPropWithStandardName")
+}
+
 // TestNoUnknownPropertyMessageText asserts every rendered message exactly.
 //
 // Three of the four messages interpolate, so an id assertion cannot see what the format string

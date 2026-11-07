@@ -16895,7 +16895,7 @@
             "namespace": "react",
             "origin": "react",
             "upstreamName": "react/no-unknown-property",
-            "typeAware": false,
+            "typeAware": true,
             "options": {
                 "elements": "one"
             },
