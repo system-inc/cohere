@@ -3,8 +3,8 @@ package main
 import (
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/line_wrap"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
 )
 
 // commentLine is one `//` comment of a group, as it reads after its edits.
