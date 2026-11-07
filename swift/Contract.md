@@ -391,17 +391,18 @@ regardless. Narrowing what is reported to the scope would hide findings the edit
 front door prints `  types: covered the whole package, not only the N files in scope` when the two
 differ.
 
-### `inputs`, the Go engine's, just before `summary`
+### `inputs`, just before `summary`
 
 ```json
 {"kind":"inputs","files":["/…/go.mod","/…/go.sum","/…/p/p.go","<goroot>/VERSION","<goroot>/bin/go","<goroot>/src/fmt/print.go"],
  "directories":["/…","/…/p"],"absent":["/…/CohereSettings.json","/…/staticcheck.conf","/go.work"]}
 ```
 
-Additive within contract 3, and written only by the Go engine, once, in a check run whose load ran, just before
-the summary. Swift's engine does not write it. It declares what the run's verdict was decided from, so the front
-door can replay that verdict without starting the engine when nothing it names has moved: `go list` and the load
-read in a subprocess and in the engine's own process, where the front door cannot observe them.
+Additive within contract 3, and written once, just before the summary: by the Go engine in a check run whose load
+ran, and by the Swift engine in a check run that described its project (#nkk91tv). It declares what the run's
+verdict was decided from, so the front door can replay that verdict without starting the engine when nothing it
+names has moved: `go list`, SwiftPM and the engines read in subprocesses and in their own processes, where the front
+door cannot observe them. The Go engine's record names:
 
 - `files` are the files whose bytes the verdict can depend on: every file of every package in the loaded graph, the
   standard library's and the module cache's too, the project's census, every module's go.mod, each module root's
@@ -418,10 +419,36 @@ read in a subprocess and in the engine's own process, where the front door canno
 - `absent` are paths whose absence the run depends on: a go.work in each directory above a module root while none
   is in use, and each of the files above that is not there. An ancestor is only ever named this way, as a path.
 
+The Swift engine's record (`RunInputs.swift` says why each is enough) names:
+
+- `files`: every file below each root a build reads, the project's root, each local and path package's, and at an
+  Xcode root each package its project links, walked as the build-input snapshot walks them: no directory whose name
+  starts with `.` is entered, so neither `.git`, `.build` nor cohere's `.cache` is, and everything else is, ignored by
+  git or not, with the hidden files in each walked directory but `.DS_Store`. Beside them, every target's sources,
+  each package's `Package.swift` and `Package.resolved`, the ignore files and git config files the file set
+  consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
+  `xcrun` and `xcodebuild` PATH finds (and `xcodegen` at a spec's root), the `swift` xcrun names with
+  `swift-frontend`, `swift-build` and `swift-package` beside it, the toolchain's `ToolchainInfo.plist`, its Xcode's
+  `version.plist`, and each SDK's `SDKSettings.json`. A remote dependency's checkout lives in the engine's scratch and
+  is pinned by the resolved file.
+- `directories`: every directory those walks listed, every directory the file set's walk listed (a hidden one it
+  entered among them), and the directory holding each target source. None is in cohere's cache directory, which
+  the file set's walk no longer enters, since the front door writes its table there after every run.
+- `absent`: each of the files above that is not there, a `.git` in each directory from a package up to its
+  repository, and a `.swift-format` in each directory from a file of ours up to the repository.
+
+The front door adds what only it knows: the settings file it handed the engine, the engine binary it ran, the `swift`
+its own `swift --version` went to, and for an engine built from the working tree, that engine's sources. A Swift
+record lists every directory whose listing it read, so the front door records no directory holding a file beyond
+those: a git config in `.git`, or a toolchain's binary, is decided by its own signature, never by a directory every
+git command or install moves. Which toolchain xcrun would pick, and how the engine was chosen, are keyed rather than
+named (command/cohere/swift_run_cache.go), since a replay asks neither.
+
 Every path is absolute and cleaned, each list is sorted, without duplicates, and `[]` when empty, and two runs over
 an unchanged tree write the same record. A superset only costs a miss, and a path left out is a replay that goes
 stale, so whatever the load, or a later cache of the engine's, reads to decide a verdict must be named here. A
-check run whose load failed, or that asked for no load, writes none, and the front door records nothing for it.
+check run whose load failed, or that asked for no load, writes none, nor does a Swift run that could not describe its
+project, and the front door records nothing for either.
 
 ### `lint`
 

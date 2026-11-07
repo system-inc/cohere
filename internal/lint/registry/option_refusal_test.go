@@ -270,12 +270,28 @@ var nestedOptionCases = []nestedOptionCase{
 		probe:    `{"RequireDefaultForNonUnion": true}`,
 		refusal:  "RequireDefaultForNonUnion",
 	},
-	{
-		rule:     "nexus/consistency-no-shouting",
-		baseline: `{"allow": ["NASA"]}`,
-		probe:    `{"Allow": ["NASA"]}`,
-		refusal:  "Allow",
-	},
+}
+
+// TestTheShoutingRuleRefusesAnAllowList pins Kirk's ruling of 2026-11-06 (#4b337jk): shouting has no
+// per-project allow list, so the safe list in internal/shouting is the one place an acronym is
+// earned. A config that still writes `allow` is refused by name through the real config layer
+// rather than loaded and ignored, which would leave its author believing the words were silenced.
+// The bare severity is the control, so the refusal is about the option, not the rule.
+func TestTheShoutingRuleRefusesAnAllowList(test *testing.T) {
+	test.Parallel()
+	const shoutingRule = "nexus/consistency-no-shouting"
+	if _, decodeError := optionsThroughTheConfigLayer(test, shoutingRule, `"error"`); decodeError != nil {
+		test.Fatalf("%s refused a bare severity, so the refusal below proves nothing: %v", shoutingRule, decodeError)
+	}
+	_, decodeError := optionsThroughTheConfigLayer(test, shoutingRule, `["error", {"allow": ["WIDGET"]}]`)
+	if decodeError == nil {
+		test.Fatalf("%s loaded an `allow` list, a per-project vocabulary the ruling removed", shoutingRule)
+	}
+	for _, want := range []string{shoutingRule, "takes no options", `"allow"`} {
+		if !strings.Contains(decodeError.Error(), want) {
+			test.Errorf("the refusal does not name %q, so the author cannot tell what to remove: %v", want, decodeError)
+		}
+	}
 }
 
 func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {

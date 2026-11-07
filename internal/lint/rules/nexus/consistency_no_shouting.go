@@ -28,12 +28,6 @@ func messageShoutingInComment(token string) rule.Message {
 	}
 }
 
-// ConsistencyNoShoutingOptions lets a project name uppercase tokens it legitimately writes, beyond
-// the shared allowlist.
-type ConsistencyNoShoutingOptions struct {
-	Allow []string `json:"allow"`
-}
-
 // ConsistencyNoShouting bans all-caps words in comments.
 //
 //	valid:   // the `NOT_FOUND` branch returns early
@@ -62,24 +56,22 @@ type ConsistencyNoShoutingOptions struct {
 // finding covers one shouted word, the defect itself, so a long comment points at what to change.
 // The generated-code marker a file opens with is not read: its capitals are fixed by a convention
 // tools match exactly.
-var ConsistencyNoShouting = rule.Rule[ConsistencyNoShoutingOptions]{
+//
+// The rule takes no options. Kirk ruled on 2026-11-06 (#4b337jk) that there is no per-project allow
+// list: the shared safe list in internal/shouting, which every engine reads, is the one mechanism, so
+// an acronym a project needs earns its place there with its reason, and a config that writes `allow`
+// is refused.
+var ConsistencyNoShouting = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-shouting",
-	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoShoutingOptions]) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
-		}
-
-		additionalAllowed := map[string]bool{}
-		if settings, hasSettings := options.Read(); hasSettings {
-			for _, token := range settings.Allow {
-				additionalAllowed[token] = true
-			}
 		}
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				for _, run := range commentRuns(ruleContext) {
-					reportShoutedWords(ruleContext, run, additionalAllowed)
+					reportShoutedWords(ruleContext, run)
 				}
 			},
 		}
@@ -126,7 +118,7 @@ func continuesLineCommentRun(sourceText string, run []comments.Comment, comment 
 // The comments are joined by a newline each, so a line of the joined text is a line of the source,
 // and every comment's own offsets in it are kept, so a word maps back to the source by its comment's
 // start.
-func reportShoutedWords(ruleContext rule.Context, run []comments.Comment, additionalAllowed map[string]bool) {
+func reportShoutedWords(ruleContext rule.Context, run []comments.Comment) {
 	var joined strings.Builder
 	starts := make([]int, 0, len(run))
 	for index, comment := range run {
@@ -146,9 +138,6 @@ func reportShoutedWords(ruleContext rule.Context, run []comments.Comment, additi
 	for index, comment := range run {
 		commentMasked := masked[starts[index] : starts[index]+len(comment.Text)]
 		for _, shouted := range shouting.ShoutedTokensInMasked(commentMasked) {
-			if additionalAllowed[shouted.Text] {
-				continue
-			}
 			start := comment.Range.Pos() + shouted.Offset
 			ruleContext.ReportRange(
 				core.NewTextRange(start, start+len(shouted.Text)),

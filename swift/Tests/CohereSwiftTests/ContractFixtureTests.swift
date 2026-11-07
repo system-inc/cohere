@@ -42,6 +42,23 @@ struct ContractFixtureTests {
         #expect(reparsed != original)
     }
 
+    /*
+     The inputs record, which no fixture holds: a fixture's paths are made up, and a front door replaying a run of one
+     would stat them. Its shape is pinned here instead, as the Go renderer's tests pin it in theirs.
+     */
+    @Test func theInputsRecordRoundTrips() throws {
+        let line =
+            #"{"kind":"inputs","files":["/p/Package.swift"],"directories":["/p"],"absent":["/p/CohereSettings.json"]}"#
+        let original = try JSONSerialization.jsonObject(with: Data(line.utf8)) as? NSDictionary
+        let reparsed = try JSONSerialization.jsonObject(with: Self.roundTrip(line, kind: "inputs")) as? NSDictionary
+        #expect(reparsed == original)
+        let empty = try JSONEncoder().encode(InputsRecord(files: [], directories: [], absent: []))
+        #expect(
+            String(decoding: empty, as: UTF8.self).contains(#""absent":[]"#),
+            "an empty list must be written [], never left out",
+        )
+    }
+
     static func lines(of fixture: String) throws -> [String] {
         let url = contractDirectory.appendingPathComponent("\(fixture).jsonl")
         return try String(contentsOf: url, encoding: .utf8).split(separator: "\n").map(String.init)
@@ -56,6 +73,7 @@ struct ContractFixtureTests {
             case "project": return try encoder.encode(decoder.decode(ProjectRecord.self, from: data))
             case "finding": return try encoder.encode(decoder.decode(FindingRecord.self, from: data))
             case "fix": return try encoder.encode(decoder.decode(FixRecord.self, from: data))
+            case "inputs": return try encoder.encode(decoder.decode(InputsRecord.self, from: data))
             case "types": return try encoder.encode(decoder.decode(TypesRecord.self, from: data))
             case "lint": return try encoder.encode(decoder.decode(LintRecord.self, from: data))
             case "phase": return try encoder.encode(decoder.decode(PhaseRecord.self, from: data))

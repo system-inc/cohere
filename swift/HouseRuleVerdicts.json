@@ -168,6 +168,12 @@
     "reason": null
   },
   {
+    "typeScriptRule": "nexus/consistency-no-label",
+    "verdict": "Ported",
+    "swiftRule": "cohere-swift/consistency-no-label",
+    "reason": null
+  },
+  {
     "typeScriptRule": "nexus/consistency-no-long-line-comment",
     "verdict": "NotApplicable",
     "swiftRule": null,

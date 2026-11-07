@@ -41,6 +41,11 @@ type engineLanguage struct {
 	// CacheOffDetail is what `--no-cache` kept the run from, said after "cache: off, by --no-cache:" in the
 	// account. An engine keeps no cache table of the TypeScript pipeline's, so each says what is true of its own.
 	CacheOffDetail string
+
+	// NamedScratch is the directory in a project's cache directory where the engine keeps a scratch of its own whose
+	// files its inputs record may name, empty when it names none there. Swift's names the package pins an Xcode
+	// root's build starts from, which only that scratch holds (RunInputs.pinsRead). See engineInputsUnreplayable.
+	NamedScratch string
 }
 
 // theEngine is how a sentence names the engine, "the Swift engine", so every error and unfinished
@@ -64,8 +69,13 @@ var swiftLanguage = engineLanguage{
 		"vendored under Vendor/": true,
 		"a package manifest":     true,
 	},
-	CacheOffDetail: "nothing was read from or written to this package's cache, since the engine described " +
-		"and built it in a scratch of its own and removed it",
+	// A Swift run's cache is the run cache's table, which replays a verdict with nothing changed (beginSwiftRunCache),
+	// beside the engine's own scratch in the package's .cache, so the sentence says the flag reaches both.
+	CacheOffDetail: "nothing was read from or written to this package's cache: no recorded run was replayed and " +
+		"this one was not recorded, and the engine described and built the package in a scratch of its own and " +
+		"removed it",
+	// Pipeline.scratchPath in swift/Sources/CohereSwift/Pipeline/Pipeline.swift: `.cache/cohere/swift`.
+	NamedScratch: "swift",
 }
 
 // swiftVersionLines is the Swift engine's `--version` lines. Only Swift has the source-commit line,
