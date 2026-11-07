@@ -11,7 +11,7 @@ enum PolicyWords {
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
         # From @cspell/dict-software-terms 5.2.2, under the MIT License:
         #     Copyright (c) 2017-2025 Street Side Software <support@streetsidesoftware.nl>
-        # With the house's own words, 2 from policy/HouseWords.txt, each with its reason there.
+        # With the house's own words, 15 from policy/HouseWords.txt, each with its reason there.
         # The license texts are in policy/Words.NOTICE.
         a
         aa
@@ -25589,6 +25589,7 @@ enum PolicyWords {
         cloudbursts
         clouded
         cloudera
+        cloudflare
         cloudflared
         cloudier
         cloudiest
@@ -40741,6 +40742,7 @@ enum PolicyWords {
         door
         doorbell
         doorbells
+        doordash
         doorframe
         doorframes
         doorhandles
@@ -41699,6 +41701,7 @@ enum PolicyWords {
         dropsied
         dropsies
         dropsonde
+        dropstream
         dropsy
         dropt
         dropwort
@@ -57949,6 +57952,7 @@ enum PolicyWords {
         godwin
         godwit
         godwits
+        godword
         godzilla
         goebbels
         goer
@@ -78048,6 +78052,7 @@ enum PolicyWords {
         lifeboats
         lifebuoy
         lifebuoys
+        lifecycle
         lifeforms
         lifeful
         lifeguard
@@ -84139,6 +84144,7 @@ enum PolicyWords {
         meronym
         meronymous
         meronymy
+        meross
         merovingian
         merozoite
         merozoites
@@ -85046,6 +85052,7 @@ enum PolicyWords {
         midiron
         midirons
         midis
+        midjourney
         midland
         midlands
         midleg
@@ -99659,6 +99666,7 @@ enum PolicyWords {
         pense
         pensee
         pensees
+        pensieve
         pensile
         pension
         pensionable
@@ -99696,6 +99704,7 @@ enum PolicyWords {
         pentagrid
         pentahedron
         pentahedrons
+        pentair
         pentalogies
         pentalpha
         pentamerous
@@ -102136,6 +102145,7 @@ enum PolicyWords {
         pintas
         pinter
         pinteresque
+        pinterest
         pintle
         pintles
         pinto
@@ -102633,6 +102643,7 @@ enum PolicyWords {
         planetologists
         planetology
         planets
+        planetscale
         plangency
         plangent
         plangently
@@ -150295,6 +150306,7 @@ enum PolicyWords {
         waitfor
         waiting
         waitings
+        waitlist
         waitperson
         waitpersons
         waitress
@@ -150918,6 +150930,7 @@ enum PolicyWords {
         watt
         wattage
         wattages
+        wattbox
         watteau
         wattest
         watthour

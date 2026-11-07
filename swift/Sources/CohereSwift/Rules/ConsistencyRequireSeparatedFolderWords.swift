@@ -16,9 +16,10 @@ import Foundation
      that a lowercase letter follows, so `AISTBench` is `AIST` and `Bench`, and `iOSTerminal` is `i`, `OS` and
      `Terminal`;
    - each part, lowercased, passes when it is a word, of policy's word list (`WordList`, `policy/Words.txt`) or a
-     brand `policy/Brands.json` lists, lowercased to its letters. A part that splits into two or more pieces that are
-     each a word is the finding, with the fewest pieces Go's tie-break chooses. A part that splits no way is a name
-     the lists cannot read (`vfs`, `cachedvfs`) rather than words run together, and passes.
+     brand `policy/Brands.json` lists, lowercased to its letters, or a plural of one (`isPlural`). A part that splits
+     into two or more pieces that are each a word is the finding, with the fewest pieces Go's tie-break chooses. A
+     part that splits no way is a name the lists cannot read (`vfs`, `cachedvfs`) rather than words run together, and
+     passes.
 
  The replacement is the folder with each run-together part written as its pieces, in the style the folder already
  has. A folder with both capitals and lowercase letters is camel case, so its pieces are capitalized and run
@@ -100,7 +101,9 @@ public struct ConsistencyRequireSeparatedFolderWords: FileRule {
         var written = 0
         for part in Self.parts(of: bytes) {
             let lowercase = String(decoding: bytes[part].map(Self.lowercased), as: UTF8.self)
-            guard !isWord(lowercase), let pieces = fewestPieces(Array(lowercase.utf8)), pieces.count >= 2 else {
+            guard !isWord(lowercase), !isPlural(lowercase), let pieces = fewestPieces(Array(lowercase.utf8)),
+                pieces.count >= 2
+            else {
                 continue
             }
             replacement += String(decoding: bytes[written..<part.lowerBound], as: UTF8.self)
@@ -170,6 +173,18 @@ public struct ConsistencyRequireSeparatedFolderWords: FileRule {
     /* Whether text is in the list or is a brand, at any length: Go's `isWord`. */
     func isWord(_ text: String) -> Bool {
         brandWords.contains(text) || words.contains(text)
+    }
+
+    /*
+     Whether text is a word with `s` or `es` after it: Go's `isPlural`. cspell's en_US holds the inflections its source
+     lists, and its source gives some words no plural: it holds `automation` and not `automations` (#narw7aq). A part
+     is read this way only whole, never as a piece of a split, so `jsonlines` still splits as it did.
+     */
+    func isPlural(_ text: String) -> Bool {
+        if text.hasSuffix("es"), isWord(String(text.dropLast(2))) {
+            return true
+        }
+        return text.hasSuffix("s") && isWord(String(text.dropLast()))
     }
 
     /* Whether text may be one piece of a split: one of `twoLetterWords`, or a word of `minimumPieceLength` letters or more. Go's `isPiece`. */

@@ -49,9 +49,9 @@ func init() {
 			Rule:   ConsistencyNoStutteringName,
 			Decode: rule.DecodeOptionsInto[ConsistencyNoStutteringNameOptions](),
 		},
-		rule.Registration[ConsistencyNoUtilsFolderOptions]{
+		rule.Registration[ProjectRootOptions]{
 			Rule:     ConsistencyNoUtilsFolder,
-			DecodeAt: decodeConsistencyNoUtilsFolderOptions,
+			DecodeAt: decodeProjectRootOptions,
 		},
 		rule.Registration[ConsistencyRequireConstantCasingOptions]{
 			Rule:   ConsistencyRequireConstantCasing,

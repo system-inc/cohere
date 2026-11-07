@@ -1,5 +1,6 @@
 {
   "rules": {
+    "TypeScript": "nexus/consistency-require-separated-folder-words",
     "Swift": "cohere-swift/consistency-require-separated-folder-words",
     "Go": "cohere-go/consistency-require-separated-folder-words"
   },
@@ -14,6 +15,12 @@
       "text": "Package name \"{{package}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format_options` at a glance and has to stop and parse `formatoptions`, and a caller reads the package name before every exported name it uses, so its words are separated by underscores.",
       "languages": [
         "Go"
+      ]
+    },
+    "runTogetherProjectFolder": {
+      "text": "Folder name \"{{folder}}\" runs its words together. Use \"{{replacement}}\" instead. A mind reading cold reads `format-options` at a glance and has to stop and parse `formatoptions`, and a folder's name is read on every import line and every path, so its words are separated.",
+      "languages": [
+        "TypeScript"
       ]
     },
     "runTogetherFolderWords": {

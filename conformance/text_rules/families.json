@@ -36,9 +36,7 @@
         "swift": "cohere-swift/file-length"
     },
     "separated-folder-words": {
-        "typescript": {
-            "missing": true
-        },
+        "typescript": "nexus/consistency-require-separated-folder-words",
         "go": "cohere-go/consistency-require-separated-folder-words",
         "swift": "cohere-swift/consistency-require-separated-folder-words"
     },

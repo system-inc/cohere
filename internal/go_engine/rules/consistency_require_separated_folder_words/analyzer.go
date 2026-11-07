@@ -4,10 +4,10 @@
 // A mind reading cold reads format_options at a glance and has to stop and parse formatoptions, and a folder's name
 // is read before anything in it, on every import line and every path. The rule reads the package's folder, the last
 // element of its import path below the module root, and its package clause where the clause differs from the folder
-// and is not main. A name is judged one underscore-separated part at a time (separated.go): a part that is a word
-// passes, and a part that splits into two or more words is the finding, with the split as the spelling it asks for.
-// The words are policy's (policy/Words.txt, cspell's lists with policy/HouseWords.txt merged in, and Brands.json's
-// brands joined), so a word the lists lack is a reviewed change to policy, never a carve-out here.
+// and is not main. A name is judged one underscore-separated part at a time by internal/folder_words, the judgment
+// TypeScript's nexus/consistency-require-separated-folder-words reads too: a part that is a word passes, and a part
+// that splits into two or more words is the finding, with the split as the spelling it asks for. The words are
+// policy's, so a word the lists lack is a reviewed change to policy, never a carve-out here.
 //
 // testdata and vendor folders are never judged, since the engine never loads a package inside either. A package at
 // its module's root is not judged by its folder, whose name is the module's (typescript-go's tsoptions shim is one).
@@ -32,6 +32,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/folder_words"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/policy"
 )
@@ -66,6 +67,10 @@ const testFileSuffix = "_test.go"
 // mainPackageName is the clause of a command, which names no folder and is never renamed.
 const mainPackageName = "main"
 
+// goSpelling separates a name's words with the underscore alone, the one separator a package clause may hold, so a
+// folder and its clause are cut into the same parts and a split of either is spelled as the other would be.
+var goSpelling = folder_words.Spelling{Separators: "_", Joiner: "_"}
+
 func run(pass *analysis.Pass) (any, error) {
 	file := reportedFile(pass)
 	if file == nil {
@@ -75,7 +80,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// Renaming the folder is the moment to rename a clause that runs together too, so a package whose folder is a
 	// finding is reported once, for the folder, as consistency-no-utils-folder does.
 	if folderJudged {
-		if replacement, runTogether := separated(folder); runTogether {
+		if replacement, runTogether := folder_words.Separated(folder, goSpelling); runTogether {
 			reportFolder(pass, file, map[string]string{"folder": folder, "replacement": replacement})
 			return nil, nil
 		}
@@ -84,7 +89,7 @@ func run(pass *analysis.Pass) (any, error) {
 	if strings.TrimSuffix(clause, externalTestSuffix) == folder || clause == mainPackageName {
 		return nil, nil
 	}
-	if replacement, runTogether := separated(clause); runTogether {
+	if replacement, runTogether := folder_words.Separated(clause, goSpelling); runTogether {
 		reportPackageName(pass, file, map[string]string{"package": clause, "replacement": replacement})
 	}
 	return nil, nil

@@ -184,7 +184,7 @@
         "plugins": [
             "@next"
         ],
-        "rulesOn": 304,
+        "rulesOn": 305,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -956,6 +956,10 @@
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-separated-folder-words",
                 "severity": "error"
             },
             {
@@ -1738,7 +1742,7 @@
             "react",
             "react-hooks"
         ],
-        "rulesOn": 369,
+        "rulesOn": 370,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -2422,6 +2426,10 @@
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-separated-folder-words",
                 "severity": "error"
             },
             {
@@ -3539,7 +3547,7 @@
     },
     {
         "name": "cohere:style",
-        "rulesOn": 141,
+        "rulesOn": 142,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -3945,6 +3953,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-require-separated-folder-words",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-type-suffix",
                 "severity": "error"
             },
@@ -4297,7 +4309,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -5239,6 +5251,10 @@
                 "severity": "error"
             },
             {
+                "name": "nexus/consistency-require-separated-folder-words",
+                "severity": "error"
+            },
+            {
                 "name": "nexus/consistency-require-type-suffix",
                 "severity": "error"
             },
@@ -6118,7 +6134,7 @@
         "plugins": [
             "@typescript-eslint"
         ],
-        "rulesOn": 302,
+        "rulesOn": 303,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6931,6 +6947,10 @@
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-separated-folder-words",
                 "severity": "error"
             },
             {
@@ -7844,7 +7864,7 @@
         "extends": [
             "cohere:typescript"
         ],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8576,6 +8596,10 @@
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-separated-folder-words",
                 "severity": "error"
             },
             {
@@ -9337,7 +9361,7 @@
             "cohere:adamic",
             "cohere:style"
         ],
-        "rulesOn": 281,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -10021,6 +10045,10 @@
             },
             {
                 "name": "nexus/consistency-require-matching-return-type",
+                "severity": "error"
+            },
+            {
+                "name": "nexus/consistency-require-separated-folder-words",
                 "severity": "error"
             },
             {

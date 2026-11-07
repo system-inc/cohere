@@ -1,0 +1,10 @@
+{
+    "why": "fw20: an acronym ends before the capital that opens the word after it, so `URLSession` is `URL` and `Session`, and clean, in every engine whose case separates. Go has no form: Go's package names hold no capitals, and its spelling reads a name lowercased whole",
+    "expect": [],
+    "options": {},
+    "path": "URLSession/fw20",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

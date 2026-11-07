@@ -1,0 +1,10 @@
+{
+    "why": "fw17: the Pascal-cased `ProfileImages` is `Profile` and `Images`, separated by case, and clean. Go has no form: Go's package names hold no capitals, and its spelling reads a name lowercased whole",
+    "expect": [],
+    "options": {},
+    "path": "ProfileImages/fw17",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

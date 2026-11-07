@@ -38,6 +38,7 @@
         "nexus/consistency-no-single-line-jsdoc": "error",
         "nexus/consistency-no-stuttering-name": "error",
         "nexus/consistency-no-utils-folder": "error",
+        "nexus/consistency-require-separated-folder-words": "error",
         "nexus/consistency-require-type-suffix": "error",
         "nexus/import-require-module-alias": "error",
         "nexus/import-require-node-namespace": "error",

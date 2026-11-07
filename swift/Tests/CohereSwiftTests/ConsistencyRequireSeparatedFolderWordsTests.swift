@@ -101,6 +101,12 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
         ("text_formatoptions", "text_format_options"),
         ("_formatoptions", "_format_options"),
         ("formatoptions_test", "format_options_test"),
+        /* A plural of a word is one word, though the lists lack it, and only a whole part is read so. */
+        ("automations", ""),
+        ("webhooks", ""),
+        ("hotfixes", ""),
+        ("text_automations", ""),
+        ("webhookhandlers", "webhook_handlers"),
         /* Words a split would break. */
         ("workspace", ""),
         ("charset", ""),
@@ -216,6 +222,8 @@ struct ConsistencyRequireSeparatedFolderWordsTests {
         "Sources",
         "Tests",
         "Workspace",
+        "Automations",
+        "ServiceTypes",
     ])
     func separatedSwiftNamesPass(name: String) throws {
         #expect(try Self.rule().separated(name) == nil)

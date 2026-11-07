@@ -692,6 +692,9 @@
                 "nexus/consistency-require-matching-return-type": {
                     "$ref": "#/$defs/ruleSetting"
                 },
+                "nexus/consistency-require-separated-folder-words": {
+                    "$ref": "#/$defs/ruleSetting"
+                },
                 "nexus/consistency-require-type-suffix": {
                     "$ref": "#/$defs/ruleSetting"
                 },

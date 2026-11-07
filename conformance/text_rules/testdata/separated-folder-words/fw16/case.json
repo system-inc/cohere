@@ -1,0 +1,10 @@
+{
+    "why": "fw16: a capital after a lowercase letter separates words as a hyphen does, so the camel-cased `serviceTypes` is `service` and `Types`, and clean. Go has no form: Go's package names hold no capitals, and its spelling reads a name lowercased whole",
+    "expect": [],
+    "options": {},
+    "path": "serviceTypes/fw16",
+    "languages": [
+        "typescript",
+        "swift"
+    ]
+}

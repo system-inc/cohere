@@ -24,12 +24,6 @@
         "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
     },
     {
-        "engine": "typescript",
-        "family": "separated-folder-words",
-        "task": "narw7aq",
-        "reason": "TypeScript has no separated-folder-words rule"
-    },
-    {
         "engine": "swift",
         "family": "ambiguous-identifier",
         "case": "am03",
