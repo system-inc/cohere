@@ -1,0 +1,11 @@
+{
+    "why": "sh24: a command on a `//` line is masked, read without its slashes as a command behind a block comment's gutter is, so the word on it is not shouting",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

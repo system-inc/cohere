@@ -22,5 +22,29 @@
         "kind": "verdict",
         "task": "p5hm8xm",
         "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
+    },
+    {
+        "engine": "typescript",
+        "family": "shouting",
+        "case": "sh26",
+        "kind": "verdict",
+        "task": "tp7ahz0",
+        "reason": "the command mask blanks every line opening with `git`, so the sentence wrapped onto one is masked and `HOME` is not reported until #tp7ahz0 reads a line that continues a sentence as prose"
+    },
+    {
+        "engine": "go",
+        "family": "shouting",
+        "case": "sh25",
+        "kind": "verdict",
+        "task": "xfa3q6w",
+        "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
+    },
+    {
+        "engine": "swift",
+        "family": "shouting",
+        "case": "sh25",
+        "kind": "verdict",
+        "task": "xfa3q6w",
+        "reason": "a block comment is read with its `/*`, so a command in a one-line block comment never opens its line and `NEVER` is reported"
     }
 ]
