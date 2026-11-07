@@ -309,7 +309,7 @@ never as *no files changed*, and renders the counts alone. `Clean.jsonl` is such
 
 ```json
 {"kind":"types","diagnostics":1,"files":149,"elapsedMilliseconds":2187,
- "filesWithoutRecord":[],"build":"checked without building: the build server prepared the dependencies in 4.1s, and 12 frontend jobs checked 149 files of 8 modules with -emit-sil in 6.2s, scratch <root>/.cache/cohere/swift; prepare built no plugin host tool"}
+ "filesWithoutRecord":[],"build":"checked without building: the build server prepared the dependencies in 4.1s, and 12 frontend jobs checked 149 files of 8 modules with -emit-sib in 6.2s, scratch <root>/.cache/cohere/swift; prepare built no plugin host tool"}
 ```
 
 Rendered as `types: 1 diagnostics over 149 files in 2.187s`. Each entry in `filesWithoutRecord`
@@ -346,7 +346,7 @@ steps, all into the scratch:
 - `swift package experimental-build-server`, SwiftPM's Build Server Protocol server, gives each target's compiler
   arguments (`sourceKitOptions`) and prepares the dependencies' modules (`buildTarget/prepare`, Swift Build's
   prepare-for-indexing), bodies skipped and no object written, under `<scratch>/out`;
-- each owned module's frontend jobs, planned by the driver as `-typecheck`, run as `-emit-sil` with their output
+- each owned module's frontend jobs, planned by the driver as `-typecheck`, run as `-emit-sib` with their output
   sent to /dev/null, so the diagnostics a build reports after type checking (missing returns, constant overflow,
   infinite recursion, use before initialization, exclusivity violations, Swift 6's sending data races) are
   reported too. Each file has its own record under `<scratch>/check/<Target>.build` and its own index unit in

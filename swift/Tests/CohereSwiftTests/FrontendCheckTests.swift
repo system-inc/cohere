@@ -4,7 +4,7 @@ import Testing
 @testable import CohereSwift
 
 /*
- The check runs the driver's planned frontend jobs as `-emit-sil` with a record and an index unit per primary, reruns
+ The check runs the driver's planned frontend jobs as `-emit-sib` with a record and an index unit per primary, reruns
  a failed batch one primary at a time, and names the file and module a crash happened in. Serialized, because the
  tests that reach the toolchain each start a build server and a pool of frontends.
  */
@@ -41,16 +41,16 @@ struct FrontendCheckTests {
     }
 
     /*
-     The rewrite: `-emit-sil` for `-typecheck`, the driver's records dropped, and per primary in the driver's order `SIL`
-     to /dev/null, a record under the module and an index unit, then the store.
+     The rewrite: `-emit-sib` for `-typecheck`, the driver's records dropped, and per primary in the driver's order
+     serialized `SIL` to /dev/null, a record under the module and an index unit, then the store.
      */
-    @Test func aPlannedJobIsRewrittenToEmitSilWithARecordAndUnitPerPrimary() {
+    @Test func aPlannedJobIsRewrittenToEmitSibWithARecordAndUnitPerPrimary() {
         let arguments = Self.check().frontendArguments(of: Self.batch)
         #expect(!arguments.contains("-typecheck"))
         #expect(!arguments.contains("/tmp/Count-1.dia"))
         #expect(
             arguments == [
-                "-frontend", "-emit-sil", "-primary-file", "/package/Count.swift", "-primary-file",
+                "-frontend", "-emit-sib", "-primary-file", "/package/Count.swift", "-primary-file",
                 "/package/Welcome.swift", "/package/Other.swift", "-module-name", "Feature", "-o", "/dev/null", "-o",
                 "/dev/null", "-serialize-diagnostics-path", "/check/Feature.build/Objects-normal/check/Count.dia",
                 "-serialize-diagnostics-path", "/check/Feature.build/Objects-normal/check/Welcome.dia",
