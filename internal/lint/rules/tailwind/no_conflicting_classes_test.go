@@ -148,6 +148,68 @@ func TestNoConflictingClassesReportsSymmetrically(test *testing.T) {
 	}
 }
 
+// TestNoConflictingClassesInTemplateRuns reads the static runs of a template with holes (#j9yk44e).
+//
+// Measured on eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-07, with ahra's theme.
+// Each piece of a template is judged as a literal, so two classes collide only within one piece:
+//
+//	`flex block ${x}`                    flex and block, one finding each
+//	`flex block${x}`                     likewise, the glued block included
+//	`flex ${x} block`                    silent
+//	`flex flex ${x}`                     silent, a repeat is no-duplicate-classes's
+//	`p-2 ${x} flex hover:block ${y}`     silent, two states
+//
+// Each finding sits on its run, as a literal's sits on the literal.
+func TestNoConflictingClassesInTemplateRuns(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		covered []string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`flex block ${size}`} />;",
+			covered: []string{"flex block ", "flex block "},
+		},
+		{
+			name:    "with a class glued to the hole",
+			source:  "const element = <div className={`flex block${size}`} />;",
+			covered: []string{"flex block", "flex block"},
+		},
+		{
+			name:    "never across a hole",
+			source:  "const element = <div className={`flex ${size} block`} />;",
+			covered: []string{},
+		},
+		{
+			name:    "a repeat in a run",
+			source:  "const element = <div className={`flex flex ${size}`} />;",
+			covered: []string{},
+		},
+		{
+			name:    "two states in a middle run",
+			source:  "const element = <div className={`p-2 ${size} flex hover:block ${tone}`} />;",
+			covered: []string{},
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConflictFixture(test, "Component.tsx", testCase.source)
+			if len(result.Diagnostics) != len(testCase.covered) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.covered))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				if covered := text[diagnostic.Range.Pos():diagnostic.Range.End()]; covered != testCase.covered[index] {
+					test.Errorf("finding %d covers %q, want %q", index, covered, testCase.covered[index])
+				}
+			}
+		})
+	}
+}
+
 // The silent half, which for this rule is where the real difficulty is.
 //
 // Each of these is a case a reasonable port reports and upstream does not, so getting them wrong

@@ -1,11 +1,12 @@
 // Command errornames names every error for what produced it. A local `err` (or an error named `e`) written
 // once takes a name from its call: a table of standard library calls first (matched through types, never by
 // spelling), else the function's name in full words plus Error, a function value's name, or for a call of a
-// call's result the function that made it. A local written more than once is split into one variable per
-// web of reaching definitions (splitter.go), each named the same way. A named result takes its function's name
-// and a walk callback's error parameter is pathError, each split too when the body reuses it. A name that
-// abbreviates error (`readErr`, `errOne`) is spelled out. A second phase renames sentinels, error-making
-// functions and fields the same way through the cross-package engine (globals.go).
+// call's result the function that made it. That naming is internal/naming/go_origin_names, which the Go
+// engine's naming rule asks too, so its suggestion and this rename agree. A local written more than once is
+// split into one variable per web of reaching definitions (splitter.go), each named the same way. A named
+// result takes its function's name and a walk callback's error parameter is pathError, each split too when the
+// body reuses it. A name that abbreviates error (`readErr`, `errOne`) is spelled out. A second phase renames
+// sentinels, error-making functions and fields the same way through the cross-package engine (globals.go).
 //
 // Whole renames go through the rename engine, which refuses any that would change what an identifier
 // resolves to. Every package is then rehearsed in memory (verify.go): rewritten, type-checked, every
@@ -15,22 +16,22 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 	"github.com/system-inc/cohere/internal/streams"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/typeutil"
@@ -104,288 +105,18 @@ type pendingParameter struct {
 	resolve func(newName string) (string, string, *splitPlan)
 }
 
-// typeName is a named type by package path and name.
-type typeName struct {
-	packagePath string
-	name        string
-}
-
-// tableEntry names the error of one standard library call.
-type tableEntry struct {
-	packagePath string
-	// receiver is the receiver's type name for a method, "" for a package function.
-	receiver string
-	name     string
-	// namePrefix matches every function whose name starts with name (strconv.Parse*).
-	namePrefix bool
-	// newName is the error's name; "" marks a constructed error, which is named by meaning in the waves.
-	newName string
-}
-
-// errorTable is the spec's override table, matched before the default.
-var errorTable = []tableEntry{
-	{packagePath: "os", name: "ReadFile", newName: "readError"},
-	{packagePath: "io", name: "ReadAll", newName: "readError"},
-	{packagePath: "os", name: "WriteFile", newName: "writeError"},
-	{packagePath: "os", name: "MkdirAll", newName: "createDirectoryError"},
-	{packagePath: "os", name: "Mkdir", newName: "createDirectoryError"},
-	{packagePath: "os", name: "MkdirTemp", newName: "temporaryDirectoryError"},
-	{packagePath: "os", name: "CreateTemp", newName: "temporaryFileError"},
-	{packagePath: "os", name: "ReadDir", newName: "readDirectoryError"},
-	{packagePath: "os", name: "Stat", newName: "statError"},
-	{packagePath: "os", name: "Lstat", newName: "statError"},
-	{packagePath: "os", name: "Open", newName: "openError"},
-	{packagePath: "os", name: "OpenFile", newName: "openError"},
-	{packagePath: "os", name: "Create", newName: "createError"},
-	{packagePath: "os", name: "Remove", newName: "removeError"},
-	{packagePath: "os", name: "RemoveAll", newName: "removeError"},
-	{packagePath: "os", name: "Rename", newName: "renameError"},
-	{packagePath: "os", name: "Symlink", newName: "symlinkError"},
-	{packagePath: "os", name: "Readlink", newName: "readLinkError"},
-	{packagePath: "os", name: "Chtimes", newName: "changeTimesError"},
-	{packagePath: "os", name: "Chmod", newName: "changeModeError"},
-	{packagePath: "os", name: "Getwd", newName: "workingDirectoryError"},
-	{packagePath: "os", name: "UserHomeDir", newName: "homeDirectoryError"},
-	{packagePath: "os", name: "Executable", newName: "executableError"},
-	{packagePath: "path/filepath", name: "Abs", newName: "absolutePathError"},
-	{packagePath: "path/filepath", name: "Rel", newName: "relativePathError"},
-	{packagePath: "path/filepath", name: "EvalSymlinks", newName: "resolveSymlinksError"},
-	{packagePath: "path/filepath", name: "Walk", newName: "walkError"},
-	{packagePath: "path/filepath", name: "WalkDir", newName: "walkError"},
-	{packagePath: "path/filepath", name: "Glob", newName: "globError"},
-	{packagePath: "path/filepath", name: "Match", newName: "matchError"},
-	{packagePath: "encoding/json", name: "Unmarshal", newName: "decodeError"},
-	{packagePath: "encoding/json", receiver: "Decoder", name: "Decode", newName: "decodeError"},
-	{packagePath: "encoding/json", name: "Marshal", newName: "encodeError"},
-	{packagePath: "encoding/json", name: "MarshalIndent", newName: "encodeError"},
-	{packagePath: "strconv", name: "Atoi", newName: "parseError"},
-	{packagePath: "strconv", name: "Parse", namePrefix: true, newName: "parseError"},
-	{packagePath: "os/exec", name: "LookPath", newName: "lookPathError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "Run", newName: "runError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "Output", newName: "outputError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "CombinedOutput", newName: "outputError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "Start", newName: "startError"},
-	{packagePath: "os/exec", receiver: "Cmd", name: "Wait", newName: "waitError"},
-	{packagePath: "regexp", name: "Compile", newName: "compileError"},
-	{packagePath: "io", name: "Copy", newName: "copyError"},
-	{packagePath: "fmt", name: "Sscanf", newName: "scanError"},
-	{packagePath: "fmt", name: "Sscan", newName: "scanError"},
-	{packagePath: "bufio", receiver: "Scanner", name: "Err", newName: "scanError"},
-	{packagePath: "go/format", name: "Source", newName: "formatError"},
-	{packagePath: "compress/gzip", name: "NewReader", newName: "gzipError"},
-	{packagePath: "net/http", receiver: "Client", name: "Do", newName: "requestError"},
-	{packagePath: "io", name: "ReadFull", newName: "readError"},
-	{packagePath: "io", name: "WriteString", newName: "writeError"},
-	{packagePath: "syscall", name: "Dup", newName: "duplicateError"},
-	{packagePath: "syscall", name: "Mmap", newName: "memoryMapError"},
-	{packagePath: "fmt", name: "Errorf"},
-	{packagePath: "errors", name: "New"},
-	{packagePath: "errors", name: "Join"},
-}
-
-// matches reports whether function, called on a receiver of one of receivers' types, is this entry's call.
-// A method matches on either its declared receiver or the receiver expression's type, so a method promoted
-// from an embedded type still matches the type it was called on.
-func (entry tableEntry) matches(function *types.Func, receivers []typeName) bool {
-	if function.Pkg() == nil {
-		return false
+// parseVocabulary reads policy/Abbreviations.json through the shared vocabulary, into the words an error's
+// name is built from.
+func parseVocabulary(contents []byte) (go_origin_names.Vocabulary, error) {
+	loaded, loadError := abbreviation.Load(contents)
+	if loadError != nil {
+		return go_origin_names.Vocabulary{}, loadError
 	}
-	if function.Name() != entry.name && !(entry.namePrefix && strings.HasPrefix(function.Name(), entry.name)) {
-		return false
-	}
-	if entry.receiver == "" {
-		return len(receivers) == 0 && function.Pkg().Path() == entry.packagePath
-	}
-	for _, receiver := range receivers {
-		if receiver == (typeName{packagePath: entry.packagePath, name: entry.receiver}) {
-			return true
-		}
-	}
-	return false
-}
-
-// vocabulary is the abbreviation vocabulary, by lowercased word.
-type vocabulary struct {
-	expansions map[string]string
-	// adviceWords have no mechanical expansion: a name holding one is judged by hand.
-	adviceWords map[string]bool
-	// matcherWords are judged by a matcher, not as a plain word (`ms`): a name holding one is judged by hand.
-	matcherWords    map[string]bool
-	allowedNames    []string
-	allowedSegments []string
-}
-
-// parseVocabulary reads policy/Abbreviations.json.
-func parseVocabulary(contents []byte) (vocabulary, error) {
-	type style struct {
-		Style   string `json:"style"`
-		Matcher string `json:"matcher"`
-	}
-	var file struct {
-		Abbreviations []struct {
-			Abbreviation string   `json:"abbreviation"`
-			Expansions   []string `json:"expansions"`
-			Advice       string   `json:"advice"`
-			Whole        *style   `json:"whole"`
-			Prefix       *style   `json:"prefix"`
-			Suffix       *style   `json:"suffix"`
-		} `json:"abbreviations"`
-		AllowedNames []struct {
-			Name string `json:"name"`
-		} `json:"allowedNames"`
-		AllowedSegments []struct {
-			Segment string `json:"segment"`
-		} `json:"allowedSegments"`
-	}
-	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
-		return vocabulary{}, decodeError
-	}
-	words := vocabulary{
-		expansions:   map[string]string{},
-		adviceWords:  map[string]bool{},
-		matcherWords: map[string]bool{},
-	}
-	isAdvice := func(form *style) bool { return form != nil && form.Style == "advice" }
-	for _, entry := range file.Abbreviations {
-		word := strings.ToLower(entry.Abbreviation)
-		switch {
-		case entry.Suffix != nil && entry.Suffix.Matcher != "":
-			words.matcherWords[word] = true
-		case len(entry.Expansions) != 1 || entry.Advice != "" || isAdvice(entry.Whole) || isAdvice(entry.Prefix):
-			words.adviceWords[word] = true
-		default:
-			words.expansions[word] = entry.Expansions[0]
-		}
-	}
-	if len(words.expansions) == 0 {
-		return vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
-	}
-	for _, allowed := range file.AllowedNames {
-		words.allowedNames = append(words.allowedNames, allowed.Name)
-	}
-	for _, allowed := range file.AllowedSegments {
-		words.allowedSegments = append(words.allowedSegments, allowed.Segment)
+	words := go_origin_names.VocabularyOf(loaded)
+	if len(words.Expansions) == 0 {
+		return go_origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
 	}
 	return words, nil
-}
-
-// camelWords splits a Go name into its camelCase words: a boundary before an uppercase letter that follows a
-// lowercase letter or digit, and before the last uppercase letter of a run that a lowercase letter follows
-// (`HTTPServer` is `HTTP` and `Server`).
-func camelWords(name string) []string {
-	runes := []rune(name)
-	var words []string
-	start := 0
-	for index := 1; index < len(runes); index++ {
-		previous, current := runes[index-1], runes[index]
-		lowerFollows := index+1 < len(runes) && unicode.IsLower(runes[index+1])
-		if unicode.IsUpper(current) &&
-			(unicode.IsLower(previous) || unicode.IsDigit(previous) || (unicode.IsUpper(previous) && lowerFollows)) {
-			words = append(words, string(runes[start:index]))
-			start = index
-		}
-	}
-	return append(words, string(runes[start:]))
-}
-
-// defaultErrorName is lowerCamel(functionName) with every vocabulary word expanded, plus Error unless the
-// name already ends in it. It returns "" and a category when the name is left for the waves.
-func defaultErrorName(functionName string, words vocabulary) (string, string) {
-	if strings.Contains(functionName, "_") {
-		return "", "function name holds an underscore"
-	}
-	for _, allowed := range words.allowedNames {
-		if functionName == allowed {
-			return "", "function name is an allowed name in the vocabulary"
-		}
-	}
-	for _, allowed := range words.allowedSegments {
-		if strings.Contains(functionName, allowed) {
-			return "", "function name holds an allowed segment in the vocabulary"
-		}
-	}
-	var builder strings.Builder
-	lastWord := ""
-	for index, word := range camelWords(functionName) {
-		lowered := strings.ToLower(word)
-		if words.adviceWords[lowered] {
-			return "", "advice-only word in the function name"
-		}
-		if words.matcherWords[lowered] {
-			return "", "matcher-judged word (ms) in the function name"
-		}
-		expansion, abbreviated := words.expansions[lowered]
-		switch {
-		case abbreviated && index == 0:
-			// An expansion is already lowerCamel (`workingDirectory`).
-			word = expansion
-		case abbreviated:
-			word = strings.ToUpper(expansion[:1]) + expansion[1:]
-		case index == 0:
-			// A plain first word lowers whole, initialism or not: `HTTPGet` is `httpGet`.
-			word = lowered
-		default:
-			word = houseCased(word, index)
-		}
-		builder.WriteString(word)
-		lastWord = strings.ToLower(camelWords(word)[len(camelWords(word))-1])
-	}
-	name := builder.String()
-	if lastWord != "error" {
-		name += "Error"
-	}
-	if token.IsKeyword(name) || types.Universe.Lookup(name) != nil {
-		return "", "name would be a keyword or predeclared identifier"
-	}
-	return name, ""
-}
-
-// qualifiedCallNames are producing call names too generic to name an error alone. The error folds in a
-// qualifier: the package name for a package-level function, the last camel word of the receiver's type name
-// for a method.
-var qualifiedCallNames = map[string]bool{"New": true, "For": true, "Of": true}
-
-// qualifierWords spells an all-lowercase package name in its camel words, so a qualifier reads as the words it
-// is made of (`optionschema.For` gives optionSchemaForError). Every qualifier passes through it, so a pass
-// reproduces exactly the names the tree holds; a new multi-word package that needs splitting is added here,
-// never respelled by hand after a pass.
-var qualifierWords = map[string]string{
-	"optionschema":  "optionSchema",
-	"tooldirectory": "toolDirectory",
-}
-
-// qualifiedErrorName names the error of a New, For or Of call: New gives `new` + Qualifier + `Error`
-// (`prettier.New` gives newPrettierError), For and Of give qualifier + Name + `Error` (`release.For` gives
-// releaseForError, `Of` on a `*Graph` gives graphOfError). A qualifier in qualifierWords takes its camel
-// spelling; otherwise a vocabulary word in it is expanded.
-func qualifiedErrorName(function *types.Func, words vocabulary) (string, string) {
-	qualifier := ""
-	if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-		receiverWords := camelWords(namedTypeOf(signature.Recv().Type()).name)
-		qualifier = receiverWords[len(receiverWords)-1]
-	} else if function.Pkg() != nil {
-		qualifier = function.Pkg().Name()
-	}
-	if qualifier == "" {
-		return "", "New, For or Of call without a named package or receiver type"
-	}
-	lowered := strings.ToLower(qualifier)
-	if words.adviceWords[lowered] || words.matcherWords[lowered] {
-		return "", "advice-only or matcher-judged word in the qualifier"
-	}
-	if camel, known := qualifierWords[lowered]; known {
-		lowered = camel
-	} else if expansion, abbreviated := words.expansions[lowered]; abbreviated {
-		lowered = expansion
-	}
-	name := lowered + function.Name() + "Error"
-	if function.Name() == "New" {
-		name = "new" + strings.ToUpper(lowered[:1]) + lowered[1:] + "Error"
-	}
-	if token.IsKeyword(name) || types.Universe.Lookup(name) != nil {
-		return "", "name would be a keyword or predeclared identifier"
-	}
-	return name, ""
 }
 
 // fixupNames are the generic names an earlier pass gave before the qualifier rule; -fixup renames them.
@@ -513,61 +244,6 @@ func findWrites(info *types.Info, files []*ast.File) writeSites {
 	return sites
 }
 
-// namedTypeOf is the named type `resolvedType` is or points to, or the zero typeName.
-func namedTypeOf(resolvedType types.Type) typeName {
-	dereferenced := resolvedType
-	if pointer, isPointer := types.Unalias(resolvedType).(*types.Pointer); isPointer {
-		dereferenced = pointer.Elem()
-	}
-	if named, isNamed := types.Unalias(dereferenced).(*types.Named); isNamed && named.Obj().Pkg() != nil {
-		return typeName{packagePath: named.Obj().Pkg().Path(), name: named.Obj().Name()}
-	}
-	return typeName{}
-}
-
-// producingFunction resolves call to the function it calls, with the receiver types a table entry may match
-// (the method's declared receiver, and the type of the expression it was called on). It returns a category
-// instead when the call has no declared function behind it.
-func producingFunction(info *types.Info, call *ast.CallExpr) (*types.Func, []typeName, string) {
-	if typeAndValue, found := info.Types[call.Fun]; found && typeAndValue.IsType() {
-		return nil, nil, "right side is a conversion"
-	}
-	switch callee := typeutil.Callee(info, call).(type) {
-	case *types.Func:
-		function := callee.Origin()
-		var receivers []typeName
-		if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-			receivers = append(receivers, namedTypeOf(signature.Recv().Type()))
-		}
-		if selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr); isSelector {
-			if selection, found := info.Selections[selector]; found {
-				receivers = append(receivers, namedTypeOf(selection.Recv()))
-			}
-		}
-		return function, receivers, ""
-	case *types.Builtin:
-		return nil, nil, "right side calls a builtin"
-	case *types.Var:
-		return nil, nil, "right side calls a function value"
-	}
-	return nil, nil, "right side calls a function expression"
-}
-
-// qualifiedName prints function as package.Name or (Receiver).Name, for the report.
-func qualifiedName(function *types.Func) string {
-	if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-		receiver := namedTypeOf(signature.Recv().Type())
-		if receiver.name != "" {
-			return "(" + receiver.packagePath + "." + receiver.name + ")." + function.Name()
-		}
-		return "(" + signature.Recv().Type().String() + ")." + function.Name()
-	}
-	if function.Pkg() == nil {
-		return function.Name()
-	}
-	return function.Pkg().Path() + "." + function.Name()
-}
-
 // definingCall returns the single call a variable is defined from, or a category saying why there is none.
 func definingCall(sites writeSites, variable *types.Var) (*ast.CallExpr, string) {
 	if kind, inSignature := sites.signature[variable]; inSignature {
@@ -633,7 +309,7 @@ func findCandidates(
 	info *types.Info,
 	fileSet *token.FileSet,
 	files []*ast.File,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 	fixup bool,
 	finalNames map[string]string,
 ) []candidate {
@@ -823,7 +499,8 @@ func literalBindings(info *types.Info, files []*ast.File) map[*ast.FuncLit]liter
 				}
 				bind(names, typed.Values)
 			case *ast.CompositeLit:
-				if namedTypeOf(info.TypeOf(typed)) != (typeName{packagePath: "go/types", name: "Config"}) {
+				configuration := go_origin_names.TypeName{PackagePath: "go/types", Name: "Config"}
+				if go_origin_names.NamedTypeOf(info.TypeOf(typed)) != configuration {
 					return true
 				}
 				for _, element := range typed.Elts {
@@ -917,7 +594,7 @@ func pendParameter(
 func callSites(
 	goPackage *packages.Package,
 	finalNames map[string]string,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 	sites map[string]map[int][]string,
 ) {
 	for _, file := range goPackage.Syntax {
@@ -950,11 +627,11 @@ func argumentName(
 	goPackage *packages.Package,
 	argument ast.Expr,
 	finalNames map[string]string,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 ) string {
 	switch typed := ast.Unparen(argument).(type) {
 	case *ast.CallExpr:
-		newName, _, _ := producerName(goPackage.TypesInfo, typed, words)
+		newName, _, _ := go_origin_names.CallErrorName(goPackage.TypesInfo, typed, words)
 		return newName
 	case *ast.Ident:
 		if _, isVariable := goPackage.TypesInfo.ObjectOf(typed).(*types.Var); !isVariable {
@@ -992,7 +669,7 @@ func nameParameter(pending *pendingParameter, sites map[string]map[int][]string)
 			return agreed, fmt.Sprintf("clause 2: all %d callers hand in %s", len(names), agreed)
 		}
 	}
-	words := camelWords(pending.function)
+	words := go_origin_names.CamelWords(pending.function)
 	first := ""
 	if len(words) > 0 {
 		first = strings.ToLower(words[0])
@@ -1011,7 +688,7 @@ func errorName(
 	sites writeSites,
 	variable *types.Var,
 	errorType types.Type,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 	fixup bool,
 ) (string, string, string) {
 	if !types.Identical(variable.Type(), errorType) {
@@ -1042,78 +719,18 @@ func errorName(
 		return "", category, ""
 	}
 	if fixup {
-		function, _, category := producingFunction(info, call)
+		function, _, category := go_origin_names.ProducingFunction(info, call)
 		if function == nil {
 			return "", category, ""
 		}
-		callName := qualifiedName(function)
-		if !qualifiedCallNames[function.Name()] {
+		callName := go_origin_names.QualifiedName(function)
+		if !go_origin_names.IsQualifiedCall(function) {
 			return "", "fixup: call is not New, For or Of", callName
 		}
-		newName, category := qualifiedErrorName(function, words)
+		newName, category := go_origin_names.QualifiedErrorName(function, words)
 		return newName, category, callName
 	}
-	return producerName(info, call, words)
-}
-
-// functionWords are trailing words a function value's name may carry that say only that it is a function.
-var functionWords = map[string]bool{"Function": true, "Func": true, "Fn": true, "Callback": true}
-
-// prepositionWords are trailing words a function-making function's name may end on (`DecodeOptionsInto`),
-// which say what the made function is for, not what it does.
-var prepositionWords = map[string]bool{
-	"Into": true,
-	"For":  true,
-	"Of":   true,
-	"From": true,
-	"To":   true,
-	"With": true,
-	"At":   true,
-	"On":   true,
-	"In":   true,
-}
-
-// producerName names the error of call: a declared function by the table, then the New, For and Of rule,
-// then its own name; a function value by the value's name, less a trailing Function, Func, Fn or Callback; a
-// call of a call's result by the inner call's function, less a trailing preposition, since that call made
-// the function (`rule.DecodeOptionsInto[T]()(raw)` gives decodeOptionsError). It returns the call's name for
-// the report, or a category when the call names nothing.
-func producerName(info *types.Info, call *ast.CallExpr, words vocabulary) (string, string, string) {
-	function, receivers, category := producingFunction(info, call)
-	if function != nil {
-		callName := qualifiedName(function)
-		for _, entry := range errorTable {
-			if entry.matches(function, receivers) {
-				if entry.newName == "" {
-					return "", "constructed error", callName
-				}
-				return entry.newName, "", callName
-			}
-		}
-		if qualifiedCallNames[function.Name()] {
-			newName, category := qualifiedErrorName(function, words)
-			return newName, category, callName
-		}
-		newName, category := defaultErrorName(function.Name(), words)
-		return newName, category, callName
-	}
-	switch category {
-	case "right side calls a function value":
-		value, _ := typeutil.Callee(info, call).(*types.Var)
-		newName, category := defaultErrorName(withoutTrailingWords(value.Name(), functionWords), words)
-		return newName, category, "function value " + value.Name()
-	case "right side calls a function expression":
-		switch inner := ast.Unparen(call.Fun).(type) {
-		case *ast.FuncLit:
-			return "", "a function literal called in place", ""
-		case *ast.CallExpr:
-			if maker, isNamed := typeutil.Callee(info, inner).(interface{ Name() string }); isNamed && maker != nil {
-				newName, category := defaultErrorName(withoutTrailingWords(maker.Name(), prepositionWords), words)
-				return newName, category, "function made by " + maker.Name()
-			}
-		}
-	}
-	return "", category, ""
+	return go_origin_names.CallErrorName(info, call, words)
 }
 
 // receivedErrorName names an error received from a channel by the channel, where its name says what it
@@ -1134,7 +751,7 @@ func receivedErrorName(value ast.Expr) string {
 	default:
 		return ""
 	}
-	words := camelWords(name)
+	words := go_origin_names.CamelWords(name)
 	switch strings.ToLower(words[len(words)-1]) {
 	case "errs", "errors":
 		return "receivedError"
@@ -1144,19 +761,10 @@ func receivedErrorName(value ast.Expr) string {
 	return ""
 }
 
-// withoutTrailingWords drops name's trailing camel words that are in trailing, keeping at least one word.
-func withoutTrailingWords(name string, trailing map[string]bool) string {
-	words := camelWords(name)
-	for len(words) > 1 && trailing[strings.ToUpper(words[len(words)-1][:1])+words[len(words)-1][1:]] {
-		words = words[:len(words)-1]
-	}
-	return strings.Join(words, "")
-}
-
 // resultErrorName names a named result from its function: the declared function's name in full words plus
 // Error, by the same rule as a call's (`func (writer *Writer) Close() (closeError error)`). A literal's or a
 // function type's result has no function name to take.
-func resultErrorName(info *types.Info, owner ast.Node, words vocabulary) (string, string, string) {
+func resultErrorName(info *types.Info, owner ast.Node, words go_origin_names.Vocabulary) (string, string, string) {
 	declaration, isDeclaration := owner.(*ast.FuncDecl)
 	if !isDeclaration {
 		return "", "named result of a function literal or type", ""
@@ -1165,12 +773,8 @@ func resultErrorName(info *types.Info, owner ast.Node, words vocabulary) (string
 	if !isFunction {
 		return "", "named result of a function literal or type", ""
 	}
-	if qualifiedCallNames[function.Name()] {
-		newName, category := qualifiedErrorName(function, words)
-		return newName, category, qualifiedName(function)
-	}
-	newName, category := defaultErrorName(function.Name(), words)
-	return newName, category, qualifiedName(function)
+	newName, category := go_origin_names.FunctionErrorName(function, words)
+	return newName, category, go_origin_names.QualifiedName(function)
 }
 
 // parameterErrorName names an error parameter. A walk callback's third parameter, a function literal taking
@@ -1200,9 +804,9 @@ func isWalkCallback(signature *types.Signature) bool {
 	if basic, isBasic := signature.Params().At(0).Type().(*types.Basic); !isBasic || basic.Kind() != types.String {
 		return false
 	}
-	entry := namedTypeOf(signature.Params().At(1).Type())
-	if entry != (typeName{packagePath: "io/fs", name: "DirEntry"}) &&
-		entry != (typeName{packagePath: "io/fs", name: "FileInfo"}) {
+	entry := go_origin_names.NamedTypeOf(signature.Params().At(1).Type())
+	if entry != (go_origin_names.TypeName{PackagePath: "io/fs", Name: "DirEntry"}) &&
+		entry != (go_origin_names.TypeName{PackagePath: "io/fs", Name: "FileInfo"}) {
 		return false
 	}
 	return types.Identical(signature.Params().At(2).Type(), errorType)
@@ -1212,8 +816,8 @@ func isWalkCallback(signature *types.Signature) bool {
 // leading err moves to the end as Error (`errOne` gives oneError), with every other vocabulary word expanded.
 // It reports false for a name with no such word. A name holding an advice-only or matcher-judged word gets a
 // category instead of a name.
-func abbreviatedErrorName(name string, words vocabulary) (string, string, bool) {
-	parts := camelWords(name)
+func abbreviatedErrorName(name string, words go_origin_names.Vocabulary) (string, string, bool) {
+	parts := go_origin_names.CamelWords(name)
 	if len(parts) < 2 {
 		return "", "", false
 	}
@@ -1235,45 +839,33 @@ func abbreviatedErrorName(name string, words vocabulary) (string, string, bool) 
 			builder.WriteString("Error")
 			continue
 		}
-		if words.adviceWords[lowered] || words.matcherWords[lowered] {
+		if words.AdviceWords[lowered] || words.MatcherWords[lowered] {
 			return "", "advice-only or matcher-judged word beside Err", true
 		}
-		if expansion, abbreviated := words.expansions[lowered]; abbreviated && lowered != "err" {
+		if expansion, abbreviated := words.Expansions[lowered]; abbreviated && lowered != "err" {
 			if index > 0 {
 				expansion = strings.ToUpper(expansion[:1]) + expansion[1:]
 			}
 			builder.WriteString(expansion)
 			continue
 		}
-		builder.WriteString(houseCased(word, index))
+		builder.WriteString(go_origin_names.HouseCased(word, index))
 	}
 	return builder.String(), "", true
 }
 
-// houseCased writes a name's word as the house writes it: an initialism as any other word (`CSS` after the
-// first word is `Css`), and the first word lowered whole.
-func houseCased(word string, index int) string {
-	if index == 0 {
-		return strings.ToLower(word[:1]) + word[1:]
-	}
-	if len(word) > 1 && strings.ToUpper(word) == word && strings.ToLower(word) != word {
-		return word[:1] + strings.ToLower(word[1:])
-	}
-	return word
-}
-
 // otherAbbreviatedError reports whether a local error not named err still carries an abbreviated name: one
 // or two letters, or a camel word in the vocabulary. They are out of this pass and counted for the waves.
-func otherAbbreviatedError(variable *types.Var, words vocabulary) bool {
+func otherAbbreviatedError(variable *types.Var, words go_origin_names.Vocabulary) bool {
 	if variable.Name() == "err" || variable.Name() == "_" {
 		return false
 	}
 	if len(variable.Name()) <= 2 {
 		return true
 	}
-	for _, word := range camelWords(variable.Name()) {
+	for _, word := range go_origin_names.CamelWords(variable.Name()) {
 		lowered := strings.ToLower(word)
-		if _, abbreviated := words.expansions[lowered]; abbreviated || words.adviceWords[lowered] {
+		if _, abbreviated := words.Expansions[lowered]; abbreviated || words.AdviceWords[lowered] {
 			return true
 		}
 	}
@@ -1312,12 +904,9 @@ func run(root string, skips []string, dryRun bool, fixup bool) int {
 		fmt.Fprintf(streams.Errors, "%s: loading: %v\n", commandName, loadError)
 		return 1
 	}
-	vocabularyFile, readError := os.ReadFile(filepath.Join(loaded.Root, "policy", "Abbreviations.json"))
-	if readError != nil {
-		fmt.Fprintf(streams.Errors, "%s: %v\n", commandName, readError)
-		return 1
-	}
-	words, vocabularyError := parseVocabulary(vocabularyFile)
+	// The vocabulary is the one built into the pass, from the cohere tree it was built in, so a pass run over another
+	// repository judges words exactly as it does over cohere.
+	words, vocabularyError := parseVocabulary(policy.AbbreviationsFile())
 	if vocabularyError != nil {
 		fmt.Fprintf(streams.Errors, "%s: policy/Abbreviations.json: %v\n", commandName, vocabularyError)
 		return 1
@@ -1627,7 +1216,7 @@ func nameParameters(
 	loaded *workspace.Workspace,
 	candidatesOf map[*packages.Package][]candidate,
 	finalNames map[string]string,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 ) []string {
 	sites := map[string]map[int][]string{}
 	for _, analyzedPackage := range loaded.Analyzed {

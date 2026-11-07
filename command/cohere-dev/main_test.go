@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 func TestWholeModuleAndCountOnceAreReadFromTheArguments(test *testing.T) {
@@ -70,6 +72,7 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 		test.Skip("slots are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -162,6 +165,7 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 		test.Skip("slots are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -266,6 +270,7 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		test.Skip("nice is a Unix priority")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -416,6 +421,7 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		test.Skip("tokens are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -518,6 +524,7 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}
@@ -680,6 +687,7 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}

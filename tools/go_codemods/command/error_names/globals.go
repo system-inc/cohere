@@ -7,9 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_rename/global_rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 	"github.com/system-inc/cohere/internal/streams"
-	"github.com/system-inc/cohere/tools/go_codemods/global_rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
 )
 
 // The second phase renames the declarations whose name abbreviates error and whose uses reach past one
@@ -24,11 +25,11 @@ import (
 // abbreviate error. A package-level variable opening on err keeps the prefix, spelled out. An exported name
 // opening on Err followed by more words is Go's own convention for a sentinel, which the house rule leaves
 // alone, so it is kept.
-func globalErrorName(name string, packageVariable bool, words vocabulary) (string, bool) {
+func globalErrorName(name string, packageVariable bool, words go_origin_names.Vocabulary) (string, bool) {
 	if name == "Err" {
 		return "Error", true
 	}
-	parts := camelWords(name)
+	parts := go_origin_names.CamelWords(name)
 	if len(parts) > 1 && parts[0] == "Err" {
 		return "", false
 	}
@@ -36,10 +37,10 @@ func globalErrorName(name string, packageVariable bool, words vocabulary) (strin
 		var builder strings.Builder
 		builder.WriteString("error")
 		for index, word := range parts[1:] {
-			if expansion, abbreviated := words.expansions[strings.ToLower(word)]; abbreviated {
+			if expansion, abbreviated := words.Expansions[strings.ToLower(word)]; abbreviated {
 				word = strings.ToUpper(expansion[:1]) + expansion[1:]
 			}
-			builder.WriteString(houseCased(word, index+1))
+			builder.WriteString(go_origin_names.HouseCased(word, index+1))
 		}
 		return builder.String(), true
 	}
@@ -52,7 +53,7 @@ func globalErrorName(name string, packageVariable bool, words vocabulary) (strin
 
 // findGlobalProposals lists every package-level declaration and field of the editable files whose name
 // abbreviates error, once each.
-func findGlobalProposals(loaded *workspace.Workspace, words vocabulary) []global_rename.Proposal {
+func findGlobalProposals(loaded *workspace.Workspace, words go_origin_names.Vocabulary) []global_rename.Proposal {
 	var proposals []global_rename.Proposal
 	seen := map[string]bool{}
 	for _, analyzedPackage := range loaded.Analyzed {
@@ -93,7 +94,7 @@ func findGlobalProposals(loaded *workspace.Workspace, words vocabulary) []global
 }
 
 // planGlobals plans the second phase over loaded and prints what it decided.
-func planGlobals(loaded *workspace.Workspace, words vocabulary) *global_rename.Result {
+func planGlobals(loaded *workspace.Workspace, words go_origin_names.Vocabulary) *global_rename.Result {
 	proposals := findGlobalProposals(loaded, words)
 	result := global_rename.Plan(loaded, proposals, global_rename.Options{})
 	fmt.Fprintf(
@@ -149,7 +150,7 @@ func planGlobals(loaded *workspace.Workspace, words vocabulary) *global_rename.R
 
 // applyGlobals reloads the tree the first phase wrote, plans the second phase over it, and applies it. It
 // returns the exit code.
-func applyGlobals(root string, skips []string, words vocabulary) int {
+func applyGlobals(root string, skips []string, words go_origin_names.Vocabulary) int {
 	reloaded, loadError := workspace.Load(root, skips)
 	if loadError != nil {
 		fmt.Fprintf(streams.Errors, "%s: reloading for the second phase: %v\n", commandName, loadError)

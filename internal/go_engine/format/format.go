@@ -2,7 +2,9 @@
 // reads the formatted tree. A run either rewrites what gofmt would change or, for `--no-fix`, writes nothing
 // and says where each file would change, which the engine reports as one finding per file at that line. A run that
 // rewrites may also wrap each file's long lines once the load has found the types sound, through RunWrap and
-// Options.Wrap, keeping the wrap only when it is provably the same program and gofmt leaves it as it is.
+// Options.Wrap, keeping the wrap only when it is provably the same program and gofmt leaves it as it is. The engine's
+// rename, which runs after the wrap, wraps the files it rewrote in memory through WrapSource and writes them through
+// WriteAtomically, the same steps.
 //
 // A formatter that formatted nothing must never read like one that found everything already correct, so
 // every file a run is handed comes back accounted for: already formatted, changed, not formatted with its
@@ -248,7 +250,7 @@ func formatFile(file string, options Options) outcome {
 	}
 	changed := &ChangedFile{File: file, Formatted: true, FirstDifferingLine: firstDifferingLine(original, formatted)}
 	if options.Write {
-		if writeError := writeAtomically(file, formatted); writeError != nil {
+		if writeError := WriteAtomically(file, formatted); writeError != nil {
 			return notFormatted(file, fmt.Sprintf("it cannot be written: %v", writeError))
 		}
 		changed.Written = true
@@ -277,7 +279,7 @@ func wrapFile(source Source, options Options) outcome {
 		}
 		return outcome{}
 	}
-	if writeError := writeAtomically(source.File, output); writeError != nil {
+	if writeError := WriteAtomically(source.File, output); writeError != nil {
 		return outcome{wrapDeclined: &WrapDeclinedFile{File: source.File,
 			Reason: fmt.Sprintf("the wrap could not be written: %v", writeError)}}
 	}
@@ -350,34 +352,61 @@ func firstDifferingLine(original, formatted []byte) int {
 	return max(1, len(originalLines))
 }
 
-// writeAtomically replaces file with contents through a temporary file beside it and a rename, so an interrupted
+// WriteAtomically replaces file with contents through a temporary file beside it and a rename, so an interrupted
 // run leaves the old file or the new one, never half of either. The temporary file takes the file's permissions
 // before the rename makes it the file. A symbolic link is written through to its target, and stays a link.
 //
 // Nothing is synced to disk: the rename already guards against the run being stopped, and a sync per file
 // would cost every run to guard against the machine losing power mid-write.
-func writeAtomically(file string, contents []byte) error {
+func WriteAtomically(file string, contents []byte) error {
+	staged, stageError := stage(file, contents)
+	if stageError != nil {
+		return stageError
+	}
+	return putInPlace(staged)
+}
+
+// stagedFile is a file's new contents written to a temporary file beside it, not yet renamed into place.
+type stagedFile struct {
+	// target is the file, through any symbolic link, and temporary the file beside it holding the new contents.
+	target    string
+	temporary string
+}
+
+// stage writes contents to a temporary file beside file, through any symbolic link, with the file's permissions,
+// and removes it again when it cannot be filled.
+func stage(file string, contents []byte) (stagedFile, error) {
 	target, resolveError := filepath.EvalSymlinks(file)
 	if resolveError != nil {
-		return fmt.Errorf("resolving %s: %w", file, resolveError)
+		return stagedFile{}, fmt.Errorf("resolving %s: %w", file, resolveError)
 	}
 	information, statError := os.Stat(target)
 	if statError != nil {
-		return fmt.Errorf("reading the mode of %s: %w", target, statError)
+		return stagedFile{}, fmt.Errorf("reading the mode of %s: %w", target, statError)
 	}
 	temporary, createError := os.CreateTemp(filepath.Dir(target), "."+filepath.Base(target)+".cohere-format-*")
 	if createError != nil {
-		return fmt.Errorf("creating a temporary file beside %s: %w", target, createError)
+		// The cause alone: the temporary file's name is random, and the file it would sit beside is named already.
+		var pathError *os.PathError
+		if errors.As(createError, &pathError) {
+			createError = pathError.Err
+		}
+		return stagedFile{}, fmt.Errorf("creating a temporary file beside %s: %w", target, createError)
 	}
 	if fillError := fillTemporary(temporary, contents, information.Mode().Perm()); fillError != nil {
 		// Ignored: the temporary file is ours and half written, and the error worth returning is the fill's.
 		_ = os.Remove(temporary.Name())
-		return fillError
+		return stagedFile{}, fillError
 	}
-	if renameError := os.Rename(temporary.Name(), target); renameError != nil {
+	return stagedFile{target: target, temporary: temporary.Name()}, nil
+}
+
+// putInPlace renames a staged file's temporary over its target, and removes the temporary when it cannot.
+func putInPlace(staged stagedFile) error {
+	if renameError := os.Rename(staged.temporary, staged.target); renameError != nil {
 		// Ignored: the temporary file is ours, and the error worth returning is the rename's.
-		_ = os.Remove(temporary.Name())
-		return fmt.Errorf("renaming %s over %s: %w", temporary.Name(), target, renameError)
+		_ = os.Remove(staged.temporary)
+		return fmt.Errorf("renaming %s over %s: %w", staged.temporary, staged.target, renameError)
 	}
 	return nil
 }

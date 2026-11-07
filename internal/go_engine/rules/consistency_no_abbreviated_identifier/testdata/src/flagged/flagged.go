@@ -25,10 +25,10 @@ type srcFile struct { // want `Identifier "srcFile" should not be abbreviated\. 
 	ownerRef string // want `Identifier "ownerRef" should not end with "Ref"\. Use "ownerReference"\.`
 }
 
-// A method; a parameter whose bare expansion is a package this one imports; a named result whose bare expansion is
-// predeclared. Both get the descriptive advice instead of the expansion.
+// A method; a parameter whose bare expansion is a package this one imports, a context, named for its caller instead;
+// a named result whose bare expansion is predeclared, which gets the descriptive advice instead of the expansion.
 func (file *srcFile) readBuf( // want `Identifier "readBuf" abbreviates "Buf"\. Use "readBuffer"\.`
-	ctx context.Context, // want `Identifier "ctx" should not be abbreviated\. Use a descriptive name ending in "Context", since "context" is already Go's name for something else\.`
+	ctx context.Context, // want `Identifier "ctx" should not be abbreviated\. Use "callerContext", named for where the context came from\.`
 ) (err error) { // want `Identifier "err" should not be abbreviated\. Use a descriptive name ending in "Error", since "error" is already Go's name for something else\.`
 	return ctx.Err()
 }
@@ -108,3 +108,11 @@ func (halfReader) Src() int { return 0 } // want `Identifier "Src" abbreviates "
 type wideReader struct{}
 
 func (wideReader) Src(name string) int { return 0 } // want `Identifier "Src" abbreviates "Src"\. Use "Source"\.`
+
+// A segment keeps the name's case shape, so an unexported name stays unexported and an exported one exported.
+func parseCfgFile() {} // want `Identifier "parseCfgFile" abbreviates "Cfg"\. Use "parseConfigurationFile"\.`
+
+var MaxLen = 3 // want `Identifier "MaxLen" abbreviates "Len"\. Use "MaxLength"\.`
+
+// The prefix form keeps the rest of the name.
+var cfgPath = "" // want `Identifier "cfgPath" should not be abbreviated\. Use "configurationPath"\.`

@@ -1,0 +1,97 @@
+package flagged
+
+import (
+	"encoding/json"
+
+	"elsewhere"
+)
+
+const Id = 1 // want `"ID" spells an initialism in capitals. Use "Id"`
+
+var userId = 2 // want `"userID" spells an initialism in capitals. Use "userId"`
+
+var HttpClient = "client" // want `"HTTPClient" .* Use "HttpClient"`
+
+type JsonEncoder struct{} // want `"JSONEncoder" .* Use "JsonEncoder"`
+
+type HttpServer struct { // want `"HTTPServer" .* Use "HttpServer"`
+	// The tag carries the external spelling, so the field's own name is ours.
+	UserId   string   `json:"userID"` // want `"UserID" .* Use "UserId"`
+	homeUrls []string // want `"homeURLs" .* Use "homeUrls"`
+}
+
+func ParseUrl(requestId string) (responseUrl string) { // want `"ParseURL" .* Use "ParseUrl"` `"requestID" .* Use "requestId"` `"responseURL" .* Use "responseUrl"`
+	parseUrlPath := requestID // want `"parseURLPath" .* Use "parseUrlPath"`
+	responseURL = parseURLPath
+	return responseURL
+}
+
+func Digest(names []string) int {
+	Sha256Sum := 0              // want `"SHA256Sum" .* Use "Sha256Sum"`
+	for nameId := range names { // want `"nameID" .* Use "nameId"`
+		SHA256Sum += nameID
+	}
+	var UrlsToFetch []string // want `"URLsToFetch" .* Use "UrlsToFetch"`
+	_ = URLsToFetch
+	return SHA256Sum
+}
+
+func Retry() {
+retryHttp: // want `"retryHTTP" .* Use "retryHttp"`
+	for {
+		break retryHTTP
+	}
+}
+
+func Describe(subject any) string {
+	switch valueId := subject.(type) { // want `"valueID" .* Use "valueId"`
+	case string:
+		return valueID
+	}
+	return ""
+}
+
+func Lookup[KeyId comparable](keys map[KeyID]string) int { // want `"KeyID" .* Use "KeyId"`
+	return len(keys)
+}
+
+// A receiver's name and a method's name are both ours when no interface fixes them.
+func (serverApi *HTTPServer) ServeJson() {} // want `"serverAPI" .* Use "serverApi"` `"ServeJSON" .* Use "ServeJson"`
+
+// fetcher is our own interface, so its method and the method implementing it are ours and renamed together.
+type fetcher interface {
+	FetchUrl() string // want `"FetchURL" .* Use "FetchUrl"`
+}
+
+type page struct{}
+
+func (current page) FetchUrl() string { return "" } // want `"FetchURL" .* Use "FetchUrl"`
+
+var _ fetcher = page{}
+
+// record spells MarshalJSON with a signature json.Marshaler does not have, so no interface fixes the name.
+type record struct{}
+
+func (current record) MarshalJson() string { return "" } // want `"MarshalJSON" .* Use "MarshalJson"`
+
+var _ = json.Valid
+
+// partial has only one of elsewhere.Located's two methods, so it does not implement it and the name is ours.
+type partial struct{}
+
+func (current partial) HomeUrl() string { return "" } // want `"HomeURL" .* Use "HomeUrl"`
+
+// keyed shares a name with elsewhere.Keyed's method and takes a parameter it does not, so no instantiation fixes it.
+type keyed struct{}
+
+func (current keyed) KeyId(extra int) string { return "" } // want `"KeyID" .* Use "KeyId"`
+
+var _ elsewhere.Identified = nil
+
+// A plural initialism ends in a lone s.
+var userIds []int // want `"userIDs" .* Use "userIds"`
+
+var Md5 = "digest" // want `"MD5" .* Use "Md5"`
+
+// A sentence in a comment never names anything, so URL here is quiet; the declaration below is not.
+var sessionTtl = 3 // want `"sessionTTL" .* Use "sessionTtl"`

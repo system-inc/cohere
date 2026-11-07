@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A quiet window holds until it ends and not after, so a holder that never says off cannot switch the trim
@@ -89,6 +91,7 @@ type quietTrimCase struct {
 func newQuietTrimCase(test *testing.T) quietTrimCase {
 	test.Helper()
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}

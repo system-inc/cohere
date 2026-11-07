@@ -176,6 +176,12 @@ var EnforceCanonicalClasses = rule.Rule[EnforceCanonicalClassesOptions]{
 				)
 				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
+			canonicalizer := designSystem.Canonicalizer.WithFeatures(
+				tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+			)
+			for _, segments := range reader.ClassTemplateSegmentsIn(node) {
+				reportTemplateCanonical(ruleContext, segments, ignored, designSystem, canonicalizer, collapse)
+			}
 		}
 
 		listeners := rule.Listeners{}
@@ -199,11 +205,36 @@ func reportCollapses(
 	designSystem DesignSystemResult,
 	collapse canonicalCollapseOptions,
 ) map[string]bool {
-	classes := SplitClasses(literal.Text)
+	collapses, reported := collapsesIn(SplitClasses(literal.Text), ignored, designSystem, collapse)
+	for _, found := range collapses {
+		ruleContext.ReportRange(literal.Range, messageCanonicalCollapse(found.inputs, found.output))
+	}
+	return reported
+}
+
+// canonicalCollapse is one mergeable set and the class it becomes.
+type canonicalCollapse struct {
+	inputs []string
+	output string
+}
+
+// collapsesIn finds every collapse among a list of classes, returning the classes that took part so
+// the singles pass leaves them to the collapse's finding.
+//
+// Applied repeatedly, because collapses compose: `mt-1 mb-1 ml-1 mr-1` becomes `m-1` only through
+// `mt+mb => my`, then `ml+mr => mx`, then `my+mx => m`. Verified against the engine, which produces
+// the same single finding for the four-class case.
+func collapsesIn(
+	classes []string,
+	ignored []*ignorePattern,
+	designSystem DesignSystemResult,
+	collapse canonicalCollapseOptions,
+) ([]canonicalCollapse, map[string]bool) {
 	if len(classes) < 2 {
-		return nil
+		return nil, nil
 	}
 	reported := map[string]bool{}
+	var collapses []canonicalCollapse
 
 	remaining := make([]string, 0, len(classes))
 	seen := make(map[string]bool, len(classes))
@@ -222,10 +253,10 @@ func reportCollapses(
 	for pass := 0; pass < maximumPasses; pass++ {
 		inputs, output, didMerge := mergeOnce(remaining, designSystem, collapse)
 		if !didMerge {
-			return reported
+			return collapses, reported
 		}
 
-		ruleContext.ReportRange(literal.Range, messageCanonicalCollapse(inputs, output))
+		collapses = append(collapses, canonicalCollapse{inputs: inputs, output: output})
 		for _, input := range inputs {
 			reported[input] = true
 		}
@@ -240,7 +271,72 @@ func reportCollapses(
 		}
 		remaining = append(next, output)
 	}
-	return reported
+	return collapses, reported
+}
+
+// reportTemplateCanonical judges the static runs of a template with holes, each run on its own.
+//
+// Upstream 4.9.1 reads each piece of a template as a literal, so a collapse pairs classes within one
+// piece and never across a hole: measured under ESLint with ahra's theme, `px-4 py-4 ${x}` and
+// `w-8 h-8 ${x}` report, `px-4 ${x} py-4` is silent. A class glued to a hole is judged as written,
+// so `z-[1]${x}` reports and `px-4 py-4${x}` collapses.
+//
+// A collapse is reported at its run, as a literal's is at the literal, and offers no fix, as a
+// literal's does not. A single is reported at its own class, and fixed only where the class has its
+// own source range, no hole touches it and it is not a repeat in its run. Upstream rewrites
+// `z-[1]${x}` to `z-1${x}`, which is right for that class and wrong for `z-[1]${x}` where the hole
+// holds `0`: the rename turns the half the author wrote into a different half. A repeat is
+// no-duplicate-classes's to delete, as in reportSingles.
+func reportTemplateCanonical(
+	ruleContext rule.Context,
+	segments []ClassSegment,
+	ignored []*ignorePattern,
+	designSystem DesignSystemResult,
+	canonicalizer *tailwindengine.Canonicalizer,
+	collapse canonicalCollapseOptions,
+) {
+	system := designSystem.System
+	if system == nil {
+		return
+	}
+	// The rule declines a file with no source before it listens, so the source is always here.
+	for _, run := range TemplateRunsOf(ruleContext.SourceFile.Text(), segments) {
+		var merged map[string]bool
+		if collapse.enabled {
+			var collapses []canonicalCollapse
+			collapses, merged = collapsesIn(run.Texts(), ignored, designSystem, collapse)
+			for _, found := range collapses {
+				ruleContext.ReportRange(run.Range, messageCanonicalCollapse(found.inputs, found.output))
+			}
+		}
+
+		seenInRun := map[string]bool{}
+		for _, class := range run.Classes {
+			glued := class.GluedLeading || class.GluedTrailing
+			repeated := !glued && seenInRun[class.Text]
+			if !glued {
+				seenInRun[class.Text] = true
+			}
+			if merged[class.Text] || isIgnored(class.Text, ignored) || !classExistsIn(class.Text, system) {
+				continue
+			}
+			canonical := canonicalizer.CanonicalizeClass(class.Text)
+			if canonical == class.Text {
+				continue
+			}
+
+			var fixes []rule.Fix
+			if class.Anchored && !glued && !repeated {
+				fixes = []rule.Fix{rule.ReplaceRange(class.Range, canonical)}
+			}
+			ruleContext.Report(rule.Diagnostic{
+				Range:      class.Range,
+				Message:    messageCanonicalSingle(class.Text, canonical),
+				SourceFile: ruleContext.SourceFile,
+				Fixes:      fixes,
+			})
+		}
+	}
 }
 
 // reportSingles reports each class Tailwind rewrites on its own, at the literal, with a fix that rewrites

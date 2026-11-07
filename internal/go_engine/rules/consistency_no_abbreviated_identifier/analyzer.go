@@ -9,12 +9,20 @@
 // Only names this package declares are judged. A name that is someone else's, a use, an imported package's name, an
 // embedded field named for its type, a method whose name another package's interface fixes, is not ours to rename,
 // and is decided by types rather than by spelling.
+//
+// A whole word whose expansion Go already uses, as `err`'s `error` and `ctx`'s `context` are, asks for a descriptive
+// name. Where the value came from gives one (internal/naming/go_origin_names, which the errornames and contextnames
+// codemods name by too). A local error written once, by a single call, takes the call's name, so `data, err :=
+// os.ReadFile(path)` is told to use readError, and offered it. A context.Context parameter is the caller's,
+// callerContext, and a local context written once takes the name of the call that made it, as context.WithCancel
+// gives cancelContext.
 package consistency_no_abbreviated_identifier
 
 import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"sync"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -26,15 +34,28 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-abbreviated-identifier"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_abbreviated_identifier",
-	Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
-		"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded fields, " +
-		"and a method whose name and signature another package's interface or type fixes are not judged, since " +
-		"those names are someone else's.",
-	Run: run,
+// NewAnalyzer builds the rule's analyzer with a flag set of its own, so a test can run it with renameExports set
+// without setting the flag another test's analyzer reads.
+func NewAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "consistency_no_abbreviated_identifier",
+		Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
+			"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded " +
+			"fields, and a method whose name and signature another package's interface or type fixes are not " +
+			"judged, since those names are someone else's. Where the vocabulary names exactly one full spelling for " +
+			"the whole name, the finding offers it as a rename, which the engine applies at every reference. A local " +
+			"error written once by a single call is named for that call instead, and a context.Context for its " +
+			"caller when it is a parameter or for the call that made it, the name the finding gives and offers. " +
+			"The renameExports option lets a rename reach an exported name of an importable package, and never " +
+			"changes a finding.",
+		Run: run,
+	}
+	rule.AddRenameExportsOption(analyzer)
+	return analyzer
 }
+
+// Analyzer runs the rule over one package.
+var Analyzer = NewAnalyzer()
 
 // Rule is this rule's entry in the Go engine's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
@@ -46,6 +67,24 @@ var messages = map[string]policy.MessageHandle{
 	abbreviation.AbbreviatedSuffix:      policy.MessageOf(Name, abbreviation.AbbreviatedSuffix),
 	abbreviation.MillisecondSuffix:      policy.MessageOf(Name, abbreviation.MillisecondSuffix),
 	abbreviation.AbbreviatedWordSegment: policy.MessageOf(Name, abbreviation.AbbreviatedWordSegment),
+}
+
+// fullWordRenameMessage is the rename a finding offers when the vocabulary names one spelling for the whole name.
+var fullWordRenameMessage = policy.MessageOf(Name, "fullWordRename")
+
+// namedForItsCall is the id of a Go finding on a local error named for the call that produced it: the whole word's
+// advice toward a descriptive name, with the one descriptive name the call gives in its place.
+const namedForItsCall = "namedForItsCall"
+
+// contextNamedForItsOrigin is the id of a Go finding on a context named for where it came from, its caller or the
+// call that made it, in place of the advice toward a descriptive name.
+const contextNamedForItsOrigin = "contextNamedForItsOrigin"
+
+// originMessages are the messages of a finding named for where its value came from, by id, each naming the exact
+// spelling its rename writes.
+var originMessages = map[string]policy.MessageHandle{
+	namedForItsCall:          policy.MessageOf(Name, namedForItsCall),
+	contextNamedForItsOrigin: policy.MessageOf(Name, contextNamedForItsOrigin),
 }
 
 // foreignMethod is a method another package declares, on an interface or on a named type, whose name and signature
@@ -69,6 +108,8 @@ type reach struct {
 
 func run(pass *analysis.Pass) (any, error) {
 	reachable := reachOf(pass.Pkg)
+	// Counted only once a finding asks, so a package with no abbreviated error pays no second walk.
+	writes := sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(pass) })
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch typed := node.(type) {
@@ -80,14 +121,14 @@ func run(pass *analysis.Pass) (any, error) {
 					return true
 				}
 				if identifier, isIdentifier := assignment.Lhs[0].(*ast.Ident); isIdentifier {
-					judge(pass, reachable, identifier)
+					judge(pass, reachable, writes, identifier)
 				}
 			case *ast.Ident:
 				object, isDefinition := pass.TypesInfo.Defs[typed]
 				// Only a declaration: every other identifier is a use, the declaring code's spelling. A definition
 				// with no object is the package clause's name or the type switch variable handled above.
 				if isDefinition && object != nil && isOurs(pass, reachable, object) {
-					judge(pass, reachable, typed)
+					judge(pass, reachable, writes, typed)
 				}
 			}
 			return true
@@ -304,7 +345,12 @@ func reachOf(current *types.Package) reach {
 }
 
 // judge reports a declared name the vocabulary finds abbreviated.
-func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
+func judge(
+	pass *analysis.Pass,
+	reachable reach,
+	writes func() map[*types.Var]*variableWrites,
+	identifier *ast.Ident,
+) {
 	if identifier.Name == "_" {
 		return
 	}
@@ -313,6 +359,7 @@ func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
 		return
 	}
 	values := finding.Values
+	descriptive := false
 	// The house expands to a descriptive name, never to one Go already gives something else: `ctx` becomes
 	// `requestContext`, not the package name `context`, and `err` becomes `readError`, not the predeclared `error`.
 	// Only a whole-word finding suggests the bare expansion, so only its advice changes, and an advice-style entry
@@ -325,13 +372,42 @@ func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
 			"advice": `Use a descriptive name ending in "` + abbreviation.Capitalize(finding.Entry.Expansions[0]) +
 				`", since "` + finding.Entry.Expansions[0] + `" is already Go's name for something else.`,
 		}
+		descriptive = true
 	}
-	pass.Report(analysis.Diagnostic{
+	diagnostic := analysis.Diagnostic{
 		Pos:      identifier.Pos(),
 		End:      identifier.End(),
 		Category: finding.MessageId,
 		Message:  messages[finding.MessageId].Render(values),
-	})
+	}
+	// A local error or context the advice asks a descriptive name of has one when where it came from names it, so
+	// the finding names that spelling and offers it as the rename, the name the codemods give the same local.
+	if descriptive {
+		if newName, messageId, named := originName(pass, reachable, writes, identifier); named {
+			renameValues := map[string]string{"name": identifier.Name, "suggestedName": newName}
+			diagnostic.Category = messageId
+			diagnostic.Message = originMessages[messageId].Render(renameValues)
+			diagnostic.SuggestedFixes = rule.RenameFixes(identifier, newName,
+				fullWordRenameMessage.Render(renameValues))
+		}
+	} else if spelling, isOne := oneSpelling(reachable, finding, identifier.Name); isOne {
+		diagnostic.SuggestedFixes = rule.RenameFixes(identifier, spelling, fullWordRenameMessage.Render(
+			map[string]string{"name": identifier.Name, "suggestedName": spelling},
+		))
+	}
+	pass.Report(diagnostic)
+}
+
+// oneSpelling is the full spelling a finding's advice names for the whole name, when it names exactly one and that
+// one is a name this package may declare. A word with several meanings names one per meaning and leaves the choice to
+// the author, an advice-style form names none, and a whole word whose expansion Go already uses is advised toward a
+// descriptive name above, as `err` and `ctx` are, so none of them is a rename by its spelling. A local error or
+// context may be one by where it came from instead (originName).
+func oneSpelling(reachable reach, finding abbreviation.Finding, name string) (string, bool) {
+	if len(finding.Spellings) != 1 || finding.Spellings[0] == name || isTakenInGo(reachable, finding.Spellings[0]) {
+		return "", false
+	}
+	return finding.Spellings[0], true
 }
 
 // isTakenInGo is whether a name is a keyword, a predeclared identifier, or the name of a package this one reaches, so

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/format/format_files"
 )
 
@@ -332,6 +333,9 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 	// whenever another node edited it between builds, and the second build then discarded the record:
 	// the test failed about one run in three, measuring the tree's churn rather than the record's rule.
 	snapshot := sourceSnapshot(test)
+	// The snapshot is a copy of this package's own source, read in process, but its TypeScript is a link to the
+	// module's, which the builds read through it.
+	build_inputs.Record(test, ".", ".")
 	// The three differ only in what the linker stamps. The first builds alone, compiling every package,
 	// and the other two link at once from what it left in the build cache: one after another the links
 	// were most of this test's time (#nxgt2ca), and all three started together each compiled every

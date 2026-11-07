@@ -424,6 +424,92 @@ func TestConsistencyNoShoutingMasksARunOfLineCommentsAsOneText(test *testing.T) 
 	}
 }
 
+// A comment is masked without its delimiters (#xfa3q6w), as the Go engine reads a `//` line and ESLint a
+// comment's value. The command patterns anchor at a line's start, so read with its slashes a `//` command
+// line, or a one-line block comment holding one, was prose and its capitals shouted, while the same line
+// behind a block comment's gutter was masked. The reporting rows pin that a shout is still found, at the
+// word, now that every finding maps back through what the body cut from the front.
+func TestConsistencyNoShoutingReadsACommentWithoutItsDelimiters(test *testing.T) {
+	test.Parallel()
+
+	silent := []struct {
+		name       string
+		sourceText string
+	}{
+		{"a command on a line comment", "// git commit --amend NEVER\nexport const Value = 1;\n"},
+		{
+			"a command behind a block comment's gutter",
+			"/*\n * git commit --amend NEVER\n */\nexport const Value = 1;\n",
+		},
+		{"a command in a one-line block comment", "/* git commit --amend NEVER */\nexport const Value = 1;\n"},
+		{"a command in a one-line jsdoc", "/** git commit --amend NEVER */\nexport const Value = 1;\n"},
+		{
+			"a command on a run's second line",
+			"// Amend the last commit:\n// git commit --amend NEVER\nexport const Value = 1;\n",
+		},
+		{
+			"a command on an indented run's second line",
+			"export function run() {\n    // Amend it:\n    // git commit --amend NEVER\n    return 1;\n}\n",
+		},
+	}
+	for _, testCase := range silent {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			rule_testing.ExpectClean(test, result)
+		})
+	}
+
+	fires := []struct {
+		name       string
+		sourceText string
+		words      []string
+	}{
+		{"a shout on a line comment", "// this is NEVER ok\nexport const Value = 1;\n", []string{"NEVER"}},
+		{
+			"a shout in a one-line block comment",
+			"/* this is NEVER ok */\nexport const Value = 1;\n",
+			[]string{"NEVER"},
+		},
+		{"a shout in a one-line jsdoc", "/** this is NEVER ok */\nexport const Value = 1;\n", []string{"NEVER"}},
+		{"a trailing line comment", "export const Value = 1; // this is NEVER ok\n", []string{"NEVER"}},
+		// Two spaces after the slashes are one past the space every comment opens with, not an indented
+		// code block, which blanking the slashes to spaces would have made of them.
+		{
+			"two spaces after the slashes",
+			"//  this is NEVER ok\nexport const Value = 1;\n",
+			[]string{"NEVER"},
+		},
+		{
+			"two spaces after a block comment opens",
+			"/*  this is NEVER ok */\nexport const Value = 1;\n",
+			[]string{"NEVER"},
+		},
+		{
+			"a shout after a command on a run",
+			"// Amend it:\n// git commit --amend NEVER\n// and ALWAYS check.\nexport const Value = 1;\n",
+			[]string{"ALWAYS"},
+		},
+	}
+	for _, testCase := range fires {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
+			expectShoutedWords(test, result, testCase.sourceText, testCase.words...)
+		})
+	}
+
+	// The exact column, written out: in both forms `NEVER` opens byte 11 of the line, its twelfth column, the
+	// two delimiter bytes and the space after them before `this is `.
+	for _, sourceText := range []string{"// this is NEVER ok\nexport const Value = 1;\n", "/* this is NEVER ok */\n"} {
+		result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, sourceText)
+		rule_testing.ExpectFindings(test, result, "shoutingInComment")
+		if start := result.Diagnostics[0].Range.Pos(); start != 11 {
+			test.Fatalf("the finding in %q starts at byte %d, not at `NEVER`'s byte 11", sourceText, start)
+		}
+	}
+}
+
 // The generated-code marker's capitals are fixed by go.dev/s/generatedcode, which tools match
 // exactly, so the line is not read (the corpus's sh10). The convention counts it only before the
 // file's first token and only as a line comment spelled exactly, so the same words anywhere else

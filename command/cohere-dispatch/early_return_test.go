@@ -13,6 +13,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A run that returns early gives its caller exactly what a run that waits gives: every byte of stdout and
@@ -134,6 +136,7 @@ func buildDispatcherAndEngine(test *testing.T) (dispatcher string, engine string
 // buildBinary builds the package at packagePath, from the working tree, into a directory of its own.
 func buildBinary(test *testing.T, output string, packagePath string) string {
 	binary := filepath.Join(test.TempDir(), output)
+	build_inputs.Record(test, ".", packagePath)
 	combined, outputError := exec.Command("go", "build", "-o", binary, packagePath).CombinedOutput()
 	if outputError != nil {
 		test.Fatalf("building %s: %v\n%s", packagePath, outputError, combined)

@@ -1,18 +1,1 @@
-[
-    {
-        "engine": "typescript",
-        "family": "ambiguous-identifier",
-        "case": "am03",
-        "kind": "verdict",
-        "task": "1289mz6",
-        "reason": "`.sort`'s comparator parameters are exempt, so `a` and `b` are not reported"
-    },
-    {
-        "engine": "typescript",
-        "family": "casing",
-        "case": "us05",
-        "kind": "verdict",
-        "task": "bjxkmf8",
-        "reason": "neither casing rule judges a leading underscore, so `_cache` is not reported"
-    }
-]
+[]

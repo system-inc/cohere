@@ -40,6 +40,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
@@ -69,11 +70,6 @@ var Rule = rule.Rule{
 var undeclaredWalkMessage = policy.MessageOf(Name, "undeclaredWalk")
 
 var readsWithoutGlobMessage = policy.MessageOf(Name, "readsWithoutGlob")
-
-// readsMarker opens the comment that declares a walk. It is matched as written, with nothing before it, because a
-// planner reads the glob after it, and a comment the rule took as a declaration the planner skipped would leave the
-// walk undeclared with no finding to say so.
-const readsMarker = "// Reads:"
 
 // relatedWalkText labels the walk a finding's source reaches, for a reader that shows related positions.
 const relatedWalkText = "the walk it reaches"
@@ -210,7 +206,7 @@ func readsLines(table *positions.Table, file *ast.File) (declared map[int]bool, 
 	globless = map[int]bool{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			rest, isDeclaration := strings.CutPrefix(comment.Text, readsMarker)
+			rest, isDeclaration := strings.CutPrefix(comment.Text, "// "+marker.Reads)
 			if !isDeclaration {
 				continue
 			}

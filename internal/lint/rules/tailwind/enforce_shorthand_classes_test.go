@@ -106,6 +106,69 @@ func TestEnforceShorthandClassesReports(test *testing.T) {
 	}
 }
 
+// TestEnforceShorthandClassesInTemplateRuns reads the static runs of a template with holes (#j9yk44e).
+//
+// Measured on eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-07, with ahra's theme.
+// Each piece of a template is judged as a literal, so longhands pair within one piece and never
+// across a hole, and a class glued to a hole is judged as written:
+//
+//	`block ps-4 pe-4 ${x}`              ps-4 pe-4 to px-4
+//	`ps-4 pe-4${x}`                     ps-4 pe-4 to px-4, the glued pe-4 included
+//	`block ${x} pt-2 pb-2 ${y} flex`    pt-2 pb-2 to py-2, in a middle run
+//	`ps-4 ${x} pe-4`                    silent
+//	`ps-4 pe-2 ${x}`                    silent
+//
+// A finding sits on its run, as a literal's sits on the literal.
+func TestEnforceShorthandClassesInTemplateRuns(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		covered []string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`block ps-4 pe-4 ${size}`} />;",
+			covered: []string{"block ps-4 pe-4 "},
+		},
+		{
+			name:    "with a class glued to the hole",
+			source:  "const element = <div className={`ps-4 pe-4${size}`} />;",
+			covered: []string{"ps-4 pe-4"},
+		},
+		{
+			name:    "in a middle run",
+			source:  "const element = <div className={`block ${size} pt-2 pb-2 ${tone} flex`} />;",
+			covered: []string{" pt-2 pb-2 "},
+		},
+		{
+			name:    "never across a hole",
+			source:  "const element = <div className={`ps-4 ${size} pe-4`} />;",
+			covered: []string{},
+		},
+		{
+			name:    "values that differ",
+			source:  "const element = <div className={`ps-4 pe-2 ${size}`} />;",
+			covered: []string{},
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runShorthandFixture(test, testCase.source)
+			if len(result.Diagnostics) != len(testCase.covered) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.covered))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				if covered := text[diagnostic.Range.Pos():diagnostic.Range.End()]; covered != testCase.covered[index] {
+					test.Errorf("finding %d covers %q, want %q", index, covered, testCase.covered[index])
+				}
+			}
+		})
+	}
+}
+
 // TestEnforceShorthandClassesStaysSilent covers what upstream leaves alone.
 //
 // Each case here is one of the four things that must agree across a group. Dropping any one of the

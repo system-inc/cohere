@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -364,5 +365,64 @@ func TestAnAnalyzerReadsEachPackagesModule(test *testing.T) {
 	}
 	if !maps.Equal(modules, want) {
 		test.Fatalf("want the modules\n%v\ngot\n%v", want, modules)
+	}
+}
+
+// A load with an overlay parses each overlaid file from its bytes and every other file from disk, and writes nothing:
+// a rename of p's Double overlaid in p and q type-checks under the new name with the old one still on disk, and the
+// same rename overlaid in p alone leaves q's use of the old name a type error, read from q's file on disk.
+func TestAnOverlaidFileIsParsedFromItsBytes(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	files := map[string]string{
+		"go.mod": "module example.com/overlaid\n\ngo 1.21\n",
+		"p/p.go": "package p\n\nfunc Double(value int) int { return value * 2 }\n",
+		"q/q.go": "package q\n\nimport \"example.com/overlaid/p\"\n\nfunc Quadruple(value int) int { return " +
+			"p.Double(p.Double(value)) }\n",
+	}
+	for name, contents := range files {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if directoryError := os.MkdirAll(filepath.Dir(path), 0o755); directoryError != nil {
+			test.Fatal(directoryError)
+		}
+		if writeError := os.WriteFile(path, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	renamed := func(name string) []byte {
+		return []byte(strings.ReplaceAll(files[name], "Double", "Twice"))
+	}
+	pFile, qFile := filepath.Join(root, "p", "p.go"), filepath.Join(root, "q", "q.go")
+
+	both, bothError := PackagesWithOverlay(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		map[string][]byte{pFile: renamed("p/p.go"), qFile: renamed("q/q.go")})
+	if bothError != nil {
+		test.Fatal(bothError)
+	}
+	if len(both.Diagnostics) > 0 {
+		test.Fatalf("the rename overlaid in both files loaded with diagnostics: %+v", both.Diagnostics)
+	}
+	for _, analyzedPackage := range both.Packages {
+		if analyzedPackage.PkgPath != "example.com/overlaid/p" {
+			continue
+		}
+		scope := analyzedPackage.Types.Scope()
+		if scope.Lookup("Twice") == nil || scope.Lookup("Double") != nil {
+			test.Fatalf("p declares %v, want Twice and not Double", scope.Names())
+		}
+	}
+	onDisk, readError := os.ReadFile(pFile)
+	if readError != nil || string(onDisk) != files["p/p.go"] {
+		test.Fatalf("the overlaid load changed p.go on disk (%v):\n%s", readError, onDisk)
+	}
+
+	alone, aloneError := PackagesWithOverlay(root, []string{"./..."}, []string{"GOWORK=off"}, nil,
+		map[string][]byte{pFile: renamed("p/p.go")})
+	if aloneError != nil {
+		test.Fatal(aloneError)
+	}
+	if len(alone.Diagnostics) == 0 || alone.Diagnostics[0].File != qFile {
+		test.Fatalf("want q's use of Double a type error once p's rename is overlaid alone, got %+v", alone.Diagnostics)
 	}
 }

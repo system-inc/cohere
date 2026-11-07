@@ -347,8 +347,9 @@ func indentation(text string) string {
 	return text[:len(text)-len(strings.TrimLeft(text, " \t"))]
 }
 
-// isDirective mirrors go/ast's test for a directive comment such as //go:generate or //line.
-func isDirective(comment string) bool {
+// IsDirective mirrors go/ast's test for a directive comment such as //go:generate or //line: a comment a tool
+// reads by its exact text, which neither a wrap nor a rename may change.
+func IsDirective(comment string) bool {
 	if strings.HasPrefix(comment, "//line ") ||
 		strings.HasPrefix(comment, "//extern ") ||
 		strings.HasPrefix(comment, "//export ") {
@@ -424,7 +425,7 @@ func (sourceFile *sourceFile) classify(line int) Category {
 	if sourceFile.importLines[line] {
 		return CategoryImport
 	}
-	if comment, isComment := sourceFile.commentOnlyLine(line); isComment && isDirective(comment.text) {
+	if comment, isComment := sourceFile.commentOnlyLine(line); isComment && IsDirective(comment.text) {
 		return CategoryDirective
 	}
 	if sourceFile.options.KeepComments && sourceFile.opensInComment(line) {

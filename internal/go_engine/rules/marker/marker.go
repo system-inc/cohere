@@ -7,18 +7,22 @@
 // nothing. A comment speaks for a node from directly above it, on lines of its own, or from the end of the node's
 // last line. A comment trailing the code on the line above a node belongs to that line, not to the node below it.
 //
-// Two rules keep a reading of their own on purpose and do not use this package: concurrency-no-buffered-wait-delay's
-// `// WaitDelay:` and correctness-require-declared-walk's `// Reads:`. Each is a port of an Adamic rule, and keeps
-// Adamic's line reading, in which a marker covers its own line and the line after its group, so
-// `work() // WaitDelay: why` still excuses the line below. Their ports are held to excuse exactly what Adamic's rules
-// excuse, and a `Reads:` glob feeds a planner that reads it the same way, so that reading is not drift for this
-// package to absorb.
+// Every rule's marker is a constant of this package, listed in All, whether or not the rule reads it through Read.
+//
+// Two rules keep a reading of their own on purpose, though their markers live here with the rest:
+// concurrency-no-buffered-wait-delay's `// WaitDelay:` and correctness-require-declared-walk's `// Reads:`. Each is a
+// port of an Adamic rule, and keeps Adamic's line reading, in which a marker covers its own line and the line after
+// its group, so `work() // WaitDelay: why` still excuses the line below. Their ports are held to excuse exactly what
+// Adamic's rules excuse, and a `Reads:` glob feeds a planner that reads it the same way, so that reading is not drift
+// for this package to absorb.
 package marker
 
 import (
 	"go/ast"
 	"go/token"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // Excuse is what a comment says about why a finding is excused. The values are ordered so a stronger excuse compares
@@ -62,11 +66,11 @@ func Read(group *ast.CommentGroup, marker string) Excuse {
 	return found
 }
 
-// NewIndex indexes file's comment groups. Where code sits on a line is read from where the file's nodes begin and end
-// in the AST, never from the source text.
-func NewIndex(fileSet *token.FileSet, file *ast.File) *Index {
+// NewIndex indexes file's comment groups, reading each position's line from table. Where code sits on a line is read
+// from where the file's nodes begin and end in the AST, never from the source text.
+func NewIndex(table *positions.Table, file *ast.File) *Index {
 	index := &Index{
-		fileSet:          fileSet,
+		table:            table,
 		ownLinesEndingOn: map[int]*ast.CommentGroup{},
 		startingOn:       map[int][]*ast.CommentGroup{},
 	}

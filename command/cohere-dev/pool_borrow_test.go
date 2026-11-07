@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A run widened by borrowed tokens splits their cores between packages and threads as evenly as they divide,
@@ -40,6 +42,7 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 		test.Skip("tokens are a Unix lock")
 	}
 	wrapper := filepath.Join(test.TempDir(), "cohere-dev")
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command("go", "build", "-o", wrapper, ".").CombinedOutput(); outputError != nil {
 		test.Fatalf("building: %v\n%s", outputError, output)
 	}

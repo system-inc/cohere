@@ -19,6 +19,18 @@
         },
         "abbreviatedWordSegment": {
             "text": "Identifier \"{{name}}\" abbreviates \"{{word}}\". {{advice}} <<reasoning>>"
+        },
+        "namedForItsCall": {
+            "text": "Identifier \"{{name}}\" should not be abbreviated. Use \"{{suggestedName}}\", named for the call that produced it. <<reasoning>>",
+            "languages": ["Go"]
+        },
+        "contextNamedForItsOrigin": {
+            "text": "Identifier \"{{name}}\" should not be abbreviated. Use \"{{suggestedName}}\", named for where the context came from. <<reasoning>>",
+            "languages": ["Go"]
+        },
+        "fullWordRename": {
+            "text": "Rename \"{{name}}\" to \"{{suggestedName}}\" at its declaration and at every reference.",
+            "languages": ["Go"]
         }
     }
 }

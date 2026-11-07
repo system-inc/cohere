@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // To a pipe or a file, a step and a note print nothing; a failure always prints (#ytqqv8v).
@@ -92,6 +94,7 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(test *testing.T) {
 
 	fixture := newCommittedFixture(test)
 	launcher := filepath.Join(test.TempDir(), "cohere-dispatch")
+	build_inputs.Record(test, ".", "../../../command/cohere-dispatch")
 	if output, outputError := exec.Command(
 		"go",
 		"build",

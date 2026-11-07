@@ -28,17 +28,28 @@ var (
 		"nexus/consistency-require-identifier-casing",
 		"requireUpperCamelCaseCapital",
 	)
+	identifierCasingLeadingUnderscoreText = policy.MessageOf(
+		"nexus/consistency-require-identifier-casing",
+		"noLeadingUnderscore",
+	)
 )
 
+// messageIdentifierCasing renders a finding's message. A name opening on an underscore is told about the
+// underscore, whatever casing its suggestion takes, as the Go and Swift engines tell it, since that is
+// what the name chose and the advice removes.
 func messageIdentifierCasing(
 	text policy.MessageHandle,
 	declaration string,
 	name string,
 	suggestion string,
 ) rule.Message {
+	reportedText := text
+	if strings.HasPrefix(name, "_") {
+		reportedText = identifierCasingLeadingUnderscoreText
+	}
 	return rule.Message{
-		Id: text.Id,
-		Description: text.Render(
+		Id: reportedText.Id,
+		Description: reportedText.Render(
 			map[string]string{"declaration": declaration, "name": name, "suggestion": suggestion},
 		),
 	}
@@ -85,13 +96,19 @@ func messageIdentifierCasing(
 //     decorator, as Base's `Inject*` and `With*` are;
 //   - a constructor: a function the file calls with `new`, or one that assigns properties of `this`.
 //
-// Left alone, besides: a name with a leading or a trailing underscore, `_cache` and `__meta__` alike,
-// which is a taste call pending with Kirk, and the bare `_` discard; a member a base or an implemented
-// type declares, which is judged at the base, an `override` included; a decorated method, whose decorator
-// is handed its name; an ambient declaration, which
-// describes something under the spelling its owner chose; an export Next.js reads by name; a value
-// read from an external grammar into a name that spells it exactly; and a name the converter cannot
-// turn into a passing one, since the advice has to be legal.
+// A leading underscore is flagged on every name this rule judges, as the Go and Swift engines flag it
+// (Kirk, 2026-11-06, #4b337jk, case us05), and so is a trailing one, which both of them report too:
+// `_cache` is told `cache`, `__meta__` `meta` and `event_` `event`. The underscore is a convention for
+// private or for unused, and TypeScript says private with `#` or `private`, which the compiler checks,
+// while an unused name is deleted, or written as the bare `_`.
+//
+// Left alone, besides: the bare `_` discard, and any name that is nothing but underscores, which is no
+// name; a name that only escapes a reserved word, `class_` or `_default`; a member a base or an
+// implemented type declares, which is judged at the base, an `override` included; a decorated method,
+// whose decorator is handed its name; an ambient declaration, which describes something under the
+// spelling its owner chose; an export Next.js reads by name; a value read from an external grammar into
+// a name that spells it exactly; and a name the converter cannot turn into a passing one, since the
+// advice has to be legal.
 //
 // A parameter, a local and a function nothing outside the file can name are renamed by the fix, at the
 // declaration and every reference, through the checker-resolved rename consistency-require-constant-
@@ -360,12 +377,11 @@ func judgeIdentifierCasingCapital(ruleContext rule.Context, name *ast.Node, decl
 	ruleContext.ReportNode(name, messageIdentifierCasing(identifierCasingCapitalText, declaration, text, suggestion))
 }
 
-// isJudgedCasing reports a name whose casing is this rule's to judge. A leading or a trailing underscore
-// is a taste call pending with Kirk, so `_cache`, `event_` and `__meta__` are left alone whatever else
-// they spell, and the bare `_` with them. A reserved word's escape belongs to the keyword it escapes.
+// isJudgedCasing reports a name whose casing is this rule's to judge. The bare `_` is the discard, no
+// name at all, and so is a name of underscores only, which has no word to advise. A reserved word's
+// escape belongs to the keyword it escapes.
 func isJudgedCasing(name string) bool {
-	return name != "" && !strings.HasPrefix(name, "_") && !strings.HasSuffix(name, "_") &&
-		!escapesAReservedWord(name)
+	return strings.Trim(name, "_") != "" && !escapesAReservedWord(name)
 }
 
 // isAmbientDeclaration reports a declaration under `declare`, in a declaration file, or in a `declare
@@ -676,17 +692,18 @@ func mirrorsExternalSpelling(ruleContext rule.Context, name string, initializer 
 		rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetSymbolAtLocation(property))
 }
 
-// startsWithUppercase reports a name whose first character is a capital.
+// startsWithUppercase reports a name whose first character past any leading underscore is a capital, so
+// `_Icon` holding a component keeps its capital and is told `Icon`, never `icon`, an HTML tag.
 func startsWithUppercase(name string) bool {
-	for _, character := range name {
+	for _, character := range strings.TrimLeft(name, "_") {
 		return unicode.IsUpper(character)
 	}
 	return false
 }
 
-// opensOnTwoCapitals reports a name whose first two characters are capitals: an acronym the converter
-// lowers only the first letter of.
+// opensOnTwoCapitals reports a name whose first two characters past any leading underscore are capitals:
+// an acronym the converter lowers only the first letter of.
 func opensOnTwoCapitals(name string) bool {
-	runes := []rune(name)
+	runes := []rune(strings.TrimLeft(name, "_"))
 	return len(runes) > 1 && unicode.IsUpper(runes[0]) && unicode.IsUpper(runes[1])
 }

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -448,5 +451,71 @@ func TestSummaryLineCountsTheFormatProject(test *testing.T) {
 	line := summaryLine(discovery{}, runs)
 	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Format), 1 failed"; !strings.HasPrefix(line, want) {
 		test.Errorf("summary %q, want it to start %q", line, want)
+	}
+}
+
+// TestTheFormatProjectsRecordSaysWhatItCovered is #vyjvz9k, through the binary: at a Go module's root holding Markdown
+// and JSON, the format project's `--json` summary counts the files it accounted for: formatted fresh on the first run,
+// vouched for by the format record on the next, and after one file changes, that one fresh and the other two vouched
+// for. Its label is its own, `. (Format)`, beside the Go project's `.`. It used to say 0 files in scope.
+func TestTheFormatProjectsRecordSaysWhatItCovered(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		".gitignore":         ".cache/\n",
+		"go.mod":             "module example.com/covered\n\ngo 1.27\n",
+		"main.go":            "package main\n\nfunc main() {}\n",
+		"README.md":          "# covered\n",
+		"policy/Words.json":  "[\"a\", \"b\"]\n",
+		"policy/README.md":   "# policy\n",
+		"internal/notes.txt": "not formatted\n",
+	})
+	summaries := func() map[string]summaryJson {
+		test.Helper()
+		command := exec.Command(binary, "--no-fix", "--format-only", "--json")
+		command.Dir = root
+		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=",
+			"CGO_ENABLED=0")
+		output, runError := command.Output()
+		var exitError *exec.ExitError
+		if runError != nil && !errors.As(runError, &exitError) {
+			test.Fatalf("running cohere: %v", runError)
+		}
+		found := map[string]summaryJson{}
+		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			var record summaryJson
+			if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+				test.Fatalf("a line that is not JSON: %q", line)
+			}
+			// A project's summary carries its label; the overall one, merging them, carries none.
+			if record.Kind != "summary" || record.Label == "" {
+				continue
+			}
+			if _, duplicated := found[record.Label]; duplicated {
+				test.Errorf("two summaries share the label %q:\n%s", record.Label, output)
+			}
+			found[record.Label] = record
+		}
+		return found
+	}
+	// The third run follows an edit to one file, so its counts split: a zeroed count, checked or cached, shows
+	// here even where the other runs' zero is the right answer.
+	for run, want := range []struct {
+		edit            string
+		checked, cached int
+	}{{"", 3, 0}, {"", 0, 3}, {"# covered, edited\n", 1, 2}} {
+		if want.edit != "" {
+			writeTree(test, root, map[string]string{"README.md": want.edit})
+		}
+		found := summaries()
+		formatProject, present := found[". (Format)"]
+		if _, goPresent := found["."]; !present || !goPresent {
+			test.Fatalf("run %d: want summaries labeled `.` and `. (Format)`, got %v", run, found)
+		}
+		if formatProject.FilesInScope != 3 || formatProject.Checked != want.checked ||
+			formatProject.Cached != want.cached {
+			test.Errorf("run %d: the format project counts %d in scope, %d checked, %d cached; want 3, %d, %d", run,
+				formatProject.FilesInScope, formatProject.Checked, formatProject.Cached, want.checked, want.cached)
+		}
 	}
 }

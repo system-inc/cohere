@@ -1,0 +1,14 @@
+{
+    "why": "sh26: a sentence a formatter wrapped onto a `//` line opening with `git` is prose, read without its slashes as Go reads sh20's, so the shout on it is read",
+    "expect": [
+        {
+            "covers": "HOME",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript"
+    ]
+}

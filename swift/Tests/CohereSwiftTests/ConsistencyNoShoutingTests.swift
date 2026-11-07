@@ -11,6 +11,16 @@ import Testing
  */
 struct ConsistencyNoShoutingTests {
     static func flagged(_ source: String) throws -> [String] {
+        try findings(source).map { "\($0.line):\($0.word)" }
+    }
+
+    /* Each finding as `line:column:word`, for a case where the column is the claim. */
+    static func located(_ source: String) throws -> [String] {
+        try findings(source).map { "\($0.line):\($0.column):\($0.word)" }
+    }
+
+    /* Each finding's line and column, and the word its span covers in the source. */
+    static func findings(_ source: String) throws -> [(line: Int, column: Int, word: String)] {
         let file = ParsedFile(
             url: URL(fileURLWithPath: "/fixture/Subject.swift"),
             targetName: "Fixture",
@@ -25,7 +35,7 @@ struct ConsistencyNoShoutingTests {
             finding in
             let range = TextRulesConformanceTests.byteRange(of: finding, starts: starts)
             let end = range.end ?? range.start
-            return "\(finding.line):\(String(decoding: bytes[range.start..<end], as: UTF8.self))"
+            return (finding.line, finding.column, String(decoding: bytes[range.start..<end], as: UTF8.self))
         }
     }
 
@@ -65,6 +75,41 @@ struct ConsistencyNoShoutingTests {
             try Self.flagged("/**\n * @example\n * PRINT HELLO\n * @returns NOTHING\n */\nlet value = 1\n") == [
                 "4:NOTHING"
             ]
+        )
+    }
+
+    /*
+     A block comment is read without its delimiters (#gzwa8xr), as the TypeScript rule reads one (#xfa3q6w). A command
+     line's mask is anchored at a line's start, so read with its opening slash a one-line block comment holding a
+     command was prose and its capitals shouted (the corpus's sh25). The located rows pin that a shout is still found
+     at its exact line and column, in one-line, multi-line, doc and nested forms, now that the delimiters are cut.
+     */
+    @Test func aBlockCommentIsReadWithoutItsDelimiters() throws {
+        #expect(try Self.flagged("/* git commit --amend NEVER */\nlet value = 1\n").isEmpty)
+        #expect(try Self.flagged("/** git commit --amend NEVER */\nlet value = 1\n").isEmpty)
+        #expect(try Self.flagged("let value = 1 /* git commit --amend NEVER */\n").isEmpty)
+        #expect(try Self.flagged("/*\n * git commit --amend NEVER\n */\nlet value = 1\n").isEmpty)
+        /* The opening line is blank once its delimiter is cut, so an indented line straight after it opens a code block. */
+        #expect(try Self.flagged("/*\n     MAKE BUILD\n */\nlet value = 1\n").isEmpty)
+
+        #expect(try Self.located("/* this is NEVER ok */\nlet value = 1\n") == ["1:12:NEVER"])
+        #expect(try Self.located("/** this is NEVER ok */\nlet value = 1\n") == ["1:13:NEVER"])
+        #expect(try Self.located("let value = 1 /* this is NEVER ok */\n") == ["1:26:NEVER"])
+        /* Two spaces after the opening are one past the space a comment opens with, not an indented code block. */
+        #expect(try Self.located("/*  this is NEVER ok */\nlet value = 1\n") == ["1:13:NEVER"])
+        /* Only the outer pair is cut; a nested comment is read as it stands. */
+        #expect(try Self.located("/* outer /* inner NEVER */ done */\nlet value = 1\n") == ["1:19:NEVER"])
+        #expect(
+            try Self.located("/* NEVER on the first line,\n and NOT on the second.\n */\nlet value = 1\n")
+                == ["1:4:NEVER", "2:6:NOT"]
+        )
+        #expect(
+            try Self.located("/**\n * Returns NOTHING.\n * git commit --amend NEVER\n */\nfunc probe() {}\n")
+                == ["2:12:NOTHING"]
+        )
+        #expect(
+            try Self.located("/** git commit --amend NEVER\n * and ALWAYS check.\n */\nfunc probe() {}\n")
+                == ["2:8:ALWAYS"]
         )
     }
 

@@ -52,8 +52,10 @@ func messageShoutingInComment(token string) rule.Message {
 // and the repair is usually to state the reason instead, which a rule cannot write.
 //
 // A run of `//` lines is masked as one text, as a block comment is, so a backtick pair or a fence a
-// writer wrapped across the lines is code here as it is behind a block comment's gutter. Each
-// finding covers one shouted word, the defect itself, so a long comment points at what to change.
+// writer wrapped across the lines is code here as it is behind a block comment's gutter. A comment is
+// read without its delimiters, so a command line on a `//` line or in a one-line block comment is
+// masked as one behind a gutter is. Each finding covers one shouted word, the defect itself, so a long
+// comment points at what to change.
 // The generated-code marker a file opens with is not read: its capitals are fixed by a convention
 // tools match exactly.
 //
@@ -113,20 +115,58 @@ func continuesLineCommentRun(sourceText string, run []comments.Comment, comment 
 	return text.TrimWhitespace(sourceText[previous.Range.End():comment.Range.Pos()]) == ""
 }
 
+// commentBodySpan is where one comment's body sits in its run's joined text, and where it starts in
+// the comment's own text.
+type commentBodySpan struct {
+	comment comments.Comment
+	// joinedStart is the body's offset in the joined text.
+	joinedStart int
+	// joinedEnd is where the body ends in the joined text.
+	joinedEnd int
+	// bodyStart is what was cut from the front of the comment's text, the delimiter and for a `//` line
+	// the one space after it, so a word's offset in the body plus this is its offset in the comment.
+	bodyStart int
+}
+
+// commentBody is the text of a comment the masks read, its delimiters out (#xfa3q6w): the command
+// patterns anchor at a line's start, so a `// git commit` line, or a `/* git commit */` on one line,
+// read whole opens on its slashes and is never a command. A `//` line loses its slashes and the one
+// space after them, as shouting.GoCommentBody reads a Go line and the Swift engine a Swift one, so a
+// code block's indentation is measured alike in every engine. A block comment loses its `/*` and `*/`,
+// as ESLint's comment value does. The body is a substring of the text, so it returns where it starts
+// there, and a word maps back to the source by it.
+func commentBody(comment comments.Comment) (body string, bodyStart int) {
+	if !comment.IsBlock {
+		body = shouting.GoCommentBody(comment.Text)
+		return body, len(comment.Text) - len(body)
+	}
+	body = strings.TrimPrefix(comment.Text, "/*")
+	bodyStart = len(comment.Text) - len(body)
+	// An unterminated comment at the end of a file has no `*/` to cut.
+	return strings.TrimSuffix(body, "*/"), bodyStart
+}
+
 // reportShoutedWords masks a run as one text and reports each shouted word in it, at the word.
 //
-// The comments are joined by a newline each, so a line of the joined text is a line of the source,
-// and every comment's own offsets in it are kept, so a word maps back to the source by its comment's
-// start.
+// The comments' bodies are joined by a newline each, so a line of the joined text is a line of the
+// source, and every body's own offsets in it are kept, so a word maps back to the source by its
+// comment's start and what its body cut from the front.
 func reportShoutedWords(ruleContext rule.Context, run []comments.Comment) {
 	var joined strings.Builder
-	starts := make([]int, 0, len(run))
+	spans := make([]commentBodySpan, 0, len(run))
 	for index, comment := range run {
 		if index > 0 {
 			joined.WriteByte('\n')
 		}
-		starts = append(starts, joined.Len())
-		joined.WriteString(comment.Text)
+		body, bodyStart := commentBody(comment)
+		joinedStart := joined.Len()
+		joined.WriteString(body)
+		spans = append(spans, commentBodySpan{
+			comment:     comment,
+			joinedStart: joinedStart,
+			joinedEnd:   joined.Len(),
+			bodyStart:   bodyStart,
+		})
 	}
 	runText := joined.String()
 	// The shared gate: without two capitals in a row nothing can be reported, and only about one
@@ -135,10 +175,9 @@ func reportShoutedWords(ruleContext rule.Context, run []comments.Comment) {
 		return
 	}
 	masked := shouting.MaskCodeAndCommands(runText)
-	for index, comment := range run {
-		commentMasked := masked[starts[index] : starts[index]+len(comment.Text)]
-		for _, shouted := range shouting.ShoutedTokensInMasked(commentMasked) {
-			start := comment.Range.Pos() + shouted.Offset
+	for _, span := range spans {
+		for _, shouted := range shouting.ShoutedTokensInMasked(masked[span.joinedStart:span.joinedEnd]) {
+			start := span.comment.Range.Pos() + span.bodyStart + shouted.Offset
 			ruleContext.ReportRange(
 				core.NewTextRange(start, start+len(shouted.Text)),
 				messageShoutingInComment(shouted.Text),

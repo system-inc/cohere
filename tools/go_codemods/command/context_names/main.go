@@ -2,16 +2,16 @@
 // exactly once, at its own definition, from one call in a short table (matched through types, never by
 // spelling) takes the name that call gives it: `context.WithTimeout` gives timeoutContext,
 // `(*testing.T).Context` testContext, and so on; one from any other call is left for the waves. A
-// context.Context parameter came from the caller, and is named for that: callerContext. A ctx parameter or
-// variable whose type, after one pointer, is a named type of our
-// own module ending in Context takes the type's name: `composeContext` stays composeContext, and an exact
-// `Context` takes its package's name in front (`rule.Context` gives ruleContext). Every rename goes through
-// the rename engine, which refuses any that would change what an identifier resolves to; after writing, the
-// tree is reloaded and every identifier's resolution compared. Everything left alone is reported.
+// context.Context parameter came from the caller, and is named for that: callerContext. The parameter's name
+// and the call table are internal/naming/go_origin_names, which the Go engine's naming rule asks too, so its
+// suggestion and this rename agree. A ctx parameter or variable whose type, after one pointer, is a named type
+// of our own module ending in Context takes the type's name: `composeContext` stays composeContext, and an
+// exact `Context` takes its package's name in front (`rule.Context` gives ruleContext). Every rename goes
+// through the rename engine, which refuses any that would change what an identifier resolves to; after
+// writing, the tree is reloaded and every identifier's resolution compared. Everything left alone is reported.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -22,14 +22,15 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 
+	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/go_rename/workspace"
+	"github.com/system-inc/cohere/internal/naming/abbreviation"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 	"github.com/system-inc/cohere/internal/streams"
-	"github.com/system-inc/cohere/tools/go_codemods/rename"
-	"github.com/system-inc/cohere/tools/go_codemods/workspace"
+	"github.com/system-inc/cohere/policy"
 
 	"golang.org/x/mod/modfile"
-	"golang.org/x/tools/go/types/typeutil"
 )
 
 // commandName prefixes every message this command prints to standard error.
@@ -72,67 +73,6 @@ type candidate struct {
 	// call is the producing call's function, qualified, when the definition has one; for a variable of the
 	// wrong type, its type.
 	call string
-}
-
-// typeName is a named type by package path and name.
-type typeName struct {
-	packagePath string
-	name        string
-}
-
-// tableEntry names the context one call returns.
-type tableEntry struct {
-	packagePath string
-	// receiver is the receiver's type name for a method, "" for a package function.
-	receiver string
-	name     string
-	newName  string
-}
-
-// contextTable is the spec's table; a ctx from any other call is left for the waves.
-var contextTable = []tableEntry{
-	{packagePath: "context", name: "WithCancel", newName: "cancelContext"},
-	{packagePath: "context", name: "WithCancelCause", newName: "cancelContext"},
-	{packagePath: "context", name: "WithTimeout", newName: "timeoutContext"},
-	{packagePath: "context", name: "WithDeadline", newName: "timeoutContext"},
-	{packagePath: "context", name: "Background", newName: "backgroundContext"},
-	{packagePath: "context", name: "TODO", newName: "backgroundContext"},
-	{packagePath: "os/signal", name: "NotifyContext", newName: "signalContext"},
-	{packagePath: "testing", receiver: "T", name: "Context", newName: "testContext"},
-	{packagePath: "net/http", receiver: "Request", name: "Context", newName: "requestContext"},
-	// The format shim puts a formatter's settings on a context, which is how the formatter reads them.
-	{
-		packagePath: "github.com/microsoft/TypeScript/tsc/shim/format",
-		name:        "WithFormatCodeSettings",
-		newName:     "settingsContext",
-	},
-}
-
-// callerContextName is every context.Context parameter's name. A parameter's context is the caller's: the
-// function did not make it and cannot say what made it, and every caller in the tree hands down the one it was
-// given, so the name says where it came from and nothing it cannot know.
-const callerContextName = "callerContext"
-
-// matches reports whether function, called on a receiver of one of receivers' types, is this entry's call.
-// A method matches on either its declared receiver or the receiver expression's type, so a method promoted
-// from an embedded type still matches the type it was called on: `(*testing.T).Context` is declared on the
-// unexported testing.common.
-func (entry tableEntry) matches(function *types.Func, receivers []typeName) bool {
-	if function.Pkg() == nil {
-		return false
-	}
-	if function.Name() != entry.name {
-		return false
-	}
-	if entry.receiver == "" {
-		return len(receivers) == 0 && function.Pkg().Path() == entry.packagePath
-	}
-	for _, receiver := range receivers {
-		if receiver == (typeName{packagePath: entry.packagePath, name: entry.receiver}) {
-			return true
-		}
-	}
-	return false
 }
 
 // writeSites records how the function bodies of some files write each variable.
@@ -243,61 +183,6 @@ func findWrites(info *types.Info, files []*ast.File) writeSites {
 	return sites
 }
 
-// namedTypeOf is the named type `resolvedType` is or points to, or the zero typeName.
-func namedTypeOf(resolvedType types.Type) typeName {
-	dereferenced := resolvedType
-	if pointer, isPointer := types.Unalias(resolvedType).(*types.Pointer); isPointer {
-		dereferenced = pointer.Elem()
-	}
-	if named, isNamed := types.Unalias(dereferenced).(*types.Named); isNamed && named.Obj().Pkg() != nil {
-		return typeName{packagePath: named.Obj().Pkg().Path(), name: named.Obj().Name()}
-	}
-	return typeName{}
-}
-
-// producingFunction resolves call to the function it calls, with the receiver types a table entry may match
-// (the method's declared receiver, and the type of the expression it was called on). It returns a category
-// instead when the call has no declared function behind it.
-func producingFunction(info *types.Info, call *ast.CallExpr) (*types.Func, []typeName, string) {
-	if typeAndValue, found := info.Types[call.Fun]; found && typeAndValue.IsType() {
-		return nil, nil, "right side is a conversion"
-	}
-	switch callee := typeutil.Callee(info, call).(type) {
-	case *types.Func:
-		function := callee.Origin()
-		var receivers []typeName
-		if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-			receivers = append(receivers, namedTypeOf(signature.Recv().Type()))
-		}
-		if selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr); isSelector {
-			if selection, found := info.Selections[selector]; found {
-				receivers = append(receivers, namedTypeOf(selection.Recv()))
-			}
-		}
-		return function, receivers, ""
-	case *types.Builtin:
-		return nil, nil, "right side calls a builtin"
-	case *types.Var:
-		return nil, nil, "right side calls a function value"
-	}
-	return nil, nil, "right side calls a function expression"
-}
-
-// qualifiedName prints function as package.Name or (Receiver).Name, for the report.
-func qualifiedName(function *types.Func) string {
-	if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {
-		receiver := namedTypeOf(signature.Recv().Type())
-		if receiver.name != "" {
-			return "(" + receiver.packagePath + "." + receiver.name + ")." + function.Name()
-		}
-		return "(" + signature.Recv().Type().String() + ")." + function.Name()
-	}
-	if function.Pkg() == nil {
-		return function.Name()
-	}
-	return function.Pkg().Path() + "." + function.Name()
-}
-
 // definingCall returns the single call a variable is defined from, or a category saying why there is none.
 func definingCall(sites writeSites, variable *types.Var) (*ast.CallExpr, string) {
 	if kind, inSignature := sites.signature[variable]; inSignature {
@@ -327,103 +212,33 @@ func definingCall(sites writeSites, variable *types.Var) (*ast.CallExpr, string)
 	return call, ""
 }
 
-// vocabulary is the abbreviation vocabulary, by lowercased word.
-type vocabulary struct {
-	expansions map[string]string
-	// adviceWords have no mechanical expansion: a name holding one is judged by hand.
-	adviceWords map[string]bool
-	// matcherWords are judged by a matcher, not as a plain word (`ms`): a name holding one is judged by hand.
-	matcherWords    map[string]bool
-	allowedNames    []string
-	allowedSegments []string
-}
-
-// parseVocabulary reads policy/Abbreviations.json.
-func parseVocabulary(contents []byte) (vocabulary, error) {
-	type style struct {
-		Style   string `json:"style"`
-		Matcher string `json:"matcher"`
+// parseVocabulary reads policy/Abbreviations.json through the shared vocabulary, into the words a context's
+// name is built from.
+func parseVocabulary(contents []byte) (go_origin_names.Vocabulary, error) {
+	loaded, loadError := abbreviation.Load(contents)
+	if loadError != nil {
+		return go_origin_names.Vocabulary{}, loadError
 	}
-	var file struct {
-		Abbreviations []struct {
-			Abbreviation string   `json:"abbreviation"`
-			Expansions   []string `json:"expansions"`
-			Advice       string   `json:"advice"`
-			Whole        *style   `json:"whole"`
-			Prefix       *style   `json:"prefix"`
-			Suffix       *style   `json:"suffix"`
-		} `json:"abbreviations"`
-		AllowedNames []struct {
-			Name string `json:"name"`
-		} `json:"allowedNames"`
-		AllowedSegments []struct {
-			Segment string `json:"segment"`
-		} `json:"allowedSegments"`
-	}
-	if decodeError := json.Unmarshal(contents, &file); decodeError != nil {
-		return vocabulary{}, decodeError
-	}
-	words := vocabulary{
-		expansions:   map[string]string{},
-		adviceWords:  map[string]bool{},
-		matcherWords: map[string]bool{},
-	}
-	isAdvice := func(form *style) bool { return form != nil && form.Style == "advice" }
-	for _, entry := range file.Abbreviations {
-		word := strings.ToLower(entry.Abbreviation)
-		switch {
-		case entry.Suffix != nil && entry.Suffix.Matcher != "":
-			words.matcherWords[word] = true
-		case len(entry.Expansions) != 1 || entry.Advice != "" || isAdvice(entry.Whole) || isAdvice(entry.Prefix):
-			words.adviceWords[word] = true
-		default:
-			words.expansions[word] = entry.Expansions[0]
-		}
-	}
-	if len(words.expansions) == 0 {
-		return vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
-	}
-	for _, allowed := range file.AllowedNames {
-		words.allowedNames = append(words.allowedNames, allowed.Name)
-	}
-	for _, allowed := range file.AllowedSegments {
-		words.allowedSegments = append(words.allowedSegments, allowed.Segment)
+	words := go_origin_names.VocabularyOf(loaded)
+	if len(words.Expansions) == 0 {
+		return go_origin_names.Vocabulary{}, fmt.Errorf("the vocabulary holds no expansions")
 	}
 	return words, nil
 }
 
-// camelWords splits a Go name into its camelCase words: a boundary before an uppercase letter that follows a
-// lowercase letter or digit, and before the last uppercase letter of a run that a lowercase letter follows
-// (`HTTPServer` is `HTTP` and `Server`).
-func camelWords(name string) []string {
-	runes := []rune(name)
-	var words []string
-	start := 0
-	for index := 1; index < len(runes); index++ {
-		previous, current := runes[index-1], runes[index]
-		lowerFollows := index+1 < len(runes) && unicode.IsLower(runes[index+1])
-		if unicode.IsUpper(current) &&
-			(unicode.IsLower(previous) || unicode.IsDigit(previous) || (unicode.IsUpper(previous) && lowerFollows)) {
-			words = append(words, string(runes[start:index]))
-			start = index
-		}
-	}
-	return append(words, string(runes[start:]))
-}
-
 // fullWordsLowerCamel is name in lowerCamel with every vocabulary word expanded. It returns "" and a category
 // when a word has no mechanical expansion.
-func fullWordsLowerCamel(name string, words vocabulary) (string, string) {
+func fullWordsLowerCamel(name string, words go_origin_names.Vocabulary) (string, string) {
 	var builder strings.Builder
-	for index, word := range camelWords(name) {
+	for index, word := range go_origin_names.CamelWords(name) {
 		lowered := strings.ToLower(word)
-		if words.adviceWords[lowered] {
+		if words.AdviceWords[lowered] {
 			return "", "advice-only word in the type name"
 		}
-		if words.matcherWords[lowered] {
+		if words.MatcherWords[lowered] {
 			return "", "matcher-judged word (ms) in the type name"
 		}
-		expansion, abbreviated := words.expansions[lowered]
+		expansion, abbreviated := words.Expansions[lowered]
 		switch {
 		case abbreviated && index == 0:
 			// An expansion is already lowerCamel (`workingDirectory`).
@@ -460,31 +275,24 @@ func ownContextType(variable *types.Var, ownModule string) (*types.TypeName, boo
 // contextOverrides names the ctx of an own Context type whose derived name would be the type's own name, which
 // a parameter cannot take without shadowing the type. Keyed by the package path relative to the module, and
 // applied before the type-derived name.
-var contextOverrides = map[typeName]string{
-	{packagePath: "internal/format/yaml/compose", name: "composeContext"}:   "composition",
-	{packagePath: "internal/lint/ecmascript/regexp", name: "escapeContext"}: "escaping",
-}
-
-// qualifierWords spells an all-lowercase package name in its camel words, so a qualifier reads as the words it
-// is made of. It is the same table as errornames' and must stay so: every pass reproduces exactly the names
-// the tree holds, and a new multi-word package is added to both, never respelled by hand after a pass.
-var qualifierWords = map[string]string{
-	"optionschema":  "optionSchema",
-	"tooldirectory": "toolDirectory",
+var contextOverrides = map[go_origin_names.TypeName]string{
+	{PackagePath: "internal/format/yaml/compose", Name: "composeContext"}:   "composition",
+	{PackagePath: "internal/lint/ecmascript/regexp", Name: "escapeContext"}: "escaping",
 }
 
 // ownContextName names a ctx of one of our own Context types: the override for its type when there is one,
-// else lowerCamel of the type name in full words, with the package name (in its qualifierWords spelling) in
+// else lowerCamel of the type name in full words, with the package name (in its QualifierSpelling) in
 // front when the type is named exactly Context.
-func ownContextName(typeObject *types.TypeName, ownModule string, words vocabulary) (string, string) {
+func ownContextName(typeObject *types.TypeName, ownModule string, words go_origin_names.Vocabulary) (string, string) {
 	relativePath := strings.TrimPrefix(strings.TrimPrefix(typeObject.Pkg().Path(), ownModule), "/")
-	if override, found := contextOverrides[typeName{packagePath: relativePath, name: typeObject.Name()}]; found {
+	overrideKey := go_origin_names.TypeName{PackagePath: relativePath, Name: typeObject.Name()}
+	if override, found := contextOverrides[overrideKey]; found {
 		return override, ""
 	}
 	base := typeObject.Name()
 	if base == "Context" {
 		qualifier := typeObject.Pkg().Name()
-		if camel, known := qualifierWords[qualifier]; known {
+		if camel, known := go_origin_names.QualifierSpelling(qualifier); known {
 			qualifier = camel
 		}
 		base = qualifier + "Context"
@@ -505,7 +313,7 @@ func findCandidates(
 	info *types.Info,
 	files []*ast.File,
 	ownModule string,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 ) []candidate {
 	sites := findWrites(info, files)
 	var candidates []candidate
@@ -535,7 +343,7 @@ func contextName(
 	sites writeSites,
 	variable *types.Var,
 	ownModule string,
-	words vocabulary,
+	words go_origin_names.Vocabulary,
 ) (string, string, string) {
 	if typeObject, isOwn := ownContextType(variable, ownModule); isOwn {
 		typeString := variable.Type().String()
@@ -548,27 +356,17 @@ func contextName(
 		newName, category := ownContextName(typeObject, ownModule, words)
 		return newName, category, typeString
 	}
-	if namedTypeOf(variable.Type()) != (typeName{packagePath: "context", name: "Context"}) {
+	if !go_origin_names.IsContext(variable.Type()) {
 		return "", "type is neither context.Context nor an own Context type", variable.Type().String()
 	}
 	if sites.signature[variable] == "parameter" {
-		return callerContextName, "", "a parameter"
+		return go_origin_names.CallerContextName, "", "a parameter"
 	}
 	call, category := definingCall(sites, variable)
 	if call == nil {
 		return "", category, ""
 	}
-	function, receivers, category := producingFunction(info, call)
-	if function == nil {
-		return "", category, ""
-	}
-	callName := qualifiedName(function)
-	for _, entry := range contextTable {
-		if entry.matches(function, receivers) {
-			return entry.newName, "", callName
-		}
-	}
-	return "", "call not in the table", callName
+	return go_origin_names.ContextCallName(info, call)
 }
 
 // declarationRecord is one candidate's outcome, keyed by where it is declared, so a file seen by two
@@ -598,12 +396,9 @@ func run(root string, skips []string, dryRun bool) int {
 		fmt.Fprintf(streams.Errors, "%s: loading: %v\n", commandName, loadError)
 		return 1
 	}
-	vocabularyFile, readError := os.ReadFile(filepath.Join(loaded.Root, "policy", "Abbreviations.json"))
-	if readError != nil {
-		fmt.Fprintf(streams.Errors, "%s: %v\n", commandName, readError)
-		return 1
-	}
-	words, vocabularyError := parseVocabulary(vocabularyFile)
+	// The vocabulary is the one built into the pass, from the cohere tree it was built in, so a pass run over another
+	// repository judges words exactly as it does over cohere.
+	words, vocabularyError := parseVocabulary(policy.AbbreviationsFile())
 	if vocabularyError != nil {
 		fmt.Fprintf(streams.Errors, "%s: policy/Abbreviations.json: %v\n", commandName, vocabularyError)
 		return 1

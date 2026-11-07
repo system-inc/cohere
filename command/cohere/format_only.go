@@ -27,6 +27,29 @@ type uncheckedFile struct {
 	Reason   string
 }
 
+// reportFormatOnly prints the files a format-only run could not check, each a finding, and sets its summary's counts
+// from its format scope, returning how many findings it added.
+func reportFormatOnly(out *bufio.Writer, fixSummary edit.Summary, scope formatScope, recordUniverse []string) int {
+	unchecked := formatOnlyUnchecked(fixSummary, scope)
+	printUnchecked(out, unchecked)
+	activeSummary.Findings += len(unchecked)
+	activeSummary.FilesInScope, activeSummary.FilesChecked, activeSummary.FilesCached =
+		formatOnlyCounts(scope, recordUniverse)
+	return len(unchecked)
+}
+
+// formatOnlyCounts is what a format-only run accounts for, since it builds no program to count: in scope, every file
+// its format scope was drawn from, the record's whole universe when a record narrowed it; checked, those it formatted
+// this run; cached, those the format record vouched for. The run's summary said 0 in scope while it formatted 1,137
+// (#vyjvz9k).
+func formatOnlyCounts(scope formatScope, recordUniverse []string) (inScope int, checked int, cached int) {
+	inScope = len(scope.FileNames)
+	if recordUniverse != nil {
+		inScope = len(recordUniverse)
+	}
+	return inScope, len(scope.FileNames), inScope - len(scope.FileNames)
+}
+
 // formatOnlyUnchecked is every file the fix phase could not check for formatting, from its summary and its
 // scope, sorted by name.
 func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFile {

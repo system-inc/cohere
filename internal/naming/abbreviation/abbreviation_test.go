@@ -22,17 +22,7 @@ func TestFindGivesEachMessageItsValues(test *testing.T) {
 		abbreviation.AbbreviatedWordSegment: {"advice", "name", "word"},
 	}
 	vocabulary := abbreviation.Policy
-	names := slices.Collect(maps.Keys(vocabulary.WholeByName))
-	for _, entry := range slices.Concat(vocabulary.EarlyPrefixes, vocabulary.LatePrefixes) {
-		names = append(names, entry.Abbreviation+"Widget")
-	}
-	for _, entry := range vocabulary.Suffixes {
-		names = append(names, "widget"+abbreviation.Capitalize(entry.Abbreviation))
-	}
-	for _, entry := range vocabulary.Segments {
-		names = append(names, "widget"+abbreviation.Capitalize(entry.Abbreviation)+"Name")
-	}
-	for _, name := range names {
+	for _, name := range oneNamePerForm(vocabulary) {
 		finding, found := vocabulary.Find(name)
 		if !found {
 			test.Errorf("%q: not found", name)
@@ -47,6 +37,79 @@ func TestFindGivesEachMessageItsValues(test *testing.T) {
 			test.Errorf("%q: values %v, want %v", name, got, want)
 		}
 	}
+}
+
+// A finding's spellings are the advice's own list: every one is quoted in the text the finding renders, so an engine
+// that renames by them renames to what the message says, never to a second reading of the entry.
+func TestFindSpellsOnlyWhatItsAdviceSays(test *testing.T) {
+	test.Parallel()
+	vocabulary := abbreviation.Policy
+	for _, name := range oneNamePerForm(vocabulary) {
+		finding, found := vocabulary.Find(name)
+		if !found {
+			test.Errorf("%q: not found", name)
+			continue
+		}
+		// The millisecond message quotes its one suggestion itself, so it is quoted here the way the text reads.
+		text := finding.Values["advice"] + `"` + finding.Values["suggestion"] + `"`
+		for _, spelling := range finding.Spellings {
+			if !strings.Contains(text, `"`+spelling+`"`) {
+				test.Errorf("%q: the spelling %q is not in the advice %q", name, spelling, text)
+			}
+		}
+	}
+}
+
+// The spellings of each form, in the name's own case, one per meaning, and none where the advice names no name.
+func TestFindNamesTheSpellingsItsAdviceOffers(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		name string
+		want []string
+	}{
+		{"cfg", []string{"configuration"}},
+		// The vocabulary names Go's own word for it, and leaves to an engine whether that word is free.
+		{"err", []string{"error"}},
+		{"cfgPath", []string{"configurationPath"}},
+		{"parseCfgFile", []string{"parseConfigurationFile"}},
+		{"MaxLen", []string{"MaxLength"}},
+		{"ownerRef", []string{"ownerReference"}},
+		{"timeoutMs", []string{"timeoutInMilliseconds"}},
+		{"pos", []string{"position", "positive"}},
+		{"resultPos", []string{"resultPosition", "resultPositive"}},
+		{"sb", nil},
+		{"sbBottom", nil},
+		{"scrollSbOffset", nil},
+		{"fn", nil},
+		{"argCount", nil},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			finding, found := abbreviation.Policy.Find(testCase.name)
+			if !found {
+				test.Fatalf("%q: not found", testCase.name)
+			}
+			if !slices.Equal(finding.Spellings, testCase.want) {
+				test.Errorf("spellings %q, want %q", finding.Spellings, testCase.want)
+			}
+		})
+	}
+}
+
+// oneNamePerForm is one generated name per form of every entry, the same names nexus's tests judge.
+func oneNamePerForm(vocabulary *abbreviation.Vocabulary) []string {
+	names := slices.Collect(maps.Keys(vocabulary.WholeByName))
+	for _, entry := range slices.Concat(vocabulary.EarlyPrefixes, vocabulary.LatePrefixes) {
+		names = append(names, entry.Abbreviation+"Widget")
+	}
+	for _, entry := range vocabulary.Suffixes {
+		names = append(names, "widget"+abbreviation.Capitalize(entry.Abbreviation))
+	}
+	for _, entry := range vocabulary.Segments {
+		names = append(names, "widget"+abbreviation.Capitalize(entry.Abbreviation)+"Name")
+	}
+	return names
 }
 
 // A name holding none of the words is no finding, and an allowed name is none even though it holds one.
@@ -204,5 +267,22 @@ func TestLoadRefusesABrokenExpansionList(test *testing.T) {
 		"segment": {"style": "advice"}}]}`,
 	)); loadError != nil {
 		test.Errorf("an advice-only entry is refused: %v", loadError)
+	}
+}
+
+// Find tests the prefix, suffix and segment forms as literal text, which says what the patterns say only while an
+// abbreviation is letters a to z. So the loader refuses anything else, rather than let a digit, a pattern's syntax
+// or a letter that capitalizes in more than one byte quietly change what a form matches.
+func TestLoadRefusesAnAbbreviationThatIsNotLetters(test *testing.T) {
+	test.Parallel()
+	for _, abbreviationText := range []string{"db2", "d.b", "d+", "Db", "dé", "d_b", ""} {
+		test.Run(abbreviationText, func(test *testing.T) {
+			test.Parallel()
+			file := `{"abbreviations": [{"abbreviation": "` + abbreviationText + `", "expansions": ["database"], ` +
+				`"prefix": {"phase": "late"}}]}`
+			if _, loadError := abbreviation.Load([]byte(file)); loadError == nil {
+				test.Errorf("the loader accepted %q", abbreviationText)
+			}
+		})
 	}
 }

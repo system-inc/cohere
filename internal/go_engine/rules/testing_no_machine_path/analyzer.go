@@ -47,9 +47,6 @@ var machinePathMessage = policy.MessageOf(Name, "machinePath")
 
 var machinePathWithoutReasonMessage = policy.MessageOf(Name, "machinePathWithoutReason")
 
-// notAMachinePathMarker opens the comment that excuses a literal. It is matched as written.
-const notAMachinePathMarker = "Not a machine path:"
-
 // homeDirectory is a /Users/ or /home/ that no word character runs into, followed by a name and the slash after it,
 // so /Users/ alone and /AllUsers/x/ are not home directories.
 var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
@@ -84,7 +81,7 @@ func run(pass *analysis.Pass) (any, error) {
 			// own last line.
 			given := coveredAbove[table.Line(literal.Pos())]
 			for _, group := range comments.Trailing(literal) {
-				given = max(given, marker.Read(group, notAMachinePathMarker))
+				given = max(given, marker.Read(group, marker.NotAMachinePath))
 			}
 			message := machinePathMessage
 			switch given {
@@ -117,7 +114,7 @@ func linesCoveredAbove(table *positions.Table, file *ast.File, comments *marker.
 		if node == nil {
 			return true
 		}
-		given := marker.Read(comments.Above(node), notAMachinePathMarker)
+		given := marker.Read(comments.Above(node), marker.NotAMachinePath)
 		if given == marker.None {
 			return true
 		}

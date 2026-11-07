@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_uppercase_initialism"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 )
 
@@ -99,6 +101,33 @@ func TestAStricterOptionNeedsNoDeparture(test *testing.T) {
 	for _, options := range []string{`{"max": 1500}`, `{"max": 2000}`} {
 		if configureError := configureRules(longFileSettings(options, nil), longFileRules()); configureError != nil {
 			test.Errorf("%s with no departure was refused: %v", options, configureError)
+		}
+	}
+}
+
+// renameExports reaches both renaming rules' analyzers from the settings as written, and needs no departure: it
+// widens the fix, never loosens a finding.
+func TestRenameExportsReachesTheRenamingRules(test *testing.T) {
+	test.Parallel()
+	registered := []rule.Rule{
+		withOwnAnalyzer(
+			consistency_no_abbreviated_identifier.Rule,
+			consistency_no_abbreviated_identifier.NewAnalyzer(),
+		),
+		withOwnAnalyzer(consistency_no_uppercase_initialism.Rule, consistency_no_uppercase_initialism.NewAnalyzer()),
+	}
+	ruleSettings := settings.Settings{Rules: map[string]settings.RuleSetting{}}
+	for _, renaming := range registered {
+		ruleSettings.Rules[renaming.Name] = settings.RuleSetting{
+			Severity: settings.SeverityError, Options: json.RawMessage(`{"renameExports": true}`),
+		}
+	}
+	if configureError := configureRules(ruleSettings, registered); configureError != nil {
+		test.Fatalf("renameExports was refused: %v", configureError)
+	}
+	for _, renaming := range registered {
+		if !rule.RenamesExports(renaming.Analyzer) {
+			test.Errorf("renameExports set to true in the settings reads as off on %s", renaming.Name)
 		}
 	}
 }

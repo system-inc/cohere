@@ -11,6 +11,7 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/unicode_properties"
 )
 
@@ -178,6 +179,7 @@ func TestUnicodePropertiesNode(test *testing.T) {
 
 func TestUnicodePropertiesFresh(test *testing.T) {
 	test.Parallel()
+	build_inputs.Record(test, ".", "../../../../unicode_properties/internal/generate")
 	command := exec.Command(
 		"go",
 		"run",

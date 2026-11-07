@@ -319,6 +319,198 @@ var endToEndCases = []endToEndCase{
 		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 1, prepare: turnOffLongLines,
 		verify: unchanged("long_lines.go", "long-lines"),
 	},
+	// The fix phase renames what the naming rules ask, at every reference: maxLen in two rounds to maximumLength,
+	// ParseURL across its package, both test packages and the command, FetchURL with its implementation, and maxRows in
+	// report.go, a file the long-line wrap writes first, whose one changedFiles entry carries both rules, and cfg and
+	// modeID under their //go:embed and //go:generate directives, which come out as written, beside a //go:linkname
+	// whose name the rule never flags. It leaves msg, a type switch's symbol, which no object declares, refused once
+	// though three rounds read its finding, and OwnerID, which json reads by name with no tag, UserID, which reflect
+	// reads with FieldByName, TitleHTML, which a template calls as .TitleHTML, LinkURL and PageID, which a template
+	// parsed from an embedded page.html calls and reads, RunHTTP, which reflect's MethodByName may call by a computed
+	// name, pageHTML and rowCSV, whose type names %T and reflect.TypeOf read, cfgName, which a generated file reads,
+	// groupID, whose new name is taken, readHTML, which a directive keeps, and ToHTML, exported from an importable
+	// package, each still a finding, and MarshalJSON, which json.Marshaler names, no finding at all. A second run
+	// changes nothing.
+	{name: "rename-rewritten", fixture: "rename", exitCode: 1, verify: renamedTree("rename", "rename-rewritten")},
+	{
+		name: "rename-no-fix", fixture: "rename", extra: []string{"--no-fix"}, exitCode: 1,
+		verify: unchangedTree("rename"),
+	},
+	// `--no-format` leaves formatting out and still applies the rules' fixes: every rename of rename-rewritten is made
+	// and each renamed file is printed by gofmt, but the long-line wrap, which is formatting, does not run, so
+	// report.go's long call stays one line and a finding while its maxRows is renamed.
+	{
+		name: "rename-no-format", fixture: "rename", extra: []string{"--no-format"}, exitCode: 1,
+		verify: renamedTreeUnder("rename", "rename-no-format", "--no-format"),
+	},
+	// A rename's files are written as one set: with the command's directory read-only, the rename of ParseURL, which
+	// reaches it, can't be written whole, so no rename is written, each is refused as unwritable, and every finding
+	// stands. The long-line wrap, which wrote report.go before the rename, is its own write and stands too.
+	{
+		name: "rename-unwritable", fixture: "rename", exitCode: 1, prepare: lockDirectory("command/report"),
+		verify: renamedNothing("rename", "rename-unwritable", "command/report", "internal/store/report.go"),
+	},
+	// With files held to 12 lines, the wrap of report.go's long line would take it past the long-file limit, so both
+	// wraps of it are declined and noted: the one after the load, and the one over the rename of maxRows, which
+	// lengthens the line. The file holds gofmt's output of the rename, and the line stays a finding.
+	{
+		name: "rename-wrap-declined", fixture: "rename", exitCode: 1, prepare: limitLongFiles(12),
+		rules: ownLongFileAnalyzer(), verify: renamedTree("rename", "rename-wrap-declined"),
+	},
+	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
+	{
+		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
+		verify: renamedTree("rename", "rename-exports"),
+	},
+	// A local error written once by a single call is renamed for that call at every reference: Load's err becomes
+	// readError, in its definition, its check and its return. Both's err, written by two reads, keeps the advice, and
+	// is still a finding. A second run changes nothing.
+	{
+		name: "rename-errors-rewritten", fixture: "rename-errors", exitCode: 1,
+		verify: renamedTree("rename-errors", "rename-errors-rewritten"),
+	},
+	// A context.Context parameter is renamed for its caller at every use: Run's ctx becomes callerContext in its
+	// signature, both checks and the call it hands it to. Detach's ctx, written by two calls, keeps the advice, and is
+	// still a finding. A second run changes nothing.
+	{
+		name: "rename-contexts-rewritten", fixture: "rename-contexts", exitCode: 1,
+		verify: renamedTree("rename-contexts", "rename-contexts-rewritten"),
+	},
+}
+
+// renameExports writes settings beside the copy's go.mod that set renameExports on the initialism rule.
+func renameExports(root string) error {
+	settingsText := `{"go": {"rules": {"` + consistency_no_uppercase_initialism.Name +
+		`": ["error", {"renameExports": true}]}}}` + "\n"
+	return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
+}
+
+// renamingOwnAnalyzers is the registry with each naming rule on an analyzer of its own, so a case that sets
+// renameExports sets it on no analyzer another case runs.
+func renamingOwnAnalyzers() []rule.Rule {
+	registered := rules.All()
+	for index, each := range registered {
+		switch each.Name {
+		case consistency_no_abbreviated_identifier.Name:
+			registered[index] = withOwnAnalyzer(each, consistency_no_abbreviated_identifier.NewAnalyzer())
+		case consistency_no_uppercase_initialism.Name:
+			registered[index] = withOwnAnalyzer(each, consistency_no_uppercase_initialism.NewAnalyzer())
+		}
+	}
+	return registered
+}
+
+// goFilesOf is every .go file below root, relative and slash-separated, sorted.
+func goFilesOf(test *testing.T, root string) []string {
+	test.Helper()
+	var files []string
+	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, pathError error) error {
+		if pathError != nil || entry.IsDir() || filepath.Ext(path) != ".go" {
+			return pathError
+		}
+		relative, relativeError := filepath.Rel(root, path)
+		files = append(files, filepath.ToSlash(relative))
+		return relativeError
+	})
+	if walkError != nil {
+		test.Fatalf("listing %s: %v", root, walkError)
+	}
+	slices.Sort(files)
+	return files
+}
+
+// renamedTree is a verify that every .go file of the copy reads as the case's golden, `<path>.golden` beside its
+// expected files under the file's own path, and that a second run, which reads the renamed tree and the same rules,
+// rewrites nothing. Under -update the goldens are rewritten from the copy.
+func renamedTree(fixture string, caseName string) func(test *testing.T, root string) {
+	return renamedTreeUnder(fixture, caseName)
+}
+
+// renamedTreeUnder is renamedTree for a case run with extra arguments, which its second run is given too, so the
+// second run asks what the first did.
+func renamedTreeUnder(fixture string, caseName string, extra ...string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		files := goFilesOf(test, root)
+		if !slices.Equal(files, goFilesOf(test, filepath.Join("testdata", fixture))) {
+			test.Fatalf("the run left the files %q, and the fixture has others", files)
+		}
+		after := map[string][]byte{}
+		for _, relative := range files {
+			contents, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+			if readError != nil {
+				test.Fatalf("reading %s: %v", relative, readError)
+			}
+			after[relative] = contents
+			compareExpected(test, filepath.Join("testdata", caseName, filepath.FromSlash(relative)+".golden"),
+				string(contents))
+		}
+		registered := rules.All()
+		switch caseName {
+		case "rename-exports":
+			registered = renamingOwnAnalyzers()
+		case "rename-wrap-declined":
+			registered = ownLongFileAnalyzer()
+		}
+		var standardOutput bytes.Buffer
+		var standardError bytes.Buffer
+		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
+		run(arguments, &standardOutput, &standardError, registered)
+		for line := range strings.Lines(standardOutput.String()) {
+			var record contract.FixRecord
+			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
+				record.FilesRewritten != 0 {
+				test.Errorf("a second run rewrote %d files: %s", record.FilesRewritten, line)
+			}
+		}
+		for _, relative := range files {
+			again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+			if againError != nil || !bytes.Equal(again, after[relative]) {
+				test.Errorf("a second run changed %s (%v)", relative, againError)
+			}
+		}
+	}
+}
+
+// lockDirectory makes a directory of the copy read-only, so no file can be created in it, nor one renamed over a file
+// there.
+func lockDirectory(relative string) func(root string) error {
+	return func(root string) error {
+		return os.Chmod(filepath.Join(root, filepath.FromSlash(relative)), 0o555)
+	}
+}
+
+// renamedNothing is a verify, after a run whose rename could not be written, that the locked directory is writable
+// again, so the copy can be removed, that wrapped, the file the long-line wrap writes, reads as the case's golden, and
+// that every other .go file reads as its fixture.
+func renamedNothing(fixture string, caseName string, locked string, wrapped string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		if chmodError := os.Chmod(filepath.Join(root, filepath.FromSlash(locked)), 0o755); chmodError != nil {
+			test.Fatalf("unlocking %s: %v", locked, chmodError)
+		}
+		contents, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(wrapped)))
+		if readError != nil {
+			test.Fatalf("reading %s: %v", wrapped, readError)
+		}
+		golden := filepath.Join("testdata", caseName, filepath.FromSlash(wrapped)+".golden")
+		compareExpected(test, golden, string(contents))
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			if relative != wrapped {
+				unchanged(relative, fixture)(test, root)
+			}
+		}
+	}
+}
+
+// unchangedTree is a verify that every .go file of the copy reads as it does in its fixture.
+func unchangedTree(fixture string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			unchanged(relative, fixture)(test, root)
+		}
+	}
 }
 
 // every is a verify that runs each of verifies in order.

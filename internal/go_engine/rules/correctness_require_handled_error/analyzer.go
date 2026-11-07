@@ -40,9 +40,6 @@ var unhandledErrorMessage = policy.MessageOf(Name, "unhandledError")
 
 var unhandledErrorWithoutReasonMessage = policy.MessageOf(Name, "unhandledErrorWithoutReason")
 
-// ignoredMarker opens the comment that excuses a dropped error.
-const ignoredMarker = "Ignored:"
-
 // The callees whose error need not be checked at the call: either it is documented never to be non-nil, so handling
 // it would be ceremony around a value that cannot be anything but nil, or it is kept and handed back at a later call
 // that is itself checked. Each is matched by its package, type and method, never by how the call is spelled.
@@ -116,20 +113,20 @@ func run(pass *analysis.Pass) (any, error) {
 			switch statement := node.(type) {
 			case *ast.ExprStmt:
 				if call, isCall := ast.Unparen(statement.X).(*ast.CallExpr); isCall && checker.returnsError(call) {
-					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
+					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
 				}
 			case *ast.DeferStmt:
 				// A deferred or started call's results go nowhere, whatever they are.
 				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, comments.ExcuseFor(statement, ignoredMarker))
+					checker.report(statement.Call, comments.ExcuseFor(statement, marker.Ignored))
 				}
 			case *ast.GoStmt:
 				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, comments.ExcuseFor(statement, ignoredMarker))
+					checker.report(statement.Call, comments.ExcuseFor(statement, marker.Ignored))
 				}
 			case *ast.AssignStmt:
 				for _, call := range checker.callsDroppingError(statement.Lhs, statement.Rhs) {
-					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
+					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
 				}
 			case *ast.ValueSpec:
 				// `var value, _ = strconv.Atoi(text)` drops the error as an assignment does.
@@ -138,7 +135,7 @@ func run(pass *analysis.Pass) (any, error) {
 					names = append(names, name)
 				}
 				for _, call := range checker.callsDroppingError(names, statement.Values) {
-					checker.report(call, comments.ExcuseFor(statement, ignoredMarker))
+					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
 				}
 			}
 			return true

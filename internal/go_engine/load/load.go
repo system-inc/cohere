@@ -108,7 +108,22 @@ type Loaded struct {
 // files: each comes back held by a package, in Excluded, or in Unseen. It returns an error only when
 // nothing could be loaded at all; what the packages themselves get wrong is Loaded.Diagnostics.
 func Packages(directory string, patterns []string, environment []string, census []string) (*Loaded, error) {
-	return loadWorkspace(directory, patterns, environment, census, true, Caching{})
+	return loadWorkspace(directory, patterns, environment, census, true, Caching{}, nil)
+}
+
+// PackagesWithOverlay is Packages reading the files in overlay, by absolute path as the load names them, in place of
+// what is on disk, so a rewrite is type-checked before it is written. Only the parse reads the overlay. go list, the
+// constraints and the census read the disk, which is right for a rewrite that changes no file's imports, package
+// clause or build lines, as a rename does not: go list's answer for the overlaid tree is its answer for the tree on
+// disk. A project with cgo of its own, whose load goes through the cgo tool, takes no overlay.
+func PackagesWithOverlay(
+	directory string,
+	patterns []string,
+	environment []string,
+	census []string,
+	overlay map[string][]byte,
+) (*Loaded, error) {
+	return loadWorkspace(directory, patterns, environment, census, true, Caching{}, overlay)
 }
 
 // Caching is what the findings cache gives a load: a Restorer, whose packages the load from source parses and
@@ -126,11 +141,12 @@ func PackagesCached(
 	census []string,
 	caching Caching,
 ) (*Loaded, error) {
-	return loadWorkspace(directory, patterns, environment, census, true, caching)
+	return loadWorkspace(directory, patterns, environment, census, true, caching, nil)
 }
 
-// loadWorkspace is PackagesCached. With translateOwnCgo unset it loads from source even a project with cgo files
-// of its own, which only the tests ask for, to judge the load from source on such a package.
+// loadWorkspace is PackagesCached, and PackagesWithOverlay when overlay is set. With translateOwnCgo unset it loads
+// from source even a project with cgo files of its own, which only the tests ask for, to judge the load from source on
+// such a package.
 func loadWorkspace(
 	directory string,
 	patterns []string,
@@ -138,6 +154,7 @@ func loadWorkspace(
 	census []string,
 	translateOwnCgo bool,
 	caching Caching,
+	overlay map[string][]byte,
 ) (*Loaded, error) {
 	started := time.Now()
 	workspace, absoluteError := filepath.Abs(directory)
@@ -160,6 +177,11 @@ func loadWorkspace(
 	var loaded *Loaded
 	var loadError error
 	if translateOwnCgo && hasOwnCgo(listed, workspace) {
+		if len(overlay) > 0 {
+			// The cgo tool reads its files from disk, so an overlay would prove some of the rewrite and not the rest.
+			return nil, fmt.Errorf("loading %s with an overlay: the project has cgo files of its own, which the cgo "+
+				"tool reads from disk", workspace)
+		}
 		translationStarted := time.Now()
 		roots, loaded, loadError = translated(workspace, patterns, environment, caching.Restorer)
 		if loadError == nil {
@@ -167,7 +189,7 @@ func loadWorkspace(
 			loaded.CgoTranslatedPackages = withCgoFiles(listed)
 		}
 	} else {
-		roots, loaded, loadError = fromSource(workspace, listed, buildContext, caching.Restorer)
+		roots, loaded, loadError = fromSource(workspace, listed, buildContext, caching.Restorer, overlay)
 	}
 	if loadError != nil {
 		return nil, loadError
@@ -212,14 +234,15 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 	return false
 }
 
-// fromSource parses and type-checks the listing's graph from source, and returns its roots and what the load
-// knows of them before the diagnostics and the counts. The declarations of dependencies that reach their cgo files
-// lose what reaches it only once every package is type-checked.
+// fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, and
+// returns its roots and what the load knows of them before the diagnostics and the counts. The declarations of
+// dependencies that reach their cgo files lose what reaches it only once every package is type-checked.
 func fromSource(
 	workspace string,
 	listed *listing,
 	buildContext *build.Context,
 	restorer Restorer,
+	overlay map[string][]byte,
 ) ([]*packages.Package, *Loaded, error) {
 	sizes := types.SizesFor("gc", buildContext.GOARCH)
 	if sizes == nil {
@@ -228,7 +251,7 @@ func fromSource(
 	}
 	built := newGraph(listed, workspace)
 	withheld := newWithheldErrors()
-	typeChecker := newLoader(built, sizes, withheld)
+	typeChecker := newLoader(built, sizes, withheld, overlay)
 	reachable := typeChecker.connect()
 	analyzedPackages := analyzedOfGraph(built)
 	if restorer != nil {
