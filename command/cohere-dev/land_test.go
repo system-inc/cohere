@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // landFixture is a repository with main checked out and two worktrees, a and b, each one commit ahead on a
@@ -30,6 +32,7 @@ func newLandFixture(test *testing.T) *landFixture {
 		wrapper:    filepath.Join(test.TempDir(), "cohere-dev"),
 		repository: test.TempDir(),
 	}
+	build_inputs.Record(test, ".", ".")
 	if output, outputError := exec.Command(
 		"go",
 		"build",
@@ -483,7 +486,7 @@ func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(test *testing.T) {
 		}
 	}
 	build := exec.Command("go", "build", "-o", filepath.Join(test.TempDir(), "stamp"), ".")
-	build.Dir, build.Env = worktreeA, gateEnvironment(caller)
+	build.Dir, build.Env = build_inputs.OutsideModule(test, worktreeA), gateEnvironment(caller)
 	if output, outputError := build.CombinedOutput(); outputError != nil {
 		test.Errorf(
 			"the gate's go build failed in a worktree with a symlinked submodule (%v):\n%s",

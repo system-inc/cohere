@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 func TestOpenFlag(test *testing.T) {
@@ -315,6 +317,7 @@ func TestOpenDiscoveredProjects(test *testing.T) {
 func TestOpenCrash(test *testing.T) {
 	test.Parallel()
 	binary := filepath.Join(test.TempDir(), "cohere")
+	build_inputs.Record(test, ".", "-tags", "cohere_planted_panic", ".")
 	build := exec.Command("go", "build", "-buildvcs=false", "-tags", "cohere_planted_panic", "-o", binary, ".")
 	if output, outputError := build.CombinedOutput(); outputError != nil {
 		test.Fatalf("build: %v\n%s", outputError, output)

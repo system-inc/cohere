@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
@@ -388,7 +389,7 @@ func main() {
 func runShow(test *testing.T, fixture fixture) string {
 	test.Helper()
 	command := exec.Command("go", "run", "./cmd/show")
-	command.Dir = fixture.root
+	command.Dir = build_inputs.OutsideModule(test, fixture.root)
 	output, runError := command.CombinedOutput()
 	if runError != nil {
 		test.Fatalf("go run: %v\n%s", runError, output)
@@ -595,7 +596,7 @@ var Parse = a.ParseURL
 		}
 	}
 	command := exec.Command("go", "test", "./...")
-	command.Dir = fixture.root
+	command.Dir = build_inputs.OutsideModule(test, fixture.root)
 	if output, testError := command.CombinedOutput(); testError != nil {
 		test.Fatalf("go test after the rename: %v\n%s", testError, output)
 	}

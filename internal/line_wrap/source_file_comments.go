@@ -3,10 +3,12 @@ package line_wrap
 import (
 	"go/ast"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 )
 
 // exampleOutput is how go/doc recognizes an Example's output block, `// Output:` or `// Unordered output:` in any case,
@@ -27,7 +29,15 @@ func ProseComment(comment string) bool {
 	}
 	fields := strings.Fields(comment[3:])
 	return len(fields) > 0 && !listMarker(fields[0]) && !strings.HasPrefix(fields[0], "#") && !markerWord(fields[0]) &&
-		!exampleOutput.MatchString(comment[3:])
+		!exampleOutput.MatchString(comment[3:]) && !ruleMarker(comment[3:])
+}
+
+// ruleMarker reports whether a comment line's text, after its `// `, opens with a marker a house rule reads, taken
+// from the rules' own list rather than from the shape markerWord guesses at, so `Not parallel:` and
+// `Not a machine path:`, which open with a word and no colon, are refused as surely as `Ignored:`. A paragraph joined
+// into one, or a marker reflowed onto two lines, would leave the rule no longer seeing it.
+func ruleMarker(text string) bool {
+	return slices.ContainsFunc(marker.All, func(known string) bool { return strings.HasPrefix(text, known) })
 }
 
 // markerWord reports whether a word opening a comment line marks the line as data a line-based reader parses: a

@@ -28,6 +28,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -73,10 +74,6 @@ var Rule = rule.Rule{
 var bufferedWaitDelayMessage = policy.MessageOf(Name, "bufferedWaitDelay")
 
 var bufferedWaitDelayWithoutReasonMessage = policy.MessageOf(Name, "bufferedWaitDelayWithoutReason")
-
-// waitDelayMarker opens the comment that excuses a WaitDelay, Adamic's spelling, so a reason written for Adamic's
-// rule carries over.
-const waitDelayMarker = "WaitDelay:"
 
 // excuse is what the comments on or above a line say about the WaitDelay there.
 type excuse int
@@ -264,7 +261,7 @@ func excusedLines(pass *analysis.Pass, file *ast.File) map[int]excuse {
 			if !isLineComment {
 				continue
 			}
-			reason, hasMarker := strings.CutPrefix(strings.TrimSpace(text), waitDelayMarker)
+			reason, hasMarker := strings.CutPrefix(strings.TrimSpace(text), marker.WaitDelay)
 			if !hasMarker {
 				continue
 			}

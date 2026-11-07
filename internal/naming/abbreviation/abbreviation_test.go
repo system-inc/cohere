@@ -269,3 +269,20 @@ func TestLoadRefusesABrokenExpansionList(test *testing.T) {
 		test.Errorf("an advice-only entry is refused: %v", loadError)
 	}
 }
+
+// Find tests the prefix, suffix and segment forms as literal text, which says what the patterns say only while an
+// abbreviation is letters a to z. So the loader refuses anything else, rather than let a digit, a pattern's syntax
+// or a letter that capitalizes in more than one byte quietly change what a form matches.
+func TestLoadRefusesAnAbbreviationThatIsNotLetters(test *testing.T) {
+	test.Parallel()
+	for _, abbreviationText := range []string{"db2", "d.b", "d+", "Db", "dé", "d_b", ""} {
+		test.Run(abbreviationText, func(test *testing.T) {
+			test.Parallel()
+			file := `{"abbreviations": [{"abbreviation": "` + abbreviationText + `", "expansions": ["database"], ` +
+				`"prefix": {"phase": "late"}}]}`
+			if _, loadError := abbreviation.Load([]byte(file)); loadError == nil {
+				test.Errorf("the loader accepted %q", abbreviationText)
+			}
+		})
+	}
+}

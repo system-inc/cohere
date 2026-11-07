@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
+	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 )
 
 // TestMain points go/build at the toolchain's `GOROOT`: under `GOFLAGS=-trimpath` the test binary has none
@@ -79,7 +80,7 @@ func typeCheck(test *testing.T, source string) fixture {
 	return fixture{fileSet: fileSet, packageTypes: packageTypes, info: info, files: []*ast.File{file}}
 }
 
-func fixtureWords(test *testing.T) vocabulary {
+func fixtureWords(test *testing.T) go_origin_names.Vocabulary {
 	test.Helper()
 	words, vocabularyError := parseVocabulary([]byte(fixtureVocabulary))
 	if vocabularyError != nil {
@@ -423,7 +424,7 @@ func TestQualifierWords(test *testing.T) {
 			false,
 		)
 		function := types.NewFunc(token.NoPos, packageTypes, testCase.functionName, signature)
-		newName, category := qualifiedErrorName(function, words)
+		newName, category := go_origin_names.QualifiedErrorName(function, words)
 		if newName != testCase.newName || category != "" {
 			test.Errorf(
 				"%s.%s: got name %q category %q, want %q",

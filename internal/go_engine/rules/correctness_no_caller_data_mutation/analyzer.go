@@ -23,6 +23,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -48,10 +49,6 @@ var callerDataMutationMessage = policy.MessageOf(Name, "callerDataMutation")
 var mutatesWithoutReasonMessage = policy.MessageOf(Name, "mutatesWithoutReason")
 
 var mutatesUnknownParameterMessage = policy.MessageOf(Name, "mutatesUnknownParameter")
-
-// mutatesMarker opens the doc comment line that makes a parameter an out-parameter by contract. It is the twin's
-// `@mutates <parameter> <why>` in the shape of the house's Go markers: the marker, the parameter's name, the reason.
-const mutatesMarker = "Mutates:"
 
 func run(pass *analysis.Pass) (any, error) {
 	reader := &ioReader{pass: pass}
@@ -388,7 +385,7 @@ func readMutatesTags(pass *analysis.Pass, function *ast.FuncDecl) map[*types.Var
 			// The marker counts where it opens a line, after the comment's slashes, stars and spaces, read as the
 			// marker package reads a reasoned marker, so a sentence that mentions it exempts nothing.
 			opening := strings.TrimSpace(strings.TrimLeft(strings.TrimSpace(line), "/*"))
-			tag, hasMarker := strings.CutPrefix(opening, mutatesMarker)
+			tag, hasMarker := strings.CutPrefix(opening, marker.Mutates)
 			if !hasMarker {
 				continue
 			}

@@ -1167,10 +1167,7 @@ func run() error {
 		// a failed walk, or a file the formatter declined because it does not parse, or broke on, would
 		// otherwise read as a clean tree. Other runs leave those to the phases that report them.
 		if *formatOnly {
-			unchecked := formatOnlyUnchecked(fixSummary, scope)
-			printUnchecked(streams.Output, unchecked)
-			findings += len(unchecked)
-			activeSummary.Findings += len(unchecked)
+			findings += reportFormatOnly(streams.Output, fixSummary, scope, recordUniverse)
 		}
 		if mutate {
 			report.record(phaseFix, outcomeRan, fixDuration, "")

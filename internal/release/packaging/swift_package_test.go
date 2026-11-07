@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // smallMacBinary builds a tiny Go program for macOS on goArchitecture and returns its path. The guards
@@ -25,7 +27,7 @@ func smallMacBinary(test *testing.T, goArchitecture string) string {
 
 	binary := filepath.Join(directory, "small")
 	command := exec.Command("go", "build", "-o", binary, ".")
-	command.Dir = directory
+	command.Dir = build_inputs.OutsideModule(test, directory)
 	command.Env = append(command.Environ(), "GOOS=darwin", "GOARCH="+goArchitecture, "CGO_ENABLED=0")
 	if output, outputError := command.CombinedOutput(); outputError != nil {
 		test.Fatalf("building the sample binary: %v\n%s", outputError, output)

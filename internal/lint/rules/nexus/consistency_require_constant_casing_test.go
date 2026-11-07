@@ -121,6 +121,15 @@ func TestConsistencyRequireConstantCasingFires(test *testing.T) {
 			"const classNames = { small: 'a', large: 'b' } as const;\nexport const table = classNames;\n",
 			"requirePascalCaseExported",
 		},
+		// A leading underscore is flagged on every name we declare (us05), and told about itself
+		// whichever clause the constant falls to.
+		{"leading underscore local", constantCasingFile, "const _results = [1];\n", "noLeadingUnderscore"},
+		{"leading underscore export", constantCasingFile, "export const _Results = [1];\n", "noLeadingUnderscore"},
+		{
+			"leading underscore function", constantCasingFile,
+			"export const _format = (value: number) => String(value);\n",
+			"noLeadingUnderscore",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -171,13 +180,13 @@ func TestConsistencyRequireConstantCasingStaysSilent(test *testing.T) {
 		{"screaming snake local", constantCasingFile, "const MAX_RETRY_COUNT = 3;\n"},
 		{"screaming snake export", constantCasingFile, "export const HTTP_TIMEOUT = 5000;\n"},
 
-		// The trailing underscore escapes a keyword, so recasing produces a name the parser rejects.
+		// The underscore escapes a keyword, so recasing produces a name the parser rejects.
 		{"reserved word escape", constantCasingFile, "const do_ = 1;\n"},
 		{"reserved word escape, exported", constantCasingFile, "export const class_ = 1;\n"},
+		{"reserved word escape, leading", constantCasingFile, "const _default = 1;\n"},
 
-		// A leading underscore marks a knowingly-unused binding, which is orthogonal to casing.
-		{"leading underscore local", constantCasingFile, "const _results = [1];\n"},
-		{"leading underscore export", constantCasingFile, "export const _Results = [1];\n"},
+		// The bare discard, and a name of underscores only, is no name and has no word to advise.
+		{"underscores only", constantCasingFile, "const _ = 1;\nconst __ = 2;\n"},
 
 		// Built-in containers hold rather than act, so an exported one is exported data.
 		{"exported Map keeps PascalCase", constantCasingFile, "export const Conversations = new Map();\n"},
@@ -357,7 +366,8 @@ func TestConsistencyRequireConstantCasingSuggestionsAreAccepted(test *testing.T)
 		{"screaming part folded, exported", "export const utm_SOURCE = 'x';\n", isPascalCase},
 		{"camelCase to PascalCase", "export const numberAbsentPlaceholder = '-';\n", isPascalCase},
 		{"PascalCase to camelCase", "const OrderColumns = [1];\n", isCamelCase},
-		{"leading underscore kept", "const _order_columns = [1];\n", isCamelCase},
+		{"leading underscore dropped", "const _order_columns = [1];\n", isCamelCase},
+		{"leading underscore dropped, exported", "export const _order_columns = [1];\n", isPascalCase},
 	}
 
 	for _, testCase := range cases {
@@ -409,8 +419,9 @@ func TestConsistencyRequireConstantCasingSuggestionText(test *testing.T) {
 		{"all-uppercase part is folded whole, exported", "export const utm_SOURCE = 'x';\n", "UtmSource"},
 		{"underscores become word boundaries", "const user_id = 'x';\n", "userId"},
 		{"underscores become word boundaries, exported", "export const apple_root_ca = 'x';\n", "AppleRootCa"},
-		// The leading underscore is the unused-binding convention and is not this rule's to remove.
-		{"leading underscore survives", "const _order_columns = [1];\n", "_orderColumns"},
+		// A leading underscore is flagged (us05), so the advice drops it.
+		{"leading underscore dropped", "const _order_columns = [1];\n", "orderColumns"},
+		{"leading underscore dropped, exported", "export const _Results = [1];\n", "Results"},
 		{"internal boundaries survive", "export const numberAbsentPlaceholder = '-';\n", "NumberAbsentPlaceholder"},
 		{"internal boundaries survive, lowered", "const OrderColumns = [1];\n", "orderColumns"},
 		// A listed brand keeps its owner's spelling in the advice.
@@ -771,6 +782,13 @@ func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(test *testing
 				"export function isTooLong(text: string): boolean {\n" +
 				"    return text.length > maximumDraftBytes;\n}\n" +
 				"export const Limits = [maximumDraftBytes, maximumDraftBytes / 2];\n",
+		},
+		{
+			// A leading underscore is flagged (us05), and the rename drops it at every read.
+			"a leading underscore",
+			"const _cache = new Map<string, number>();\nexport function read(key: string) { return _cache.get(key); }\n",
+			"noLeadingUnderscore",
+			"const cache = new Map<string, number>();\nexport function read(key: string) { return cache.get(key); }\n",
 		},
 		{
 			// The key is the property's name and is somebody else's contract, so it survives.

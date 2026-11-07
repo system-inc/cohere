@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
@@ -57,6 +58,7 @@ func stampedCohere(test *testing.T, version string) string {
 		stampedBinaries.byVersion[version] = stamped
 	}
 	stampedBinaries.Unlock()
+	build_inputs.Record(test, ".", ".")
 	stamped.once.Do(func() {
 		stamped.directory, stamped.buildError = os.MkdirTemp("", "cohere-test-stamped-binary-")
 		if stamped.buildError != nil {

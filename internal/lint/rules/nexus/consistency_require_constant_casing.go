@@ -46,6 +46,10 @@ var (
 		"nexus/consistency-require-constant-casing",
 		"requireCamelCaseInstance",
 	)
+	constantCasingNoLeadingUnderscoreText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"noLeadingUnderscore",
+	)
 )
 
 func messageRequirePascalCaseExported(name string, suggestion string) rule.Message {
@@ -101,6 +105,21 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 	}
 }
 
+// messageUnlessLeadingUnderscore is a clause's message, or, for a name opening on an underscore, the
+// message about the underscore with the same suggestion, as consistency-require-identifier-casing tells
+// a local, since the underscore is what the name chose and the advice removes.
+func messageUnlessLeadingUnderscore(message rule.Message, name string, suggestion string) rule.Message {
+	if !strings.HasPrefix(name, "_") {
+		return message
+	}
+	return rule.Message{
+		Id: constantCasingNoLeadingUnderscoreText.Id,
+		Description: constantCasingNoLeadingUnderscoreText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
+	}
+}
+
 // ConsistencyRequireConstantCasing maps a constant's casing to what it is.
 //
 //	valid:   export const OrderColumns = [...]
@@ -126,6 +145,11 @@ func messageRequireCamelCaseInstance(name string, suggestion string) rule.Messag
 // AhraOsIncantationsStore. An instance is a thing that acts, and incantationsStore.findById() says
 // so at the call site. Built-in containers are the exception, because they hold rather than act: a
 // new Map() is a data structure with an access syntax, so an exported one is exported data.
+//
+// A leading underscore passes neither casing, so `const _cache` is told `cache` and `export const
+// _Results` `Results`, with a message about the underscore: it is flagged on every name we declare, as
+// the Go and Swift engines flag it (Kirk, 2026-11-06, #4b337jk, case us05). A name of underscores only is
+// no name, and has no word to advise.
 //
 // SCREAMING_SNAKE_CASE is deliberately not flagged here. It is neither casing, so it would fire, but
 // consistency-no-screaming-snake-case already owns that shape with a better message and with the
@@ -210,9 +234,10 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 					return
 				}
 
-				// The trailing underscore is escaping a keyword, so recasing it produces a name the
-				// parser rejects. "do_" is a Durable Object handle, and "do" is a loop.
-				if escapesAReservedWord(declaredName) {
+				// The underscore is escaping a keyword, so recasing it produces a name the parser
+				// rejects. "do_" is a Durable Object handle, and "do" is a loop. A name of underscores
+				// only, the bare `_` discard among them, has no word to recase.
+				if escapesAReservedWord(declaredName) || strings.Trim(declaredName, "_") == "" {
 					return
 				}
 
@@ -332,8 +357,10 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 						))
 						return
 					}
-					ruleContext.ReportNode(name, messageRequirePascalCaseExported(
-						declaredName, upperCamelCaseSuggestion(declaredName),
+					ruleContext.ReportNode(name, messageUnlessLeadingUnderscore(
+						messageRequirePascalCaseExported(declaredName, upperCamelCaseSuggestion(declaredName)),
+						declaredName,
+						upperCamelCaseSuggestion(declaredName),
 					))
 					return
 				}
@@ -363,13 +390,14 @@ var ConsistencyRequireConstantCasing = rule.Rule[ConsistencyRequireConstantCasin
 // The suggestion inside the message is the rename the fix performs, so the two cannot disagree:
 // both come from `constantNameToCamelCase`.
 func reportCamelCase(ruleContext rule.Context, exported bool, name *ast.Node, message rule.Message) {
+	reportedMessage := messageUnlessLeadingUnderscore(message, name.Text(), constantNameToCamelCase(name.Text()))
 	if !exported {
 		if fix, isSafe := fileLocalRenameFix(ruleContext, name, constantNameToCamelCase(name.Text())); isSafe {
-			ruleContext.ReportNodeWithFixes(name, message, fix)
+			ruleContext.ReportNodeWithFixes(name, reportedMessage, fix)
 			return
 		}
 	}
-	ruleContext.ReportNode(name, message)
+	ruleContext.ReportNode(name, reportedMessage)
 }
 
 // isModuleScopeConstant reports a declaration list that is a statement of the module itself, or of a

@@ -9076,6 +9076,7 @@
             },
             "messageIds": [
                 "dropUnimportedExport",
+                "noLeadingUnderscore",
                 "requireCamelCaseFunction",
                 "requireCamelCaseInstance",
                 "requireCamelCaseLocal",
@@ -9103,7 +9104,12 @@
             "origin": "house",
             "category": "consistency",
             "typeAware": true,
-            "messageIds": ["requireLowerCamelCaseValue", "requireUpperCamelCaseCapital", "requireUpperCamelCaseType"],
+            "messageIds": [
+                "noLeadingUnderscore",
+                "requireLowerCamelCaseValue",
+                "requireUpperCamelCaseCapital",
+                "requireUpperCamelCaseType"
+            ],
             "fixKind": "fix",
             "sets": [
                 {

@@ -43,9 +43,6 @@ var uncachedRunMessage = policy.MessageOf(Name, "uncachedRun")
 
 var uncachedWithoutReasonMessage = policy.MessageOf(Name, "uncachedWithoutReason")
 
-// uncachedMarker opens the comment that excuses a run from the test cache, matched as written.
-const uncachedMarker = "Uncached:"
-
 // argument is one element of a command's argument list as the rule reads it. An argument whose value is not a
 // string constant is kept as unknown, holding its place, so a flag and its value are only paired when they are
 // adjacent.
@@ -82,7 +79,7 @@ func run(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			message := uncachedRunMessage
-			switch comments.ExcuseFor(holdingStatement(enclosing), uncachedMarker) {
+			switch comments.ExcuseFor(holdingStatement(enclosing), marker.Uncached) {
 			case marker.WithReason:
 				return true
 			case marker.WithoutReason:

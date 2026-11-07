@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/system-inc/cohere/internal/build_inputs"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -96,6 +97,9 @@ func runWithEngine(test *testing.T, binary string, engine string, directory stri
 // is about.
 func buildCohere(test *testing.T) string {
 	test.Helper()
+	// The binary's own code is mostly dead in this test binary, so Go keys the result on its sources only
+	// through this (#4p82x8d).
+	build_inputs.Record(test, ".", ".")
 	sharedBinary.once.Do(func() {
 		sharedBinary.directory, sharedBinary.buildError = os.MkdirTemp("", "cohere-test-binary-")
 		if sharedBinary.buildError != nil {

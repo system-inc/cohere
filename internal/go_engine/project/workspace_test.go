@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A go.work's modules are its uses, minus any inside a submodule, found by its gitlink in the index rather
@@ -109,7 +111,7 @@ func TestReadWorkspaceOfAModuleUnderAnotherWorkspaceTurnsTheWorkspaceOff(test *t
 
 	listPackage := func(extra []string) (string, error) {
 		command := exec.Command("go", "list", ".")
-		command.Dir = nested
+		command.Dir = build_inputs.OutsideModule(test, nested)
 		command.Env = append(withoutVariable(os.Environ(), "GOWORK"), "GOTOOLCHAIN=local", "GOPROXY=off", "GOFLAGS=")
 		command.Env = append(command.Env, extra...)
 		output, runError := command.CombinedOutput()

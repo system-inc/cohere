@@ -1,10 +1,1 @@
-[
-    {
-        "engine": "typescript",
-        "family": "casing",
-        "case": "us05",
-        "kind": "verdict",
-        "task": "bjxkmf8",
-        "reason": "neither casing rule judges a leading underscore, so `_cache` is not reported"
-    }
-]
+[]

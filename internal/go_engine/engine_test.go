@@ -336,6 +336,13 @@ var endToEndCases = []endToEndCase{
 		name: "rename-no-fix", fixture: "rename", extra: []string{"--no-fix"}, exitCode: 1,
 		verify: unchangedTree("rename"),
 	},
+	// `--no-format` leaves formatting out and still applies the rules' fixes: every rename of rename-rewritten is made
+	// and each renamed file is printed by gofmt, but the long-line wrap, which is formatting, does not run, so
+	// report.go's long call stays one line and a finding while its maxRows is renamed.
+	{
+		name: "rename-no-format", fixture: "rename", extra: []string{"--no-format"}, exitCode: 1,
+		verify: renamedTreeUnder("rename", "rename-no-format", "--no-format"),
+	},
 	// A rename's files are written as one set: with the command's directory read-only, the rename of ParseURL, which
 	// reaches it, can't be written whole, so no rename is written, each is refused as unwritable, and every finding
 	// stands. The long-line wrap, which wrote report.go before the rename, is its own write and stands too.
@@ -354,6 +361,20 @@ var endToEndCases = []endToEndCase{
 	{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
 		verify: renamedTree("rename", "rename-exports"),
+	},
+	// A local error written once by a single call is renamed for that call at every reference: Load's err becomes
+	// readError, in its definition, its check and its return. Both's err, written by two reads, keeps the advice, and
+	// is still a finding. A second run changes nothing.
+	{
+		name: "rename-errors-rewritten", fixture: "rename-errors", exitCode: 1,
+		verify: renamedTree("rename-errors", "rename-errors-rewritten"),
+	},
+	// A context.Context parameter is renamed for its caller at every use: Run's ctx becomes callerContext in its
+	// signature, both checks and the call it hands it to. Detach's ctx, written by two calls, keeps the advice, and is
+	// still a finding. A second run changes nothing.
+	{
+		name: "rename-contexts-rewritten", fixture: "rename-contexts", exitCode: 1,
+		verify: renamedTree("rename-contexts", "rename-contexts-rewritten"),
 	},
 }
 
@@ -402,6 +423,12 @@ func goFilesOf(test *testing.T, root string) []string {
 // expected files under the file's own path, and that a second run, which reads the renamed tree and the same rules,
 // rewrites nothing. Under -update the goldens are rewritten from the copy.
 func renamedTree(fixture string, caseName string) func(test *testing.T, root string) {
+	return renamedTreeUnder(fixture, caseName)
+}
+
+// renamedTreeUnder is renamedTree for a case run with extra arguments, which its second run is given too, so the
+// second run asks what the first did.
+func renamedTreeUnder(fixture string, caseName string, extra ...string) func(test *testing.T, root string) {
 	return func(test *testing.T, root string) {
 		test.Helper()
 		files := goFilesOf(test, root)
@@ -427,8 +454,8 @@ func renamedTree(fixture string, caseName string) func(test *testing.T, root str
 		}
 		var standardOutput bytes.Buffer
 		var standardError bytes.Buffer
-		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-			registered)
+		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
+		run(arguments, &standardOutput, &standardError, registered)
 		for line := range strings.Lines(standardOutput.String()) {
 			var record contract.FixRecord
 			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
