@@ -92,13 +92,17 @@ tree_hash() {
     xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
 }
 
-# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none.
+# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none, and
+# running the project's generator in it when the sourcing script set `generate` (run_generator).
 prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
   project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
-  # The layout is in the name, so a copy extracted before it was a repository is never reused.
-  copy=$work/${project:t}-${project_commit[1,12]}-git
+  # The layout is in the name, so a copy extracted before it was a repository is never reused, and so is the
+  # generator, so a copy made with one is never taken for a copy made without it, or with another.
+  local layout=git
+  [[ -n ${generate:-} ]] && layout=git-generated-$(print -rn -- $generate | shasum -a 256 | cut -c1-12)
+  copy=$work/${project:t}-${project_commit[1,12]}-$layout
   if [[ -f $copy/bench-ready ]]; then
     print -u2 "reusing the copy at $copy"
     [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
@@ -126,9 +130,35 @@ prepare_copy() {
       git -C $repository update-index -q --refresh > /dev/null
       git -C $repository diff --quiet || fail "$repository differs from the commit it was extracted at"
     done
+    [[ -n ${generate:-} ]] && run_generator $repositories
     tree_hash > $copy/bench-ready
   fi
   expected_tree=$(< $copy/bench-ready)
+}
+
+# run_generator runs the project's own generator (`generate`) in the copy, after the copy is proven to be its
+# commits and before its tree is hashed, so the hash covers what the generator wrote (#e2pe2xp). A checkout
+# holds what its project's generators wrote, and a copy without it checks less: ahra's lacked the route types
+# Next's dev server writes, so its runs type-checked with 161 errors, held every fix and ran no rule. The copy
+# is then its commits plus what the commits' own generator wrote, both fixed by the commits.
+#
+# The generator may change tracked files, as it does in any checkout (`next typegen` rewrites next-env.d.ts),
+# and every one it changed is kept in bench-generated with the command, and printed in the header, so nothing
+# hides in the hash. It runs where the network is denied, and a generator that exits nonzero, network refused
+# or not, refuses the copy. A generator that sends telemetry is told not to in the command, as
+# `NEXT_TELEMETRY_DISABLED=1 next typegen`.
+run_generator() {
+  local profile=$work/bench-no-network.sb repository changed
+  print -l '(version 1)' '(allow default)' '(deny network*)' '(allow network* (local unix))' > $profile
+  print -u2 "generating in the copy, with no network: $generate"
+  (cd $copy && sandbox-exec -f $profile zsh -c $generate) >&2 ||
+    fail "the generator failed in $copy, so the copy is refused: $generate"
+  print -r -- $generate > $copy/bench-generated
+  for repository in $@; do
+    for changed in ${(f)"$(git -C $repository diff --name-only)"}; do
+      print -r -- ${${repository#$copy}#/}${${repository#$copy}:+/}$changed >> $copy/bench-generated
+    done
+  done
 }
 
 # pin_engine sets cohere_version, engine_source and engine, a copy of the engine in <logs>, and the Swift
@@ -221,6 +251,10 @@ swift_engine_named_otherwise() {
 print_pinned_header() {
   print "# project  ${project:t} at $project_commit"
   [[ -f $copy/bench-submodules ]] && sed 's/^/#   submodule /' $copy/bench-submodules
+  if [[ -f $copy/bench-generated ]]; then
+    print "# generate $(head -1 $copy/bench-generated)"
+    tail -n +2 $copy/bench-generated | sed 's/^/#   changed /'
+  fi
   print "# machine  $(sysctl -n hw.model), $(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores," \
     "$(( $(sysctl -n hw.memsize) / 1073741824 )) GB, macOS $(sw_vers -productVersion)"
   print "# cohere   $engine_source"
