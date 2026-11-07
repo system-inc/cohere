@@ -95,6 +95,9 @@
 #   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
 #                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
 #                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
+#   --link PATH          an input git ignores and no generator can make, relative to the project, linked from
+#                        the checkout into the copy and named in the header with its content's hash, as
+#                        presence's Local/Models files; repeat it for each (see link_inputs)
 #   --work DIR           where the copies live (default $TMPDIR/cohere-quiet-machine)
 #   --record             also write the run to bench/results as a record to commit
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
@@ -118,6 +121,7 @@ idle_seconds=60
 edit=modules/tasks/TasksSearchQuery.ts
 cohere=cohere
 generate=
+links=()
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 
@@ -133,6 +137,7 @@ while (( $# > 0 )); do
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
+    --link) links+=($2); shift 2 ;;
     --work) work=$2; shift 2 ;;
     --record) record=true; shift ;;
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;

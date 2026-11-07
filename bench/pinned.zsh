@@ -24,6 +24,9 @@
 zmodload zsh/datetime
 # This directory, read here at the top of the sourced file, since inside a function $0 is the function's name.
 bench_directory=${0:A:h}
+# What a sourcing script that sets neither leaves empty: no generator, and nothing linked.
+(( ${+generate} )) || generate=
+(( ${+links} )) || links=()
 
 fail() { print -u2 "$name: $*"; exit 1; }
 load() { sysctl -n vm.loadavg | awk '{print $2}'; }
@@ -92,8 +95,9 @@ tree_hash() {
     xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
 }
 
-# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none, and
-# running the project's generator in it when the sourcing script set `generate` (run_generator).
+# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none,
+# linking the ignored inputs the sourcing script named in `links` (link_inputs), and running the project's
+# generator in it when the sourcing script set `generate` (run_generator).
 prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
@@ -102,11 +106,16 @@ prepare_copy() {
   # generator, so a copy made with one is never taken for a copy made without it, or with another.
   local layout=git
   [[ -n ${generate:-} ]] && layout=git-generated-$(print -rn -- $generate | shasum -a 256 | cut -c1-12)
+  (( ${#links} > 0 )) && layout+=-linked-$(print -rl -- ${(o)links} | shasum -a 256 | cut -c1-12)
   copy=$work/${project:t}-${project_commit[1,12]}-$layout
   if [[ -f $copy/bench-ready ]]; then
     print -u2 "reusing the copy at $copy"
     [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
       fail "the copy at $copy no longer matches what was extracted; remove it and run again"
+    local linked
+    for linked in $links; do
+      [[ -e $copy/$linked ]] || fail "--link $linked: the checkout's ${project:t}/$linked is gone, so the copy is refused"
+    done
   else
     [[ -e $copy ]] && fail "$copy exists but was never finished; remove it and run again"
     print -u2 "extracting ${project:t} at ${project_commit[1,12]} into $copy"
@@ -120,6 +129,7 @@ prepare_copy() {
       local package=${manifest:h}
       [[ -d $project/$package/node_modules ]] && ln -s $project/$package/node_modules $copy/$package/node_modules
     done
+    link_inputs
     # Each index learns its files' stats once, here, as a checkout's has them, so the first git command a
     # measured run makes does not hash the whole tree to find out that nothing changed. Then each repository
     # must show no change against its commit, or the copy is not the commits it is named by.
@@ -134,6 +144,31 @@ prepare_copy() {
     tree_hash > $copy/bench-ready
   fi
   expected_tree=$(< $copy/bench-ready)
+}
+
+# link_inputs links each path in `links`, relative to the project, from the checkout into the copy, as
+# node_modules is linked (#zp3t8vy). An input git ignores that no generator can make without the network, as
+# ahraos-presence's pose models CapturePhone's project.yml lists as sources, would otherwise be missing from
+# every copy, and its project refused. Only the paths the run names are linked, never a guess. One the checkout
+# lacks, or one git tracks (the copy holds it already), refuses the copy. The header names each with a hash of
+# its content, taken every run, so two rounds over different files never read as the same input.
+link_inputs() {
+  local linked target
+  for linked in $links; do
+    target=$project/$linked
+    [[ -e $target ]] || fail "--link $linked: the checkout has no $target, so the copy is refused"
+    git -C $project ls-files --error-unmatch -- $linked > /dev/null 2>&1 &&
+      fail "--link $linked: git tracks it, so the copy holds it already"
+    [[ -e $copy/$linked || -L $copy/$linked ]] && fail "--link $linked: the copy already has a $linked"
+    mkdir -p $copy/${linked:h}
+    ln -s ${target:A} $copy/$linked
+  done
+}
+
+# link_hash prints one hash over the content a linked path holds, a file or every file below a folder, with
+# the folder's relative paths, links followed.
+link_hash() {
+  (cd ${1:h} && find -L ${1:t} -type f -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)
 }
 
 # run_generator runs the project's own generator (`generate`) in the copy, after the copy is proven to be its
@@ -251,6 +286,10 @@ swift_engine_named_otherwise() {
 print_pinned_header() {
   print "# project  ${project:t} at $project_commit"
   [[ -f $copy/bench-submodules ]] && sed 's/^/#   submodule /' $copy/bench-submodules
+  local linked
+  for linked in $links; do
+    print "# linked   $linked, content $(link_hash $copy/$linked), from ${project:t}/$linked"
+  done
   if [[ -f $copy/bench-generated ]]; then
     print "# generate $(head -1 $copy/bench-generated)"
     tail -n +2 $copy/bench-generated | sed 's/^/#   changed /'
