@@ -15,6 +15,7 @@
 package consistency_no_long_line
 
 import (
+	"bytes"
 	"cmp"
 	"fmt"
 	"go/ast"
@@ -49,12 +50,13 @@ var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Ana
 
 var longLineMessage = policy.MessageOf(Name, "longLine")
 
-// limit is the house line length.
-const limit = 120
+// Limit is the house line length. The fix phase's long-line wrap (internal/line_wrap) wraps to it, so the fix and
+// the rule never disagree on what is long.
+const Limit = 120
 
-// tabColumns is what a tab counts for. gofmt indents with tabs, and the house reads a tab as four columns wherever it
+// TabColumns is what a tab counts for. gofmt indents with tabs, and the house reads a tab as four columns wherever it
 // sits, rather than as a jump to the next tab stop.
-const tabColumns = 4
+const TabColumns = 4
 
 // closingPunctuation is what may follow a string literal alone on its line: what a formatter prints after a last
 // argument or element, with nothing in it that could move to the next line.
@@ -186,30 +188,40 @@ func newSourceFile(file *ast.File, tokenFile *token.File, content []byte) *sourc
 
 // judgeFile reports every line of source past the limit that no exemption covers, at its first column past it.
 func judgeFile(pass *analysis.Pass, source *sourceFile) {
-	for line := 1; line <= source.tokenFile.LineCount(); line++ {
-		if source.exemptLines[line] {
-			continue
-		}
-		start, end := source.lineStart(line), source.lineEnd(line)
-		length := columnsOf(source.content[start:end])
-		if length <= limit {
-			continue
-		}
-		overflow := start + offsetPastLimit(source.content[start:end])
-		if source.isRawStringBody(line, overflow) || source.isLoneStringLiteral(line, overflow) ||
-			source.isUnbreakableCommentToken(line, overflow) || source.isLoneField(line) {
-			continue
-		}
+	for _, long := range source.reportedLines() {
 		pass.Report(analysis.Diagnostic{
-			Pos:      source.tokenFile.Pos(overflow),
-			End:      source.tokenFile.Pos(end),
+			Pos:      source.tokenFile.Pos(long.overflow),
+			End:      source.tokenFile.Pos(long.end),
 			Category: longLineMessage.Id,
 			Message: longLineMessage.Render(map[string]string{
-				"length": strconv.Itoa(length),
-				"limit":  strconv.Itoa(limit),
+				"length": strconv.Itoa(long.length),
+				"limit":  strconv.Itoa(Limit),
 			}),
 		})
 	}
+}
+
+// ReportedLines are the 1-based lines of a file the rule reports, in order, from content parsed with its comments
+// into file and tokenFile. The fix phase's long-line wrap acts on these lines alone, so it never rewrites a line the
+// rule leaves alone.
+func ReportedLines(file *ast.File, tokenFile *token.File, content []byte) []int {
+	reported := newSourceFile(file, tokenFile, content).reportedLines()
+	lines := make([]int, 0, len(reported))
+	for _, long := range reported {
+		lines = append(lines, long.line)
+	}
+	return lines
+}
+
+// HasLongLine is whether any line of content is wider than Limit, the check the fix phase makes before it parses a
+// file to wrap.
+func HasLongLine(content []byte) bool {
+	for line := range bytes.Lines(content) {
+		if columnsOf(bytes.TrimRight(line, "\r\n")) > Limit {
+			return true
+		}
+	}
+	return false
 }
 
 // isUnbreakableType is whether a type expression has no place gofmt keeps a line break: names, selectors, pointers,
@@ -316,7 +328,7 @@ func offsetPastLimit(text []byte) int {
 	for offset := 0; offset < len(text); {
 		character, size := utf8.DecodeRune(text[offset:])
 		columns += runeColumns(character)
-		if columns > limit {
+		if columns > Limit {
 			return offset
 		}
 		offset += size
@@ -326,7 +338,7 @@ func offsetPastLimit(text []byte) int {
 
 func runeColumns(character rune) int {
 	if character == '\t' {
-		return tabColumns
+		return TabColumns
 	}
 	return 1
 }
