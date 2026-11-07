@@ -178,7 +178,7 @@
         "name": "cohere:next",
         "extends": ["cohere:typescript"],
         "plugins": ["@next"],
-        "rulesOn": 304,
+        "rulesOn": 305,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -378,6 +378,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
@@ -1725,7 +1729,7 @@
         "name": "cohere:react",
         "extends": ["cohere:typescript"],
         "plugins": ["react", "react-hooks"],
-        "rulesOn": 369,
+        "rulesOn": 370,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1837,6 +1841,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
@@ -4281,7 +4289,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4481,6 +4489,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
@@ -6095,7 +6107,7 @@
         "name": "cohere:system-inc/structure",
         "extends": ["cohere:typescript"],
         "plugins": ["@typescript-eslint"],
-        "rulesOn": 302,
+        "rulesOn": 303,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6207,6 +6219,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
@@ -7811,7 +7827,7 @@
     {
         "name": "cohere:tailwind",
         "extends": ["cohere:typescript"],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -7923,6 +7939,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
@@ -9302,7 +9322,7 @@
     {
         "name": "cohere:typescript",
         "extends": ["cohere:adamic", "cohere:style"],
-        "rulesOn": 281,
+        "rulesOn": 282,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9414,6 +9434,10 @@
             },
             {
                 "name": "@typescript-eslint/no-confusing-void-expression",
+                "severity": "error"
+            },
+            {
+                "name": "@typescript-eslint/no-deprecated",
                 "severity": "error"
             },
             {
