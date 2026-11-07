@@ -114,9 +114,15 @@ func TestNilCollectorIsInert(test *testing.T) {
 	}
 }
 
-// spinFor burns cpu of this thread's CPU, by the thread's own clock, so it is CPU however the scheduler
-// treats it.
-func spinFor(test *testing.T, cpu time.Duration) {
+// spinFor burns at least cpu of this thread's CPU, by the thread's own clock, so it is CPU however the
+// scheduler treats it, and returns what it actually spent.
+//
+// At least, not exactly: the spin stops at the first read past cpu, and a read can land well past it. On
+// a quiet machine the step is the clock's, about 100ns, but on a loaded virtual machine one jump between
+// two reads can be hundreds of microseconds. So a test holds the meter to what the spin returns, never to
+// the cpu it asked for. 0.2.0's dry run on a 3-core macos-26 runner read 3.656ms billed against a 3ms
+// ask, and it kept no record of what the spin spent, so it could not say which of the two was off.
+func spinFor(test *testing.T, cpu time.Duration) time.Duration {
 	test.Helper()
 	start, known := threadCpu()
 	if !known {
@@ -126,12 +132,13 @@ func spinFor(test *testing.T, cpu time.Duration) {
 	}
 	for {
 		if now, _ := threadCpu(); now-start >= cpu {
-			return
+			return now - start
 		}
 	}
 }
 
-// within reports whether got is want give or take a tenth, plus a little for the clock's step.
+// within reports whether got is want give or take a tenth, plus a little for the clock's step and the
+// meter's own bookkeeping. want is what a spin returned, not what it asked for.
 func within(got time.Duration, want time.Duration) bool {
 	slack := want/10 + 200*time.Microsecond
 	return got >= want-slack && got <= want+slack
@@ -157,7 +164,8 @@ func TestAMeteredCallIsBilledItsCpu(test *testing.T) {
 	test.Parallel()
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "spins"}
-	spins := func(node *ast.Node) { spinFor(test, 2*time.Millisecond) }
+	var spent time.Duration
+	spins := func(node *ast.Node) { spent += spinFor(test, 2*time.Millisecond) }
 
 	for range 5 {
 		meter.call(timing, spins, nil)
@@ -166,8 +174,8 @@ func TestAMeteredCallIsBilledItsCpu(test *testing.T) {
 	if timing.NodesOffered != 5 {
 		test.Fatalf("calls were not counted: %d", timing.NodesOffered)
 	}
-	if !within(timing.ListenerCpu, 10*time.Millisecond) {
-		test.Fatalf("five calls spinning 2ms were billed %v", timing.ListenerCpu)
+	if !within(timing.ListenerCpu, spent) {
+		test.Fatalf("five calls spinning %v in all were billed %v", spent, timing.ListenerCpu)
 	}
 }
 
@@ -200,10 +208,11 @@ func TestSetupIsBilledApartFromListeners(test *testing.T) {
 	test.Parallel()
 	meter, _ := startTestMeter(test)
 	timing := &RuleTiming{Name: "decides"}
-	meter.setup(timing, func() { spinFor(test, 3*time.Millisecond) })
+	var spent time.Duration
+	meter.setup(timing, func() { spent = spinFor(test, 3*time.Millisecond) })
 
-	if !within(timing.SetupCpu, 3*time.Millisecond) || timing.ListenerCpu != 0 {
-		test.Fatalf("a 3ms setup was billed setup %v and listen %v", timing.SetupCpu, timing.ListenerCpu)
+	if !within(timing.SetupCpu, spent) || timing.ListenerCpu != 0 {
+		test.Fatalf("a setup spinning %v was billed setup %v and listen %v", spent, timing.SetupCpu, timing.ListenerCpu)
 	}
 }
 
@@ -224,27 +233,30 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(test *testing.T) {
 	cache := rule.NewFileCache()
 	meter.watchFills(cache)
 	timing := &RuleTiming{Name: "asked-first"}
+	var askerSpent time.Duration
+	var outerSpent time.Duration
+	var innerSpent time.Duration
 
 	meter.call(timing, func(node *ast.Node) {
-		spinFor(test, 2*time.Millisecond)
+		askerSpent = spinFor(test, 2*time.Millisecond)
 		rule.Cached(cache, "comments.All", func() int {
-			spinFor(test, 3*time.Millisecond)
+			outerSpent = spinFor(test, 3*time.Millisecond)
 			rule.Cached(cache, "hir.Function:175:1001", func() int {
-				spinFor(test, 4*time.Millisecond)
+				innerSpent = spinFor(test, 4*time.Millisecond)
 				return 1
 			})
 			return 1
 		})
 	}, nil)
 
-	if !within(timing.ListenerCpu, 2*time.Millisecond) {
-		test.Fatalf("the rule that asked was billed %v for its own 2ms", timing.ListenerCpu)
+	if !within(timing.ListenerCpu, askerSpent) {
+		test.Fatalf("the rule that asked was billed %v for its own %v", timing.ListenerCpu, askerSpent)
 	}
-	if got := timings.SharedCpu()["comments.All"]; !within(got, 3*time.Millisecond) {
-		test.Fatalf("the outer derivation was billed %v for its own 3ms", got)
+	if got := timings.SharedCpu()["comments.All"]; !within(got, outerSpent) {
+		test.Fatalf("the outer derivation was billed %v for its own %v", got, outerSpent)
 	}
-	if got := timings.SharedCpu()["hir.Function"]; !within(got, 4*time.Millisecond) {
-		test.Fatalf("the per-node derivation was billed %v to its family for its 4ms", got)
+	if got := timings.SharedCpu()["hir.Function"]; !within(got, innerSpent) {
+		test.Fatalf("the per-node derivation was billed %v to its family for its %v", got, innerSpent)
 	}
 	if cache.Fills()["comments.All"] != 1 || cache.Fills()["hir.Function:175:1001"] != 1 {
 		test.Fatalf("each derivation should have been computed once: %v", cache.Fills())
@@ -281,7 +293,7 @@ func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 		test.Skipf("no meter on this platform: %s", timings.Account.Unavailable)
 	}
 	timing := timings.forRule("spins")
-	spinFor(test, 2*time.Millisecond)
+	outsideSpent := spinFor(test, 2*time.Millisecond)
 	meter.call(timing, func(node *ast.Node) { spinFor(test, 3*time.Millisecond) }, nil)
 	meter.finish()
 
@@ -289,8 +301,8 @@ func TestTheWorkersCpuIsAccountedFor(test *testing.T) {
 	if account.Calls != 1 {
 		test.Fatalf("one call was counted as %d", account.Calls)
 	}
-	if !within(account.WalkCpu, 2*time.Millisecond) {
-		test.Fatalf("2ms spent outside any call was billed to the walk as %v", account.WalkCpu)
+	if !within(account.WalkCpu, outsideSpent) {
+		test.Fatalf("%v spent outside any call was billed to the walk as %v", outsideSpent, account.WalkCpu)
 	}
 	parts := timing.ListenerCpu + account.InstrumentCpu + account.WalkCpu
 	if difference := account.WorkersCpu - parts; difference < -time.Microsecond || difference > time.Microsecond {
