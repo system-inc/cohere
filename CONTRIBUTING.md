@@ -139,6 +139,55 @@ skips every package whose inputs did not change, and after a one-file change `-c
 CPU for the same verdict (1,180 against 2,136 core-seconds). A flaky test is fixed rather than re-run
 around; name its package to re-run it alone.
 
+## Taking a Go tree to zero
+
+Cohere's own Go went from 37,889 findings to 0 in two days, and this is how, so another tree can do it the same
+way. The names, the line lengths and the file layout went through typed codemods, written once and checked to
+the end. What was left went through waves of light agents, each holding one package's judgment.
+
+**The codemods are in `tools/go_codemods`.** Every rename goes through the rename engines in `rename` (one
+package) and `global_rename` (across packages). A rename is accepted only if every identifier still resolves to
+the same object under the new names, checked to a fixpoint. The rewrite is reloaded in memory and compared
+before anything is written, and checked again from disk. A name someone else owns (a field an encoder reads by
+name, a method an interface of another package requires, an export outside the repository) is found by type and
+refused, and the refusal is listed with its reason. The passes:
+
+- `test_names`, `error_names`, `context_names`, `receiver_names`, `loop_names`: the handle of a test, an error
+  named for what produced it, a context for where it came from, a receiver spelled from its type, a loop variable
+  for what it holds.
+- `word_names`, `initialisms`: the abbreviation vocabulary in `policy/Abbreviations.json` and initialisms
+  written as words. `-global` reaches across packages. A word with several meanings (`pos`) is listed for a
+  person, never given its first.
+- `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
+- `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words), `type_split` (one type
+  with methods to a file, each file named for it), `folder_names` (a package folder moved with its clause, its
+  import paths and every qualifier).
+
+`tools/go_codemods/house_names.sh` runs the naming passes in the order they landed, each built from the tree it
+runs over. A branch runs it before merging main, so the two sides spell every name the same way, and again after
+the merge. It writes nothing on a tree that already has the names.
+
+**Each mechanical pass is one commit**, proven three ways. A census before and after, keyed by path, rule and
+message, shows what the pass removed, and a pass that creates any finding is refused. The tests of every package
+it touched pass. The bare run at the root says the same as the census. Rename passes go first, then the wrap,
+since a longer name makes a longer line, then the type split.
+
+**What stays judgment goes in waves.** Single letters, whose name depends on what they hold, dropped errors,
+whose cure depends on what failing means there, and the rest of the correctness rules have no autofix.
+
+- Brief one light agent whole, on an ordinary package, not the hardest: the goal and why, the exact files, the
+  done-when, what not to touch, and that stopping with a reason is a good answer.
+- Read its diff, and fix the brief where it was wrong.
+- Then send the rest at once, one package or one set of files each, so no two agents touch a file. Each works in
+  its own worktree off the branch and commits there. A codemod hand hands back its codemod's head instead, and the
+  lead re-runs it on the branch.
+- The lead reads every diff, merges, runs `house_names.sh` and the tests, and censuses again. An agent's report
+  is relay; the diff is the record.
+
+A whole class of findings sometimes has one cure, and then it isn't 400 judgments. A command's dropped
+`fmt.Printf` errors are cured by writing to `internal/streams`, whose buffered writes can't fail partway and whose
+delivery `streams.Finish` checks once at exit, the way `command/cohere-dev` does.
+
 ## Porting a rule
 
 Five things, each of which caught a defect the others could not. They are ordered by what they cost
