@@ -3,6 +3,7 @@ package native
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/format/format_options"
@@ -13,6 +14,25 @@ import (
 type Formatter struct {
 	Options format_options.Options
 }
+
+// FormatHouse is the house format of a file a program writes, named by its path so its printer is chosen as the
+// format phase chooses it. A generator writes through it, so what it writes is what the format check reads as
+// formatted, and a regeneration leaves the tree as it was (#4wjhppw). The house options, never a resolution from
+// the directory the generator happens to run in, so the same inputs give the same bytes wherever it runs.
+func FormatHouse(fileName string, text []byte) ([]byte, error) {
+	options, houseOptionsError := houseOptions()
+	if houseOptionsError != nil {
+		return nil, houseOptionsError
+	}
+	formatted, formatError := Formatter{Options: options}.Format(fileName, string(text))
+	if formatError != nil {
+		return nil, fmt.Errorf("formatting %s in the house format: %w", fileName, formatError)
+	}
+	return []byte(formatted), nil
+}
+
+// houseOptions reads the house options once: the block is compiled into the binary, so every read gives the same.
+var houseOptions = sync.OnceValues(format_options.HouseOptions)
 
 // Handles reports whether a printer is registered for the file's type.
 func (formatter Formatter) Handles(fileName string) bool {

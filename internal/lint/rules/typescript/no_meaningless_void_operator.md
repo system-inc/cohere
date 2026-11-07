@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-meaningless-void-operator`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **11** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **11**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ if(!rest[0]) return void console.log('Usage: ahra phi social untarget <targetId>
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

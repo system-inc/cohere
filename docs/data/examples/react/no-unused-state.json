@@ -18,7 +18,5 @@
         "file": "/repository/source/NoUnusedState.tsx",
         "source": "var o = { getInitialState: function(){ return { a: 1 }; } };"
     },
-    "assertedMessageIds": [
-        "unusedStateField"
-    ]
+    "assertedMessageIds": ["unusedStateField"]
 }

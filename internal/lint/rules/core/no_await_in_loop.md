@@ -1,12 +1,12 @@
 # `no-await-in-loop`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **363** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Yes**       |
+| Violations in ahra     | **363**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const result = await this.task();
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

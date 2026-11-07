@@ -38,7 +38,7 @@ import { loadDesignSystem } from '../generate_descriptors/loader.mjs';
 import { locate, recordBeside } from '../corpus.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: enumerate.mjs <theme.css> [--resolve-root <dir>] [--harvest <root>]\n');
     process.exit(2);
 }
@@ -66,13 +66,13 @@ const cases = JSON.parse(NodeFileSystem.readFileSync(casesPath, 'utf8'));
  */
 const origins = new Map();
 function offer(className, origin) {
-    if (className && !origins.has(className)) {
+    if(className && !origins.has(className)) {
         origins.set(className, origin);
     }
 }
 
-for (const [block, inputs] of Object.entries(cases.upstream)) {
-    for (const input of inputs) {
+for(const [block, inputs] of Object.entries(cases.upstream)) {
+    for(const input of inputs) {
         offer(input, `upstream: ${block}`);
         // The with-variant and important strategies, which only make sense on a class with no variant of
         // its own already in front of the utility.
@@ -80,48 +80,49 @@ for (const [block, inputs] of Object.entries(cases.upstream)) {
         offer(`${input}!`, `upstream: ${block}, important`);
     }
 }
-for (const input of cases.consumers) {
+for(const input of cases.consumers) {
     offer(input, 'consumer');
 }
-for (const input of cases.clean) {
+for(const input of cases.clean) {
     offer(input, 'clean');
 }
 
 const harvestArgument = flagValue('--harvest');
 let harvested = null;
-if (harvestArgument) {
+if(harvestArgument) {
     const harvestRoot = locate(harvestArgument).path;
     harvested = recordBeside(harvestArgument, harvestRoot);
     const skippedDirectories = new Set(['node_modules', '.git', '.next', 'data', 'dist', 'build', '.turbo']);
     const tokens = new Set();
     const visit = (directory) => {
-        for (const entry of NodeFileSystem.readdirSync(directory, { withFileTypes: true })) {
-            if (skippedDirectories.has(entry.name)) continue;
+        for(const entry of NodeFileSystem.readdirSync(directory, { withFileTypes: true })) {
+            if(skippedDirectories.has(entry.name)) continue;
             const path = NodePath.join(directory, entry.name);
-            if (entry.isDirectory()) {
+            if(entry.isDirectory()) {
                 visit(path);
                 continue;
             }
-            if (!/\.(tsx?|jsx?|mjs)$/.test(entry.name) || entry.name.endsWith('.d.ts')) continue;
+            if(!/\.(tsx?|jsx?|mjs)$/.test(entry.name) || entry.name.endsWith('.d.ts')) continue;
             const source = NodeFileSystem.readFileSync(path, 'utf8');
-            for (const match of source.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.){1,2000})\1/g)) {
-                for (const token of match[2].split(/[\s'"`{}]+/)) {
-                    if (token && !token.includes('${')) tokens.add(token);
+            for(const match of source.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.){1,2000})\1/g)) {
+                for(const token of match[2].split(/[\s'"`{}]+/)) {
+                    if(token && !token.includes('${')) tokens.add(token);
                 }
             }
         }
     };
     visit(harvestRoot);
-    for (const token of [...tokens].sort()) {
+    for(const token of [...tokens].sort()) {
         offer(token, 'harvested');
     }
 }
 
 const recorded = [];
 let unknownCount = 0;
-for (const [className, origin] of origins) {
-    const isKnown = designSystem.parseCandidate(className).length > 0 && designSystem.candidatesToCss([className])[0] !== null;
-    if (!isKnown) {
+for(const [className, origin] of origins) {
+    const isKnown =
+        designSystem.parseCandidate(className).length > 0 && designSystem.candidatesToCss([className])[0] !== null;
+    if(!isKnown) {
         unknownCount++;
         continue;
     }

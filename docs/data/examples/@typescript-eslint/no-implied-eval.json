@@ -18,8 +18,5 @@
         "file": "noImpliedEval.ts",
         "source": "foo();\n"
     },
-    "assertedMessageIds": [
-        "noFunctionConstructor",
-        "noImpliedEvalError"
-    ]
+    "assertedMessageIds": ["noFunctionConstructor", "noImpliedEvalError"]
 }

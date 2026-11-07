@@ -1,6 +1,4 @@
 {
     "rule": "default-case",
-    "assertedMessageIds": [
-        "missingDefaultCase"
-    ]
+    "assertedMessageIds": ["missingDefaultCase"]
 }

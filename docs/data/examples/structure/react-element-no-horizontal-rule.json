@@ -18,7 +18,5 @@
         "file": "/repository/source/components/layout/HorizontalRule.tsx",
         "source": "export function HorizontalRule() {\n    return <hr />;\n}\n"
     },
-    "assertedMessageIds": [
-        "noHrElement"
-    ]
+    "assertedMessageIds": ["noHrElement"]
 }

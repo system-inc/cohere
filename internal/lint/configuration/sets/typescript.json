@@ -1,23 +1,12 @@
 {
-    "extends": [
-        "cohere:adamic",
-        "cohere:style"
-    ],
+    "extends": ["cohere:adamic", "cohere:style"],
     "format": {
         "tabWidth": 4,
         "useTabs": false,
         "semi": true,
         "singleQuote": true,
         "printWidth": 120,
-        "ignore": [
-            "next-env.d.ts",
-            "pnpm-lock.yaml",
-            "*.sqlite",
-            "*.sqlite3",
-            "*.db",
-            "*.db-wal",
-            "*.db-shm"
-        ]
+        "ignore": ["next-env.d.ts", "pnpm-lock.yaml", "*.sqlite", "*.sqlite3", "*.db", "*.db-wal", "*.db-shm"]
     },
     "rules": {
         "no-restricted-globals": [

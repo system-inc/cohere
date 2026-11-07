@@ -19,8 +19,6 @@
         "file": "/repository/source/Thing.ts",
         "source": "let a = new Array();"
     },
-    "assertedMessageIds": [
-        "commentDetected"
-    ],
+    "assertedMessageIds": ["commentDetected"],
     "assertsFix": true
 }

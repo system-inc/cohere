@@ -18,7 +18,5 @@
         "file": "/repository/source/Loops.ts",
         "source": "for (;;) ;"
     },
-    "assertedMessageIds": [
-        "invalid"
-    ]
+    "assertedMessageIds": ["invalid"]
 }

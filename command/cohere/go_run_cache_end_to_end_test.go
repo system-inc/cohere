@@ -36,6 +36,12 @@ type goReplayFixture struct {
 	environment []string
 }
 
+// goReplaySettings is the replay fixtures' settings: no Go rule changed, and the settings file itself left out of
+// the format walk, the one file of theirs the house formatter reads, so a root of them is the Go module alone. A
+// format project beside it (#4wjhppw) would make every run two projects, whose replays are each their own, and these
+// tests are about the Go engine's.
+const goReplaySettings = `{"go":{"rules":{}},"ignorePatterns":["CohereSettings.json"]}`
+
 // goReplayFinding is a line the printf rule reports, the finding every planted file carries, so a run that loaded
 // the file says so in its verdict.
 const goReplayFinding = "\treturn fmt.Sprintf(\"%d\", \"text\")\n"
@@ -53,11 +59,11 @@ func newGoReplayFixture(test *testing.T) *goReplayFixture {
 	fixture.write("go.mod", "module example.com/replay\n\ngo 1.27\n")
 	fixture.write("go.sum", "")
 	fixture.write(".gitignore", ".cache/\n")
-	fixture.write("CohereSettings.json", `{"go":{"rules":{}}}`)
+	fixture.write("CohereSettings.json", goReplaySettings)
 	fixture.write("a.go", goReplaySource("replay", "Greet"))
 	fixture.write("sub/b.go", "package sub\n\n// Answer answers.\nfunc Answer() int {\n\treturn 42\n}\n")
 	// A directory `./...` reaches that holds no Go file, so only its listing says when a package appears below it.
-	fixture.write("notes/README.md", "notes\n")
+	fixture.write("notes/README.txt", "notes\n")
 	// A file the package embeds, which no Go file names but its directive.
 	fixture.write("embedded.go", "package replay\n\nimport _ \"embed\"\n\n// Message is embedded.\n//\n"+
 		"//go:embed data/message.txt\nvar Message string\n")
@@ -423,6 +429,13 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			if writeError := os.WriteFile(path, []byte("go 1.27\n\nuse ./module\n"), 0o644); writeError != nil {
 				fixture.test.Fatal(writeError)
 			}
+			// The workspace is the root now, so its settings are the ones that keep every settings file, its own and
+			// the module's, out of the format walk, as goReplaySettings does at the module.
+			settings := filepath.Join(fixture.parent, "CohereSettings.json")
+			contents := []byte(`{"ignorePatterns":["**/CohereSettings.json"]}`)
+			if writeError := os.WriteFile(settings, contents, 0o644); writeError != nil {
+				fixture.test.Fatal(writeError)
+			}
 		}},
 		// The absent-path case: the variable naming the file is the same before and after, so only the file's absence,
 		// recorded, can tell.
@@ -442,7 +455,8 @@ func TestAGoRunWithAStaleInputIsNeverReplayed(test *testing.T) {
 			}
 		}},
 		{"the settings file edited", nil, func(fixture *goReplayFixture) {
-			fixture.write("CohereSettings.json", `{"go":{"rules":{"cohere-go/printf":"off"}}}`)
+			fixture.write("CohereSettings.json", strings.Replace(goReplaySettings, `{"rules":{}}`,
+				`{"rules":{"cohere-go/printf":"off"}}`, 1))
 		}},
 		{"GOFLAGS changed", nil, func(fixture *goReplayFixture) {
 			fixture.setVariable("GOFLAGS", strings.TrimSpace(os.Getenv("GOFLAGS")+" -tags=replaytest"))
@@ -810,6 +824,55 @@ func TestEveryProjectOfAMixedRootReplays(test *testing.T) {
 	}
 }
 
+// TestAGoModuleAndItsFormatProjectEachReplay: at a Go module's root holding Markdown, discovery runs the module and
+// the format project beside it, two children given the same arguments in one directory (#4wjhppw). Each records under
+// its own engine's name in the root's cache table, so the second run replays both. Under one name each run would
+// replay neither, whichever recorded last having overwritten the other.
+func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		".gitignore":          ".cache/\n",
+		"go.mod":              "module example.com/formatted\n\ngo 1.27\n",
+		"go.sum":              "",
+		"a.go":                goReplaySource("formatted", "Greet"),
+		"CohereSettings.json": "{ \"go\": { \"rules\": {} } }\n",
+		"README.md":           "# formatted\n",
+	})
+	run := func() map[string]string {
+		test.Helper()
+		command := exec.Command(binary, "--no-fix", "--verbose")
+		command.Dir = root
+		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=", "CGO_ENABLED=0")
+		output, runError := command.CombinedOutput()
+		var exitError *exec.ExitError
+		if runError != nil && !errors.As(runError, &exitError) {
+			test.Fatalf("running cohere: %v\n%s", runError, output)
+		}
+		found := map[string]string{}
+		heading := regexp.MustCompile(`(?m)^== (\S+) \((Go|Format)\) ==\n`)
+		bounds := heading.FindAllStringSubmatchIndex(string(output), -1)
+		for index, bound := range bounds {
+			end := len(output)
+			if index+1 < len(bounds) {
+				end = bounds[index+1][0]
+			}
+			found[string(output[bound[4]:bound[5]])] = string(output[bound[1]:end])
+		}
+		return found
+	}
+
+	if first := run(); len(first) != 2 {
+		test.Fatalf("the root was not checked as the module and its format project:\n%v", first)
+	}
+	second := run()
+	for _, engine := range []string{"Go", "Format"} {
+		if section := second[engine]; !strings.HasPrefix(section, "cached: ") {
+			test.Errorf("the %s project ran again rather than replaying:\n%s", engine, section)
+		}
+	}
+}
+
 // TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory: a go.work root checked out as a git worktree, whose record
 // names the index in the main repository's git directory, the file its gitlinks are read from. A file created
 // beside that index, as every git command in the worktree creates a lock file there, leaves the next run a replay,
@@ -835,7 +898,7 @@ func TestAGoWorkspaceInAWorktreeReplaysOverItsGitDirectory(test *testing.T) {
 		"module/go.mod":       "module example.com/worked\n\ngo 1.27\n",
 		"module/go.sum":       "",
 		"module/a.go":         goReplaySource("worked", "Greet"),
-		"CohereSettings.json": `{"go":{"rules":{}}}`,
+		"CohereSettings.json": goReplaySettings,
 	})
 	git(main, "init", "--quiet")
 	git(main, "add", "-A")

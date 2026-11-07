@@ -18,7 +18,5 @@
         "file": "pages/_document.tsx",
         "source": "import Head from ;\n"
     },
-    "assertedMessageIds": [
-        "noHeadImportInDocument"
-    ]
+    "assertedMessageIds": ["noHeadImportInDocument"]
 }

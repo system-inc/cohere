@@ -280,6 +280,16 @@ func resolveChain(path string) (Resolution, error) {
 	return resolution, nil
 }
 
+// HouseOptions are the house format's options, what zero config formats with, for a program that writes files a
+// format check reads and has no directory of its own to resolve them from: a generator (see native.FormatHouse).
+func HouseOptions() (Options, error) {
+	resolution, houseResolutionError := houseResolution()
+	if houseResolutionError != nil {
+		return Options{}, houseResolutionError
+	}
+	return resolution.Options, nil
+}
+
 // houseResolution is the house format and ignore list, from the block cohere:typescript carries: what
 // zero config formats with. It names no Source, since no settings file chose it.
 func houseResolution() (Resolution, error) {

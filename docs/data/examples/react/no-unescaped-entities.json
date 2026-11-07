@@ -19,9 +19,6 @@
         "file": "component.tsx",
         "source": "const a = `it's here`;"
     },
-    "assertedMessageIds": [
-        "unescapedEntity",
-        "unescapedEntityAlts"
-    ],
+    "assertedMessageIds": ["unescapedEntity", "unescapedEntityAlts"],
     "assertsSuggestion": true
 }

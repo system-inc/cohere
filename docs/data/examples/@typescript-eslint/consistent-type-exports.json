@@ -20,10 +20,6 @@
         "file": "main.ts",
         "source": "import { Type1 } from './consistent-type-exports/index';\nexport { Type1 };"
     },
-    "assertedMessageIds": [
-        "multipleExportsAreTypes",
-        "singleExportIsType",
-        "typeOverValue"
-    ],
+    "assertedMessageIds": ["multipleExportsAreTypes", "singleExportIsType", "typeOverValue"],
     "assertsFix": true
 }

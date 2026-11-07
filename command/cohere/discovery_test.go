@@ -339,3 +339,114 @@ func TestDiscoveryAppliesOnlyToARunThatNamesNoProject(test *testing.T) {
 		test.Error("a run naming a path discovers")
 	}
 }
+
+// A root no TypeScript project holds gets the format project when it holds a file the house formatter handles
+// outside every TypeScript project's directory (#4wjhppw), and the project yields each TypeScript project's
+// directory to that project's own run. Controls, each without it: a TypeScript project at the root, which
+// formats the repository itself; a root whose only such files are inside a TypeScript project below it; one
+// whose only such file the root's ignorePatterns name; and a Go module with nothing for it to format.
+func TestARootNoTypeScriptProjectHoldsGetsTheFormatProject(test *testing.T) {
+	test.Parallel()
+	goModule := map[string]string{"go.mod": "module example.com/root\n", "main.go": "package main\n"}
+	withFiles := func(files map[string]string) map[string]string {
+		tree := map[string]string{}
+		for path, contents := range goModule {
+			tree[path] = contents
+		}
+		for path, contents := range files {
+			tree[path] = contents
+		}
+		return tree
+	}
+	for name, testCase := range map[string]struct {
+		files         map[string]string
+		ignore        []string
+		wantFormat    bool
+		wantYieldFrom []string
+	}{
+		"a README beside the module": {
+			files:      withFiles(map[string]string{"README.md": "# root\n"}),
+			wantFormat: true,
+		},
+		"a policy file below the module, and a web app": {
+			files: withFiles(map[string]string{
+				"policy/Words.json":    "[]\n",
+				"web/tsconfig.json":    discoveryTsconfig,
+				"web/source/a.ts":      "export const a = 1;\n",
+				"web/package.json":     "{}\n",
+				"web/source/README.md": "# web\n",
+			}),
+			wantFormat:    true,
+			wantYieldFrom: []string{"web"},
+		},
+		"a TypeScript project at the root": {
+			files: withFiles(map[string]string{"tsconfig.json": discoveryTsconfig, "README.md": "# root\n"}),
+		},
+		"Markdown only inside a TypeScript project": {
+			files: withFiles(map[string]string{"web/tsconfig.json": discoveryTsconfig, "web/README.md": "# web\n"}),
+		},
+		"Markdown only where the ignorePatterns reach": {
+			files:  withFiles(map[string]string{"vendored/README.md": "# theirs\n"}),
+			ignore: []string{"vendored/**"},
+		},
+		"nothing to format": {
+			files: withFiles(nil),
+		},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			root := newRepository(test, testCase.files)
+			found, discoverProjectsError := discoverProjects(root, testCase.ignore)
+			if discoverProjectsError != nil {
+				test.Fatal(discoverProjectsError)
+			}
+			found.addRootFormatProject()
+			formatProjects := 0
+			for _, project := range found.Projects {
+				if project.Engine == engineFormat {
+					formatProjects++
+					if project.Directory != "." {
+						test.Errorf("the format project is at %q, want the root", project.Directory)
+					}
+				}
+			}
+			if testCase.wantFormat != (formatProjects == 1) || formatProjects > 1 {
+				test.Fatalf("%d format projects among %+v, want one: %v", formatProjects, found.Projects,
+					testCase.wantFormat)
+			}
+			if !testCase.wantFormat {
+				return
+			}
+			rootProjects := []discoveredProject{}
+			for _, project := range found.Projects {
+				if project.Directory == "." {
+					rootProjects = append(rootProjects, project)
+				}
+			}
+			if last := rootProjects[len(rootProjects)-1]; last.Engine != engineFormat {
+				test.Errorf("the format project sorts before %+v, want it last of the root's", last)
+			}
+			wantYield := projectYield{}
+			for _, directory := range testCase.wantYieldFrom {
+				wantYield.Directories = append(wantYield.Directories, filepath.Join(root, directory))
+			}
+			if yield := found.formatYield(); !reflect.DeepEqual(yield, wantYield) {
+				test.Errorf("the format project yields %+v, want %+v", yield, wantYield)
+			}
+		})
+	}
+}
+
+// The summary line counts the format project after every engine with a marker.
+func TestSummaryLineCountsTheFormatProject(test *testing.T) {
+	test.Parallel()
+	runs := []projectRun{
+		{project: discoveredProject{Directory: ".", Engine: engineGo}},
+		{project: discoveredProject{Directory: ".", Engine: engineFormat}, exitCode: 1},
+		{project: discoveredProject{Directory: "swift", Engine: engineSwift}},
+	}
+	line := summaryLine(discovery{}, runs)
+	if want := "projects: 3 checked (1 Swift, 1 Go, 1 Format), 1 failed"; !strings.HasPrefix(line, want) {
+		test.Errorf("summary %q, want it to start %q", line, want)
+	}
+}

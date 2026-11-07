@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-inferrable-types`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **203** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **203**              |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | yes                  |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -76,4 +76,3 @@ Registered so it compiles in and appears in `cohere --rules`; deliberately not e
 enabling it means accepting 204 findings' worth of cleanup, and that is a decision about this
 codebase rather than a porting step. The audit's **No** above is a judgment about that cleanup cost
 and it is untouched; what has changed is only that the rule now exists to be turned on.
-

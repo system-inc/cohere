@@ -1,12 +1,12 @@
 # `no-inline-comments`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | **3976** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **Strong No** |
+| Violations in ahra     | **3976**      |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ Stylistic and enormous: the volume says the codebase has a different convention,
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

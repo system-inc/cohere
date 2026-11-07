@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-nullish-coalescing`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **64** with every check on; none under the house sets' interim options |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no (a suggestion on every finding) |
-| Needs type information | yes |
+|                        |                                                                        |
+| ---------------------- | ---------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**                                                                |
+| Violations in ahra     | **64** with every check on; none under the house sets' interim options |
+| Plugin                 | `@typescript-eslint`                                                   |
+| Auto-fixable           | no (a suggestion on every finding)                                     |
+| Needs type information | yes                                                                    |
 
 ## What it checks
 
@@ -63,10 +63,10 @@ Measured with both options off, against ESLint with typescript-eslint 8.67.0 on 
 by file, line and column:
 
 | Tree | Ternary | `if` | Agreement with ESLint |
-|---|---|---|---|
-| ahra | 55 | 9 | 64 of 64 |
-| www | 33 | 5 | 38 of 38 |
-| api | 21 | 1 | 22 of 22 |
+| ---- | ------- | ---- | --------------------- |
+| ahra | 55      | 9    | 64 of 64              |
+| www  | 33      | 5    | 38 of 38              |
+| api  | 21      | 1    | 22 of 22              |
 
 ## Violations
 

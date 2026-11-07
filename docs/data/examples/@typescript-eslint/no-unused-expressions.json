@@ -18,7 +18,5 @@
         "file": "/repository/source/UnusedExpressions.tsx",
         "source": "{}"
     },
-    "assertedMessageIds": [
-        "unusedExpression"
-    ]
+    "assertedMessageIds": ["unusedExpression"]
 }

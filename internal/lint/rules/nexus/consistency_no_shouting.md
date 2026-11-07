@@ -1,12 +1,12 @@
 # `nexus/consistency-no-shouting`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at error |
-| Findings in ahra | 37 on the morning of 2026-10-01 (32 true, 5 acronyms misread); 7 after the site sweep and the safe-list additions, all true; 0 that evening, the last one a wrapped quote now masked |
-| Plugin | Nexus house rule, ported from `nexus/code-quality/lint/rules/ConsistencyNoShoutingRule.ts` and `nexus/source/text/Shouting.ts` |
-| Auto-fixable | no, deliberately (the repair is a reason, which a rule cannot write) |
-| Needs type information | no |
+|                        |                                                                                                                                                                                      |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Recommendation**     | **Yes**, at error                                                                                                                                                                    |
+| Findings in ahra       | 37 on the morning of 2026-10-01 (32 true, 5 acronyms misread); 7 after the site sweep and the safe-list additions, all true; 0 that evening, the last one a wrapped quote now masked |
+| Plugin                 | Nexus house rule, ported from `nexus/code-quality/lint/rules/ConsistencyNoShoutingRule.ts` and `nexus/source/text/Shouting.ts`                                                       |
+| Auto-fixable           | no, deliberately (the repair is a reason, which a rule cannot write)                                                                                                                 |
+| Needs type information | no                                                                                                                                                                                   |
 
 ## What it checks
 

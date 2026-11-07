@@ -1,13 +1,13 @@
 # `nexus/correctness-no-identical-branches`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes**, at `error` once ahra's 9 findings are fixed. Registered `off` in ahra until then, because the Kling pair needs its owner's call (`#d5ryqgk`) |
-| Findings | **ahra 9, www-phi-health 4, www-connected-app 4** (measured 2026-10-02; the Structure pair is shared by phi and connected) |
-| Measured precision | 17 of 17 true: in every finding the condition chooses nothing |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
-| Needs type information | yes, for the narrowing guard; without a checker the rule registers nothing |
+|                        |                                                                                                                                                       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes**, at `error` once ahra's 9 findings are fixed. Registered `off` in ahra until then, because the Kling pair needs its owner's call (`#d5ryqgk`) |
+| Findings               | **ahra 9, www-phi-health 4, www-connected-app 4** (measured 2026-10-02; the Structure pair is shared by phi and connected)                            |
+| Measured precision     | 17 of 17 true: in every finding the condition chooses nothing                                                                                         |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                |
+| Auto-fixable           | no                                                                                                                                                    |
+| Needs type information | yes, for the narrowing guard; without a checker the rule registers nothing                                                                            |
 
 ## What it checks
 
@@ -26,15 +26,15 @@ new-rules sweep (`#tevhg3f`), built as `#052jffy`.
 
 **ahra (9)**
 
-| Site | Shape | Reading |
-|---|---|---|
-| `modules/kling/KlingApi.ts:156`, `:187` | `highQuality ? 'pro' : 'pro'` | **Bug.** The flag is ignored; the false side was meant to be `'std'` (`#d5ryqgk`) |
-| `modules/meta/MetaMessagingApi.ts:52`, `:142` | `appKey === 'instagramApp' ? '/me/conversations' : '/me/conversations'` (and `/me/messages`) | Dead condition, possibly a bug: the Instagram branch may have been meant to differ |
-| `modules/midjourney/MidjourneyApi.ts:590` | `.includes('.mp4') ? 'mp4' : 'mp4'` | Dead condition |
-| `app/(os-layout)/finance/_components/FinanceChart.tsx:134` | `left: horizontal ? 8 : 8` | Dead condition |
-| `modules/facets/FacetsWeeklies.ts:410` | `if(isCurrentWeek) { ... } else { ... }`, six identical lines each | Dead condition |
-| `libraries/structure/code-quality/lint/rules/NetworkRequireHookOptionsParameterRule.ts:92` | the last three arms of an `else if` chain all set index 2, `'third'` | Two conditions ignored; reported from the first of the three |
-| `libraries/structure/libraries/nexus/code-quality/lint/rules/ImportRequirePathAliasRule.ts:158` | `node.type === ImportDeclaration ? node.source : node.source` | Dead condition; merging compiles (a fixture) |
+| Site                                                                                            | Shape                                                                                        | Reading                                                                            |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `modules/kling/KlingApi.ts:156`, `:187`                                                         | `highQuality ? 'pro' : 'pro'`                                                                | **Bug.** The flag is ignored; the false side was meant to be `'std'` (`#d5ryqgk`)  |
+| `modules/meta/MetaMessagingApi.ts:52`, `:142`                                                   | `appKey === 'instagramApp' ? '/me/conversations' : '/me/conversations'` (and `/me/messages`) | Dead condition, possibly a bug: the Instagram branch may have been meant to differ |
+| `modules/midjourney/MidjourneyApi.ts:590`                                                       | `.includes('.mp4') ? 'mp4' : 'mp4'`                                                          | Dead condition                                                                     |
+| `app/(os-layout)/finance/_components/FinanceChart.tsx:134`                                      | `left: horizontal ? 8 : 8`                                                                   | Dead condition                                                                     |
+| `modules/facets/FacetsWeeklies.ts:410`                                                          | `if(isCurrentWeek) { ... } else { ... }`, six identical lines each                           | Dead condition                                                                     |
+| `libraries/structure/code-quality/lint/rules/NetworkRequireHookOptionsParameterRule.ts:92`      | the last three arms of an `else if` chain all set index 2, `'third'`                         | Two conditions ignored; reported from the first of the three                       |
+| `libraries/structure/libraries/nexus/code-quality/lint/rules/ImportRequirePathAliasRule.ts:158` | `node.type === ImportDeclaration ? node.source : node.source`                                | Dead condition; merging compiles (a fixture)                                       |
 
 **www-phi-health (4)**: `HealthTimelineFormatters.ts:123` and `:202`, `Number.isInteger(count) ?
 count.toString() : count.toString()`, which may have meant a fixed precision on the false side; plus the

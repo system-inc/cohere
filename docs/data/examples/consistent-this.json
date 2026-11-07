@@ -18,8 +18,5 @@
         "file": "/repository/source/ConsistentThis.ts",
         "source": "var that = this"
     },
-    "assertedMessageIds": [
-        "aliasNotAssignedToThis",
-        "unexpectedAlias"
-    ]
+    "assertedMessageIds": ["aliasNotAssignedToThis", "unexpectedAlias"]
 }

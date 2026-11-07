@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/system-inc/cohere/internal/format/native"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/types/program"
 )
@@ -120,6 +121,11 @@ type discovery struct {
 	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package or Xcode
 	// project holds, which no run checks, in path order.
 	UnclaimedSwift []unclaimedSwiftDirectory
+
+	// Formattable counts the files the house formatter handles in each directory that holds any, by directory
+	// relative to Root, for addRootFormatProject to know whether a root no TypeScript project holds has
+	// anything to format. Counted from the listings the walk already read, as the Swift files are.
+	Formattable map[string]int
 
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
@@ -236,7 +242,7 @@ func repositoryKind(directory string) nestedRepository {
 // discoverProjects walks root and returns every project it finds. ignorePatterns are the root's, as lint
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
-	found := discovery{Root: root, Listings: program.NewDirectoryListings()}
+	found := discovery{Root: root, Listings: program.NewDirectoryListings(), Formattable: map[string]int{}}
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
@@ -330,8 +336,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		// file .gitignore or the root's ignorePatterns match is no more expected checked than an ignored
 		// directory is.
 		swiftFileCount := 0
+		formattableCount := 0
 		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".swift") {
+			isSwift := strings.HasSuffix(entry.Name(), ".swift")
+			isFormattable := formattableExtensions[strings.ToLower(path.Ext(entry.Name()))]
+			if entry.IsDir() || (!isSwift && !isFormattable) {
 				continue
 			}
 			filePath := path.Join(relative, entry.Name())
@@ -339,11 +348,18 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				configuration.MatchAny(ignorePatterns, filePath) {
 				continue
 			}
-			swiftFileCount++
+			if isSwift {
+				swiftFileCount++
+			} else {
+				formattableCount++
+			}
 		}
 		lock.Lock()
 		if swiftFileCount > 0 {
 			swiftFiles[relative] = swiftFileCount
+		}
+		if formattableCount > 0 {
+			found.Formattable[relative] = formattableCount
 		}
 		// A go.work found here makes the directory's go.mod part of its project rather than one of its own.
 		workspaceHere := false
@@ -610,7 +626,7 @@ func nearestSwiftMarker(
 	}
 }
 
-// sortProjects puts parents before children, TypeScript, then Swift, then Go in one directory, and a
+// sortProjects puts parents before children, TypeScript, then Swift, then Go, then Format in one directory, and a
 // directory's tsconfig.json before its other tsconfigs, whatever order the reads finished in, so the report
 // reads the same on every run.
 func (found *discovery) sortProjects() {
@@ -636,8 +652,10 @@ func engineRank(engine projectEngine) int {
 		return 1
 	case engineGo:
 		return 2
-	default:
+	case engineFormat:
 		return 3
+	default:
+		return 4
 	}
 }
 
@@ -749,6 +767,69 @@ func (found discovery) notes() []string {
 	}
 	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
 	return lines
+}
+
+// formattableExtensions are the file types the house formatter handles, the native printers', as discovery's
+// count of them reads them.
+var formattableExtensions = func() map[string]bool {
+	extensions := map[string]bool{}
+	for _, extension := range native.Extensions() {
+		extensions[strings.ToLower(extension)] = true
+	}
+	return extensions
+}()
+
+// addRootFormatProject adds the format project at the root when no TypeScript project runs there and the
+// root holds files the house formatter handles outside every TypeScript project's directory (#4wjhppw).
+//
+// A TypeScript project at the root formats every such file in the repository, its JSON and Markdown among
+// them, from its own walk of the disk. A repository whose root is a Go workspace or a Swift package had
+// nothing that did: gofmt and the Swift engine format their own languages, and cohere's own policy/ JSON,
+// read by every engine, landed misformatted and green. So the root gets a project of its own, the format
+// phase alone over the same walk, leaving each TypeScript project's directory below it to that project's run.
+//
+// Not a marker, such as a CohereSettings.json without a tsconfig: a project nobody declares needs no file
+// every repository would then have to carry, and covers a repository that never added one.
+//
+// Mutates: found the caller runs the projects found holds, so the format project joins them here
+func (found *discovery) addRootFormatProject() {
+	typeScriptDirectories := []string{}
+	for _, project := range found.Projects {
+		if project.Engine != engineTypeScript {
+			continue
+		}
+		if project.Directory == "." {
+			return
+		}
+		typeScriptDirectories = append(typeScriptDirectories, project.Directory)
+	}
+	for directory := range found.Formattable {
+		formattedElsewhere := false
+		for _, typeScriptDirectory := range typeScriptDirectories {
+			if directory == typeScriptDirectory || isBelow(directory, typeScriptDirectory) {
+				formattedElsewhere = true
+				break
+			}
+		}
+		if !formattedElsewhere {
+			found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineFormat})
+			found.sortProjects()
+			return
+		}
+	}
+}
+
+// formatYield is what the format project's run leaves to others: the directory of every running TypeScript
+// project, absolute, whose own run formats it, so two runs never write one file.
+func (found discovery) formatYield() projectYield {
+	yield := projectYield{}
+	for _, other := range found.Projects {
+		if other.Engine == engineTypeScript {
+			yield.Directories = append(yield.Directories, filepath.Join(found.Root, filepath.FromSlash(other.Directory)))
+		}
+	}
+	sort.Strings(yield.Directories)
+	return yield
 }
 
 // swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift

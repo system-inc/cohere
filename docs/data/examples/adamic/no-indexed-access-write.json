@@ -18,7 +18,5 @@
         "file": "Case.ts",
         "source": "function make<T extends { readonly value: number }>(source: T): { readonly value: T['value'] } { return source; }\n"
     },
-    "assertedMessageIds": [
-        "indexedAccessWrite"
-    ]
+    "assertedMessageIds": ["indexedAccessWrite"]
 }

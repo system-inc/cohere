@@ -43,7 +43,7 @@ import * as NodePath from 'node:path';
 const [, , packageRootArgument, corpusRootRaw, themeEntryRaw] = process.argv;
 const corpusRootArgument = corpusRootRaw || null;
 const themeEntryArgument = themeEntryRaw || null;
-if (!packageRootArgument) {
+if(!packageRootArgument) {
     process.stderr.write('usage: enumerate.mjs <tailwindcss package root> [corpus root] [theme entry css]\n');
     process.exit(2);
 }
@@ -51,9 +51,7 @@ if (!packageRootArgument) {
 const packageRoot = NodePath.resolve(packageRootArgument);
 const packageJson = JSON.parse(NodeFileSystem.readFileSync(NodePath.join(packageRoot, 'package.json'), 'utf8'));
 
-const { __unstable__loadDesignSystem } = await import(
-    NodePath.join(packageRoot, 'dist', 'lib.mjs')
-);
+const { __unstable__loadDesignSystem } = await import(NodePath.join(packageRoot, 'dist', 'lib.mjs'));
 
 /*
  * Load the design system. When a repository theme entry point is named, that file is the entry and
@@ -61,27 +59,28 @@ const { __unstable__loadDesignSystem } = await import(
  * exit criterion asks for the real repository, not for framework defaults.
  */
 const themeEntry = themeEntryArgument ? NodePath.resolve(themeEntryArgument) : null;
-const entrySource = themeEntry
-    ? NodeFileSystem.readFileSync(themeEntry, 'utf8')
-    : '@import "tailwindcss";';
+const entrySource = themeEntry ? NodeFileSystem.readFileSync(themeEntry, 'utf8') : '@import "tailwindcss";';
 const entryBase = themeEntry ? NodePath.dirname(themeEntry) : packageRoot;
 
 async function loadStylesheet(id, base) {
-    if (id === 'tailwindcss') {
-        return { base: packageRoot, content: NodeFileSystem.readFileSync(NodePath.join(packageRoot, 'index.css'), 'utf8') };
+    if(id === 'tailwindcss') {
+        return {
+            base: packageRoot,
+            content: NodeFileSystem.readFileSync(NodePath.join(packageRoot, 'index.css'), 'utf8'),
+        };
     }
-    if (id.startsWith('tailwindcss/')) {
+    if(id.startsWith('tailwindcss/')) {
         const relative = id.slice('tailwindcss/'.length);
-        for (const candidate of [relative, `${relative}.css`]) {
+        for(const candidate of [relative, `${relative}.css`]) {
             const full = NodePath.join(packageRoot, candidate);
-            if (NodeFileSystem.existsSync(full)) {
+            if(NodeFileSystem.existsSync(full)) {
                 return { base: NodePath.dirname(full), content: NodeFileSystem.readFileSync(full, 'utf8') };
             }
         }
     }
     const resolved = NodePath.resolve(base, id);
-    for (const candidate of [resolved, `${resolved}.css`]) {
-        if (NodeFileSystem.existsSync(candidate)) {
+    for(const candidate of [resolved, `${resolved}.css`]) {
+        if(NodeFileSystem.existsSync(candidate)) {
             return { base: NodePath.dirname(candidate), content: NodeFileSystem.readFileSync(candidate, 'utf8') };
         }
     }
@@ -104,10 +103,14 @@ const designSystem = await __unstable__loadDesignSystem(entrySource, {
     const probe = [...designSystem.parseCandidate('border-b')];
     const shapedRight =
         probe.length === 2 &&
-        probe[0].kind === 'functional' && probe[0].root === 'border-b' && probe[0].value === null &&
-        probe[1].kind === 'functional' && probe[1].root === 'border' &&
-        probe[1].value?.kind === 'named' && probe[1].value.value === 'b';
-    if (!shapedRight) {
+        probe[0].kind === 'functional' &&
+        probe[0].root === 'border-b' &&
+        probe[0].value === null &&
+        probe[1].kind === 'functional' &&
+        probe[1].root === 'border' &&
+        probe[1].value?.kind === 'named' &&
+        probe[1].value.value === 'b';
+    if(!shapedRight) {
         process.stderr.write(
             'parseCandidate did not produce the known two-candidate reading for `border-b`; ' +
                 'the export was located but is not the parser this fixture describes\n',
@@ -121,12 +124,12 @@ const designSystem = await __unstable__loadDesignSystem(entrySource, {
  * questions the engine answered without reimplementing the theme.
  */
 const utilityRoots = {};
-for (const [root, entries] of designSystem.utilities.utilities) {
+for(const [root, entries] of designSystem.utilities.utilities) {
     utilityRoots[root] = [...new Set(entries.map((entry) => entry.kind))].sort();
 }
 
 const variantRoots = {};
-for (const [root, info] of designSystem.variants.variants) {
+for(const [root, info] of designSystem.variants.variants) {
     variantRoots[root] = { kind: info.kind, compounds: info.compounds, compoundsWith: info.compoundsWith };
 }
 
@@ -139,12 +142,27 @@ for (const [root, info] of designSystem.variants.variants) {
 const compoundsForSelectorsProbes = [];
 {
     const selectors = [
-        '&:hover', '&:is(p)', '&::before', '&::after', '& p', '> img', '+ p', '~ p',
-        '@media(width>=100px)', '@supports(display:grid)', '@container(width>=100px)',
-        '@layer foo', '@page', '&:has(p)', '&:not(:hover)', 'p', '&', '&:hover::before',
+        '&:hover',
+        '&:is(p)',
+        '&::before',
+        '&::after',
+        '& p',
+        '> img',
+        '+ p',
+        '~ p',
+        '@media(width>=100px)',
+        '@supports(display:grid)',
+        '@container(width>=100px)',
+        '@layer foo',
+        '@page',
+        '&:has(p)',
+        '&:not(:hover)',
+        'p',
+        '&',
+        '&:hover::before',
     ];
-    for (const parent of ['not', 'group', 'peer', 'has', 'in']) {
-        for (const selector of selectors) {
+    for(const parent of ['not', 'group', 'peer', 'has', 'in']) {
+        for(const selector of selectors) {
             compoundsForSelectorsProbes.push({
                 parent,
                 selector,
@@ -159,12 +177,12 @@ const compoundsForSelectorsProbes = [];
 }
 
 function serializeModifier(modifier) {
-    if (modifier === null || modifier === undefined) return null;
+    if(modifier === null || modifier === undefined) return null;
     return { kind: modifier.kind, value: modifier.value };
 }
 
 function serializeVariant(variant) {
-    switch (variant.kind) {
+    switch(variant.kind) {
         case 'arbitrary':
             return { kind: 'arbitrary', selector: variant.selector, relative: Boolean(variant.relative) };
         case 'static':
@@ -194,7 +212,7 @@ function serializeCandidate(candidate) {
         important: candidate.important,
         raw: candidate.raw,
     };
-    switch (candidate.kind) {
+    switch(candidate.kind) {
         case 'arbitrary':
             return {
                 kind: 'arbitrary',
@@ -211,7 +229,11 @@ function serializeCandidate(candidate) {
                 root: candidate.root,
                 value: candidate.value
                     ? candidate.value.kind === 'arbitrary'
-                        ? { kind: 'arbitrary', dataType: candidate.value.dataType ?? null, value: candidate.value.value }
+                        ? {
+                              kind: 'arbitrary',
+                              dataType: candidate.value.dataType ?? null,
+                              value: candidate.value.value,
+                          }
                         : { kind: 'named', value: candidate.value.value, fraction: candidate.value.fraction ?? null }
                     : null,
                 modifier: serializeModifier(candidate.modifier),
@@ -229,91 +251,246 @@ function serializeCandidate(candidate) {
  */
 const syntheticClasses = [
     // Empty and degenerate.
-    '', '-', '--', '!', '!!', ':', '::', 'a:', ':a', '/', 'x/', '/x',
+    '',
+    '-',
+    '--',
+    '!',
+    '!!',
+    ':',
+    '::',
+    'a:',
+    ':a',
+    '/',
+    'x/',
+    '/x',
 
     // Static.
-    'underline', 'flex', 'sr-only', 'box-border', 'italic', 'truncate',
-    'nonexistent-utility', 'group', 'peer',
+    'underline',
+    'flex',
+    'sr-only',
+    'box-border',
+    'italic',
+    'truncate',
+    'nonexistent-utility',
+    'group',
+    'peer',
 
     // Functional, named values.
-    'bg-red-500', 'text-sm', 'p-4', 'm-0', 'w-full', 'z-10', 'gap-x-4',
-    'bg-', 'bg--', 'p-', 'w-1/2', 'w-1/2/3', 'aspect-16/9', 'basis-1/3',
+    'bg-red-500',
+    'text-sm',
+    'p-4',
+    'm-0',
+    'w-full',
+    'z-10',
+    'gap-x-4',
+    'bg-',
+    'bg--',
+    'p-',
+    'w-1/2',
+    'w-1/2/3',
+    'aspect-16/9',
+    'basis-1/3',
 
     // The ambiguity that decides this port. Every one of these yields more than one candidate and
     // the order is what picks the winner.
-    'border-b', 'border-t', 'border-l', 'border-r', 'border-x', 'border-y',
-    'border-2', 'border-b-2', 'border-b-red-500', 'border-black',
-    'text-red-500', 'shadow-lg', 'ring-offset-2', 'ring-2', 'inset-x-0',
-    'outline-offset-2', 'divide-x-2', 'scroll-m-4', 'space-x-4',
-    'grid-cols-3', 'translate-x-4', 'bg-linear-to-r', 'font-bold',
+    'border-b',
+    'border-t',
+    'border-l',
+    'border-r',
+    'border-x',
+    'border-y',
+    'border-2',
+    'border-b-2',
+    'border-b-red-500',
+    'border-black',
+    'text-red-500',
+    'shadow-lg',
+    'ring-offset-2',
+    'ring-2',
+    'inset-x-0',
+    'outline-offset-2',
+    'divide-x-2',
+    'scroll-m-4',
+    'space-x-4',
+    'grid-cols-3',
+    'translate-x-4',
+    'bg-linear-to-r',
+    'font-bold',
 
     // Arbitrary values.
-    'bg-[#0088cc]', 'bg-[color:var(--my-color)]', 'p-[10px]', 'w-[calc(100%-1rem)]',
-    'bg-[]', 'bg-[ ]', 'p-[]', 'bg-[:red]', 'bg-[color:]', 'text-[12px]/[1.5]',
-    'bg-[url(a_b.png)]', 'content-[\'hello_world\']', 'bg-[#0088cc]/50',
-    'grid-cols-[1fr_2fr]', 'shadow-[0_0_0_1px_red]', 'bg-[rgb(0,0,0)]',
-    'w-[calc(1px+2px)]', 'w-[calc(1px_+_2px)]', 'm-[-10px]',
-    'bg-[var(--a,var(--b))]', 'bg-[semicolon;bad]', 'bg-[curly}bad]',
-    'bg-[unbalanced(]', 'bg-[unbalanced)]', 'nonexistent-[10px]',
+    'bg-[#0088cc]',
+    'bg-[color:var(--my-color)]',
+    'p-[10px]',
+    'w-[calc(100%-1rem)]',
+    'bg-[]',
+    'bg-[ ]',
+    'p-[]',
+    'bg-[:red]',
+    'bg-[color:]',
+    'text-[12px]/[1.5]',
+    'bg-[url(a_b.png)]',
+    "content-['hello_world']",
+    'bg-[#0088cc]/50',
+    'grid-cols-[1fr_2fr]',
+    'shadow-[0_0_0_1px_red]',
+    'bg-[rgb(0,0,0)]',
+    'w-[calc(1px+2px)]',
+    'w-[calc(1px_+_2px)]',
+    'm-[-10px]',
+    'bg-[var(--a,var(--b))]',
+    'bg-[semicolon;bad]',
+    'bg-[curly}bad]',
+    'bg-[unbalanced(]',
+    'bg-[unbalanced)]',
+    'nonexistent-[10px]',
 
     // Arbitrary values in the `(…)` shorthand.
-    'bg-(--my-var)', 'bg-(color:--my-var)', 'bg-(--my-var)/50', 'bg-()',
-    'bg-(notavar)', 'bg-(color:notavar)', 'bg-(a:b:--c)', 'nonexistent-(--v)',
+    'bg-(--my-var)',
+    'bg-(color:--my-var)',
+    'bg-(--my-var)/50',
+    'bg-()',
+    'bg-(notavar)',
+    'bg-(color:notavar)',
+    'bg-(a:b:--c)',
+    'nonexistent-(--v)',
 
     // Arbitrary properties.
-    '[color:red]', '[color:red]/50', '[color:red]!', '[--my-var:red]',
-    '[-webkit-line-clamp:3]', '[Color:red]', '[0:red]', '[color]', '[:red]',
-    '[color:]', '[]', '[color:red', 'color:red]', '[color:red;bad]',
-    '[background:url(a_b.png)]', '[color:var(--a)]/[0.5]',
+    '[color:red]',
+    '[color:red]/50',
+    '[color:red]!',
+    '[--my-var:red]',
+    '[-webkit-line-clamp:3]',
+    '[Color:red]',
+    '[0:red]',
+    '[color]',
+    '[:red]',
+    '[color:]',
+    '[]',
+    '[color:red',
+    'color:red]',
+    '[color:red;bad]',
+    '[background:url(a_b.png)]',
+    '[color:var(--a)]/[0.5]',
 
     // Modifiers, the third axis with three states.
-    'bg-red-500/50', 'bg-red-500/[0.5]', 'bg-red-500/[var(--a)]', 'bg-red-500/(--a)',
-    'text-sm/none', 'text-sm/6', 'text-sm/[1.5]', 'bg-red-500/50/50',
-    'bg-red-500/', 'bg-red-500/[]', 'bg-red-500/()', 'bg-red-500/(notavar)',
-    'bg-red-500/!', 'text-[12px]/none',
+    'bg-red-500/50',
+    'bg-red-500/[0.5]',
+    'bg-red-500/[var(--a)]',
+    'bg-red-500/(--a)',
+    'text-sm/none',
+    'text-sm/6',
+    'text-sm/[1.5]',
+    'bg-red-500/50/50',
+    'bg-red-500/',
+    'bg-red-500/[]',
+    'bg-red-500/()',
+    'bg-red-500/(notavar)',
+    'bg-red-500/!',
+    'text-[12px]/none',
 
     // Importance, both spellings.
-    'underline!', '!underline', 'bg-red-500!', '!bg-red-500', 'bg-red-500/50!',
-    '!bg-red-500/50', 'underline!!', '!!underline', '!', 'flex!',
+    'underline!',
+    '!underline',
+    'bg-red-500!',
+    '!bg-red-500',
+    'bg-red-500/50!',
+    '!bg-red-500/50',
+    'underline!!',
+    '!!underline',
+    '!',
+    'flex!',
 
     // Variants: static.
-    'hover:underline', 'hover:focus:underline', 'sm:flex', 'dark:bg-black',
-    'first:underline', 'nonexistent:underline', 'hover:hover:underline',
-    'motion-safe:underline', 'print:hidden', 'rtl:text-right',
+    'hover:underline',
+    'hover:focus:underline',
+    'sm:flex',
+    'dark:bg-black',
+    'first:underline',
+    'nonexistent:underline',
+    'hover:hover:underline',
+    'motion-safe:underline',
+    'print:hidden',
+    'rtl:text-right',
 
     // Variants: functional.
-    'aria-disabled:underline', 'aria-[disabled]:underline', 'data-[state=open]:flex',
-    'supports-[display:grid]:flex', 'min-[400px]:flex', 'max-sm:flex',
-    'nth-3:flex', 'nth-[2n+1]:flex', '@container:flex', '@lg:flex', '@max-lg:flex',
-    '@[400px]:flex', '@-lg:flex', '@:flex', 'data-[]:flex', 'data-():flex',
-    'data-(--a):flex', 'aria-(--a):flex', 'supports-(--a):flex',
+    'aria-disabled:underline',
+    'aria-[disabled]:underline',
+    'data-[state=open]:flex',
+    'supports-[display:grid]:flex',
+    'min-[400px]:flex',
+    'max-sm:flex',
+    'nth-3:flex',
+    'nth-[2n+1]:flex',
+    '@container:flex',
+    '@lg:flex',
+    '@max-lg:flex',
+    '@[400px]:flex',
+    '@-lg:flex',
+    '@:flex',
+    'data-[]:flex',
+    'data-():flex',
+    'data-(--a):flex',
+    'aria-(--a):flex',
+    'supports-(--a):flex',
 
     // Variants: compound.
-    'group-hover:underline', 'peer-focus:underline', 'has-[p]:flex',
-    'group-hover/name:underline', 'not-hover:underline', 'in-[p]:flex',
-    'not-group-hover/name:flex', 'has-hover:flex', 'group-[&_p]:flex',
-    'group-hover/foo/bar:flex', 'group-:flex', 'not-:flex', 'has-:flex',
-    'group-nonexistent:flex', 'not-[&::before]:flex', 'has-[&::before]:flex',
-    'group-[&::before]:flex', 'peer-[&_p]:flex', 'not-*:flex', 'has-*:flex',
+    'group-hover:underline',
+    'peer-focus:underline',
+    'has-[p]:flex',
+    'group-hover/name:underline',
+    'not-hover:underline',
+    'in-[p]:flex',
+    'not-group-hover/name:flex',
+    'has-hover:flex',
+    'group-[&_p]:flex',
+    'group-hover/foo/bar:flex',
+    'group-:flex',
+    'not-:flex',
+    'has-:flex',
+    'group-nonexistent:flex',
+    'not-[&::before]:flex',
+    'has-[&::before]:flex',
+    'group-[&::before]:flex',
+    'peer-[&_p]:flex',
+    'not-*:flex',
+    'has-*:flex',
 
     // Variants: arbitrary.
-    '[&_p]:flex', '[p]:flex', '[>_img]:flex', '[+_p]:flex', '[~_p]:flex',
-    '[@media(width>=100px)]:flex', '[@media(width>=100px){&:hover}]:flex',
-    '[]:flex', '[_]:flex', '[&]:flex', '[@supports(display:grid)]:flex',
-    '[&:hover]:[&:focus]:flex', '[&{color:red}]:flex',
+    '[&_p]:flex',
+    '[p]:flex',
+    '[>_img]:flex',
+    '[+_p]:flex',
+    '[~_p]:flex',
+    '[@media(width>=100px)]:flex',
+    '[@media(width>=100px){&:hover}]:flex',
+    '[]:flex',
+    '[_]:flex',
+    '[&]:flex',
+    '[@supports(display:grid)]:flex',
+    '[&:hover]:[&:focus]:flex',
+    '[&{color:red}]:flex',
 
     // Combinations.
-    'hover:bg-red-500/50!', 'dark:hover:bg-[#0088cc]/[0.5]!',
+    'hover:bg-red-500/50!',
+    'dark:hover:bg-[#0088cc]/[0.5]!',
     'group-hover/name:data-[state=open]:bg-red-500/50!',
-    'sm:hover:focus:border-b-2', '!sm:hover:border-b',
-    'hover:[color:red]', 'hover:[color:red]/50!',
+    'sm:hover:focus:border-b-2',
+    '!sm:hover:border-b',
+    'hover:[color:red]',
+    'hover:[color:red]/50!',
 
     // Underscore decoding, which routes through decodeArbitraryValue.
-    'bg-[url(https://example.com/a_b.png)]', 'font-[\'Comic_Sans\']',
-    'content-[a\\_b]', 'bg-[a_b]', 'grid-cols-[repeat(2,_minmax(0,_1fr))]',
+    'bg-[url(https://example.com/a_b.png)]',
+    "font-['Comic_Sans']",
+    'content-[a\\_b]',
+    'bg-[a_b]',
+    'grid-cols-[repeat(2,_minmax(0,_1fr))]',
     'shadow-[inset_0_1px_--theme(--color-white/15%)]',
-    'w-[calc(100%---spacing(2))]', 'bg-[theme(--color-red-500)]',
-    'w-[--spacing(2)]', 'w-[var(--a_b)]', 'w-[var(--a,_1px)]',
+    'w-[calc(100%---spacing(2))]',
+    'bg-[theme(--color-red-500)]',
+    'w-[--spacing(2)]',
+    'w-[var(--a_b)]',
+    'w-[var(--a,_1px)]',
 ];
 
 const cases = [];
@@ -328,16 +505,17 @@ const seen = new Set();
  * ambiguity population, not for its misses.
  */
 function record(name, source, className, dropWhenEmpty = false) {
-    if (seen.has(className)) return;
+    if(seen.has(className)) return;
     seen.add(className);
     let candidates = null;
     let threw = null;
     try {
         candidates = [...designSystem.parseCandidate(className)].map(serializeCandidate);
-    } catch (error) {
+    }
+    catch(error) {
         threw = String(error?.message ?? error);
     }
-    if (dropWhenEmpty && threw === null && candidates.length === 0) return;
+    if(dropWhenEmpty && threw === null && candidates.length === 0) return;
     cases.push({
         name,
         source,
@@ -348,7 +526,7 @@ function record(name, source, className, dropWhenEmpty = false) {
     });
 }
 
-for (const className of syntheticClasses) {
+for(const className of syntheticClasses) {
     record(className === '' ? '<empty>' : className, 'synthetic', className);
 }
 
@@ -357,35 +535,37 @@ for (const className of syntheticClasses) {
  * ambiguity figure in the task body was measured against.
  */
 let corpusScanned = 0;
-if (corpusRootArgument) {
+if(corpusRootArgument) {
     const corpusRoot = NodePath.resolve(corpusRootArgument);
     const distinct = new Set();
 
     function scanDirectory(directory, depth) {
-        if (depth > 10) return;
+        if(depth > 10) return;
         let entries;
         try {
             entries = NodeFileSystem.readdirSync(directory, { withFileTypes: true });
-        } catch {
+        }
+        catch {
             return;
         }
-        for (const entry of entries) {
-            if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+        for(const entry of entries) {
+            if(entry.name.startsWith('.') || entry.name === 'node_modules') continue;
             const fullPath = NodePath.join(directory, entry.name);
-            if (entry.isDirectory()) {
+            if(entry.isDirectory()) {
                 scanDirectory(fullPath, depth + 1);
                 continue;
             }
-            if (!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
+            if(!entry.name.endsWith('.tsx') && !entry.name.endsWith('.ts')) continue;
             let contents;
             try {
                 contents = NodeFileSystem.readFileSync(fullPath, 'utf8');
-            } catch {
+            }
+            catch {
                 continue;
             }
-            for (const match of contents.matchAll(/className="([^"]*)"/g)) {
-                for (const className of match[1].split(/\s+/)) {
-                    if (className.length === 0) continue;
+            for(const match of contents.matchAll(/className="([^"]*)"/g)) {
+                for(const className of match[1].split(/\s+/)) {
+                    if(className.length === 0) continue;
                     corpusScanned++;
                     distinct.add(className);
                 }
@@ -394,7 +574,7 @@ if (corpusRootArgument) {
     }
     scanDirectory(corpusRoot, 0);
 
-    for (const className of [...distinct].sort()) {
+    for(const className of [...distinct].sort()) {
         record(className, 'repository', className);
     }
 }
@@ -418,29 +598,30 @@ if (corpusRootArgument) {
      */
     const staged = [];
     const stagedSeen = new Set();
-    for (const root of roots) {
-        if (root.indexOf('-') === -1) continue;
-        for (const suffix of suffixes) {
+    for(const root of roots) {
+        if(root.indexOf('-') === -1) continue;
+        for(const suffix of suffixes) {
             const className = `${root}-${suffix}`;
-            if (seen.has(className) || stagedSeen.has(className)) continue;
+            if(seen.has(className) || stagedSeen.has(className)) continue;
             stagedSeen.add(className);
             let candidates;
             try {
                 candidates = [...designSystem.parseCandidate(className)].map(serializeCandidate);
-            } catch {
+            }
+            catch {
                 continue;
             }
-            if (candidates.length === 0) continue;
+            if(candidates.length === 0) continue;
             staged.push({ className, candidates });
         }
     }
 
     let unambiguousKept = 0;
-    for (const entry of staged) {
-        if (entry.candidates.length === 1) {
+    for(const entry of staged) {
+        if(entry.candidates.length === 1) {
             // Deterministic sample rather than random, so regenerating produces the same fixture
             // and `-check` means something.
-            if (unambiguousKept % 8 !== 0) {
+            if(unambiguousKept % 8 !== 0) {
                 unambiguousKept++;
                 continue;
             }
@@ -484,36 +665,36 @@ const failures = [];
 const repositoryUtilityMarkers = ['scrollbar-hide', 'prose', 'fade-in', 'slide-in-from-top'];
 const repositoryVariantMarkers = ['sm', 'md', 'lg', 'xl', '2xl'];
 
-if (Object.keys(utilityRoots).length < 500) {
+if(Object.keys(utilityRoots).length < 500) {
     failures.push(`only ${Object.keys(utilityRoots).length} utility roots; even the framework defaults are missing`);
 }
-if (Object.keys(variantRoots).length < 50) {
+if(Object.keys(variantRoots).length < 50) {
     failures.push(`only ${Object.keys(variantRoots).length} variant roots; even the framework defaults are missing`);
 }
-if (themeEntry) {
+if(themeEntry) {
     const missingUtilities = repositoryUtilityMarkers.filter((marker) => !(marker in utilityRoots));
-    if (missingUtilities.length > 0) {
+    if(missingUtilities.length > 0) {
         failures.push(
             `the repository's own @utility roots are absent (${missingUtilities.join(', ')}); ` +
                 'the theme entry point was named but its @import graph did not load, so these tables are framework defaults',
         );
     }
     const missingVariants = repositoryVariantMarkers.filter((marker) => !(marker in variantRoots));
-    if (missingVariants.length > 0) {
+    if(missingVariants.length > 0) {
         failures.push(
             `the repository's own breakpoint variants are absent (${missingVariants.join(', ')}); ` +
                 'the @theme block did not load',
         );
     }
 }
-if (ambiguousCount < 100) {
+if(ambiguousCount < 100) {
     failures.push(`only ${ambiguousCount} ambiguous classes; the ordering claim rests on too few`);
 }
-if (corpusRootArgument && repositoryCases.length < 100) {
+if(corpusRootArgument && repositoryCases.length < 100) {
     failures.push(`only ${repositoryCases.length} repository classes; the corpus scan found the wrong directory`);
 }
-if (failures.length > 0) {
-    for (const failure of failures) process.stderr.write(`${failure}\n`);
+if(failures.length > 0) {
+    for(const failure of failures) process.stderr.write(`${failure}\n`);
     process.exit(4);
 }
 

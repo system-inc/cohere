@@ -18,7 +18,5 @@
         "file": "/repository/source/PrivateMembers.ts",
         "source": "class Foo {}"
     },
-    "assertedMessageIds": [
-        "noUnusedPrivateClassMember"
-    ]
+    "assertedMessageIds": ["noUnusedPrivateClassMember"]
 }

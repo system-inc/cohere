@@ -1,12 +1,12 @@
 # `react/no-array-index-key`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes** |
-| Violations in ahra | **84** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Yes**               |
+| Violations in ahra     | **84**                |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ return <OsKingdomActivityToolUse key={index} part={part} />;
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

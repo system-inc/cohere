@@ -1,12 +1,12 @@
 # `prefer-named-capture-group`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **563** |
-| Plugin | `eslint core` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |               |
+| ---------------------- | ------------- |
+| **Recommendation**     | **No**        |
+| Violations in ahra     | **563**       |
+| Plugin                 | `eslint core` |
+| Auto-fixable           | no            |
+| Needs type information | no            |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ const match = birthDate.match(/(\d{4})?-?(\d{2})-(\d{2})/);
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

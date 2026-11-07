@@ -39,9 +39,9 @@ A perfectly coherent story can be entirely false. Coherence is a relation among 
 nothing about whether they touch reality, which is why a green run over a probe that never fired
 feels exactly like a green run over a clean tree.
 
-Those are two jobs rather than two features of one program. `cohere` answers *is this well-formed
-and in phase*, from the graph alone, which is what lets it be fast enough to leave on. A separate
-`verify` will answer *did it actually do the thing*, which cannot be answered from inside the code
+Those are two jobs rather than two features of one program. `cohere` answers _is this well-formed
+and in phase_, from the graph alone, which is what lets it be fast enough to leave on. A separate
+`verify` will answer _did it actually do the thing_, which cannot be answered from inside the code
 and needs running it and reading what came out. The oracles belong there: the fixture pairs, the
 mutation sweeps, the known-dirty controls, the differential against the gate this replaces. Today
 they live here, in `internal/lint/rules/tools/` and beside the rules they hold.
@@ -525,7 +525,7 @@ results they would read as their own build's.
 Measured, because the answer decides how much this matters. An unsigned binary with no quarantine
 attribute runs normally, and that is what an `npm install` produces — package managers extract
 tarballs without setting `com.apple.quarantine`, so consumers installing from the registry are not
-blocked. The same binary *with* quarantine set is killed by the kernel: exit 137, SIGKILL, and zero
+blocked. The same binary _with_ quarantine set is killed by the kernel: exit 137, SIGKILL, and zero
 bytes on both stdout and stderr.
 
 That silent kill is the reason to sign. It is reached whenever the binary travels as a file rather

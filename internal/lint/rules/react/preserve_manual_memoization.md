@@ -9,19 +9,18 @@ program is covered or that the warning count should be forced to zero.
 An archived binary from cohere `6f04852` reports exactly one occurrence on both
 the frozen source snapshot and the live ahra checkout. The live comparison uses
 `s l no-cache --linter eslint`, which reports zero occurrences of this rule.
-Resolved ESLint configuration on the remaining file enables the rule at severity
-2. The binary SHA256 is
+Resolved ESLint configuration on the remaining file enables the rule at severity 2. The binary SHA256 is
 `932daf0210614b0f996b12b8caef3796968a448d53ed08ec6e0b19f020f5d5e2`.
 
 All comparisons retain diagnostic multiplicity rather than deduplicating
 declaration anchors. The final bounded repairs measure separately:
 
-| Commit | Repair | Before | After | Removed | Added |
-| --- | --- | ---: | ---: | ---: | ---: |
-| `0740825` | Primitive property constraints | 9 | 7 | 2 | 0 |
-| `44d6bf9` | Imperative handle effects | 7 | 6 | 1 | 0 |
-| `04501c3` | Computed read kinds | 6 | 1 | 5 | 0 |
-| `6f04852` | Mixed-capture conditional closure | 1 | 1 | 0 | 0 |
+| Commit    | Repair                            | Before | After | Removed | Added |
+| --------- | --------------------------------- | -----: | ----: | ------: | ----: |
+| `0740825` | Primitive property constraints    |      9 |     7 |       2 |     0 |
+| `44d6bf9` | Imperative handle effects         |      7 |     6 |       1 |     0 |
+| `04501c3` | Computed read kinds               |      6 |     1 |       5 |     0 |
+| `6f04852` | Mixed-capture conditional closure |      1 |     1 |       0 |     0 |
 
 The last repair covers an additional reference-clean reproduction discovered
 during reduction, even though it does not change the live population. The
@@ -43,11 +42,11 @@ The reference's original-source verdict is Suppression: two
 component before preservation validation. That bailout alone did not adjudicate
 the cohere finding. The following controlled interventions do:
 
-| Source | React Compiler 1.0.0 | Cohere |
-| --- | --- | --- |
-| Original | Suppression bailout | 1 finding |
-| Remove only the suppression comments | 1 preservation CompileError | 1 finding |
-| Also replace the memo's empty deps with `[field.value]` | CompileSuccess | 0 findings |
+| Source                                                  | React Compiler 1.0.0        | Cohere     |
+| ------------------------------------------------------- | --------------------------- | ---------- |
+| Original                                                | Suppression bailout         | 1 finding  |
+| Remove only the suppression comments                    | 1 preservation CompileError | 1 finding  |
+| Also replace the memo's empty deps with `[field.value]` | CompileSuccess              | 0 findings |
 
 The preservation error names the missing inferred dependency `field.value.value`.
 No executable source changes in the first intervention. The live and frozen

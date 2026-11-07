@@ -20,8 +20,6 @@
         "file": "/repository/source/NoArrowFunctionLifecycle.tsx",
         "source": "var H = { render: () => <div /> };"
     },
-    "assertedMessageIds": [
-        "lifecycle"
-    ],
+    "assertedMessageIds": ["lifecycle"],
     "assertsFix": true
 }

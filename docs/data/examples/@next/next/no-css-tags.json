@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "export const C = (props) => <link {...props} />;"
     },
-    "assertedMessageIds": [
-        "noCssTags"
-    ]
+    "assertedMessageIds": ["noCssTags"]
 }

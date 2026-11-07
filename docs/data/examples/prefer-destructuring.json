@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferDestructuring.ts",
         "source": "var foo;"
     },
-    "assertedMessageIds": [
-        "preferDestructuring"
-    ],
+    "assertedMessageIds": ["preferDestructuring"],
     "assertsFix": true
 }

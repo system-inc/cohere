@@ -18,9 +18,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-explicit-any",
@@ -178,12 +176,8 @@
     },
     {
         "name": "cohere:next",
-        "extends": [
-            "cohere:typescript"
-        ],
-        "plugins": [
-            "@next"
-        ],
+        "extends": ["cohere:typescript"],
+        "plugins": ["@next"],
         "rulesOn": 305,
         "rules": [
             {
@@ -364,9 +358,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -1582,16 +1574,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -1706,9 +1694,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -1719,10 +1705,7 @@
             },
             {
                 "definedIn": "cohere:next",
-                "files": [
-                    "**/*.test.*",
-                    "**/eslint.config.*"
-                ],
+                "files": ["**/*.test.*", "**/eslint.config.*"],
                 "reason": "A test file or an ESLint config is run by Node or the test runner directly and never bundled, so a module-scope import.meta path is correct there (#ay7a8vx).",
                 "rules": [
                     {
@@ -1735,13 +1718,8 @@
     },
     {
         "name": "cohere:react",
-        "extends": [
-            "cohere:typescript"
-        ],
-        "plugins": [
-            "react",
-            "react-hooks"
-        ],
+        "extends": ["cohere:typescript"],
+        "plugins": ["react", "react-hooks"],
         "rulesOn": 370,
         "rules": [
             {
@@ -1834,9 +1812,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -3048,16 +3024,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -3532,9 +3504,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -4195,16 +4165,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -4291,9 +4257,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -4306,9 +4270,7 @@
     },
     {
         "name": "cohere:system-inc/base",
-        "extends": [
-            "cohere:typescript"
-        ],
+        "extends": ["cohere:typescript"],
         "rulesOn": 294,
         "rules": [
             {
@@ -4489,9 +4451,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -4965,10 +4925,7 @@
                         "requirements": [
                             {
                                 "contextKey": "AccountRequestContextKey",
-                                "requiresAny": [
-                                    "RequireSessionAccess",
-                                    "WithSessionAccess"
-                                ]
+                                "requiresAny": ["RequireSessionAccess", "WithSessionAccess"]
                             },
                             {
                                 "contextKey": "AuthenticationRequestContextKey",
@@ -4980,11 +4937,7 @@
                             },
                             {
                                 "contextKey": "DeviceIdRequestContextKey",
-                                "requiresAny": [
-                                    "RequireDeviceId",
-                                    "RequireSessionAccess",
-                                    "WithSessionAccess"
-                                ]
+                                "requiresAny": ["RequireDeviceId", "RequireSessionAccess", "WithSessionAccess"]
                             }
                         ]
                     }
@@ -5889,16 +5842,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -6081,9 +6030,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -6094,9 +6041,7 @@
             },
             {
                 "definedIn": "cohere:system-inc/base",
-                "files": [
-                    "**/*.cjs"
-                ],
+                "files": ["**/*.cjs"],
                 "reason": "CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use.",
                 "rules": [
                     {
@@ -6107,10 +6052,7 @@
             },
             {
                 "definedIn": "cohere:system-inc/base",
-                "files": [
-                    "**/*.test.ts",
-                    "**/*.test.a"
-                ],
+                "files": ["**/*.test.ts", "**/*.test.a"],
                 "reason": "A test declares ORM entities that relate to each other through relation thunks (() => OtherEntity), so each names a class the other declares later and no order removes the cycle. A thunk runs only after both classes exist. ESLint reports these and cohere does not, so both engines take classes: false here, scoped to test files, and agree (#yfkhkvy).",
                 "rules": [
                     {
@@ -6128,12 +6070,8 @@
     },
     {
         "name": "cohere:system-inc/structure",
-        "extends": [
-            "cohere:typescript"
-        ],
-        "plugins": [
-            "@typescript-eslint"
-        ],
+        "extends": ["cohere:typescript"],
+        "plugins": ["@typescript-eslint"],
         "rulesOn": 303,
         "rules": [
             {
@@ -6226,9 +6164,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -6832,18 +6768,13 @@
                             "/layout.jsx",
                             "/route.ts"
                         ],
-                        "frameworkConstantFilePatterns": [
-                            "/middleware.ts",
-                            "middleware.ts"
-                        ],
+                        "frameworkConstantFilePatterns": ["/middleware.ts", "middleware.ts"],
                         "frameworkParameterScopeNames": [
                             "generateMetadata",
                             "generateStaticParams",
                             "generateViewport"
                         ],
-                        "frameworkParameterScopeSuffixes": [
-                            "PageRoute"
-                        ]
+                        "frameworkParameterScopeSuffixes": ["PageRoute"]
                     }
                 ]
             },
@@ -7597,16 +7528,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -7817,9 +7744,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -7830,9 +7755,7 @@
             },
             {
                 "definedIn": "cohere:system-inc/structure",
-                "files": [
-                    "**/graphql/GraphQl*.generated.ts"
-                ],
+                "files": ["**/graphql/GraphQl*.generated.ts"],
                 "reason": "Interim, until the last open decision on the generated-code ruling (#c076xbg) lands: the GraphQL schema itself names fields like min, max and idx, a wire change waiting on Kirk because the Phi mobile app may read them. When it lands, this override is deleted.",
                 "rules": [
                     {
@@ -7843,9 +7766,7 @@
             },
             {
                 "definedIn": "cohere:system-inc/structure",
-                "files": [
-                    "**/next-env.d.ts"
-                ],
+                "files": ["**/next-env.d.ts"],
                 "rules": [
                     {
                         "name": "@typescript-eslint/triple-slash-reference",
@@ -7861,9 +7782,7 @@
     },
     {
         "name": "cohere:tailwind",
-        "extends": [
-            "cohere:typescript"
-        ],
+        "extends": ["cohere:typescript"],
         "rulesOn": 294,
         "rules": [
             {
@@ -7956,9 +7875,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -9218,16 +9135,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -9342,9 +9255,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {
@@ -9357,10 +9268,7 @@
     },
     {
         "name": "cohere:typescript",
-        "extends": [
-            "cohere:adamic",
-            "cohere:style"
-        ],
+        "extends": ["cohere:adamic", "cohere:style"],
         "rulesOn": 282,
         "rules": [
             {
@@ -9453,9 +9361,7 @@
             {
                 "name": "@typescript-eslint/method-signature-style",
                 "severity": "error",
-                "options": [
-                    "property"
-                ]
+                "options": ["property"]
             },
             {
                 "name": "@typescript-eslint/no-array-constructor",
@@ -10667,16 +10573,12 @@
             {
                 "name": "object-shorthand",
                 "severity": "error",
-                "options": [
-                    "properties"
-                ]
+                "options": ["properties"]
             },
             {
                 "name": "one-var",
                 "severity": "error",
-                "options": [
-                    "never"
-                ]
+                "options": ["never"]
             },
             {
                 "name": "operator-assignment",
@@ -10791,9 +10693,7 @@
         "overrides": [
             {
                 "definedIn": "cohere:style",
-                "files": [
-                    "**/*.generated.*"
-                ],
+                "files": ["**/*.generated.*"],
                 "reason": "A generator's output is as long as the schema it prints, so its length measures the schema rather than a seam anyone chose. Every other rule holds generated code to the house standard (#c076xbg); max-lines alone does not apply (#50tpzjq).",
                 "rules": [
                     {

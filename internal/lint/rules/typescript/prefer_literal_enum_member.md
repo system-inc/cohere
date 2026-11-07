@@ -1,12 +1,12 @@
 # `@typescript-eslint/prefer-literal-enum-member`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **2** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **2**                |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -39,4 +39,3 @@ C = B + A,
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

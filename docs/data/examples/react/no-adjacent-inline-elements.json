@@ -18,7 +18,5 @@
         "file": "/repository/source/NoAdjacentInlineElements.tsx",
         "source": "<div />;\n"
     },
-    "assertedMessageIds": [
-        "inlineElement"
-    ]
+    "assertedMessageIds": ["inlineElement"]
 }

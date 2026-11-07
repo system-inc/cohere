@@ -1,12 +1,12 @@
 # `@typescript-eslint/no-invalid-void-type`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **18** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **No**               |
+| Violations in ahra     | **18**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | no                   |
 
 ## What it checks
 
@@ -68,4 +68,3 @@ const commentDeleteRequest = networkService.useWriteRequest<void, { transactionI
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

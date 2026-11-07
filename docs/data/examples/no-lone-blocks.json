@@ -18,8 +18,5 @@
         "file": "/repository/source/NoLoneBlocks.ts",
         "source": "{ let x = 1; }"
     },
-    "assertedMessageIds": [
-        "redundantBlock",
-        "redundantNestedBlock"
-    ]
+    "assertedMessageIds": ["redundantBlock", "redundantNestedBlock"]
 }

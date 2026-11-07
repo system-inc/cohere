@@ -64,15 +64,15 @@ Commands used provisioned `go version go1.27.1 linux/amd64`, with `which go`
 returning `/workspace/adamic-tools/go/bin/go`. Tests were run one package at a time.
 Counts include parent and subtest pass events reported by `go test -json`.
 
-| Command | Result |
-| --- | --- |
-| `go test ./internal/lint/rules/adamic -json` | 387 pass events, 0 failures |
-| `go test ./internal/lint/checking/flow -json` | 1 pass event, 0 failures |
-| `go test ./internal/lint/configuration -json` | 130 pass events, 4 skips, 0 failures |
-| `go test ./policy -json` | 26 pass events, 0 failures |
-| `go vet ./internal/lint/rules/adamic ./internal/lint/checking/flow ./internal/lint/configuration ./policy` | exit 0, 0 diagnostics |
-| `gofmt -l` on the 5 changed/added Go files | exit 0, 0 filenames |
-| `git diff --check` | exit 0, 0 whitespace errors |
+| Command                                                                                                    | Result                               |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `go test ./internal/lint/rules/adamic -json`                                                               | 387 pass events, 0 failures          |
+| `go test ./internal/lint/checking/flow -json`                                                              | 1 pass event, 0 failures             |
+| `go test ./internal/lint/configuration -json`                                                              | 130 pass events, 4 skips, 0 failures |
+| `go test ./policy -json`                                                                                   | 26 pass events, 0 failures           |
+| `go vet ./internal/lint/rules/adamic ./internal/lint/checking/flow ./internal/lint/configuration ./policy` | exit 0, 0 diagnostics                |
+| `gofmt -l` on the 5 changed/added Go files                                                                 | exit 0, 0 filenames                  |
+| `git diff --check`                                                                                         | exit 0, 0 whitespace errors          |
 
 ## Census and relay
 
@@ -111,14 +111,14 @@ and `method*.ts`: 6 files accepted, 0 diagnostics, exit 0. Running each emitted
 file with Node v24.19.0 gives exit 1 and the same TypeError reading `toUpperCase`
 from undefined (6/6 failures; `edges-node.log`).
 
-| Refused fixture | Finding span | Runtime |
-| --- | --- | --- |
-| `spread.ts` | `source` | concrete property copied into the indexed slot |
-| `spread-override.ts` | `2` | explicit override stores a concrete value |
-| `method-return.ts` | `get` | contextual method returns a concrete value |
-| `method-argument.ts` | `put` | wider caller passes 2 to an indexed parameter |
-| `method-reused.ts` | `result` | reused object's method returns a concrete value |
-| `method-mixed-return.ts` | `get` | one return reads T, another returns 2 |
+| Refused fixture          | Finding span | Runtime                                         |
+| ------------------------ | ------------ | ----------------------------------------------- |
+| `spread.ts`              | `source`     | concrete property copied into the indexed slot  |
+| `spread-override.ts`     | `2`          | explicit override stores a concrete value       |
+| `method-return.ts`       | `get`        | contextual method returns a concrete value      |
+| `method-argument.ts`     | `put`        | wider caller passes 2 to an indexed parameter   |
+| `method-reused.ts`       | `result`     | reused object's method returns a concrete value |
+| `method-mixed-return.ts` | `get`        | one return reads T, another returns 2           |
 
 Accepted controls cover a spread from T, a spread overridden by a read from T,
 a contextual method returning that read (with an unrelated nested function),
@@ -142,13 +142,13 @@ fixtures, temporary programs and checker state are independent.
 
 Commands at the spread/method follow-up:
 
-| Command | Result |
-| --- | --- |
+| Command                                                                   | Result                                |
+| ------------------------------------------------------------------------- | ------------------------------------- |
 | `go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel -v` | 1 pass, 0 failures (`testpolicy.log`) |
-| `go test ./internal/lint/rules/adamic -json` | 399 pass events, 0 failures |
-| `go vet ./internal/lint/rules/adamic` | exit 0, 0 diagnostics |
-| `gofmt -l` on the 2 changed Go files | exit 0, 0 filenames |
-| `git diff --check` | exit 0, 0 whitespace errors |
+| `go test ./internal/lint/rules/adamic -json`                              | 399 pass events, 0 failures           |
+| `go vet ./internal/lint/rules/adamic`                                     | exit 0, 0 diagnostics                 |
+| `gofmt -l` on the 2 changed Go files                                      | exit 0, 0 filenames                   |
+| `git diff --check`                                                        | exit 0, 0 whitespace errors           |
 
 At the spread/method follow-up, the same Adamic census command checked 2,140 files and
 reports 1,068 findings, 0 rule crashes. Comparing full finding records against
@@ -195,13 +195,13 @@ See `clean-functions-node.log`.
 
 Current checks:
 
-| Command | Result |
-| --- | --- |
+| Command                                                                   | Result                                                |
+| ------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `go test ./internal/testpolicy -run TestEveryCohereTestRunsInParallel -v` | 1 pass, 0 failures (`clean-functions-testpolicy.log`) |
-| `go test ./internal/lint/rules/adamic -json` | 402 pass events, 0 failures |
-| `go vet ./internal/lint/rules/adamic` | exit 0, 0 diagnostics |
-| `gofmt -l` on the 2 changed Go files | exit 0, 0 filenames |
-| `git diff --check` | exit 0, 0 whitespace errors |
+| `go test ./internal/lint/rules/adamic -json`                              | 402 pass events, 0 failures                           |
+| `go vet ./internal/lint/rules/adamic`                                     | exit 0, 0 diagnostics                                 |
+| `gofmt -l` on the 2 changed Go files                                      | exit 0, 0 filenames                                   |
+| `git diff --check`                                                        | exit 0, 0 whitespace errors                           |
 
 No census was rerun for this follow-up: @system_cohere_lint owns the census
 after this fix. The worker pushes the branch without landing it.

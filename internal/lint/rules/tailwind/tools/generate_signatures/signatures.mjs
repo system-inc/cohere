@@ -40,7 +40,7 @@ import NodeZlib from 'node:zlib';
 import { loadDesignSystem } from '../generate_descriptors/loader.mjs';
 
 const entryPointArgument = process.argv[2];
-if (!entryPointArgument) {
+if(!entryPointArgument) {
     process.stderr.write('usage: signatures.mjs <theme.css> [--resolve-root <dir>] [--targets <json>]\n');
     process.exit(2);
 }
@@ -63,21 +63,24 @@ function cachesFor(options) {
     designSystem.canonicalizeCandidates(['bg-[#000]'], options);
     let signatures = null;
     let lookup = null;
-    for (const symbol of Object.getOwnPropertySymbols(designSystem.storage)) {
+    for(const symbol of Object.getOwnPropertySymbols(designSystem.storage)) {
         const byOptions = designSystem.storage[symbol];
-        if (!byOptions || typeof byOptions.get !== 'function' || typeof byOptions.entries !== 'function') continue;
-        for (const [key, inner] of byOptions.entries()) {
-            if (!key || typeof key !== 'object' || !('features' in key) || !('rem' in key)) continue;
-            if (key.features !== features(options)) continue;
-            if (!inner || typeof inner.get !== 'function' || typeof inner.entries !== 'function') continue;
+        if(!byOptions || typeof byOptions.get !== 'function' || typeof byOptions.entries !== 'function') continue;
+        for(const [key, inner] of byOptions.entries()) {
+            if(!key || typeof key !== 'object' || !('features' in key) || !('rem' in key)) continue;
+            if(key.features !== features(options)) continue;
+            if(!inner || typeof inner.get !== 'function' || typeof inner.entries !== 'function') continue;
             const sample = inner.entries().next().value;
-            if (!sample) continue;
-            if (typeof sample[1] === 'string' && sample[1].startsWith('.x {')) signatures = inner;
-            else if (typeof sample[0] === 'string' && sample[0].startsWith('.x {') && Array.isArray(sample[1])) lookup = inner;
+            if(!sample) continue;
+            if(typeof sample[1] === 'string' && sample[1].startsWith('.x {')) signatures = inner;
+            else if(typeof sample[0] === 'string' && sample[0].startsWith('.x {') && Array.isArray(sample[1]))
+                lookup = inner;
         }
     }
-    if (!signatures || !lookup) {
-        process.stderr.write('signatures.mjs: the signature cache or the precomputed lookup was not found in storage\n');
+    if(!signatures || !lookup) {
+        process.stderr.write(
+            'signatures.mjs: the signature cache or the precomputed lookup was not found in storage\n',
+        );
         process.exit(1);
     }
     return { signatures, lookup };
@@ -92,16 +95,16 @@ const collapsed = cachesFor({ collapse: true, logicalToPhysical: true });
 const uncollapsed = cachesFor({ collapse: false, logicalToPhysical: true });
 
 function hash(signature) {
-    if (typeof signature !== 'string') return '-';
+    if(typeof signature !== 'string') return '-';
     return NodeCrypto.createHash('sha256').update(signature).digest('hex').slice(0, 12);
 }
 
 function properties(signature) {
-    if (typeof signature !== 'string') return '-';
+    if(typeof signature !== 'string') return '-';
     const names = new Set();
     // Declarations only: a line ending in a semicolon that opens no block, so an at-rule's condition,
     // `@supports (color: red) {`, is not read as a property.
-    for (const match of signature.matchAll(/^\s*([^\s{}@][^:{}]*?): [^{\n]*;$/gm)) names.add(match[1]);
+    for(const match of signature.matchAll(/^\s*([^\s{}@][^:{}]*?): [^{\n]*;$/gm)) names.add(match[1]);
     return [...names].sort().join(' ');
 }
 
@@ -111,21 +114,21 @@ function line(className) {
 }
 
 const listed = [];
-for (const classNames of collapsed.lookup.values()) listed.push(...classNames);
+for(const classNames of collapsed.lookup.values()) listed.push(...classNames);
 listed.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
 
 const lines = [`# tailwind ${tailwindVersion} entry ${recordedEntryPoint}`, '# listed'];
-for (const className of listed) lines.push(line(className));
+for(const className of listed) lines.push(line(className));
 
 const targetsPath = flagValue('--targets');
-if (targetsPath) {
+if(targetsPath) {
     const listedSet = new Set(listed);
     const targets = JSON.parse(NodeFileSystem.readFileSync(targetsPath, 'utf8'))
         .cases.map((entry) => entry.className)
         .filter((className) => !listedSet.has(className))
         .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
     lines.push('# targets');
-    for (const className of targets) lines.push(line(className));
+    for(const className of targets) lines.push(line(className));
 }
 
 const text = lines.join('\n') + '\n';

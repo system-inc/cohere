@@ -14,9 +14,5 @@
             }
         ]
     },
-    "assertedMessageIds": [
-        "declareOutsideClass",
-        "notGetterClassFunc",
-        "notStaticClassProp"
-    ]
+    "assertedMessageIds": ["declareOutsideClass", "notGetterClassFunc", "notStaticClassProp"]
 }

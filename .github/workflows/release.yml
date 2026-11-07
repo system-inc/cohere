@@ -36,7 +36,7 @@ name: release
 
 on:
     push:
-        tags: ["v*"]
+        tags: ['v*']
     workflow_dispatch:
         inputs:
             version:

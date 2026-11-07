@@ -18,8 +18,5 @@
         "file": "onlyThrowError.ts",
         "source": "throw 'error';"
     },
-    "assertedMessageIds": [
-        "object",
-        "undef"
-    ]
+    "assertedMessageIds": ["object", "undef"]
 }

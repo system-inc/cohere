@@ -18,7 +18,5 @@
         "file": "Component.tsx",
         "source": "const element = <div className=\"ps-4\" />;"
     },
-    "assertedMessageIds": [
-        "shorthandClasses"
-    ]
+    "assertedMessageIds": ["shorthandClasses"]
 }

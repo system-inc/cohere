@@ -18,7 +18,5 @@
         "file": "file.ts",
         "source": "if (test) { var foo; }"
     },
-    "assertedMessageIds": [
-        "moveDeclToRoot"
-    ]
+    "assertedMessageIds": ["moveDeclToRoot"]
 }

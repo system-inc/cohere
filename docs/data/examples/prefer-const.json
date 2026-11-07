@@ -20,8 +20,6 @@
         "file": "/repository/source/PreferConst.ts",
         "source": "let x;\n"
     },
-    "assertedMessageIds": [
-        "preferConst"
-    ],
+    "assertedMessageIds": ["preferConst"],
     "assertsFix": true
 }

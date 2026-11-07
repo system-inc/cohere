@@ -18,7 +18,5 @@
         "file": "/repository/source/NewFunc.ts",
         "source": "Function.bind;\n"
     },
-    "assertedMessageIds": [
-        "noFunctionConstructor"
-    ]
+    "assertedMessageIds": ["noFunctionConstructor"]
 }

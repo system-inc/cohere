@@ -18,7 +18,5 @@
         "file": "pages/test.tsx",
         "source": "export const getStaticPro = 1;"
     },
-    "assertedMessageIds": [
-        "noTypos"
-    ]
+    "assertedMessageIds": ["noTypos"]
 }

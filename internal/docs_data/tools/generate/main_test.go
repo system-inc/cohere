@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/docs_data"
 	"github.com/system-inc/cohere/internal/docs_data/capture"
+	"github.com/system-inc/cohere/internal/format/native"
 )
 
 // moduleRoot is the module's root: go test runs in this package's directory, four below it.
@@ -168,7 +169,12 @@ func plantStaleExample(test *testing.T, root string) string {
 		test.Fatal(encodeError)
 	}
 	path := docs_data.ExamplePath(planted.Rule)
-	if writeError := os.WriteFile(filepath.Join(root, path), append(encoded, '\n'), 0o644); writeError != nil {
+	// In the house format, as the generator writes an example, so the only thing stale about it is its case.
+	formatted, formatHouseError := native.FormatHouse(path, append(encoded, '\n'))
+	if formatHouseError != nil {
+		test.Fatal(formatHouseError)
+	}
+	if writeError := os.WriteFile(filepath.Join(root, path), formatted, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
 	return path

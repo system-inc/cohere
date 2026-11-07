@@ -18,10 +18,6 @@
         "file": "prefer_regex_literals.ts",
         "source": "/abc/\n"
     },
-    "assertedMessageIds": [
-        "unexpectedRedundantRegExp",
-        "unexpectedRedundantRegExpWithFlags",
-        "unexpectedRegExp"
-    ],
+    "assertedMessageIds": ["unexpectedRedundantRegExp", "unexpectedRedundantRegExpWithFlags", "unexpectedRegExp"],
     "assertsSuggestion": true
 }

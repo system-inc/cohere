@@ -18,8 +18,5 @@
         "file": "Component.tsx",
         "source": "export const Test = () => <link href={fontUrl} />;"
     },
-    "assertedMessageIds": [
-        "googleFontDisplayMissing",
-        "googleFontDisplayNotRecommended"
-    ]
+    "assertedMessageIds": ["googleFontDisplayMissing", "googleFontDisplayNotRecommended"]
 }

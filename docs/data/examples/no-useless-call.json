@@ -18,7 +18,5 @@
         "file": "/repository/source/UselessCall.ts",
         "source": "foo.call();"
     },
-    "assertedMessageIds": [
-        "unnecessaryCall"
-    ]
+    "assertedMessageIds": ["unnecessaryCall"]
 }

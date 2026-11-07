@@ -18,7 +18,5 @@
         "file": "/repository/source/Entity.ts",
         "source": "declare const OrmManyToOne: any;\ndeclare class Profile {}\nclass E { @OrmManyToOne() profile: Profile; }\n"
     },
-    "assertedMessageIds": [
-        "mustBeOptional"
-    ]
+    "assertedMessageIds": ["mustBeOptional"]
 }

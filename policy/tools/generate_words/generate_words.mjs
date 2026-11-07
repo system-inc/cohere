@@ -34,7 +34,7 @@ const expectedVersions = {
 };
 
 const [, , englishArgument, softwareArgument] = process.argv;
-if (!englishArgument || !softwareArgument) {
+if(!englishArgument || !softwareArgument) {
     process.stderr.write(
         'usage: generate_words.mjs <@cspell/dict-en_us package directory> <@cspell/dict-software-terms package ' +
             'directory>\n',
@@ -49,16 +49,16 @@ const softwareDirectory = NodePath.resolve(softwareArgument);
 /* A package's package.json, refused unless it is the package and version expected. */
 function readPackage(directory, name) {
     const packageJson = JSON.parse(NodeFileSystem.readFileSync(NodePath.join(directory, 'package.json'), 'utf8'));
-    if (packageJson.name !== name) {
+    if(packageJson.name !== name) {
         throw new Error(`${directory} holds ${packageJson.name}, not ${name}`);
     }
-    if (packageJson.version !== expectedVersions[name]) {
+    if(packageJson.version !== expectedVersions[name]) {
         throw new Error(
             `${name} is ${packageJson.version}, and Words.txt is generated from ${expectedVersions[name]}; ` +
                 'review the new version and update expectedVersions',
         );
     }
-    if (packageJson.license !== 'MIT') {
+    if(packageJson.license !== 'MIT') {
         throw new Error(`${name} is licensed ${packageJson.license}, and this generator was reviewed for MIT alone`);
     }
     return packageJson;
@@ -66,12 +66,12 @@ function readPackage(directory, name) {
 
 /* The nearest cspell-trie-lib at or above directory, as Node's resolution would find it. */
 function findTrieLibrary(directory) {
-    for (let current = directory; ; current = NodePath.dirname(current)) {
+    for(let current = directory; ; current = NodePath.dirname(current)) {
         const candidate = NodePath.join(current, 'node_modules', 'cspell-trie-lib');
-        if (NodeFileSystem.existsSync(NodePath.join(candidate, 'package.json'))) {
+        if(NodeFileSystem.existsSync(NodePath.join(candidate, 'package.json'))) {
             return candidate;
         }
-        if (NodePath.dirname(current) === current) {
+        if(NodePath.dirname(current) === current) {
             throw new Error(`no node_modules at or above ${directory} holds cspell-trie-lib`);
         }
     }
@@ -81,7 +81,7 @@ function findTrieLibrary(directory) {
 function readLicense(directory, name) {
     const text = NodeFileSystem.readFileSync(NodePath.join(directory, 'LICENSE'), 'utf8');
     const copyright = text.split('\n').find((line) => line.startsWith('Copyright'));
-    if (!copyright) {
+    if(!copyright) {
         throw new Error(`${name}'s LICENSE names no copyright holder`);
     }
     return { text: text.trimEnd(), copyright: copyright.trim() };
@@ -104,9 +104,9 @@ const words = new Set();
 const englishTrie = trieLibrary.decodeTrie(
     NodeZlib.gunzipSync(NodeFileSystem.readFileSync(NodePath.join(englishDirectory, 'en_US.trie.gz'))),
 );
-for (const entry of englishTrie.words()) {
+for(const entry of englishTrie.words()) {
     const word = wordOf(entry);
-    if (word) {
+    if(word) {
         words.add(word);
     }
 }
@@ -115,16 +115,16 @@ const softwareDictionary = NodePath.join(softwareDirectory, 'dict');
 const softwareFiles = NodeFileSystem.readdirSync(softwareDictionary)
     .filter((file) => file.endsWith('.txt') || file.endsWith('.txt.gz'))
     .sort();
-for (const file of softwareFiles) {
+for(const file of softwareFiles) {
     const contents = NodeFileSystem.readFileSync(NodePath.join(softwareDictionary, file));
     const text = (file.endsWith('.gz') ? NodeZlib.gunzipSync(contents) : contents).toString('utf8');
-    for (const line of text.split('\n')) {
+    for(const line of text.split('\n')) {
         const entry = line.trim();
-        if (entry === '' || entry.startsWith('#') || entry.startsWith('!')) {
+        if(entry === '' || entry.startsWith('#') || entry.startsWith('!')) {
             continue;
         }
         const word = wordOf(entry);
-        if (word) {
+        if(word) {
             words.add(word);
         }
     }
@@ -137,19 +137,19 @@ for (const file of softwareFiles) {
 const houseWordsPath = NodePath.join(policyDirectory, 'HouseWords.txt');
 let houseWordCount = 0;
 let previousHouseWord = '';
-for (const [index, line] of NodeFileSystem.readFileSync(houseWordsPath, 'utf8').split('\n').entries()) {
-    if (line === '' || line.startsWith('#')) {
+for(const [index, line] of NodeFileSystem.readFileSync(houseWordsPath, 'utf8').split('\n').entries()) {
+    if(line === '' || line.startsWith('#')) {
         continue;
     }
     const match = /^([a-z]+) # \S.*$/.exec(line);
-    if (!match) {
+    if(!match) {
         throw new Error(`HouseWords.txt line ${index + 1} is not a lowercase word, a space and a # reason: ${line}`);
     }
     const word = match[1];
-    if (word <= previousHouseWord) {
+    if(word <= previousHouseWord) {
         throw new Error(`HouseWords.txt line ${index + 1}, ${word}, does not come after ${previousHouseWord}`);
     }
-    if (words.has(word)) {
+    if(words.has(word)) {
         throw new Error(`HouseWords.txt line ${index + 1}, ${word}, is in the lists already; remove it`);
     }
     previousHouseWord = word;

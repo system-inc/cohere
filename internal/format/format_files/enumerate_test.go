@@ -762,3 +762,32 @@ func TestEnumerateHoldsAdamicFilesBack(test *testing.T) {
 		)
 	}
 }
+
+// Go's testdata is never entered, at any depth, and each one skipped is counted under its own layer, so a fixture
+// kept unformatted on purpose is never offered and the skip still shows (#4wjhppw). The control is a directory
+// named like it, which is entered.
+func TestTheWalkNeverEntersTestdata(test *testing.T) {
+	test.Parallel()
+	root := writeTree(test, map[string]string{
+		"README.md":                         "# root\n",
+		"testdata/upstream.json":            "{ }\n",
+		"internal/printer/testdata/a.md":    "#a\n",
+		"internal/printer/testdata_note.md": "# kept\n",
+		"internal/printer/notes/b.json":     "{}\n",
+	})
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
+	}
+	want := map[string]bool{
+		"README.md":                         true,
+		"internal/printer/testdata_note.md": true,
+		"internal/printer/notes/b.json":     true,
+	}
+	if survivors := survivorsOf(root, enumeration); !maps.Equal(survivors, want) {
+		test.Errorf("offered %v, want %v", survivors, want)
+	}
+	if skipped := enumeration.IgnoredByLayer[FixturesLayer]; skipped != 2 {
+		test.Errorf("%d testdata directories counted, want 2", skipped)
+	}
+}

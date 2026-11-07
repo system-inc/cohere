@@ -18,10 +18,5 @@
         "file": "component.tsx",
         "source": "import {useRef, useState, useCallback, useMemo, useReducer, useEffect} from 'react';\nfunction helper(props) {\n  return props.ref.current;\n}\n"
     },
-    "assertedMessageIds": [
-        "functionAccessesRef",
-        "refPassedToFunction",
-        "refUpdate",
-        "refValueAccess"
-    ]
+    "assertedMessageIds": ["functionAccessesRef", "refPassedToFunction", "refUpdate", "refValueAccess"]
 }

@@ -18,7 +18,5 @@
         "file": "pages/_document.tsx",
         "source": "export const C = () => <Head><title>x</title></Head>;\n"
     },
-    "assertedMessageIds": [
-        "noTitleInDocumentHead"
-    ]
+    "assertedMessageIds": ["noTitleInDocumentHead"]
 }

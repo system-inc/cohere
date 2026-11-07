@@ -18,7 +18,5 @@
         "file": "/repository/libraries/nexus/code-quality/Thing.ts",
         "source": "import { Thing } from './Thing';\n"
     },
-    "assertedMessageIds": [
-        "forbiddenOutsideImport"
-    ]
+    "assertedMessageIds": ["forbiddenOutsideImport"]
 }

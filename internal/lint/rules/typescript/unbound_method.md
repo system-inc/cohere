@@ -1,12 +1,12 @@
 # `@typescript-eslint/unbound-method`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **18** |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | no |
-| Needs type information | yes |
+|                        |                      |
+| ---------------------- | -------------------- |
+| **Recommendation**     | **Maybe**            |
+| Violations in ahra     | **18**               |
+| Plugin                 | `@typescript-eslint` |
+| Auto-fixable           | no                   |
+| Needs type information | yes                  |
 
 ## What it checks
 
@@ -28,4 +28,3 @@ It is deliberately turned off in VerifySettings.json and the examples file conta
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

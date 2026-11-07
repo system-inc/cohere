@@ -1,12 +1,12 @@
 # `react/no-unescaped-entities`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong Yes** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Strong Yes**        |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -19,4 +19,3 @@ Catches a defect rather than a preference, and the tree is already clean, so it 
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

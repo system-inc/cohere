@@ -26,6 +26,7 @@ import (
 	"sort"
 
 	"github.com/system-inc/cohere/internal/bench_results"
+	"github.com/system-inc/cohere/internal/format/native"
 	goenginerule "github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
@@ -100,7 +101,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 			// published under a name the binary no longer answers to.
 			continue
 		}
-		encoded, encodeError := encode(examples)
+		encoded, encodeError := encode(ExamplePath(name), examples)
 		if encodeError != nil {
 			return nil, encodeError
 		}
@@ -111,7 +112,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 	if buildSetsError != nil {
 		return nil, buildSetsError
 	}
-	encodedSets, encodeError := encode(sets)
+	encodedSets, encodeError := encode(SetsPath, sets)
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -121,7 +122,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 	if buildRulesError != nil {
 		return nil, buildRulesError
 	}
-	encodedRules, encodeError := encode(rules)
+	encodedRules, encodeError := encode(RulesPath, rules)
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -131,7 +132,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 	if parseChangelogError != nil {
 		return nil, parseChangelogError
 	}
-	encodedChangelog, encodeError := encode(changelog)
+	encodedChangelog, encodeError := encode(ChangelogPath, changelog)
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -141,7 +142,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 	if buildBenchmarksError != nil {
 		return nil, buildBenchmarksError
 	}
-	encodedBenchmarks, encodeError := encode(benchmarks)
+	encodedBenchmarks, encodeError := encode(BenchmarksPath, benchmarks)
 	if encodeError != nil {
 		return nil, encodeError
 	}
@@ -152,7 +153,7 @@ func Build(inputs Inputs) (map[string][]byte, error) {
 		if parseCommandLineInterfaceError != nil {
 			return nil, parseCommandLineInterfaceError
 		}
-		encodedCommandLineInterface, encodeError := encode(cli)
+		encodedCommandLineInterface, encodeError := encode(CommandLineInterfacePath, cli)
 		if encodeError != nil {
 			return nil, encodeError
 		}
@@ -223,11 +224,12 @@ func OrphanedExamples(root string, files map[string][]byte) ([]string, error) {
 	return orphans, walkError
 }
 
-// encode writes a value with four-space indentation and no HTML escaping, so a regeneration diffs
-// cleanly. Every value Build encodes is a struct or a slice in a fixed order, and a map only where
-// encoding/json sorts its keys, so two runs give the same bytes. Value is whichever of those types a file
-// holds.
-func encode[Value any](value Value) ([]byte, error) {
+// encode writes a value as the file at path, relative to the module root, in the house format the format check at
+// cohere's root holds it to, with no HTML escaping. It is indented first, since the house format keeps an object
+// expanded where its source was, and the committed files have every object expanded. Every value Build encodes is
+// a struct or a slice in a fixed order, and a map only where encoding/json sorts its keys, so two runs give the
+// same bytes. Value is whichever of those types a file holds.
+func encode[Value any](path string, value Value) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
@@ -235,5 +237,5 @@ func encode[Value any](value Value) ([]byte, error) {
 	if encodeError := encoder.Encode(value); encodeError != nil {
 		return nil, encodeError
 	}
-	return buffer.Bytes(), nil
+	return native.FormatHouse(path, buffer.Bytes())
 }

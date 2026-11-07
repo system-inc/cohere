@@ -18,7 +18,5 @@
         "file": "/repository/source/NoBitwise.ts",
         "source": "!a"
     },
-    "assertedMessageIds": [
-        "unexpected"
-    ]
+    "assertedMessageIds": ["unexpected"]
 }

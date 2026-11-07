@@ -1,12 +1,12 @@
 # `react/forbid-component-props`
 
-| | |
-|---|---|
-| **Recommendation** | **No** |
-| Violations in ahra | **1357** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | no |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **No**                |
+| Violations in ahra     | **1357**              |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | no                    |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ className="p-2 text-sm font-medium transition-opacity hover:opacity-70"
 ### What fixing looks like
 
 Not auto-fixable. Each site needs a human decision, which is what makes the count above the real cost.
-

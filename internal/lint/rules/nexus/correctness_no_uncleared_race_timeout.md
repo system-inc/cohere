@@ -1,12 +1,12 @@
 # `nexus/correctness-no-uncleared-race-timeout`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, at `error` once the one ahra site is fixed.** 1 finding, 1 true |
-| Findings | **ahra 1** (measured 2026-10-03) |
-| Measured precision | 1 of 1 true: the timer's handle is dropped where it is made |
-| Plugin | cohere-native, `nexus` |
-| Auto-fixable | no |
+|                        |                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, at `error` once the one ahra site is fixed.** 1 finding, 1 true                                                                                      |
+| Findings               | **ahra 1** (measured 2026-10-03)                                                                                                                            |
+| Measured precision     | 1 of 1 true: the timer's handle is dropped where it is made                                                                                                 |
+| Plugin                 | cohere-native, `nexus`                                                                                                                                      |
+| Auto-fixable           | no                                                                                                                                                          |
 | Needs type information | yes, to resolve `Promise.race`, `Promise` and `setTimeout` to the default library and the global declarations; without a checker the rule registers nothing |
 
 ## What it checks

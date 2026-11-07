@@ -20,8 +20,6 @@
         "file": "/repository/source/Qualifiers.ts",
         "source": "const x: A.B = 3;\n"
     },
-    "assertedMessageIds": [
-        "unnecessaryQualifier"
-    ],
+    "assertedMessageIds": ["unnecessaryQualifier"],
     "assertsFix": true
 }

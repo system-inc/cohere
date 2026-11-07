@@ -18,7 +18,5 @@
         "file": "/repository/source/LoopConditions.ts",
         "source": "var foo; if (foo) { }\n"
     },
-    "assertedMessageIds": [
-        "loopConditionNotModified"
-    ]
+    "assertedMessageIds": ["loopConditionNotModified"]
 }

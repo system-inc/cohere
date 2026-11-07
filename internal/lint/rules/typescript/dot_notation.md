@@ -1,12 +1,12 @@
 # `@typescript-eslint/dot-notation`
 
-| | |
-|---|---|
-| **Recommendation** | **Yes, with `allowProtectedClassPropertyAccess`, in place of the core `dot-notation`.** Bracket access is TypeScript's sanctioned way past `protected`, so a test reaching a protected hook keeps its brackets, and the dot form the core rule would propose is a type error (TS2445) |
-| Measured precision | exact against typescript-eslint 8.71.0: all 63 of upstream's rows and 40 edge rows replayed through the installed rule, findings, spans and fix output identical |
-| Plugin | `@typescript-eslint` |
-| Auto-fixable | yes, the core rule's repair |
-| Needs type information | yes |
+|                        |                                                                                                                                                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recommendation**     | **Yes, with `allowProtectedClassPropertyAccess`, in place of the core `dot-notation`.** Bracket access is TypeScript's sanctioned way past `protected`, so a test reaching a protected hook keeps its brackets, and the dot form the core rule would propose is a type error (TS2445) |
+| Measured precision     | exact against typescript-eslint 8.71.0: all 63 of upstream's rows and 40 edge rows replayed through the installed rule, findings, spans and fix output identical                                                                                                                      |
+| Plugin                 | `@typescript-eslint`                                                                                                                                                                                                                                                                  |
+| Auto-fixable           | yes, the core rule's repair                                                                                                                                                                                                                                                           |
+| Needs type information | yes                                                                                                                                                                                                                                                                                   |
 
 ## What it checks
 
@@ -30,16 +30,16 @@ three typed options is on:
 
 The property is found as upstream finds it: the checker's symbol for the key, or failing that the
 object's non-nullable type's property of the same name for a string key. So `x[('p')]` and
-`` x[`p`] `` are judged like `x['p']`, while `x[null]` and `x[true]` never find a property.
+``x[`p`]`` are judged like `x['p']`, while `x[null]` and `x[true]` never find a property.
 
 ## Options
 
-| Option | Default |
-|---|---|
-| `allowKeywords` | `true` |
-| `allowPattern` | `""` |
+| Option                              | Default |
+| ----------------------------------- | ------- |
+| `allowKeywords`                     | `true`  |
+| `allowPattern`                      | `""`    |
 | `allowIndexSignaturePropertyAccess` | `false` |
-| `allowPrivateClassPropertyAccess` | `false` |
+| `allowPrivateClassPropertyAccess`   | `false` |
 | `allowProtectedClassPropertyAccess` | `false` |
 
 An unknown key is refused, as upstream's schema does.

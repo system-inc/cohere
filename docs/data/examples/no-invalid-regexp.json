@@ -18,7 +18,5 @@
         "file": "/repository/source/Patterns.ts",
         "source": "export const a = other('[');\n"
     },
-    "assertedMessageIds": [
-        "invalidRegexp"
-    ]
+    "assertedMessageIds": ["invalidRegexp"]
 }

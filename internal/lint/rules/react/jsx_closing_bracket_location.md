@@ -1,12 +1,12 @@
 # `react/jsx-closing-bracket-location`
 
-| | |
-|---|---|
-| **Recommendation** | **Strong No** |
-| Violations in ahra | none |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Strong No**         |
+| Violations in ahra     | none                  |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | yes                   |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -19,4 +19,3 @@ Formatting, which Prettier already decides. Turning it on creates a second autho
 ## Violations
 
 None. The tree already satisfies this rule, so enabling it is a guardrail against future drift rather than a cleanup.
-

@@ -18,7 +18,5 @@
         "file": "pages/_document.tsx",
         "source": "export const C = () => <div jsx>{\"x\"}</div>;"
     },
-    "assertedMessageIds": [
-        "noStyledJsxInDocument"
-    ]
+    "assertedMessageIds": ["noStyledJsxInDocument"]
 }

@@ -1,6 +1,4 @@
 {
     "rule": "react/style-prop-object",
-    "assertedMessageIds": [
-        "stylePropNotObject"
-    ]
+    "assertedMessageIds": ["stylePropNotObject"]
 }

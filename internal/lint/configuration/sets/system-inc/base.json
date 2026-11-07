@@ -280,10 +280,7 @@
             "reason": "CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use."
         },
         {
-            "files": [
-                "**/*.test.ts",
-                "**/*.test.a"
-            ],
+            "files": ["**/*.test.ts", "**/*.test.a"],
             "rules": {
                 "no-use-before-define": [
                     "error",

@@ -62,13 +62,13 @@ remaining comparisons for that spelling. A spelling was rejected if its basic
 `\p` pattern did not compile; otherwise any disagreement among the 12 profiles
 made it wrong, and passing all comparisons made it working.
 
-| Family | Working | Rejected | Wrong |
-|---|---:|---:|---:|
-| General_Category | 65 | 160 | 15 |
-| Script | 0 | 688 | 0 |
-| Script_Extensions | 0 | 688 | 0 |
-| Binary | 32 | 61 | 6 |
-| Total | 97 | 1597 | 21 |
+| Family            | Working | Rejected | Wrong |
+| ----------------- | ------: | -------: | ----: |
+| General_Category  |      65 |      160 |    15 |
+| Script            |       0 |      688 |     0 |
+| Script_Extensions |       0 |      688 |     0 |
+| Binary            |      32 |       61 |     6 |
+| Total             |      97 |     1597 |    21 |
 
 Node rejected eight other UCD candidates: Hrkt and Katakana_Or_Hiragana under
 each of sc, Script, scx, and Script_Extensions. The accepted-name fixture was
@@ -96,12 +96,12 @@ Each mutant was applied separately to tables_generated.go, compiled with
 run only against its Node differential subtest. Each extended the first interval's
 upper endpoint by one, retaining a valid compiled set.
 
-| Canonical table | Targeted command suffix after `go test ./internal/lint/ecmascript/regexp` | Node caught |
-|---|---|---|
-| sc=Greek | `-run '^TestUnicodePropertiesNode$/^Script=Greek$' -v` | extra U+0374, 1 failing subtest |
-| scx=Latin | `-run '^TestUnicodePropertiesNode$/^Script_Extensions=Latin$' -v` | extra U+005B, 1 failing subtest |
-| gc=L | `-run '^TestUnicodePropertiesNode$/^General_Category=Letter$' -v` | extra U+005B, 1 failing subtest |
-| Emoji | `-run '^TestUnicodePropertiesNode$/^Emoji$' -v` | extra U+0024, 1 failing subtest |
+| Canonical table | Targeted command suffix after `go test ./internal/lint/ecmascript/regexp` | Node caught                     |
+| --------------- | ------------------------------------------------------------------------- | ------------------------------- |
+| sc=Greek        | `-run '^TestUnicodePropertiesNode$/^Script=Greek$' -v`                    | extra U+0374, 1 failing subtest |
+| scx=Latin       | `-run '^TestUnicodePropertiesNode$/^Script_Extensions=Latin$' -v`         | extra U+005B, 1 failing subtest |
+| gc=L            | `-run '^TestUnicodePropertiesNode$/^General_Category=Letter$' -v`         | extra U+005B, 1 failing subtest |
+| Emoji           | `-run '^TestUnicodePropertiesNode$/^Emoji$' -v`                           | extra U+0024, 1 failing subtest |
 
 Freshness and other local checks were excluded from these targeted mutant runs;
 only Node supplied the expected membership. The tables were restored after every run.

@@ -18,8 +18,5 @@
         "file": "/repository/source/Thing.ts",
         "source": "var result = a * b;"
     },
-    "assertedMessageIds": [
-        "arrowAssignment",
-        "returnAssignment"
-    ]
+    "assertedMessageIds": ["arrowAssignment", "returnAssignment"]
 }

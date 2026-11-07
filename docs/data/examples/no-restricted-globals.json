@@ -8,8 +8,5 @@
         "file": "/repository/source/NoRestrictedGlobals.ts",
         "source": "foo;\n"
     },
-    "assertedMessageIds": [
-        "customMessage",
-        "defaultMessage"
-    ]
+    "assertedMessageIds": ["customMessage", "defaultMessage"]
 }

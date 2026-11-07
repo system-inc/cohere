@@ -8,7 +8,5 @@
         "file": "/repository/source/Pure.tsx",
         "source": "\n        class Foo extends React.Component {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      "
     },
-    "assertedMessageIds": [
-        "noShouldCompUpdate"
-    ]
+    "assertedMessageIds": ["noShouldCompUpdate"]
 }

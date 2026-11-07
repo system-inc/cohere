@@ -18,7 +18,5 @@
         "file": "/repository/source/Rejections.ts",
         "source": "new Promise();\n"
     },
-    "assertedMessageIds": [
-        "rejectAnError"
-    ]
+    "assertedMessageIds": ["rejectAnError"]
 }

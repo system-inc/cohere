@@ -18,11 +18,6 @@
         "file": "o.ts",
         "source": "foo.forEach(x => x)"
     },
-    "assertedMessageIds": [
-        "expectedAtEnd",
-        "expectedInside",
-        "expectedNoReturnValue",
-        "expectedReturnValue"
-    ],
+    "assertedMessageIds": ["expectedAtEnd", "expectedInside", "expectedNoReturnValue", "expectedReturnValue"],
     "assertsSuggestion": true
 }

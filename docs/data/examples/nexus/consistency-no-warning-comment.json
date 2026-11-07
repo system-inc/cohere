@@ -18,7 +18,5 @@
         "file": "/project/source/Thing.ts",
         "source": "export const Block = `/* XXX the cache */`;\n"
     },
-    "assertedMessageIds": [
-        "warningComment"
-    ]
+    "assertedMessageIds": ["warningComment"]
 }

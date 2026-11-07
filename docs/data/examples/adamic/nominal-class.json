@@ -18,8 +18,5 @@
         "file": "Case.ts",
         "source": "class Chain { next(): Chain { return this; } }\n"
     },
-    "assertedMessageIds": [
-        "notAnInstance",
-        "typeArgumentsDiffer"
-    ]
+    "assertedMessageIds": ["notAnInstance", "typeArgumentsDiffer"]
 }

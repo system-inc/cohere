@@ -18,8 +18,5 @@
         "file": "fixture.tsx",
         "source": "function Component() {\n  const [x, setX] = useState(0);\n  setX(1);\n  return x;\n}\n"
     },
-    "assertedMessageIds": [
-        "setStateInRender",
-        "setStateInUseMemo"
-    ]
+    "assertedMessageIds": ["setStateInRender", "setStateInUseMemo"]
 }

@@ -1,12 +1,12 @@
 # `react/jsx-no-useless-fragment`
 
-| | |
-|---|---|
-| **Recommendation** | **Maybe** |
-| Violations in ahra | **18** |
-| Plugin | `eslint-plugin-react` |
-| Auto-fixable | yes |
-| Needs type information | no |
+|                        |                       |
+| ---------------------- | --------------------- |
+| **Recommendation**     | **Maybe**             |
+| Violations in ahra     | **18**                |
+| Plugin                 | `eslint-plugin-react` |
+| Auto-fixable           | yes                   |
+| Needs type information | no                    |
 
 ## What it checks
 
@@ -63,4 +63,3 @@ return <>{properties.children}</>;
 ### What fixing looks like
 
 Auto-fixable. `eslint --fix` rewrites these, so the cleanup is a command plus a review of the diff.
-

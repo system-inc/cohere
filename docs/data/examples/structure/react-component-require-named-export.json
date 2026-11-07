@@ -18,7 +18,5 @@
         "file": "/repository/source/components/Button.tsx",
         "source": "export default 42;\n"
     },
-    "assertedMessageIds": [
-        "componentRequiresNamedExport"
-    ]
+    "assertedMessageIds": ["componentRequiresNamedExport"]
 }
