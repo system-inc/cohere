@@ -72,6 +72,10 @@ func cacheBuild(root string, environment []string) ([]string, error) {
 	}
 	build := make([]string, 0, len(names)+len(processEnvironment))
 	for _, name := range names {
+		if name == "GOFLAGS" {
+			build = append(build, name+"="+verdictFlags(values[name]))
+			continue
+		}
 		build = append(build, name+"="+values[name])
 	}
 	for _, name := range processEnvironment {
@@ -83,6 +87,30 @@ func cacheBuild(root string, environment []string) ([]string, error) {
 		build = append(build, "process "+name+"="+value)
 	}
 	return build, nil
+}
+
+// flagsNoVerdictReads are the go flags a run's verdict cannot depend on, which verdictFlags leaves out of the key:
+// -p bounds how many packages go builds at once, and -v, -x and -work only change what go prints or keeps of its
+// work, while every go command runs as it would without them. The list errs narrow on purpose: a flag left in the key
+// costs a miss when it changes, a flag left out wrongly replays a verdict another build would not give, so a flag
+// joins it only when neither the load's success nor anything a rule reads can see it. That keeps -n in the key, which
+// makes go print its commands without running them, so a load that needs cgo's output gets none, and -buildvcs,
+// whose true can refuse a main package in a tree whose version control go cannot read. cohere-dev's pool sets -p to
+// each token's share, so with it in the key a run under another share missed every package.
+var flagsNoVerdictReads = []string{"p", "v", "x", "work"}
+
+// verdictFlags is goFlags, `GOFLAGS` as go env reports it, without the flags in flagsNoVerdictReads, every other
+// flag kept as written and in its order. go reads `GOFLAGS` as fields split on white space, each `-name` or
+// `-name=value`, one dash or two.
+func verdictFlags(goFlags string) string {
+	kept := []string{}
+	for _, field := range strings.Fields(goFlags) {
+		name, _, _ := strings.Cut(strings.TrimLeft(field, "-"), "=")
+		if !slices.Contains(flagsNoVerdictReads, name) {
+			kept = append(kept, field)
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // cacheRuleSet is each enabled rule as its name, then its analyzer's options as they were resolved from the
