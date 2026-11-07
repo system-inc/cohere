@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // checkedMarker is a marker no rule uses, so the cases read as the package's own and not as any one rule's.
@@ -148,7 +149,7 @@ func parseTarget(test *testing.T, body string) (*marker.Index, ast.Node) {
 	if statement == nil {
 		test.Fatalf("finding the call to target in %q", body)
 	}
-	return marker.NewIndex(fileSet, file), statement
+	return marker.NewIndex(positions.New(fileSet, []*ast.File{file}), file), statement
 }
 
 // groupText is a group's comments as one line for a failure message, or "nil".

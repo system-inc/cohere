@@ -204,6 +204,10 @@ type runGaps struct {
 	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
 	// format walk: checked, and never formatted (#6mhafvb).
 	AdamicIgnored int `json:"adamicIgnored,omitempty"`
+	// NestedUnchecked is the files in the nested repositories the run reads that the formatter could not check,
+	// each named in the account (#zmt3tv5). A gap and never the verdict: the nested repository is read-only here,
+	// and its own run is the one that fails on them.
+	NestedUnchecked int `json:"nestedUnchecked,omitempty"`
 	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
 	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
 	MissingGenerated []string `json:"missingGenerated,omitempty"`

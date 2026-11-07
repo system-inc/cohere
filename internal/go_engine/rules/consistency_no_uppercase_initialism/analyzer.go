@@ -31,20 +31,34 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-uppercase-initialism"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_uppercase_initialism",
-	Doc: "Flags a declared name holding an initialism of two or more capitals, userID, ParseURL, JSONEncoder or ID, " +
-		"and suggests it spelled as a word, userId, ParseUrl, JsonEncoder, Id, since the house capitalizes only an " +
-		"initialism's first letter. Uses, package names, methods an interface of another package fixes, " +
-		"//go:linkname and cgo //export names, Example functions and screaming snake case are left.",
-	Run: run,
+// NewAnalyzer builds the rule's analyzer with a flag set of its own, so a test can run it with renameExports set
+// without setting the flag another test's analyzer reads.
+func NewAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "consistency_no_uppercase_initialism",
+		Doc: "Flags a declared name holding an initialism of two or more capitals, userID, ParseURL, JSONEncoder or " +
+			"ID, and suggests it spelled as a word, userId, ParseUrl, JsonEncoder, Id, since the house capitalizes " +
+			"only an initialism's first letter. Uses, package names, methods an interface of another package fixes, " +
+			"//go:linkname and cgo //export names, Example functions and screaming snake case are left. The " +
+			"finding offers the suggested name as a rename, which the engine applies at every reference. The " +
+			"renameExports option lets that rename reach an exported name of an importable package, and never " +
+			"changes a finding.",
+		Run: run,
+	}
+	rule.AddRenameExportsOption(analyzer)
+	return analyzer
 }
+
+// Analyzer runs the rule over one package.
+var Analyzer = NewAnalyzer()
 
 // Rule is this rule's entry in the Go engine's registry. It reads the types to tell a method an interface fixes.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var uppercaseInitialismMessage = policy.MessageOf(Name, "uppercaseInitialism")
+
+// wordCasedRenameMessage is the rename every finding offers, to the name its message suggests.
+var wordCasedRenameMessage = policy.MessageOf(Name, "wordCasedRename")
 
 func run(pass *analysis.Pass) (any, error) {
 	directed := directedObjects(pass)
@@ -161,14 +175,14 @@ func judge(pass *analysis.Pass, identifier *ast.Ident) {
 	if suggestedName == identifier.Name {
 		return
 	}
+	values := map[string]string{"name": identifier.Name, "suggestedName": suggestedName}
 	pass.Report(analysis.Diagnostic{
 		Pos:      identifier.Pos(),
 		End:      identifier.End(),
 		Category: uppercaseInitialismMessage.Id,
-		Message: uppercaseInitialismMessage.Render(map[string]string{
-			"name":          identifier.Name,
-			"suggestedName": suggestedName,
-		}),
+		Message:  uppercaseInitialismMessage.Render(values),
+		// The name the message suggests is the rename, so the fix and the finding can't name two spellings.
+		SuggestedFixes: rule.RenameFixes(identifier, suggestedName, wordCasedRenameMessage.Render(values)),
 	})
 }
 

@@ -26,15 +26,26 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-abbreviated-identifier"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_abbreviated_identifier",
-	Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
-		"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded fields, " +
-		"and a method whose name and signature another package's interface or type fixes are not judged, since " +
-		"those names are someone else's.",
-	Run: run,
+// NewAnalyzer builds the rule's analyzer with a flag set of its own, so a test can run it with renameExports set
+// without setting the flag another test's analyzer reads.
+func NewAnalyzer() *analysis.Analyzer {
+	analyzer := &analysis.Analyzer{
+		Name: "consistency_no_abbreviated_identifier",
+		Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
+			"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded " +
+			"fields, and a method whose name and signature another package's interface or type fixes are not " +
+			"judged, since those names are someone else's. Where the vocabulary names exactly one full spelling for " +
+			"the whole name, the finding offers it as a rename, which the engine applies at every reference. The " +
+			"renameExports option lets that rename reach an exported name of an importable package, and never " +
+			"changes a finding.",
+		Run: run,
+	}
+	rule.AddRenameExportsOption(analyzer)
+	return analyzer
 }
+
+// Analyzer runs the rule over one package.
+var Analyzer = NewAnalyzer()
 
 // Rule is this rule's entry in the Go engine's registry.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
@@ -47,6 +58,9 @@ var messages = map[string]policy.MessageHandle{
 	abbreviation.MillisecondSuffix:      policy.MessageOf(Name, abbreviation.MillisecondSuffix),
 	abbreviation.AbbreviatedWordSegment: policy.MessageOf(Name, abbreviation.AbbreviatedWordSegment),
 }
+
+// fullWordRenameMessage is the rename a finding offers when the vocabulary names one spelling for the whole name.
+var fullWordRenameMessage = policy.MessageOf(Name, "fullWordRename")
 
 // foreignMethod is a method another package declares, on an interface or on a named type, whose name and signature
 // a method of ours may have to match.
@@ -326,12 +340,29 @@ func judge(pass *analysis.Pass, reachable reach, identifier *ast.Ident) {
 				`", since "` + finding.Entry.Expansions[0] + `" is already Go's name for something else.`,
 		}
 	}
-	pass.Report(analysis.Diagnostic{
+	diagnostic := analysis.Diagnostic{
 		Pos:      identifier.Pos(),
 		End:      identifier.End(),
 		Category: finding.MessageId,
 		Message:  messages[finding.MessageId].Render(values),
-	})
+	}
+	if spelling, isOne := oneSpelling(reachable, finding, identifier.Name); isOne {
+		diagnostic.SuggestedFixes = rule.RenameFixes(identifier, spelling, fullWordRenameMessage.Render(
+			map[string]string{"name": identifier.Name, "suggestedName": spelling},
+		))
+	}
+	pass.Report(diagnostic)
+}
+
+// oneSpelling is the full spelling a finding's advice names for the whole name, when it names exactly one and that
+// one is a name this package may declare. A word with several meanings names one per meaning and leaves the choice to
+// the author, an advice-style form names none, and a whole word whose expansion Go already uses is advised toward a
+// descriptive name above, as `err` and `ctx` are, so none of them is a rename.
+func oneSpelling(reachable reach, finding abbreviation.Finding, name string) (string, bool) {
+	if len(finding.Spellings) != 1 || finding.Spellings[0] == name || isTakenInGo(reachable, finding.Spellings[0]) {
+		return "", false
+	}
+	return finding.Spellings[0], true
 }
 
 // isTakenInGo is whether a name is a keyword, a predeclared identifier, or the name of a package this one reaches, so

@@ -1,0 +1,14 @@
+// Command report writes a fetched page.
+package main
+
+import (
+	"os"
+
+	"example.com/rename/internal/store"
+	"example.com/rename/library/markup"
+)
+
+func main() {
+	// Ignored: the fixture's command is never run, only loaded.
+	_, _ = os.Stdout.WriteString(markup.ToHTML(store.ParseUrl(store.Fetch())))
+}

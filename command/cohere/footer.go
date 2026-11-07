@@ -224,6 +224,12 @@ func uncheckedMarkers(summary runSummary) []string {
 	if gaps.NestedUnread != "" {
 		markers = append(markers, "⚠ nested repositories not read: "+gaps.NestedUnread)
 	}
+	if gaps.NestedUnchecked > 0 {
+		markers = append(
+			markers,
+			"⚠ "+counted(gaps.NestedUnchecked, "nested file not checked", "nested files not checked"),
+		)
+	}
 	if gaps.AdamicIgnored > 0 {
 		markers = append(markers, "⚠ "+
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))

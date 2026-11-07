@@ -321,6 +321,11 @@ type Finding struct {
 	// MessageId is one of the four message ids above, and Values are exactly the values its text uses.
 	MessageId string
 	Values    map[string]string
+	// Spellings are the whole names the advice offers in place of the name, one per meaning in the entry's order,
+	// in the name's own case: `MaxLen` gives `MaxLength`. They are empty where the advice names no spelling, an
+	// advice-style form or a suffix's own advice. They are the advice's own list, not a second reading of the
+	// entry, so an engine that renames by them renames to exactly what the message says.
+	Spellings []string
 }
 
 // quoted is a list of names as a message reads it: `"a"`, `"a" or "b"`, or `"a", "b" or "c"`.
@@ -359,7 +364,7 @@ func wholeFinding(entry *Entry, name string) Finding {
 	var advice string
 	switch entry.Whole.Style {
 	case "advice":
-		advice = entry.Advice
+		return abbreviatedIdentifierFinding(FormWhole, entry, name, entry.Advice, nil)
 	case "plain":
 		advice = useAdvice(entry.Expansions)
 	default:
@@ -368,7 +373,7 @@ func wholeFinding(entry *Entry, name string) Finding {
 			advice = `Use ` + quoted(entry.Expansions) + `, whichever it means, or a more descriptive name.`
 		}
 	}
-	return abbreviatedIdentifierFinding(FormWhole, entry, name, advice)
+	return abbreviatedIdentifierFinding(FormWhole, entry, name, advice, entry.Expansions)
 }
 
 // prefixFinding is the finding for a camelCase name that begins with the abbreviation.
@@ -377,20 +382,21 @@ func wholeFinding(entry *Entry, name string) Finding {
 // not be abbreviated`. That is how the role words have always reported.
 func prefixFinding(entry *Entry, name string) Finding {
 	if entry.Prefix.Style == "advice" {
-		return abbreviatedIdentifierFinding(FormPrefix, entry, entry.Abbreviation, entry.Advice)
+		return abbreviatedIdentifierFinding(FormPrefix, entry, entry.Abbreviation, entry.Advice, nil)
 	}
 	rest := strings.TrimPrefix(name, entry.Abbreviation)
 	suggestions := expandedNames(entry, func(expansion string) string { return expansion + rest })
-	return abbreviatedIdentifierFinding(FormPrefix, entry, name, useAdvice(suggestions))
+	return abbreviatedIdentifierFinding(FormPrefix, entry, name, useAdvice(suggestions), suggestions)
 }
 
 // suffixFinding is the finding for a name that ends with the abbreviation capitalized.
 func suffixFinding(entry *Entry, name string, suffix string) Finding {
 	advice := entry.Suffix.Advice
+	var suggestions []string
 	if advice == "" {
 		head := strings.TrimSuffix(name, suffix)
 		// A replacement is the one spelling the file chose for every meaning, so it stands alone.
-		suggestions := []string{head + entry.Suffix.Replacement}
+		suggestions = []string{head + entry.Suffix.Replacement}
 		if entry.Suffix.Replacement == "" {
 			suggestions = expandedNames(entry, func(expansion string) string { return head + Capitalize(expansion) })
 		}
@@ -401,16 +407,18 @@ func suffixFinding(entry *Entry, name string, suffix string) Finding {
 		Entry:     entry,
 		MessageId: AbbreviatedSuffix,
 		Values:    map[string]string{"name": name, "suffix": suffix, "advice": advice},
+		Spellings: suggestions,
 	}
 }
 
 // abbreviatedIdentifierFinding is the shape every whole-word and prefix finding takes.
-func abbreviatedIdentifierFinding(form Form, entry *Entry, name string, advice string) Finding {
+func abbreviatedIdentifierFinding(form Form, entry *Entry, name string, advice string, spellings []string) Finding {
 	return Finding{
 		Form:      form,
 		Entry:     entry,
 		MessageId: AbbreviatedIdentifier,
 		Values:    map[string]string{"name": name, "advice": advice},
+		Spellings: spellings,
 	}
 }
 

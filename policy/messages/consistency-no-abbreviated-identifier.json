@@ -19,6 +19,10 @@
         },
         "abbreviatedWordSegment": {
             "text": "Identifier \"{{name}}\" abbreviates \"{{word}}\". {{advice}} <<reasoning>>"
+        },
+        "fullWordRename": {
+            "text": "Rename \"{{name}}\" to \"{{suggestedName}}\" at its declaration and at every reference.",
+            "languages": ["Go"]
         }
     }
 }
