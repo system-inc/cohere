@@ -248,9 +248,11 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 		test.Fatal(writeFormatSectionError)
 	}
 
+	// A test binary is a build nobody stamped, so it says its record is keyed on the binary file; a stamped build
+	// says the formatter changed, which TestTheRecordFollowsTheFormatterNotTheBinary reads.
 	files, _, _, description := fixture.scope(test)
 	assertScope(test, files, "A.ts", "B.ts")
-	if !strings.Contains(description, "the formatter changed since the last check") {
+	if !strings.Contains(description, "this build carries no formatter identity, so its record is keyed on") {
 		test.Errorf("the scope line does not say why every file is in scope: %s", description)
 	}
 

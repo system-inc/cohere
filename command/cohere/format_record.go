@@ -97,6 +97,12 @@ func loadFormatRecord(root string) *formatRecord {
 	switch {
 	case section == nil:
 		record.absent = "no earlier check is on record"
+	case section.Key != key && release.Current().FormatterIdentity == "":
+		// A build nobody stamped keys its record on the binary file itself (see formatRecordKey), so a copy of the
+		// same build, or the same file rebuilt or touched, reads as another formatter. Said so, since a build that
+		// misses on every run would otherwise read as a formatter that changes every run (#9h6g0s3).
+		record.absent = "this build carries no formatter identity, so its record is keyed on the binary file, " +
+			"and the last check was another file's"
 	case section.Key != key:
 		record.absent = "the formatter changed since the last check, so its record says nothing about this one"
 	case section.Entries != nil:
