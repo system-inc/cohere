@@ -416,12 +416,15 @@ struct FrontendCheck {
         "-index-unit-output-path", "-driver-batch-count", "-o",
     ]
 
-    /* The server's arguments with prepare's flags and every output and planning flag removed. */
-    static func cleaned(_ arguments: [String]) -> [String] {
+    /*
+     The server's arguments with every output and planning flag removed, and prepare's flags too unless they are kept,
+     as the check's own emit of an interface keeps them (`InterfaceEmit`).
+     */
+    static func cleaned(_ arguments: [String], keepingPrepareFlags: Bool = false) -> [String] {
         var cleaned: [String] = []
         var remaining = arguments[...]
         while let argument = remaining.popFirst() {
-            if argument == "-Xfrontend", let next = remaining.first, prepareFlags.contains(next) {
+            if !keepingPrepareFlags, argument == "-Xfrontend", let next = remaining.first, prepareFlags.contains(next) {
                 remaining = remaining.dropFirst()
                 continue
             }
