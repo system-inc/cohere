@@ -192,3 +192,72 @@ func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
 		test.Fatalf("want maxBytes's rename failed under windows/amd64, got %v", failures)
 	}
 }
+
+// A platform's proof requires every identifier of a file only it builds to resolve to the declaration it did, not only
+// that the platform still type-checks it. The rewrite here renames maxBytes in limits.go and, as a twin edit, in the
+// file only windows builds, where a local already holds the new name: the use becomes the local's, windows still
+// type-checks it, and the host never reads it. The plan's own scope check refuses this rename (the rename-capture
+// case), so the rewrite is made by hand, to hold the proof to its half that compares resolutions.
+func TestAPlatformProofRefusesARenameThatCapturesAUse(test *testing.T) {
+	test.Parallel()
+
+	engine, loaded := renamingPipelineOver(test, "rename-capture")
+	root := engine.described.workspace.Root
+	space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
+	options := global_rename.Options{LoadPlatform: engine.platformLoad(space, nil), RequireSoundPlatforms: true}
+	edits := func(relative string, from int, every bool) []rename.Edit {
+		file := filepath.Join(root, filepath.FromSlash(relative))
+		contents, readError := os.ReadFile(file)
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		var found []rename.Edit
+		for offset := from; ; {
+			index := strings.Index(string(contents[offset:]), "maxBytes")
+			if index < 0 {
+				break
+			}
+			found = append(found, rename.Edit{Filename: file, Offset: offset + index, OldText: "maxBytes",
+				NewText: "maximumBytes"})
+			offset += index + len("maxBytes")
+			if !every {
+				break
+			}
+		}
+		return found
+	}
+	// limits.go's doc comment and the declaration's own spell maxBytes first, so its identifiers start at the const.
+	limitsSource, readError := os.ReadFile(filepath.Join(root, "internal", "limits", "limits.go"))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	result := &global_rename.Result{
+		Edits:     edits("internal/limits/limits.go", strings.Index(string(limitsSource), "const maxBytes"), true),
+		TwinEdits: edits("internal/limits/limits_windows.go", 0, false),
+	}
+	if len(result.Edits) != 2 || len(result.TwinEdits) != 1 {
+		test.Fatalf("want the declaration and its use in limits.go and the use under windows, got %+v and %+v",
+			result.Edits, result.TwinEdits)
+	}
+	rewritten, rewriteError := global_rename.RewrittenFiles(result)
+	if rewriteError != nil {
+		test.Fatal(rewriteError)
+	}
+	windows := workspace.Platform{OperatingSystem: "windows", Architecture: "amd64"}
+	verification := global_rename.ProvePlatform(space, global_rename.Expect(space, result), windows, rewritten,
+		options)
+	captured := slices.ContainsFunc(verification.Mismatches, func(mismatch global_rename.Mismatch) bool {
+		return mismatch.Kind == global_rename.MismatchKindIdentifier && mismatch.Platform == "windows/amd64" &&
+			strings.HasSuffix(mismatch.Filename, "limits_windows.go")
+	})
+	if !captured {
+		test.Fatalf("want the captured use in limits_windows.go a mismatch under windows/amd64, got %+v",
+			verification.Mismatches)
+	}
+	for _, mismatch := range verification.Mismatches {
+		if mismatch.Kind == global_rename.MismatchKindPlatformPackage || mismatch.Kind ==
+			global_rename.MismatchKindPlatformLoad {
+			test.Fatalf("want windows to type-check the captured rewrite, got %s", mismatch)
+		}
+	}
+}

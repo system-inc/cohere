@@ -378,6 +378,12 @@ var endToEndCases = []endToEndCase{
 	{
 		name: "rename-cgo", exitCode: 1, verify: unchangedTree("rename-cgo"),
 	},
+	// A file only windows builds declares maxBytes's new name as a local where a use of maxBytes stands, so the rename
+	// would capture that use, and windows would still type-check it. The rename is refused, naming the file and the
+	// platform, the finding stands, and every file reads as its fixture.
+	{
+		name: "rename-capture", exitCode: 1, verify: unchangedTree("rename-capture"),
+	},
 	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
 	{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
