@@ -144,6 +144,13 @@ func TestEnforceConsistentVariantOrderInTemplateRuns(test *testing.T) {
 			source:  "const element = <div className={`sm:hover:flex ${size} block`} />;",
 			classes: []string{},
 		},
+		{
+			// An escape makes the run's source differ from its decoded value, so no class has a source
+			// range of its own and the finding sits on the run.
+			name:    "a run holding an escape",
+			source:  "const element = <div className={`hover:sm:flex\\u0020block ${size}`} />;",
+			classes: []string{"hover:sm:flex\\u0020block "},
+		},
 	}
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
