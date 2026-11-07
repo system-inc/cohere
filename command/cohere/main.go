@@ -646,7 +646,7 @@ func run() error {
 		if !cacheOff {
 			earlyRecord = loadFormatRecord(repositoryRoot)
 		}
-		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maximumFixPasses)
+		early = startEarlyFormat(formatter, earlyRecord, repositoryRoot, *maximumFixPasses, mutate)
 	}
 
 	// What this run leaves to nearer projects, when it is one project of several (see ownership.go).
