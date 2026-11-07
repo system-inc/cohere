@@ -1,6 +1,9 @@
 package line_wrap
 
 import (
+	"go/scanner"
+	"go/token"
+	"slices"
 	"strings"
 	"testing"
 
@@ -598,5 +601,78 @@ func TestAChainNeverBreaksBetweenJoinedLiterals(test *testing.T) {
 		if strings.Contains(output, "\" +\n\t\t\"") {
 			test.Errorf("with %+v, a break between two literals:\n%s", options, output)
 		}
+	}
+}
+
+// codeTokens is source's tokens as go/scanner reads them, comments left out, with the two shapes a wrap is allowed to
+// change taken out of both sides: a semicolon the scanner inserted at a line's end, and a comma just before a closing
+// bracket. Each token is its kind and its literal, so a changed name, operator or literal reads as a different token.
+func codeTokens(test *testing.T, source []byte) []string {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	var tokenScanner scanner.Scanner
+	tokenScanner.Init(fileSet.AddFile("", fileSet.Base(), len(source)), source,
+		func(position token.Position, message string) { test.Fatalf("scanning at %s: %s", position, message) }, 0)
+	var tokens []string
+	for {
+		_, kind, literal := tokenScanner.Scan()
+		if kind == token.EOF {
+			return tokens
+		}
+		if kind == token.SEMICOLON && literal == "\n" {
+			continue
+		}
+		if (kind == token.RPAREN || kind == token.RBRACK || kind == token.RBRACE) && len(tokens) > 0 &&
+			tokens[len(tokens)-1] == token.COMMA.String() {
+			tokens = tokens[:len(tokens)-1]
+		}
+		if literal == "" {
+			tokens = append(tokens, kind.String())
+			continue
+		}
+		tokens = append(tokens, kind.String()+" "+literal)
+	}
+}
+
+// TestTheWrapKeepsEveryTokenButTwoShapes pins the proof of record Loom's lander took over 1,632 wrapped files: the
+// wrapped output's go/scanner token stream is the input's, comments aside, once a newline-inserted semicolon and a
+// trailing comma before a closing bracket are taken out. It holds for every case here, with the command line's
+// options and with the fix phase's, beside Equivalent's proof by syntax tree. The comparison is shown to see a change:
+// a renamed argument and a dropped one each read as different streams, while the two shapes alone do not.
+func TestTheWrapKeepsEveryTokenButTwoShapes(test *testing.T) {
+	test.Parallel()
+	const callSource = "package p\n\nvar v = f(first, second)\n"
+	for _, check := range []struct {
+		name  string
+		after string
+		same  bool
+	}{
+		{name: "the two shapes alone", after: "package p\n\nvar v = f(\n\tfirst,\n\tsecond,\n)\n", same: true},
+		{name: "a renamed argument", after: "package p\n\nvar v = f(\n\tfirst,\n\tsecnod,\n)\n"},
+		{name: "a dropped argument", after: "package p\n\nvar v = f(\n\tfirst,\n)\n"},
+	} {
+		same := slices.Equal(codeTokens(test, []byte(callSource)), codeTokens(test, []byte(check.after)))
+		if same != check.same {
+			test.Errorf("%s: the streams read the same %t, want %t", check.name, same, check.same)
+		}
+	}
+	wrappedCount := 0
+	for _, testCase := range wrapCases {
+		for _, options := range []Options{testCase.options, fixPhaseOptions} {
+			result, wrapError := Wrap([]byte(testCase.source), options)
+			if wrapError != nil {
+				test.Fatalf("%s with %+v: %v", testCase.name, options, wrapError)
+			}
+			if string(result.Output) != testCase.source {
+				wrappedCount++
+			}
+			if !slices.Equal(codeTokens(test, []byte(testCase.source)), codeTokens(test, result.Output)) {
+				test.Errorf("%s with %+v: the wrap changed a token:\n%s", testCase.name, options, result.Output)
+			}
+		}
+	}
+	if wrappedCount < len(wrapCases) {
+		test.Errorf("only %d of the %d wraps changed their file, so the proof shows little", wrappedCount,
+			2*len(wrapCases))
 	}
 }
