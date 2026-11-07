@@ -245,6 +245,99 @@ struct StandaloneScriptTests {
         #expect(run.typesBuild.hasSuffix("(1 for iOS)"), "\(run.typesBuild)")
     }
 
+    /* ahra's shape in a fresh repository with no project at its root: a script, a file of declarations, a dependency's Swift and a nested package's. */
+    static func scriptsOnlyRoot() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-scripts-root-\(UUID().uuidString)",
+            isDirectory: true,
+        )
+        for (path, text) in [
+            ".git/info/exclude": "",
+            "package.json": "{}\n",
+            "modules/ebay/EbayVision.swift":
+                "import Foundation\n\nlet words = CommandLine.arguments.count\nprint(words)\n",
+            "modules/stray/Leftover.swift": "struct Leftover {\n    let value: Int\n}\n",
+            "node_modules/dependency/Tool.swift": "print(1)\n",
+            "Nested/Package.swift": PipelineControlTests.manifest,
+            "Nested/run.swift": "print(2)\n",
+        ] {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+            )
+            try text.write(to: file, atomically: true, encoding: .utf8)
+        }
+        return root
+    }
+
+    /*
+     A root holding no Package.swift and no Xcode project is the scripts-only root discovery gives the Swift no project
+     claims (#wpd36zj), ahra's shape: its scripts are checked alone with no target checked before them, a file of
+     declarations stays a named gap, and what discovery never enters or another project claims is not this run's.
+     Its coverage query names the root alone.
+     */
+    @Test func aRootHoldingNoProjectChecksItsScriptsAlone() async throws {
+        let root = try Self.scriptsOnlyRoot()
+        defer { XcodeProjectPipelineTests.remove(root) }
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.findings.isEmpty, "\(run.of("finding"))")
+        #expect(run.exitCode == 0)
+        #expect(run.complete == true)
+        let project = try #require(run.of("project").first)
+        #expect(project["projectKind"] as? String == "Scripts")
+        #expect(project["filesOurs"] as? Int == 1)
+        #expect(Self.scriptTargets(run) == ["EbayVision:1"])
+        #expect(
+            Self.excluded(run) == [
+                "Leftover.swift: no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+            ]
+        )
+        #expect(run.typesRecord["files"] as? Int == 1)
+        #expect(
+            run.typesBuild.hasPrefix("a scripts-only root, which no package or Xcode project holds"),
+            "\(run.typesBuild)",
+        )
+
+        let covered = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--covered-packages"])
+        let record = try #require(covered.of("coveredPackages").first)
+        #expect(record["checked"] as? [String] == [root.standardizedFileURL.path])
+    }
+
+    /*
+     What a scripts-only root's verdict is decided from, which its inputs record names so the front door replays it only
+     while none has moved (#wpd36zj): each script, each Swift file it read to tell whether it is one (a file of
+     declarations becomes a script by an edit), and each directory its walk listed, so a script added beside the others
+     moves a listing. It walks no root, so nothing under `node_modules`, which discovery never enters, is named, and a
+     dependency's install never stops a replay.
+     */
+    @Test func aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict() async throws {
+        let root = try Self.scriptsOnlyRoot()
+        defer { XcodeProjectPipelineTests.remove(root) }
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        let inputs = try #require(run.of("inputs").first)
+        let relative = { (key: String) -> Set<String> in
+            Set((inputs[key] as? [String] ?? []).map { CheckFixture.relative($0, to: root) })
+        }
+        let files = relative("files")
+        let directories = relative("directories")
+        #expect(files.contains("modules/ebay/EbayVision.swift"), "the script is not named: \(files.sorted())")
+        #expect(
+            files.contains("modules/stray/Leftover.swift"),
+            "the file read to tell it is no script: \(files.sorted())",
+        )
+        #expect(
+            directories.contains("modules/ebay"),
+            "a script added beside it moves no listing: \(directories.sorted())",
+        )
+        let dependency = (files.union(directories).union(relative("absent"))).filter { $0.hasPrefix("node_modules") }
+        #expect(dependency.isEmpty, "a dependency's install would stop a replay: \(dependency.sorted())")
+    }
+
     /*
      Outside a git repository, a `git archive` copy of ahraos-presence say, a script is checked and a file of
      declarations named, as in a checkout: the walk reads the package's own ignore files as git would, so what they

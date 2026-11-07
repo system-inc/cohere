@@ -12,6 +12,19 @@ struct Linter {
     struct Result {
         var findings: [FindingRecord]
         var record: LintRecord
+        /* What each file's rules said before severity was applied, by path, which is what a verdict is kept as. */
+        var verdicts: [String: Verdict] = [:]
+    }
+
+    /*
+     One file's rules, as they returned: each enabled file rule that applies with what it found, and each enabled
+     typed rule that applies with what it found, or nil when no symbols described the file, so the typed rules
+     judged nothing. A rule absent from a map does not apply to the file.
+     */
+    struct Verdict: Sendable {
+        var fileRules: [String: [FindingRecord]]
+        var typedRules: [String]
+        var typedFindings: [String: [FindingRecord]]?
     }
 
     let configuration: RuleConfiguration
@@ -21,12 +34,21 @@ struct Linter {
     var symbols = SymbolProvider.Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
 
     /* `manifests` holds each owned package's parsed `Package.swift`, keyed by the package root's path; vendored packages are absent and never checked. */
-    /* `reusable` holds, by path, what the fix phase's last walk found per rule in exactly the text being linted; those files are not walked again. */
+    /*
+     `reusable` holds, by path, what every enabled file rule that applies found in exactly the text being linted: the
+     fix phase's last walk, or a verdict `LintVerdictCache` kept for these bytes. Each map is the whole answer for its
+     file, a rule absent from it being one that does not apply, as `FileFixer` collects it, so those files are not
+     walked by the file rules again. `typedReplayed` holds the same for the typed rules, from a verdict kept under the
+     record that describes the file as it stands; `typedRules` holds, by path, which enabled typed rules apply, where
+     a kept verdict already said, so they are not asked again.
+     */
     func run(
         package: PackageModel,
         manifests: [String: ParsedFile],
         files: [ParsedFile],
         reusable: [String: [String: [FindingRecord]]] = [:],
+        typedReplayed: [String: [String: [FindingRecord]]] = [:],
+        typedRules knownTypedRules: [String: [String]] = [:],
     ) async -> Result {
         let ownedPackages = package.allPackages.filter { $0.root == package.root || !package.isVendored($0) }
         var findings: [FindingRecord] = []
@@ -75,31 +97,62 @@ struct Linter {
          rule found in it (nil where the rule does not apply), and the results are laid out rule by rule, file by
          file, the order a sequential walk printed, so the stream is the same however the work was scheduled.
          */
-        let perFile = await withTaskGroup(of: (Int, [[FindingRecord]?]).self) { group in
+        let perFile = await withTaskGroup(of: (Int, Verdict).self) { group in
             for (index, file) in files.enumerated() {
                 group.addTask {
-                    let byRule = enabled.map { rule -> [FindingRecord]? in
-                        guard rule.applies(to: file) else { return nil }
-                        return reusable[file.url.path]?[rule.name] ?? rule.findings(in: file)
-                    }
+                    let path = file.url.path
+                    let byFileRule =
+                        reusable[path]
+                        ?? Dictionary(
+                            enabled.compactMap { rule in
+                                rule.applies(to: file) ? (rule.name, rule.findings(in: file)) : nil
+                            },
+                            uniquingKeysWith: { first, _ in first },
+                        )
+                    let applying =
+                        knownTypedRules[path] ?? enabledTyped.filter { $0.applies(to: file) }.map(\.name)
                     /* A typed rule with no symbols for a file it applies to judged nothing there; the crash list below says so. */
-                    let byTypedRule = enabledTyped.map { rule -> [FindingRecord]? in
-                        guard rule.applies(to: file), let found = symbols.symbols[file.url.path] else { return nil }
-                        return rule.findings(in: file, symbols: found)
+                    var byTypedRule: [String: [FindingRecord]]?
+                    if let replayed = typedReplayed[path] {
+                        byTypedRule = replayed
                     }
-                    return (index, byRule + byTypedRule)
+                    else if applying.isEmpty {
+                        byTypedRule = [:]
+                    }
+                    else if let found = symbols.symbols[path] {
+                        byTypedRule = Dictionary(
+                            enabledTyped.filter { applying.contains($0.name) }.map {
+                                ($0.name, $0.findings(in: file, symbols: found))
+                            },
+                            uniquingKeysWith: { first, _ in first },
+                        )
+                    }
+                    return (
+                        index, Verdict(fileRules: byFileRule, typedRules: applying, typedFindings: byTypedRule),
+                    )
                 }
             }
-            var collected = [[[FindingRecord]?]](repeating: [], count: files.count)
-            for await (index, byRule) in group {
-                collected[index] = byRule
+            var collected = [Verdict?](repeating: nil, count: files.count)
+            for await (index, verdict) in group {
+                collected[index] = verdict
             }
-            return collected
+            /* Every index was answered once: one task per file, each returning its own index. */
+            return collected.compactMap(\.self)
         }
-        for (ruleIndex, name) in (enabled.map(\.name) + enabledTyped.map(\.name)).enumerated() {
+        for name in enabled.map(\.name) {
             let severity = configuration.severity(of: name)
-            for fileIndex in files.indices {
-                guard let raw = perFile[fileIndex][ruleIndex] else { continue }
+            for verdict in perFile {
+                guard let raw = verdict.fileRules[name] else { continue }
+                listening[name, default: 0] += 1
+                let found = raw.map { Self.applying(severity, to: $0) }
+                reporting[name, default: 0] += found.count
+                findings.append(contentsOf: found)
+            }
+        }
+        for name in enabledTyped.map(\.name) {
+            let severity = configuration.severity(of: name)
+            for verdict in perFile {
+                guard let raw = verdict.typedFindings?[name] else { continue }
                 listening[name, default: 0] += 1
                 let found = raw.map { Self.applying(severity, to: $0) }
                 reporting[name, default: 0] += found.count
@@ -111,16 +164,16 @@ struct Linter {
             scopedOff[$0] == nil
         }
         /* A file a typed rule applies to and no source of symbols described: nothing that rule would say about it was said. */
-        let unchecked = files.filter { file in
-            symbols.unavailable[file.url.path] != nil && enabledTyped.contains { $0.applies(to: file) }
+        let unchecked = zip(files, perFile).filter { file, verdict in
+            symbols.unavailable[file.url.path] != nil && !verdict.typedRules.isEmpty
         }
         /*
          Each crash names the rules it cost, so a reader knows what the file was not judged for and that every other
          rule judged it: a count with no rule leaves nobody able to say what a crashed file missed (@system_cohere,
          2026-11-05, from a one-file package that crashed under `--lint` before any build).
          */
-        var crashes = unchecked.map { file in
-            let missed = enabledTyped.filter { $0.applies(to: file) }.map(\.name).sorted()
+        var crashes = unchecked.map { file, verdict in
+            let missed = verdict.typedRules.sorted()
             return LintRecord.Crash(
                 file: file.url.path,
                 error:
@@ -162,8 +215,13 @@ struct Linter {
             rulesScopedOff: scopedOff,
             rulesNotConfigured: [],
             configurationNote: configuration.note,
+            filesReplayed: 0,
         )
-        return Result(findings: findings, record: record)
+        return Result(
+            findings: findings,
+            record: record,
+            verdicts: Dictionary(zip(files.map(\.url.path), perFile), uniquingKeysWith: { first, _ in first }),
+        )
     }
 
     /* A rule reports at error; the config can lower it to warning. Both count as findings. */

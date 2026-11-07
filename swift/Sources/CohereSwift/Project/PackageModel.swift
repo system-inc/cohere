@@ -62,11 +62,15 @@ public struct PackageModel: Equatable, Sendable {
         }
     }
 
-    /* What the model was read from: a SwiftPM package, or an Xcode project (`XcodeProject`) handed to the run in its shape. */
+    /*
+     What the model was read from: a SwiftPM package, an Xcode project (`XcodeProject`) handed to the run in its shape,
+     or nothing at all, a scripts-only root (`scriptsOnly(root:)`).
+     */
     public enum ProjectKind: String, Equatable, Sendable {
         case swiftPackage = "SwiftPackage"
         case xcodeGen = "XcodeGen"
         case xcodeProject = "XcodeProject"
+        case scripts = "Scripts"
     }
 
     public var name: String
@@ -124,6 +128,17 @@ public struct PackageModel: Equatable, Sendable {
         self.targets = targets
         self.localDependencyRoots = localDependencyRoots
         self.localPackages = localPackages
+    }
+
+    /*
+     A root holding no Package.swift and no Xcode project, which the front door runs for the Swift files no project
+     claims (#wpd36zj): no target, so its files are its standalone scripts alone, each checked as `swift <file>` runs
+     it, and every other Swift file there is named as not checked (`FileSet`).
+     */
+    public static func scriptsOnly(root: URL) -> PackageModel {
+        var model = PackageModel(name: root.lastPathComponent, root: root, toolsVersion: "", targets: [])
+        model.projectKind = .scripts
+        return model
     }
 
     /* This package and every local package under it, the root first. */

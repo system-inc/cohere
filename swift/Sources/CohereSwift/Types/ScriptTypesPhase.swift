@@ -205,6 +205,19 @@ struct ScriptTypesPhase {
         return .success(Destination(sdk: sdk, target: "arm64-apple-ios\(deployment)"))
     }
 
+    /* The types phase of a scripts-only root before its scripts are added: no target, so nothing checked yet. */
+    static let noTargets = TypesPhase.Result(
+        findings: [],
+        record: TypesRecord(
+            diagnostics: 0,
+            files: 0,
+            elapsedMilliseconds: 0,
+            filesWithoutRecord: [],
+            build: "a scripts-only root, which no package or Xcode project holds, so no target was checked",
+        ),
+        hasErrors: false,
+    )
+
     /* The types phase's result with the scripts' added: their findings in order among the targets', their files counted, their words after. */
     static func adding(_ scripts: Result, count: Int, to targets: TypesPhase.Result) -> TypesPhase.Result {
         var result = targets

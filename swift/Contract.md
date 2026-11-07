@@ -74,6 +74,15 @@ engine generates a spec's project into its own scratch, never beside the spec, a
 their Swift files from the project file. A root holding two projects, or a workspace and no project, is
 refused with exit 2 and a sentence, as is a spec xcodegen refuses and a machine without xcodegen.
 
+A root holding no project at all is a scripts-only root (#wpd36zj): discovery gives one to the Swift files no
+project claims, at the repository's root, as ahra's four scripts under `modules/` are. It has no target, so no
+package or Xcode check runs, and its files are its standalone scripts (see `project`), each checked alone. Its
+walk skips what discovery never enters (`node_modules`, `.build`, `.cache`, `.git`, `testdata`), and a file
+below a project of its own is left out entirely, since that project runs or is covered by one that does. Its
+inputs record names no walk of the root, only the scripts and the file set's listings and ignore files.
+Outside a repository there are no ignore rules to walk by, so discovery names such files as the gap it always
+did, `Swift files no package checks`.
+
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
 the run, prints a sentence on stderr naming both versions, and exits 2. The first record the engine
 writes is `provenance`, which carries its own `contract` field. The front door refuses a mismatch
@@ -157,7 +166,8 @@ nothing else.
   the graph, because it is the step nothing can skip.
 - Written on every run that checks anything, since every such run describes the package first.
 - `projectKind` says what `package` was read from: `SwiftPackage`, `XcodeGen` (a spec, generated into the
-  engine's scratch) or `XcodeProject` (a committed project, read where it stands). It is additive within
+  engine's scratch), `XcodeProject` (a committed project, read where it stands) or `Scripts` (a scripts-only
+  root, whose `package` is its directory's name and which reads nothing). It is additive within
   contract 3, and an engine from before it writes none. For an Xcode project, `package` is the project's
   name, and each native target's kind is Xcode's product type in SwiftPM's words: an app or an extension
   is `application`, a unit-test or interface-test bundle `test`, a framework or library `library`, a
@@ -580,7 +590,8 @@ project, and the front door records nothing for either.
     "crashes": [{ "file": "/…/X.swift", "error": "…" }],
     "rulesScopedOff": { "cohere-swift/consistency-no-print": 12 },
     "rulesNotConfigured": [],
-    "configNote": ""
+    "configNote": "",
+    "filesReplayed": 140
 }
 ```
 
@@ -588,6 +599,23 @@ Rendered by the existing lint line and coverage printers:
 `lint: 3 findings — 15 rules over 149 files, 412233 nodes visited, in 96ms`, followed by the rule
 coverage, crash, and config notes. `reusedFrom` names the phase whose walk was reused (`fix`), and
 the line then says so instead of printing a duration.
+
+`filesReplayed` counts the files of `filesWalked` whose every rule's verdict was read from the
+engine's lint verdict store, `<scratch>/lint-verdicts.json`, rather than computed this run
+(#da5fx6d). It is additive within contract 3, as `changedFiles` is: this engine always writes it, a
+stream from an engine before it has none, and a front door that does not read it loses only the
+count. Every other field reads as it would without the store: a replayed file is still in
+`filesWalked` and `nodesVisited`, its findings are written, and it counts toward each rule's
+coverage, so a run that replayed and a run under `--no-cache` write the same stream but for this
+field and the elapsed times. A verdict is replayed only under the key it was kept under. The store
+is keyed as a whole by the engine (the executable's sha256) and the enabled rules with their
+options. Each file is keyed by its bytes, its path and its package root, both with links resolved,
+its target and the target's kind, and a standalone script's platform. Its typed rules' verdict is
+also keyed by the index record that describes the file as it stands, by store and record name (a
+content address of what the file's names resolve to), and by the modules the package owns. Never
+kept: the package rules, a typed verdict sourcekitd answered, a typed verdict for a file no source
+described, a verdict holding a rule's failure, and a file whose text moved during the run. Under
+`--no-cache` nothing is read or kept, and the count is 0.
 
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
