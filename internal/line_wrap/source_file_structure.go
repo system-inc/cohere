@@ -1,9 +1,11 @@
-package main
+package line_wrap
 
 import (
 	"go/ast"
 	"go/token"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
 // Shape names the construct a plan breaks, and labels residue.
@@ -224,9 +226,9 @@ func (sourceFile *sourceFile) estimate(candidate plan, line int) int {
 		case kind == breakClose && opensHere:
 			columns = base + width(strings.TrimSpace(segment))
 		case kind == breakClose:
-			columns = max(base-tabWidth, 0) + width(strings.TrimSpace(segment))
+			columns = max(base-consistency_no_long_line.TabColumns, 0) + width(strings.TrimSpace(segment))
 		case opensHere || kind == breakOperator:
-			columns = base + tabWidth + width(strings.TrimSpace(segment))
+			columns = base + consistency_no_long_line.TabColumns + width(strings.TrimSpace(segment))
 		default:
 			columns = base + width(strings.TrimSpace(segment))
 		}

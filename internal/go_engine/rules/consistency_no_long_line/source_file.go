@@ -29,6 +29,36 @@ type sourceFile struct {
 	unwrappableFields map[int]*ast.Field
 }
 
+// reportedLine is one line the rule reports: where it overflows, where it ends, and how wide it reads.
+type reportedLine struct {
+	line     int
+	overflow int
+	end      int
+	length   int
+}
+
+// reportedLines are the lines past the limit that no exemption covers, in order.
+func (source *sourceFile) reportedLines() []reportedLine {
+	var reported []reportedLine
+	for line := 1; line <= source.tokenFile.LineCount(); line++ {
+		if source.exemptLines[line] {
+			continue
+		}
+		start, end := source.lineStart(line), source.lineEnd(line)
+		length := columnsOf(source.content[start:end])
+		if length <= Limit {
+			continue
+		}
+		overflow := start + offsetPastLimit(source.content[start:end])
+		if source.isRawStringBody(line, overflow) || source.isLoneStringLiteral(line, overflow) ||
+			source.isUnbreakableCommentToken(line, overflow) || source.isLoneField(line) {
+			continue
+		}
+		reported = append(reported, reportedLine{line: line, overflow: overflow, end: end, length: length})
+	}
+	return reported
+}
+
 // isRawStringBody is whether the overflow falls in a raw string's body on a line after the one the string opens on:
 // data with its own line structure, which a break would change. On the line the string closes on, code after it is
 // code like any other and could wrap, so only closing punctuation may follow.
@@ -138,7 +168,7 @@ func (source *sourceFile) isUnbreakableCommentToken(line int, overflow int) bool
 	tokenStart := textStart + bytes.LastIndexAny(source.content[textStart:overflow], " \t") + 1
 	indentation := source.content[source.lineStart(line):source.codeStart(line)]
 	ownLine := columnsOf(indentation) + len("// ") + columnsOf(source.content[tokenStart:overflow+len(tail)])
-	return ownLine > limit
+	return ownLine > Limit
 }
 
 func (source *sourceFile) offsetOf(position token.Pos) int {

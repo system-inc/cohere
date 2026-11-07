@@ -1,4 +1,4 @@
-package main
+package line_wrap
 
 import (
 	"fmt"

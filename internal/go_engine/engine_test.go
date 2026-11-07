@@ -276,6 +276,92 @@ var endToEndCases = []endToEndCase{
 	{name: "refused-flag", fixture: "clean", extra: []string{"--unused"}, exitCode: 2},
 	{name: "refused-combination", fixture: "clean", extra: []string{"--format-only", "--lint"}, exitCode: 2},
 	{name: "scope-outside-root", fixture: "clean", extra: []string{"{root}/.."}, exitCode: 2},
+	// The fix phase wraps the three long lines a wrap can bring within the limit and leaves the two it cannot as they
+	// were written: the string with a comment after it, which no break touches, and the return of a long string and a
+	// name, which a break after its + would leave long. The lint phase reports those two alone, and a second run
+	// changes nothing.
+	{
+		name: "long-lines-rewritten", fixture: "long-lines", exitCode: 1,
+		verify: both(wrapped("long_lines.go", "long-lines-rewritten"),
+			keepsLine("long_lines.go", "long-lines", `	return "with thanks from the whole depot`)),
+	},
+	{
+		name: "long-lines-no-fix", fixture: "long-lines", extra: []string{"--no-fix"}, exitCode: 1,
+		verify: unchanged("long_lines.go", "long-lines"),
+	},
+	{
+		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 0, prepare: turnOffLongLines,
+		verify: unchanged("long_lines.go", "long-lines"),
+	},
+}
+
+// both is a verify that runs first and then second.
+func both(first, second func(test *testing.T, root string)) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		first(test, root)
+		second(test, root)
+	}
+}
+
+// keepsLine is a verify that the one line of a fixture file starting with prefix is in the copy's file after the run,
+// byte for byte and whole: a long line no break cures is left as it was written, not broken and left long.
+func keepsLine(relative string, fixture string, prefix string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		original, originalError := os.ReadFile(filepath.Join("testdata", fixture, filepath.FromSlash(relative)))
+		after, afterError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if originalError != nil || afterError != nil {
+			test.Fatalf("reading %s: %v, %v", relative, originalError, afterError)
+		}
+		var kept []string
+		for line := range strings.Lines(string(original)) {
+			if strings.HasPrefix(line, prefix) {
+				kept = append(kept, line)
+			}
+		}
+		if len(kept) != 1 {
+			test.Fatalf("want one line of %s starting %q, found %d", relative, prefix, len(kept))
+		}
+		if !slices.Contains(slices.Collect(strings.Lines(string(after))), kept[0]) {
+			test.Errorf("the run changed the line it could not cure:\n%s\nfile now:\n%s", kept[0], after)
+		}
+	}
+}
+
+// turnOffLongLines writes settings beside the copy's go.mod that turn the long-line rule off.
+func turnOffLongLines(root string) error {
+	settingsText := `{"go": {"rules": {"` + consistency_no_long_line.Name + `": "off"}}}` + "\n"
+	return os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(settingsText), 0o644)
+}
+
+// wrapped is a verify that a file of the copy reads as the case's golden, `<name>.golden` beside its expected files,
+// and that a second run over the copy rewrites nothing, since a wrap the fix phase keeps is gofmt's and its own fixed
+// point. Under -update the golden is rewritten from the copy.
+func wrapped(relative string, caseName string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		after, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if readError != nil {
+			test.Fatalf("reading %s: %v", relative, readError)
+		}
+		compareExpected(test, filepath.Join("testdata", caseName, filepath.Base(relative)+".golden"), string(after))
+		var standardOutput bytes.Buffer
+		var standardError bytes.Buffer
+		run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
+			rules.All())
+		for line := range strings.Lines(standardOutput.String()) {
+			var record contract.FixRecord
+			if strings.HasPrefix(line, `{"kind":"fix"`) && json.Unmarshal([]byte(line), &record) == nil &&
+				record.FilesRewritten != 0 {
+				test.Errorf("a second run rewrote %d files: %s", record.FilesRewritten, line)
+			}
+		}
+		again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if againError != nil || !bytes.Equal(again, after) {
+			test.Errorf("a second run changed %s (%v)", relative, againError)
+		}
+	}
 }
 
 func TestEndToEnd(test *testing.T) {

@@ -1,8 +1,10 @@
-package main
+package line_wrap
 
 import (
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
 // wrapCases each hold a source with long lines and the exact output the tool must produce under options.
@@ -412,7 +414,7 @@ func TestClassify(test *testing.T) {
 		test.Fatalf("parse: %v", parseSourceError)
 	}
 	for index, line := range lines {
-		if width(line.text) <= Limit {
+		if width(line.text) <= consistency_no_long_line.Limit {
 			if line.want != "" {
 				test.Errorf("line %d is not long, the case is wrong: %s", index+1, line.text)
 			}
@@ -427,6 +429,104 @@ func TestClassify(test *testing.T) {
 		}
 		if got := keyedExempt.classify(index + 1); got != want {
 			test.Errorf("line %d with keyed strings exempt: %s, want %s: %s", index+1, got, want, line.text)
+		}
+	}
+}
+
+// TestReportedOnlyWrapsOnlyTheRulesLines pins Options.ReportedOnly: a long line consistency_no_long_line leaves alone
+// is CategoryNotReported and never wrapped, though without the option it is actionable, while a line the rule reports
+// keeps its own category and wraps. The rule leaves alone a comment that overruns only on one token too long for a
+// comment line of its own, which deep indentation makes of a token of thirty letters, while this package calls such a
+// token unbroken only from forty letters or with a scheme, and would move it to a line of its own, as long as before.
+func TestReportedOnlyWrapsOnlyTheRulesLines(test *testing.T) {
+	test.Parallel()
+	const depth = 22
+	var builder strings.Builder
+	builder.WriteString("package p\n\nfunc report() {\n")
+	for level := 1; level < depth; level++ {
+		builder.WriteString(strings.Repeat("\t", level) + "{\n")
+	}
+	token := strings.Repeat("abcdefghij", 3)
+	builder.WriteString(strings.Repeat("\t", depth) + "// see " + token + "\n")
+	for level := depth - 1; level >= 1; level-- {
+		builder.WriteString(strings.Repeat("\t", level) + "}\n")
+	}
+	builder.WriteString("\tsend(context, \"" + strings.Repeat("word ", 24) + "\", first)\n}\n")
+	source := builder.String()
+	commentLine := depth + 3
+	callLine := 2*depth + 3
+	plain, parseSourceError := parseSource([]byte(source), Options{})
+	if parseSourceError != nil {
+		test.Fatalf("parse: %v\n%s", parseSourceError, source)
+	}
+	reportedOnly, parseSourceError := parseSource([]byte(source), Options{ReportedOnly: true})
+	if parseSourceError != nil {
+		test.Fatalf("parse: %v", parseSourceError)
+	}
+	for _, line := range []struct {
+		number         int
+		want           Category
+		wantInReported Category
+	}{
+		{number: commentLine, want: CategoryActionable, wantInReported: CategoryNotReported},
+		{number: callLine, want: CategoryActionable, wantInReported: CategoryActionable},
+	} {
+		if width(plain.lineText(line.number)) <= consistency_no_long_line.Limit {
+			test.Fatalf("line %d is not long, the case is wrong: %s", line.number, plain.lineText(line.number))
+		}
+		if got := plain.classify(line.number); got != line.want {
+			test.Errorf("line %d: %s, want %s", line.number, got, line.want)
+		}
+		if got := reportedOnly.classify(line.number); got != line.wantInReported {
+			test.Errorf("line %d with ReportedOnly: %s, want %s", line.number, got, line.wantInReported)
+		}
+	}
+	for _, testCase := range []struct {
+		options     Options
+		commentKept bool
+	}{
+		{options: Options{}, commentKept: false},
+		{options: Options{ReportedOnly: true}, commentKept: true},
+	} {
+		result, wrapError := Wrap([]byte(source), testCase.options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", testCase.options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if strings.Contains(output, "// see "+token+"\n") != testCase.commentKept ||
+			!strings.Contains(output, "\tsend(\n") {
+			test.Errorf("with %+v, want the comment kept %v and the call wrapped, got:\n%s", testCase.options,
+				testCase.commentKept, output)
+		}
+	}
+}
+
+// TestCuredOnlyLeavesWhatItCannotCure pins Options.CuredOnly: a return of a long string and a name, which a break after
+// the + would leave long, stays byte for byte as it was, while a call beside it is still wrapped. Without the option
+// the return is broken and left long.
+func TestCuredOnlyLeavesWhatItCannotCure(test *testing.T) {
+	test.Parallel()
+	uncured := "\treturn \"" + strings.Repeat("word ", 24) + "\" + name\n"
+	source := "package p\n\nfunc signature(name string) string {\n" + uncured + "}\n\n" +
+		"func report() {\n\tsend(context, \"" + strings.Repeat("word ", 20) + "\", first, second, third)\n}\n"
+	for _, testCase := range []struct {
+		options Options
+		kept    bool
+	}{
+		{options: Options{}, kept: false},
+		{options: Options{CuredOnly: true}, kept: true},
+	} {
+		result, wrapError := Wrap([]byte(source), testCase.options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", testCase.options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if strings.Contains(output, uncured) != testCase.kept || !strings.Contains(output, "\tsend(\n") {
+			test.Errorf("with %+v, want the return kept whole %v and the call wrapped, got:\n%s", testCase.options,
+				testCase.kept, output)
+		}
+		if testCase.kept && (result.After[CategoryNotCured] != 1 || result.After[CategoryActionable] != 0) {
+			test.Errorf("want the return counted as not cured and nothing left actionable, got %v", result.After)
 		}
 	}
 }

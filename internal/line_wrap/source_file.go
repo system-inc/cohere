@@ -1,4 +1,4 @@
-package main
+package line_wrap
 
 import (
 	"go/ast"
@@ -7,13 +7,9 @@ import (
 	"sort"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
-
-// Limit is the widest a line may be, in columns.
-const Limit = 120
-
-// tabWidth is how many columns one tab counts for.
-const tabWidth = 4
 
 // Category says whether a long line is a violation the tool should fix, or why it is not one.
 type Category string
@@ -33,6 +29,11 @@ const (
 	CategoryUnbrokenToken Category = "UnbrokenToken"
 	CategoryDirective     Category = "Directive"
 	CategoryImport        Category = "Import"
+	// CategoryNotReported is a long line consistency_no_long_line leaves alone, only with Options.ReportedOnly.
+	CategoryNotReported Category = "NotReported"
+	// CategoryNotCured is a long line no wrap brings within the limit, left as gofmt printed it, only with
+	// Options.CuredOnly.
+	CategoryNotCured Category = "NotCured"
 )
 
 // Categories lists every category in report order.
@@ -44,6 +45,8 @@ var Categories = []Category{
 	CategoryUnbrokenToken,
 	CategoryDirective,
 	CategoryImport,
+	CategoryNotReported,
+	CategoryNotCured,
 }
 
 // Options are the choices a run makes that a ruling may still change.
@@ -52,6 +55,23 @@ type Options struct {
 	// followed by nothing but closing punctuation, as Prettier leaves such a line. gofmt joins a break after
 	// a composite key's colon or a spec's `=` back onto one line, so no rewrap can put those strings alone.
 	ExemptKeyedStrings bool
+
+	// ReportedOnly wraps only the long lines consistency_no_long_line reports, every other one counted as
+	// CategoryNotReported, so a wrap that fixes the rule's findings never rewrites a line the rule leaves alone. The
+	// fix phase sets it; the command line does not, and judges by the categories above alone.
+	ReportedOnly bool
+
+	// CuredOnly keeps a wrap only where it cures: every long line the wrap touches, past CategoryNotReported, must
+	// end with each of its pieces within the limit. A long line a wrap would touch and leave long is left as it was,
+	// and so is every construct around it, and the wrap is tried again without them; when that cannot be done, the
+	// file is left as it was. A wrap that breaks a line and leaves it long is churn with no cure. The fix phase sets
+	// it.
+	CuredOnly bool
+
+	// uncured are the spans of the source, in kept bytes (see keptByte), of the lines a CuredOnly wrap leaves alone.
+	// Wrap sets it between its tries; a byte's kept index is the same in every pass, since a wrap only moves
+	// whitespace, commas and comment slashes.
+	uncured []keptSpan
 }
 
 // commentSpan is one comment of the file, `//` or `/* */`, with byte offsets.
@@ -80,7 +100,12 @@ type sourceFile struct {
 	// `key: "…"` in a composite literal, `name = "…"` in a var or const spec or an assignment, `name := "…"`.
 	keyedStarts map[int]*ast.BasicLit
 	importLines map[int]bool
-	options     Options
+	// reportedLines are the lines consistency_no_long_line reports, read only with Options.ReportedOnly.
+	reportedLines map[int]bool
+	// keptStarts holds, for each line from the first and then for the end of the source, how many kept bytes come
+	// before it, read only with Options.CuredOnly.
+	keptStarts []int
+	options    Options
 }
 
 func parseSource(source []byte, options Options) (*sourceFile, error) {
@@ -99,9 +124,18 @@ func parseSource(source []byte, options Options) (*sourceFile, error) {
 		stringAloneLines: map[int]bool{},
 		keyedStarts:      map[int]*ast.BasicLit{},
 		importLines:      map[int]bool{},
+		reportedLines:    map[int]bool{},
 		options:          options,
 	}
 	sourceFile.lineStarts = sourceFile.tokenFile.Lines()
+	if options.CuredOnly {
+		sourceFile.keptStarts = keptStarts(source, sourceFile.lineStarts)
+	}
+	if options.ReportedOnly {
+		for _, line := range consistency_no_long_line.ReportedLines(file, sourceFile.tokenFile, source) {
+			sourceFile.reportedLines[line] = true
+		}
+	}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
 			sourceFile.comments = append(sourceFile.comments, commentSpan{
@@ -210,8 +244,10 @@ func (sourceFile *sourceFile) offset(position token.Pos) int {
 	return sourceFile.tokenFile.Offset(position)
 }
 
+// lineOfPosition is the line position sits on in the text, not one a //line directive gives it, since every line
+// this package measures and edits is a line of the text.
 func (sourceFile *sourceFile) lineOfPosition(position token.Pos) int {
-	return sourceFile.tokenFile.Line(position)
+	return sourceFile.tokenFile.PositionFor(position, false).Line
 }
 
 // lineOf returns the 1-based line holding a byte offset.
@@ -266,12 +302,12 @@ func (sourceFile *sourceFile) literalAt(offset int) (*ast.BasicLit, bool) {
 	return nil, false
 }
 
-// width measures a string in columns, a tab counting as tabWidth.
+// width measures a string in columns as the rule does, a tab as its TabColumns and every other rune as one.
 func width(text string) int {
 	columns := 0
 	for _, character := range text {
 		if character == '\t' {
-			columns += tabWidth
+			columns += consistency_no_long_line.TabColumns
 		} else {
 			columns++
 		}
@@ -279,16 +315,16 @@ func width(text string) int {
 	return columns
 }
 
-// crossing returns the byte index of the first rune that lands past Limit, or -1 when the line fits.
+// crossing returns the byte index of the first rune that lands past the rule's Limit, or -1 when the line fits.
 func crossing(text string) int {
 	columns := 0
 	for index, character := range text {
 		if character == '\t' {
-			columns += tabWidth
+			columns += consistency_no_long_line.TabColumns
 		} else {
 			columns++
 		}
-		if columns > Limit {
+		if columns > consistency_no_long_line.Limit {
 			return index
 		}
 	}
@@ -355,6 +391,12 @@ func (sourceFile *sourceFile) commaBetween(start, end int) bool {
 
 // classify says whether a long line is a violation, and when it is not, why.
 func (sourceFile *sourceFile) classify(line int) Category {
+	if sourceFile.options.ReportedOnly && !sourceFile.reportedLines[line] {
+		return CategoryNotReported
+	}
+	if sourceFile.isUncured(line) {
+		return CategoryNotCured
+	}
 	if sourceFile.rawBodyLines[line] {
 		return CategoryRawStringBody
 	}
@@ -385,11 +427,11 @@ func (sourceFile *sourceFile) classify(line int) Category {
 	return CategoryActionable
 }
 
-// longLines lists every 1-based line wider than Limit.
+// longLines lists every 1-based line wider than the rule's Limit.
 func (sourceFile *sourceFile) longLines() []int {
 	var lines []int
 	for line := 1; line <= sourceFile.lineCount(); line++ {
-		if width(sourceFile.lineText(line)) > Limit {
+		if width(sourceFile.lineText(line)) > consistency_no_long_line.Limit {
 			lines = append(lines, line)
 		}
 	}
@@ -418,7 +460,11 @@ func (sourceFile *sourceFile) pass() []edit {
 	}
 	type claim struct{ start, end int }
 	var claims []claim
+	// A line left uncured is claimed from the start, so no construct around it is broken or laid out again.
 	overlaps := func(start, end int) bool {
+		if sourceFile.spansUncured(start, end) {
+			return true
+		}
 		for _, existing := range claims {
 			if start < existing.end && existing.start < end {
 				return true
@@ -471,7 +517,7 @@ func (sourceFile *sourceFile) choosePlan(plans []plan, indexes []int, line int) 
 	bestWidth := 0
 	for _, index := range ordered {
 		estimated := sourceFile.estimate(plans[index], line)
-		if estimated <= Limit {
+		if estimated <= consistency_no_long_line.Limit {
 			return plans[index], true
 		}
 		if best < 0 || estimated < bestWidth {

@@ -5,7 +5,8 @@
 // It walks every Go file under root, skipping TypeScript/, testdata/, generated files and every -skip path (a
 // file, or a directory and everything under it, relative to root), and prints counts of
 // long lines before and after, the residue, and any file whose output failed the equivalence proof. With -w it
-// writes the files that changed and passed the proof.
+// writes the files that changed and passed the proof. The wrapping and the proof are internal/line_wrap's, which the
+// engine's fix phase runs too.
 package main
 
 import (
@@ -20,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/line_wrap"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -68,7 +70,7 @@ func runCommandLine() int {
 	logs := flag.String("logs", "", "directory for linewrap-before.txt, linewrap-after.txt and linewrap-residue.txt")
 	var skips skipList
 	flag.Var(&skips, "skip", "a path relative to root to leave untouched, a file or a directory; repeatable")
-	var options Options
+	var options line_wrap.Options
 	flag.BoolVar(&options.ExemptKeyedStrings, "exempt-keyed-strings", false,
 		"exempt a line starting with `key: `, `name = ` or `name := ` and a string literal followed only by closing punctuation")
 	flag.Parse()
@@ -86,9 +88,9 @@ func runCommandLine() int {
 	return 0
 }
 
-func run(root string, write bool, logs string, skips skipList, options Options) error {
-	before := Count{}
-	after := Count{}
+func run(root string, write bool, logs string, skips skipList, options line_wrap.Options) error {
+	before := line_wrap.Count{}
+	after := line_wrap.Count{}
 	generated := 0
 	skippedFiles := 0
 	skippedLines := 0
@@ -123,8 +125,8 @@ func run(root string, write bool, logs string, skips skipList, options Options) 
 		}
 		if skips.covers(relative) {
 			skippedFiles++
-			if parsed, parseSourceError := parseSource(source, Options{}); parseSourceError == nil {
-				skippedLines += len(parsed.longLines())
+			if long, countError := line_wrap.CountLongLines(source); countError == nil {
+				skippedLines += long
 			}
 			return nil
 		}
@@ -137,12 +139,12 @@ func run(root string, write bool, logs string, skips skipList, options Options) 
 		// A copy of upstream source (a `cohere:copied` header before the package clause) is foreign code kept
 		// byte for byte, so it is left exactly as a generated file is.
 		if parseFileError == nil && (ast.IsGenerated(header) || declaresCopy(header)) {
-			if parsed, parseSourceError := parseSource(source, Options{}); parseSourceError == nil {
-				generated += len(parsed.longLines())
+			if long, countError := line_wrap.CountLongLines(source); countError == nil {
+				generated += long
 			}
 			return nil
 		}
-		result, wrapError := Wrap(source, options)
+		result, wrapError := line_wrap.Wrap(source, options)
 		if wrapError != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", relative, wrapError))
 			return nil
@@ -175,7 +177,7 @@ func run(root string, write bool, logs string, skips skipList, options Options) 
 	if walkError != nil {
 		return walkError
 	}
-	summary := func(title string, count Count) string {
+	summary := func(title string, count line_wrap.Count) string {
 		var builder strings.Builder
 		total := 0
 		for _, value := range count {
@@ -190,7 +192,7 @@ func run(root string, write bool, logs string, skips skipList, options Options) 
 			skippedFiles,
 			skippedLines,
 		)
-		for _, category := range Categories {
+		for _, category := range line_wrap.Categories {
 			fmt.Fprintf(&builder, "  %-14s %d\n", category, count[category])
 		}
 		return builder.String()

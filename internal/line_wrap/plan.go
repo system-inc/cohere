@@ -1,4 +1,4 @@
-package main
+package line_wrap
 
 // plan is one construct broken at every one of its break points.
 type plan struct {

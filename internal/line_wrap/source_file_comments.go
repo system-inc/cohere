@@ -1,8 +1,10 @@
-package main
+package line_wrap
 
 import (
 	"go/ast"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
 // proseComment reports whether a comment-only line is a prose line a reflow may touch: `// ` then a word, not
@@ -51,7 +53,7 @@ func (sourceFile *sourceFile) commentEdit(line int) (edit, bool) {
 		}
 		paragraph = append(paragraph, nextComment.text)
 	}
-	room := Limit - width(indent) - len("// ")
+	room := consistency_no_long_line.Limit - width(indent) - len("// ")
 	var output []string
 	var carry []string
 	consumed := 0
