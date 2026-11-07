@@ -315,8 +315,12 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.UnclaimedSwift = found.UnclaimedSwift
+	facts.EngineBuilds = builtEngines()
 	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
+	} else {
+		// A build this run made before its projects ran, as a coverage query does, is a record of its own.
+		fmt.Fprint(out, engineBuildLines(facts.EngineBuilds))
 	}
 	// A run stopped by a signal ends the way the signal would have ended it, after every child has, so the
 	// caller that sent it reads it as stopped and not as a verdict.

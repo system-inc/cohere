@@ -29,8 +29,9 @@ const saveArguments = ['--fix', '--format'];
 /*
  * Finds the cohere binary for a project, or returns undefined having found nothing.
  *
- * The order is Structure's (libraries/structure/command-line/Structure.ts, resolveCohereBinary), so
- * the editor and `s c` run the same binary:
+ * The order is the one a bare `c` resolves (command/c) and Nexus's formatter resolves
+ * (libraries/nexus/code-quality/format/FormatSource.ts, resolveCohereBinary), so the editor and `c` run
+ * the same binary:
  *
  *   1. COHERE_BINARY, an absolute path, which is the cohere dispatcher's own override. A broken one is
  *      a failure rather than a fallback, because whoever set it named the binary they want.
@@ -114,8 +115,8 @@ function cohereCandidatePaths(projectDirectory, environment = process.env, host 
 
 /*
  * What a save says when no cohere was found: that the file was not formatted, where cohere was looked
- * for, and the command that installs it. Structure's `s c` says the same when it finds none
- * (reportUnresolvableCohereBinary), so the two read alike.
+ * for, and the command that installs it. A bare `c` that finds none names everywhere it looked too
+ * (command/c), so the two read alike.
  */
 function cohereNotFoundMessage(projectDirectory, environment = process.env) {
     const overridePath = environment[cohereBinaryOverrideVariable];
@@ -142,8 +143,8 @@ function environmentWithoutCohereOverride(environment = process.env) {
  * cohere failed: a broken formatter, a project it cannot load, a binary that would not start. The
  * caller shows the error and saves the buffer as typed.
  *
- * It runs from the file's own directory, so cohere finds the nearest project the way `s c` run there
- * would, nested repositories included.
+ * It runs from the file's own directory, so cohere finds the nearest project the way a bare `c` run
+ * there would, nested repositories included.
  */
 function formatWithCohere(binary, filePath, text, cancellation) {
     return new Promise(function(resolve) {

@@ -6,6 +6,7 @@
         { "$ref": "#/$defs/finding" },
         { "$ref": "#/$defs/changedFile" },
         { "$ref": "#/$defs/crash" },
+        { "$ref": "#/$defs/engineBuild" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -44,6 +45,21 @@
                     "items": { "type": "string" },
                     "description": "The rules whose fixes were applied, for a fixed file."
                 }
+            }
+        },
+        "engineBuild": {
+            "description": "An engine a development cohere built from source before it could check, its sources or the toolchain having changed. Its time is not in the summary's seconds, which are the check's alone. A released cohere builds nothing.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "engine", "key", "seconds"],
+            "properties": {
+                "kind": { "const": "engineBuild" },
+                "engine": { "type": "string", "description": "The binary built, such as cohere-swift." },
+                "key": {
+                    "type": "string",
+                    "description": "The cache key it was built under, the hash its binary is named by."
+                },
+                "seconds": { "type": "number", "description": "How long the build took." }
             }
         },
         "crash": {

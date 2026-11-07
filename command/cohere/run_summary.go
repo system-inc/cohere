@@ -81,6 +81,10 @@ type runSummary struct {
 	Skips []ruleSkip
 
 	Gaps runGaps
+
+	// EngineBuilds are the engines this invocation built before it checked, which no record or replay keeps,
+	// since a build is this invocation's (engine_build.go).
+	EngineBuilds []engineBuild `json:"-"`
 }
 
 // ruleSkip is a rule that declined every file it was offered: why, and the check that reports the same

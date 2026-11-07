@@ -19,14 +19,14 @@ reload and undo works as usual.
 
 ## Which cohere
 
-The same one `s c` runs, found in Structure's order:
+The same one a bare `c` runs in that folder, found the same way:
 
 1. `COHERE_BINARY`.
 2. The project's `node_modules/.bin/cohere`.
 3. `cohere` on `PATH`.
 
-A save runs from the file's own directory, so cohere finds the nearest project, as `s c` would run
-from there.
+A save runs from the file's own directory, so cohere finds the nearest project, as a bare `c` run from
+there would.
 
 ## Install
 

@@ -22,29 +22,5 @@
         "kind": "verdict",
         "task": "p5hm8xm",
         "reason": "the rule has no test-file exemption, so `console.log` in a `*.test.ts` file is reported"
-    },
-    {
-        "engine": "swift",
-        "family": "ambiguous-identifier",
-        "case": "am03",
-        "kind": "verdict",
-        "task": "78b6gw0",
-        "reason": "`sorted`'s comparator parameters are exempt, so `a` and `b` are not reported"
-    },
-    {
-        "engine": "swift",
-        "family": "ambiguous-identifier",
-        "case": "am04",
-        "kind": "verdict",
-        "task": "78b6gw0",
-        "reason": "`max`'s comparator parameters are exempt, so `a` and `b` are not reported"
-    },
-    {
-        "engine": "swift",
-        "family": "ambiguous-identifier",
-        "case": "am05",
-        "kind": "verdict",
-        "task": "78b6gw0",
-        "reason": "a numeric function's `s`, `t` and `d` are exempt as kernel letters, so none is reported"
     }
 ]

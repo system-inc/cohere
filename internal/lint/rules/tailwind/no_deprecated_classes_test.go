@@ -109,6 +109,30 @@ func TestNoDeprecatedClassesReportsRenames(test *testing.T) {
 			source:   `const element = <div className="flex-shrink-0 overflow-ellipsis" />;`,
 			wantIds:  []string{"deprecatedClassReplaceable", "deprecatedClassReplaceable"},
 		},
+		{
+			// ahra's AdhocProposalPanel.tsx:150, which only ESLint reported until the rule read runs.
+			name:     "in a template with a hole",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={`self-start rounded px-2 ${tone ?? ''}`} />;",
+			wantIds:  []string{"deprecatedClassReplaceable"},
+		},
+		{
+			name:     "glued to a hole",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={`rounded${size} px-2`} />;",
+			wantIds:  []string{"deprecatedClassReplaceable"},
+		},
+		{
+			// Every run is read, the removed kind included.
+			name:     "in each run of a template",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={`flex ${x} rounded flex-grow ${y} bg-opacity-50`} />;",
+			wantIds: []string{
+				"deprecatedClassReplaceable",
+				"deprecatedClassReplaceable",
+				"deprecatedClassIrreplaceable",
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -169,6 +193,11 @@ func TestNoDeprecatedClassesStaysSilent(test *testing.T) {
 			name:     "unrelated variable",
 			fileName: "Styles.ts",
 			source:   `const description = 'flex-shrink-0';`,
+		},
+		{
+			name:     "a template with a hole and nothing deprecated",
+			fileName: "Component.tsx",
+			source:   "const element = <div className={`flex ${x} px-2 rounded-sm`} />;",
 		},
 	}
 
@@ -253,6 +282,86 @@ func TestNoDeprecatedClassesFixMatchesUpstream(test *testing.T) {
 			end := strings.LastIndex(testCase.source, `"`)
 			want := testCase.source[:start] + testCase.wantText + testCase.source[end:]
 			rule_testing.ExpectFixedSource(test, result, want)
+		})
+	}
+}
+
+// TestNoDeprecatedClassesInTemplateRuns pins where a template's findings land and which are fixed.
+//
+// Measured against eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-06, with ahra's
+// theme: each class is reported at its own range and renamed in place.
+//
+//	`self-start rounded px-2 ${tone ?? ''}`               rounded, fixed to rounded-sm
+//	`rounded${x} px-2`                                     rounded, fixed to rounded-sm${x}
+//	`px-2 ${x}rounded`                                     rounded, fixed to ${x}rounded-sm
+//	`flex ${x} rounded flex-grow ${y} bg-opacity-50`       three findings, two fixed
+//	`flex ${x} px-2`                                       silent
+//
+// The glued rows are where cohere reports and does not fix, on purpose: the hole completes the class,
+// so the rename can turn `rounded-lg` into `rounded-sm-lg` (reportTemplateDeprecations says why).
+func TestNoDeprecatedClassesInTemplateRuns(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		classes []string
+		fixed   string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`self-start rounded px-2 ${tone ?? ''}`} />;",
+			classes: []string{"rounded"},
+			fixed:   "const element = <div className={`self-start rounded-sm px-2 ${tone ?? ''}`} />;",
+		},
+		{
+			name:    "glued before a hole",
+			source:  "const element = <div className={`rounded${size} px-2`} />;",
+			classes: []string{"rounded"},
+		},
+		{
+			name:    "glued after a hole",
+			source:  "const element = <div className={`px-2 ${size}rounded`} />;",
+			classes: []string{"rounded"},
+		},
+		{
+			name:    "every run, each class renamed in place",
+			source:  "const element = <div className={`flex ${x} rounded flex-grow ${y} bg-opacity-50`} />;",
+			classes: []string{"rounded", "flex-grow", "bg-opacity-50"},
+			fixed:   "const element = <div className={`flex ${x} rounded-sm grow ${y} bg-opacity-50`} />;",
+		},
+		{
+			// The repeat is no-duplicate-classes's to delete, so only the first is renamed.
+			name:    "a repeat in one run",
+			source:  "const element = <div className={`rounded rounded ${x}`} />;",
+			classes: []string{"rounded", "rounded"},
+			fixed:   "const element = <div className={`rounded-sm rounded ${x}`} />;",
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := rule_testing.Run(test, NoDeprecatedClasses, "Component.tsx", testCase.source)
+			if len(result.Diagnostics) != len(testCase.classes) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.classes))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				reported := text[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if reported != testCase.classes[index] {
+					test.Errorf("finding %d covers %q, want the class %q", index, reported, testCase.classes[index])
+				}
+			}
+			if testCase.fixed == "" {
+				for _, diagnostic := range result.Diagnostics {
+					if len(diagnostic.Fixes) != 0 {
+						test.Errorf(
+							"a class glued to a hole was given a fix, which can rename a class the hole completes",
+						)
+					}
+				}
+				return
+			}
+			rule_testing.ExpectFixedSource(test, result, testCase.fixed)
 		})
 	}
 }

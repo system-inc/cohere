@@ -7,8 +7,9 @@ finding**. This is the task's correctness target, not a claim that every possibl
 program is covered or that the warning count should be forced to zero.
 
 An archived binary from cohere `6f04852` reports exactly one occurrence on both
-the frozen source snapshot and the live ahra checkout. The live comparison uses
-`s l no-cache --linter eslint`, which reports zero occurrences of this rule.
+the frozen source snapshot and the live ahra checkout. The live comparison ran
+ESLint over the same checkout, which reported zero occurrences of this rule;
+`ahra cohere parity` in ahra runs that comparison now.
 Resolved ESLint configuration on the remaining file enables the rule at severity 2. The binary SHA256 is
 `932daf0210614b0f996b12b8caef3796968a448d53ed08ec6e0b19f020f5d5e2`.
 

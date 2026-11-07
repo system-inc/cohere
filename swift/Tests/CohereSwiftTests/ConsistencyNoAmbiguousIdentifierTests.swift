@@ -8,7 +8,8 @@ import Testing
  Fixture pairs for `cohere-swift/consistency-no-ambiguous-identifier`, both directions, carrying every case the Go rule's
  own test documents (`consistency_no_ambiguous_identifier_test.go`) that has a Swift shape. Failing cases
  assert the exact line and column of the declared name. The passing cases are the near misses: the
- exemptions, the names somebody else chose, and the comparators that look like comparators and are not.
+ coordinates, the names somebody else chose, and the discard. Comparators and numeric functions get no exemption
+ (Kirk, 2026-11-06), so their letters are failing cases.
  */
 struct ConsistencyNoAmbiguousIdentifierTests {
     static func findings(_ source: String) -> [FindingRecord] {
@@ -89,7 +90,8 @@ struct ConsistencyNoAmbiguousIdentifierTests {
         #expect(Self.findings(source).isEmpty)
     }
 
-    @Test func sortComparatorsKeepAAndB() {
+    /* No comparator exemption (Kirk, 2026-11-06, call 3): `sort`, `sorted`, `min` and `max`'s `a` and `b` are reported at their declarations. */
+    @Test func comparatorsAAndBAreFound() {
         let source = """
             let ascending = items.sorted { a, b in a < b }
             let labeled = items.sorted(by: { a, b in a < b })
@@ -97,79 +99,44 @@ struct ConsistencyNoAmbiguousIdentifierTests {
             items.sort { a, b in a > b }
             let smallest = items.min { a, b in a.size < b.size }
             let largest = items.max(by: { a, b in a.size < b.size })
-            let chained = items?.sorted { a, b in a < b }
-            let bodied = items.sorted { left, right in
-                let a = left.rank
-                let b = right.rank
-                return a < b
-            }
-            """
-        #expect(Self.findings(source).isEmpty)
-    }
-
-    /*
-     Paper notation in a numeric kernel: a function, or a closure that writes its types, taking only numbers and
-     returning a number, an optional one or nothing. Barycentric `u` and `v` beside `x`, the law of cosines, a
-     ray against triangles held as tuples, a writer with no result, a closure inside a kernel that leaves its
-     types to inference, and a typed closure on its own.
-     */
-    @Test func paperNotationInANumericKernelIsAllowed() {
-        let source = """
-            func barycentric(_ x: Float, _ y: Float, edge1: SIMD2<Float>, edge2: SIMD2<Float>, determinant: Float) -> SIMD2<Float> {
-                let u = (x * edge2.y - edge2.x * y) / determinant
-                let v = (edge1.x * y - x * edge1.y) / determinant
-                return SIMD2(u, v)
-            }
-            func angle(a: Double, b: Double, c: Double) -> Double {
-                acos((a * a + b * b - c * c) / (2 * a * b))
-            }
-            func hit(origin: SIMD3<Float>, direction: SIMD3<Float>, on triangles: [(SIMD3<Float>, SIMD3<Float>, SIMD3<Float>)]) -> Float? {
-                for (a, b, c) in triangles {
-                    let p = simd_cross(direction, c - a)
-                    let t = simd_dot(b - a, p)
-                    if t > 0 { return t }
-                }
-                return nil
-            }
-            func draw(_ a: SIMD3<Float>, _ b: SIMD3<Float>, into depth: inout [Float]) {
-                depth = depth.map { d in d + a.z - b.z }
-            }
-            func slerp(_ p: simd_quatd, _ q: simd_quatd, _ t: Double) -> simd_quatd { simd_slerp(p, q, t) }
-            let lerp = { (a: Float, b: Float, t: Float) -> Float in a + (b - a) * t }
-            """
-        #expect(Self.findings(source).isEmpty)
-    }
-
-    /*
-     Not a kernel, or not a kernel's letter: a parameter that is not a number, a result that is not one, no
-     parameters, integers alone, a type, a nested function or an initializer between the name and the kernel, a
-     letter outside the short set, and `e`, which is never exempt.
-     */
-    @Test func lettersOutsideANumericKernelAreFound() {
-        let source = """
-            func describe(t: Float, body: Body) -> Float { t }
-            func label(t: Float) -> String { "" }
-            func reset() { let t = 0.0 }
-            func join(_ a: Int, _ b: Int) -> Int { a + b }
-            func kernel(_ t: Float) -> Float {
-                struct Sample { let u: Float }
-                func name(of value: Float) -> String { let v = "\\(value)"; return v }
-                let n = 2
-                return t * Float(n)
-            }
-            struct Ray { init(t: Float) { let u = t } }
-            func clamp(_ t: Double) -> Double { do { return t } catch let e { return 0 } }
-            let typed = { (a: Float, name: String) -> Float in a }
             """
         #expect(
             Self.positions(source) == [
-                "1:15", "2:12", "3:20", "4:13", "4:23", "6:25", "7:48", "8:9", "11:19", "11:35", "12:63", "13:16",
+                "1:32", "1:35", "2:34", "2:37", "3:29", "3:37", "4:14", "4:17", "5:28", "5:31", "6:31", "6:34",
             ]
         )
     }
 
-    /* Each of these looks like a comparator and is not one the Go rule would recognize. */
-    @Test func aAndBOutsideAComparatorAreFound() {
+    /*
+     No numeric-kernel exemption (Kirk, 2026-11-06, call 3): a function taking and returning only numbers gets no
+     paper-notation letters. Barycentric `u` and `v`, the law of cosines' `a`, `b` and `c`, a ray's `p` and `t`, a
+     closure's `d`, and a typed lerp are each reported, beside the exempt `x` and `y`.
+     */
+    @Test func numericFunctionsKeepNoLetters() {
+        let source = """
+            func barycentric(_ x: Float, _ y: Float, determinant: Float) -> SIMD2<Float> {
+                let u = x / determinant
+                let v = y / determinant
+                return SIMD2(u, v)
+            }
+            func angle(a: Double, b: Double, c: Double) -> Double { acos((a * a + b * b - c * c) / (2 * a * b)) }
+            func hit(direction: SIMD3<Float>, edge: SIMD3<Float>) -> Float? {
+                let p = simd_cross(direction, edge)
+                let t = simd_dot(edge, p)
+                return t > 0 ? t : nil
+            }
+            func draw(into depth: inout [Float]) { depth = depth.map { d in d + 1 } }
+            let lerp = { (a: Float, b: Float, t: Float) -> Float in a + (b - a) * t }
+            """
+        #expect(
+            Self.positions(source) == [
+                "2:9", "3:9", "6:12", "6:23", "6:34", "8:9", "9:9", "12:60", "13:15", "13:25", "13:35",
+            ]
+        )
+    }
+
+    /* Other closures taking `a` and `b`, found as every single letter is: a reduce, an unbased call, a nested closure and a filter. */
+    @Test func aAndBInOtherClosuresAreFound() {
         let source = """
             let summed = items.reduce(0) { a, b in a + b }
             let unbased = sorted { a, b in a < b }
@@ -179,11 +146,11 @@ struct ConsistencyNoAmbiguousIdentifierTests {
         #expect(Self.positions(source) == ["1:32", "1:35", "2:24", "2:27", "3:68", "4:31"])
     }
 
-    /* `e` is never exempt, not even in a comparator; its partner keeps the exemption. */
-    @Test func eInAComparatorIsStillFound() {
+    /* `e` in a comparator gets its own message, and its partner is reported beside it. */
+    @Test func eInAComparatorIsFoundWithItsPartner() {
         let findings = Self.findings("let ordered = items.sorted { e, b in e < b }")
-        #expect(findings.map { "\($0.line):\($0.column)" } == ["1:30"])
-        #expect(findings.map(\.messageId) == ["noAmbiguousE"])
+        #expect(findings.map { "\($0.line):\($0.column)" } == ["1:30", "1:33"])
+        #expect(findings.map(\.messageId) == ["noAmbiguousE", "noSingleLetter"])
     }
 
     /* An uppercase single letter is a type parameter, which the Go rule leaves alone; a non-ASCII letter is outside its `^[a-z]$`. */

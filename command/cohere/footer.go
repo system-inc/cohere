@@ -35,7 +35,7 @@ import (
 // It renders a runSummary and decides nothing: what ran, what was found and what went unchecked are the
 // summary's, so this file only says them.
 //
-// The glyphs are the house's, from `s c`: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
+// The glyphs are the house's: 💎 a clean run, ☠️ a failed one, 🪄 fixing, 💅 formatting,
 // 🔷 the type check and 👑 lint.
 //
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a
@@ -111,6 +111,10 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
+	// Said apart from the time, which leaves them out, so a build is never read as checking (#ket0hrp).
+	for _, segment := range engineBuildSegments(summary.EngineBuilds) {
+		line += " • " + segment
+	}
 	if segment := summary.Adamic.segment(); segment != "" {
 		line += " • " + segment
 	}
@@ -250,6 +254,9 @@ type overallFacts struct {
 	// UnclaimedSwift is the directories of Swift files no package holds, which no project's run checked
 	// (#ybspptb). A gap, not a failure: it never changes the verdict, and it is never left to the notes.
 	UnclaimedSwift []unclaimedSwiftDirectory
+	// EngineBuilds are the engines this run built before its projects ran, as a coverage query does: their
+	// time is in Total, and said apart from it.
+	EngineBuilds []engineBuild
 }
 
 // overallFooter renders the verdict line for a repository with several projects:
@@ -292,6 +299,9 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 	if len(facts.UnclaimedSwift) > 0 {
 		line += " • " + unclaimedSwiftMarker(facts.UnclaimedSwift)
+	}
+	for _, segment := range engineBuildSegments(facts.EngineBuilds) {
+		line += " • " + segment
 	}
 	return line
 }
