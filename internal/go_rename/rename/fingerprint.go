@@ -219,7 +219,9 @@ func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File) map[string][]i
 // spells its parameter names, which a rename changes. The renames these passes make are locals, which never
 // cross a package, so an object reached from another package keeps its name, owner and file.
 func describe(fileSet *token.FileSet, object types.Object) string {
-	position := fileSet.PositionFor(object.Pos(), false)
+	// Adjusted by //line directives: a cgo package is read from cgo's translation in the build cache by one load and
+	// from its source by another, and the translation names its source file in those directives.
+	position := fileSet.PositionFor(object.Pos(), true)
 	owner := ""
 	if function, isFunction := object.(*types.Func); isFunction {
 		if signature, isSignature := function.Type().(*types.Signature); isSignature && signature.Recv() != nil {

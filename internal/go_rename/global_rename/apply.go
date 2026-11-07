@@ -65,14 +65,16 @@ func Fingerprint(
 			// Outside the root files, a declaration is named by kind, owner, name and its file's base name, never
 			// by line, column or full path: export data spells them one way (module-relative, column 1) and a
 			// source load, which an overlay reload can turn to, another, for the same declaration. No rename here
-			// moves a declaration outside the root files.
+			// moves a declaration outside the root files. The base name is the one the file's //line directives
+			// give: a cgo package such as runtime/cgo is read from cgo's translation in the build cache by one load
+			// and from its source by another, and the translation names its source file in those directives.
 			return fmt.Sprintf(
 				"other:%s:%s:%s%s@%s",
 				declared.Pkg().Path(),
 				kindOf(declared),
 				ownerOf(declared),
 				declared.Name(),
-				filepath.Base(where.Filename),
+				filepath.Base(loaded.Roots[0].Fset.PositionFor(declared.Pos(), true).Filename),
 			)
 		}
 		return fmt.Sprintf(
