@@ -20,6 +20,7 @@
     },
     "assertedMessageIds": [
         "uncheckedCast",
+        "uncheckedCastUnderTsc",
         "uncheckedDowncast"
     ]
 }

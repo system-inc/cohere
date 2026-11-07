@@ -12,8 +12,21 @@ import (
 // noUncheckedCastText is the rule's message, whose wording lives in `policy/messages/no-unchecked-cast.json`.
 var noUncheckedCastText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedCast")
 
+// noUncheckedCastUnderTscText is uncheckedCast when no runtime check is emitted, from the same file: the
+// default's last sentence, that Adamic checks a union downcast, is false on tsc and points at the wrong fix.
+var noUncheckedCastUnderTscText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedCastUnderTsc")
+
 // noUncheckedDowncastText is the message for a union downcast when no runtime check is emitted, from the same file.
 var noUncheckedDowncastText = policy.MessageOf("adamic/no-unchecked-cast", "uncheckedDowncast")
+
+// uncheckedCastText is the message for a cast nothing could check, chosen from the option here and nowhere
+// else: Adamic's names the union downcast it checks as the way out, and tsc's names a type guard instead.
+func uncheckedCastText(settings NoUncheckedCastOptions) policy.MessageHandle {
+	if settings.RuntimeChecksEmitted {
+		return noUncheckedCastText
+	}
+	return noUncheckedCastUnderTscText
+}
 
 // NoUncheckedCastOptions says whether the program's compiler backs a union downcast with a runtime check.
 type NoUncheckedCastOptions struct {
@@ -100,6 +113,15 @@ var NoUncheckedCast = rule.Rule[NoUncheckedCastOptions]{
 			settings = DefaultNoUncheckedCastOptions()
 		}
 		typeChecker := ruleContext.TypeChecker
+		report := func(node *ast.Node, text policy.MessageHandle, source *checker.Type, target *checker.Type) {
+			ruleContext.ReportNode(node, rule.Message{
+				Id: text.Id,
+				Description: text.Render(map[string]string{
+					"source": typeChecker.TypeToString(source),
+					"target": typeChecker.TypeToString(target),
+				}),
+			})
+		}
 		judge := func(node *ast.Node) {
 			typeNode := node.Type()
 			if typeNode == nil || ast.IsConstTypeReference(typeNode) {
@@ -132,13 +154,7 @@ var NoUncheckedCast = rule.Rule[NoUncheckedCastOptions]{
 						ruleContext.Note(CheckedDowncastNote)
 						return
 					}
-					ruleContext.ReportNode(node, rule.Message{
-						Id: "uncheckedDowncast",
-						Description: noUncheckedDowncastText.Render(map[string]string{
-							"source": typeChecker.TypeToString(source),
-							"target": typeChecker.TypeToString(target),
-						}),
-					})
+					report(node, noUncheckedDowncastText, source, target)
 					return
 				}
 			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 ||
@@ -148,13 +164,7 @@ var NoUncheckedCast = rule.Rule[NoUncheckedCastOptions]{
 				// every position, type arguments included (adamic docs/rulings.md:39).
 				return
 			}
-			ruleContext.ReportNode(node, rule.Message{
-				Id: "uncheckedCast",
-				Description: noUncheckedCastText.Render(map[string]string{
-					"source": typeChecker.TypeToString(source),
-					"target": typeChecker.TypeToString(target),
-				}),
-			})
+			report(node, uncheckedCastText(settings), source, target)
 		}
 		return rule.Listeners{
 			ast.KindAsExpression:            judge,

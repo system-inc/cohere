@@ -19,7 +19,16 @@
             "*.db-shm"
         ]
     },
+    "departures": {
+        "adamic/no-unchecked-cast": "Sets runtimeChecksEmitted false and keeps the error it inherits: every project on this set runs on tsc, which emits no check behind a cast, so a union downcast is as unchecked as any other narrowing and is reported with a type guard as its fix (#mdccedj)."
+    },
     "rules": {
+        "adamic/no-unchecked-cast": [
+            "error",
+            {
+                "runtimeChecksEmitted": false
+            }
+        ],
         "no-restricted-globals": [
             "error",
             "addEventListener",

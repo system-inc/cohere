@@ -4682,6 +4682,7 @@
             },
             "messageIds": [
                 "uncheckedCast",
+                "uncheckedCastUnderTsc",
                 "uncheckedDowncast"
             ],
             "sets": [

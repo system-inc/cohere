@@ -1,6 +1,7 @@
 package adamic
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/testing"
@@ -175,5 +176,56 @@ func TestNoUncheckedCastOptionsDecode(test *testing.T) {
 	}
 	if _, misspelledError := DecodeNoUncheckedCastOptions([]byte(`{"runtimeChecks": false}`)); misspelledError == nil {
 		test.Error("an unknown key decoded without an error")
+	}
+}
+
+// TestNoUncheckedCastNamesTheFixItsOptionAllows: a cast nothing could check reads Adamic's message by
+// default, which offers the union downcast Adamic checks, and tsc's under the strict option, which offers a
+// type guard instead and says nothing of a check tsc never emits.
+func TestNoUncheckedCastNamesTheFixItsOptionAllows(test *testing.T) {
+	test.Parallel()
+	source := shapes + `const user = load() as User;`
+	for name, fixture := range map[string]struct {
+		options NoUncheckedCastOptions
+		id      string
+		says    []string
+		omits   []string
+	}{
+		"by default": {
+			DefaultNoUncheckedCastOptions(),
+			"uncheckedCast",
+			[]string{"'unknown' can't be cast to 'User' here", "since Adamic compiles that to a check"},
+			[]string{"tsc", "type guard"},
+		},
+		"without runtime checks": {
+			noRuntimeChecks,
+			"uncheckedCastUnderTsc",
+			[]string{
+				"'unknown' can't be cast to 'User' here",
+				"runs on tsc, which emits no runtime check",
+				"type guard",
+			},
+			[]string{"Adamic", "is allowed"},
+		},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			result := runAdamicWithOptions(test, NoUncheckedCast, source, fixture.options)
+			rule_testing.ExpectFindings(test, result, fixture.id)
+			if len(result.Diagnostics) != 1 {
+				return
+			}
+			description := result.Diagnostics[0].Message.Description
+			for _, wanted := range fixture.says {
+				if !strings.Contains(description, wanted) {
+					test.Errorf("message %q does not say %q", description, wanted)
+				}
+			}
+			for _, unwanted := range fixture.omits {
+				if strings.Contains(description, unwanted) {
+					test.Errorf("message %q says %q", description, unwanted)
+				}
+			}
+		})
 	}
 }
