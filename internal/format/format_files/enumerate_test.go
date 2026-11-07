@@ -791,3 +791,62 @@ func TestTheWalkNeverEntersTestdata(test *testing.T) {
 		test.Errorf("%d testdata directories counted, want 2", skipped)
 	}
 }
+
+// A directory cohere never enters is never entered by the format walk either, though no ignore file names it, so
+// cohere's own scratch in a repository whose .gitignore leaves `.cache` out is never judged (#fe4vr5s): ahraos-macos
+// read 29 files that would change after a Swift run, `.cache/cohere/swift/package-description.json` among them. Each
+// skip is counted under its name. The control is a directory named like one, which is entered.
+func TestTheWalkNeverEntersWhatDiscoveryNeverEnters(test *testing.T) {
+	test.Parallel()
+	root := writeTree(test, map[string]string{
+		"README.md":                              "# root\n",
+		".cache/cohere/x.json":                   "{\"unformatted\":   1}\n",
+		"Packages/Kit/.cache/cohere/y.json":      "{ }\n",
+		"node_modules/package/index.js":          "x\n",
+		".build/checkouts/README.md":             "#b\n",
+		"Sources/App/.cache-notes/kept.json":     "{}\n",
+		"Sources/App/Resources/Assets/icon.json": "{}\n",
+	})
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
+	}
+	want := map[string]bool{
+		"README.md":                              true,
+		"Sources/App/.cache-notes/kept.json":     true,
+		"Sources/App/Resources/Assets/icon.json": true,
+	}
+	if survivors := survivorsOf(root, enumeration); !maps.Equal(survivors, want) {
+		test.Errorf("offered %v, want %v", survivors, want)
+	}
+	for name, count := range map[string]int{".cache": 2, "node_modules": 1, ".build": 1} {
+		if enumeration.IgnoredByLayer[name] != count {
+			test.Errorf("%d %s directories counted, want %d", enumeration.IgnoredByLayer[name], name, count)
+		}
+	}
+}
+
+// A directory named Vendor, at any depth, is someone else's code to the Swift engine, so the Format walk never enters
+// it either (#fe4vr5s): at ahraos-macos the Format project read SwiftTerm's README.md and Contents.json under
+// Vendor/SwiftTerm while the Swift run there excluded all 156 of its Swift files as vendored. The control is a
+// directory named like it, which is entered.
+func TestTheWalkNeverEntersAVendorDirectory(test *testing.T) {
+	test.Parallel()
+	root := writeTree(test, map[string]string{
+		"README.md":                    "# root\n",
+		"Vendor/SwiftTerm/README.md":   "#upstream\n",
+		"App/Vendor/Kit/Contents.json": "{ }\n",
+		"App/VendorNotes/kept.md":      "# kept\n",
+	})
+	enumeration, enumerateError := Enumerate(root, handlesEveryLanguage)
+	if enumerateError != nil {
+		test.Fatal(enumerateError)
+	}
+	want := map[string]bool{"README.md": true, "App/VendorNotes/kept.md": true}
+	if survivors := survivorsOf(root, enumeration); !maps.Equal(survivors, want) {
+		test.Errorf("offered %v, want %v", survivors, want)
+	}
+	if skipped := enumeration.IgnoredByLayer[VendoredLayer]; skipped != 2 {
+		test.Errorf("%d Vendor directories counted, want 2", skipped)
+	}
+}
