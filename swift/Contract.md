@@ -157,6 +157,8 @@ nothing else.
   `no target of this package compiles it, and it holds only declarations, so it is no script to check alone`, or,
   for a script whose imports name both macOS (AppKit, Cocoa) and iOS (UIKit),
   `a script whose imports do not settle its platform: it imports AppKit for macOS and UIKit for iOS, so neither SDK was guessed at`.
+  Outside a git repository, a `git archive` copy say, "git would list" reads the package's own ignore files as git
+  would were its root a repository's, so a script there is checked and every other such file named, as in a checkout.
 - `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
   lower and describes the request in `scopeDescription`, which the front door prints in the
   parenthesis of `N in scope (…)`.
