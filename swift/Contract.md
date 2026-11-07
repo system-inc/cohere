@@ -238,7 +238,7 @@ unused: a report, not a gate — nothing here fails a build
 Files not checked and items skipped are counted by reason, sorted by reason. The section header and its
 lines are left out when nothing was found.
 
-`unused-import` reads the build's index store. An import is used when something written in the file
+`unused-import` reads the index store the types phase's check, or an Xcode root's build, writes. An import is used when something written in the file
 resolves into its module, or into a module it re-exports, or when a declaration the file refers to
 names that module in its signature (the index leaves out some member references, so a value of the
 module's type reached through a closure parameter is caught by the signature that hands it over). An
@@ -309,21 +309,20 @@ never as *no files changed*, and renders the counts alone. `Clean.jsonl` is such
 
 ```json
 {"kind":"types","diagnostics":1,"files":149,"elapsedMilliseconds":2187,
- "filesWithoutRecord":[],"build":"swift build, scratch <root>/.cache/cohere/swift"}
+ "filesWithoutRecord":[],"build":"checked without building: the build server prepared the dependencies in 4.1s, and 12 frontend jobs checked 149 files of 8 modules with -emit-sil in 6.2s, scratch <root>/.cache/cohere/swift; prepare built no plugin host tool"}
 ```
 
 Rendered as `types: 1 diagnostics over 149 files in 2.187s`. Each entry in `filesWithoutRecord`
 prints `  types: no compiler record for <file>, so its diagnostics are unknown`, and any such file
 makes the run incomplete. The types phase reads each file's serialized diagnostics (`.dia`), not
-the build's stdout, because an incremental build does not reprint warnings in files it did not
-recompile. So a file with no `.dia` is a file the engine cannot vouch for.
+the compiler's stdout, so a file with no `.dia` is a file the engine cannot vouch for.
 
-`build` says in words how the records were had: a build into the scratch, the last build's records
-reused, or edited files checked in process. A run whose builds all succeeded may end it with what the
+`build` says in words how the records were had: a check into the scratch, the last check's records
+reused, or edited files checked in process. A run whose checks all succeeded may end it with what the
 scratch prune removed, as `; the scratch prune removed 6.9 MB: 226 index records no unit names`. The
-prune runs after such a build, at most once an hour per scratch. It removes the index store's records
+prune runs after such a check, at most once an hour per scratch. It removes the index store's records
 no unit names and the scratch of a package that is no longer local, each unused for an hour, and never
-touches a build in flight or the build descriptions, whose cache the build system bounds itself.
+touches a check in flight or the build server's build descriptions, whose cache the build system bounds itself.
 
 At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that compiles a file of ours,
 through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
@@ -336,24 +335,56 @@ it was found. A resolution the repository commits (a committed bundle's own, or 
 spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
 that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
 are judged by the same rules as a package's, and `build` reads
-`xcodebuild of <n> targets for <platforms>, derived data <path>`, or that the last build's records were reused
+`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, or that the last build's records were reused
 because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.
 
-A package is built with `swift build --build-tests` for the macOS host when its manifest names macOS among its
-`platforms`, or names no platform. One whose `platforms` leave out macOS (#ee9ct1r) is never judged against the
-host's SDK, which it does not target: it is built by xcodebuild in its own folder, through the scheme Xcode makes
-for the package (named for it when it has one product, else `<Package>-Package`), for the generic device of the
-first platform it names among iOS, tvOS, watchOS and visionOS, with `build-for-testing`, into the same `xcode-build`
-derived data. Its typed rules and `--unused` read that build, as at an Xcode root. It signs nothing, removes the
-empty `.swiftpm` folders xcodebuild makes in the package, and under `--no-fix` is held to the package's own
-`Package.resolved`, as `swift build` is. `build` reads
-`xcodebuild of the package for <platform>, the first platform it names, since it names no macOS, scheme <scheme>, derived data <path>`,
-then the step a failed build failed at. A local package's own tests are not built by the root's schemes, so their
-files are in `filesWithoutRecord` and `build` says so. A package whose platforms name none of those (Mac Catalyst
-alone), or whose folder also holds an Xcode project or workspace, is not built: `build` begins `not built:` and
-says why, and every file is in `filesWithoutRecord`, so the run is incomplete.
+A package is checked, never built (#11fs5xp): no object, no code generation, no link. The check has three
+steps, all into the scratch:
+
+- `swift package experimental-build-server`, SwiftPM's Build Server Protocol server, gives each target's compiler
+  arguments (`sourceKitOptions`) and prepares the dependencies' modules (`buildTarget/prepare`, Swift Build's
+  prepare-for-indexing), bodies skipped and no object written, under `<scratch>/out`;
+- each owned module's frontend jobs, planned by the driver as `-typecheck`, run as `-emit-sil` with their output
+  sent to /dev/null, so the diagnostics a build reports after type checking (missing returns, constant overflow,
+  infinite recursion, use before initialization, exclusivity violations, Swift 6's sending data races) are
+  reported too. Each file has its own record under `<scratch>/check/<Target>.build` and its own index unit in
+  `<scratch>/index-store`, which the typed rules and `--unused` read. A batch that fails is checked again one file
+  at a time, since a failed batch leaves its other files' records unreadable, and a compiler a signal ends is a
+  finding at the file it crashed on, `messageId` `compilerCrashed`;
+- each owned C, C++ and Objective-C file is checked with `clang -fsyntax-only` and its target's arguments, and each
+  error in it is a finding at its place. Its warnings are not reported, as a build never reported them;
+- the dependencies' declarations, which a build left in its index beside the project's own, are indexed for
+  `--unused` and the typed rules: each dependency module's files with `-typecheck`, every function body skipped, and
+  every C-family file of the graph in the same `clang -fsyntax-only` pass. A file a unit newer than it already
+  describes is not indexed again.
+
+After an edit, when only files changed since the last successful check, the check looks again only at what the
+edit could change: the targets holding an edited file, every owned target that imports one of them, directly or
+through another, and the owned C-family files when one of them or a header changed. Every other target's records
+are the last check's, and `build` counts them, as `, 3 modules no edit could change read from the last check's records`.
+A scoped module that imports no other scoped module needs nothing prepare emits again, so it is checked while prepare
+runs, counted as `, 1 module of them alongside prepare, since they import no edited module`.
+An edit to anything else, a manifest or a resource, checks everything.
+
+A local package that holds test files of ours is checked in a session of its own, under `<scratch>/local/<package>`,
+since the root's build server lists a local package's libraries and not its tests. Under `--no-fix` the server is
+held to the package's own `Package.resolved` (`--disable-automatic-resolution`). A server that fails is the types
+phase failing by name, never a build in its place. The one build a check allows is a build-tool plugin's host tool,
+which prepare compiles and links because the plugin runs it: `build` counts it on every run, as
+`; prepare built 1 plugin host tool, the build a check allows, a tool a build-tool plugin runs and not the project's code: encuda in 9.8s`,
+or `; prepare built no plugin host tool`, then, when SwiftPM compiled a build-tool plugin itself so it could run it,
+`; SwiftPM compiled 1 build-tool plugin to run them: CudaBuild`. A failed job no file of ours carries an error for is a finding at the
+manifest, `messageId` `buildFailed`.
+
+A package is checked for the macOS host when its manifest names macOS among its `platforms`, or names no platform.
+One whose `platforms` leave out macOS (#ee9ct1r) is never judged against the host's SDK, which it does not target:
+it is checked the same way for the first platform it names among iOS, tvOS, watchOS and visionOS, the build server
+given `--triple arm64-apple-<system>` and that platform's SDK, and `build` begins
+`for <platform>, the first platform the package names, since it names no macOS: `. A package whose platforms name
+none of those (Mac Catalyst alone), or whose platform's SDK is not installed, is not checked: `build` begins
+`not checked:` and says why, and every file is in `filesWithoutRecord`, so the run is incomplete.
 
 The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
 not read them yet loses only what they count. The Go engine type-checks every package from source and runs no
@@ -558,7 +589,7 @@ it where a run that did not finish prints green.
 |---|---|
 | `--no-fix` | Writes nothing to the project: no source, no `.build`, no `Package.resolved`. Builds go to the engine's cache outside the project. A package is built from its own `Package.resolved` with resolution disabled, since SwiftPM keeps pins nowhere else, so one with remote dependencies and none fails by name; an Xcode project resolves into the engine's scratch, held to a resolution the repository commits when there is one. The fix phase runs in check mode, recorded as `ran`: each file the formatter would rewrite becomes one `format` finding at its first changed line. |
 | `--fix` | Fix and format only. |
-| `--types`, `--lint` | That phase alone, as for TypeScript. A `--lint` run whose typed rules apply to a file still builds, skipped when no input changed, because those rules read the build's index and compile commands, the way TypeScript's lint still loads the checker (#q1574nq). Nothing the compiler said is reported, and types stays `skipped` as `not requested`. |
+| `--types`, `--lint` | That phase alone, as for TypeScript. A `--lint` run whose typed rules apply to a file still checks, skipped when no input changed, because those rules read the check's index and compile commands, the way TypeScript's lint still loads the checker (#q1574nq). Nothing the compiler said is reported, and types stays `skipped` as `not requested`. |
 | `--format` | Formatting is on by default for Swift, unlike TypeScript, where it waits on parity with the existing gate. For Swift that parity is measured: swift-format 604.0.0 as a library is byte-identical to `xcrun swift-format` on 952 of our files. The flag is accepted and changes nothing. |
 | `--format-all` | Accepted and changes nothing. Swift formats every file in scope by default, because formatting all of Presence costs a few seconds, not the minutes that made TypeScript format only changed files. Named paths still narrow the scope. |
 | `--format-only` | The fix phase narrowed to formatting, as TypeScript's `--format-only`: no rule is asked for a fix, and types, lint and unused are skipped as not requested, so nothing is compiled. With `--no-fix` it is the format gate: each file the formatter would change is a `format` finding, and nothing is written. `--format-all` widens it to every file. Named with `--fix`, `--types`, `--lint`, `--unused` or `--no-format`, the run is refused with exit 2. |
@@ -569,7 +600,7 @@ it where a run that did not finish prints green.
 | `--lint-config <file>` | The `CohereSettings.json` whose `swift` block configures rules. |
 | `--fix-passes <n>`, `--single-threaded` | As for TypeScript. |
 | `--rules`, `--rules-enabled`, `--version` | `rule` and `provenance` records. |
-| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last build's and counts every file that build did not compile as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
+| `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report. |
 | `--timing`, `--explain <file>` | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked. |
 | `--tsconfig` | Meaningless for Swift. The front door refuses it against a Swift root. |
 | `--directory` | Resolved by the front door into `--root`. |

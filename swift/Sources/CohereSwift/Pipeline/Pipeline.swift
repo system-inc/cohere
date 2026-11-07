@@ -587,7 +587,7 @@ public struct Pipeline {
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
             if let lintBuildFailure {
                 linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
-                    "\($0), since the build this run made for the typed rules failed: \(lintBuildFailure)"
+                    "\($0), since the check this run made for the typed rules failed: \(lintBuildFailure)"
                 }
             }
             /*
@@ -934,13 +934,12 @@ public struct Pipeline {
     }
 
     /*
-     Every build of this package that writes an index store and compile commands: for a package, the root's scratch
-     and each local package's that the types phase builds for its tests; for an Xcode root, and for a package whose
-     platforms leave out macOS (`XcodePackageTypesPhase`), the one xcodebuild's derived data, which every target and
-     linked package builds into.
+     Every check or build of this package that writes an index store and compile commands: for a package, whatever
+     platform it is checked for, the root's scratch and each local package's that the types phase checks for its
+     tests; for an Xcode root, the one xcodebuild's derived data, which every target and linked package builds into.
      */
     static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
-        guard package.projectKind == .swiftPackage, !XcodePackageTypesPhase.leavesOutHost(package) else {
+        guard package.projectKind == .swiftPackage else {
             return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
         }
         let scratchPaths =
@@ -948,7 +947,7 @@ public struct Pipeline {
             + package.localPackages.map {
                 scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
             }
-        return scratchPaths.map { .swiftPackage(scratchPath: $0) }
+        return scratchPaths.map { .check(scratchPath: $0) }
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */

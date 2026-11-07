@@ -1,15 +1,16 @@
 import Foundation
 
 /*
- The gate before the types phase may take its diagnostics from sourcekitd instead of the build: for every
- file the engine owns, what sourcekitd says against what the build's `.dia` records say, finding for
+ The gate before the types phase may take its diagnostics from sourcekitd instead of the check: for every
+ file the engine owns, what sourcekitd says against what the check's `.dia` records say, finding for
  finding.
 
- The build is the oracle because it is the compiler's own verdict on the package as `swift build` compiles
- it. sourcekitd is the same compiler, but it is fed the arguments read back from the build's task store,
- and a flag lost on the way (a define, a search path, an upcoming feature) changes what it reports. Only
- agreement on whole real packages shows the arguments arrived intact. An Xcode root is built the way a run
- builds it (`XcodeTypesPhase`), and its arguments are read from the derived data's task store.
+ The check is the oracle because it is the compiler's own verdict on the package, its frontends run as a build
+ runs them up to code generation (`FrontendCheck`). sourcekitd is the same compiler, but it is fed the arguments
+ the check kept (`CompileCommands.store`), and a flag lost on the way (a define, a search path, an upcoming
+ feature) changes what it reports. Only agreement on whole real packages shows the arguments arrived intact. An
+ Xcode root is built the way a run builds it (`XcodeTypesPhase`), and its arguments are read from the derived
+ data's task store.
 
  A comparison that could not fail proves nothing, so the oracle also asks one file again with an injected
  type error and requires that error back at its line. Coverage comes first in the report: files asked,
@@ -119,7 +120,13 @@ public struct TypesOracle {
             ).run()
         let buildMilliseconds = Pipeline.milliseconds(since: buildStart)
         var buildGroups: [Diagnostic: String] = [:]
-        let build = types.findings.filter { $0.messageId != "buildFailed" }.map { finding in
+        /*
+         The owned Swift files' findings, the files sourcekitd is asked about: a C file's error the check reports is no
+         Swift file's, and a failure no file carries is no file's.
+         */
+        let ownedPaths = Set(files.map { $0.url.resolvingSymlinksInPath().path })
+        let build = types.findings.filter { $0.messageId != "buildFailed" && ownedPaths.contains($0.file) }.map {
+            finding in
             let diagnostic = Diagnostic(
                 file: finding.file,
                 line: finding.line,
@@ -136,24 +143,16 @@ public struct TypesOracle {
             /* Every target of the project builds into the one derived data, so one task store holds every command. */
             commandTables.append(try CompileCommands.read(layout: .xcode(derivedData: xcodePhase.derivedData)))
         }
-        else if XcodePackageTypesPhase.leavesOutHost(package) {
-            /* A package built for a platform it names builds into one derived data as well (`XcodePackageTypesPhase`). */
-            commandTables.append(
-                try CompileCommands.read(
-                    layout: .xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratchPath))
-                )
-            )
-        }
         else {
-            commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: scratchPath)))
-            /* A local package's tests build into their own scratch, so their commands live in that scratch's task store. */
+            commandTables.append(try CompileCommands.read(layout: .check(scratchPath: scratchPath)))
+            /* A local package's tests are checked into their own scratch, so their commands are kept in that scratch. */
             for local in package.localPackages {
                 let localScratch = scratchPath.appendingPathComponent(
                     "local/\(local.root.lastPathComponent)",
                     isDirectory: true,
                 )
                 if FileManager.default.fileExists(atPath: localScratch.path) {
-                    commandTables.append(try CompileCommands.read(layout: .swiftPackage(scratchPath: localScratch)))
+                    commandTables.append(try CompileCommands.read(layout: .check(scratchPath: localScratch)))
                 }
             }
         }

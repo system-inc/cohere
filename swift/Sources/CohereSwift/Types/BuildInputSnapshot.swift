@@ -100,6 +100,8 @@ struct BuildInputSnapshot: Equatable, Codable {
         var edited: Set<String> = []
         /* Files whose time or size moved while their bytes are the ones `earlier` recorded, by resolved path, to the modification time `earlier` saw. */
         var restored: [String: Date] = [:]
+        /* Files `earlier` walked that are gone, by walked path, when the file set may change. */
+        var removed: Set<String> = []
     }
 
     /*
@@ -111,11 +113,21 @@ struct BuildInputSnapshot: Equatable, Codable {
      describe it exactly, judged against the time the build saw it at. Only owned Swift files carry recorded
      bytes, so any other file that moved stays edited, and the types phase builds for it.
      */
-    func changes(since earlier: BuildInputSnapshot) -> Changes? {
-        guard settings == earlier.settings, files.count == earlier.files.count else { return nil }
+    func changes(since earlier: BuildInputSnapshot, allowingFileSetChanges: Bool = false) -> Changes? {
+        guard settings == earlier.settings,
+            allowingFileSetChanges || files.count == earlier.files.count
+        else { return nil }
         var changes = Changes()
+        /* A file gone, which only a scope can place, by the folder it left (`TypesPhase.scope(of:)`). */
+        changes.removed = Set(earlier.files.keys.filter { files[$0] == nil })
+        guard allowingFileSetChanges || changes.removed.isEmpty else { return nil }
         for (path, entry) in files {
-            guard let before = earlier.files[path] else { return nil }
+            guard let before = earlier.files[path] else {
+                /* A file added, which a scope takes as an edit of the target it joins (`TypesPhase.scope(of:)`). */
+                guard allowingFileSetChanges else { return nil }
+                changes.edited.insert(path)
+                continue
+            }
             guard before != entry else { continue }
             let resolved = URL(fileURLWithPath: path).resolvingSymlinksInPath()
             if let recorded = earlier.contents[resolved.path],
@@ -131,21 +143,37 @@ struct BuildInputSnapshot: Equatable, Codable {
         return changes
     }
 
-    /* Where the last successful build's snapshot is kept, beside that build in the engine's scratch. */
-    static func storeFile(scratchPath: URL) -> URL {
-        scratchPath.appendingPathComponent("build-inputs.json")
+    /*
+     Which snapshot a store holds. `lastSuccess` is the last build or check that succeeded, whose records a run may read
+     as its own. `lastRecorded` is the last check that left every file it checked a record, errors and all, which a
+     check after an edit takes its scope from (`TypesPhase.scope(of:)`): a check, unlike a build, records every file
+     even when a job fails, so after an error the next check looks again only at what changed since.
+     */
+    enum Kind: String {
+        case lastSuccess = "build-inputs.json"
+        case lastRecorded = "check-inputs.json"
     }
 
-    /* The last successful build's snapshot. An older engine's store, a bare digest, does not decode and reads as none: the next run builds. */
-    static func stored(scratchPath: URL) -> BuildInputSnapshot? {
-        guard let data = try? Data(contentsOf: storeFile(scratchPath: scratchPath)), !data.isEmpty else { return nil }
+    /* Where a snapshot of this kind is kept, beside that build or check in the engine's scratch. */
+    static func storeFile(scratchPath: URL, kind: Kind = .lastSuccess) -> URL {
+        scratchPath.appendingPathComponent(kind.rawValue)
+    }
+
+    /* The stored snapshot of this kind. An older engine's store, a bare digest, does not decode and reads as none: the next run builds. */
+    static func stored(scratchPath: URL, kind: Kind = .lastSuccess) -> BuildInputSnapshot? {
+        guard let data = try? Data(contentsOf: storeFile(scratchPath: scratchPath, kind: kind)), !data.isEmpty else {
+            return nil
+        }
         return try? JSONDecoder().decode(BuildInputSnapshot.self, from: data)
     }
 
-    func store(scratchPath: URL) {
+    func store(scratchPath: URL, kind: Kind = .lastSuccess) {
         do {
             try FileManager.default.createDirectory(at: scratchPath, withIntermediateDirectories: true)
-            try JSONEncoder().encode(self).write(to: Self.storeFile(scratchPath: scratchPath), options: .atomic)
+            try JSONEncoder().encode(self).write(
+                to: Self.storeFile(scratchPath: scratchPath, kind: kind),
+                options: .atomic,
+            )
         }
         catch {
             /* Not stored, so the next run builds: slower, and still right. */
@@ -157,8 +185,8 @@ struct BuildInputSnapshot: Equatable, Codable {
      current. Overwritten with nothing rather than removed: an empty store reads as no snapshot, and a removal
      that failed would have left the old fingerprint standing.
      */
-    static func forget(scratchPath: URL) {
-        let file = storeFile(scratchPath: scratchPath)
+    static func forget(scratchPath: URL, kind: Kind = .lastSuccess) {
+        let file = storeFile(scratchPath: scratchPath, kind: kind)
         guard FileManager.default.fileExists(atPath: file.path) else { return }
         do {
             try Data().write(to: file, options: .atomic)

@@ -8,9 +8,9 @@ import Foundation
      cohere-swift-parity [--package <dir>] [--swiftlint <path>] [--examples <n>]
      cohere-swift-parity --types-oracle [--package <dir>] [--examples <n>]
 
- `--types-oracle` compares a different incumbent: the build's own compiler records against sourcekitd in
- this process, file by file (see `TypesOracle`). It builds the package, or an Xcode root's project, into the
- engine's scratch.
+ `--types-oracle` compares a different incumbent: the check's own compiler records against sourcekitd in
+ this process, file by file (see `TypesOracle`). It checks the package, or builds an Xcode root's project, into
+ the engine's scratch.
 
  The file set is the engine's own (`FileSet`), so the incumbents read exactly the files cohere checks: the
  same vendored, git-ignored and generated exclusions, with no second list to drift. Nothing is written to
@@ -129,10 +129,10 @@ struct ParityCommand {
         /* Coverage first, so a comparison over nothing cannot read as agreement. */
         print("types oracle over \(report.filesOwned) files in \(root.path)")
         print(
-            "asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count); no fresh build record for \(report.filesWithoutRecord.count)"
+            "asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count); no fresh compiler record for \(report.filesWithoutRecord.count)"
         )
         print(
-            "build: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms"
+            "types phase: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms"
         )
         print(
             "control (an injected type error) in \(PackagePath.relative(report.controlFile, to: root)): \(report.controlFound ? "caught" : "MISSED")"
@@ -145,13 +145,13 @@ struct ParityCommand {
         )
         print("")
         print(
-            "only the build: \(report.onlyBuild.count); only sourcekitd: \(report.onlySourcekitd.count); same diagnostic, different group: \(report.groupDifferences.count)"
+            "only the types phase: \(report.onlyBuild.count); only sourcekitd: \(report.onlySourcekitd.count); same diagnostic, different group: \(report.groupDifferences.count)"
         )
         func show(_ diagnostic: TypesOracle.Diagnostic) -> String {
             "\(PackagePath.relative(diagnostic.file, to: root)):\(diagnostic.line):\(diagnostic.column) \(diagnostic.severity) \(diagnostic.message)"
         }
         for (title, diagnostics) in [
-            ("only the build", report.onlyBuild), ("only sourcekitd", report.onlySourcekitd),
+            ("only the types phase", report.onlyBuild), ("only sourcekitd", report.onlySourcekitd),
         ] where !diagnostics.isEmpty {
             print("\n\(title):")
             for diagnostic in diagnostics.prefix(examples) {
@@ -163,9 +163,11 @@ struct ParityCommand {
                 "  group \(built.isEmpty ? "(none)" : built) against \(asked.isEmpty ? "(none)" : asked): \(show(diagnostic))"
             )
         }
-        /* The build's own gap: what it said about these files, it said without compiling them, so neither side's count is the whole answer. */
+        /* The types phase's own gap: it did not vouch for these files as they stand, so neither side's count is the whole answer. */
         for file in report.filesWithoutRecord.prefix(examples) {
-            print("  no fresh build record, so the build did not vouch for it: \(PackagePath.relative(file, to: root))")
+            print(
+                "  no fresh compiler record, so the types phase did not vouch for it: \(PackagePath.relative(file, to: root))"
+            )
         }
         for file in report.filesWithoutCommand.prefix(examples) {
             print("  no compile command: \(PackagePath.relative(file, to: root))")

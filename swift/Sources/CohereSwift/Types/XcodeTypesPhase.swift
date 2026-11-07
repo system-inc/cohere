@@ -281,13 +281,19 @@ struct XcodeTypesPhase {
             BuildInputSnapshot.forget(scratchPath: derivedData)
         }
         let platforms = Set(plan.builds.map(\.platform)).sorted().joined(separator: " and ")
+        /*
+         The build an Xcode root is allowed (ruled on #nkk91tv 2026-11-06): xcodebuild has no prepare or index action,
+         and Xcode 27.2 refuses `-dry-run`, so a project is built until Apple ships one. Counted on every run that
+         builds, with how long it took, so the exception is never invisible.
+         */
+        let seconds = TypesPhase.CheckRun.seconds(Date().timeIntervalSince(buildStart))
         return try read(
             builds: plan.builds,
             unbuilt: plan.unbuilt,
             failures: failures,
             start: start,
             build:
-                "xcodebuild of \(plan.builds.count) targets for \(platforms.isEmpty ? "no platform" : platforms), derived data \(derivedData.path)",
+                "xcodebuild of \(plan.builds.count) targets for \(platforms.isEmpty ? "no platform" : platforms), derived data \(derivedData.path); built in \(seconds), the build an Xcode root is allowed, since xcodebuild has no action that checks without building",
         )
     }
 
@@ -378,8 +384,8 @@ struct XcodeTypesPhase {
     }
 
     /*
-     What failed, in xcodebuild's words, for any xcodebuild this engine runs: a project's (above), or a package's built
-     for a device platform (`XcodePackageTypesPhase`). `heldTo` is the resolution a `--no-fix` build was held to, if any.
+     What failed, in xcodebuild's words, for any xcodebuild this engine runs: a project's build (above), or the build
+     settings asked of it (`XcodeBuildSettings`). `heldTo` is the resolution a `--no-fix` build was held to, if any.
      */
     static func failedStep(of result: ProcessRunner.Result, heldTo committed: URL?) -> String {
         let text = String(decoding: result.standardOutput, as: UTF8.self) + "\n" + result.standardError

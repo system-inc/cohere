@@ -133,11 +133,24 @@ struct FrontendCheck {
     var parallelism = ProcessInfo.processInfo.activeProcessorCount
     /* The most primaries the driver puts in one batch, the size the probe measured with. */
     var batchSize = 25
+    var mode = Mode.check
+
+    /*
+     What a job is run for. `check` is the module's diagnostics and its full index. `indexDeclarations` is a
+     dependency's declarations alone, for the readers of the index (`--unused`, the typed rules), which a build used to
+     leave beside the project's own: `-typecheck` with every function body skipped, an index unit per file and no
+     record, since nothing in a dependency refers to the project's code and no dependency's diagnostics are reported.
+     */
+    enum Mode: Equatable, Sendable {
+        case check
+        case indexDeclarations
+    }
 
     /* Plans every module, side by side, then runs every job in one pool. */
     func check(_ modules: [Module]) throws(Failure) -> Outcome {
+        let files = modules.reduce(0) { $0 + $1.sources.count }
         let planned = Self.pooled(modules, width: parallelism) { module in
-            Swift.Result { () throws(Failure) -> [Job] in try plan(module) }
+            Swift.Result { () throws(Failure) -> [Job] in try plan(module, ofFiles: files) }
         }
         var jobs: [Job] = []
         for result in planned {
@@ -147,11 +160,18 @@ struct FrontendCheck {
     }
 
     /*
-     The driver's `-typecheck` jobs for one module, planned and not run. Batches hold at most `batchSize` primaries,
-     and file lists are kept inline, so each printed line is a whole command.
+     The driver's `-typecheck` jobs for one module, planned and not run, and file lists kept inline, so each printed
+     line is a whole command. Batches hold at most `batchSize` primaries, and the pool's width is shared among the
+     modules checked together by their files, `files` in all, so the pool is full without a small module paying for a
+     job per file: every job loads every module its module imports. Measured 2026-11-06: at batches of 25 alone,
+     cohere's package ran 12 jobs for 224 files in 65s, the pool mostly idle (68s of user time in 128s); with a pool's
+     width for every module, ahraos-presence's four test modules took 55 jobs, and a check after an interface edit
+     spent 194s of system time loading modules in 85 jobs.
      */
-    func plan(_ module: Module) throws(Failure) -> [Job] {
-        let batches = max(1, (module.sources.count + batchSize - 1) / batchSize)
+    func plan(_ module: Module, ofFiles files: Int? = nil) throws(Failure) -> [Job] {
+        let count = module.sources.count
+        let share = (parallelism * count + max(files ?? count, 1) - 1) / max(files ?? count, 1)
+        let batches = max(1, (count + batchSize - 1) / batchSize, min(count, share))
         let arguments =
             Self.cleaned(module.arguments) + [
                 "-typecheck", "-enable-batch-mode", "-driver-batch-count", "\(batches)",
@@ -280,7 +300,7 @@ struct FrontendCheck {
      */
     private func execute(_ job: Job) -> Swift.Result<ProcessRunner.Result, Failure> {
         do {
-            for primary in job.primaries {
+            for primary in job.primaries where mode == .check {
                 try Self.removeRecord(diagnosticsPath(module: job.module, file: primary))
             }
             return .success(try runner.run(job.executable, frontendArguments(of: job), in: workingDirectory))
@@ -293,7 +313,8 @@ struct FrontendCheck {
     /*
      The planned job as the check runs it: `-emit-sil` in place of `-typecheck`, and per primary, in the driver's
      order, `SIL` to /dev/null, a diagnostics record and an index unit. Whatever outputs the driver planned are dropped
-     first, so only these are written.
+     first, so only these are written. Indexing a dependency's declarations keeps `-typecheck`, skips every function
+     body, and writes only the index units.
      */
     func frontendArguments(of job: Job) -> [String] {
         var arguments: [String] = []
@@ -306,12 +327,15 @@ struct FrontendCheck {
             if argument == "-index-system-modules" {
                 continue
             }
-            arguments.append(argument == "-typecheck" ? "-emit-sil" : argument)
+            arguments.append(argument == "-typecheck" && mode == .check ? "-emit-sil" : argument)
         }
-        for _ in job.primaries {
+        if mode == .indexDeclarations {
+            arguments.append("-experimental-skip-all-function-bodies")
+        }
+        for _ in job.primaries where mode == .check {
             arguments += ["-o", "/dev/null"]
         }
-        for primary in job.primaries {
+        for primary in job.primaries where mode == .check {
             arguments += ["-serialize-diagnostics-path", diagnosticsPath(module: job.module, file: primary).path]
         }
         for primary in job.primaries {
@@ -347,14 +371,17 @@ struct FrontendCheck {
         )
     }
 
-    /* Removes a record a previous check left for a file about to be checked again. */
+    /* Removes a record a previous check left for a file about to be checked again. One already gone is what was wanted. */
     static func removeRecord(_ record: URL) throws {
         try FileManager.default.createDirectory(
             at: record.deletingLastPathComponent(),
             withIntermediateDirectories: true,
         )
-        if FileManager.default.fileExists(atPath: record.path) {
+        do {
             try FileManager.default.removeItem(at: record)
+        }
+        catch CocoaError.fileNoSuchFile {
+            /* No earlier record, or none left: either way nothing can vouch for the file before this check does. */
         }
     }
 

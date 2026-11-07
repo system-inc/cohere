@@ -57,14 +57,14 @@ struct SymbolProvider {
         catch {
             for file in needSourcekitd {
                 result.unavailable[file.url.path] =
-                    "the build's index does not describe it as it stands, and sourcekitd could not load: \(error)"
+                    "the index does not describe it as it stands, and sourcekitd could not load: \(error)"
             }
             return result
         }
         for file in needSourcekitd {
             guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else {
                 result.unavailable[file.url.path] =
-                    "the build's index does not describe it as it stands, and no build recorded how to compile it"
+                    "the index does not describe it as it stands, and no check or build kept how to compile it"
                 continue
             }
             /*
@@ -76,7 +76,7 @@ struct SymbolProvider {
              */
             if let gone = command.files.first(where: { !FileManager.default.fileExists(atPath: $0) }) {
                 result.unavailable[file.url.path] =
-                    "the last build compiled its module with \(gone), which no longer exists, so that build's arguments describe another module"
+                    "the last check or build compiled its module with \(gone), which no longer exists, so its arguments describe another module"
                 continue
             }
             do {
@@ -90,7 +90,7 @@ struct SymbolProvider {
             }
             catch {
                 result.unavailable[file.url.path] =
-                    "the build's index does not describe it as it stands, and sourcekitd could not index it: \(error)"
+                    "the index does not describe it as it stands, and sourcekitd could not index it: \(error)"
             }
         }
         return result

@@ -4,8 +4,8 @@ import Testing
 @testable import CohereSwift
 
 /*
- Where the typed rules' symbols come from, on real stores: two tiny packages, each built into its own scratch path
- the way a package and its local package are, so each has its own index store. Every layout's store is consulted,
+ Where the typed rules' symbols come from, on real stores: two tiny packages, each checked into its own scratch
+ path the way a package and its local package are, so each has its own index store. Every layout's store is consulted,
  a file is described by its own record and not a neighbor's, and a file edited since its unit was written is not
  vouched for by that unit, though the same store answered for it a moment before.
  */
@@ -15,8 +15,8 @@ struct SymbolProviderTests {
     static let leftSpareSource = "public func leftSpare() -> Int { 2 }\n"
     static let rightSource = "public func rightReading() -> Int { 3 }\n"
 
-    /* Both packages built, each into its own scratch, and their three files as a run hands them over. */
-    static func builtPackages() async throws -> (layouts: [BuildLayout], files: [ParsedFile]) {
+    /* Both packages checked, each into its own scratch, and their three files as a run hands them over. */
+    static func checkedPackages() async throws -> (layouts: [BuildLayout], files: [ParsedFile]) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-symbol-provider-\(UUID().uuidString)",
             isDirectory: true,
@@ -39,13 +39,12 @@ struct SymbolProviderTests {
                 owned.append(FileSet.OwnedFile(url: url, targetName: name, targetKind: "regular", packageRoot: root))
             }
             let scratch = root.appendingPathComponent(".cache/cohere/swift", isDirectory: true)
-            let built = try ProcessRunner().run(
-                "swift",
-                ["build", "--build-system", "swiftbuild", "--scratch-path", scratch.path],
-                in: root,
+            let checked = try CheckFixture.check(root, scratch: scratch)
+            try #require(
+                checked.swift.failedJobs.isEmpty,
+                "the fixture package \(name) must check: \(checked.swift.failedJobs)",
             )
-            try #require(built.succeeded, "the fixture package \(name) must build: \(built.standardError)")
-            layouts.append(.swiftPackage(scratchPath: scratch))
+            layouts.append(.check(scratchPath: scratch))
         }
         return (layouts, await SourceParser().parse(owned).files)
     }
@@ -65,7 +64,7 @@ struct SymbolProviderTests {
      symbols: the two files of one store are told apart by path, though the store's lookup is built once for both.
      */
     @Test func everyLayoutsStoreDescribesItsOwnFiles() async throws {
-        let (layouts, files) = try await Self.builtPackages()
+        let (layouts, files) = try await Self.checkedPackages()
         try #require(files.count == 3)
 
         let result = SymbolProvider(layouts: layouts, runner: ProcessRunner()).symbols(for: files)
@@ -83,7 +82,7 @@ struct SymbolProviderTests {
      beside it, untouched, is still described. Through the provider, the touched file leaves the index's count.
      */
     @Test func aFileTouchedSinceItsUnitIsNotDescribedByIt() async throws {
-        let (layouts, files) = try await Self.builtPackages()
+        let (layouts, files) = try await Self.checkedPackages()
         let left = try #require(files.first { $0.url.lastPathComponent == "Left.swift" })
         let spare = try #require(files.first { $0.url.lastPathComponent == "LeftSpare.swift" })
         let firstLayout = try #require(layouts.first)

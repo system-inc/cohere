@@ -73,7 +73,6 @@ struct TypesPhaseRecordTests {
     static func findings(_ fixture: (phase: TypesPhase, target: URL, broken: URL, record: URL)) throws -> [String] {
         try fixture.phase.read(
             targetDirectories: [("A", fixture.target)],
-            failedBuilds: [],
             start: Date(),
             build: "test",
         )

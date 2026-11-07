@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /*
@@ -47,6 +48,12 @@ struct CSyntaxCheck {
     let workingDirectory: URL
     var runner = ProcessRunner()
     var parallelism = ProcessInfo.processInfo.activeProcessorCount
+    /*
+     The index store each file's unit goes into, or nil for none. A Swift file's `import CCore` is resolved through the
+     C files' units, which a build left in its store, so the types phase indexes every C-family file of the package's
+     graph, a dependency's as well as its own, in the same pass that checks it.
+     */
+    var indexStorePath: URL?
 
     /* Every C-family file of the targets that is not a header, paired with its target's options for its language. */
     static func sources(of targets: [BuildServerClient.Target], options: [BuildServerClient.TargetOptions]) -> [Source]
@@ -67,12 +74,8 @@ struct CSyntaxCheck {
     func check(_ sources: [Source]) throws(Failure) -> Outcome {
         let ran = FrontendCheck.pooled(sources, width: parallelism) { source in
             Swift.Result { () throws(Failure) -> ProcessRunner.Result in
-                let record = FrontendCheck.diagnosticsPath(
-                    in: diagnosticsRoot,
-                    module: source.target,
-                    file: source.file.path,
-                )
-                let arguments = try Self.arguments(for: source, diagnostics: record)
+                let record = Self.recordPath(in: diagnosticsRoot, of: source)
+                let arguments = try Self.arguments(for: source, diagnostics: record, indexStorePath: indexStorePath)
                 do {
                     try FrontendCheck.removeRecord(record)
                     return try runner.run(clang, arguments, in: workingDirectory)
@@ -92,11 +95,7 @@ struct CSyntaxCheck {
                 FrontendCheck.Record(
                     module: source.target,
                     file: source.file.path,
-                    diagnostics: FrontendCheck.diagnosticsPath(
-                        in: diagnosticsRoot,
-                        module: source.target,
-                        file: source.file.path,
-                    ),
+                    diagnostics: Self.recordPath(in: diagnosticsRoot, of: source),
                     unitOutputPath: "",
                 )
             )
@@ -131,6 +130,24 @@ struct CSyntaxCheck {
         return outcome
     }
 
+    /*
+     A C-family file's record, `<root>/<Target>.build/Objects-normal/check/<File>-<hash>.dia`. Unlike a Swift module's
+     files, a C target's may share a name in different folders, and both were checked side by side into one record and
+     one index unit: measured 2026-11-06 on ahraos-presence, mlx-swift's Cmlx has two `conv` files, whose race on the
+     record failed the whole types phase, and one of whose units was always the other's, so it was indexed again every
+     run. The name is the file's stem and the first 8 hex digits of its resolved path's SHA-256.
+     */
+    static func recordPath(in root: URL, of source: Source) -> URL {
+        FrontendCheck.moduleDirectory(in: root, module: source.target)
+            .appendingPathComponent("Objects-normal/check/\(recordName(of: source.file)).dia")
+    }
+
+    static func recordName(of file: URL) -> String {
+        let digest = SHA256.hash(data: Data(file.resolvingSymlinksInPath().path.utf8))
+        let hex = digest.prefix(4).map { String($0 >> 4, radix: 16) + String($0 & 0x0f, radix: 16) }.joined()
+        return "\(file.deletingPathExtension().lastPathComponent)-\(hex)"
+    }
+
     /* Outputs the build would write: objects, dependency files, its own diagnostics record and its index. */
     private static let outputFlagsWithValue: Set<String> = [
         "-o", "-index-store-path", "-index-unit-output-path", "--serialize-diagnostics", "-serialize-diagnostic-file",
@@ -140,10 +157,12 @@ struct CSyntaxCheck {
 
     /*
      The target's arguments as one file's syntax check: the file the server was asked about replaced by this one,
-     every output dropped, then `-fsyntax-only` and this file's record. Arguments that do not name the file asked
-     about cannot be told apart from the file's own, so they are a failure, never a guess.
+     every output dropped, then `-fsyntax-only`, this file's record, and its index unit when there is a store. Arguments
+     that do not name the file asked about cannot be told apart from the file's own, so they are a failure, never a
+     guess.
      */
-    static func arguments(for source: Source, diagnostics: URL) throws(Failure) -> [String] {
+    static func arguments(for source: Source, diagnostics: URL, indexStorePath: URL? = nil) throws(Failure) -> [String]
+    {
         let asked = source.options.askedFile.path
         guard source.options.arguments.contains(asked) else {
             throw Failure(
@@ -164,6 +183,13 @@ struct CSyntaxCheck {
             }
             arguments.append(argument == asked ? source.file.path : argument)
         }
-        return arguments + ["-fsyntax-only", "--serialize-diagnostics", diagnostics.path]
+        let index =
+            indexStorePath.map {
+                [
+                    "-index-store-path", $0.path, "-index-unit-output-path",
+                    "/\(source.target)/\(recordName(of: source.file)).o",
+                ]
+            } ?? []
+        return arguments + ["-fsyntax-only", "--serialize-diagnostics", diagnostics.path] + index
     }
 }

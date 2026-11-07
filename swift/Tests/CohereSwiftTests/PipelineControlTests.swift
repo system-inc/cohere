@@ -234,7 +234,7 @@ struct PipelineControlTests {
         #expect(crashes.count == 1)
         #expect(
             crashes.first?.hasPrefix(
-                "the build's index does not describe it as it stands, and no build recorded how to compile it, since the build this run made for the typed rules failed: swift build of"
+                "the index does not describe it as it stands, and no check or build kept how to compile it, since the check this run made for the typed rules failed: the check of"
             ) == true,
             "\(crashes)",
         )

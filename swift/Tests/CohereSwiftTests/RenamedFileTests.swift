@@ -67,7 +67,7 @@ struct RenamedFileTests {
         )
         #expect((crashes.first?["error"] as? String)?.contains("Old.swift, which no longer exists") == true)
         #expect(
-            (crashes.first?["error"] as? String)?.contains("since the build this run made for the typed rules failed")
+            (crashes.first?["error"] as? String)?.contains("since the check this run made for the typed rules failed")
                 == true,
             "the rename case is reached only through a failed build: \(crashes)",
         )

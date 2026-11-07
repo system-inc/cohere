@@ -128,7 +128,7 @@ struct FrontendCheckTests {
      */
     @Test func aFailedBatchRerunsItsMatesOnePrimaryAtATime() throws {
         let root = try CheckFixture.package(plants: CheckFixture.swiftPlants)
-        let checked = try CheckFixture.check(root, scratch: CheckFixture.scratch(), batchSize: 100)
+        let checked = try CheckFixture.check(root, scratch: CheckFixture.scratch(), batchSize: 100, parallelism: 1)
         let testJobs = checked.swift.records.filter { $0.module == "FeatureTests" }
         #expect(testJobs.count == 9, "the test target's nine files, the generated entry point among them")
         #expect(Set(checked.swift.rerunPrimaries) == Set(testJobs.map(\.file)))
@@ -161,7 +161,7 @@ struct FrontendCheckTests {
         )
         let builtOccurrences = try CheckFixture.occurrences(
             of: welcome,
-            storePath: IndexStore.storePath(layout: .swiftPackage(scratchPath: buildScratch)),
+            storePath: buildScratch.appendingPathComponent("out", isDirectory: true),
         )
         #expect(checkedOccurrences == builtOccurrences)
         /* `greeting.text()` on line 5, inside `welcome`'s body: a reference only a full check records. */
