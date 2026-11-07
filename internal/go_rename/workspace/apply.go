@@ -52,15 +52,18 @@ func ApplyVerifiedRetargeted(
 	}
 	before := map[string]map[string][]rename.IdentifierRecord{}
 	for _, rootsPackage := range loaded.Roots {
+		// Keyed under the root: a cgo package's translations in the build cache are named by a hash the rewrite
+		// changes, and rename.FileKey keys each by the source it translates (see rename.FileKey).
 		fingerprint := rename.Fingerprint(
 			rootsPackage.Fset,
 			rootsPackage.Types,
 			rootsPackage.TypesInfo,
 			rootsPackage.Syntax,
+			loaded.Root,
 		)
 		rename.Expect(
 			fingerprint,
-			rename.IdentifierOffsets(rootsPackage.Fset, rootsPackage.Syntax),
+			rename.IdentifierOffsets(rootsPackage.Fset, rootsPackage.Syntax, loaded.Root),
 			newNameAt,
 			retargets,
 			insertions,
@@ -112,7 +115,8 @@ func ApplyVerifiedRetargeted(
 			mismatches++
 			continue
 		}
-		after := rename.Fingerprint(rootsPackage.Fset, rootsPackage.Types, rootsPackage.TypesInfo, rootsPackage.Syntax)
+		after := rename.Fingerprint(rootsPackage.Fset, rootsPackage.Types, rootsPackage.TypesInfo, rootsPackage.Syntax,
+			reloaded.Root)
 		expectedFiles := make([]string, 0, len(expected))
 		for filename := range expected {
 			expectedFiles = append(expectedFiles, filename)
