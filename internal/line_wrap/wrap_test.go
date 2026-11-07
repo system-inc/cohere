@@ -1,6 +1,9 @@
 package line_wrap
 
 import (
+	"go/scanner"
+	"go/token"
+	"slices"
 	"strings"
 	"testing"
 
@@ -528,5 +531,148 @@ func TestCuredOnlyLeavesWhatItCannotCure(test *testing.T) {
 		if testCase.kept && (result.After[CategoryNotCured] != 1 || result.After[CategoryActionable] != 0) {
 			test.Errorf("want the return counted as not cured and nothing left actionable, got %v", result.After)
 		}
+	}
+}
+
+// TestKeepCommentsLeavesEveryComment pins Options.KeepComments: a long prose comment stays byte for byte and counts as
+// CategoryComment, a call whose break would leave a block comment ending its line, where code followed it before,
+// stays whole, and a call with a trailing marker comment is still wrapped, its comment's text kept after the closing
+// parenthesis. Without the option the comment is reflowed and the first call broken.
+func TestKeepCommentsLeavesEveryComment(test *testing.T) {
+	test.Parallel()
+	prose := "// " + strings.Repeat("word ", 26) + "end\n"
+	moved := "\tsend( /* the context */ context, \"" + strings.Repeat("word ", 20) + "\", first)\n"
+	source := "package p\n\n" + prose + "func report() {\n" + moved + "\tsend(context, \"" +
+		strings.Repeat("word ", 20) + "\", first, second) // Serial: a marker line reads this\n}\n"
+	for _, testCase := range []struct {
+		options Options
+		kept    bool
+	}{
+		{options: Options{}, kept: false},
+		{options: Options{KeepComments: true}, kept: true},
+	} {
+		result, wrapError := Wrap([]byte(source), testCase.options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", testCase.options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if strings.Contains(output, prose) != testCase.kept || strings.Contains(output, moved) != testCase.kept {
+			test.Errorf("with %+v, want the comment and the first call kept whole %v, got:\n%s", testCase.options,
+				testCase.kept, output)
+		}
+		if !strings.Contains(output, "\t) // Serial: a marker line reads this\n") {
+			test.Errorf("with %+v, want the second call wrapped and its marker kept after it, got:\n%s",
+				testCase.options, output)
+		}
+		if testCase.kept && (result.After[CategoryComment] != 1 || result.After[CategoryActionable] != 0) {
+			test.Errorf("want the comment counted as a comment and nothing left actionable, got %v", result.After)
+		}
+	}
+}
+
+// fixPhaseOptions are the options the engine's fix phase wraps with.
+var fixPhaseOptions = Options{ReportedOnly: true, CuredOnly: true, KeepComments: true}
+
+// TestAChainNeverBreaksBetweenJoinedLiterals pins the fourth guard: a + joining two string literals, which
+// consistency_no_useless_concatenation reports on one line and leaves alone across lines, is never broken, so a wrap
+// never hides that finding. A chain holding such a join breaks at its other operators with the two literals kept
+// together, and a line only that break could cure stays as it was.
+func TestAChainNeverBreaksBetweenJoinedLiterals(test *testing.T) {
+	test.Parallel()
+	joined := `", and welcome to the depot's " + "own courier service in "`
+	wrappable := "\treturn \"good morning, \" + name + " + joined + " + city + \", have a nice day\"\n"
+	onlyThere := "\treturn prefix + \"" + strings.Repeat("word ", 12) + "\" + \"" + strings.Repeat("more ", 12) + "\"\n"
+	source := "package p\n\nfunc greeting(name, city string) string {\n" + wrappable + "}\n\n" +
+		"func signature(prefix string) string {\n" + onlyThere + "}\n"
+	for _, options := range []Options{{}, fixPhaseOptions} {
+		result, wrapError := Wrap([]byte(source), options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if !strings.Contains(output, "\t\t"+joined+" +\n") ||
+			!strings.Contains(output, "\treturn \"good morning, \" +\n") {
+			test.Errorf("with %+v, want the chain broken with its joined literals on one line, got:\n%s", options,
+				output)
+		}
+		if options.CuredOnly && !strings.Contains(output, onlyThere) {
+			test.Errorf("want the line only a break between literals could cure kept whole, got:\n%s", output)
+		}
+		if strings.Contains(output, "\" +\n\t\t\"") {
+			test.Errorf("with %+v, a break between two literals:\n%s", options, output)
+		}
+	}
+}
+
+// codeTokens is source's tokens as go/scanner reads them, comments left out, with the two shapes a wrap is allowed to
+// change taken out of both sides: a semicolon the scanner inserted at a line's end, and a comma just before a closing
+// bracket. Each token is its kind and its literal, so a changed name, operator or literal reads as a different token.
+func codeTokens(test *testing.T, source []byte) []string {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	var tokenScanner scanner.Scanner
+	tokenScanner.Init(fileSet.AddFile("", fileSet.Base(), len(source)), source,
+		func(position token.Position, message string) { test.Fatalf("scanning at %s: %s", position, message) }, 0)
+	var tokens []string
+	for {
+		_, kind, literal := tokenScanner.Scan()
+		if kind == token.EOF {
+			return tokens
+		}
+		if kind == token.SEMICOLON && literal == "\n" {
+			continue
+		}
+		if (kind == token.RPAREN || kind == token.RBRACK || kind == token.RBRACE) && len(tokens) > 0 &&
+			tokens[len(tokens)-1] == token.COMMA.String() {
+			tokens = tokens[:len(tokens)-1]
+		}
+		if literal == "" {
+			tokens = append(tokens, kind.String())
+			continue
+		}
+		tokens = append(tokens, kind.String()+" "+literal)
+	}
+}
+
+// TestTheWrapKeepsEveryTokenButTwoShapes pins the proof of record Loom's lander took over 1,632 wrapped files: the
+// wrapped output's go/scanner token stream is the input's, comments aside, once a newline-inserted semicolon and a
+// trailing comma before a closing bracket are taken out. It holds for every case here, with the command line's
+// options and with the fix phase's, beside Equivalent's proof by syntax tree. The comparison is shown to see a change:
+// a renamed argument and a dropped one each read as different streams, while the two shapes alone do not.
+func TestTheWrapKeepsEveryTokenButTwoShapes(test *testing.T) {
+	test.Parallel()
+	const callSource = "package p\n\nvar v = f(first, second)\n"
+	for _, check := range []struct {
+		name  string
+		after string
+		same  bool
+	}{
+		{name: "the two shapes alone", after: "package p\n\nvar v = f(\n\tfirst,\n\tsecond,\n)\n", same: true},
+		{name: "a renamed argument", after: "package p\n\nvar v = f(\n\tfirst,\n\tsecnod,\n)\n"},
+		{name: "a dropped argument", after: "package p\n\nvar v = f(\n\tfirst,\n)\n"},
+	} {
+		same := slices.Equal(codeTokens(test, []byte(callSource)), codeTokens(test, []byte(check.after)))
+		if same != check.same {
+			test.Errorf("%s: the streams read the same %t, want %t", check.name, same, check.same)
+		}
+	}
+	wrappedCount := 0
+	for _, testCase := range wrapCases {
+		for _, options := range []Options{testCase.options, fixPhaseOptions} {
+			result, wrapError := Wrap([]byte(testCase.source), options)
+			if wrapError != nil {
+				test.Fatalf("%s with %+v: %v", testCase.name, options, wrapError)
+			}
+			if string(result.Output) != testCase.source {
+				wrappedCount++
+			}
+			if !slices.Equal(codeTokens(test, []byte(testCase.source)), codeTokens(test, result.Output)) {
+				test.Errorf("%s with %+v: the wrap changed a token:\n%s", testCase.name, options, result.Output)
+			}
+		}
+	}
+	if wrappedCount < len(wrapCases) {
+		test.Errorf("only %d of the %d wraps changed their file, so the proof shows little", wrappedCount,
+			2*len(wrapCases))
 	}
 }

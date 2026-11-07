@@ -3,10 +3,11 @@ package base
 import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/types/source_name"
 	"github.com/system-inc/cohere/policy"
 )
 
-// ConsistencyNoConsole flags every `console.*` access in source.
+// ConsistencyNoConsole flags every `console.*` access in source outside a test file.
 //
 //	valid:   myConsole.log('x');
 //	valid:   window.console.log('x');
@@ -68,6 +69,16 @@ import (
 // the other way here first, and only the fixture measured against the real rule caught it. A port
 // that helpfully read the string literal would diverge on a message nobody would think to check.
 //
+// # A test file is exempt
+//
+// Console calls are exempt in tests, in every language (Kirk, 2026-11-06, #4b337jk): a test's output
+// is read by the person running it and never ingested, so none of the trace budget above is spent. A
+// test file is the house's notion, `source_name.IsTestFile`, a `.test` name before any TypeScript or
+// JavaScript script extension (`Thing.test.ts`, `Thing.test.tsx`, `Thing.test.js`) or Adamic's
+// `Thing.test.a`, the same one `base/consistency-no-bare-throw` exempts by. Go's twin exempts a
+// `_test.go` file and Swift's a SwiftPM test target, each its own language's notion. A test helper
+// that is not itself a test file still reports, as it does in Go.
+//
 // # No repair
 //
 // Upstream ships no fixer and says why: replacing a console call means naming what failed, which is
@@ -75,11 +86,17 @@ import (
 //
 // # Cost
 //
-// Two common anchors, both exiting on a single identifier comparison. No checker, no program.
+// One suffix test per file, then two common anchors, both exiting on a single identifier comparison. No
+// checker, no program.
 var ConsistencyNoConsole = rule.Rule[rule.NoOptions]{
 	Name: "base/consistency-no-console",
 
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+		// No listeners for a test file, so an exempt file costs its one suffix test and nothing more.
+		if ruleContext.SourceFile == nil || source_name.IsTestFile(ruleContext.SourceFile.FileName().AsString()) {
+			return nil
+		}
+
 		report := func(node *ast.Node, receiver *ast.Node, methodName string) {
 			// Parentheses are stepped through before the receiver is read, and this line was
 			// missing on the first writing.

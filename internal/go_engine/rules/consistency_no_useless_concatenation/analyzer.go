@@ -45,12 +45,11 @@ func run(pass *analysis.Pass) (any, error) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			binary, isBinary := node.(*ast.BinaryExpr)
-			if !isBinary || binary.Op != token.ADD {
+			if !isBinary {
 				return true
 			}
-			left, leftIsString := stringLiteral(rightmostOfLeft(binary.X))
-			right, rightIsString := stringLiteral(leftmostOfRight(binary.Y))
-			if !leftIsString || !rightIsString || !onOneLine(pass, left, right) || !pasteIntoOne(left, right) {
+			left, right, joins := JoinedLiterals(binary)
+			if !joins || !onOneLine(pass, left, right) {
 				return true
 			}
 			// The operator rather than the expression, as the core port reports, so a chain's findings point at the
@@ -65,6 +64,22 @@ func run(pass *analysis.Pass) (any, error) {
 		})
 	}
 	return nil, nil
+}
+
+// JoinedLiterals are the two string literals beside binary's operator when binary is a + the rule reports once both
+// stand on one line: the literals found by descending into a + on either side through parentheses, whose texts paste
+// into one literal. The rule's run reports through it, and the fix phase's long-line wrap asks it of every + it could
+// break after, so it never breaks a join the rule would report, which a join across lines would hide from it.
+func JoinedLiterals(binary *ast.BinaryExpr) (left *ast.BasicLit, right *ast.BasicLit, joins bool) {
+	if binary.Op != token.ADD {
+		return nil, nil, false
+	}
+	left, leftIsString := stringLiteral(rightmostOfLeft(binary.X))
+	right, rightIsString := stringLiteral(leftmostOfRight(binary.Y))
+	if !leftIsString || !rightIsString || !pasteIntoOne(left, right) {
+		return nil, nil, false
+	}
+	return left, right, true
 }
 
 // rightmostOfLeft is the element of a + operator's left operand that stands beside the operator. A + associates

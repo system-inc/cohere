@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -41,6 +42,21 @@ func Apply(plan *Plan) (int, error) {
 	byFile := map[string][]Edit{}
 	for _, edit := range plan.Edits {
 		byFile[edit.FileName] = append(byFile[edit.FileName], edit)
+	}
+	if plan.RewriteMentions {
+		for _, mention := range plan.Mentions {
+			if !mention.Rewritable {
+				continue
+			}
+			byFile[mention.FileName] = append(byFile[mention.FileName], Edit{
+				FileName: mention.FileName,
+				Range:    mention.Range,
+				Line:     mention.Line,
+				Column:   mention.Column,
+				Text:     plan.NewName,
+				Kind:     EditMention,
+			})
+		}
 	}
 
 	// Every file is rewritten in memory and checked before any file is written, so a plan that would
@@ -104,6 +120,11 @@ func Apply(plan *Plan) (int, error) {
 		builder.WriteString(text[previous:])
 		updated := builder.String()
 
+		// Markdown is prose, with no parse to guard; every source file is parsed, mentions rewritten or not.
+		if isMarkdownFile(fileName) {
+			rewritten[fileName] = updated
+			continue
+		}
 		if parses, reason := edit.Parses(fileName, updated); !parses {
 			return 0, fmt.Errorf(
 				"renaming would leave %s unparseable (%s), so nothing was written",
@@ -195,10 +216,57 @@ func Write(out io.Writer, plan *Plan, applied bool) error {
 		}
 	}
 
+	writeMentions(writer, plan, applied)
+
 	if !applied {
 		fmt.Fprintf(writer, "\nNothing was written. Pass --write to apply.\n")
 	}
 	return flushed(writer, "the rename plan")
+}
+
+// writeMentions prints the text mentions apart from the edits, each with what happens to it. Printed when there
+// are none too, for the reason the blindness section is: a section that appears only with something in it cannot
+// be told from a rename that never looked.
+func writeMentions(writer *bufio.Writer, plan *Plan, applied bool) {
+	where := "comments and strings of the files it touches"
+	if plan.MarkdownRoot != "" {
+		where += ", and the markdown under " + plan.MarkdownRoot
+	}
+	if len(plan.Mentions) == 0 {
+		fmt.Fprintf(writer, "\ntext mentions: none of %s names %s as a whole word.\n", where, plan.OldName)
+		return
+	}
+	rewritable := 0
+	for _, mention := range plan.Mentions {
+		if mention.Rewritable {
+			rewritable++
+		}
+	}
+	fmt.Fprintf(writer, "\ntext mentions: %d in %s name %s as a whole word. A text match is not a proven reference:\n",
+		len(plan.Mentions), where, plan.OldName)
+	for _, mention := range plan.Mentions {
+		fate := "listed only: " + mention.Why
+		if mention.Rewritable {
+			switch {
+			case applied && plan.RewriteMentions:
+				fate = "rewritten"
+			case plan.RewriteMentions:
+				fate = "would be rewritten"
+			default:
+				fate = "rewritten under --comments"
+			}
+		}
+		fmt.Fprintf(writer, "    %s:%d:%d  %s  %s\n      %s\n", mention.FileName, mention.Line, mention.Column,
+			mention.Place, fate, mention.LineText)
+	}
+	if rewritable > 0 && !plan.RewriteMentions {
+		fmt.Fprintf(writer, "  %d of them would be rewritten with --comments, and none is without it.\n", rewritable)
+	}
+}
+
+// isMarkdownFile reports whether a file is markdown, which a rename writes without a parse.
+func isMarkdownFile(fileName string) bool {
+	return strings.EqualFold(filepath.Ext(fileName), ".md")
 }
 
 // WriteCandidates prints the symbols a bare name resolved to, when it resolved to more than one, buffered as Write is.

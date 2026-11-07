@@ -280,7 +280,15 @@
             "reason": "CommonJS has no import statement and import() is async, so require is the only module form a .cjs can use."
         },
         {
-            "files": ["**/*.test.ts", "**/*.test.a"],
+            "files": [
+                "**/*.test.ts",
+                "**/*.test.tsx",
+                "**/*.test.js",
+                "**/*.test.jsx",
+                "**/*.test.mts",
+                "**/*.test.cts",
+                "**/*.test.a"
+            ],
             "rules": {
                 "no-use-before-define": [
                     "error",
@@ -289,7 +297,7 @@
                     }
                 ]
             },
-            "reason": "A test declares ORM entities that relate to each other through relation thunks (() => OtherEntity), so each names a class the other declares later and no order removes the cycle. A thunk runs only after both classes exist. ESLint reports these and cohere does not, so both engines take classes: false here, scoped to test files, and agree (#yfkhkvy)."
+            "reason": "A test declares ORM entities that relate to each other through relation thunks (() => OtherEntity), so each names a class the other declares later and no order removes the cycle. A thunk runs only after both classes exist. ESLint reports these and cohere does not, so both engines take classes: false here, scoped to test files, and agree (#yfkhkvy). A test file is a .test name before every script extension, the ones source_name.IsTestFile names, so this scope and the rules that exempt a test agree (#4b337jk)."
         }
     ]
 }

@@ -23,6 +23,18 @@
 // the five differences is a comment or a markdown file. grep over-matched by five and the checker
 // missed nothing.
 //
+// # Text mentions, and --comments
+//
+// Those five are not references, but they name the symbol, and a rename that leaves them names one that no
+// longer exists (#p9q52mg). So the dry run lists every whole-word mention of the old name apart from its
+// edits: in the comments and strings of the files it touches, and in the markdown the format walk finds
+// under the program's directory. `--comments` with `--write` rewrites the ones in comments and markdown
+// prose, and only when the old name is distinctive (a capital after its first letter, an underscore, a
+// dollar sign or a digit), since a plain word like `value` in a comment is usually English. A string or a
+// fenced code block is listed and never rewritten: a string is a message, a key or a lookup, and an
+// example may be another program's code. Rewritten source still passes the parse guard. mention.go holds
+// the rules. On ahra, `usePreviousValue` reads 4 sites in 2 files and 5 text mentions.
+//
 // # The five things that decide whether a rename is correct
 //
 // Each is handled below and each is measured rather than assumed, because four of the five produce
@@ -106,6 +118,9 @@ const (
 	// it is the one site where the replacement text is not simply the new name, and a reader
 	// skimming a dry run should see that the shape changed.
 	EditShorthandExpansion EditKind = "shorthand expansion"
+
+	// EditMention is a text mention rewritten under `--comments` (mention.go), never a proven reference.
+	EditMention EditKind = "text mention"
 )
 
 // Blindness is something the rename could not see, reported so the user is never handed a number
@@ -139,6 +154,13 @@ type Plan struct {
 	Edits        []Edit
 	Blind        []Blindness
 	FilesTouched int
+
+	// Mentions are the old name's whole-word occurrences in comments, strings and markdown, which the checker
+	// does not read (mention.go). MarkdownRoot is the directory whose markdown was searched, empty when none was.
+	Mentions     []Mention
+	MarkdownRoot string
+	// RewriteMentions is `--comments`: apply writes the rewritable mentions too.
+	RewriteMentions bool
 
 	// Refusals are reasons this plan must not be applied. A non-empty Refusals means the verb
 	// refuses: a rename that cannot be done correctly is not done at all, because a half-renamed

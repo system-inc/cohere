@@ -11,12 +11,13 @@ import (
 type Verdict string
 
 const (
-	// VerdictUnchanged is a file gofmt leaves as it is, learned by a run that does not wrap long lines, so a run
-	// that wraps them never trusts it: the file may hold a long line the wrap would change.
+	// VerdictUnchanged is a file gofmt leaves as it is, learned by Run, which does not wrap long lines, so RunWrap
+	// never trusts it: the file may hold a long line the wrap would change.
 	VerdictUnchanged Verdict = "Unchanged"
 
-	// VerdictWrapUnchanged is a file gofmt and the long-line wrap both leave as it is: it holds no long line the
-	// rule reports, or none the wrap could bring within the limit. Every run trusts it.
+	// VerdictWrapUnchanged is a file gofmt and the long-line wrap both leave as it is, learned by RunWrap over a file
+	// gofmt formatted: it holds no long line the rule reports, or none the wrap could bring within the limit. Run and
+	// RunWrap both trust it.
 	VerdictWrapUnchanged Verdict = "WrapUnchanged"
 
 	// VerdictGenerated is a file skipped as generated.
@@ -25,10 +26,11 @@ const (
 
 // KnownFiles is the verdicts of files gofmt had nothing to do to, by the sha256 of their bytes, which a run reads
 // in place of formatting them again: gofmt's answer, and the wrap's, is a function of a file's bytes and of the
-// gofmt and the wrap the binary links, which whoever keeps the verdicts keys them on. A verdict says whether the
-// wrap was asked too, since a run that wraps must not trust one that only gofmt gave. A file the run would change,
-// could not format, or whose wrap it declined is never known, so its finding or its rewrite is always the run's own.
-// Run asks it from any goroutine.
+// gofmt and the wrap the binary links, which whoever keeps the verdicts keys them on. The wrap's answer that it has
+// nothing to do reads nothing else: a file's name and the long-file limit only ever decline a wrap it would make. A
+// verdict says whether the wrap was asked too, since RunWrap must not trust one that only gofmt gave. A file a run
+// would change, could not format, or whose wrap it declined is never known, so its finding or its rewrite is always
+// the run's own. Run and RunWrap ask it from any goroutine.
 type KnownFiles struct {
 	lock     sync.Mutex
 	verdicts map[[sha256.Size]byte]Verdict
@@ -58,8 +60,8 @@ func (known *KnownFiles) Encode() ([]byte, error) {
 	return encoded.Bytes(), nil
 }
 
-// verdict is what is known of a file with digest, and false for a file not known, or known only to gofmt when the
-// run wraps long lines.
+// verdict is what is known of a file with digest, and false for a file not known, or known only to gofmt when wraps,
+// which RunWrap asks.
 func (known *KnownFiles) verdict(digest [sha256.Size]byte, wraps bool) (Verdict, bool) {
 	known.lock.Lock()
 	defer known.lock.Unlock()

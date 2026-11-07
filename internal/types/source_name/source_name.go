@@ -30,6 +30,25 @@ func TreatedAs(fileName string) string {
 	return fileName
 }
 
+// testFileExtensions are the script extensions a test file's `.test` suffix stands before: every
+// TypeScript and JavaScript one (Kirk, 2026-11-06, #4b337jk). Adamic's `.a` is not listed because
+// TreatedAs reads `Dog.test.a` as `Dog.test.ts` (#kwt1htp). `cohere:system-inc/base`'s test-file
+// override names the same extensions, so the configuration and this predicate agree on what a test is.
+var testFileExtensions = []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"}
+
+// IsTestFile reports whether a name is a test file by the house's notion: a `.test` suffix before a
+// script extension, `Dog.test.ts`, `Dog.test.tsx`, `Dog.test.js` and their kin. One notion for every rule
+// that exempts a test, so the rules cannot drift apart on what a test is.
+func IsTestFile(fileName string) bool {
+	treated := TreatedAs(fileName)
+	for _, extension := range testFileExtensions {
+		if strings.HasSuffix(treated, ".test"+extension) {
+			return true
+		}
+	}
+	return false
+}
+
 // IsAdamic reports whether a name is an Adamic `.a` source name.
 func IsAdamic(fileName string) bool {
 	return TreatedAs(fileName) != fileName
