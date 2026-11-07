@@ -19,6 +19,8 @@
         "source": "const pair = [1, 2] as const;\n"
     },
     "assertedMessageIds": [
-        "uncheckedCast"
+        "uncheckedCast",
+        "uncheckedCastUnderTsc",
+        "uncheckedDowncast"
     ]
 }
