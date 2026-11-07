@@ -4289,7 +4289,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 294,
+        "rulesOn": 295,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",

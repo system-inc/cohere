@@ -45,12 +45,10 @@ func TestEveryRegisteredRuleIsReachableFromTheLiveConfiguration(test *testing.T)
 	// nothing while reading as if it did. Their enabling-cost counts and porting notes are archived
 	// verbatim on #e4cn6wq (deliberately-not-enabled-archive.md); the decisions themselves live in the
 	// sets' reasons and departures.
-	deliberatelyNotEnabled := map[string]string{
-		// Ported and registered without being enabled, because enabling it is a decision with work
-		// attached rather than a wiring step. The audit measured 54 violations and the rule has no
-		// fixer, so every one is a hand edit; the config has never named it under either spelling.
-		"@typescript-eslint/no-deprecated": "ported and registered; the audit measured 54 violations and the rule has no fixer, so enabling is a decision for whoever takes that cleanup",
-	}
+	//
+	// The last one, @typescript-eslint/no-deprecated, left when its fix waves took every consumer to 0
+	// and cohere:typescript turned it on (#hc1qnze). The map stays, empty, for the next rule that needs it.
+	deliberatelyNotEnabled := map[string]string{}
 
 	rules := All()
 	if len(rules) == 0 {
