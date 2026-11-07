@@ -17,6 +17,7 @@
 package consistency_no_screaming_snake_case
 
 import (
+	"fmt"
 	"go/ast"
 	"go/constant"
 	"go/token"
@@ -29,6 +30,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -46,7 +48,8 @@ var Analyzer = &analysis.Analyzer{
 		"syscall or golang.org/x/sys it is assigned from or compared against, a name declared from a call whose " +
 		"constant string argument is exactly that name (os.Getenv(\"DATABASE_URL\")), and a name whose " +
 		"suggested form would not be an identifier (type_ would be the keyword type).",
-	Run: run,
+	Requires: []*analysis.Analyzer{positions.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -67,7 +70,11 @@ var testPrefixes = []string{"Test", "Benchmark", "Fuzz"}
 const examplePrefix = "Example"
 
 func run(pass *analysis.Pass) (any, error) {
-	mirrored := mirroredConstants(pass)
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
+	mirrored := mirroredConstants(pass, table)
 	keyed := keyMirrors(pass)
 	directed := directedNames(pass)
 	for _, file := range pass.Files {
@@ -338,13 +345,16 @@ func isSystemPackage(path string) bool {
 // package. Such a name keeps the system's spelling so it reads as the thing it stands for. `O_CLOEXEC_FLAGS` is not
 // the system's spelling of anything, so it mirrors nothing, and a constant in such a file with no such tie is judged
 // like any other.
-func mirroredConstants(pass *analysis.Pass) map[types.Object]bool {
-	systemFiles := map[*token.File]bool{}
+//
+// The files importing a system package are held by name, which table reads for every constant and declaration
+// without the FileSet's lock.
+func mirroredConstants(pass *analysis.Pass, table *positions.Table) map[types.Object]bool {
+	systemFiles := map[string]bool{}
 	for _, file := range pass.Files {
 		for _, specification := range file.Imports {
 			if path, unquoteError := strconv.Unquote(specification.Path.Value); unquoteError == nil &&
 				isSystemPackage(path) {
-				systemFiles[pass.Fset.File(file.Package)] = true
+				systemFiles[table.Position(file.Package).Filename] = true
 			}
 		}
 	}
@@ -354,13 +364,13 @@ func mirroredConstants(pass *analysis.Pass) map[types.Object]bool {
 	}
 	isOurs := func(object types.Object) bool {
 		constant, isConstant := object.(*types.Const)
-		return isConstant && constant.Pkg() == pass.Pkg && systemFiles[pass.Fset.File(constant.Pos())]
+		return isConstant && constant.Pkg() == pass.Pkg && systemFiles[table.Position(constant.Pos()).Filename]
 	}
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch inspected := node.(type) {
 			case *ast.GenDecl:
-				if inspected.Tok == token.CONST && systemFiles[pass.Fset.File(inspected.Pos())] {
+				if inspected.Tok == token.CONST && systemFiles[table.Position(inspected.Pos()).Filename] {
 					markAssignedConstants(pass, inspected, mirrored)
 				}
 			case *ast.BinaryExpr:

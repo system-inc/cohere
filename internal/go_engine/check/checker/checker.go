@@ -21,27 +21,37 @@
 // graph at once. Here an action's Result is released when the last
 // action that reads it has finished (releaseInputs).
 //
-// The second is prepare, the order that lets the release free anything
-// in time: an action finishes its vertical work, facts from the packages
-// below, before its horizontal dependencies are built. Without it an
-// analyzer with a large Result and no facts, such as buildir, starts on
-// every package at once, before any reader of it can finish.
+// The second is bounded scheduling, which lets the release free
+// anything in time (schedule, in scheduler.go beside this file).
+// Upstream's execAll(roots) starts every action at once, about 950 on
+// cohere's own root, so every package's syntax, types and staticcheck IR
+// are live together, the collector marks all of it on every cycle, and
+// the largest packages finish last. Here the actions on one package are
+// a group, which waits until every action on another package that it
+// inherits facts from has finished, then for one of a bounded number of
+// slots, granted largest package first. It replaces an earlier change,
+// prepare, which ordered each action's facts from below before its
+// horizontal dependencies, so that an analyzer with a large Result and no
+// facts, such as buildir, did not start on every package at once.
 //
-// Each is needed, measured on cohere's own root under the engine's
-// 5 GiB memory cap (collection off, the limit driving it), three runs
-// each, the same 335 findings both ways:
+// Measured on cohere's own root under the engine's 5 GiB memory cap
+// (collection off, the limit driving it), the engine alone, cold, four
+// interleaved runs each, the same records in every run, at a load
+// average of 35 to 41:
 //
-//	release only:     6.05 to 6.67 GB peak, 84 to 102s user
-//	release, prepare: 5.57 to 5.65 GB peak, 49 to 51s user
+//	prepare:  10.0 to 16.0s wall, 69 to 78s user (mean 73.6),
+//	          5.67 to 5.86 GB peak, 17 to 21 collections
+//	schedule:  8.2 to 11.7s wall, 45 to 48s user (mean 45.9),
+//	          5.45 to 5.53 GB peak, 10 collections
 //
-// At GOGC=100 the two look alike (8.8 GB peak release only, 9.1 to
-// 9.3 GB with prepare), since a collector with twice the live heap to
-// spare never works at a limit. The cap is what the engine ships, so
-// the cap regime is the one that decides.
+// The cap is what the engine ships, so the cap regime is the one that
+// decides: at GOGC=100 a collector with twice the live heap to spare
+// never works at a limit.
 //
 // The third is releaseSyntax: a package Analyze was not given, a
 // dependency analyzed only for its facts, lets go of its syntax trees and
-// type information once its last action has finished. On cohere's root the
+// type information once its last action has finished, and so does a
+// package it was given when Options.Finished is set, after Finished. On cohere's root the
 // dependencies' syntax and type information are 765 MB of the load's
 // 1.6 GB live heap. Measured under the cap, interleaved, the same 335
 // findings in every run, at a load average of 16 to 128:
@@ -154,6 +164,20 @@ type Options struct {
 	// returns is the action's Err. Both are nil when nothing is restored.
 	Restored func(*packages.Package) bool
 	Restore  func(*Action) error
+
+	// cohere: Finished, when set, is called with a package Analyze was
+	// given once the last action on it has finished, and the package's
+	// syntax and type information are then let go of as a dependency's
+	// are (see releaseSyntax). Unset, a given package keeps them.
+	Finished func(*packages.Package)
+
+	// cohere: slots and observeGroup are the scheduler's test hooks (see
+	// schedule). slots, above 0, is how many packages run at once in place
+	// of the default; observeGroup is called as a package's group starts,
+	// with true, and once its last action has finished, with false, before
+	// its slot is given back.
+	slots        int
+	observeGroup func(pkg *packages.Package, running bool)
 }
 
 // Graph holds the results of a round of analysis, including the graph
@@ -227,9 +251,6 @@ type Action struct {
 	// releases a non-root Result (see releaseInputs).
 	resultReaders atomic.Int32
 
-	// cohere: prepared guards prepare, which like exec runs once.
-	prepared sync.Once
-
 	// cohere: syntax is shared by every action on this action's package,
 	// so the last of them to finish can release the package's syntax
 	// (see releaseSyntax).
@@ -244,8 +265,10 @@ type syntaxReaders struct {
 	actions    []*Action
 
 	// given is whether the package was one Analyze was given, whose syntax
-	// the caller still reads once the graph has finished.
-	given bool
+	// the caller still reads once the graph has finished, unless finished
+	// is set, to take what it reads before the syntax goes.
+	given    bool
+	finished func(*packages.Package)
 }
 
 func (act *Action) String() string {
@@ -264,7 +287,8 @@ func (act *Action) String() string {
 //
 // cohere: every package below pkgs comes back without its Syntax and
 // TypesInfo, which Analyze let go once it was done with them
-// (releaseSyntax); pkgs themselves keep theirs.
+// (releaseSyntax); pkgs themselves keep theirs, unless opts.Finished is
+// set, which is called with each before it lets go of its too.
 //
 // If opts is nil, it is equivalent to new(Options).
 func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Options) (*Graph, error) {
@@ -342,25 +366,37 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 
 	// cohere: group the actions by package, so the last action on a
-	// package that was not given can release its syntax.
+	// package that was not given can release its syntax, and the scheduler
+	// can start a package's actions together. The groups, and the actions
+	// in each, are in depth-first postorder from the roots, so a sequential
+	// run takes them in the same order every time.
 	given := make(map[*packages.Package]bool, len(pkgs))
 	for _, pkg := range pkgs {
 		given[pkg] = true
 	}
 	readers := make(map[*packages.Package]*syntaxReaders)
-	for _, act := range actions {
+	var groups []*syntaxReaders
+	forEach(roots, func(act *Action) error {
 		shared, ok := readers[act.Package]
 		if !ok {
 			shared = &syntaxReaders{given: given[act.Package]}
+			if shared.given {
+				shared.finished = opts.Finished
+			}
 			readers[act.Package] = shared
+			groups = append(groups, shared)
 		}
 		shared.unfinished.Add(1)
 		shared.actions = append(shared.actions, act)
 		act.syntax = shared
-	}
+		return nil
+	})
 
 	// Execute the graph in parallel.
-	execAll(roots)
+	// cohere: a package's actions at a time, in a bounded number of
+	// packages at once, largest first (see schedule), where upstream's
+	// execAll(roots) starts every action at once.
+	schedule(groups, opts)
 
 	// Ensure that only root Results are visible to caller.
 	// (The others are considered temporary intermediaries.)
@@ -411,57 +447,9 @@ func execAll(actions []*Action) {
 
 func (act *Action) exec() { act.once.Do(act.execOnce) }
 
-// cohere: prepare runs everything act and its horizontal dependencies
-// wait on across packages: each vertical dependency in full, and each
-// horizontal dependency's own prepare. Only then does execOnce run the
-// horizontal dependencies themselves.
-//
-// It is what lets the engine's memory cap hold. An analyzer with a
-// large Result and no facts, such as staticcheck's buildir, has no
-// vertical dependencies, so upstream's execAll(act.Deps) starts it on
-// every package at once, while the actions that read it still wait on
-// facts from the packages below, and the release cannot free what no
-// reader has finished with. Preparing first builds a package's IR only
-// once a reader of it has its facts in hand. Measured on cohere's own
-// root under the engine's 5 GiB cap, three runs each, the same 335
-// findings in every run: with prepare, 5.57 to 5.65 GB peak at 49 to
-// 51s user; without it, 6.05 to 6.67 GB at 84 to 102s user, the
-// collector working at the cap to hold what is alive at once.
-func (act *Action) prepare() {
-	act.prepared.Do(func() {
-		var wg sync.WaitGroup
-		for _, dep := range act.Deps {
-			step := dep.exec
-			if dep.Package == act.Package {
-				step = dep.prepare
-			}
-			wg.Add(1)
-			work := func() {
-				step()
-				wg.Done()
-			}
-			if act.opts.Sequential {
-				work()
-			} else {
-				go work()
-			}
-		}
-		wg.Wait()
-	})
-}
-
 func (act *Action) execOnce() {
 	// Analyze dependencies.
-	// cohere: in two steps, the vertical work first (see prepare), then
-	// the horizontal dependencies, all of whose vertical work is done.
-	act.prepare()
-	var horizontal []*Action
-	for _, dep := range act.Deps {
-		if dep.Package == act.Package {
-			horizontal = append(horizontal, dep)
-		}
-	}
-	execAll(horizontal)
+	execAll(act.Deps)
 
 	// cohere: however this action ends, a failed prerequisite or an
 	// error from Run included, it has read all it will of its inputs, and
@@ -621,18 +609,28 @@ func (act *Action) releaseInputs() {
 
 // cohere: releaseSyntax lets go of a package's syntax trees and type
 // information once the last action on it has finished, unless Analyze was
-// given the package. A dependency is analyzed only by the analyzers that
-// learn facts and what they require, and once those have finished its facts
-// are all that is read of it again: an importer reads its types, which
-// stay. Every finding is the same, since every action ran as it would have.
+// given the package and Options.Finished is unset. A dependency is analyzed
+// only by the analyzers that learn facts and what they require, and once
+// those have finished its facts are all that is read of it again: an
+// importer reads its types, which stay. A given package is the same to its
+// importers, whose actions read their own syntax and its facts and types,
+// never its syntax, so once Finished has taken what the caller reads of it
+// it goes too. Every finding is the same, since every action ran as it
+// would have.
 //
 // The actions' passes are cleared with the package, since each holds its
 // files and type information. A Result that holds syntax, such as
 // ctrlflow's or buildir's, is released by releaseInputs when its last
 // reader, an action on the same package, has finished, so by now.
 func (act *Action) releaseSyntax() {
-	if act.syntax.unfinished.Add(-1) != 0 || act.syntax.given {
+	if act.syntax.unfinished.Add(-1) != 0 {
 		return
+	}
+	if act.syntax.given {
+		if act.syntax.finished == nil {
+			return
+		}
+		act.syntax.finished(act.Package)
 	}
 	for _, finished := range act.syntax.actions {
 		if finished.pass != nil {

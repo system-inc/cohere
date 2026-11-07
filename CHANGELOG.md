@@ -34,6 +34,11 @@ No rule set changed.
   A path, a file, a quoted value or another tool's output at the end keeps its spelling. A script that
   matched the old lowercase opening of a failure line should match the new one.
 - The errors that name the markers cohere looks for name all four.
+- `@typescript-eslint/no-redeclare` is off in `cohere:typescript` and every set that extends it. tsc reports
+  every real redeclaration (TS2300, TS2451); what the rule adds is a type and a value sharing a name, which is
+  valid declaration merging, as lib.es5.d.ts's own `interface Array<T>` plus `declare var Array`. A project
+  that wants it turns it on in its own settings. A `no-redeclare` disable comment is now unused, and so an
+  error: delete it.
 
 ## 0.1.1 (2026-11-03)
 
