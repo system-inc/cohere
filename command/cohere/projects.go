@@ -119,7 +119,10 @@ func checkDiscoveredProjects(
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
 	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
-	discoveredIgnores = ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root)
+	discoveredIgnores = append(
+		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
+		defaultIgnoreAccounts(found.DefaultMatched)...,
+	)
 	if found.isTheLocatedProject(location, locateError) {
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
@@ -321,6 +324,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// The overall verdict, last, in the human views. Under `--json` each project's own summary line, with its
 	// label, is the record, and a program reads the worst from them.
 	facts := overallFactsOf(runs, time.Since(processStart))
+	facts.UnusedIgnores = unusedIgnoreCount(discoveredIgnores)
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.EngineBuilds = builtEngines()
 	if activeOutput.Mode != outputJson {

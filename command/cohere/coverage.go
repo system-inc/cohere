@@ -170,7 +170,8 @@ func classifyTypeScriptCoverage(
 	lintConfiguration *configuration.Configuration,
 ) coverageSummary {
 	summary := coverageSummary{
-		FilesIgnored: coverage.FilesIgnored,
+		FilesIgnored:   coverage.FilesIgnored,
+		FilesTypesOnly: coverage.FilesTypesOnly,
 		Suppression: &suppressionCoverage{
 			Suppressed:              coverage.Suppressed,
 			SuppressedWithoutReason: coverage.SuppressedWithoutReason,
@@ -642,8 +643,11 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	// The --json summary's cache.filesReplayed said 0 on every run, since nothing set it, and read as a full
 	// check on runs that replayed 3,891 files (#547dhjz).
 	activeSummary.Cache.FilesReplayed = report.Result.FilesReplayed
-	activeSummary.FilesChecked = coverage.FilesWalked - report.Result.FilesReplayed
-	activeSummary.FilesInScope = coverage.FilesWalked
+	// An ignored file was handed to the walk and walked by no rule, so it is not checked: a plain ignore's is in
+	// no count, and one an entry keeping the type check matched is counted as types-only (#cxeq6jw).
+	activeSummary.FilesChecked = coverage.FilesWalked - coverage.FilesIgnored - report.Result.FilesReplayed
+	activeSummary.FilesInScope = coverage.FilesWalked - coverage.FilesIgnored
+	activeSummary.FilesTypesOnly = coverage.FilesTypesOnly
 	activeSummary.Nodes = coverage.NodesVisited
 	activeSummary.Findings += len(report.Result.Diagnostics)
 	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfiguration)

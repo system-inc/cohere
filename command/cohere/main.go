@@ -1320,7 +1320,11 @@ func run() error {
 		if check == nil {
 			check = startTypeCheck(backgroundContext, graph, !cacheOff)
 		}
-		typeDiagnostics := finishTypeCheck(backgroundContext, check, projectFiles, !*noFix)
+		typeChecked, typeDiagnostics, scopeError := finishScopedTypeCheck(
+			backgroundContext, check, graph, location, lintConfiguration, projectFiles, !*noFix)
+		if scopeError != nil {
+			return scopeError
+		}
 		// The check's own time plus what finishing it took, rather than the wait here, which is nothing when the
 		// check ran alongside the walk. The phase line can then add up to more than the run, and says by how much.
 		finishing := check.finished
@@ -1345,17 +1349,14 @@ func run() error {
 		// Counted among the files reported on: the check covers the whole program whatever the scope.
 		replayedClause := ""
 		if check.replayed > 0 {
-			if inScope := check.reuse.ReplayedAmong(projectFiles); inScope > 0 {
-				replayedClause = fmt.Sprintf(
-					"; %d of %d files' semantic diagnostics replayed from cache",
-					inScope,
-					len(projectFiles),
-				)
+			if inScope := check.reuse.ReplayedAmong(typeChecked); inScope > 0 {
+				replayedClause = fmt.Sprintf("; %d of %d files' semantic diagnostics replayed from cache",
+					inScope, len(typeChecked))
 			}
 		}
 		printInvocation(accountOutput(streams.Output),
 			"types: %d diagnostics over %d files in %s%s\n",
-			len(typeDiagnostics), len(projectFiles), round(typesDuration), replayedClause,
+			len(typeDiagnostics), len(typeChecked), round(typesDuration), replayedClause,
 		)
 		// The types phase's line is out before the lint phase's wait.
 		streams.Show(streams.Output)

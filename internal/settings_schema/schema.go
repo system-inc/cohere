@@ -248,8 +248,8 @@ const goReasonPattern = `[^\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u20
 
 // ignoreEntryShape is one `ignorePatterns` entry, as configuration.IgnoreEntry reads it: a glob, or an object
 // naming the glob and why, its kind and check from the loader's own lists, and no other key. The reason is held
-// to goReasonPattern, since the loader trims it by the same set before refusing a blank one. In a set cohere
-// carries the loader also refuses an entry with no reason, which a project's own file is not held to.
+// to goReasonPattern, since the loader trims it by the same set before refusing a blank one. Inside our tiers
+// the loader also refuses an entry with no reason, which the schema cannot see from one file.
 func ignoreEntryShape() *schemaNode {
 	kinds := make([]string, 0, len(configuration.IgnoreKinds))
 	for _, kind := range configuration.IgnoreKinds {

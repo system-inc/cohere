@@ -168,8 +168,10 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	}
 	recordRunSummary(summary)
 	// After the record, since it is what this invocation's discovery found and not part of the run: discovery's
-	// ignores and their counts would otherwise be said, or left out, by every replay (see ignore_account.go).
+	// ignores and their counts would otherwise be said, or left out, by every replay, and so would an ignore
+	// that matched nothing (see ignore_account.go).
 	summary.IgnorePatterns = discoveredIgnores
+	summary.Findings += unusedIgnoreCount(discoveredIgnores)
 	summary.EngineBuilds = builtEngines()
 
 	// Discovery's ignores come after everything a recording keeps, just before the footer, which is where a

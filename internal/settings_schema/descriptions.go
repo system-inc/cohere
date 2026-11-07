@@ -39,10 +39,11 @@ var topLevelDescriptions = map[string]string{
 	"ignorePatterns": "Paths cohere never checks and the formatter never offers, one list for both, as globs " +
 		"relative to the directory of the settings file cohere reads first: * within a path segment, ** across " +
 		"any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the " +
-		"file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere " +
-		"carries each entry gives a reason, as an off does. " +
-		"--verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, " +
-		"and --json carries the same.",
+		"file it extends. An entry is a glob, or an object naming the glob and why: in a chain extending a " +
+		"cohere:system-inc set, and in every set cohere carries, each entry gives a reason, as an off does. " +
+		"--verbose lists every entry with its reason, kind, file and how many paths it matched, and --json " +
+		"carries the same. An entry a settings file writes that matches nothing fails the run, as an unused " +
+		"disable directive does, so delete it, unless its kind is generated: build output may not exist yet.",
 
 	"plugins": "Rule namespaces whose rules apply without a rules entry naming them, at warn, as an oxlint " +
 		"plugins declaration does. A rules entry still sets any of them explicitly.",
@@ -88,11 +89,12 @@ var topLevelDescriptions = map[string]string{
 
 var ignoreEntryDescriptions = map[string]string{
 	"pattern": "The paths the entry ignores, as a glob.",
-	"reason":  "Why these paths are never checked, in a sentence. Required in cohere's sets.",
+	"reason":  "Why these paths are never checked, in a sentence. Required in our tiers and in cohere's sets.",
 	"kind": "What the paths are: input, data a program reads as it was given; generated, written by a tool; " +
 		"thirdParty, somebody else's code.",
-	"check": "A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet " +
-		"acted on.",
+	"check": "A check that still reads the ignored paths: types, the type check, whose errors in them are still " +
+		"reported while they are never linted or formatted. Without it an ignored path is never checked at all, " +
+		"and where both kinds of entry match a path, the one naming types keeps it.",
 }
 
 var overrideDescriptions = map[string]string{

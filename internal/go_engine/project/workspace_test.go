@@ -163,3 +163,58 @@ func withoutVariable(environment []string, name string) []string {
 	}
 	return kept
 }
+
+// A module copied into the tree whole and wired in by a directory replace in a module go.work uses is a vendored
+// dependency, as third_party's staticcheck is, and its own go.mod is not refused: its tests are its upstream's. The
+// exemption is exact. A stray module nobody replaces is still refused, and so is one only an unlisted module
+// replaces with, one a replace by module and version merely shares a name with, and a second go.mod inside the copy.
+func TestRefuseUnlistedModulesLeavesAVendoredReplaceTargetToItsUpstream(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	if repository := nearestRepository(root); repository != "" {
+		test.Fatalf("the temporary directory is inside the repository at %s, so its gitlinks would be read", repository)
+	}
+	files := map[string]string{
+		"go.work": "go 1.25\n\nuse (\n\t.\n\t./listed\n)\n",
+		"go.mod": "module example.com/root\n\ngo 1.25\n\nreplace (\n" +
+			"\texample.com/vendored => ./third_party/example.com/vendored\n" +
+			"\texample.com/released => example.com/released v1.2.0\n" +
+			"\texample.com/elsewhere => ../elsewhere\n)\n",
+		"listed/go.mod": "module example.com/root/listed\n\ngo 1.25\n",
+		"third_party/example.com/vendored/go.mod":       "module example.com/vendored\n\ngo 1.21\n",
+		"third_party/example.com/vendored/inner/go.mod": "module example.com/vendored/inner\n\ngo 1.21\n",
+		"example.com/released/go.mod":                   "module example.com/released\n\ngo 1.21\n",
+		"stray/go.mod":                                  "module example.com/stray\n\ngo 1.21\n",
+		"unlisted/go.mod": "module example.com/unlisted\n\ngo 1.21\n\n" +
+			"replace example.com/shadow => ../shadow\n",
+		"shadow/go.mod": "module example.com/shadow\n\ngo 1.21\n",
+	}
+	if writeError := writeFiles(root, files); writeError != nil {
+		test.Fatalf("writing the fixture: %v", writeError)
+	}
+	covered, readError := ReadWorkspace(root)
+	if readError != nil {
+		test.Fatalf("reading the workspace failed: %v", readError)
+	}
+	if want := []string{"third_party/example.com/vendored"}; !slices.Equal(covered.Replaced, want) {
+		test.Errorf("the replaced directories read %q, want %q", covered.Replaced, want)
+	}
+	refusal := covered.RefuseUnlistedModules()
+	if refusal == nil {
+		test.Fatal("nothing was refused, though stray, unlisted and shadow are modules nobody listed")
+	}
+	if strings.Contains(refusal.Error(), "third_party/example.com/vendored/go.mod") {
+		test.Errorf("the vendored copy's go.mod was refused, though a listed module replaces with it: %v", refusal)
+	}
+	for _, refused := range []string{
+		"stray/go.mod",
+		"unlisted/go.mod",
+		"shadow/go.mod",
+		"example.com/released/go.mod",
+		"third_party/example.com/vendored/inner/go.mod",
+	} {
+		if !strings.Contains(refusal.Error(), refused) {
+			test.Errorf("%s was not refused: %v", refused, refusal)
+		}
+	}
+}
