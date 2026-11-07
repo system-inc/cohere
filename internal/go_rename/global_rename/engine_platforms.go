@@ -11,24 +11,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
-// Platforms are the platforms the plan read files under, in order, each of which the rewrite must be proven under
-// as well as the host (ProvePlatform).
-func (result *Result) Platforms() []workspace.Platform {
-	return slices.Clone(result.platforms)
-}
-
-// RenamesUnder are the accepted renames that reach a package holding a file only platform builds, the ones a proof
-// that fails under it names, in the order of Accepted.
-func (result *Result) RenamesUnder(platform workspace.Platform) []Rename {
-	var under []Rename
-	for _, accepted := range result.Accepted {
-		if result.platformKeys[platform][accepted.Key] {
-			under = append(under, accepted)
-		}
-	}
-	return under
-}
-
 // ProvePlatform proves a plan's rewrite, overlay, under one of its Platforms, through options.LoadPlatform as the plan
 // read it: every root package that type-checks there before the rewrite must after, and every identifier in it must
 // resolve to the same declaration under its expected name, as Compare requires of the host. A load that fails is a

@@ -226,6 +226,9 @@ type endToEndCase struct {
 	verify func(test *testing.T, root string)
 }
 
+// platformsWindowsFile is the rename-platforms fixture's file only windows builds.
+const platformsWindowsFile = "internal/limits/limits_windows.go"
+
 var endToEndCases = []endToEndCase{
 	{name: "clean", exitCode: 0},
 	{
@@ -483,9 +486,6 @@ func renamedTreeUnder(fixture string, caseName string, extra ...string) func(tes
 		}
 	}
 }
-
-// platformsWindowsFile is the rename-platforms fixture's file only windows builds.
-const platformsWindowsFile = "internal/limits/limits_windows.go"
 
 // breakUnderWindows plants a type error in the rename-platforms copy's file only windows builds, which the host's
 // load never reads.
