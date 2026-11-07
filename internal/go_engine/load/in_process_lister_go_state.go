@@ -84,7 +84,8 @@ func readGoState(workspace string, environment []string) (goState, string) {
 		return goState{}, "GODEBUG is set, and go list reads some of its settings"
 	}
 	if goEnvironment.Fips140 != "" && goEnvironment.Fips140 != "off" {
-		// A FIPS 140 module snapshot moves the standard library's crypto/internal/fips140 imports to a versioned copy.
+		// A `GOFIPS140` snapshot of the cryptographic module moves the standard library's crypto/internal/fips140
+		// imports to a versioned copy.
 		return goState{}, fmt.Sprintf("GOFIPS140 is %s", goEnvironment.Fips140)
 	}
 	if doubt := listerFlagsOnly(goEnvironment.Flags); doubt != "" {

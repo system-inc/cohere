@@ -29,8 +29,8 @@ import (
 // It answers only what it can answer exactly. Anything go list would report as an error, a missing or ambiguous
 // import, a cycle, an internal package used from outside, an embed pattern that matches nothing, a file that does
 // not parse to its imports, and anything whose rules it does not carry, vendoring, a go.mod ignore directive, a
-// GODEBUG setting, a flag in GOFLAGS that changes what is listed, another target or another toolchain, is a doubt,
-// and a doubt is answered by go list itself, so a listing is never this lister's guess (see listInProcess).
+// `GODEBUG` setting, a flag in `GOFLAGS` that changes what is listed, another target or another toolchain, is a
+// doubt, and a doubt is answered by go list itself, so a listing is never this lister's guess (see listInProcess).
 type inProcessLister struct {
 	workspace   string
 	environment []string
@@ -58,6 +58,9 @@ type inProcessLister struct {
 	prefetchSlots chan struct{}
 	pending       sync.WaitGroup
 
+	// visited is how far order's walk has got with each package, by import path.
+	visited map[string]visitState
+
 	mutex  sync.Mutex
 	byPath map[string]*inProcessPackage
 	reads  map[string]*directoryRead
@@ -77,6 +80,15 @@ type directoryRead struct {
 	built       *build.Package
 	importError error
 }
+
+// visitState is how far order's walk has got with a package: not reached, open while what it walks to is walked,
+// and closed once it is in the order.
+type visitState int
+
+// The states of order's walk past not reached.
+const visitOpen visitState = 1
+
+const visitClosed visitState = 2
 
 // The packages cgo excludes from the imports its translation adds, so they do not import themselves.
 var (
@@ -103,8 +115,7 @@ func listInProcess(workspace string, environment []string, patterns []string) (*
 	if doubt = lister.firstDoubt(); doubt != "" {
 		return nil, doubt
 	}
-	visited := map[string]int{}
-	first, doubt := lister.order(rootPaths, visited)
+	first, doubt := lister.order(rootPaths)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -119,7 +130,7 @@ func listInProcess(workspace string, environment []string, patterns []string) (*
 	if doubt = lister.firstDoubt(); doubt != "" {
 		return nil, doubt
 	}
-	second, doubt := lister.order(testImports, visited)
+	second, doubt := lister.order(testImports)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -170,17 +181,18 @@ func newInProcessLister(workspace string, environment []string) (*inProcessListe
 		return nil, doubt
 	}
 	lister := &inProcessLister{
-		workspace:   workspace,
-		environment: environment,
-		context:     read.context,
-		modules:     read.modules,
-		inWorkspace: read.workspaceFile != "",
-		goModDirect: map[string]bool{},
-		required:    map[string]bool{},
+		workspace:     workspace,
+		environment:   environment,
+		context:       read.context,
+		modules:       read.modules,
+		inWorkspace:   read.workspaceFile != "",
+		goModDirect:   map[string]bool{},
+		required:      map[string]bool{},
 		slots:         make(chan struct{}, 2*runtime.GOMAXPROCS(0)),
 		prefetchSlots: make(chan struct{}, max(1, runtime.GOMAXPROCS(0)/2)),
-		byPath:      map[string]*inProcessPackage{},
-		reads:       map[string]*directoryRead{},
+		byPath:        map[string]*inProcessPackage{},
+		visited:       map[string]visitState{},
+		reads:         map[string]*directoryRead{},
 	}
 	for _, each := range read.modules {
 		if each.Error != nil {
@@ -213,7 +225,10 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 		group.Go(func() {
 			if pattern == "./..." {
 				matches[index], doubts[index] = lister.matchLocal()
-			} else if prefix, wildcard := strings.CutSuffix(pattern, "/..."); wildcard && !strings.Contains(prefix, "...") {
+			} else if prefix, wildcard := strings.CutSuffix(
+				pattern,
+				"/...",
+			); wildcard && !strings.Contains(prefix, "...") {
 				matches[index], doubts[index] = lister.matchModules(prefix)
 			} else {
 				doubts[index] = fmt.Sprintf("the pattern %s is not one the lister matches", pattern)
@@ -399,34 +414,39 @@ func (lister *inProcessLister) load(importPath string) {
 	lister.byPath[importPath] = current
 	lister.mutex.Unlock()
 	lister.pending.Go(func() {
-		if doubt := lister.read(current); doubt != "" {
+		listed, walked, doubt := lister.read(importPath)
+		if doubt != "" {
 			lister.doubt(doubt)
 			return
 		}
-		for _, walked := range current.walked {
-			lister.load(walked)
+		// Nothing reads a package's fields until every read has ended (see listInProcess).
+		current.listed, current.walked = listed, walked
+		for _, each := range walked {
+			lister.load(each)
 		}
 	})
 }
 
-// read fills in one package from its directory, as go list's load of it would: its files, its imports resolved, and
-// the imports cgo and the linker add, which go list walks but does not print among Imports.
-func (lister *inProcessLister) read(current *inProcessPackage) string {
-	listed := current.listed
+// read is one package as go list's load of it reads it from its directory, its files and its imports resolved, and
+// the import paths go list walks from it: each import, then those cgo and the linker add, which it does not print
+// among Imports.
+func (lister *inProcessLister) read(importPath string) (*listedPackage, []string, string) {
+	listed := &listedPackage{ImportPath: importPath}
+	var walked []string
 	directory, owner, doubt := lister.locate(listed.ImportPath)
 	if doubt != "" {
-		return doubt
+		return nil, nil, doubt
 	}
 	read := lister.readDirectory(directory)
 	if read.importError != nil {
-		return fmt.Sprintf("%s: %v", listed.ImportPath, read.importError)
+		return nil, nil, fmt.Sprintf("%s: %v", listed.ImportPath, read.importError)
 	}
 	built := read.built
 	if built.Name == "" || len(built.InvalidGoFiles) > 0 {
-		return fmt.Sprintf("%s has Go files that do not parse", listed.ImportPath)
+		return nil, nil, fmt.Sprintf("%s has Go files that do not parse", listed.ImportPath)
 	}
 	if len(built.SwigFiles)+len(built.SwigCXXFiles) > 0 {
-		return fmt.Sprintf("%s has SWIG files", listed.ImportPath)
+		return nil, nil, fmt.Sprintf("%s has files for the swig tool", listed.ImportPath)
 	}
 	listed.Name = built.Name
 	listed.Directory = directory
@@ -440,7 +460,7 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 	listed.SFiles = nonEmpty(built.SFiles)
 	listed.SysoFiles = nonEmpty(built.SysoFiles)
 	if lister.context.CgoEnabled {
-		// go list drops the C, C++, Objective-C and SWIG files of every package when cgo is off.
+		// go list drops the C, C++ and Objective-C files of every package when cgo is off, and the swig tool's too.
 		listed.CFiles = nonEmpty(built.CFiles)
 		listed.CxxFiles = nonEmpty(built.CXXFiles)
 		listed.MFiles = nonEmpty(built.MFiles)
@@ -448,7 +468,7 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 	listed.FFiles = nonEmpty(built.FFiles)
 	usesCgo := len(built.CgoFiles) > 0
 	if !usesCgo && len(listed.CFiles)+len(listed.CxxFiles)+len(listed.MFiles)+len(listed.FFiles) > 0 {
-		return fmt.Sprintf("%s has C, C++, Objective-C or Fortran files and no cgo", listed.ImportPath)
+		return nil, nil, fmt.Sprintf("%s has C, C++, Objective-C or Fortran files and no cgo", listed.ImportPath)
 	}
 	listed.TestGoFiles = nonEmpty(built.TestGoFiles)
 	listed.XTestGoFiles = nonEmpty(built.XTestGoFiles)
@@ -460,7 +480,7 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 	if len(built.EmbedPatterns) > 0 {
 		files, embedDoubt := resolveEmbedPatterns(directory, built.EmbedPatterns)
 		if embedDoubt != "" {
-			return fmt.Sprintf("%s: %s", listed.ImportPath, embedDoubt)
+			return nil, nil, fmt.Sprintf("%s: %s", listed.ImportPath, embedDoubt)
 		}
 		listed.EmbedFiles = files
 	}
@@ -468,7 +488,7 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 	written := slices.Clone(built.Imports)
 	for _, each := range written {
 		if each == "simd" {
-			return fmt.Sprintf("%s imports simd, whose bridge go list adds", listed.ImportPath)
+			return nil, nil, fmt.Sprintf("%s imports simd, whose bridge go list adds", listed.ImportPath)
 		}
 	}
 	added := written
@@ -502,7 +522,7 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 		}
 		resolved, resolveDoubt := lister.resolve(listed, standard, each)
 		if resolveDoubt != "" {
-			return resolveDoubt
+			return nil, nil, resolveDoubt
 		}
 		if index < len(written) {
 			listed.Imports[index] = resolved
@@ -513,9 +533,9 @@ func (lister *inProcessLister) read(current *inProcessPackage) string {
 				listed.ImportMap[each] = resolved
 			}
 		}
-		current.walked = append(current.walked, resolved)
+		walked = append(walked, resolved)
 	}
-	return ""
+	return listed, walked, ""
 }
 
 // resolve is the import path an import written in listed resolves to: a standard package's import of a package
@@ -656,29 +676,28 @@ func (lister *inProcessLister) testImports(rootPaths []string) []string {
 	return imported
 }
 
-// order is the packages reached from starts that visited does not hold yet, in go list's order: depth first from each
+// order is the packages reached from starts that no earlier order reached, in go list's order: depth first from each
 // start in turn, each package after everything it walks to. A package reached again while its own walk is still open
-// is a cycle, which go list reports, so it is a doubt. visited is shared across calls, as the second listing's
+// is a cycle, which go list reports, so it is a doubt. What an order visited stays visited, as the second listing's
 // packages are the ones the first did not list.
-func (lister *inProcessLister) order(starts []string, visited map[string]int) ([]*inProcessPackage, string) {
-	const open, closed = 1, 2
+func (lister *inProcessLister) order(starts []string) ([]*inProcessPackage, string) {
 	var ordered []*inProcessPackage
 	var visit func(importPath string) string
 	visit = func(importPath string) string {
-		switch visited[importPath] {
-		case open:
+		switch lister.visited[importPath] {
+		case visitOpen:
 			return fmt.Sprintf("%s is in an import cycle", importPath)
-		case closed:
+		case visitClosed:
 			return ""
 		}
-		visited[importPath] = open
+		lister.visited[importPath] = visitOpen
 		current := lister.byPath[importPath]
 		for _, walked := range current.walked {
 			if doubt := visit(walked); doubt != "" {
 				return doubt
 			}
 		}
-		visited[importPath] = closed
+		lister.visited[importPath] = visitClosed
 		ordered = append(ordered, current)
 		return ""
 	}
@@ -795,7 +814,10 @@ func importPathIn(moduleDirectory string, modulePath string, directory string) s
 	if directory == moduleDirectory {
 		return modulePath
 	}
-	return path.Join(modulePath, filepath.ToSlash(strings.TrimPrefix(directory, moduleDirectory+string(filepath.Separator))))
+	return path.Join(
+		modulePath,
+		filepath.ToSlash(strings.TrimPrefix(directory, moduleDirectory+string(filepath.Separator))),
+	)
 }
 
 // standardImportPath reports whether importPath is one go looks for in the standard library: its first element has
@@ -852,7 +874,9 @@ func hasGoFiles(directory string) bool {
 		if entry.Type().IsRegular() {
 			return true
 		}
-		if info, statError := os.Stat(filepath.Join(directory, entry.Name())); statError == nil && info.Mode().IsRegular() {
+		if info, statError := os.Stat(
+			filepath.Join(directory, entry.Name()),
+		); statError == nil && info.Mode().IsRegular() {
 			return true
 		}
 	}

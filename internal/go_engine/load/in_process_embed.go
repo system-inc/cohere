@@ -12,9 +12,10 @@ import (
 	"golang.org/x/mod/module"
 )
 
-// resolveEmbedPatterns is the files a package's `//go:embed` patterns match, relative to its directory, slash-separated and
-// sorted, as go list resolves them for EmbedFiles (cmd/go's resolveEmbed): each pattern a glob, `all:` keeping the
-// files a directory's walk would skip for starting with a dot or an underscore, no match crossing into another module.
+// resolveEmbedPatterns is the files a package's `//go:embed` patterns match, relative to its directory,
+// slash-separated and sorted, as go list resolves them for EmbedFiles (cmd/go's resolveEmbed): each pattern a glob,
+// `all:` keeping the files a directory's walk would skip for starting with a dot or an underscore, no match crossing
+// into another module.
 // Anything go list would report as the pattern's error is a doubt, returned in place of the files, and so is a
 // directory whose name a glob would read as more than a name.
 func resolveEmbedPatterns(directory string, patterns []string) ([]string, string) {
@@ -22,7 +23,6 @@ func resolveEmbedPatterns(directory string, patterns []string) ([]string, string
 		return nil, fmt.Sprintf("the directory %s holds a glob character", directory)
 	}
 	have := map[string]bool{}
-	checked := map[string]bool{}
 	for _, pattern := range patterns {
 		glob, all := strings.CutPrefix(pattern, "all:")
 		if _, matchError := path.Match(glob, ""); matchError != nil || glob == "." || !fs.ValidPath(glob) {
@@ -34,7 +34,7 @@ func resolveEmbedPatterns(directory string, patterns []string) ([]string, string
 		}
 		var matched []string
 		for _, file := range matches {
-			files, doubt := embeddedMatch(directory, file, all, checked)
+			files, doubt := embeddedMatch(directory, file, all)
 			if doubt != "" {
 				return nil, fmt.Sprintf("the embed pattern %s: %s", pattern, doubt)
 			}
@@ -51,13 +51,13 @@ func resolveEmbedPatterns(directory string, patterns []string) ([]string, string
 }
 
 // embeddedMatch is the files one glob match embeds: the file, or every file below the directory, or a doubt.
-func embeddedMatch(directory string, file string, all bool, checked map[string]bool) ([]string, string) {
+func embeddedMatch(directory string, file string, all bool) ([]string, string) {
 	relative := filepath.ToSlash(strings.TrimPrefix(file, directory+string(filepath.Separator)))
 	info, statError := os.Lstat(file)
 	if statError != nil {
 		return nil, statError.Error()
 	}
-	for each := file; len(each) > len(directory)+1 && !checked[each]; each = filepath.Dir(each) {
+	for each := file; len(each) > len(directory)+1; each = filepath.Dir(each) {
 		if goModAt(each) {
 			return nil, fmt.Sprintf("%s is in another module", relative)
 		}
@@ -66,7 +66,6 @@ func embeddedMatch(directory string, file string, all bool, checked map[string]b
 				return nil, fmt.Sprintf("%s is in something not a directory", relative)
 			}
 		}
-		checked[each] = true
 		if badEmbedName(filepath.Base(each)) {
 			return nil, fmt.Sprintf("%s has an invalid name", relative)
 		}
@@ -77,7 +76,7 @@ func embeddedMatch(directory string, file string, all bool, checked map[string]b
 	case info.IsDir():
 		return embeddedDirectory(directory, file, all)
 	}
-	// A symbolic link is embedded only under a GODEBUG setting, and the lister answers only with none set.
+	// A symbolic link is embedded only under a `GODEBUG` setting, and the lister answers only with none set.
 	return nil, fmt.Sprintf("%s is not a regular file", relative)
 }
 

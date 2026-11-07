@@ -2,6 +2,7 @@ package load
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -39,19 +40,19 @@ var listedModuleFiles = map[string]string{
 	"internal/helper/helper.go": "package helper\n\n// H is one.\nfunc H() int { return 1 }\n",
 	"command/tool/main.go": "package main\n\nimport (\n\t\"os/user\"\n\n\t\"example.com/dependency\"\n)\n\n" +
 		"func main() { _, _ = user.Current(); _ = dependency.D() }\n",
-	"testsonly/only_test.go":  "package testsonly\n\nimport \"testing\"\n\nfunc TestOnly(test *testing.T) {}\n",
-	"allignored/ignored.go":   "//go:build ignore\n\npackage allignored\n",
-	"cgo/cgo.go":              "package cgo\n\n// int one(void) { return 1; }\nimport \"C\"\n\n// One is one.\nfunc One() int { return int(C.one()) }\n",
-	"testdata/skipped.go":     "package skipped\n",
-	"_skipped/skipped.go":     "package skipped\n",
-	".skipped/skipped.go":     "package skipped\n",
-	"documents/readme.md":     "# Not a package\n",
-	"scripts/vendor/tool.js":  "// A vendor directory with no Go in it.\n",
+	"testsonly/only_test.go":        "package testsonly\n\nimport \"testing\"\n\nfunc TestOnly(test *testing.T) {}\n",
+	"allignored/ignored.go":         "//go:build ignore\n\npackage allignored\n",
+	"cgo/cgo.go":                    "package cgo\n\n// int one(void) { return 1; }\nimport \"C\"\n\n// One is one.\nfunc One() int { return int(C.one()) }\n",
+	"testdata/skipped.go":           "package skipped\n",
+	"_skipped/skipped.go":           "package skipped\n",
+	".skipped/skipped.go":           "package skipped\n",
+	"documents/readme.md":           "# Not a package\n",
+	"scripts/vendor/tool.js":        "// A vendor directory with no Go in it.\n",
 	"scripts/vendor/inner/inner.go": "package inner\n",
-	"dependency_module/go.mod": "module example.com/dependency\n\ngo 1.27\n\nrequire example.com/transitive v1.0.0\n",
+	"dependency_module/go.mod":      "module example.com/dependency\n\ngo 1.27\n\nrequire example.com/transitive v1.0.0\n",
 	"dependency_module/dependency.go": "package dependency\n\nimport \"example.com/transitive\"\n\n" +
 		"// D is one.\nfunc D() int { return transitive.T() }\n",
-	"transitive_module/go.mod":       "module example.com/transitive\n\ngo 1.27\n",
+	"transitive_module/go.mod":        "module example.com/transitive\n\ngo 1.27\n",
 	"transitive_module/transitive.go": "package transitive\n\n// T is one.\nfunc T() int { return 1 }\n",
 }
 
@@ -97,7 +98,11 @@ func TestInProcessListingIsGoListsAnswer(test *testing.T) {
 			writeListingFiles(test, directory, each.files)
 			goList := requireGoListsAnswer(test, directory, each.environment, each.patterns)
 			if each.testOnly != "" && !goList.testOnly[each.testOnly] {
-				test.Errorf("go list did not list %s for the tests alone: %v", each.testOnly, sortedKeys(goList.testOnly))
+				test.Errorf(
+					"go list did not list %s for the tests alone: %v",
+					each.testOnly,
+					sortedKeys(goList.testOnly),
+				)
 			}
 		})
 	}
@@ -161,16 +166,23 @@ func fieldDifferences(listed *listedPackage, wanted *listedPackage) string {
 	var differences []string
 	listedValue, wantedValue := reflect.ValueOf(listed).Elem(), reflect.ValueOf(wanted).Elem()
 	for index := range listedValue.NumField() {
-		left, right := listedValue.Field(index).Interface(), wantedValue.Field(index).Interface()
-		if reflect.DeepEqual(left, right) {
+		left, right := listedValue.Field(index), wantedValue.Field(index)
+		if reflect.DeepEqual(left.Interface(), right.Interface()) {
 			continue
 		}
-		leftJson, _ := json.Marshal(left)
-		rightJson, _ := json.Marshal(right)
-		differences = append(differences, listedValue.Type().Field(index).Name+": "+string(leftJson)+
-			", go list's "+string(rightJson))
+		differences = append(differences, listedValue.Type().Field(index).Name+": "+asJson(left)+", go list's "+
+			asJson(right))
 	}
 	return strings.Join(differences, "; ")
+}
+
+// asJson is value as JSON, or as Go prints it when it has no JSON form, so a difference is always shown.
+func asJson(value reflect.Value) string {
+	encoded, encodeError := json.Marshal(value.Interface())
+	if encodeError != nil {
+		return fmt.Sprintf("%+v", value.Interface())
+	}
+	return string(encoded)
 }
 
 // What go list would report as an error, and what the lister does not carry, is a doubt, never a listing of its
@@ -186,26 +198,51 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 		// reason is a piece of the doubt, so each module is proven doubted for its own reason and not another's.
 		reason string
 	}{
-		{"MissingImport", map[string]string{"go.mod": module, "a.go": "package a\n\nimport _ \"example.com/missing\"\n"}, nil, "example.com/missing is in 0 modules"},
+		{
+			"MissingImport",
+			map[string]string{"go.mod": module, "a.go": "package a\n\nimport _ \"example.com/missing\"\n"},
+			nil,
+			"example.com/missing is in 0 modules",
+		},
 		{"Cycle", map[string]string{
 			"go.mod": module,
 			"a/a.go": "package a\n\nimport _ \"example.com/doubted/b\"\n",
 			"b/b.go": "package b\n\nimport _ \"example.com/doubted/a\"\n",
 		}, nil, "in an import cycle"},
 		{"InternalFromOutside", map[string]string{
-			"go.mod":              module,
-			"a/internal/x/x.go":   "package x\n",
-			"b/b.go":              "package b\n\nimport _ \"example.com/doubted/a/internal/x\"\n",
+			"go.mod":            module,
+			"a/internal/x/x.go": "package x\n",
+			"b/b.go":            "package b\n\nimport _ \"example.com/doubted/a/internal/x\"\n",
 		}, nil, "an internal package of another tree"},
-		{"Vendor", map[string]string{"go.mod": module, "a.go": "package a\n", "vendor/modules.txt": ""}, nil, "vendor directory"},
-		{"IgnoreDirective", map[string]string{"go.mod": module + "\nignore ./unused\n", "a.go": "package a\n"}, nil, "an ignore or a godebug directive"},
+		{
+			"Vendor",
+			map[string]string{"go.mod": module, "a.go": "package a\n", "vendor/modules.txt": ""},
+			nil,
+			"vendor directory",
+		},
+		{
+			"IgnoreDirective",
+			map[string]string{"go.mod": module + "\nignore ./unused\n", "a.go": "package a\n"},
+			nil,
+			"an ignore or a godebug directive",
+		},
 		{"EmbedMatchesNothing", map[string]string{
 			"go.mod": module,
 			"a.go":   "package a\n\nimport _ \"embed\"\n\n//go:embed missing.txt\nvar missing string\n",
 		}, nil, "matches no file"},
-		{"FlagBeyondTheLister", map[string]string{"go.mod": module, "a.go": "package a\n"}, []string{"GOFLAGS=-race"}, "GOFLAGS holds -race"},
+		{
+			"FlagBeyondTheLister",
+			map[string]string{"go.mod": module, "a.go": "package a\n"},
+			[]string{"GOFLAGS=-race"},
+			"GOFLAGS holds -race",
+		},
 		{"NotParsing", map[string]string{"go.mod": module, "a.go": "packge a\n"}, nil, "expected 'package'"},
-		{"MultiplePackages", map[string]string{"go.mod": module, "a.go": "package a\n", "b.go": "package b\n"}, nil, "found packages a (a.go) and b (b.go)"},
+		{
+			"MultiplePackages",
+			map[string]string{"go.mod": module, "a.go": "package a\n", "b.go": "package b\n"},
+			nil,
+			"found packages a (a.go) and b (b.go)",
+		},
 	}
 	for _, each := range cases {
 		test.Run(each.name, func(test *testing.T) {
