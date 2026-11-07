@@ -7,8 +7,10 @@
 #
 # <root> is a scratch checkout of the other repository, with a go.work, that this script may commit in: after each
 # pass its changes are committed there, under a placeholder author, so the next pass's change is its own, and the
-# commit's patch prints base64 between a `BEGIN pass-<n>.patch` line and an `END pass-<n>.patch` line, to apply in
-# order onto a branch of that repository, one commit per pass. Each pass's lines that say whether it is sound (its
+# commit's patch prints gzipped and then base64 between a `BEGIN pass-<n>.patch.gz` line and an `END pass-<n>.patch.gz`
+# line, to decode (`base64 -d | gunzip`) and apply in order onto a branch of that repository, one commit per pass. A
+# pass over a large tree writes tens of megabytes of patch, and gzip keeps it a fraction of that, small enough for a
+# job relay that lets bytes go when a job writes faster than it reads. Each pass's lines that say whether it is sound (its
 # accepted and rejected counts, "zero package errors", "0 mismatches") print as it runs. A pass that changes nothing
 # says so. A pass that fails stops the run, and every pass before it stays printed.
 #
@@ -60,8 +62,8 @@ for (( number = 1; number <= count; number++ )); do
 	git -C "$root" -c user.name=house_names -c user.email=house_names@invalid commit -q \
 		-m "house_names pass $number"
 	echo "=== PASS $number files $(git -C "$root" show --name-only --format= HEAD | wc -l | tr -d ' ')"
-	echo "BEGIN pass-$number.patch"
-	git -C "$root" show --binary --format= HEAD | base64
-	echo "END pass-$number.patch"
+	echo "BEGIN pass-$number.patch.gz"
+	git -C "$root" show --binary --format= HEAD | gzip -9 | base64
+	echo "END pass-$number.patch.gz"
 done
 echo "house_names_patches: done"
