@@ -566,3 +566,37 @@ func TestKeepCommentsLeavesEveryComment(test *testing.T) {
 		}
 	}
 }
+
+// fixPhaseOptions are the options the engine's fix phase wraps with.
+var fixPhaseOptions = Options{ReportedOnly: true, CuredOnly: true, KeepComments: true}
+
+// TestAChainNeverBreaksBetweenJoinedLiterals pins the fourth guard: a + joining two string literals, which
+// consistency_no_useless_concatenation reports on one line and leaves alone across lines, is never broken, so a wrap
+// never hides that finding. A chain holding such a join breaks at its other operators with the two literals kept
+// together, and a line only that break could cure stays as it was.
+func TestAChainNeverBreaksBetweenJoinedLiterals(test *testing.T) {
+	test.Parallel()
+	joined := `", and welcome to the depot's " + "own courier service in "`
+	wrappable := "\treturn \"good morning, \" + name + " + joined + " + city + \", have a nice day\"\n"
+	onlyThere := "\treturn prefix + \"" + strings.Repeat("word ", 12) + "\" + \"" + strings.Repeat("more ", 12) + "\"\n"
+	source := "package p\n\nfunc greeting(name, city string) string {\n" + wrappable + "}\n\n" +
+		"func signature(prefix string) string {\n" + onlyThere + "}\n"
+	for _, options := range []Options{{}, fixPhaseOptions} {
+		result, wrapError := Wrap([]byte(source), options)
+		if wrapError != nil || result.Rejected != nil {
+			test.Fatalf("Wrap with %+v: %v, %v", options, wrapError, result.Rejected)
+		}
+		output := string(result.Output)
+		if !strings.Contains(output, "\t\t"+joined+" +\n") ||
+			!strings.Contains(output, "\treturn \"good morning, \" +\n") {
+			test.Errorf("with %+v, want the chain broken with its joined literals on one line, got:\n%s", options,
+				output)
+		}
+		if options.CuredOnly && !strings.Contains(output, onlyThere) {
+			test.Errorf("want the line only a break between literals could cure kept whole, got:\n%s", output)
+		}
+		if strings.Contains(output, "\" +\n\t\t\"") {
+			test.Errorf("with %+v, a break between two literals:\n%s", options, output)
+		}
+	}
+}

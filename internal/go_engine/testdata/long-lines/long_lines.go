@@ -1,4 +1,4 @@
-// Package longlines describes a delivery, with three code lines past the limit that a wrap can bring within it.
+// Package longlines describes a delivery, with four code lines past the limit that a wrap can bring within it.
 package longlines
 
 import "fmt"
@@ -13,6 +13,11 @@ func Describe(sender string, recipient string, street string, city string, weekd
 func Deliverable(sender string, recipient string, street string, city string) bool {
 	// Serial: the depot reads this check for one courier at a time, and its tooling reads this marker as one whole line of text
 	return len(sender) > 0 && len(recipient) > 0 && len(street) > 0 && len(city) > 0 && sender != recipient && street != city
+}
+
+// Greeting is what a courier says first, two of its pieces joined on one line where a wrap must keep them together.
+func Greeting(name string, city string) string {
+	return "good morning, " + name + ", and welcome to the depot's " + "own courier service in " + city + ", have a nice day"
 }
 
 // Notices are what a courier reads out at the door.

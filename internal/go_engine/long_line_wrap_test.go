@@ -2,11 +2,17 @@ package go_engine
 
 import (
 	"bytes"
+	"fmt"
 	goformat "go/format"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_useless_concatenation"
 )
 
 // longCallBody is a function whose one statement is a call past the limit that a wrap breaks one argument per line.
@@ -100,5 +106,45 @@ func TestTheWrapNeverTakesAFilePastTheLongFileLimit(test *testing.T) {
 		if held.Declined != "" || !bytes.Equal(held.Output, wrapping.Output) || held.Lines != wrapping.Lines {
 			test.Errorf("%s: want the wrap kept, got %d lines, %q", testCase.name, held.Lines, held.Declined)
 		}
+	}
+}
+
+// The wrap hides no other rule's finding: over the long-lines fixture, whose Greeting joins two string literals with a
+// + on a long line, useless-concatenation reports as many joins after a writing run as before it, though the run
+// wrapped the line. That rule leaves alone a join across lines, so a break between the two literals would drop its
+// finding while fixing nothing it names.
+func TestTheWrapHidesNoUselessConcatenation(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "long-lines"))
+	file := filepath.Join(root, "long_lines.go")
+	joins := func(extra ...string) int {
+		test.Helper()
+		var standardOutput bytes.Buffer
+		var standardError bytes.Buffer
+		arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
+			extra...)
+		if exitCode := run(arguments, &standardOutput, &standardError, rules.All()); exitCode != exitFindings {
+			test.Fatalf("exit %d, want %d; stderr:\n%s", exitCode, exitFindings, standardError.String())
+		}
+		return strings.Count(standardOutput.String(), `"rule":"`+consistency_no_useless_concatenation.Name+`"`)
+	}
+	original, readError := os.ReadFile(file)
+	if readError != nil {
+		test.Fatalf("reading %s: %v", file, readError)
+	}
+	before := joins("--no-fix")
+	joins()
+	after := joins("--no-fix")
+	wrapped, readError := os.ReadFile(file)
+	if readError != nil || bytes.Equal(wrapped, original) {
+		test.Fatalf("the writing run left %s as it was (%v)", file, readError)
+	}
+	if before < 1 || after != before {
+		test.Fatalf("useless-concatenation reported %d joins before the wrap and %d after, want the same, at least "+
+			"one:\n%s", before, after, wrapped)
+	}
+	if !strings.Contains(string(wrapped), `", and welcome to the depot's " + "own courier service in " +`) {
+		test.Errorf("want the two joined literals kept on one line, got:\n%s", wrapped)
 	}
 }

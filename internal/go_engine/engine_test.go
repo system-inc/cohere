@@ -276,11 +276,12 @@ var endToEndCases = []endToEndCase{
 	{name: "refused-flag", fixture: "clean", extra: []string{"--unused"}, exitCode: 2},
 	{name: "refused-combination", fixture: "clean", extra: []string{"--format-only", "--lint"}, exitCode: 2},
 	{name: "scope-outside-root", fixture: "clean", extra: []string{"{root}/.."}, exitCode: 2},
-	// The fix phase wraps the three code lines a wrap can bring within the limit, the Example's call among them, and
+	// The fix phase wraps the four code lines a wrap can bring within the limit, the Example's call among them, and
+	// Greeting's chain everywhere but between its two joined literals, which useless-concatenation still reports, and
 	// leaves as they were written the two it cannot (the string with a comment after it, which no break touches, and
 	// the return of a long string and a name, which a break after its + would leave long) and every comment: a long
 	// doc comment, a `// Serial:` marker and an Example's `// Output:` line, which a line-based reader parses. The lint
-	// phase reports those five alone, and a second run changes nothing.
+	// phase reports those five and the join alone, and a second run changes nothing.
 	{
 		name: "long-lines-rewritten", fixture: "long-lines", exitCode: 1,
 		verify: every(wrapped("long_lines.go", "long-lines-rewritten"),
@@ -314,7 +315,8 @@ var endToEndCases = []endToEndCase{
 		verify: unchanged("long_lines.go", "long-lines"),
 	},
 	{
-		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 0, prepare: turnOffLongLines,
+		// Greeting's join of two literals is still useless-concatenation's finding, so the run exits 1.
+		name: "long-lines-rule-off", fixture: "long-lines", exitCode: 1, prepare: turnOffLongLines,
 		verify: unchanged("long_lines.go", "long-lines"),
 	},
 }
