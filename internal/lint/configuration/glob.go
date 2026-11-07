@@ -45,6 +45,27 @@ func MatchAny(patterns []string, path string) bool {
 	return false
 }
 
+// TakesWholeDirectory reports whether a glob ignores everything below a directory it matches, `name/**` or `**`,
+// which is when a walk may prune the directory rather than enter it. Lint matches files, and `*.code.js` matching
+// a directory's name says nothing about its contents.
+func TakesWholeDirectory(pattern string) bool {
+	return pattern == "**" || strings.HasSuffix(pattern, "/**")
+}
+
+// LiteralPrefix is a glob's leading path segments that hold no glob syntax, slash-joined: `internal/testdata`
+// for `internal/testdata/**/*.ts`, the whole of a glob with none, and "" for one that begins with a wildcard or a
+// brace. Every path the glob matches lies at or below it.
+func LiteralPrefix(pattern string) string {
+	var literal []string
+	for _, segment := range splitPath(pattern) {
+		if strings.ContainsAny(segment, "*?{") {
+			break
+		}
+		literal = append(literal, segment)
+	}
+	return strings.Join(literal, "/")
+}
+
 // glob is a pattern compiled once: each of its brace alternatives, already split into segments.
 //
 // Match expands the braces and splits both the pattern and the path on every call. Resolve asks every

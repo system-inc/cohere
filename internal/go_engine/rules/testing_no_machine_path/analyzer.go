@@ -21,6 +21,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -34,7 +35,7 @@ var Analyzer = &analysis.Analyzer{
 		"since a test reading one developer's machine covers nothing anywhere else, unless a comment opening with " +
 		"// Not a machine path: <reason> ends the literal's line or sits on lines of its own directly above the " +
 		"statement or declaration holding it.",
-	Requires: []*analysis.Analyzer{marker.Analyzer},
+	Requires: []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
 	Run:      run,
 }
 
@@ -55,13 +56,17 @@ func run(pass *analysis.Pass) (any, error) {
 	if !isIndexes {
 		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
 	}
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	for _, file := range pass.Files {
 		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
 		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
 			continue
 		}
 		comments := indexes.ForFile(file)
-		coveredAbove := linesCoveredAbove(pass, file, comments)
+		coveredAbove := linesCoveredAbove(table, file, comments)
 		ast.Inspect(file, func(node ast.Node) bool {
 			literal, isLiteral := node.(*ast.BasicLit)
 			if !isLiteral || literal.Kind != token.STRING {
@@ -74,7 +79,7 @@ func run(pass *analysis.Pass) (any, error) {
 			}
 			// The marker above the statement or declaration holding the literal, or one at the end of the literal's
 			// own last line.
-			given := coveredAbove[pass.Fset.PositionFor(literal.Pos(), false).Line]
+			given := coveredAbove[table.Line(literal.Pos())]
 			for _, group := range comments.Trailing(literal) {
 				given = max(given, marker.Read(group, marker.NotAMachinePath))
 			}
@@ -100,8 +105,8 @@ func run(pass *analysis.Pass) (any, error) {
 
 // linesCoveredAbove is the excuse each line of file takes from a marker directly above a node: every line of each node
 // with a marker comment directly above it, so a marker above a statement or declaration speaks for every literal in
-// it, over as many lines as it runs.
-func linesCoveredAbove(pass *analysis.Pass, file *ast.File, comments *marker.Index) map[int]marker.Excuse {
+// it, over as many lines as it runs. Each node's lines are read from table, without the FileSet's lock.
+func linesCoveredAbove(table *positions.Table, file *ast.File, comments *marker.Index) map[int]marker.Excuse {
 	covered := map[int]marker.Excuse{}
 	// Every node, not only the outermost, since a marker may sit above a statement inside a function; an inner node
 	// lies within the outer one's lines, so the lines covered are the outermost marked node's.
@@ -113,8 +118,8 @@ func linesCoveredAbove(pass *analysis.Pass, file *ast.File, comments *marker.Ind
 		if given == marker.None {
 			return true
 		}
-		lastLine := pass.Fset.PositionFor(node.End(), false).Line
-		for line := pass.Fset.PositionFor(node.Pos(), false).Line; line <= lastLine; line++ {
+		lastLine := table.Line(node.End())
+		for line := table.Line(node.Pos()); line <= lastLine; line++ {
 			covered[line] = max(covered[line], given)
 		}
 		return true

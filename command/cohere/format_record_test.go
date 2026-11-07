@@ -248,9 +248,11 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 		test.Fatal(writeFormatSectionError)
 	}
 
+	// A test binary is a build nobody stamped, so it says its record is keyed on the binary file; a stamped build
+	// says the formatter changed, which TestTheRecordFollowsTheFormatterNotTheBinary reads.
 	files, _, _, description := fixture.scope(test)
 	assertScope(test, files, "A.ts", "B.ts")
-	if !strings.Contains(description, "the formatter changed since the last check") {
+	if !strings.Contains(description, "this build carries no formatter identity, so its record is keyed on") {
 		test.Errorf("the scope line does not say why every file is in scope: %s", description)
 	}
 
@@ -423,6 +425,96 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 		"--format",
 	); !strings.Contains(output, "all 5 files, because the formatter changed since the last check") {
 		test.Fatalf("a build with another formatter trusted the record:\n%s", output)
+	}
+}
+
+// A plain run, the one most people type, writes like --fix but formats only what is not on record, so an
+// unchanged tree costs no formatting and no write. The fixer is the exception the record must not hide: a
+// file whose bytes are on record and which a rule then rewrites is formatted anyway, since its fixed text
+// is on record nowhere. The fixtures above read the scope in process; this runs the binary, with no flag but
+// --verbose for the scope line.
+func TestAPlainRunFormatsOnlyWhatIsNotOnRecord(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	home := test.TempDir()
+	// no-debugger is on in cohere:typescript, so it is turned off until step 3 wants the fixer: Fixed.ts
+	// is formatted with its debugger statement on record first. Its blank lines either side are the point,
+	// since the fix deletes the statement and leaves its line's indent between two blank lines, which
+	// only the formatter collapses.
+	fixed := "export function value(): number {\n  const count = 1;\n\n  debugger;\n\n  return count;\n}\n"
+	settings := func(severity string) string {
+		return "{ \"extends\": \"./NexusCohereSettings.json\", \"rules\": { \"no-debugger\": \"" + severity + "\" } }\n"
+	}
+	writeTree(test, root, map[string]string{
+		"tsconfig.json":            fixScopeTsconfig,
+		"CohereSettings.json":      settings("off"),
+		"NexusCohereSettings.json": "{ \"format\": { \"ignore\": [] } }\n",
+		".gitignore":               ".cache/\n",
+		"Tidy.ts":                  "export const tidy = 1;\n",
+		"Ugly.ts":                  "export const ugly   =   1\n",
+		"Fixed.ts":                 fixed,
+	})
+	run := func() string {
+		test.Helper()
+		command := exec.Command(binary, verboseArguments(nil)...)
+		command.Dir = root
+		command.Env = append(os.Environ(), "HOME="+home, "XDG_CACHE_HOME=")
+		output, runError := command.CombinedOutput()
+		requireChildRan(test, runError)
+		return string(output)
+	}
+
+	// 1. With no record, every file is in scope, and the unformatted one is written.
+	if output := run(); readForTest(test, filepath.Join(root, "Ugly.ts")) != "export const ugly = 1;\n" {
+		test.Fatalf("a plain run did not format Ugly.ts:\n%s", output)
+	}
+	if readForTest(test, filepath.Join(root, "Fixed.ts")) != fixed {
+		test.Fatal("Fixed.ts was rewritten while no-debugger was off, so step 3 would not start from bytes on record")
+	}
+
+	// 2. Nothing changed since, so nothing is in scope and nothing is written. The modification time is
+	// read as well as the bytes, because a run that formatted a file and wrote the same bytes back would
+	// pass a bytes check while doing the work the record exists to skip.
+	type snapshot struct {
+		contents string
+		modified time.Time
+	}
+	taken := map[string]snapshot{}
+	for _, name := range []string{"Tidy.ts", "Ugly.ts", "Fixed.ts"} {
+		information, statError := os.Stat(filepath.Join(root, name))
+		if statError != nil {
+			test.Fatal(statError)
+		}
+		taken[name] = snapshot{readForTest(test, filepath.Join(root, name)), information.ModTime()}
+	}
+	output := run()
+	if !strings.Contains(output, "format scope: 0 of 6 files not on record as formatted") {
+		test.Fatalf("a plain run over an unchanged tree put files in the format scope:\n%s", output)
+	}
+	for name, before := range taken {
+		information, statError := os.Stat(filepath.Join(root, name))
+		if statError != nil {
+			test.Fatal(statError)
+		}
+		if after := readForTest(test, filepath.Join(root, name)); after != before.contents ||
+			!information.ModTime().Equal(before.modified) {
+			test.Fatalf("a plain run over an unchanged tree wrote %s:\n%s", name, output)
+		}
+	}
+
+	// 3. The rule turned on, Fixed.ts is fixed. Its bytes are still on record, so the scope holds only the
+	// settings file just written, and Fixed.ts is formatted because the fixer proposed a change there.
+	writeTree(test, root, map[string]string{
+		"CohereSettings.json": settings("error"),
+	})
+	output = run()
+	if !strings.Contains(output, "format scope: 1 of 6 files not on record as formatted") {
+		test.Fatalf("the scope should hold the settings file alone, leaving Fixed.ts to the fixer:\n%s", output)
+	}
+	want := "export function value(): number {\n  const count = 1;\n\n  return count;\n}\n"
+	if after := readForTest(test, filepath.Join(root, "Fixed.ts")); after != want {
+		test.Fatalf("a file the fixer rewrote was not fixed and formatted, it reads:\n%q\n%s", after, output)
 	}
 }
 

@@ -167,22 +167,29 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 			!summary.Gaps.NothingToCheck && summary.Gaps.Unread == ""
 	}
 	recordRunSummary(summary)
-	// After the record, since it is what this invocation's discovery found and not part of the run: Swift
-	// added or given a package since would otherwise be said, or left out, by every replay.
-	summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
+	// After the record, since it is what this invocation's discovery found and not part of the run: discovery's
+	// ignores and their counts would otherwise be said, or left out, by every replay, and so would an ignore
+	// that matched nothing (see ignore_account.go).
+	summary.IgnorePatterns = discoveredIgnores
+	summary.Findings += unusedIgnoreCount(discoveredIgnores)
 	summary.EngineBuilds = builtEngines()
 
+	// Discovery's ignores come after everything a recording keeps, just before the footer, which is where a
+	// replay says them too: after the recorded report (see replayRunCache).
 	switch activeOutput.Mode {
 	case outputVerbose:
 		report.Write(out)
 		if line := summary.Cache.missLine(); line != "" {
 			printInvocation(out, "%s\n", line)
 		}
+		writeDiscoveredIgnores(out)
 		printInvocation(out, "%s\n",
 			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJson:
+		writeDiscoveredIgnores(out)
 		printInvocation(out, "%s", engineBuildLines(summary.EngineBuilds)+summaryJsonLine(summaryAsJson(summary)))
 	default:
+		writeDiscoveredIgnores(out)
 		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
 }

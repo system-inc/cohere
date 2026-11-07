@@ -46,8 +46,18 @@ type Options struct {
 	RenameImplementations bool
 	// HostOnly loads no other platform. A rename with a site in the directory of a package holding a Go file the
 	// host's build leaves out is refused, class "platform", rather than proven under a platform that builds the
-	// file. The Go engine's rename plans so, since a load per platform is more than every run should pay.
+	// file, for a caller that would sooner decline such a rename than pay a load per platform.
 	HostOnly bool
+	// LoadPlatform is how the plan loads the tree as a platform builds it, reading overlay in place of the disk, and
+	// how ProvePlatform proves the rewrite there; nil is workspace's own LoadPlatform, through go/packages. A caller
+	// with a load of its own, as the Go engine has, gives it here, so the platform's proof reads the load its host
+	// proof reads.
+	LoadPlatform func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error)
+	// RequireSoundPlatforms refuses a rename that reaches a package holding a file only some platform builds when that
+	// platform's load fails, or the package does not type-check under it, with a reason naming the platform: a rename
+	// there is proven under the platform's types or not at all. Without it, such files are read as text and the
+	// textual guard answers for them (see outsideRefusal).
+	RequireSoundPlatforms bool
 }
 
 // Rename is one declaration and the name it is asked to take.
@@ -72,31 +82,6 @@ type EncodedField struct {
 	Encoders []string
 	Tag      string
 	Outcome  string
-}
-
-// Result is the verified plan and everything a reader needs to trust it.
-type Result struct {
-	Accepted   []Rename
-	Rejections []Rejection
-	// Edits rename identifiers; TagEdits add the tags -tag-encoded-fields asked for; CommentEdits respell the
-	// old name in the renamed declaration's own doc and line comments; TwinEdits rename a platform twin's
-	// declarations, and respell their doc comments, in a build-constrained file the load does not check.
-	Edits        []rename.Edit
-	TagEdits     []rename.Edit
-	CommentEdits []rename.Edit
-	TwinEdits    []rename.Edit
-	// EncodedFields lists every proposed field the encoding guard found reachable.
-	EncodedFields []EncodedField
-	// The model checks: any entry means the engine's model of Go disagreed with go/types somewhere, and every
-	// rename the disagreement touched was refused.
-	Unresolved                  []string
-	SelectionModelMismatches    []string
-	SatisfactionModelMismatches []string
-	// OpaqueEncoderArguments are values handed to an encoder whose concrete types the guard could not follow.
-	OpaqueEncoderArguments []string
-	Notes                  []string
-	// platforms are the platforms the plan read files under, which Apply verifies the rewrite under too.
-	platforms []workspace.Platform
 }
 
 // candidate is one proposed rename, with what the engine knows about its declaration.
@@ -153,6 +138,10 @@ type engine struct {
 	unbuilt map[string]string
 	// methodLookup is computedMethodLookup's answer, nil until asked.
 	methodLookup *string
+	// unbuiltFiles are, by directory, the Go files there that the host does not build and a platform does, and
+	// platformFailures what kept a platform the plan loaded from proving anything in a directory.
+	unbuiltFiles     map[string][]unbuiltFile
+	platformFailures map[workspace.Platform]platformFailure
 }
 
 // Plan verifies proposals against the loaded workspace and returns what survived and why the rest did not.
@@ -179,13 +168,7 @@ func Plan(loaded *workspace.Workspace, proposals []Proposal, options Options) *R
 		return engine.result
 	}
 	engine.keyer = newKeyer(loaded.Roots[0].Fset)
-	if options.HostOnly {
-		engine.platforms = newPlatformReading()
-		engine.unbuilt = engine.unbuiltDirectories()
-	} else {
-		engine.platforms = engine.readPlatforms()
-	}
-	engine.result.platforms = engine.platforms.loaded
+	engine.platforms = newPlatformReading()
 	for _, rootsPackage := range engine.roots {
 		engine.workspacePaths[rootsPackage.PkgPath] = true
 		for _, file := range rootsPackage.Syntax {
@@ -198,6 +181,13 @@ func Plan(loaded *workspace.Workspace, proposals []Proposal, options Options) *R
 	engine.addImpliedImplementations()
 	engine.addImpliedEmbeddedFields()
 	engine.indexSites()
+	// The platforms are read once the sites are known, so only a platform whose files a candidate reaches is loaded.
+	if options.HostOnly {
+		engine.unbuilt = engine.unbuiltDirectories()
+	} else {
+		engine.platforms = engine.readPlatforms(engine.reachedDirectories())
+	}
+	engine.result.platforms = engine.platforms.loaded
 	engine.refuseUpfront()
 	engine.checkLocals()
 	engine.verify()
@@ -857,11 +847,16 @@ func (engine *engine) keepingTag(oldName string, set encoder, structure *ast.Str
 	return strings.Join(parts, " ")
 }
 
-// readPlatforms loads the tree under each platform the host's build-constrained files need and reads the files
-// only those loads build. It notes every constrained file no platform builds and every package a platform
-// cannot type-check, since the textual guard still answers for their files.
-func (engine *engine) readPlatforms() *platformReading {
+// readPlatforms loads the tree under each platform that the build-constrained files of a reached directory need, and
+// reads the files only those loads build. A platform no reached directory needs is never loaded, so a plan whose
+// renames reach no such package costs what a host-only plan does. It notes every constrained file no platform builds
+// and every package a platform cannot type-check, since the textual guard still answers for their files, and keeps
+// what failed (platformFailures), which refuses the renames that reach it, naming the platform.
+func (engine *engine) readPlatforms(reached map[string]map[Key]bool) *platformReading {
 	reading := newPlatformReading()
+	engine.unbuiltFiles = map[string][]unbuiltFile{}
+	engine.platformFailures = map[workspace.Platform]platformFailure{}
+	engine.result.platformKeys = map[workspace.Platform]map[Key]bool{}
 	hostBuilt := map[string]bool{}
 	for _, rootsPackage := range engine.roots {
 		for _, list := range [][]string{rootsPackage.GoFiles, rootsPackage.CompiledGoFiles, rootsPackage.OtherFiles} {
@@ -872,15 +867,18 @@ func (engine *engine) readPlatforms() *platformReading {
 	}
 	needed := map[workspace.Platform]bool{}
 	unbuilt := map[string]bool{}
+	seen := map[string]bool{}
 	for _, rootsPackage := range engine.roots {
 		for _, filename := range rootsPackage.IgnoredFiles {
 			filename = filepath.Clean(filename)
 			relative, inside := engine.workspace.Relative(filename)
-			if !inside ||
-				!strings.HasSuffix(filename, ".go") ||
-				hostBuilt[filename] ||
-				relative == "TypeScript" ||
-				strings.HasPrefix(relative, "TypeScript/") {
+			if !inside || !strings.HasSuffix(filename, ".go") || hostBuilt[filename] || isTypeScript(relative) ||
+				seen[filename] {
+				continue
+			}
+			seen[filename] = true
+			directory := filepath.Dir(filename)
+			if len(reached[directory]) == 0 {
 				continue
 			}
 			platform, builds := workspace.PlatformFor(filename)
@@ -889,8 +887,17 @@ func (engine *engine) readPlatforms() *platformReading {
 				continue
 			}
 			needed[platform] = true
+			engine.unbuiltFiles[directory] = append(engine.unbuiltFiles[directory],
+				unbuiltFile{relative: relative, platform: platform})
+			if engine.result.platformKeys[platform] == nil {
+				engine.result.platformKeys[platform] = map[Key]bool{}
+			}
+			for key := range reached[directory] {
+				engine.result.platformKeys[platform][key] = true
+			}
 		}
 	}
+	sortedUnbuilt(engine.unbuiltFiles)
 	for _, relative := range sortedNames(unbuilt) {
 		engine.result.Notes = append(
 			engine.result.Notes,
@@ -901,8 +908,9 @@ func (engine *engine) readPlatforms() *platformReading {
 		if !needed[platform] {
 			continue
 		}
-		load, loadError := engine.workspace.LoadPlatform(platform, nil)
+		load, loadError := engine.loadPlatform(platform, nil)
 		if loadError != nil {
+			engine.platformFailures[platform] = platformFailure{load: loadError.Error()}
 			engine.result.Notes = append(
 				engine.result.Notes,
 				fmt.Sprintf("platform %s: %v; its files are read as text", platform, loadError),
@@ -911,6 +919,15 @@ func (engine *engine) readPlatforms() *platformReading {
 		}
 		reading.loaded = append(reading.loaded, platform)
 		reading.read(engine, load, hostBuilt)
+		failure := platformFailure{packages: map[string]string{}}
+		for id, reason := range load.Failed {
+			if directory := engine.packageDirectory(id); directory != "" {
+				failure.packages[directory] = reason
+			}
+		}
+		if len(failure.packages) > 0 {
+			engine.platformFailures[platform] = failure
+		}
 		failed := load.FailedSummary()
 		engine.result.Notes = append(
 			engine.result.Notes,

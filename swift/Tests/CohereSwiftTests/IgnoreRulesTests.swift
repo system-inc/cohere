@@ -200,7 +200,10 @@ struct IgnoreRulesTests {
         let fileSet = try FileSet.build(package: package)
         #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift", "Generated.swift"])
         #expect(fileSet.excluded.isEmpty)
-        #expect(fileSet.note == "not a git repository, so every file a target compiles was treated as ours")
+        #expect(
+            fileSet.note
+                == "not a git repository, so every file a target compiles was treated as ours, and the Swift files no target compiles were found by the package's own ignore files"
+        )
     }
 
     @Test func aNestedIgnoreAppliesOnlyBelowItsDirectory() throws {

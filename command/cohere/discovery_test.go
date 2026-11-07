@@ -27,6 +27,17 @@ func newRepository(test *testing.T, files map[string]string) string {
 	return root
 }
 
+// outsideAnyRepository removes a fixture's `.git`, so a test can hold discovery to what it does inside one: the
+// Swift no project claims is a scripts-only root's either way, since the engine walks by the tree's own ignore files
+// outside a repository (#13nbb1s).
+func outsideAnyRepository(test *testing.T, root string) string {
+	test.Helper()
+	if removeError := os.Remove(filepath.Join(root, ".git")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	return root
+}
+
 // Every tsconfig.json and Package.swift the repository keeps is a project, nested at any depth, and a
 // directory holding both is two (#f9nftxz). Parents come before children and TypeScript before Swift.
 func TestDiscoveryFindsEveryProjectTheRepositoryKeeps(test *testing.T) {

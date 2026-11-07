@@ -104,7 +104,7 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	transform := func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 		return formatter.FormatParsed(fileName, text, parsed)
 	}
-	speculation := speculateFormatOn([]string{unchanged, edited, marked}, transform, 1, 2, &programs)
+	speculation := speculateFormatOn([]string{unchanged, edited, marked}, transform, 1, 2, true, &programs)
 	speculation.wait()
 
 	for _, fileName := range []string{unchanged, edited, marked} {

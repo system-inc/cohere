@@ -34,11 +34,6 @@ const projectLabelVariable = "COHERE_PROJECT_LABEL"
 // process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
 var discoveredListings *program.DirectoryListings
 
-// discoveredUnclaimedSwift is the Swift no package holds that discovery found, when the one project it found
-// runs in this process, for that run's footer to say. Nil otherwise: a project run as one of several says
-// nothing of it, since the overall verdict line does.
-var discoveredUnclaimedSwift []unclaimedSwiftDirectory
-
 // discoveryApplies reports whether a run discovers its projects. Anything that names one project, a
 // directory, a tsconfig or a path, narrows the run to it as it always did, and so do the listings, the
 // explanations and the editor's save, which answer about one project.
@@ -76,9 +71,9 @@ func checkDiscoveredProjects(
 	formats bool,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
-	patterns, rootIgnorePatternsError := rootIgnorePatterns(root)
-	if rootIgnorePatternsError != nil {
-		return 0, false, rootIgnorePatternsError
+	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(root)
+	if rootIgnoreEntriesError != nil {
+		return 0, false, rootIgnoreEntriesError
 	}
 	// Asked here because a Swift-only run loads no lint configuration, so this is the one read of the root's
 	// file that every run makes. A file the command line named is the Swift engine's to read wherever it
@@ -93,7 +88,7 @@ func checkDiscoveredProjects(
 			return 0, false, checkSwiftBlockHasAReaderError
 		}
 	}
-	found, discoverProjectsError := discoverProjects(root, patterns)
+	found, discoverProjectsError := discoverProjects(root, configuration.IgnorePatternsFrom(ignoreEntries))
 	if discoverProjectsError != nil {
 		return 0, false, discoverProjectsError
 	}
@@ -123,17 +118,27 @@ func checkDiscoveredProjects(
 			projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, root, solutions, found.Ignored,
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
+	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
+	discoveredIgnores = append(
+		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
+		defaultIgnoreAccounts(found.DefaultMatched)...,
+	)
 	if found.isTheLocatedProject(location, locateError) {
-		// The project runs here, and its build lists the directories discovery just did. Its footer says the
-		// Swift no package checks, since a TypeScript program at the root beside an app's Swift is this path.
+		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
-		discoveredUnclaimedSwift = found.UnclaimedSwift
 		for _, note := range found.notes() {
 			fmt.Fprintf(accountOutput(streams.Errors), "cohere: %s\n", note)
 		}
 		showWarning()
 		return 0, false, nil
 	}
+	// The one project's summary carries the list under `--json`. With several, each project's summary is its own,
+	// so the list is a record of this run's, once.
+	writeDiscoveredIgnores(streams.Output)
+	if activeOutput.Mode == outputJson && len(discoveredIgnores) > 0 {
+		writeJsonLine(streams.Output, ignorePatternsJson{Kind: "ignorePatterns", IgnorePatterns: discoveredIgnores})
+	}
+	showWarning()
 	return runProjects(found, childArguments(os.Args[1:], lintConfigFileName), streams.Output), true, nil
 }
 
@@ -319,8 +324,8 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// The overall verdict, last, in the human views. Under `--json` each project's own summary line, with its
 	// label, is the record, and a program reads the worst from them.
 	facts := overallFactsOf(runs, time.Since(processStart))
+	facts.UnusedIgnores = unusedIgnoreCount(discoveredIgnores)
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
-	facts.UnclaimedSwift = found.UnclaimedSwift
 	facts.EngineBuilds = builtEngines()
 	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
@@ -532,27 +537,13 @@ func summaryLine(found discovery, runs []projectRun) string {
 	if len(notRunParts) > 0 {
 		notRun = "; not run: " + strings.Join(notRunParts, ", ")
 	}
-	// Beside what was not run, since these files were not checked either, and nothing would have.
-	notChecked := ""
-	if len(found.UnclaimedSwift) > 0 {
-		files := 0
-		for _, unclaimed := range found.UnclaimedSwift {
-			files += unclaimed.Files
-		}
-		notChecked = fmt.Sprintf(
-			"; not checked: %s no Swift package checks, in %s",
-			counted(files, "Swift file", "Swift files"),
-			counted(len(found.UnclaimedSwift), "directory", "directories"),
-		)
-	}
 	return fmt.Sprintf(
-		"projects: %d checked (%s), %s%s%s; not searched for projects: %d directories .gitignore ignores, "+
+		"projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 			"%d dependency, build, cache or fixture directories, %d nested repositories",
 		checkedCount,
 		strings.Join(engines, ", "),
 		verdict,
 		notRun,
-		notChecked,
 		found.Ignored,
 		found.NeverDescended,
 		len(found.NestedRepositories)+found.Submodules,

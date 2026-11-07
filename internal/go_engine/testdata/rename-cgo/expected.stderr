@@ -1,0 +1,2 @@
+cohere-go: /project/internal/reads/reads.go:5:7: maxReads was not renamed to maximumReads, unsafe to rename (named in a file outside the load): the name appears in internal/reads/reads_cgo_windows.go, a file of its own package that no load type-checks, other than as a declaration there
+cohere-go: /project/internal/limits/limits.go:8:7: maxBytes was not renamed to maximumBytes, not proven by a load of the rewrite: no load type-checked internal/limits/limits_cgo_windows.go, the host's or any platform's, so its rewrite is unproven

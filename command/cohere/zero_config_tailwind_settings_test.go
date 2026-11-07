@@ -47,7 +47,6 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 func TestZeroConfigReadsTailwindSettingsOrRefusesThem(test *testing.T) {
 	test.Parallel()
 	binary := buildCohere(test)
-	environment := []string{"COHERE_RUN_CACHE=off"}
 
 	test.Run("settings naming a stylesheet the default probes miss are read", func(test *testing.T) {
 		test.Parallel()
@@ -60,7 +59,7 @@ func TestZeroConfigReadsTailwindSettingsOrRefusesThem(test *testing.T) {
 				"export const ours = mergeClassNames('flex flex');\n" +
 				"export const theirs = cn('p-2 p-2');\n",
 		})
-		output, _ := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
+		output, _ := runCohere(test, binary, root, "--no-fix", "--no-cache")
 		if !strings.Contains(output, "design/brand.css is a Tailwind stylesheet") {
 			test.Fatalf("zero config did not apply cohere:tailwind from the stylesheet the settings name:\n%s", output)
 		}
@@ -78,7 +77,7 @@ func TestZeroConfigReadsTailwindSettingsOrRefusesThem(test *testing.T) {
 			"CohereSettings.json": `{"settings": {"better-tailwindcss": {"callees": ["mergeClassNames"]}}}`,
 			"index.ts":            "export const value = 1;\n",
 		})
-		output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
+		output, exitCode := runCohere(test, binary, root, "--no-fix", "--no-cache")
 		if exitCode == 0 || !strings.Contains(
 			output,
 			`writes settings["better-tailwindcss"], and zero config does not apply cohere:tailwind`,
@@ -96,7 +95,7 @@ func TestZeroConfigReadsTailwindSettingsOrRefusesThem(test *testing.T) {
 				"export const a = cn('flex flex');\n" +
 				"export const b = clsx('gap-2 gap-2');\n",
 		})
-		output, _ := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
+		output, _ := runCohere(test, binary, root, "--no-fix", "--no-cache")
 		for _, repeated := range []string{`"flex" is listed more than once`, `"gap-2" is listed more than once`} {
 			if !strings.Contains(output, repeated) {
 				test.Errorf("an outsider's repeat went unreported (%s):\n%s", repeated, output)

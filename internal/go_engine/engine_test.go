@@ -226,6 +226,9 @@ type endToEndCase struct {
 	verify func(test *testing.T, root string)
 }
 
+// platformsWindowsFile is the rename-platforms fixture's file only windows builds.
+const platformsWindowsFile = "internal/limits/limits_windows.go"
+
 var endToEndCases = []endToEndCase{
 	{name: "clean", exitCode: 0},
 	{
@@ -357,6 +360,30 @@ var endToEndCases = []endToEndCase{
 		name: "rename-wrap-declined", fixture: "rename", exitCode: 1, prepare: limitLongFiles(12),
 		rules: ownLongFileAnalyzer(), verify: renamedTree("rename", "rename-wrap-declined"),
 	},
+	// maxBytes is read by a file only windows builds and one only freebsd builds: it is renamed in all three, and
+	// the rewrite is proven under each platform with the engine's own load for it as well as the host's.
+	{
+		name: "rename-platforms-rewritten", fixture: "rename-platforms", exitCode: 0,
+		verify: renamedTree("rename-platforms", "rename-platforms-rewritten"),
+	},
+	// The same tree with a type error in the file only windows builds: nothing can prove the rename under windows,
+	// so it is declined, naming the platform, and every file but the one planted reads as its fixture.
+	{
+		name: "rename-platforms-broken", fixture: "rename-platforms", exitCode: 1, prepare: breakUnderWindows,
+		verify: unchangedBut("rename-platforms", platformsWindowsFile),
+	},
+	// Every load runs with cgo off, so a cgo file only windows builds is type-checked by none, and no rename may edit
+	// it unproven: maxReads, which such a file reads, and maxBytes, which such a file declares as a twin, keep their
+	// names, each refused with why, and every file reads as its fixture.
+	{
+		name: "rename-cgo", exitCode: 1, verify: unchangedTree("rename-cgo"),
+	},
+	// A file only windows builds declares maxBytes's new name as a local where a use of maxBytes stands, so the rename
+	// would capture that use, and windows would still type-check it. The rename is refused, naming the file and the
+	// platform, the finding stands, and every file reads as its fixture.
+	{
+		name: "rename-capture", exitCode: 1, verify: unchangedTree("rename-capture"),
+	},
 	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
 	{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
@@ -467,6 +494,27 @@ func renamedTreeUnder(fixture string, caseName string, extra ...string) func(tes
 			again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 			if againError != nil || !bytes.Equal(again, after[relative]) {
 				test.Errorf("a second run changed %s (%v)", relative, againError)
+			}
+		}
+	}
+}
+
+// breakUnderWindows plants a type error in the rename-platforms copy's file only windows builds, which the host's
+// load never reads.
+func breakUnderWindows(root string) error {
+	broken := "package limits\n\n// extra is what windows adds to a read, mistyped.\nfunc extra() int {\n" +
+		"\treturn maxBytes + \"half\"\n}\n"
+	return os.WriteFile(filepath.Join(root, filepath.FromSlash(platformsWindowsFile)), []byte(broken), 0o644)
+}
+
+// unchangedBut is a verify that every .go file of the copy but planted, which the case's prepare wrote, reads as it
+// does in its fixture.
+func unchangedBut(fixture string, planted string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			if relative != planted {
+				unchanged(relative, fixture)(test, root)
 			}
 		}
 	}

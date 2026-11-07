@@ -37,7 +37,7 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 	for _, pattern := range layer.globs {
 		// A glob prunes a directory only when it takes everything below it, `name/**` or `**`: lint
 		// matches files, and `*.code.js` matching a directory's name says nothing about its contents.
-		if directory && pattern != "**" && !strings.HasSuffix(pattern, "/**") {
+		if directory && !configuration.TakesWholeDirectory(pattern) {
 			continue
 		}
 		if configuration.Match(pattern, fromSettings) {

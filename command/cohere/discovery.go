@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"maps"
 	"os"
 	"path"
@@ -47,11 +48,13 @@ import (
 // So ahraos-presence's CapturePhone, inside the root package's directory, is a project of its own, because its
 // project.yml is nearer to its sources than the root's Package.swift is.
 //
-// Swift with no marker above it is checked by nothing, and beside a TypeScript program a green run read clean
-// over code nobody looked at. Such files are named by the top directory holding them, in the notes and on the
-// verdict line, and fail nothing: a run says what it covered as well as what it found. Files the walk never
-// enters, or that .gitignore or the root's ignorePatterns match, are not counted, since nobody expects those
-// checked.
+// Swift with no marker above it was once checked by nothing, and beside a TypeScript program a green run read
+// clean over code nobody looked at. Such files get a Swift project of their own at the root, a scripts-only root
+// with no Package.swift (#wpd36zj): the engine checks each standalone script among them alone, as `swift <file>`
+// runs it, and names every other file as not checked, by the same nearest-marker rule this walk claims by, so
+// ahra's four scripts under modules/ are checked rather than named. Inside a repository or not: outside one the
+// engine walks by the tree's own ignore files, as this walk does (#13nbb1s). Files the walk never enters, or that
+// .gitignore or the root's ignorePatterns match, give no root, since nobody expects those checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
 // directory claims it, and the engine knows which files it checks. A standalone script there, one `swift <file>`
@@ -99,6 +102,18 @@ type discovery struct {
 	// Refused are markers the root's ignorePatterns match, relative to Root.
 	Refused []string
 
+	// IgnoreMatched is how many paths each of the root's ignorePatterns matched, by the pattern's index: every
+	// entry of every directory the walk read, asked before .gitignore or any other ignore applies, a directory
+	// counted only by a pattern that takes it whole (#cxeq6jw). Inside a repository of its own too (see
+	// countIgnoredBelow), and, for a pattern still at zero, at and below the path it names (see countNamedPaths).
+	// So a pattern whose paths exist counts, and one at zero matched nothing the run could have checked.
+	IgnoreMatched []int
+
+	// DefaultMatched is how many directories each of cohere's default ignores matched, by directory name: every
+	// testdata and Vendor directory among the entries the walk read, the same entries IgnoreMatched counts in
+	// (see defaultIgnores).
+	DefaultMatched map[string]int
+
 	// UnusedModules are Go modules below a discovered workspace whose go.work does not use them, each run as
 	// a module of its own, for the notes to say why.
 	UnusedModules []unusedModule
@@ -123,10 +138,6 @@ type discovery struct {
 	// SwiftCoverage is what asking the Swift projects which packages their runs cover decided. See
 	// swift_coverage.go.
 	SwiftCoverage swiftCoverage
-
-	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package or Xcode
-	// project holds, which no run checks, in path order.
-	UnclaimedSwift []unclaimedSwiftDirectory
 
 	// Formattable counts the files the house formatter handles in each directory that holds any, by directory
 	// relative to Root, for addRootFormatProject to know whether a root no TypeScript project holds has
@@ -248,7 +259,13 @@ func repositoryKind(directory string) nestedRepository {
 // discoverProjects walks root and returns every project it finds. ignorePatterns are the root's, as lint
 // globs relative to root.
 func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
-	found := discovery{Root: root, Listings: program.NewDirectoryListings(), Formattable: map[string]int{}}
+	found := discovery{
+		Root:           root,
+		Listings:       program.NewDirectoryListings(),
+		Formattable:    map[string]int{},
+		DefaultMatched: map[string]int{},
+	}
+	ignoreTally := configuration.NewIgnoreTally(ignorePatterns)
 
 	// The matcher is the repository's, a submodule's own when the root is inside one, so the .gitignore
 	// files between its root and this one apply too.
@@ -315,7 +332,16 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		names := map[string]bool{}
 		for _, entry := range entries {
 			if entry.Name() == ".git" && relative != "." {
+				// Counted though not searched for projects: see countIgnoredBelow.
+				nestedTally := ignoreTally.Fresh()
+				if len(ignorePatterns) > 0 && !ignoreTally.TakesWhole(relative) {
+					if countError := countIgnoredBelow(root, relative, entries, nestedTally); countError != nil {
+						fail(countError)
+						return
+					}
+				}
 				lock.Lock()
+				ignoreTally.Add(nestedTally)
 				if entry.IsDir() {
 					found.NestedRepositories = append(found.NestedRepositories, relative)
 				} else {
@@ -328,6 +354,16 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 			if !entry.IsDir() {
 				names[entry.Name()] = true
+			}
+		}
+		// After the check above, since a repository of its own is counted where its parent lists it and its
+		// entries are never this walk's to consider.
+		directoryTally := ignoreTally.Fresh()
+		directoryDefaults := map[string]int{}
+		for _, entry := range entries {
+			directoryTally.Count(path.Join(relative, entry.Name()), entry.IsDir())
+			if entry.IsDir() && isDefaultIgnore(entry.Name()) {
+				directoryDefaults[entry.Name()]++
 			}
 		}
 		directoryScope := scope
@@ -361,6 +397,10 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 			}
 		}
 		lock.Lock()
+		ignoreTally.Add(directoryTally)
+		for name, count := range directoryDefaults {
+			found.DefaultMatched[name] += count
+		}
 		if swiftFileCount > 0 {
 			swiftFiles[relative] = swiftFileCount
 		}
@@ -434,14 +474,130 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, firstError
 	}
 
-	xcodeProjects, unclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
+	if countNamedPathsError := countNamedPaths(root, ignoreTally); countNamedPathsError != nil {
+		return discovery{}, countNamedPathsError
+	}
+	found.IgnoreMatched = ignoreTally.Matched
+	xcodeProjects, anyUnclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
-	found.UnclaimedSwift = unclaimed
+	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only
+	// Swift project there (see the header).
+	if anyUnclaimed {
+		found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
+	}
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
 	found.claimWorkspaceModules(workspaces)
 	return found, nil
+}
+
+// countIgnoredBelow counts, against the root's ignorePatterns, every entry of a directory inside a repository
+// of its own, which discovery does not search for projects, and of each directory below it the walk would
+// enter (#cxeq6jw). A submodule or a clone inside a program is checked as part of that program, as Structure is
+// in ahra, so an ignore that keeps its files out of the run is live: api-phi-health's `**/graphql/schemas/**`
+// matches only inside its libraries/nexus-project.
+//
+// It descends as discovery does, under each repository's own ignore files and never into a dependency, build,
+// cache or fixture directory, and it does not enter a directory a pattern takes whole, which it counts once:
+// cohere's TypeScript, typescript-go pinned whole under `TypeScript/**`, would otherwise be walked on every run.
+// directory is relative to root and the root of a repository of its own, and entries its listing.
+func countIgnoredBelow(
+	root string,
+	directory string,
+	entries []os.DirEntry,
+	tally *configuration.IgnoreTally,
+) error {
+	scope, newIgnoreScopeError := newIgnoreScope(filepath.Join(root, directory))
+	if newIgnoreScopeError != nil {
+		return newIgnoreScopeError
+	}
+	return countIgnoredIn(root, directory, directory, entries, scope, tally)
+}
+
+// countIgnoredIn is countIgnoredBelow within one repository, whose directory relative to root is repository:
+// directory's entries, and below them, scope being the ignore scope that has entered directory.
+func countIgnoredIn(
+	root string,
+	repository string,
+	directory string,
+	entries []os.DirEntry,
+	scope ignoreScope,
+	tally *configuration.IgnoreTally,
+) error {
+	for _, entry := range entries {
+		tally.Count(path.Join(directory, entry.Name()), entry.IsDir())
+	}
+	for _, entry := range entries {
+		child := path.Join(directory, entry.Name())
+		if !entry.IsDir() || neverDescended[entry.Name()] || tally.TakesWhole(child) {
+			continue
+		}
+		inRepository := strings.TrimPrefix(child, repository+"/")
+		if scope.Ignored(inRepository, true) {
+			continue
+		}
+		childEntries, readDirectoryError := os.ReadDir(filepath.Join(root, child))
+		if readDirectoryError != nil {
+			return fmt.Errorf("reading %s: %w", filepath.Join(root, child), readDirectoryError)
+		}
+		if slices.ContainsFunc(childEntries, func(childEntry os.DirEntry) bool { return childEntry.Name() == ".git" }) {
+			if countError := countIgnoredBelow(root, child, childEntries, tally); countError != nil {
+				return countError
+			}
+			continue
+		}
+		entered, enterError := scope.Enter(inRepository)
+		if enterError != nil {
+			return enterError
+		}
+		if countError := countIgnoredIn(root, repository, child, childEntries, entered, tally); countError != nil {
+			return countError
+		}
+	}
+	return nil
+}
+
+// countNamedPaths counts, for each pattern the walk found nothing for, the paths at and below the path its literal
+// leading segments name, whether or not the walk went there (#cxeq6jw). The walk never enters testdata or
+// node_modules, nor what .gitignore ignores, and a program's include reaches files there all the same: adamic's
+// `internal/load/testdata/0.1/refuse/**` keeps fixtures out of a TypeScript program that includes them, and
+// would read as dead. A pattern that begins with a wildcard names no path and stays as the walk left it, so this
+// never walks a tree the pattern does not name, and a directory the pattern takes whole is counted once.
+func countNamedPaths(root string, tally *configuration.IgnoreTally) error {
+	for _, index := range tally.Unmatched() {
+		prefix := tally.LiteralPrefix(index)
+		if prefix == "" {
+			continue
+		}
+		named := filepath.Join(root, filepath.FromSlash(prefix))
+		walkError := filepath.WalkDir(
+			named,
+			func(walked string, entry fs.DirEntry, pathError error) error {
+				// A path the pattern names that is not there, or cannot be read, is what leaves it at zero.
+				if pathError != nil || entry == nil {
+					return nil
+				}
+				// Below the named path, never into a dependency, build, cache or fixture directory, as the walk keeps
+				// out of them: the one the pattern names is where the walk starts, so it is still read.
+				if entry.IsDir() && neverDescended[entry.Name()] && walked != named {
+					return fs.SkipDir
+				}
+				relative, relativePathError := filepath.Rel(root, walked)
+				if relativePathError != nil {
+					return relativePathError
+				}
+				if tally.CountOne(index, filepath.ToSlash(relative), entry.IsDir()) {
+					return fs.SkipDir
+				}
+				return nil
+			},
+		)
+		if walkError != nil {
+			return walkError
+		}
+	}
+	return nil
 }
 
 // claimWorkspaceModules removes from Projects each Go module a discovered workspace's go.work uses, since the
@@ -541,34 +697,20 @@ func xcodeMarker(entries []os.DirEntry, names map[string]bool) string {
 	return bundle
 }
 
-// unclaimedSwiftDirectory is one top directory holding .swift files no Swift package or Xcode project holds.
-type unclaimedSwiftDirectory struct {
-	// Directory is the shallowest directory under the root holding the files, relative to it and ending in
-	// a slash, such as "CapturePhone/", or "." for files directly in the root.
-	Directory string `json:"directory"`
-
-	// Files counts the unclaimed .swift files at any depth below it.
-	Files int `json:"files"`
-}
-
 // claimSwiftFiles gives each directory of .swift files to the nearest Swift marker at or above it: a Swift
 // package among projects, or one of the Xcode candidates. It returns the candidates that claimed any file, as
-// projects, and the files nothing claimed, grouped by the top directory holding them.
+// projects, and whether any file was claimed by nothing, which the scripts-only root takes.
 //
 // A package claims by its directory, whether it runs or another package's run covers it, since then the
 // covering run checks its files. Every Swift package discovery found is one or the other, so the claim is
 // decided here, before coverage is asked. Nearest, so a candidate inside a package's directory claims the
 // files below it, which no target of that package compiles, and a package inside a candidate's directory
 // claims its own.
-//
-// The top directory of unclaimed files is a path's first segment: no marker is at or above them, so none is
-// at that directory, and it is the shallowest one holding them. So CapturePhone/Sources/App and
-// CapturePhone/Tests are both CapturePhone/.
 func claimSwiftFiles(
 	swiftFiles map[string]int,
 	projects []discoveredProject,
 	xcodeCandidates map[string]bool,
-) ([]discoveredProject, []unclaimedSwiftDirectory) {
+) ([]discoveredProject, bool) {
 	packages := map[string]bool{}
 	for _, project := range projects {
 		if project.Engine == engineSwift {
@@ -576,37 +718,21 @@ func claimSwiftFiles(
 		}
 	}
 	claiming := map[string]bool{}
-	byTop := map[string]int{}
-	for directory, count := range swiftFiles {
+	anyUnclaimed := false
+	for directory := range swiftFiles {
 		if marker, isCandidate, claimed := nearestSwiftMarker(directory, packages, xcodeCandidates); claimed {
 			if isCandidate {
 				claiming[marker] = true
 			}
 			continue
 		}
-		top := "."
-		if directory != "." {
-			top, _, _ = strings.Cut(directory, "/")
-			top += "/"
-		}
-		byTop[top] += count
+		anyUnclaimed = true
 	}
-	unclaimed := make([]unclaimedSwiftDirectory, 0, len(byTop))
-	for top, count := range byTop {
-		unclaimed = append(unclaimed, unclaimedSwiftDirectory{Directory: top, Files: count})
-	}
-	// In path order, the root's first, so the report reads the same on every run.
-	sort.Slice(unclaimed, func(left, right int) bool {
-		return pathBefore(
-			strings.TrimSuffix(unclaimed[left].Directory, "/"),
-			strings.TrimSuffix(unclaimed[right].Directory, "/"),
-		)
-	})
 	xcodeProjects := make([]discoveredProject, 0, len(claiming))
 	for directory := range claiming {
 		xcodeProjects = append(xcodeProjects, discoveredProject{Directory: directory, Engine: engineSwift})
 	}
-	return xcodeProjects, unclaimed
+	return xcodeProjects, anyUnclaimed
 }
 
 // nearestSwiftMarker is the nearest directory at or above a slash directory holding a Swift marker, whether it
@@ -683,11 +809,20 @@ func pathBefore(left string, right string) bool {
 // rootIgnorePatterns reads the ignorePatterns of the settings file at the root, as globs relative to it.
 // A root with no settings file has none.
 func rootIgnorePatterns(root string) ([]string, error) {
+	entries, rootIgnoreEntriesError := rootIgnoreEntries(root)
+	if rootIgnoreEntriesError != nil {
+		return nil, rootIgnoreEntriesError
+	}
+	return configuration.IgnorePatternsFrom(entries), nil
+}
+
+// rootIgnoreEntries is rootIgnorePatterns with each entry whole, its reason and the file that wrote it.
+func rootIgnoreEntries(root string) ([]configuration.IgnoreEntry, error) {
 	settings := filepath.Join(root, "CohereSettings.json")
 	if !isRegularFile(settings) {
 		return nil, nil
 	}
-	return configuration.IgnorePatternsOf(settings)
+	return configuration.IgnoreEntriesOf(settings)
 }
 
 // isTheLocatedProject reports whether discovery found exactly the one project the walk up located, which
@@ -755,13 +890,6 @@ func (found discovery) notes() []string {
 			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
 			failed.Label,
 			failed.Reason,
-		))
-	}
-	for _, unclaimed := range found.UnclaimedSwift {
-		lines = append(lines, fmt.Sprintf(
-			"%s: %s no Swift package checks",
-			unclaimed.Directory,
-			counted(unclaimed.Files, "Swift file", "Swift files"),
 		))
 	}
 	// Last, since only these are sorted: a map has no order of its own.

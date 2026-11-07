@@ -20,6 +20,7 @@
 package consistency_no_warning_comment
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"regexp"
@@ -28,6 +29,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/internal/warning_comment"
 	"github.com/system-inc/cohere/policy"
 )
@@ -41,7 +43,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags TODO, FIXME or XXX written as a whole word in a comment, because a deferred task kept in a comment " +
 		"rots where nobody is reminded of it. Directives, words in backticks and a doc comment's code blocks are not " +
 		"read.",
-	Run: run,
+	Requires: []*analysis.Analyzer{positions.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -55,10 +58,14 @@ var warningCommentMessage = policy.MessageOf(Name, "warningComment")
 var directive = regexp.MustCompile(`^//(line |extern |export |[a-z0-9]+:[a-z0-9])`)
 
 func run(pass *analysis.Pass) (any, error) {
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	for _, file := range pass.Files {
 		tokenFile := pass.Fset.File(file.Pos())
 		for _, group := range file.Comments {
-			judgeGroup(pass, tokenFile, group)
+			judgeGroup(pass, table, tokenFile, group)
 		}
 	}
 	return nil, nil
@@ -67,7 +74,7 @@ func run(pass *analysis.Pass) (any, error) {
 // judgeGroup reports every warning word in group, outside a code block and backticks, as internal/warning_comment
 // finds them. Go's directives are set aside first, since go/doc leaves a directive out of the comment's text, so it
 // is neither read nor a line between its neighbours.
-func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGroup) {
+func judgeGroup(pass *analysis.Pass, table *positions.Table, tokenFile *token.File, group *ast.CommentGroup) {
 	read := []*ast.Comment{}
 	texts := []string{}
 	for _, comment := range group.List {
@@ -79,7 +86,7 @@ func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGr
 	}
 	for _, word := range warning_comment.WordsIn(texts) {
 		comment := read[word.Comment]
-		position := positionOf(pass, tokenFile, comment, word.Start)
+		position := positionOf(table, tokenFile, comment, word.Start)
 		pass.Report(analysis.Diagnostic{
 			Pos:      position,
 			End:      position + token.Pos(word.End-word.Start),
@@ -93,14 +100,14 @@ func judgeGroup(pass *analysis.Pass, tokenFile *token.File, group *ast.CommentGr
 // comment's text, so in a CRLF file a block comment's text is shorter than its source after its first line, and
 // comment.Pos() plus the offset would drift by a byte a line. A line's own bytes come through intact, so the
 // position is found as the line's start plus the column within it, by the file's own lines and not the ones a //line
-// directive claims.
-func positionOf(pass *analysis.Pass, tokenFile *token.File, comment *ast.Comment, offset int) token.Pos {
+// directive claims. The comment's line is read from table, without the FileSet's lock.
+func positionOf(table *positions.Table, tokenFile *token.File, comment *ast.Comment, offset int) token.Pos {
 	before := comment.Text[:offset]
 	lastNewline := strings.LastIndexByte(before, '\n')
 	if lastNewline < 0 {
 		return comment.Pos() + token.Pos(offset)
 	}
 	// Every newline in the text is one in the source, so the line exists in the file.
-	line := pass.Fset.PositionFor(comment.Pos(), false).Line + strings.Count(before, "\n")
+	line := table.Line(comment.Pos()) + strings.Count(before, "\n")
 	return tokenFile.LineStart(line) + token.Pos(offset-lastNewline-1)
 }

@@ -20,7 +20,12 @@ import (
 // The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
 // files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files
 // examined fresh this run, and cached the ones the cache answered for; together they are every file in
-// scope. A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
+// scope. Types-only is the files an ignore naming the type check matched, which only that check reads, and a
+// file a plain ignore matched is in no count (#cxeq6jw):
+//
+//	✓ 💎 2.4s (480 rules • 3,900 checked • 26 types-only)
+//
+// A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
 // and time, what was found, what was cohered, the parentheses, and anything the run did not check.
 //
 // With `--phases`, or `"output": { "phases": true }` in the settings, where the time went comes first
@@ -41,8 +46,8 @@ import (
 // One rule outranks the brevity. Anything the run did not check is in this line, green or not: a file a
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
 // not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
-// program asks for that does not exist yet, Swift files beside the project that no package holds, Swift
-// files inside a package's directory that no target compiles and no other project's run checks, and what a
+// program asks for that does not exist yet, Swift files inside a package's directory that no target compiles
+// and no other project's run checks, and what a
 // Go run withheld of its dependencies because no cgo tool ran. The old phase line existed so that a run which
 // checked nothing could not print like one that checked everything, and a one-line summary that dropped those
 // cases would undo it in the line people actually read. So a gap is never left to `--verbose`.
@@ -103,6 +108,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	}
 	if summary.FilesCached > 0 {
 		inside = append(inside, grouped(summary.FilesCached)+" cached")
+	}
+	if summary.FilesTypesOnly > 0 {
+		inside = append(inside, grouped(summary.FilesTypesOnly)+" types-only")
 	}
 	if options.Verbose && summary.Nodes > 0 {
 		inside = append(inside, counted(summary.Nodes, "node", "nodes"))
@@ -234,9 +242,6 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
-	if len(gaps.UnclaimedSwift) > 0 {
-		markers = append(markers, unclaimedSwiftMarker(gaps.UnclaimedSwift))
-	}
 	if len(gaps.UncheckedSwift) > 0 {
 		markers = append(markers, "⚠ "+
 			counted(len(gaps.UncheckedSwift), "Swift file not checked", "Swift files not checked"))
@@ -260,13 +265,13 @@ type overallFacts struct {
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
 	Unfinished int
+	// UnusedIgnores is the root's ignorePatterns entries that matched nothing, each a finding of this run's own
+	// that fails it, whatever its projects found (#cxeq6jw).
+	UnusedIgnores int
 	// CoverageUnknown is the Swift packages whose coverage query failed. Everything they might check ran as
 	// its own project too, so some files may be counted twice, and that is said here rather than only in
 	// `--verbose`'s notes (#sxs26s3).
 	CoverageUnknown int
-	// UnclaimedSwift is the directories of Swift files no package holds, which no project's run checked
-	// (#ybspptb). A gap, not a failure: it never changes the verdict, and it is never left to the notes.
-	UnclaimedSwift []unclaimedSwiftDirectory
 	// EngineBuilds are the engines this run built before its projects ran, as a coverage query does: their
 	// time is in Total, and said apart from it.
 	EngineBuilds []engineBuild
@@ -292,12 +297,15 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 
 	verdict := "✓ 💎 "
-	if len(facts.Failed) > 0 || facts.Unfinished > 0 {
+	if len(facts.Failed) > 0 || facts.Unfinished > 0 || facts.UnusedIgnores > 0 {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict+footerSeconds(facts.Total)) + " • " + counted(total, "project", "projects")
 	if len(byEngine) > 1 {
 		line += ": " + strings.Join(byEngine, ", ")
+	}
+	if facts.UnusedIgnores > 0 {
+		line += " • " + style.red(counted(facts.UnusedIgnores, "unused ignore pattern", "unused ignore patterns"))
 	}
 	if len(facts.Failed) > 0 {
 		line += " → " + style.red("☠️ "+strings.Join(facts.Failed, ", "))
@@ -309,9 +317,6 @@ func overallFooter(facts overallFacts, style textStyle) string {
 		line += " • ⚠ " +
 			counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
 				"Swift coverage queries failed, so some files may be counted twice")
-	}
-	if len(facts.UnclaimedSwift) > 0 {
-		line += " • " + unclaimedSwiftMarker(facts.UnclaimedSwift)
 	}
 	for _, segment := range engineBuildSegments(facts.EngineBuilds) {
 		line += " • " + segment
@@ -342,24 +347,6 @@ func withheldCgoMarker(files []withheldCgoFile, declarations int) string {
 		return ""
 	}
 	return "⚠ cgo withheld: " + strings.Join(parts, ", ")
-}
-
-// unclaimedSwiftMarker says the directories of Swift files no package checks, the first three by name and
-// the rest counted, so the line stays short however many there are:
-//
-//	⚠ Swift files no package checks: CapturePhone/
-//	⚠ Swift files no package checks: A/, B/, C/ and 2 more
-func unclaimedSwiftMarker(directories []unclaimedSwiftDirectory) string {
-	const named = 3
-	names := make([]string, 0, named)
-	for _, unclaimed := range directories[:min(len(directories), named)] {
-		names = append(names, unclaimed.Directory)
-	}
-	marker := "⚠ Swift files no package checks: " + strings.Join(names, ", ")
-	if len(directories) > named {
-		marker += fmt.Sprintf(" and %d more", len(directories)-named)
-	}
-	return marker
 }
 
 // footerSeconds is a duration as the footer says it: 0.004s, 0.05s, 0.4s, 2.4s, 12s. Below a hundredth it

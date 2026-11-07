@@ -14,7 +14,7 @@ func withHouseSetsForTest(test *testing.T) {
 	withSetFiles(test, map[string]string{
 		"typescript": `{"rules": {"no-var": "error", "eqeqeq": ["error", "always"]}, "overrides": [{"files": ["**/*.generated.*"], "rules": {"no-var": "off"}}]}`,
 		"react":      `{"extends": "cohere:typescript", "rules": {"react/no-danger": "error"}}`,
-		"next":       `{"extends": "cohere:typescript", "rules": {"@next/next/no-img-element": "error"}, "ignorePatterns": ["**/.next/**"]}`,
+		"next":       `{"extends": "cohere:typescript", "rules": {"@next/next/no-img-element": "error"}, "ignorePatterns": [{"pattern": "**/.next/**", "reason": "Next's build output."}]}`,
 		"tailwind":   `{"extends": "cohere:typescript", "rules": {"better-tailwindcss/no-unknown-classes": "error"}}`,
 	})
 }

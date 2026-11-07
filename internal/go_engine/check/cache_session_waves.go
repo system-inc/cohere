@@ -86,11 +86,15 @@ func (session *CacheSession) firstWave(
 	if !waiting || len(first) == 0 {
 		return nil, nil
 	}
+	// The first wave's packages keep their syntax, since one whose entry does not encode is analyzed again by the
+	// second wave, and its walk is read from the syntax below.
+	firstOptions := *options
+	firstOptions.Finished = nil
 	session.counts.Waves++
 	var graphs []*checker.Graph
 	var givenGraph *checker.Graph
 	if len(firstGiven) > 0 {
-		graph, analyzeError := checker.Analyze(analyzers, firstGiven, options)
+		graph, analyzeError := checker.Analyze(analyzers, firstGiven, &firstOptions)
 		if analyzeError != nil {
 			return nil, fmt.Errorf("analyzing %d packages: %w", len(firstGiven), analyzeError)
 		}
@@ -98,7 +102,7 @@ func (session *CacheSession) firstWave(
 		graphs = append(graphs, graph)
 	}
 	if len(firstOthers) > 0 {
-		graph, analyzeError := checker.Analyze(session.known.facts, firstOthers, options)
+		graph, analyzeError := checker.Analyze(session.known.facts, firstOthers, &firstOptions)
 		if analyzeError != nil {
 			return nil, fmt.Errorf("analyzing %d dependencies: %w", len(firstOthers), analyzeError)
 		}

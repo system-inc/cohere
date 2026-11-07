@@ -178,7 +178,7 @@
         "name": "cohere:next",
         "extends": ["cohere:typescript"],
         "plugins": ["@next"],
-        "rulesOn": 305,
+        "rulesOn": 304,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -470,7 +470,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",
@@ -1725,7 +1725,7 @@
         "name": "cohere:react",
         "extends": ["cohere:typescript"],
         "plugins": ["react", "react-hooks"],
-        "rulesOn": 370,
+        "rulesOn": 369,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -1929,7 +1929,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",
@@ -4281,7 +4281,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 294,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4578,7 +4578,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",
@@ -6095,7 +6095,7 @@
         "name": "cohere:system-inc/structure",
         "extends": ["cohere:typescript"],
         "plugins": ["@typescript-eslint"],
-        "rulesOn": 303,
+        "rulesOn": 302,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -6299,7 +6299,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",
@@ -7811,7 +7811,7 @@
     {
         "name": "cohere:tailwind",
         "extends": ["cohere:typescript"],
-        "rulesOn": 294,
+        "rulesOn": 293,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -8015,7 +8015,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",
@@ -9302,7 +9302,7 @@
     {
         "name": "cohere:typescript",
         "extends": ["cohere:adamic", "cohere:style"],
-        "rulesOn": 282,
+        "rulesOn": 281,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -9506,7 +9506,7 @@
             },
             {
                 "name": "@typescript-eslint/no-redeclare",
-                "severity": "error"
+                "severity": "off"
             },
             {
                 "name": "@typescript-eslint/no-redundant-type-constituents",

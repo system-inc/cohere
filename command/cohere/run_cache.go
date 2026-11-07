@@ -501,6 +501,8 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	streams.Show(streams.Output)
 	streams.Errors.Write(spelledOutput(stored.Errors, anchor))
 	streams.Show(streams.Errors)
+	// This invocation's, never the recording's (see ignore_account.go).
+	writeDiscoveredIgnores(streams.Output)
 	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
 	fmt.Fprintf(
 		account,
@@ -516,8 +518,9 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	var summary runSummary
 	if len(stored.Summary) > 0 && json.Unmarshal(spelledOutput(stored.Summary, anchor), &summary) == nil {
 		summary = replayedSummary(summary, time.Since(processStart))
-		// The run on record kept none, since what discovery found beside the project is this run's to say.
-		summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
+		// The run on record kept none, since what discovery found is this run's to say.
+		summary.IgnorePatterns = discoveredIgnores
+		summary.Findings += unusedIgnoreCount(discoveredIgnores)
 		switch activeOutput.Mode {
 		case outputVerbose:
 			fmt.Fprintln(
@@ -672,7 +675,9 @@ func abandonRunCache() {
 
 // finishRunCache ends a run whose exit is a verdict about the tree: it records the run if it may, then
 // exits with the code. Every verdict exit goes through here, or the cache would record a run with the
-// wrong exit code, and a failing tree replayed as exit 0 passes CI while printing a failure.
+// wrong exit code, and a failing tree replayed as exit 0 passes CI while printing a failure. The record keeps
+// the tree's own code and the caller is answered with ignoreVerdict's, since discovery says its dead ignores
+// again on every run, a replayed one included.
 func finishRunCache(exitCode int) {
 	finishOpen()
 	session := activeRunCache
@@ -686,7 +691,7 @@ func finishRunCache(exitCode int) {
 		// does. The table's lock is taken first and held until the table is in place, so a run the caller
 		// starts next waits for this write rather than reading around it. See table_lock.go.
 		release := holdTableLock(session.directory)
-		answered := sendVerdict(streams.Finish(exitCode))
+		answered := sendVerdict(streams.Finish(ignoreVerdict(exitCode)))
 		var recorded *program.RunCache
 		if session.declared && session.declined == "" {
 			recorded = session.record(exitCode)
@@ -700,7 +705,7 @@ func finishRunCache(exitCode int) {
 		// A run nothing records still leaves the types section for the next, after its caller has the answer.
 		pendingTypes = nil
 		release := holdTableLock(record.directory)
-		if sendVerdict(streams.Finish(exitCode)) {
+		if sendVerdict(streams.Finish(ignoreVerdict(exitCode))) {
 			record.computedShapes += graduateSignatures(record.directory, record.shapesGraph, record.shapes)
 		}
 		record.write()

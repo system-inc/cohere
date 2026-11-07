@@ -1,6 +1,7 @@
 package check
 
 import (
+	"bytes"
 	"cmp"
 	"maps"
 	"path/filepath"
@@ -10,15 +11,18 @@ import (
 	"unicode"
 
 	"golang.org/x/tools/go/packages"
+	"golang.org/x/tools/go/types/objectpath"
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 )
 
-// outputDigest is what an importer can read of a package, hashed: its export data written without positions, then
-// every fact it exported, slot by slot in order of slot name, the object facts sorted by objectpath, type and bytes,
-// the package facts by type and bytes. Two runs that give a package the same digest give every importer the same
-// types and the same facts, so an importer whose own inputs did not move need not be analyzed again (see
-// CacheSession.secondKey).
+// outputDigest is what an importer can read of a package, hashed by value: the digest of its API (exportDigest), then
+// every fact it exported, slot by slot in order of slot name, the object facts sorted by objectpath, type and the
+// digest of the fact's value (factValueDigest), the package facts by type and value digest. Two runs that give a
+// package the same digest give every importer the same types and the same facts, so an importer whose own inputs did
+// not move need not be analyzed again (see CacheSession.secondKey). It is never a digest of bytes, since the export
+// data's bytes move with how the package's dependencies were loaded and a fact's with what gob encoded before it,
+// while what an importer reads did not move (#z14ch7c).
 //
 // Positions are left out because a body edit that moves a line moves every later declaration's position, which is in
 // the export data, while what an importer's rules conclude does not depend on it. That rests on a census of every
@@ -31,29 +35,50 @@ import (
 // others), which newFinding drops. And no fact type holds a position. The census sampled two kinds rather than
 // reading every one: a diagnostic placed at an imported object, and a fix that edits another package's file. So the
 // guard is positionDependent, which needs no list: a package with any such finding never takes the second key.
-func outputDigest(exportData []byte, analyses map[string]storedAnalysis) cache.Key {
-	parts := [][]byte{[]byte("output"), exportData}
+func outputDigest(export cache.Key, analyses map[string]analysisFacts) cache.Key {
+	parts := [][]byte{[]byte("output"), export[:]}
 	for _, slot := range slices.Sorted(maps.Keys(analyses)) {
-		stored := analyses[slot]
-		objectFacts := slices.Clone(stored.ObjectFacts)
-		slices.SortFunc(objectFacts, func(left, right storedObjectFact) int {
-			return cmp.Or(cmp.Compare(left.Path, right.Path), cmp.Compare(left.Fact.Type, right.Fact.Type),
-				slices.Compare(left.Fact.Encoded, right.Fact.Encoded))
+		facts := analyses[slot]
+		objectFacts := slices.Clone(facts.objectFacts)
+		slices.SortFunc(objectFacts, func(left, right objectFactDigest) int {
+			return cmp.Or(cmp.Compare(left.path, right.path), compareFactDigests(left.fact, right.fact))
 		})
-		packageFacts := slices.Clone(stored.PackageFacts)
-		slices.SortFunc(packageFacts, func(left, right storedFact) int {
-			return cmp.Or(cmp.Compare(left.Type, right.Type), slices.Compare(left.Encoded, right.Encoded))
-		})
+		packageFacts := slices.Clone(facts.packageFacts)
+		slices.SortFunc(packageFacts, compareFactDigests)
 		parts = append(parts, []byte(slot), []byte(strconv.Itoa(len(objectFacts))))
 		for _, objectFact := range objectFacts {
-			parts = append(parts, []byte(objectFact.Path), []byte(objectFact.Fact.Type), objectFact.Fact.Encoded)
+			parts = append(parts, []byte(objectFact.path), []byte(objectFact.fact.typeName), objectFact.fact.value[:])
 		}
 		parts = append(parts, []byte(strconv.Itoa(len(packageFacts))))
 		for _, packageFact := range packageFacts {
-			parts = append(parts, []byte(packageFact.Type), packageFact.Encoded)
+			parts = append(parts, []byte(packageFact.typeName), packageFact.value[:])
 		}
 	}
 	return cache.DigestOf(parts...)
+}
+
+// analysisFacts are the facts one analyzer exported on one package, as outputDigest reads them: by value.
+type analysisFacts struct {
+	objectFacts  []objectFactDigest
+	packageFacts []factDigest
+}
+
+// objectFactDigest is a fact about one object of the package, by the object's objectpath, as outputDigest reads it.
+type objectFactDigest struct {
+	path objectpath.Path
+	fact factDigest
+}
+
+// factDigest is one fact as outputDigest reads it: its type's name, which factTypeName gives, and the digest of its
+// value (factValueDigest).
+type factDigest struct {
+	typeName string
+	value    cache.Key
+}
+
+// compareFactDigests orders two facts by their type's name, then by their value's digest.
+func compareFactDigests(left factDigest, right factDigest) int {
+	return cmp.Or(cmp.Compare(left.typeName, right.typeName), bytes.Compare(left.value[:], right.value[:]))
 }
 
 // positionDependent reports whether a finding of saved can change with a line of another package: its message names

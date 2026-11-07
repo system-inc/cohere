@@ -97,7 +97,10 @@ type summaryJson struct {
 	FilesInScope int `json:"filesInScope"`
 	Checked      int `json:"checked"`
 	Cached       int `json:"cached"`
-	Nodes        int `json:"nodes"`
+	// TypesOnly is the files an ignore naming the type check matched, beside FilesInScope: type-checked, never
+	// linted or formatted. Absent when there were none.
+	TypesOnly int `json:"typesOnly,omitempty"`
+	Nodes     int `json:"nodes"`
 	// Gaps is every way the run fell short of checking everything. A reader deciding whether a green run
 	// can be trusted reads this, not the verdict alone.
 	Gaps runGaps `json:"gaps"`
@@ -107,6 +110,16 @@ type summaryJson struct {
 	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
 	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
 	Error string `json:"error,omitempty"`
+	// IgnorePatterns is the root's ignorePatterns, each with its reason, kind, file and the paths it matched, then
+	// cohere's defaults, present when the run discovered its project (#cxeq6jw).
+	IgnorePatterns []ignoreAccount `json:"ignorePatterns,omitempty"`
+}
+
+// ignorePatternsJson is the root's ignorePatterns as a record of its own, for a run of several projects, whose
+// summaries are each a project's: the list summaryJson carries for a run of one.
+type ignorePatternsJson struct {
+	Kind           string          `json:"kind"`
+	IgnorePatterns []ignoreAccount `json:"ignorePatterns"`
 }
 
 // phaseJson is one phase's outcome.
@@ -157,9 +170,11 @@ func summaryAsJson(summary runSummary) summaryJson {
 		FilesInScope:      summary.FilesInScope,
 		Checked:           summary.FilesChecked,
 		Cached:            summary.FilesCached,
+		TypesOnly:         summary.FilesTypesOnly,
 		Nodes:             summary.Nodes,
 		Gaps:              summary.Gaps,
 		Adamic:            adamic,
+		IgnorePatterns:    summary.IgnorePatterns,
 	}
 }
 

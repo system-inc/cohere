@@ -22,6 +22,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"iter"
 	"sync"
 
 	"golang.org/x/tools/go/analysis"
@@ -100,14 +101,30 @@ type foreignMethod struct {
 
 // reach is what the rule knows of the packages this one can reach through its imports.
 type reach struct {
-	// methodsByName are every method of every interface and named type those packages declare, by name.
-	methodsByName map[string][]foreignMethod
+	// declared are the methods of every interface and named type those packages declare, by name, one map to each
+	// package that declares any. Each map is its package's alone, so it is shared with every other package of the
+	// load that reaches the same one (see loadDeclarations).
+	declared []map[string][]foreignMethod
 	// packageNames are those packages' names, which a whole-word suggestion must not take.
 	packageNames map[string]bool
 }
 
+// methodsNamed are the methods named name that the reachable packages declare, in no order the rule depends on: a
+// method is fixed by another package when any of them fixes it.
+func methodsNamed(reachable reach, name string) iter.Seq[foreignMethod] {
+	return func(yield func(foreignMethod) bool) {
+		for _, methodsByName := range reachable.declared {
+			for _, method := range methodsByName[name] {
+				if !yield(method) {
+					return
+				}
+			}
+		}
+	}
+}
+
 func run(pass *analysis.Pass) (any, error) {
-	reachable := reachOf(pass.Pkg)
+	reachable := reachOf(declarationsOf(pass.Fset), pass.Pkg)
 	// Counted only once a finding asks, so a package with no abbreviated error pays no second walk.
 	writes := sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(pass) })
 	for _, file := range pass.Files {
@@ -171,7 +188,7 @@ func fixedByAnotherPackage(pass *analysis.Pass, reachable reach, method *types.F
 	}
 	isInterfaceMethod := types.IsInterface(receiver.Type())
 	named := receiverNamed(receiver.Type())
-	for _, candidate := range reachable.methodsByName[method.Name()] {
+	for candidate := range methodsNamed(reachable, method.Name()) {
 		foreign := candidate
 		if candidate.generic != nil {
 			arguments, determined := typeArgumentsOf(candidate, method.Signature())
@@ -296,10 +313,10 @@ func haveSameShape(left *types.Signature, right *types.Signature) bool {
 		left.Variadic() == right.Variadic()
 }
 
-// reachOf walks every package this one reaches through its imports, once per package, and indexes what the rule
-// asks of them.
-func reachOf(current *types.Package) reach {
-	reachable := reach{methodsByName: map[string][]foreignMethod{}, packageNames: map[string]bool{}}
+// reachOf walks every package this one reaches through its imports, once per package, and gathers what the rule
+// asks of them, each package's methods from what the load has already read of it.
+func reachOf(declarations *loadDeclarations, current *types.Package) reach {
+	reachable := reach{packageNames: map[string]bool{}}
 	visited := map[*types.Package]bool{current: true}
 	pending := append([]*types.Package{}, current.Imports()...)
 	for len(pending) > 0 {
@@ -311,37 +328,48 @@ func reachOf(current *types.Package) reach {
 		visited[imported] = true
 		pending = append(pending, imported.Imports()...)
 		reachable.packageNames[imported.Name()] = true
-		for _, name := range imported.Scope().Names() {
-			typeName, isTypeName := imported.Scope().Lookup(name).(*types.TypeName)
-			if !isTypeName || typeName.IsAlias() {
-				continue
-			}
-			// An alias is indexed where the type it names is declared.
-			named, isNamed := typeName.Type().(*types.Named)
-			if !isNamed {
-				continue
-			}
-			// A generic type's methods are compared through an instance, so the type is kept to instantiate.
-			var generic *types.Named
-			if named.TypeParams().Len() > 0 {
-				generic = named
-			}
-			if declaredInterface, isInterface := named.Underlying().(*types.Interface); isInterface {
-				for index := range declaredInterface.NumMethods() {
-					method := declaredInterface.Method(index)
-					reachable.methodsByName[method.Name()] = append(reachable.methodsByName[method.Name()],
-						foreignMethod{method: method, owner: declaredInterface, generic: generic})
-				}
-				continue
-			}
-			for index := range named.NumMethods() {
-				method := named.Method(index)
-				reachable.methodsByName[method.Name()] = append(reachable.methodsByName[method.Name()],
-					foreignMethod{method: method, generic: generic})
-			}
+		if methodsByName := declarations.of(imported); len(methodsByName) > 0 {
+			reachable.declared = append(reachable.declared, methodsByName)
 		}
 	}
 	return reachable
+}
+
+// declaredMethodsOf are the methods of every interface and named type one package declares, by name. Nothing in them
+// depends on the package that reaches it: they are read off the declaring package's own scope, and a generic type's
+// are kept uninstantiated, to be instantiated against the method a finding asks about (typeArgumentsOf).
+func declaredMethodsOf(declaring *types.Package) map[string][]foreignMethod {
+	methodsByName := map[string][]foreignMethod{}
+	for _, name := range declaring.Scope().Names() {
+		typeName, isTypeName := declaring.Scope().Lookup(name).(*types.TypeName)
+		if !isTypeName || typeName.IsAlias() {
+			continue
+		}
+		// An alias is indexed where the type it names is declared.
+		named, isNamed := typeName.Type().(*types.Named)
+		if !isNamed {
+			continue
+		}
+		// A generic type's methods are compared through an instance, so the type is kept to instantiate.
+		var generic *types.Named
+		if named.TypeParams().Len() > 0 {
+			generic = named
+		}
+		if declaredInterface, isInterface := named.Underlying().(*types.Interface); isInterface {
+			for index := range declaredInterface.NumMethods() {
+				method := declaredInterface.Method(index)
+				methodsByName[method.Name()] = append(methodsByName[method.Name()],
+					foreignMethod{method: method, owner: declaredInterface, generic: generic})
+			}
+			continue
+		}
+		for index := range named.NumMethods() {
+			method := named.Method(index)
+			methodsByName[method.Name()] = append(methodsByName[method.Name()],
+				foreignMethod{method: method, generic: generic})
+		}
+	}
+	return methodsByName
 }
 
 // judge reports a declared name the vocabulary finds abbreviated.

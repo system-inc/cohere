@@ -43,10 +43,15 @@ public struct FileSet: Equatable, Sendable {
     /*
      What deciding the set read beyond the targets' files, for the run's inputs record (`RunInputs`): every ignore file
      and git config file consulted, there or not, and every directory the walk for files no target compiles listed.
-     Empty outside a git repository, where nothing is consulted or walked.
+     Outside a git repository that walk reads the package's own ignore files, so these are its.
      */
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
+    /*
+     Every Swift file no target compiles that the walk read to tell whether it is a script, a file of declarations among
+     them, since an edit that gives one top-level code makes it a script the next run checks.
+     */
+    public var filesRead: [String] = []
 
     /* The files of ours a target compiles, which the package's or the Xcode project's types phase checks. */
     public var targetFiles: [OwnedFile] { owned.filter { $0.scriptPlatform == nil } }
@@ -103,16 +108,35 @@ public struct FileSet: Equatable, Sendable {
          holding 56 force unwraps the target files do not. A script whose nearest project is this run's is ours,
          checked alone (`StandaloneScript`, #13nbb1s). Every other is named, so a clean verdict over the targets cannot
          read as a clean verdict over the directory, and a file below a project of its own is left to that project's run.
+
+         Outside a git repository, a `git archive` copy say, the walk reads the package's own ignore files as git would
+         were the package's root a repository's, which is what keeps its build output and dependencies out: before
+         this, no walk ran there, and a copy of ahraos-presence checked neither Glyph script nor named it, 1,342 files
+         where its checkout checks 1,343 (the presence Circle, 2026-11-07). A file a target compiles is still ours there,
+         ignored or not, as the note says.
          */
-        if let ignoreRules {
+        let walkRules =
+            ignoreRules
+            ?? IgnoreRules(
+                repository: IgnoreRules.Repository(root: package.root.resolvingSymlinksInPath(), commonDirectory: nil),
+                environment: environment,
+            )
+        var filesRead: [String] = []
+        do {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
+            /* A scripts-only root walks what discovery walks, which never enters these by name (`neverDescended` in command/cohere). */
+            let scriptsOnly = package.projectKind == .scripts
             let visible = Set(
-                ignoreRules.visibleFiles(
+                walkRules.visibleFiles(
                     under: resolvedRoot,
                     skipping: Self.buildScratches(of: package),
-                    skippingWhere: Self.isCohereCache,
+                    skippingWhere: { directory in
+                        Self.isCohereCache(directory)
+                            || (scriptsOnly
+                                && Self.neverEnteredAtScriptsRoot.contains((directory as NSString).lastPathComponent))
+                    },
                 )
             )
             let coveredRoots = Dictionary(
@@ -127,6 +151,19 @@ public struct FileSet: Equatable, Sendable {
             var scriptModules = Set<String>()
             for path in visible.sorted()
             where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
+                let packageRoot = Self.coveringRoot(
+                    of: path,
+                    resolvedRoot: resolvedRoot,
+                    coveredRoots: coveredRoots,
+                    projectDirectories: &projectDirectories,
+                )
+                /*
+                 At a scripts-only root a file below a project is that project's, by the rule discovery claims by, and that
+                 project runs on its own or is covered by one that does, so it is not this run's to name.
+                 */
+                if scriptsOnly && packageRoot == nil {
+                    continue
+                }
                 let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
                 if underVendor || path.hasSuffix("/Package.swift") {
                     excluded.append(
@@ -135,17 +172,11 @@ public struct FileSet: Equatable, Sendable {
                     continue
                 }
                 let url = URL(fileURLWithPath: path)
-                guard
-                    let packageRoot = Self.coveringRoot(
-                        of: path,
-                        resolvedRoot: resolvedRoot,
-                        coveredRoots: coveredRoots,
-                        projectDirectories: &projectDirectories,
-                    )
-                else {
+                guard let packageRoot else {
                     excluded.append(.init(file: path, reason: Self.notCompiledReason))
                     continue
                 }
+                filesRead.append(path)
                 guard let source = try? String(contentsOf: url, encoding: .utf8) else {
                     excluded.append(.init(file: path, reason: Self.unreadableReason))
                     continue
@@ -178,11 +209,12 @@ public struct FileSet: Equatable, Sendable {
 
         let note =
             ignoreRules == nil
-            ? "not a git repository, so every file a target compiles was treated as ours"
+            ? "not a git repository, so every file a target compiles was treated as ours, and the Swift files no target compiles were found by the package's own ignore files"
             : ""
         var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
-        fileSet.ignoreFilesConsulted = (ignoreRules?.filesConsulted ?? []).sorted()
-        fileSet.directoriesListed = ignoreRules?.directoriesListed ?? []
+        fileSet.ignoreFilesConsulted = walkRules.filesConsulted.sorted()
+        fileSet.directoriesListed = walkRules.directoriesListed
+        fileSet.filesRead = filesRead
         return fileSet
     }
 
@@ -192,6 +224,9 @@ public struct FileSet: Equatable, Sendable {
      below a project of its own is given, and that project's run accounts for it.
      */
     static let notCompiledReason = "no target of this package compiles it"
+
+    /* The directories discovery never enters, whatever any ignore file says, which a scripts-only root's walk skips too. */
+    static let neverEnteredAtScriptsRoot: Set<String> = ["node_modules", ".build", ".cache", ".git", "testdata"]
     static let unreadableReason =
         "no target of this package compiles it, and it could not be read as UTF-8 to tell whether it is a script"
     static let declarationsOnlyReason =

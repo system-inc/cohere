@@ -19,6 +19,13 @@ struct SymbolProvider {
         var unavailable: [String: String]
         var fromIndex: Int
         var fromSourcekitd: Int
+        /* The record each file the index described was read from, by path; a file sourcekitd described has none. */
+        var records: [String: IndexStore.FreshRecord.Identity] = [:]
+        /*
+         The files whose verdict the caller already holds under the record that describes them as they stand, by path,
+         with that record. Their records were not read, and they have no symbols here.
+         */
+        var replayed: [String: IndexStore.FreshRecord.Identity] = [:]
     }
 
     /* Every build whose index and compile commands may describe a file (`Pipeline.symbolLayouts`). */
@@ -26,21 +33,73 @@ struct SymbolProvider {
     let runner: ProcessRunner
     /* Handed to every file's symbols, so a rule can tell our declarations from a dependency's. */
     var ownedModules: Set<String> = []
+    /* How the demangler is loaded: the process's own, or a test's loader that fails, to drive the path where none loads. */
+    var loadDemangler: (ProcessRunner) throws -> SwiftDemangler = { try SwiftDemangler.shared(runner: $0) }
 
-    func symbols(for files: [ParsedFile]) -> Result {
+    /*
+     `replaying` is asked, for each file the index can vouch for, whether the caller holds the file's verdict under the
+     record that would be read (`LintVerdictCache`); a file it answers yes for is not read. A file only sourcekitd can
+     describe is never offered, since no record stands for what sourcekitd would say.
+     */
+    func symbols(
+        for files: [ParsedFile],
+        replaying: (ParsedFile, IndexStore.FreshRecord.Identity) -> Bool = { _, _ in false },
+    ) -> Result {
         var result = Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
         guard !files.isEmpty else { return result }
+        /*
+         The demangler tells the standard library's declarations from an extension of ours on its types
+         (`FileSymbols.Occurrence.isStandardLibrary`), so a file is judged only once it is loaded. Without it, no file
+         is: each says why, as a file no source could describe does.
+         */
+        let demangler: SwiftDemangler
+        do {
+            demangler = try loadDemangler(runner)
+        }
+        catch {
+            for file in files {
+                result.unavailable[file.url.path] =
+                    "the demangler that tells the standard library's declarations from ours could not load: \(error)"
+            }
+            return result
+        }
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
             stores = layouts.compactMap {
                 try? IndexStore(libraryPath: library, storePath: IndexStore.storePath(layout: $0))
             }
         }
+        var toRead: [(file: ParsedFile, candidates: [IndexStore.FreshRecord])] = []
+        /*
+         A kept verdict must name the record a read would answer from: the first fresh record whose reader opens, not
+         merely the first, since a read passes over a record deleted or damaged under a unit that still names it. Only
+         the files the caller holds a verdict for under one of their records are opened to find it.
+         */
+        var offered: [(file: ParsedFile, candidates: [IndexStore.FreshRecord])] = []
+        for (file, candidates) in zip(files, IndexStore.freshRecords(of: files.map(\.url), in: stores)) {
+            if candidates.contains(where: { replaying(file, $0.identity) }) {
+                offered.append((file, candidates))
+            }
+            else {
+                toRead.append((file, candidates))
+            }
+        }
+        for ((file, candidates), chosen) in zip(offered, IndexStore.readableRecords(in: offered.map(\.candidates))) {
+            if let chosen, replaying(file, chosen.identity) {
+                result.replayed[file.url.path] = chosen.identity
+            }
+            else {
+                toRead.append((file, candidates))
+            }
+        }
         var needSourcekitd: [ParsedFile] = []
-        for (file, indexed) in zip(files, IndexStore.symbols(of: files.map(\.url), in: stores)) {
-            if var found = indexed {
+        for (file, read) in zip(toRead.map(\.file), IndexStore.symbols(in: toRead.map(\.candidates))) {
+            if let read {
+                var found = read.symbols
                 found.ownedModules = ownedModules
+                found.demangler = demangler
                 result.symbols[file.url.path] = found
+                result.records[file.url.path] = read.record.identity
                 result.fromIndex += 1
             }
             else {
@@ -85,6 +144,7 @@ struct SymbolProvider {
                     arguments: command.arguments,
                 )
                 found.ownedModules = ownedModules
+                found.demangler = demangler
                 result.symbols[file.url.path] = found
                 result.fromSourcekitd += 1
             }

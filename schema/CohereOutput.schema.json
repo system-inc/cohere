@@ -7,6 +7,7 @@
         { "$ref": "#/$defs/changedFile" },
         { "$ref": "#/$defs/crash" },
         { "$ref": "#/$defs/engineBuild" },
+        { "$ref": "#/$defs/ignorePatterns" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -62,6 +63,50 @@
                 "seconds": { "type": "number", "description": "How long the build took." }
             }
         },
+        "ignoreEntry": {
+            "description": "One entry of the root settings' ignorePatterns, or one of cohere's defaults, as this run's discovery counted it.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pattern", "file", "matched"],
+            "properties": {
+                "pattern": { "type": "string", "description": "The glob." },
+                "reason": {
+                    "type": "string",
+                    "description": "Why the paths are never checked. Absent when none was given."
+                },
+                "kind": {
+                    "enum": ["input", "generated", "thirdParty"],
+                    "description": "What the paths are. Absent when none was given."
+                },
+                "check": {
+                    "enum": ["types"],
+                    "description": "A check that still reads the paths. Absent when none was named."
+                },
+                "file": {
+                    "type": "string",
+                    "description": "The settings file that wrote the entry, as an absolute path, or the set's name, such as cohere:next, or cohere for one of its defaults."
+                },
+                "default": {
+                    "type": "boolean",
+                    "description": "One of cohere's defaults, written by no settings file: testdata, which the Go engine and the format walk never enter, and Vendor, which the format walk and the Swift engine never enter. Each holds only there, so a file a tsconfig includes under either is still type-checked and linted, and neither is ever a finding. Absent for an entry a settings file or set wrote."
+                },
+                "matched": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The paths it matched, files and directories it takes whole, among every entry of every directory discovery read before any ignore applied, inside repositories of their own too, and, for an entry the walk found nothing for, at and below the path it names. Zero for an entry a settings file wrote, unless its kind is generated, is a finding, correctness-no-unused-ignore, which fails the run."
+                }
+            }
+        },
+        "ignorePatterns": {
+            "description": "The root settings' ignorePatterns, in a run of several projects, whose summaries are each a project's: the list a run of one carries on its summary. Written once, before the projects' lines.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ignorePatterns"],
+            "properties": {
+                "kind": { "const": "ignorePatterns" },
+                "ignorePatterns": { "type": "array", "items": { "$ref": "#/$defs/ignoreEntry" } }
+            }
+        },
         "crash": {
             "description": "A rule that could not finish a file, or a file nothing could check, because cohere crashed. A bug in cohere, not in the code checked, and it fails the run.",
             "type": "object",
@@ -115,6 +160,11 @@
                 "error": {
                     "type": "string",
                     "description": "Why the run stopped before it could judge anything, such as a tsconfig that does not load, in the words the human view prints. Present only then, and the verdict is fail."
+                },
+                "ignorePatterns": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/ignoreEntry" },
+                    "description": "The root settings' ignorePatterns, then cohere's defaults, when the run discovered its project. findings counts each dead one, an entry a settings file wrote that matched nothing and whose kind is not generated."
                 },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },
@@ -226,6 +276,10 @@
                 },
                 "checked": { "type": "integer", "description": "The files examined fresh this run." },
                 "cached": { "type": "integer", "description": "The files the cache answered for." },
+                "typesOnly": {
+                    "type": "integer",
+                    "description": "The files an ignorePatterns entry naming \"check\": \"types\" matched, beside filesInScope and not in it: type-checked, their type errors reported, and never linted or formatted. Absent when there were none. A file only plain entries match is in no count, since it is never checked at all."
+                },
                 "nodes": {
                     "type": "integer",
                     "description": "The syntax nodes walked this run, in the checked files."
@@ -311,25 +365,6 @@
                         "fixesHeld": {
                             "type": "boolean",
                             "description": "Lint fixes were held because an input the program was told to load is missing: a generated file, or an import, reference or types entry that resolves to nothing. None was proposed or written, and formatting ran alone. Absent otherwise."
-                        },
-                        "unclaimedSwift": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": false,
-                                "required": ["directory", "files"],
-                                "properties": {
-                                    "directory": {
-                                        "type": "string",
-                                        "description": "The shallowest directory under the discovery root holding the files, ending in a slash, or \".\" for files directly in the root."
-                                    },
-                                    "files": {
-                                        "type": "integer",
-                                        "description": "The .swift files below it that no Swift package holds."
-                                    }
-                                }
-                            },
-                            "description": "Directories of .swift files beside the project that no Swift package holds, so nothing checked them, found by a run from the repository that discovered this one project. They fail nothing. Absent when there are none."
                         },
                         "uncheckedSwift": {
                             "type": "array",

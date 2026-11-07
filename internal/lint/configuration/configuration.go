@@ -17,8 +17,12 @@ type Configuration struct {
 	// Rules is the base configuration, applying to every file not excluded.
 	Rules map[string]RuleSetting
 
-	// IgnorePatterns are paths no rule runs on at all.
+	// IgnorePatterns are paths no rule runs on at all: each of IgnoreEntries' globs, in the same order.
 	IgnorePatterns []string
+
+	// IgnoreEntries are the chain's `ignorePatterns` whole, the base's first: each glob with its reason, kind and
+	// check when its author gave them, and the file that wrote it. What reports an ignore reads these.
+	IgnoreEntries []IgnoreEntry
 
 	// Overrides apply in order, later blocks winning over earlier ones, which is how both ESLint and
 	// oxlint resolve them. Order is preserved rather than sorted for exactly this reason.
@@ -136,11 +140,15 @@ func (configuration *Configuration) globs() *configurationGlobs {
 		return compiled
 	}
 	compiled := &configurationGlobs{
-		ignore:    make([]glob, len(configuration.IgnorePatterns)),
-		overrides: make([][]glob, len(configuration.Overrides)),
+		ignore:      make([]glob, len(configuration.IgnorePatterns)),
+		ignoreTypes: make([]bool, len(configuration.IgnorePatterns)),
+		overrides:   make([][]glob, len(configuration.Overrides)),
 	}
 	for index, pattern := range configuration.IgnorePatterns {
 		compiled.ignore[index] = compileGlob(pattern)
+		// A configuration built with patterns alone, as a test's is, has no entries, and no entry keeps types.
+		compiled.ignoreTypes[index] = index < len(configuration.IgnoreEntries) &&
+			configuration.IgnoreEntries[index].Check == IgnoreCheckTypes
 	}
 	for index, override := range configuration.Overrides {
 		compiled.overrides[index] = make([]glob, len(override.Files))
@@ -181,10 +189,24 @@ func (configuration *Configuration) Resolve(path string) Resolved {
 	segments := splitPath(configuration.relativePath(path))
 	globs := configuration.globs()
 
+	// Every pattern is asked, not just the first that matches, because an entry naming the type check keeps it
+	// whichever entry matched first: one written to keep types says so of its paths, and a broader plain entry
+	// beside it, `legacy/**` against `legacy/models/**`, is no ruling that they lose it (#cxeq6jw).
+	ignored := Resolved{}
 	for index, pattern := range globs.ignore {
-		if pattern.matches(segments) {
-			return Resolved{Ignored: true, IgnoredBy: configuration.IgnorePatterns[index]}
+		if !pattern.matches(segments) {
+			continue
 		}
+		if !ignored.Ignored || (globs.ignoreTypes[index] && !ignored.TypesOnly) {
+			ignored = Resolved{
+				Ignored:   true,
+				IgnoredBy: configuration.IgnorePatterns[index],
+				TypesOnly: globs.ignoreTypes[index],
+			}
+		}
+	}
+	if ignored.Ignored {
+		return ignored
 	}
 
 	// The match, as the indices of the overrides that apply, in order. On the stack for the common case

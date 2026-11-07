@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/system-inc/cohere/internal/go_rename/rename"
@@ -174,6 +176,10 @@ type Expectation struct {
 type Verification struct {
 	Compared   int
 	Mismatches []Mismatch
+	// Packages counts the root packages of the load compared, and Files holds every file they type-checked, by
+	// absolute path, which only a platform's proof sets: a file no proof holds was proven by none.
+	Packages int
+	Files    map[string]bool
 }
 
 // Apply rewrites the files the result's edits touch, proves the result before writing any of it, and writes only
@@ -219,7 +225,7 @@ func Apply(
 	)
 	mismatches := len(verification.Mismatches)
 	for _, platform := range result.platforms {
-		platformMismatches, platformError := verifyPlatform(loaded, platform, files, expectation.newNameAt, output)
+		platformMismatches, platformError := verifyPlatform(loaded, platform, files, expectation, output)
 		if platformError != nil {
 			return 0, fmt.Errorf("%w (nothing written)", platformError)
 		}
@@ -344,65 +350,76 @@ func expectedFingerprint(loaded *workspace.Workspace, newNameAt map[rename.EditK
 	return &Expectation{Fingerprints: expected, Offsets: offsets, newNameAt: newNameAt}
 }
 
-// verifyPlatform proves the rewrite under one platform: it loads the tree as the platform builds it, before and
-// with the rewrite in memory, and requires every package that type-checked before to type-check after, every
-// identifier in it to resolve to the same declaration, under its expected name. It returns the mismatches.
+// verifyPlatform proves the rewrite under one platform (provePlatform) through workspace's own platform load, and
+// reports each mismatch and the count. It returns the mismatches, or the error of a load that failed.
 func verifyPlatform(
 	loaded *workspace.Workspace,
 	platform workspace.Platform,
 	overlay map[string][]byte,
-	newNameAt map[rename.EditKey]string,
+	expectation *Expectation,
 	output *bufio.Writer,
 ) (int, error) {
-	before, beforeError := platformExpectation(loaded, platform, newNameAt)
-	if beforeError != nil {
-		return 0, beforeError
+	verification, proveError := provePlatform(loaded.LoadPlatform, platform, overlay, expectation.newNameAt)
+	if proveError != nil {
+		return 0, proveError
 	}
-	afterLoad, afterError := loaded.LoadPlatform(platform, overlay)
-	if afterError != nil {
-		return 0, afterError
-	}
-	mismatches := 0
-	for id := range before.Fingerprints {
-		if reason, failed := afterLoad.Failed[id]; failed {
-			fmt.Fprintf(
-				output,
-				"mismatch: package %s type-checks as %s before the rewrite and not after: %s\n",
-				id,
-				platform,
-				reason,
-			)
-			mismatches++
-			delete(before.Fingerprints, id)
-		}
-	}
-	after, _ := Fingerprint(afterLoad.Clean)
-	verification := compareFingerprints(before, after)
 	reportMismatches(verification.Mismatches, output)
-	mismatches += len(verification.Mismatches)
 	fmt.Fprintf(
 		output,
 		"re-verification as %s: %d identifiers compared across %d packages, %d mismatches\n",
 		platform,
 		verification.Compared,
-		len(afterLoad.Clean.Roots),
-		mismatches,
+		verification.Packages,
+		len(verification.Mismatches),
 	)
-	return mismatches, nil
+	return len(verification.Mismatches), nil
 }
 
-// platformExpectation is the expected fingerprint of the tree as platform builds it, from a load of its own that
-// is let go before the rewrite is loaded: the loads are several gigabytes each.
-func platformExpectation(
-	loaded *workspace.Workspace,
+// provePlatform proves the rewrite under one platform: it loads the tree as the platform builds it, before and with
+// the rewrite in memory, and requires every package that type-checked before to type-check after, and every
+// identifier in it to resolve to the same declaration, under its expected name. Nothing reads the load before once
+// its fingerprint is taken, so it is collected before the rewrite loads: the loads are several gigabytes each. A
+// package that fails after is a PlatformPackage
+// mismatch, by ID, and every mismatch names the platform.
+func provePlatform(
+	loadPlatform func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error),
 	platform workspace.Platform,
+	overlay map[string][]byte,
 	newNameAt map[rename.EditKey]string,
-) (*Expectation, error) {
-	load, loadError := loaded.LoadPlatform(platform, nil)
-	if loadError != nil {
-		return nil, loadError
+) (Verification, error) {
+	beforeLoad, beforeError := loadPlatform(platform, nil)
+	if beforeError != nil {
+		return Verification{}, beforeError
 	}
-	return expectedFingerprint(load.Clean, newNameAt), nil
+	before := expectedFingerprint(beforeLoad.Clean, newNameAt)
+	afterLoad, afterError := loadPlatform(platform, overlay)
+	if afterError != nil {
+		return Verification{}, afterError
+	}
+	var verification Verification
+	for _, id := range slices.Sorted(maps.Keys(before.Fingerprints)) {
+		if reason, failed := afterLoad.Failed[id]; failed {
+			verification.Mismatches = append(verification.Mismatches, Mismatch{
+				Kind: MismatchKindPlatformPackage, Package: id, Platform: platform.String(), Reason: reason,
+			})
+			delete(before.Fingerprints, id)
+		}
+	}
+	after, _ := Fingerprint(afterLoad.Clean)
+	compared := compareFingerprints(before, after)
+	for index := range compared.Mismatches {
+		compared.Mismatches[index].Platform = platform.String()
+	}
+	verification.Compared = compared.Compared
+	verification.Mismatches = append(verification.Mismatches, compared.Mismatches...)
+	verification.Packages = len(afterLoad.Clean.Roots)
+	verification.Files = map[string]bool{}
+	for _, rootsPackage := range afterLoad.Clean.Roots {
+		for _, file := range rootsPackage.Syntax {
+			verification.Files[filepath.Clean(rootsPackage.Fset.PositionFor(file.Pos(), false).Filename)] = true
+		}
+	}
+	return verification, nil
 }
 
 // compareFingerprints compares every identifier the expectation holds with after, and returns how many it compared

@@ -67,6 +67,10 @@ type runSummary struct {
 	FilesInScope int
 	FilesChecked int
 	FilesCached  int
+	// FilesTypesOnly is the files an ignore naming `"check": "types"` matched, beside FilesInScope and not in it:
+	// type-checked, and never linted or formatted, so a reader sees how much of the program only the type check
+	// reads (#cxeq6jw). A file a plain ignore matched is in neither, since it is never checked at all.
+	FilesTypesOnly int
 	// Nodes is the syntax nodes walked this run, so only in the checked files.
 	Nodes int
 
@@ -85,6 +89,11 @@ type runSummary struct {
 	// EngineBuilds are the engines this invocation built before it checked, which no record or replay keeps,
 	// since a build is this invocation's (engine_build.go).
 	EngineBuilds []engineBuild `json:"-"`
+
+	// IgnorePatterns are the root's ignorePatterns as this invocation's discovery counted them, which no record
+	// keeps, since discovery runs again on every run (ignore_account.go). Findings already counts each dead one
+	// (unused_ignore.go).
+	IgnorePatterns []ignoreAccount `json:"-"`
 }
 
 // ruleSkip is a rule that declined every file it was offered: why, and the check that reports the same
@@ -215,10 +224,6 @@ type runGaps struct {
 	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
 	// None was proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
-	// UnclaimedSwift is the directories of Swift files no package holds that discovery found beside the one
-	// project it ran here (#ybspptb). Nothing checked them, and the run neither fails nor passes on them. It
-	// is this invocation's walk, never recorded, so a replay says what its own walk found.
-	UnclaimedSwift []unclaimedSwiftDirectory `json:"unclaimedSwift,omitempty"`
 	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
 	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
 	// them and they are no standalone script the run checks alone (#13nbb1s), less those the runs of the Swift

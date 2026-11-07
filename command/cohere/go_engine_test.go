@@ -158,7 +158,8 @@ func runRealCohereAtAGoRoot(test *testing.T, environment ...string) (string, int
 	defer cancel()
 	command := exec.CommandContext(deadline, binary, "--no-fix")
 	command.Dir = root
-	command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_RUN_CACHE=off")
+	// Never a replay: the run record lives in the root's own .cache/cohere, and the root is new.
+	command.Env = withoutVariable(os.Environ(), goEngineChildVariable)
 	command.Env = append(command.Env, environment...)
 	output, runError := command.CombinedOutput()
 	if deadline.Err() != nil {

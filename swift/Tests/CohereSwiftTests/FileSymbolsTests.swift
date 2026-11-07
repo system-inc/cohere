@@ -1,3 +1,5 @@
+import Foundation
+import SwiftParser
 import Testing
 
 @testable import CohereSwift
@@ -37,6 +39,21 @@ struct FileSymbolsTests {
         )
     }
 
+    /*
+     A member of a constrained extension of ours on a standard library type is ours (#awb2ykk). Its symbol puts the
+     extension's generic signature between our module and the `E` that marks the extension (`SiRsz` is
+     `Element == Int`), which the demangler reads and a reading of the mangling did not. The standard library's own
+     members of the same types still are its own. Red under the reading that expected the `E` right after the module.
+     */
+    @Test func aConstrainedExtensionOfOursIsNot() {
+        #expect(!Self.isStandardLibrary("s:Sa7ControlSiRszlE5countSivp"), "Array where Element == Int")
+        #expect(!Self.isStandardLibrary("s:SD7ControlSSRszrlE5countSivp"), "Dictionary where Key == String")
+        #expect(!Self.isStandardLibrary("s:Sh7ControlSiRszlE5countSivp"), "Set where Element == Int")
+        #expect(Self.isStandardLibrary("s:Sa5countSivp"))
+        #expect(Self.isStandardLibrary("s:SD5countSivp"))
+        #expect(Self.isStandardLibrary("s:Sh5countSivp"))
+    }
+
     @Test func ourOwnDeclarationsAreNot() {
         #expect(!Self.isStandardLibrary("s:7Control5TallyV5countSivp"))
         #expect(!Self.isStandardLibrary("c:objc(cs)NSArray(py)count"))
@@ -63,5 +80,60 @@ struct FileSymbolsTests {
             isReference: true,
         )
         #expect(standard.declaringModule == nil)
+    }
+    /*
+     A symbol that names a standard library type and that the demangler places in no module (a hand-made one here) is
+     of unknown origin. empty-count, which asks of it, says nothing of the comparison it decides, and the file is
+     reported unchecked by that rule, naming the symbol: never clean and never flagged. The comparison beside it on
+     the standard library's own `count` is still flagged. Red under a reading that takes an unplaced symbol for one
+     not the standard library's without saying so.
+     */
+    @Test func aSymbolNobodyCanPlaceIsUncheckedNeverClean() async throws {
+        let source = "func checks(items: [Int], tally: [Int]) -> Bool {\n    items.count == 0 || tally.count == 0\n}\n"
+        let url = URL(fileURLWithPath: "/package/Sources/A/Checks.swift")
+        let file = ParsedFile(
+            url: url,
+            targetName: "A",
+            targetKind: "library",
+            source: source,
+            tree: Parser.parse(source: source),
+            nodeCount: 1,
+        )
+        let unplaceable = "s:Sa_unplaceable"
+        #expect(
+            FileSymbols.Occurrence(line: 2, column: 11, symbol: unplaceable, name: "count", isReference: true).origin
+                == .unplaced,
+            "the control: the demangler places this symbol nowhere",
+        )
+        var linter = Linter(configuration: RuleConfiguration(severities: [:], note: ""), fileRules: [])
+        linter.typedRules = [EmptyCount()]
+        linter.symbols = SymbolProvider.Result(
+            symbols: [
+                url.path: FileSymbols([
+                    FileSymbols.Occurrence(line: 2, column: 11, symbol: unplaceable, name: "count", isReference: true),
+                    FileSymbols.Occurrence(
+                        line: 2,
+                        column: 31,
+                        symbol: "s:Sa5countSivp",
+                        name: "count",
+                        isReference: true,
+                    ),
+                ])
+            ],
+            unavailable: [:],
+            fromIndex: 1,
+            fromSourcekitd: 0,
+        )
+        let package = try PackageModel(
+            root: PackageModelTests.root,
+            describeJson: PackageModelTests.describe(targets: ["A"]),
+            dumpPackageJson: PackageModelTests.dump(tools: "6.4.0"),
+        )
+        let result = await linter.run(package: package, manifests: [:], files: [file])
+        let flagged = result.findings.filter { $0.rule == EmptyCount().name }.map { "\($0.line):\($0.column)" }
+        #expect(flagged == ["2:25"], "only the standard library's count is flagged: \(flagged)")
+        let crash = try #require(result.record.crashes.first { $0.file == url.path }, "the file was reported clean")
+        #expect(crash.error.contains(EmptyCount().name) && crash.error.contains(unplaceable), "\(crash.error)")
+        #expect(result.verdicts[url.path]?.typedUnplaced == [EmptyCount().name: [unplaceable]])
     }
 }

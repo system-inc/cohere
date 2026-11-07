@@ -13,6 +13,7 @@
 package consistency_no_useless_concatenation
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -32,7 +34,8 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a + between two string literals on one line, since nothing is computed between them and one literal " +
 		"says the same with no operator to follow. A join across lines, which is how a long string is wrapped, is " +
 		"left alone, and so is a raw literal joined to an interpreted one whose texts cannot be pasted into one.",
-	Run: run,
+	Requires: []*analysis.Analyzer{positions.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry. It reads no type information: a + with a string literal
@@ -42,6 +45,10 @@ var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Ana
 var uselessConcatenationMessage = policy.MessageOf(Name, "uselessConcatenation")
 
 func run(pass *analysis.Pass) (any, error) {
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			binary, isBinary := node.(*ast.BinaryExpr)
@@ -49,7 +56,7 @@ func run(pass *analysis.Pass) (any, error) {
 				return true
 			}
 			left, right, joins := JoinedLiterals(binary)
-			if !joins || !onOneLine(pass, left, right) {
+			if !joins || !onOneLine(table, left, right) {
 				return true
 			}
 			// The operator rather than the expression, as the core port reports, so a chain's findings point at the
@@ -120,9 +127,9 @@ func stringLiteral(expression ast.Expr) (*ast.BasicLit, bool) {
 
 // onOneLine is whether left ends on the line right starts on, the core port's test. The lines are the file's own, not
 // those a //line directive gives it, since a directive between the operands would otherwise move one of them onto
-// another's line or off it.
-func onOneLine(pass *analysis.Pass, left *ast.BasicLit, right *ast.BasicLit) bool {
-	return pass.Fset.PositionFor(left.End(), false).Line == pass.Fset.PositionFor(right.Pos(), false).Line
+// another's line or off it. table reads both lines without the FileSet's lock, which every join would take.
+func onOneLine(table *positions.Table, left *ast.BasicLit, right *ast.BasicLit) bool {
+	return table.Line(left.End()) == table.Line(right.Pos())
 }
 
 // pasteIntoOne is whether the two literals' texts, set side by side, are one literal that holds what the join does,

@@ -13,8 +13,8 @@
 package consistency_no_stuttering_name
 
 import (
+	"fmt"
 	"go/ast"
-	"go/token"
 	"go/types"
 	"unicode"
 	"unicode/utf8"
@@ -22,6 +22,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -36,7 +37,8 @@ var Analyzer = &analysis.Analyzer{
 		"thing): result.Result, outcome.Outcome(). The variable must be one this package declares, so an imported " +
 		"package, a type's method expression, a dot-imported variable and a variable a generated file declares are " +
 		"left alone.",
-	Run: run,
+	Requires: []*analysis.Analyzer{positions.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -60,12 +62,17 @@ var genericNames = map[string]bool{
 }
 
 func run(pass *analysis.Pass) (any, error) {
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	// A variable declared in a generated file has its generator's name, and a rename by hand is undone on the next
-	// run, so a stutter on one is no finding even where a hand-written file uses it.
-	generatedFiles := map[*token.File]bool{}
+	// run, so a stutter on one is no finding even where a hand-written file uses it. The files are held by name, which
+	// table reads for a variable without the FileSet's lock.
+	generatedFiles := map[string]bool{}
 	for _, file := range pass.Files {
 		if ast.IsGenerated(file) {
-			generatedFiles[pass.Fset.File(file.Pos())] = true
+			generatedFiles[table.Position(file.Pos()).Filename] = true
 		}
 	}
 	for _, file := range pass.Files {
@@ -87,7 +94,7 @@ func run(pass *analysis.Pass) (any, error) {
 			// it must be one this package declared, outside a generated file: a dot-imported variable is another
 			// package's name, reached bare.
 			variable, isVariable := pass.TypesInfo.Uses[base].(*types.Var)
-			if !isVariable || variable.Pkg() != pass.Pkg || generatedFiles[pass.Fset.File(variable.Pos())] {
+			if !isVariable || variable.Pkg() != pass.Pkg || generatedFiles[table.Position(variable.Pos()).Filename] {
 				return true
 			}
 			pass.Report(analysis.Diagnostic{

@@ -124,7 +124,7 @@ func applyProposedFixes(
 		if graph != nil {
 			programs.offer(graph)
 		}
-		speculation = speculateFormat(formatCandidates, transform, maximumPasses, &programs)
+		speculation = speculateFormat(formatCandidates, transform, maximumPasses, write, &programs)
 	}
 
 	var result program.Result
@@ -146,7 +146,12 @@ func applyProposedFixes(
 	if early != nil {
 		speculation = early.speculationOf()
 	}
-	if graph != nil && graph.FusedCheck != nil {
+	// Nothing else wants the cores now on a run whose walk did the type check, and on a run with no program, which
+	// has no walk to overlap and no type check beside it, so formatInParallel takes what the speculation has not
+	// begun on every core. Left running, a quarter of them set the run's end: on a copy of adamic,
+	// `--no-fix --no-cache --format-only` spent 61 CPU-seconds in 28 to 38s of wall (#9h6g0s3). A run with a
+	// program and no fused check keeps its speculation, since its type check is still running beside it.
+	if graph == nil || graph.FusedCheck != nil {
 		speculation.stop()
 	}
 
@@ -740,13 +745,14 @@ func walkNode(node *ast.Node, listeners rule.Listeners) {
 // Measured on ahra (#679s763), the pass after the walk was 0.5 to 0.6s of a 3.2s cold run, and starting it
 // early takes about 0.17s off: the rest is the type check, which then sets the run (speculationWorkers).
 //
-// It never writes. Each attempt goes through edit.CheckFile, and only a file its formatting left unchanged is
-// kept, which is the common case: on a cold run nearly every file is already formatted. A file the printer
-// changed is discarded, whether it came back refused (a TypeScript file, whose rules would be asked about the
-// printed text) or simply changed (a markdown, css or json file, which has none), and is left to the path
-// after the walk, which writes it. A file the walk then proposes a fix for, or whose bytes are not
-// the ones the walk read, is discarded too (keepable), so what is kept is exactly what formatInParallel would
-// have computed, and everything else is computed as it always was.
+// It never writes. Each attempt goes through edit.CheckFile, and a file its formatting left unchanged is kept,
+// which is the common case: on a cold run nearly every file is already formatted. A file the printer changed is
+// discarded where it came back refused (a TypeScript file, whose rules would be asked about the printed text),
+// and, on a run that writes, where it simply changed (a markdown, css or json file, which has none), since the
+// path after the walk is what writes it. On a run that writes nothing, write false, that changed file is kept:
+// the path after the walk would only check it again, as edit.CheckFile, to the same result. A file the walk then
+// proposes a fix for, or whose bytes are not the ones the walk read, is discarded too (keepable), so what is kept
+// is exactly what formatInParallel would have computed, and everything else is computed as it always was.
 //
 // A TypeScript file is formatted from the program's own tree where the program has one of exactly the bytes read,
 // already bound, rather than parsed twice more, once by the fix engine's guard and once by the printer (#dk2502g).
@@ -757,9 +763,10 @@ func speculateFormat(
 	candidates []string,
 	transform edit.Transform,
 	maximumPasses int,
+	write bool,
 	programs *programOffer,
 ) *formatSpeculation {
-	return speculateFormatOn(candidates, transform, maximumPasses, speculationWorkers(), programs)
+	return speculateFormatOn(candidates, transform, maximumPasses, speculationWorkers(), write, programs)
 }
 
 // speculateFormatOn is speculateFormat on a given number of workers.
@@ -768,6 +775,7 @@ func speculateFormatOn(
 	transform edit.Transform,
 	maximumPasses int,
 	workers int,
+	write bool,
 	programs *programOffer,
 ) *formatSpeculation {
 	speculation := &formatSpeculation{
@@ -840,16 +848,26 @@ func speculateFormatOn(
 						maximumPasses,
 					)
 				}
-				// Only an unchanged result is final this early. A changed one is left to the path after the
-				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
-				// the printer changed comes back changed rather than refused, and keeping it would report a
-				// rewrite that this check, which writes nothing, never made.
-				if errors.Is(checkError, errorRelintRefused) || checkError == nil && result.Changed {
+				// A changed result is final this early only where the path after the walk would compute it
+				// again and do nothing else with it. On a run that writes, that path writes it, and keeping it
+				// would report a rewrite that this check, which writes nothing, never made, so it is left
+				// there. On a run that writes nothing, that path is edit.CheckFile too, and for a markdown,
+				// css or json file, which has no rules to re-lint, it formats the same bytes to the same
+				// result. On a copy of adamic, where about 4,900 such files would change, keeping them took
+				// `--no-fix --format-only` from 115 to 61 CPU-seconds. A TypeScript file's changed result is
+				// discarded on every run, since its rules must be asked about the printed text: the check asks
+				// unproposed again, which refuses, so it comes back refused.
+				// TestANoFixRunFormatsAChangedFileWithNoRulesOnce holds that, reading Ugly.ts formatted twice.
+				if errors.Is(checkError, errorRelintRefused) || checkError == nil && result.Changed && write {
 					continue
 				}
 				mutex.Lock()
 				speculation.attempts[fileName] = formatAttempt{result: result, formatError: checkError, done: true}
-				speculation.read[fileName] = result.Text
+				// A changed result's text is what the printer made, not what was read, so it has no entry,
+				// and keepable discards it wherever the program holds the file and could tell.
+				if !result.Changed {
+					speculation.read[fileName] = result.Text
+				}
 				mutex.Unlock()
 			}
 		}()

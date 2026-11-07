@@ -5,15 +5,16 @@ import "slices"
 // subtokenize is micromark-util-subtokenize: tokenize the content of every chunk that has a content type,
 // and splice the result in. Returns the events and whether no subtokens were found.
 //
-// Upstream wraps the events in a SpliceBuffer, a gap buffer that makes repeated splices cheap. It has
-// array semantics, so a slice is the port.
-func subtokenize(events []Event) ([]Event, bool) {
-	subtokenizedEvents := events
+// The events sit in a SpliceBuffer, as upstream has them: subcontent splices each content's events in as
+// the loop sweeps forward, and on a plain slice every splice copied all the events after it, which grew
+// with the square of the document.
+func subtokenize(eventsArray []Event) ([]Event, bool) {
+	events := NewSpliceBuffer(eventsArray)
 	jumps := map[int]int{}
 	index := -1
 	more := false
 
-	for index+1 < len(subtokenizedEvents) {
+	for index+1 < events.Length() {
 		index++
 		for {
 			jump, present := jumps[index]
@@ -23,13 +24,13 @@ func subtokenize(events []Event) ([]Event, bool) {
 			index = jump
 		}
 
-		event := subtokenizedEvents[index]
+		event := events.Get(index)
 
 		// Add a hook for the GFM tasklist extension, which needs to know if text is in the first content
 		// of a list item.
 		if index > 0 &&
 			event.Token.Type == TypeChunkFlow &&
-			subtokenizedEvents[index-1].Token.Type == TypeListItemPrefix {
+			events.Get(index-1).Token.Type == TypeListItemPrefix {
 			subevents := event.Token.tokenizer.Events
 			otherIndex := 0
 
@@ -58,9 +59,7 @@ func subtokenize(events []Event) ([]Event, bool) {
 		if event.Enter {
 			// Enter.
 			if event.Token.ContentType != "" {
-				var gaps map[int]int
-				subtokenizedEvents, gaps = subcontent(subtokenizedEvents, index)
-				for key, value := range gaps {
+				for key, value := range subcontent(events, index) {
 					jumps[key] = value
 				}
 				index = jumps[index]
@@ -73,12 +72,12 @@ func subtokenize(events []Event) ([]Event, bool) {
 
 			for otherIndex > 0 {
 				otherIndex--
-				otherEvent := subtokenizedEvents[otherIndex]
+				otherEvent := events.Get(otherIndex)
 
 				if otherEvent.Token.Type == TypeLineEnding || otherEvent.Token.Type == TypeLineEndingBlank {
 					if otherEvent.Enter {
 						if lineIndex > 0 {
-							subtokenizedEvents[lineIndex].Token.Type = TypeLineEndingBlank
+							events.Get(lineIndex).Token.Type = TypeLineEndingBlank
 						}
 
 						otherEvent.Token.Type = TypeLineEnding
@@ -94,22 +93,25 @@ func subtokenize(events []Event) ([]Event, bool) {
 			// Upstream tests `lineIndex` for truthiness, so index 0 counts as none.
 			if lineIndex > 0 {
 				// Fix position.
-				event.Token.End = subtokenizedEvents[lineIndex].Token.Start
+				event.Token.End = events.Get(lineIndex).Token.Start
 
 				// Switch container exit w/ line endings.
-				parameters := append([]Event{event}, slices.Clone(subtokenizedEvents[lineIndex:index])...)
-				subtokenizedEvents = splice(subtokenizedEvents, lineIndex, index-lineIndex+1, parameters)
+				parameters := append([]Event{event}, events.Slice(lineIndex, index)...)
+				events.Splice(lineIndex, index-lineIndex+1, parameters)
 			}
 		}
 	}
 
-	return subtokenizedEvents, !more
+	// Upstream copies the buffer back into the array it was given; here the copy is returned in its place.
+	return events.Slice(0, events.Length()), !more
 }
 
 // subcontent tokenizes embedded tokens, splices them in, and returns the gaps to jump over.
-func subcontent(events []Event, eventIndex int) ([]Event, map[int]int) {
-	token := events[eventIndex].Token
-	context := events[eventIndex].Context
+//
+// Mutates: events splicing the content's own events in place of its chunks is the job, as upstream's does
+func subcontent(events *SpliceBuffer, eventIndex int) map[int]int {
+	token := events.Get(eventIndex).Token
+	context := events.Get(eventIndex).Context
 	startPosition := eventIndex - 1
 	var startPositions []int
 
@@ -137,7 +139,7 @@ func subcontent(events []Event, eventIndex int) ([]Event, map[int]int) {
 		// Find the position of the event for this token.
 		for {
 			startPosition++
-			if events[startPosition].Token == current {
+			if events.Get(startPosition).Token == current {
 				break
 			}
 		}
@@ -206,20 +208,20 @@ func subcontent(events []Event, eventIndex int) ([]Event, map[int]int) {
 		breaks = breaks[:len(breaks)-1]
 	}
 
-	splicedEvents := events
 	// Now splice the events from the subtokenizer into the current events, moving back to front so that
 	// splice indices aren’t affected.
 	for index := len(breaks) - 1; index >= 0; index-- {
+		// The buffer copies what it inserts, so a view of the child events serves where upstream slices a copy.
 		var slice []Event
 		if index+1 < len(breaks) {
-			slice = slices.Clone(childEvents[breaks[index]:breaks[index+1]])
+			slice = childEvents[breaks[index]:breaks[index+1]]
 		} else {
-			slice = slices.Clone(childEvents[breaks[index]:])
+			slice = childEvents[breaks[index]:]
 		}
 		start := startPositions[len(startPositions)-1]
 		startPositions = startPositions[:len(startPositions)-1]
 		jumps = append(jumps, [2]int{start, start + len(slice) - 1})
-		splicedEvents = splice(splicedEvents, start, 2, slice)
+		events.Splice(start, 2, slice)
 	}
 
 	slices.Reverse(jumps)
@@ -229,5 +231,5 @@ func subcontent(events []Event, eventIndex int) ([]Event, map[int]int) {
 		adjust += jump[1] - jump[0] - 1
 	}
 
-	return splicedEvents, gaps
+	return gaps
 }

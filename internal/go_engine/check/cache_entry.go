@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
-	"go/token"
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
@@ -24,11 +23,13 @@ import (
 
 // CacheFormatVersion is the version of the cache entry's format, which the engine hashes into every key as the
 // cache's own, so an entry written in another format is never read. It changes whenever cacheEntry or anything it
-// holds changes shape, Finding included.
-const CacheFormatVersion = "go-engine-cache-4"
+// holds changes shape, Finding included, or what a field means: at 5, Output became a digest of the package's API and
+// facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
+// can match, and would only be a miss read the long way.
+const CacheFormatVersion = "go-engine-cache-5"
 
-// errorUnstorable is a package an entry cannot hold, a fact gob refuses or types export data cannot carry, so it
-// gets no entry, and is counted.
+// errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
+// data cannot carry, so it gets no entry, and is counted.
 var errorUnstorable = errors.New("what the entry cannot hold")
 
 // cacheEntry is one package as the cache holds it, gob-encoded: by slot, what each analyzer that a later run could
@@ -141,8 +142,8 @@ func factTypeName(factType reflect.Type) string {
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
 // error, its types, what the load withheld of it, and, for a package Analyze was given, its files' walk, with its
 // export data beside it, its output digest, and whether a finding of it names a file outside it, among knownFiles,
-// every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported or its
-// types cannot be written as export data.
+// every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
+// factValueDigest cannot read one, or its types cannot be written as export data.
 func encodeEntry(
 	known *cacheAnalyzers,
 	ruleOf map[*analysis.Analyzer]rule.Rule,
@@ -159,6 +160,7 @@ func encodeEntry(
 		Files:     files,
 	}
 	encoded := encodedEntry{}
+	digested := map[string]analysisFacts{}
 	var encoder objectpath.Encoder
 	for _, action := range actions {
 		slot, held := known.slot(action.Analyzer)
@@ -166,6 +168,7 @@ func encodeEntry(
 			continue
 		}
 		stored := storedAnalysis{}
+		facts := analysisFacts{}
 		if actionRule, isRule := ruleOf[action.Analyzer]; isRule {
 			for _, diagnostic := range action.Diagnostics {
 				stored.Findings = append(stored.Findings, newFinding(actionRule, action.Package.Fset, diagnostic))
@@ -186,23 +189,26 @@ func encodeEntry(
 				encoded.dropped++
 				continue
 			}
-			fact, factError := encodeFact(objectFact.Fact)
+			fact, value, factError := encodeFactAndValue(objectFact.Fact)
 			if factError != nil {
 				return encodedEntry{}, fmt.Errorf("storing %s's fact on %s: %w", action.Analyzer.Name,
 					objectFact.Object, factError)
 			}
 			stored.ObjectFacts = append(stored.ObjectFacts, storedObjectFact{Path: path, Fact: fact})
+			facts.objectFacts = append(facts.objectFacts, objectFactDigest{path: path, fact: value})
 		}
 		for _, packageFact := range packageFacts {
-			fact, factError := encodeFact(packageFact.Fact)
+			fact, value, factError := encodeFactAndValue(packageFact.Fact)
 			if factError != nil {
 				return encodedEntry{}, fmt.Errorf("storing %s's package fact: %w", action.Analyzer.Name, factError)
 			}
 			stored.PackageFacts = append(stored.PackageFacts, fact)
+			facts.packageFacts = append(facts.packageFacts, value)
 		}
 		entry.Analyzers[slot] = stored
+		digested[slot] = facts
 	}
-	exportData, exportError := writeExportData(saved, saved.Fset)
+	exportData, exportError := writeExportData(saved)
 	if exportError != nil {
 		return encodedEntry{}, exportError
 	}
@@ -213,11 +219,7 @@ func encodeEntry(
 		}
 	}
 	if holdsFacts(known, entry.Analyzers) {
-		withoutPositions, writeError := writeExportData(saved, nil)
-		if writeError != nil {
-			return encodedEntry{}, writeError
-		}
-		encoded.output, encoded.hasOutput = outputDigest(withoutPositions, entry.Analyzers), true
+		encoded.output, encoded.hasOutput = outputDigest(exportDigest(saved.Types), digested), true
 		entry.Output = encoded.output[:]
 	}
 	encoded.positionDependent = positionDependent(saved, entry.Analyzers, knownFiles)
@@ -246,11 +248,10 @@ func exportDataKey(key cache.Key) cache.Key {
 	return sha256.Sum256(append([]byte("export data "), key[:]...))
 }
 
-// writeExportData is a package's types as gcexportdata writes them with positions from fileSet, or every position
-// written as none when fileSet is nil, nothing for unsafe, whose types are the type checker's own. The writer panics
-// on what it cannot carry, as types a faked package "C" left invalid may be, so a panic is a package the entry cannot
-// hold.
-func writeExportData(saved *packages.Package, fileSet *token.FileSet) (exportData []byte, exportError error) {
+// writeExportData is a package's types as gcexportdata writes them with the package's positions, nothing for unsafe,
+// whose types are the type checker's own. The writer panics on what it cannot carry, as types a faked package "C" left
+// invalid may be, so a panic is a package the entry cannot hold.
+func writeExportData(saved *packages.Package) (exportData []byte, exportError error) {
 	if saved.PkgPath == "unsafe" {
 		return nil, nil
 	}
@@ -264,7 +265,7 @@ func writeExportData(saved *packages.Package, fileSet *token.FileSet) (exportDat
 		}
 	}()
 	var written bytes.Buffer
-	if writeError := gcexportdata.Write(&written, fileSet, saved.Types); writeError != nil {
+	if writeError := gcexportdata.Write(&written, saved.Fset, saved.Types); writeError != nil {
 		return nil, fmt.Errorf("writing the export data of %s: %w: %w", saved.ID, errorUnstorable, writeError)
 	}
 	return written.Bytes(), nil
@@ -298,6 +299,20 @@ func encodeFact(fact analysis.Fact) (storedFact, error) {
 		return storedFact{}, fmt.Errorf("encoding a %T fact: %w: %w", fact, errorUnstorable, encodeError)
 	}
 	return storedFact{Type: factTypeName(reflect.TypeOf(fact)), Encoded: encoded.Bytes()}, nil
+}
+
+// encodeFactAndValue is one fact as an entry holds it, and as outputDigest reads it, by the digest of its value, which
+// is taken only once gob has encoded the fact, so the walk never meets a value gob refuses.
+func encodeFactAndValue(fact analysis.Fact) (storedFact, factDigest, error) {
+	stored, encodeError := encodeFact(fact)
+	if encodeError != nil {
+		return storedFact{}, factDigest{}, encodeError
+	}
+	value, valueError := factValueDigest(fact)
+	if valueError != nil {
+		return storedFact{}, factDigest{}, fmt.Errorf("%w: %w", errorUnstorable, valueError)
+	}
+	return stored, factDigest{typeName: stored.Type, value: value}, nil
 }
 
 // decodeEntry is a package's entry decoded whole, or an error, which is a miss: an entry in another format, a fact

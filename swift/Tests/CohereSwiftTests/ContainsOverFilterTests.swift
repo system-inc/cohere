@@ -162,10 +162,15 @@ struct ContainsOverFilterTests {
         #expect(Self.findings(source, filter: Self.lazyFilter).isEmpty)
     }
 
-    /* Every standard library collection's `filter` builds a new collection: dictionary, set and string alike. */
+    /*
+     Every standard library collection's `filter` builds a new collection: dictionary, set and string alike. Each
+     symbol is one the 6.4 compiler writes, since which module declares it is the demangler's answer: `Dictionary`'s own
+     `filter`, and the `RangeReplaceableCollection` one a `String` resolves to.
+     */
     @Test(arguments: [
-        ("s:SD6filteryAByxq_GSbx3key_q_5valuet_tKXEKF", "s:SD5countSivp"),
-        ("s:Sh6filteryShyxGSbxKXEKF", "s:Sh5countSivp"), ("s:SS6filteryS2SSbSJKXEKF", "s:SS5countSivp"),
+        ("s:SD6filterySDyxq_GSbx3key_q_5valuet_tqd__YKXEqd__YKs5ErrorRd__lF", "s:SD5countSivp"),
+        ("s:Sh6filteryShyxGSbxKXEKF", "s:Sh5countSivp"),
+        ("s:SmsE6filteryxSb7ElementQzqd__YKXEqd__YKs5ErrorRd__lF", "s:SS5countSivp"),
     ])
     func otherStandardLibraryCollectionsAreFound(filter: String, count: String) {
         let source = """
