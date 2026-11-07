@@ -225,6 +225,14 @@ func (workspace *Workspace) LoadPlatform(platform Platform, overlay map[string][
 	if loadError != nil {
 		return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
 	}
+	return workspace.PlatformLoadOf(platform, loaded), nil
+}
+
+// PlatformLoadOf is loaded, the root packages of a load of the tree as platform builds it, sorted into what
+// type-checks and what does not: Clean holds each package with no error that imports none, and is the workspace's
+// own, its skips and writable kept, and Failed names every other one with its first error or the import that
+// failed. It reads nothing, so a caller that loads a platform its own way, as the Go engine does, sorts it alike.
+func (workspace *Workspace) PlatformLoadOf(platform Platform, loaded []*packages.Package) *PlatformLoad {
 	result := &PlatformLoad{Platform: platform, Failed: map[string]string{}}
 	clean := map[*packages.Package]bool{}
 	var isClean func(goPackage *packages.Package, visiting map[*packages.Package]bool) bool
@@ -268,5 +276,6 @@ func (workspace *Workspace) LoadPlatform(platform Platform, overlay map[string][
 		}
 	}
 	result.Clean = newWorkspace(workspace.Root, workspace.skips, kept)
-	return result, nil
+	result.Clean.writable = workspace.writable
+	return result
 }

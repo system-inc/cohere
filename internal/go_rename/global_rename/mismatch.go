@@ -21,6 +21,12 @@ const (
 	// MismatchKindIdentifier is one identifier under another name, or resolving to another declaration, than
 	// expected.
 	MismatchKindIdentifier MismatchKind = "Identifier"
+	// MismatchKindPlatformLoad is a platform the tree does not load under, before the rewrite or with it, so nothing
+	// was compared there.
+	MismatchKindPlatformLoad MismatchKind = "PlatformLoad"
+	// MismatchKindPlatformPackage is a root package that type-checks under a platform before the rewrite and not
+	// after.
+	MismatchKindPlatformPackage MismatchKind = "PlatformPackage"
 )
 
 // Mismatch is one place a load of the rewrite reads back other than its Expectation, as data, so a caller can tell
@@ -44,11 +50,24 @@ type Mismatch struct {
 	// mismatch, and the files in the package for a FileCount mismatch.
 	ExpectedCount int
 	ActualCount   int
+	// Platform is the platform a mismatch was found under, as `GOOS/GOARCH`, and empty for the host's load.
+	Platform string
+	// Reason is why a PlatformLoad or PlatformPackage mismatch failed to load or type-check.
+	Reason string
 }
 
 // String is the mismatch as Apply's report spells it.
 func (mismatch Mismatch) String() string {
 	switch mismatch.Kind {
+	case MismatchKindPlatformLoad:
+		return fmt.Sprintf("the tree does not load as %s: %s", mismatch.Platform, mismatch.Reason)
+	case MismatchKindPlatformPackage:
+		return fmt.Sprintf(
+			"package %s type-checks as %s before the rewrite and not after: %s",
+			mismatch.Package,
+			mismatch.Platform,
+			mismatch.Reason,
+		)
 	case MismatchKindPackageGone:
 		return fmt.Sprintf("package %s is gone after the rewrite", mismatch.Package)
 	case MismatchKindPackageNew:

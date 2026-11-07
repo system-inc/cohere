@@ -71,6 +71,10 @@ func (engine *engine) refuseUpfront() {
 			engine.reject(key, "platform", reason)
 			continue
 		}
+		if reason := engine.platformLoadRefusal(key); reason != "" {
+			engine.reject(key, "platform", reason)
+			continue
+		}
 		if !engine.packageVisible(candidate) {
 			// A constant or type declared in a function is seen by nothing outside it, so its capital exports
 			// nothing and may come or go: LS reads lineSeparator.
