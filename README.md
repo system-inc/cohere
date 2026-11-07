@@ -346,8 +346,12 @@ fixes, no type check and no lint, so a lint finding has no say in it.
 
 - `0`: no file would change, here or in any nested repository.
 - nonzero: each file that would change is a finding, a nested one naming its repository. So is each file
-  the formatter could not read, such as one that does not parse, and a format walk that failed. A run that
-  could not check a file never exits `0`.
+  of this repository the formatter could not read, such as one that does not parse, and a format walk that
+  failed. A run that could not check one of its own files never exits `0`.
+
+A nested repository's file the formatter could not read is named in the account and counted on the footer
+as `nested files not checked`, and doesn't decide the exit: the nested repository is read-only from here,
+and its own gate is the one that fails on it.
 
 Only declared submodules are read. A git repository inside yours that `.gitmodules` does not name (a
 clone in an ignored directory, say) is skipped and nothing in it is checked: the scope line lists it

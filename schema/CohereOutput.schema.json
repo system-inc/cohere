@@ -290,6 +290,10 @@
                             "type": "integer",
                             "description": "Adamic .a files the program holds that git's ignore rules leave out of the format walk: type-checked and linted, never formatted. Absent when there are none."
                         },
+                        "nestedUnchecked": {
+                            "type": "integer",
+                            "description": "Files in the nested repositories the run reads that the formatter could not check, each named in the account. A gap, never the verdict: the nested repository's own run fails on them. Absent when there are none."
+                        },
                         "missingGenerated": {
                             "type": "array",
                             "items": { "type": "string" },
