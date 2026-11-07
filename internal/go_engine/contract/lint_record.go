@@ -16,6 +16,10 @@ type LintRecord struct {
 	RulesNotConfigured   []string       `json:"rulesNotConfigured"`
 	// ConfigNote is the line saying which defaults ran when no config was read, empty when one was.
 	ConfigNote string `json:"configNote"`
+	// FilesReplayed is additive within contract 3 (swift/Contract.md): of FilesWalked, the files whose every rule's
+	// verdict the engine read from a per-file verdict store rather than computed. The Swift engine's lint verdict
+	// cache fills it. This engine caches by package, not by file (Cache below), so it always writes 0.
+	FilesReplayed int `json:"filesReplayed"`
 
 	// WithheldBySuppression, WithheldAsGenerated and WithheldAsCopied are additive within contract 3, which the
 	// front door ignores until it reads them, as it ignores any field the contract does not list. Each counts by

@@ -500,3 +500,103 @@ func TestEveryProjectOfARootWithGoAndSwiftReplays(test *testing.T) {
 		test.Errorf("the Swift engine started %d times over a recording and two replays, want 1", starts)
 	}
 }
+
+// swiftScriptsRootEngine is the stand-in engine at a scripts-only root (#wpd36zj): a check over `--root`'s Swift
+// files, one rule finding at each that holds `forced`, whose inputs record names what the real engine's names there
+// (swift/Tests/CohereSwiftTests/StandaloneScriptTests.swift, aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict):
+// each Swift file and each directory its walk listed, and nothing under node_modules, .cache or .git, which the walk
+// never enters. COHERE_TEST_WALK_DEPENDENCIES names node_modules too, the walk a mutant would make.
+const swiftScriptsRootEngine = `echo started >> "$COHERE_TEST_SWIFT_STARTS"
+root=""
+while [ $# -gt 0 ]; do
+	if [ "$1" = "--root" ]; then root="$2"; shift; fi
+	shift
+done
+skipped='-name node_modules -o -name .cache -o -name .git'
+if [ -n "$COHERE_TEST_WALK_DEPENDENCIES" ]; then skipped='-name .cache -o -name .git'; fi
+listed() { find "$root" \( $skipped \) -prune -o -type "$1" $2 -print | sort | sed 's/.*/"&"/' | paste -sd, - ; }
+scripts=$(find "$root" \( -name node_modules -o -name .cache -o -name .git \) -prune -o -type f -name '*.swift' -print | sort)
+count=$(printf '%s\n' "$scripts" | grep -c .)
+echo '{"kind":"provenance","contract":3,"engine":"cohere-swift","version":"0.1.0","commit":"dev","sourceTreeModified":false,"toolchain":"swiftlang-6.4.0.34.1","swiftSyntax":"604.0.0","swiftFormat":"604.0.0"}'
+printf '{"kind":"project","root":"%s","package":"root","elapsedMilliseconds":5,"filesInPackage":%d,"filesOurs":%d,"filesInScope":%d,"scopeDescription":"","targets":[],"excluded":[],"projectKind":"Scripts"}\n' "$root" "$count" "$count" "$count"
+printf '{"kind":"fix","filesConsidered":%d,"filesRewritten":0,"fixesApplied":0,"fixesRefused":0,"refusalsByReason":{},"filesReformatted":0,"filesNotFormatted":0,"notFormattedReasons":{},"formatScope":"every file in the package","changedFiles":[]}\n' "$count"
+echo '{"kind":"phase","name":"fix","outcome":"ran","elapsedMilliseconds":3,"detail":""}'
+printf '{"kind":"types","diagnostics":0,"files":%d,"elapsedMilliseconds":7,"filesWithoutRecord":[],"build":"scripts checked alone"}\n' "$count"
+echo '{"kind":"phase","name":"types","outcome":"ran","elapsedMilliseconds":7,"detail":""}'
+findings=0
+for script in $scripts; do
+	if grep -q forced "$script"; then
+		findings=$((findings + 1))
+		printf '{"kind":"finding","source":"rule","file":"%s","line":1,"column":1,"severity":"error","rule":"cohere-swift/force-unwrapping","messageId":"forceUnwrap","message":"force unwrapping crashes on nil","fixes":[],"suggestions":[]}\n' "$script"
+	fi
+done
+printf '{"kind":"lint","findings":%d,"rulesRun":4,"filesWalked":%d,"nodesVisited":64,"elapsedMilliseconds":2,"reusedFrom":"","rulesSilent":[],"rulesWatchedAndQuiet":3,"crashes":[],"rulesScopedOff":{},"rulesNotConfigured":[],"configNote":""}\n' "$findings" "$count"
+echo '{"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":2,"detail":""}'
+echo '{"kind":"phase","name":"unused","outcome":"skipped","elapsedMilliseconds":0,"detail":"not requested ` + "\u2014" +
+	` this is a report, ask for it with --unused"}'
+printf '{"kind":"inputs","files":[%s],"directories":[%s],"absent":["%s/Package.swift"]}\n' "$(listed f "-name *.swift")" "$(listed d)" "$root"
+exitCode=0; if [ "$findings" -gt 0 ]; then exitCode=1; fi
+printf '{"kind":"summary","findings":%d,"complete":true,"exitCode":%d}\n' "$findings" "$exitCode"
+exit $exitCode
+`
+
+// TestAScriptsOnlyRootReplaysUntilAScriptMoves: a scripts-only root's run, started as discovery starts it (its
+// directory and its engine named), replays while nothing its record names moves (#wpd36zj). A script edited, and a
+// script added beside the others, each make the next run start the engine and report the new finding; a file under
+// node_modules changing replays, since the walk never enters it. Under a stand-in that names node_modules, as the
+// walk of the whole root would, that change misses too, the cost the engine's record spares.
+func TestAScriptsOnlyRootReplaysUntilAScriptMoves(test *testing.T) {
+	test.Parallel()
+	scenarios := []struct {
+		name      string
+		walksDeps bool
+		change    func(fixture *swiftReplayFixture)
+		replays   bool
+		finding   string
+	}{
+		{"a script edited", false, func(fixture *swiftReplayFixture) {
+			fixture.write("modules/ebay/EbayVision.swift", "let forced = 1\nprint(forced)\n")
+		}, false, "modules/ebay/EbayVision.swift:1:1"},
+		{"a script added beside them", false, func(fixture *swiftReplayFixture) {
+			fixture.write("modules/ebay/Second.swift", "let forced = 2\nprint(forced)\n")
+		}, false, "modules/ebay/Second.swift:1:1"},
+		{"a dependency's Swift changed", false, func(fixture *swiftReplayFixture) {
+			fixture.write("node_modules/dependency/Tool.swift", "print(2)\n")
+		}, true, ""},
+		{"a dependency's Swift changed, the walk entering node_modules", true, func(fixture *swiftReplayFixture) {
+			fixture.write("node_modules/dependency/Tool.swift", "print(2)\n")
+		}, false, ""},
+	}
+	for _, scenario := range scenarios {
+		test.Run(scenario.name, func(test *testing.T) {
+			test.Parallel()
+			fixture := newSwiftReplayFixture(test)
+			fixture.root = filepath.Join(test.TempDir(), "repository")
+			fixture.write(".git/info/exclude", "")
+			fixture.write(".gitignore", ".cache/\n")
+			fixture.write("modules/ebay/EbayVision.swift", "let words = 1\nprint(words)\n")
+			fixture.write("node_modules/dependency/Tool.swift", "print(1)\n")
+			fixture.script(fixture.engine, swiftScriptsRootEngine)
+			fixture.setVariable(projectEngineVariable, string(engineSwift))
+			if scenario.walksDeps {
+				fixture.setVariable("COHERE_TEST_WALK_DEPENDENCIES", "1")
+			}
+			// As runProject starts a discovered project: its directory first, which the run cache takes off
+			// (runCacheArguments).
+			arguments := []string{"--directory", fixture.root, "--no-fix", "--verbose"}
+			fixture.establishHit(arguments...)
+			// The new modification time must differ from the recorded one at the file system's resolution.
+			time.Sleep(10 * time.Millisecond)
+			scenario.change(fixture)
+			started := fixture.engineStarts()
+			after := fixture.run(true, arguments...)
+			if replayed := isSwiftReplay(after) && fixture.engineStarts() == started; replayed != scenario.replays {
+				test.Fatalf("%s: replayed %t, want %t:\n%s%s", scenario.name, replayed, scenario.replays,
+					after.stdout, after.stderr)
+			}
+			if scenario.finding != "" && !strings.Contains(after.stdout, scenario.finding) {
+				test.Errorf("%s and the next run did not report %s:\n%s", scenario.name, scenario.finding, after.stdout)
+			}
+		})
+	}
+}

@@ -300,35 +300,104 @@ import Synchronization
     }
 
     /*
+     One record that may describe a file as it stands, in the store that holds it. A record's name is a content
+     address: Swift names it by its file and `SymbolTracker::hashRecord()`, a hash over every symbol and occurrence
+     it holds and their relations, and writes nothing when a record of that name exists (lib/Index/IndexRecord.cpp).
+     So the store and the name say which names the file resolves to, without the record being read.
+     */
+    struct FreshRecord {
+        var store: IndexStore
+        var record: String
+
+        /* The store's folder and the record's name, which together are what a verdict read from it may be keyed by. */
+        var identity: Identity { Identity(storePath: store.storePath.path, record: record) }
+
+        struct Identity: Codable, Hashable, Sendable {
+            var storePath: String
+            var record: String
+        }
+    }
+
+    /*
      Each file's names and what they resolve to, from the first of the stores, in their order, holding a unit newer
-     than the file that describes it; nil for a file none of them can vouch for. Each file's path and modification
-     date are asked once, for every store. Which records may answer is asked on this thread, where the stores fill
-     their caches; the records are then read side by side, since a record's reader touches only what `init` bound,
-     the way indexstore-db reads records concurrently (swiftlang/indexstore-db#300).
+     than the file that describes it; nil for a file none of them can vouch for.
      */
     static func symbols(of files: [URL], in stores: [IndexStore]) -> [FileSymbols?] {
-        /*
-         Shared with the reading threads, which only call `symbols(inRecord:)` on these stores: it reads no cache and
-         nothing but the `let`s `init` bound, and each record's reader is its own. The caches are filled here, first.
-         */
-        nonisolated(unsafe) let candidates = files.map { file in
+        symbols(in: freshRecords(of: files, in: stores)).map { $0?.symbols }
+    }
+
+    /*
+     The records that may describe each file as it stands, one per store holding a unit newer than the file, in the
+     stores' order. Each file's path and modification date are asked once, for every store, on this thread, where the
+     stores fill their caches.
+     */
+    static func freshRecords(of files: [URL], in stores: [IndexStore]) -> [[FreshRecord]] {
+        files.map { file in
             let path = file.resolvingSymlinksInPath().path
             let modified =
                 (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
                 ?? .distantFuture
             return stores.compactMap { store in
-                store.freshRecord(atPath: path, modified: modified).map { (store: store, record: $0) }
+                store.freshRecord(atPath: path, modified: modified).map { FreshRecord(store: store, record: $0) }
             }
         }
-        let found = Mutex<[FileSymbols?]>(Array(repeating: nil, count: files.count))
-        DispatchQueue.concurrentPerform(iterations: files.count) { index in
+    }
+
+    /*
+     For each file, the first of its fresh records whose reader opens, or nil when none does: the record
+     `symbols(in:)` answers from, since a record whose reader opens is read whole, and one deleted or damaged under a
+     unit that still names it is passed over for the next store's. Opened side by side, as the records are read.
+     */
+    static func readableRecords(in candidates: [[FreshRecord]]) -> [FreshRecord?] {
+        /* Shared with the opening threads, which only call `canRead(record:)`, for the reasons `symbols(in:)` gives. */
+        nonisolated(unsafe) let shared = candidates
+        let chosen = Mutex<[Int?]>(Array(repeating: nil, count: candidates.count))
+        DispatchQueue.concurrentPerform(iterations: candidates.count) { index in
+            guard
+                let position = unsafe shared[index].indices.first(where: { position in
+                    unsafe shared[index][position].store.canRead(record: shared[index][position].record)
+                })
+            else { return }
+            chosen.withLock { $0[index] = position }
+        }
+        return zip(candidates, chosen.withLock { $0 }).map { records, position in position.map { records[$0] } }
+    }
+
+    /* Whether this record's reader opens, which is all `occurrences(inRecord:)` needs to answer. */
+    private func canRead(record: String) -> Bool {
+        guard let reader = unsafe recordReaderCreate(store, record, nil) else { return false }
+        unsafe recordReaderDispose(reader)
+        return true
+    }
+
+    /*
+     For each file, the names of the first of its fresh records that can be read, with that record; nil for a file
+     none of them describes. The records are read side by side, since a record's reader touches only what `init`
+     bound, the way indexstore-db reads records concurrently (swiftlang/indexstore-db#300).
+     */
+    static func symbols(in candidates: [[FreshRecord]]) -> [(symbols: FileSymbols, record: FreshRecord)?] {
+        /*
+         Shared with the reading threads, which only call `symbols(inRecord:)` on these stores: it reads no cache and
+         nothing but the `let`s `init` bound, and each record's reader is its own. The caches were filled by
+         `freshRecords(of:in:)`, on the caller's thread.
+         */
+        nonisolated(unsafe) let shared = candidates
+        /* Each file's symbols and which of its candidates they were read from, handed back by position, since a record's store stays on this thread. */
+        let found = Mutex<[(symbols: FileSymbols, candidate: Int)?]>(Array(repeating: nil, count: candidates.count))
+        DispatchQueue.concurrentPerform(iterations: candidates.count) { index in
             /* A record that cannot be read leaves the file to the next store's, as a store with no fresh unit does. */
             guard
-                let symbols = unsafe candidates[index].lazy.compactMap({ $0.store.symbols(inRecord: $0.record) }).first
+                let read = unsafe shared[index].indices.lazy.compactMap({ position in
+                    unsafe shared[index][position].store.symbols(inRecord: shared[index][position].record).map {
+                        (symbols: $0, candidate: position)
+                    }
+                }).first
             else { return }
-            found.withLock { $0[index] = symbols }
+            found.withLock { $0[index] = read }
         }
-        return found.withLock { $0 }
+        return zip(candidates, found.withLock { $0 }).map { records, read in
+            read.map { (symbols: $0.symbols, record: records[$0.candidate]) }
+        }
     }
 
     /*
