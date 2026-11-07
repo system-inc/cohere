@@ -803,8 +803,8 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 			test.Errorf("the report names %q, which a run of its own accounts for:\n%s", unwanted, output)
 		}
 	}
-	// The TypeScript project in the root's directory shares its label, so the footers are kept by label in the
-	// order they print, and only the Swift one may carry the gap.
+	// The TypeScript project in the root's directory keeps the label `.`, and the Swift project beside it is
+	// `. (Swift)` (#vyjvz9k), so the gap is on that footer alone.
 	footers := map[string][]string{}
 	gapFooters := 0
 	for _, line := range strings.Split(output, "\n") {
@@ -815,16 +815,16 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 			}
 		}
 	}
-	if !slices.ContainsFunc(footers["."], func(footer string) bool {
+	if !slices.ContainsFunc(footers[". (Swift)"], func(footer string) bool {
 		return strings.HasSuffix(footer, " • ⚠ 2 Swift files not checked")
 	}) ||
-		gapFooters != 1 {
+		gapFooters != 1 || len(footers["."]) != 1 {
 		test.Errorf(
 			"the footers are %q, want the root's Swift one alone to end on the gap of build.swift and odd.swift",
 			footers,
 		)
 	}
-	for _, label := range []string{"CapturePhone", "Tools/Sim"} {
+	for _, label := range []string{". (Swift)", "CapturePhone", "Tools/Sim"} {
 		if len(footers[label]) != 1 {
 			test.Errorf("%s printed the footers %q, want one, green", label, footers[label])
 		}
@@ -870,8 +870,8 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 	if exitCode != 0 {
 		test.Errorf("under --json the run exited %d, want 0:\n%s", exitCode, output)
 	}
-	// Each label's gap, the files named with their reasons. The TypeScript summary in the root's directory
-	// shares the label and lists none, so appending keeps the Swift one whichever prints first.
+	// Each label's gap, the files named with their reasons. The TypeScript summary in the root's directory is
+	// `.` and lists none; the Swift one beside it is `. (Swift)`.
 	gaps := map[string][]map[string]string{}
 	for _, line := range strings.Split(output, "\n") {
 		var summary struct {
@@ -890,9 +890,10 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		{"file": alias + "/Scripts/build.swift", "reason": "no target of this package compiles it"},
 		{"file": alias + "/Scripts/odd.swift", "reason": "a reason no engine has given yet"},
 	}
-	if !reflect.DeepEqual(gaps["."], wantGaps) || len(gaps["CapturePhone"]) != 0 || len(gaps["Tools/Sim"]) != 0 {
+	if !reflect.DeepEqual(gaps[". (Swift)"], wantGaps) || len(gaps["."]) != 0 || len(gaps["CapturePhone"]) != 0 ||
+		len(gaps["Tools/Sim"]) != 0 {
 		test.Errorf(
-			"under --json the gaps are %v, want build.swift and odd.swift for . and none for the others:\n%s",
+			"under --json the gaps are %v, want build.swift and odd.swift for . (Swift) and none for the others:\n%s",
 			gaps,
 			output,
 		)
