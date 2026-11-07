@@ -170,6 +170,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 	// After the record, since it is what this invocation's discovery found and not part of the run: Swift
 	// added or given a package since would otherwise be said, or left out, by every replay.
 	summary.Gaps.UnclaimedSwift = discoveredUnclaimedSwift
+	summary.EngineBuilds = builtEngines()
 
 	switch activeOutput.Mode {
 	case outputVerbose:
@@ -180,7 +181,7 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 		printInvocation(out, "%s\n",
 			footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJson:
-		printInvocation(out, "%s", summaryJsonLine(summaryAsJson(summary)))
+		printInvocation(out, "%s", engineBuildLines(summary.EngineBuilds)+summaryJsonLine(summaryAsJson(summary)))
 	default:
 		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}
