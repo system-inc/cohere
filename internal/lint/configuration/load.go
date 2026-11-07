@@ -245,12 +245,12 @@ func LoadFor(path string, registeredNames []string) (*Configuration, error) {
 //
 // # Reasons are required inside our tiers, and of our own sets
 //
-// A chain that reaches a `cohere:system-inc/*` set is one of ours (InOurTiers), and every off and every
-// departure in it says why, or the load is refused. Outside our tiers a project goes its own way (#bfxz13m):
-// its own file may turn a rule off or change its options with no reason, and coverage counts each unreasoned
-// off by rule so the choice stays visible. The sets cohere carries are ours wherever they are read, so an
-// off, a departure or an ignore written in one is held to a reason in every chain (ignoreEntriesOf holds the
-// ignores).
+// A chain that reaches a `cohere:system-inc/*` set is one of ours (InOurTiers), and every off, every
+// departure and every ignore in it says why, or the load is refused (ignoreEntriesOf holds the ignores).
+// Outside our tiers a project goes its own way (#bfxz13m): its own file may turn a rule off or change its
+// options with no reason, and coverage counts each unreasoned off by rule so the choice stays visible. The
+// sets cohere carries are ours wherever they are read, so an off, a departure or an ignore written in one is
+// held to a reason in every chain.
 func loadLayers(layers []configurationLayer, root string, registeredNames []string) (*Configuration, error) {
 	layerPaths := make([]string, 0, len(layers))
 	for _, layer := range layers {
@@ -552,17 +552,20 @@ func IgnorePatternsFrom(entries []IgnoreEntry) []string {
 
 // ignoreEntriesOf is every layer's `ignorePatterns`, the base's first, each stamped with the file that wrote it.
 //
-// In every set cohere carries an entry says why, or the read is refused, as an off or a departure written in one
-// is (#cxeq6jw). A project's own file in our tiers is not held to it yet: its entries take the object form only
-// once a cohere that reads it is installed everywhere, so that refusal lands after ahra's and api's settings
-// carry their reasons. Here rather than in Load alone, since discovery and the format walk read the list
-// through IgnorePatternsOf, and a run that loads no lint configuration, a Go root's, would never meet the
-// check otherwise.
+// Inside our tiers, and in every set cohere carries, an entry says why, or the read is refused: the rule an off
+// and a departure are held to, applied by the same predicate (#cxeq6jw). Here rather than in Load alone, since
+// discovery and the format walk read the list through IgnorePatternsOf, and a run that loads no lint
+// configuration, a Go root's, would never meet the check otherwise.
 func ignoreEntriesOf(layers []configurationLayer) ([]IgnoreEntry, error) {
+	layerPaths := make([]string, 0, len(layers))
+	for _, layer := range layers {
+		layerPaths = append(layerPaths, layer.path)
+	}
+	inOurTiers := InOurTiers(layerPaths)
 	var entries []IgnoreEntry
 	for _, layer := range layers {
 		for _, entry := range layer.raw.IgnorePatterns {
-			if entry.Reason == "" && IsSet(layer.path) {
+			if entry.Reason == "" && (inOurTiers || IsSet(layer.path)) {
 				return nil, fmt.Errorf("lint config %s ignores %q and gives no reason: an ignore that says nothing "+
 					"reads as an allowance, so write it as {\"pattern\": %q, \"reason\": \"...\"} with why these "+
 					"paths are never checked, or remove it so they are", layer.path, entry.Pattern, entry.Pattern)

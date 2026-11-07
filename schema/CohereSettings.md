@@ -129,12 +129,12 @@ Which of the Go engine's rules run, and how strictly, read from the file beside 
 
 ### `ignorePatterns`
 
-Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere carries each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, and --json carries the same.
+Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why: in a chain extending a cohere:system-inc set, and in every set cohere carries, each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, and --json carries the same. An entry a settings file writes that matches nothing fails the run, as an unused disable directive does, so delete it, unless its kind is generated: build output may not exist yet.
 
 An entry written as an object takes:
 
 - `pattern`: The paths the entry ignores, as a glob.
-- `reason`: Why these paths are never checked, in a sentence. Required in cohere's sets.
+- `reason`: Why these paths are never checked, in a sentence. Required in our tiers and in cohere's sets.
 - `kind`: What the paths are: input, data a program reads as it was given; generated, written by a tool; thirdParty, somebody else's code.
 - `check`: A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet acted on.
 

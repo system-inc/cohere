@@ -1716,7 +1716,7 @@
             "type": "object"
         },
         "ignorePatterns": {
-            "description": "Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere carries each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, and --json carries the same.",
+            "description": "Paths cohere never checks and the formatter never offers, one list for both, as globs relative to the directory of the settings file cohere reads first: * within a path segment, ** across any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the file it extends. An entry is a glob, or an object naming the glob and why: in a chain extending a cohere:system-inc set, and in every set cohere carries, each entry gives a reason, as an off does. --verbose lists every entry with its reason, kind, file and how many paths it matched, and --json carries the same. An entry a settings file writes that matches nothing fails the run, as an unused disable directive does, so delete it, unless its kind is generated: build output may not exist yet.",
             "items": {
                 "oneOf": [
                     {
@@ -1741,7 +1741,7 @@
                                 "type": "string"
                             },
                             "reason": {
-                                "description": "Why these paths are never checked, in a sentence. Required in cohere's sets.",
+                                "description": "Why these paths are never checked, in a sentence. Required in our tiers and in cohere's sets.",
                                 "pattern": "[^\\t-\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
                                 "type": "string"
                             }

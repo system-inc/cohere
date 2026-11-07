@@ -89,7 +89,7 @@
                 "matched": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "The paths it matched, files and directories it takes whole, among every entry of every directory discovery read before any ignore applied, inside repositories of their own too, and, for an entry the walk found nothing for, at and below the path it names."
+                    "description": "The paths it matched, files and directories it takes whole, among every entry of every directory discovery read before any ignore applied, inside repositories of their own too, and, for an entry the walk found nothing for, at and below the path it names. Zero for an entry a settings file wrote, unless its kind is generated, is a finding, correctness-no-unused-ignore, which fails the run."
                 }
             }
         },
@@ -160,7 +160,7 @@
                 "ignorePatterns": {
                     "type": "array",
                     "items": { "$ref": "#/$defs/ignoreEntry" },
-                    "description": "The root settings' ignorePatterns, when the run discovered its project and the root has any."
+                    "description": "The root settings' ignorePatterns, when the run discovered its project and the root has any. findings counts each dead one, an entry a settings file wrote that matched nothing and whose kind is not generated."
                 },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },

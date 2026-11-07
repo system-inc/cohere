@@ -14,7 +14,7 @@ import (
 // counts, for each entry, the paths it matched among every entry of every directory the walk read, before any
 // ignore applied, inside repositories of their own too, and below the path an entry names where the walk did
 // not go (see discovery.IgnoreMatched). `--verbose` lists each entry with its reason, kind, file and count, a
-// count of zero included, and `--json` carries the same list.
+// count of zero included, and `--json` carries the same list. A dead one is a finding (see unused_ignore.go).
 //
 // Discovery is the one place a whole-tree run always passes, and it runs fresh on every run, a replayed one
 // included. So the account is this invocation's, never the run cache's: a run of one project says it at its
@@ -93,8 +93,8 @@ func (account ignoreAccount) line() string {
 	return fmt.Sprintf("  ignore: %s, matched %s: %s\n", described, counted(account.Matched, "path", "paths"), reason)
 }
 
-// writeDiscoveredIgnores says discovery's account, once, as lines of this invocation's that a recording leaves
-// out.
+// writeDiscoveredIgnores says discovery's account, once: each dead ignore as a finding, in every view, and
+// every entry under `--verbose`, as lines of this invocation's that a recording leaves out.
 func writeDiscoveredIgnores(out *bufio.Writer) {
 	if discoveredIgnoresWritten || len(discoveredIgnores) == 0 {
 		return
@@ -108,8 +108,10 @@ func writeDiscoveredIgnores(out *bufio.Writer) {
 	streams.Show(out)
 }
 
-// writeIgnoreAccounts lists every entry under `--verbose`.
+// writeIgnoreAccounts prints each dead ignore as a finding, in every view (see writeUnusedIgnores), and lists
+// every entry under `--verbose`.
 func writeIgnoreAccounts(out *bufio.Writer, accounts []ignoreAccount) {
+	writeUnusedIgnores(out, accounts)
 	account := accountOutput(out)
 	for _, entry := range accounts {
 		fmt.Fprint(account, entry.line())
