@@ -252,7 +252,7 @@ public struct Pipeline {
                 let phase = XcodeTypesPhase(
                     package: package,
                     project: xcodeProject,
-                    files: fileSet.owned,
+                    files: fileSet.targetFiles,
                     scratchPath: runScratch(for: root),
                     resolutionAllowed: !options.noFix,
                     toolchain: toolchain,
@@ -423,14 +423,14 @@ public struct Pipeline {
                             formatted: formattedHere,
                         )
                     )
-                    rewritten.append(
-                        FileSet.OwnedFile(
-                            url: file.url,
-                            targetName: file.targetName,
-                            targetKind: file.targetKind,
-                            packageRoot: file.packageRoot,
-                        )
+                    var owned = FileSet.OwnedFile(
+                        url: file.url,
+                        targetName: file.targetName,
+                        targetKind: file.targetKind,
+                        packageRoot: file.packageRoot,
                     )
+                    owned.scriptPlatform = file.scriptPlatform
+                    rewritten.append(owned)
                 }
             }
             /* Rewritten files are parsed again, so lint reads the text that is on disk now rather than the text that was. */
@@ -480,13 +480,18 @@ public struct Pipeline {
             return try finish(complete: false)
         }
 
-        /* The whole package, whatever the scope: a change in one file changes what the rest of its module means. */
+        /*
+         The whole package, whatever the scope: a change in one file changes what the rest of its module means. Then each
+         standalone script of ours, alone, as `swift <file>` runs it (`ScriptTypesPhase`), its findings and files added
+         to the package's, so one types record covers every file of ours.
+         */
         func build() throws -> TypesPhase.Result {
+            let targets: TypesPhase.Result
             if let xcodeProject {
-                return try XcodeTypesPhase(
+                targets = try XcodeTypesPhase(
                     package: package,
                     project: xcodeProject,
-                    files: fileSet.owned,
+                    files: fileSet.targetFiles,
                     scratchPath: runScratch(for: root),
                     resolutionAllowed: !options.noFix,
                     toolchain: toolchain,
@@ -494,19 +499,31 @@ public struct Pipeline {
                 )
                 .run()
             }
-            var typesPhase = TypesPhase(
-                package: package,
-                files: fileSet.owned,
+            else {
+                var typesPhase = TypesPhase(
+                    package: package,
+                    files: fileSet.targetFiles,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                typesPhase.parsed = Dictionary(
+                    parsed.files.map { ($0.url.path, $0.tree) },
+                    uniquingKeysWith: { first, _ in first },
+                )
+                targets = try typesPhase.run()
+            }
+            let scripts = fileSet.scripts
+            guard !scripts.isEmpty else { return targets }
+            let checked = try ScriptTypesPhase(
+                scripts: scripts,
                 scratchPath: runScratch(for: root),
-                resolutionAllowed: !options.noFix,
-                toolchain: toolchain,
+                workingDirectory: root,
                 runner: runner,
             )
-            typesPhase.parsed = Dictionary(
-                parsed.files.map { ($0.url.path, $0.tree) },
-                uniquingKeysWith: { first, _ in first },
-            )
-            return try typesPhase.run()
+            .run()
+            return ScriptTypesPhase.adding(checked, count: scripts.count, to: targets)
         }
 
         var typeErrors = 0
@@ -581,9 +598,9 @@ public struct Pipeline {
                 layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
-            symbolProvider.ownedModules = Self.ownedModules(of: package).union(
-                Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts)
-            )
+            symbolProvider.ownedModules = Self.ownedModules(of: package)
+                .union(Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts))
+                .union(fileSet.scripts.map(\.targetName))
             linter.symbols = symbolProvider.symbols(for: typedCandidates)
             if let lintBuildFailure {
                 linter.symbols.unavailable = linter.symbols.unavailable.mapValues {
@@ -697,7 +714,7 @@ public struct Pipeline {
         let phase = XcodeTypesPhase(
             package: package,
             project: project,
-            files: fileSet.owned,
+            files: fileSet.targetFiles,
             scratchPath: runScratch(for: root),
             resolutionAllowed: !options.noFix,
             toolchain: toolchain,
@@ -789,6 +806,7 @@ public struct Pipeline {
                 layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
             )
         )
+        unusedDeclarations.ownedModules.formUnion(fileSet.scripts.map(\.targetName))
         let declarations = unusedDeclarations.run(files: files)
         try writeReport(
             rule: UnusedDeclarations.ruleName,
@@ -846,11 +864,13 @@ public struct Pipeline {
         elapsed: Int,
     ) -> ProjectRecord {
         let counts = Dictionary(grouping: fileSet.owned, by: \.targetName).mapValues(\.count)
+        /* A script is a file of ours that no target compiles, so it counts among the package's files too, and its own target is listed beside the package's. */
+        let scripts = fileSet.scripts
         return ProjectRecord(
             root: package.root.path,
             package: package.name,
             elapsedMilliseconds: elapsed,
-            filesInPackage: fileSet.filesInPackage.count,
+            filesInPackage: fileSet.filesInPackage.count + scripts.count,
             filesOurs: fileSet.owned.count,
             filesInScope: scope.files.count,
             scopeDescription: scope.description,
@@ -865,7 +885,10 @@ public struct Pipeline {
                         languageMode: target.languageMode,
                     )
                 }
-            },
+            }
+                + scripts.map {
+                    ProjectRecord.Target(name: $0.targetName, kind: "script", files: 1, languageMode: "6")
+                },
             excluded: fileSet.excluded,
             projectKind: package.projectKind.rawValue,
         )
@@ -937,17 +960,20 @@ public struct Pipeline {
      Every check or build of this package that writes an index store and compile commands: for a package, whatever
      platform it is checked for, the root's scratch and each local package's that the types phase checks for its
      tests; for an Xcode root, the one xcodebuild's derived data, which every target and linked package builds into.
+     And for either, the check of the standalone scripts of ours (`ScriptTypesPhase`).
      */
     static func symbolLayouts(package: PackageModel, scratch: URL) -> [BuildLayout] {
+        /* The scripts' check, last: its store and commands describe only scripts, so no other file is looked for there first. */
+        let scripts = BuildLayout.check(scratchPath: ScriptTypesPhase.scratchPath(in: scratch))
         guard package.projectKind == .swiftPackage else {
-            return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch))]
+            return [.xcode(derivedData: XcodeTypesPhase.derivedData(scratchPath: scratch)), scripts]
         }
         let scratchPaths =
             [scratch]
             + package.localPackages.map {
                 scratch.appendingPathComponent("local/\($0.root.lastPathComponent)", isDirectory: true)
             }
-        return scratchPaths.map { .check(scratchPath: $0) }
+        return scratchPaths.map { .check(scratchPath: $0) } + [scripts]
     }
 
     /* Each owned package's manifest, parsed, so package rules can point at the line that would fix them. A manifest that cannot be read is absent, and its findings point at line 1. */

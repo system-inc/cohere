@@ -17,7 +17,8 @@ import SwiftSyntax
  - An extension of any other type belongs in that type's `+Purpose` file. A nested type can be named
    either way: `Outer.Inner+Purpose.swift` or `Outer+Purpose.swift`.
  - `main.swift` keeps its name, which SwiftPM gives meaning to (top-level code), so naming is not judged
-   there. One-type-per-file still is.
+   there. One-type-per-file still is. A standalone script is judged as `main.swift` is (#13nbb1s): its name is
+   the command a person types, `swift Icon/Glyph.swift`, and the types it declares serve the code it runs.
  - Two extensions of another type stay beside the file's type, because moving them would cost what the
    ruling is for. Both were raised by @system_cohere_swift_ahraos_macos on real code:
    - A `private` or `fileprivate` extension. It is used only in this file, and moving it out would force
@@ -46,7 +47,7 @@ public struct ConsistencyRequireMatchingFileName: FileRule {
     public init() {}
 
     public func applies(to file: ParsedFile) -> Bool {
-        file.url.lastPathComponent != "main.swift"
+        file.url.lastPathComponent != "main.swift" && file.scriptPlatform == nil
     }
 
     public func findings(in file: ParsedFile) -> [FindingRecord] {

@@ -73,7 +73,7 @@ struct IgnoreRulesTests {
             "Package.swift": "",
             "Sources/A/A.swift": "",
             "Sources/A/Generated.swift": "",
-            "Script.swift": "",
+            "Stray.swift": "",
         ])
         let describe =
             #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["A.swift","Generated.swift"]}]}"#
@@ -91,7 +91,8 @@ struct IgnoreRulesTests {
         #expect(
             reasons == [
                 "Generated.swift": "ignored by git", "Package.swift": "a package manifest",
-                "Script.swift": "no target of this package compiles it",
+                "Stray.swift":
+                    "no target of this package compiles it, and it holds only declarations, so it is no script to check alone",
             ]
         )
         #expect(fileSet.note.isEmpty)
@@ -164,15 +165,17 @@ struct IgnoreRulesTests {
     @Test func anUntaggedBuildDirectoryAndAnotherCacheAreWalked() throws {
         let excluded = try Self.excluded(packageFiles: [
             ".gitignore": "",
-            ".build/Script.swift": "",
+            ".build/Stray.swift": "",
             ".build/CACHEDIR.TAG": "not the signature\n",
-            ".cache/other/Script.swift": "",
+            ".cache/other/Stray.swift": "",
         ])
         #expect(
             excluded == [
                 "Package.swift": "a package manifest",
-                ".build/Script.swift": "no target of this package compiles it",
-                ".cache/other/Script.swift": "no target of this package compiles it",
+                ".build/Stray.swift":
+                    "no target of this package compiles it, and it holds only declarations, so it is no script to check alone",
+                ".cache/other/Stray.swift":
+                    "no target of this package compiles it, and it holds only declarations, so it is no script to check alone",
             ]
         )
     }

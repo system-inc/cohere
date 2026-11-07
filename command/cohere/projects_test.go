@@ -763,8 +763,8 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		{alias + "/CapturePhone/App/App.swift", "no target of this package compiles it"},
 		{alias + "/Tools/Sim/Package.swift", "a package manifest"},
 		{alias + "/Tools/Sim/Sources/Toy/Toy.swift", "no target of this package compiles it"},
-		{alias + "/Scripts/build.swift", "no target of this package compiles it"},
-		{alias + "/Scripts/odd.swift", "a reason no engine has given yet"},
+		{alias + "/Stray/Leftover.swift", declarationsOnlyReason},
+		{alias + "/Stray/odd.swift", "a reason no engine has given yet"},
 		{alias + "/Package.swift", "a package manifest"},
 		{alias + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
 		{alias + "/Scratch.swift", "ignored by git"},
@@ -783,8 +783,8 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		"== CapturePhone (Swift) ==",
 		"== Tools/Sim (Swift) ==",
 		"Libraries/Lib not run: checked as part of .",
-		"  not checked: " + alias + "/Scripts/build.swift (no target of this package compiles it)\n",
-		"  not checked: " + alias + "/Scripts/odd.swift (a reason no engine has given yet)\n",
+		"  not checked: " + alias + "/Stray/Leftover.swift (" + declarationsOnlyReason + ")\n",
+		"  not checked: " + alias + "/Stray/odd.swift (a reason no engine has given yet)\n",
 		"  not checked: " + alias + "/Package.swift (a package manifest)\n",
 		"  not checked: " + alias + "/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
 		"  not checked: " + alias + "/Scratch.swift (ignored by git)\n",
@@ -820,7 +820,7 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 	}) ||
 		gapFooters != 1 || len(footers["."]) != 1 {
 		test.Errorf(
-			"the footers are %q, want the root's Swift one alone to end on the gap of build.swift and odd.swift",
+			"the footers are %q, want the root's Swift one alone to end on the gap of Leftover.swift and odd.swift",
 			footers,
 		)
 	}
@@ -887,13 +887,13 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		gaps[summary.Label] = append(gaps[summary.Label], summary.Gaps.UncheckedSwift...)
 	}
 	wantGaps := []map[string]string{
-		{"file": alias + "/Scripts/build.swift", "reason": "no target of this package compiles it"},
-		{"file": alias + "/Scripts/odd.swift", "reason": "a reason no engine has given yet"},
+		{"file": alias + "/Stray/Leftover.swift", "reason": declarationsOnlyReason},
+		{"file": alias + "/Stray/odd.swift", "reason": "a reason no engine has given yet"},
 	}
 	if !reflect.DeepEqual(gaps[". (Swift)"], wantGaps) || len(gaps["."]) != 0 || len(gaps["CapturePhone"]) != 0 ||
 		len(gaps["Tools/Sim"]) != 0 {
 		test.Errorf(
-			"under --json the gaps are %v, want build.swift and odd.swift for . (Swift) and none for the others:\n%s",
+			"under --json the gaps are %v, want Leftover.swift and odd.swift for . (Swift) and none for the others:\n%s",
 			gaps,
 			output,
 		)

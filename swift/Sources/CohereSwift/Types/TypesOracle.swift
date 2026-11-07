@@ -94,7 +94,7 @@ public struct TypesOracle {
         let package =
             try xcodeProject?.model
             ?? PackageModel.load(root: root, scratchPath: scratchPath, runner: runner, toolchain: toolchain)
-        let files = try FileSet.build(package: package).owned
+        let files = try FileSet.build(package: package).targetFiles
         let xcodePhase = xcodeProject.map { project in
             XcodeTypesPhase(
                 package: package,

@@ -21,6 +21,11 @@ public struct FileSet: Equatable, Sendable {
         public var targetKind: String
         /* The root of the package whose target compiles it. */
         public var packageRoot: URL?
+        /*
+         The platform a standalone script is checked for, nil for a file a target compiles. A script's target is its own,
+         named for the module `swift <file>` compiles it into (`StandaloneScript`).
+         */
+        var scriptPlatform: StandaloneScript.Platform?
 
         public init(url: URL, targetName: String, targetKind: String, packageRoot: URL? = nil) {
             self.packageRoot = packageRoot
@@ -42,6 +47,12 @@ public struct FileSet: Equatable, Sendable {
      */
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
+
+    /* The files of ours a target compiles, which the package's or the Xcode project's types phase checks. */
+    public var targetFiles: [OwnedFile] { owned.filter { $0.scriptPlatform == nil } }
+
+    /* The standalone scripts of ours, each checked alone (`ScriptTypesPhase`). */
+    public var scripts: [OwnedFile] { owned.filter { $0.scriptPlatform != nil } }
 
     public init(filesInPackage: [URL], owned: [OwnedFile], excluded: [ProjectRecord.ExcludedFile], note: String) {
         self.filesInPackage = filesInPackage
@@ -88,9 +99,10 @@ public struct FileSet: Equatable, Sendable {
 
         /*
          Swift files git would list under the package that no target compiles: standalone scripts, the manifests, an
-         app built by an Xcode project, a separate package beside this one. None is checked by this run, and
-         each is named, so a clean verdict over the targets cannot read as a clean verdict over the directory.
-         Measured on Presence: 20 such files, holding 56 force unwraps the target files do not.
+         app built by an Xcode project, a separate package beside this one. Measured on Presence: 20 such files,
+         holding 56 force unwraps the target files do not. A script whose nearest project is this run's is ours,
+         checked alone (`StandaloneScript`, #13nbb1s). Every other is named, so a clean verdict over the targets cannot
+         read as a clean verdict over the directory, and a file below a project of its own is left to that project's run.
          */
         if let ignoreRules {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
@@ -103,14 +115,64 @@ public struct FileSet: Equatable, Sendable {
                     skippingWhere: Self.isCohereCache,
                 )
             )
+            let coveredRoots = Dictionary(
+                package.allPackages.filter { member in
+                    member.root == package.root
+                        || (PackageModel.isInside(member.root, package.root) && !package.isVendored(member))
+                }
+                .map { ($0.root.resolvingSymlinksInPath().path, $0.root) },
+                uniquingKeysWith: { first, _ in first },
+            )
+            var projectDirectories: [String: Bool] = [:]
+            var scriptModules = Set<String>()
             for path in visible.sorted()
             where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
                 let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
-                let reason =
-                    underVendor
-                    ? "vendored under Vendor/"
-                    : path.hasSuffix("/Package.swift") ? "a package manifest" : "no target of this package compiles it"
-                excluded.append(.init(file: path, reason: reason))
+                if underVendor || path.hasSuffix("/Package.swift") {
+                    excluded.append(
+                        .init(file: path, reason: underVendor ? "vendored under Vendor/" : "a package manifest")
+                    )
+                    continue
+                }
+                let url = URL(fileURLWithPath: path)
+                guard
+                    let packageRoot = Self.coveringRoot(
+                        of: path,
+                        resolvedRoot: resolvedRoot,
+                        coveredRoots: coveredRoots,
+                        projectDirectories: &projectDirectories,
+                    )
+                else {
+                    excluded.append(.init(file: path, reason: Self.notCompiledReason))
+                    continue
+                }
+                guard let source = try? String(contentsOf: url, encoding: .utf8) else {
+                    excluded.append(.init(file: path, reason: Self.unreadableReason))
+                    continue
+                }
+                switch StandaloneScript.read(source: source) {
+                    case .declarationsOnly:
+                        excluded.append(.init(file: path, reason: Self.declarationsOnlyReason))
+                    case .platformsDisagree(let words):
+                        excluded.append(.init(file: path, reason: Self.platformsDisagreeReason(words)))
+                    case .script(let platform):
+                        /* Two scripts of one name would share a module's records and index units, so a later one takes a number. */
+                        let base = StandaloneScript.moduleName(of: url)
+                        var module = base
+                        var suffix = 2
+                        while !scriptModules.insert(module).inserted {
+                            module = "\(base)_\(suffix)"
+                            suffix += 1
+                        }
+                        var script = OwnedFile(
+                            url: url,
+                            targetName: module,
+                            targetKind: StandaloneScript.targetKind,
+                            packageRoot: packageRoot,
+                        )
+                        script.scriptPlatform = platform
+                        owned.append(script)
+                }
             }
         }
 
@@ -122,6 +184,59 @@ public struct FileSet: Equatable, Sendable {
         fileSet.ignoreFilesConsulted = (ignoreRules?.filesConsulted ?? []).sorted()
         fileSet.directoriesListed = ignoreRules?.directoriesListed ?? []
         return fileSet
+    }
+
+    /*
+     Why a file no target compiles is not checked, in the words the project record gives. The front door expects none
+     of them (`ExpectedExclusionReasons` in command/cohere), so each is the run's gap but the first, which only a file
+     below a project of its own is given, and that project's run accounts for it.
+     */
+    static let notCompiledReason = "no target of this package compiles it"
+    static let unreadableReason =
+        "no target of this package compiles it, and it could not be read as UTF-8 to tell whether it is a script"
+    static let declarationsOnlyReason =
+        "no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+
+    static func platformsDisagreeReason(_ words: String) -> String {
+        "a script whose imports do not settle its platform: \(words), so neither SDK was guessed at"
+    }
+
+    /*
+     The root of the package whose directory is the nearest project above the file at `path`, when that is this run's
+     root or a local package inside it the run covers; nil when a project of its own is nearer, whose run checks the
+     file. A project is what a run would check at a directory (`XcodeProject.rootProject`): a Package.swift, a
+     project.yml or one .xcodeproj, and a directory a run would refuse counts too, since its files are not this run's
+     either. Each directory is asked once, in `projectDirectories`.
+     */
+    static func coveringRoot(
+        of path: String,
+        resolvedRoot: String,
+        coveredRoots: [String: URL],
+        projectDirectories: inout [String: Bool],
+    ) -> URL? {
+        var directory = (path as NSString).deletingLastPathComponent
+        while directory == resolvedRoot || directory.hasPrefix(resolvedRoot + "/") {
+            if let covered = coveredRoots[directory] {
+                return covered
+            }
+            let isProject =
+                projectDirectories[directory]
+                ?? {
+                    do {
+                        return try XcodeProject.rootProject(at: URL(fileURLWithPath: directory, isDirectory: true))
+                            != nil
+                    }
+                    catch {
+                        return true
+                    }
+                }()
+            projectDirectories[directory] = isProject
+            if isProject {
+                return nil
+            }
+            directory = (directory as NSString).deletingLastPathComponent
+        }
+        return nil
     }
 
     /*

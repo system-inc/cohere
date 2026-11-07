@@ -221,7 +221,8 @@ type runGaps struct {
 	UnclaimedSwift []unclaimedSwiftDirectory `json:"unclaimedSwift,omitempty"`
 	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
 	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
-	// them, less those the runs of the Swift projects below it account for (#ybspptb). A gap, not a failure.
+	// them and they are no standalone script the run checks alone (#13nbb1s), less those the runs of the Swift
+	// projects below it account for (#ybspptb). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
 	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,

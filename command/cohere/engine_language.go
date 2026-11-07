@@ -63,7 +63,9 @@ var swiftLanguage = engineLanguage{
 	CompilerLabel: "swiftc",
 	VersionLines:  swiftVersionLines,
 	// In swift/Sources/CohereSwift/Project/FileSet.swift's words: what git ignores, what is vendored, and the
-	// manifests. `no target of this package compiles it` is a gap, and so is whatever sentence comes next.
+	// manifests. A standalone script is checked, alone (#13nbb1s), so it is never excluded. Every other file no
+	// target compiles is a gap, a file of declarations only and a script whose imports name two platforms, and so
+	// is whatever sentence comes next.
 	ExpectedExclusionReasons: map[string]bool{
 		"ignored by git":         true,
 		"vendored under Vendor/": true,

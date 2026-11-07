@@ -62,6 +62,7 @@ struct FileFixer {
             }
             let counter = NodeCounter(viewMode: .sourceAccurate)
             counter.walk(tree)
+            let scriptPlatform = current.scriptPlatform
             current = ParsedFile(
                 url: current.url,
                 targetName: current.targetName,
@@ -71,6 +72,7 @@ struct FileFixer {
                 nodeCount: counter.count,
                 packageRoot: current.packageRoot,
             )
+            current.scriptPlatform = scriptPlatform
             applied += result.applied
             appliedByRule.merge(result.appliedByRule, uniquingKeysWith: +)
             /* The text moved past what this pass found; only a later pass over it can stand for lint. */

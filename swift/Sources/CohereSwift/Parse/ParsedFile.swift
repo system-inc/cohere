@@ -19,6 +19,8 @@ public struct ParsedFile: Sendable {
     public var nodeCount: Int
     /* The root of the package whose target compiles this file (a local package's own root, not the checked root's); nil where nothing set it, such as a test fixture. */
     public var packageRoot: URL?
+    /* The platform a standalone script is checked for, nil for a file a target compiles (`FileSet.OwnedFile.scriptPlatform`). */
+    var scriptPlatform: StandaloneScript.Platform?
 
     public init(
         url: URL,

@@ -559,6 +559,11 @@ type excludedFile struct {
 	reason string
 }
 
+// declarationsOnlyReason is the engine's reason for a file no target compiles that holds only declarations, so
+// it is no standalone script to check alone (swift/Sources/CohereSwift/Project/FileSet.swift, #13nbb1s). A script
+// is checked, and the bare `no target of this package compiles it` is left for a file below a project of its own.
+const declarationsOnlyReason = "no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+
 // projectRecordAt is a contract fixture's project record moved to root, its excluded files replaced, so a
 // test can state which files the engine left out and why.
 func projectRecordAt(test *testing.T, record string, root string, excluded []excludedFile) string {
@@ -627,8 +632,8 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 		excluded := []excludedFile{
 			{engineRoot + "/CapturePhone/App/App.swift", "no target of this package compiles it"},
 			{engineRoot + "/Tools/Sim/Package.swift", "a package manifest"},
-			{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
-			{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+			{engineRoot + "/Stray/Leftover.swift", declarationsOnlyReason},
+			{engineRoot + "/Stray/odd.swift", "a reason no engine has given yet"},
 			{engineRoot + "/Package.swift", "a package manifest"},
 			{engineRoot + "/Vendor/Kit/Kit.swift", "vendored under Vendor/"},
 			{engineRoot + "/Scratch.swift", "ignored by git"},
@@ -651,19 +656,22 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 			}
 			forbidLines(test, output, "CapturePhone/App/App.swift", "Tools/Sim/Package.swift")
 			requireLines(test, output,
-				"  not checked: "+engineRoot+"/Scripts/build.swift (no target of this package compiles it)\n",
-				"  not checked: "+engineRoot+"/Scripts/odd.swift (a reason no engine has given yet)\n",
+				"  not checked: "+engineRoot+"/Stray/Leftover.swift ("+declarationsOnlyReason+")\n",
+				"  not checked: "+engineRoot+"/Stray/odd.swift (a reason no engine has given yet)\n",
 				"  not checked: "+engineRoot+"/Package.swift (a package manifest)\n",
 				"  not checked: "+engineRoot+"/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
 				"  not checked: "+engineRoot+"/Scratch.swift (ignored by git)\n",
 			)
 			wantGap := []uncheckedSwiftFile{
-				{engineRoot + "/Scripts/build.swift", "no target of this package compiles it"},
-				{engineRoot + "/Scripts/odd.swift", "a reason no engine has given yet"},
+				{engineRoot + "/Stray/Leftover.swift", declarationsOnlyReason},
+				{engineRoot + "/Stray/odd.swift", "a reason no engine has given yet"},
 			}
 			if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
-				test.Errorf("the gap is %v, want %v: build.swift and odd.swift, and none of the three expected reasons",
-					activeSummary.Gaps.UncheckedSwift, wantGap)
+				test.Errorf(
+					"the gap is %v, want %v: Leftover.swift and odd.swift, and none of the three expected reasons",
+					activeSummary.Gaps.UncheckedSwift,
+					wantGap,
+				)
 			}
 			if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 2 Swift files not checked") {
 				test.Errorf("the footer's markers are %q, want the gap among them", markers)
@@ -746,12 +754,12 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	for index := range excludedNamedLimit + 1 {
 		letter := string(rune('a' + index))
 		excluded = append(excluded,
-			excludedFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"},
+			excludedFile{"/project/Stray/S" + letter + ".swift", declarationsOnlyReason},
 			excludedFile{"/project/Vendor/V" + letter + ".swift", "vendored under Vendor/"},
 		)
 		wantGap = append(
 			wantGap,
-			uncheckedSwiftFile{"/project/Scripts/S" + letter + ".swift", "no target of this package compiles it"},
+			uncheckedSwiftFile{"/project/Stray/S" + letter + ".swift", declarationsOnlyReason},
 		)
 	}
 	clean := contractFixture(test, "Clean.jsonl")
@@ -775,7 +783,7 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	forbidLines(
 		test,
 		output,
-		"files (no target of this package compiles it)",
+		"files ("+declarationsOnlyReason+")",
 		"/project/Vendor/Va.swift",
 		"/project/App/Main.swift",
 	)
