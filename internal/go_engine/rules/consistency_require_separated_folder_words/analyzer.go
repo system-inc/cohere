@@ -13,10 +13,11 @@
 // its module's root is not judged by its folder, whose name is the module's (typescript-go's tsoptions shim is one).
 // A finding in a file that declares itself `cohere:copied` is withheld by the engine, not the rule, as every house
 // rule's is there, so a copied package such as x/tools' analysistest needs nothing. Any other folder that mirrors
-// another project's name, such as the micromark library's, keeps it through the house suppression, on its own line
-// directly above the package clause the finding is at:
+// another project's name, such as the micromark library's, keeps it through the house suppression, a file-ignore in
+// the file the finding is at. The finding sits at that file's start, about the file's place rather than any line of
+// it, and a line directive covers only the line after it, so none can sit above the first:
 //
-//	//cohere:ignore cohere-go/consistency-require-separated-folder-words the micromark library's name
+//	//cohere:file-ignore consistency-require-separated-folder-words the micromark library's name
 //
 // The rule knows no mirror itself, so the reason lives beside the name it excuses, and one that withholds nothing is
 // a cohere-go/consistency-no-unused-ignore finding.
@@ -44,7 +45,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_separated_folder_words",
 	Doc: "Flags a package whose folder, the last element of its import path below its module root, runs two or more " +
 		"words together, or whose package clause does where it differs from the folder and is not main, once per " +
-		"package at the package clause of its first file by name that is neither a test nor generated.",
+		"package in its first file by name that is neither a test nor generated: a folder at the file's start, and " +
+		"a clause on the clause.",
 	Run: run,
 }
 
@@ -79,10 +81,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// finding is reported once, for the folder, as consistency-no-utils-folder does.
 	if folderJudged {
 		if replacement, runTogether := folder_words.Separated(folder, goSpelling); runTogether {
-			report(pass, file, runTogetherFolderMessage, map[string]string{
-				"folder":      folder,
-				"replacement": replacement,
-			})
+			reportFolder(pass, file, map[string]string{"folder": folder, "replacement": replacement})
 			return nil, nil
 		}
 	}
@@ -91,10 +90,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	if replacement, runTogether := folder_words.Separated(clause, goSpelling); runTogether {
-		report(pass, file, runTogetherPackageNameMessage, map[string]string{
-			"package":     clause,
-			"replacement": replacement,
-		})
+		reportPackageName(pass, file, map[string]string{"package": clause, "replacement": replacement})
 	}
 	return nil, nil
 }
@@ -116,8 +112,9 @@ func packageFolder(pass *analysis.Pass) (string, bool) {
 
 // reportedFile is the file the package's one finding is at: the first by base name that is neither a test nor
 // generated, so the finding sits in the source a reader opens first and a directive excusing it has one home, or the
-// first of all when every file is one or the other, as in an external test package. The name is the one a finding
-// prints, a //line directive's included, and is compared whole, so the order is the same on every run and machine.
+// first of all when every file is one or the other, as in an external test package. The name is the file's own, read
+// at its start, which no //line directive reaches, so the order is by the name the finding prints, and it is compared
+// whole, so the order is the same on every run and machine.
 func reportedFile(pass *analysis.Pass) *ast.File {
 	if len(pass.Files) == 0 {
 		return nil
@@ -134,18 +131,30 @@ func reportedFile(pass *analysis.Pass) *ast.File {
 	return files[0]
 }
 
-// baseName is the name of the file a finding at file's package clause prints, without its folder.
+// baseName is the name of file without its folder, read at its start, where the folder finding prints.
 func baseName(pass *analysis.Pass, file *ast.File) string {
-	return filepath.Base(pass.Fset.Position(file.Package).Filename)
+	return filepath.Base(pass.Fset.Position(file.FileStart).Filename)
 }
 
-// report flags the package clause from its `package` keyword to the end of its name, since the clause is where the
-// package names itself, and where a directive excusing a mirror sits directly above.
-func report(pass *analysis.Pass, file *ast.File, message policy.MessageHandle, values map[string]string) {
+// reportFolder flags file at its start, a point rather than a range, since the finding is about the folder the
+// file sits in and no text inside the file is to blame, as every engine's folder finding and
+// consistency-no-utils-folder's are.
+func reportFolder(pass *analysis.Pass, file *ast.File, values map[string]string) {
+	pass.Report(analysis.Diagnostic{
+		Pos:      file.FileStart,
+		End:      file.FileStart,
+		Category: runTogetherFolderMessage.Id,
+		Message:  runTogetherFolderMessage.Render(values),
+	})
+}
+
+// reportPackageName flags the package clause from its `package` keyword to the end of its name, since the finding is
+// about the name the clause gives the package, which is text in the file a reader renames.
+func reportPackageName(pass *analysis.Pass, file *ast.File, values map[string]string) {
 	pass.Report(analysis.Diagnostic{
 		Pos:      file.Package,
 		End:      file.Name.End(),
-		Category: message.Id,
-		Message:  message.Render(values),
+		Category: runTogetherPackageNameMessage.Id,
+		Message:  runTogetherPackageNameMessage.Render(values),
 	})
 }
