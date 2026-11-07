@@ -37,6 +37,21 @@ struct FileSymbolsTests {
         )
     }
 
+    /*
+     A member of a constrained extension of ours on a standard library type is ours (#awb2ykk). Its symbol puts the
+     extension's generic signature between our module and the `E` that marks the extension (`SiRsz` is
+     `Element == Int`), which the demangler reads and a reading of the mangling did not. The standard library's own
+     members of the same types still are its own. Red under the reading that expected the `E` right after the module.
+     */
+    @Test func aConstrainedExtensionOfOursIsNot() {
+        #expect(!Self.isStandardLibrary("s:Sa7ControlSiRszlE5countSivp"), "Array where Element == Int")
+        #expect(!Self.isStandardLibrary("s:SD7ControlSSRszrlE5countSivp"), "Dictionary where Key == String")
+        #expect(!Self.isStandardLibrary("s:Sh7ControlSiRszlE5countSivp"), "Set where Element == Int")
+        #expect(Self.isStandardLibrary("s:Sa5countSivp"))
+        #expect(Self.isStandardLibrary("s:SD5countSivp"))
+        #expect(Self.isStandardLibrary("s:Sh5countSivp"))
+    }
+
     @Test func ourOwnDeclarationsAreNot() {
         #expect(!Self.isStandardLibrary("s:7Control5TallyV5countSivp"))
         #expect(!Self.isStandardLibrary("c:objc(cs)NSArray(py)count"))

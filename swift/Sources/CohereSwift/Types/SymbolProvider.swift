@@ -30,6 +30,21 @@ struct SymbolProvider {
     func symbols(for files: [ParsedFile]) -> Result {
         var result = Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
         guard !files.isEmpty else { return result }
+        /*
+         The demangler tells the standard library's declarations from an extension of ours on its types
+         (`FileSymbols.Occurrence.isStandardLibrary`), so a file is judged only once it is loaded. Without it, no file
+         is: each says why, as a file no source could describe does.
+         */
+        do {
+            _ = try SwiftDemangler.shared(runner: runner)
+        }
+        catch {
+            for file in files {
+                result.unavailable[file.url.path] =
+                    "the demangler that tells the standard library's declarations from ours could not load: \(error)"
+            }
+            return result
+        }
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
             stores = layouts.compactMap {

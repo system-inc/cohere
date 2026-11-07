@@ -90,6 +90,42 @@ struct EmptyCountTests {
         #expect(run.complete)
     }
 
+    /*
+     A `count` of our own constrained extension on `Array`, `Dictionary` and `Set`, which the compiler picks over the
+     standard library's for those element types, is not flagged, and the standard library's `count` on other element
+     types still is (#awb2ykk). Red under the reading of the symbol that took the constrained extension's members for
+     the standard library's.
+     */
+    static let constrainedSource = """
+        extension Array where Element == Int {
+            var count: Int { 7 }
+        }
+
+        extension Dictionary where Key == String {
+            var count: Int { 7 }
+        }
+
+        extension Set where Element == Int {
+            var count: Int { 7 }
+        }
+
+        func checks(numbers: [Int], names: [String: Int], seen: Set<Int>, words: [String], tags: [Int: String], codes: Set<String>) -> Bool {
+            numbers.count == 0 || names.count == 0 || seen.count == 0
+                || words.count == 0 || tags.count == 0 || codes.count == 0
+        }
+
+        """
+
+    @Test func aCountOfOurConstrainedExtensionIsNotFlagged() async throws {
+        let package = try Package(source: Self.constrainedSource)
+        let run = try await package.run()
+        #expect(
+            run.lines == [15, 15, 15],
+            "expected only the standard library's three on line 15, none of ours on 14: \(run.lines)",
+        )
+        #expect(run.crashes == 0)
+    }
+
     /* A body-only edit is checked without building, so the index no longer describes the file, and sourcekitd must. */
     @Test func aFileTheIndexNoLongerDescribesIsAskedInProcess() async throws {
         let package = try Package(source: Self.source)

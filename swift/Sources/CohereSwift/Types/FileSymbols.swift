@@ -49,45 +49,27 @@ public struct FileSymbols: Sendable {
 
         /*
          Declared by the Swift standard library. Its symbols name their type first, as a standard substitution
-         (`s:Sa`, `s:ST`) or `s` and a length-prefixed name and a kind letter (`s:s14_ArrayProtocolP`). The prefix
-         alone is not enough: a member an extension adds names the extending module next, `s:ST7ControlE6sorted`
-         for our own `extension Sequence` or `s:ST10FoundationE` for Foundation's, where the standard library's
-         own extensions spell that module `s` (`s:STsE5first`). Found by the sorted-first-last rule, whose
-         key-path `sorted(by:)` of ours read as the standard library's.
+         (`s:Sa`, `s:ST`, `s:ScT`) or `s` and a length-prefixed name (`s:s14_ArrayProtocolP`), and `So` and `SC` are
+         types imported from C and Objective-C (`s:So6CGRectV`), not its own. The type alone is not enough: a member an
+         extension adds is the extending module's, `s:ST7ControlE6sorted` for our own `extension Sequence` or
+         `s:ST10FoundationE` for Foundation's (found by the sorted-first-last rule, whose key-path `sorted(by:)` of ours
+         read as the standard library's). Which module declares a member is the demangler's answer
+         (`SwiftDemangler.module(ofSymbol:)`), never a reading of the mangling of ours: a constrained extension's generic
+         signature sits between the module and the `E` that marks it, `s:Sa7ControlSiRszlE5count` for our `count` in an
+         `extension Array where Element == Int` (#awb2ykk), and an earlier reading took that for the standard library's.
+         The standard library's underscored companion modules ship with it and are its own (`_Concurrency` adds
+         AsyncSequence's `filter`). A symbol the demangler cannot place is not the standard library's, so a rule that
+         asks says nothing of it rather than flag our code. `SymbolProvider` loads the demangler before any typed rule
+         reads a file's symbols, and a file it cannot load for is unchecked, never judged without it.
          */
         public var isStandardLibrary: Bool {
             guard symbol.hasPrefix("s:") else { return false }
-            var rest = symbol.utf8.dropFirst(2)
-            /* `So` and `SC` are types imported from C and Objective-C (`s:So6CGRectV...`), not the standard library's. */
-            if rest.starts(with: "So".utf8) || rest.starts(with: "SC".utf8) {
-                return false
-            }
-            if rest.starts(with: "Sc".utf8) {
-                /* The concurrency substitutions are three characters: `ScT` Task, `Sci` AsyncSequence. */
-                rest = rest.dropFirst(3)
-            }
-            else if rest.first == UInt8(ascii: "S") {
-                rest = rest.dropFirst(2)
-            }
-            else if rest.first == UInt8(ascii: "s") {
-                rest = rest.dropFirst()
-                let digits = rest.prefix { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
-                guard let length = Int(String(decoding: digits, as: UTF8.self)) else { return false }
-                rest = rest.dropFirst(digits.count + length + 1)
-            }
-            else {
-                return false
-            }
-            /*
-             What follows the type: a member, or the module of an extension, a length-prefixed name and `E`. The
-             standard library's underscored companion modules ship with it and are its own (`_Concurrency` adds
-             AsyncSequence's `filter`, `s:Sci12_ConcurrencyE6filter`); any other module's extension is not.
-             */
-            let digits = rest.prefix { $0 >= UInt8(ascii: "0") && $0 <= UInt8(ascii: "9") }
-            guard let length = Int(String(decoding: digits, as: UTF8.self)) else { return true }
-            let module = rest.dropFirst(digits.count).prefix(length)
-            guard rest.dropFirst(digits.count + length).first == UInt8(ascii: "E") else { return true }
-            return module.first == UInt8(ascii: "_")
+            let rest = symbol.utf8.dropFirst(2)
+            guard !rest.starts(with: "So".utf8), !rest.starts(with: "SC".utf8),
+                rest.first == UInt8(ascii: "S") || rest.first == UInt8(ascii: "s"),
+                let module = (try? SwiftDemangler.shared())?.module(ofSymbol: symbol)
+            else { return false }
+            return module == "Swift" || module.hasPrefix("_")
         }
     }
 
