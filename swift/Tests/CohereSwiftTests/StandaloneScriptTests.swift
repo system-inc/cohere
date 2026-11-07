@@ -36,7 +36,7 @@ struct StandaloneScriptTests {
         """
 
     /* A package with one clean target, in a repository, with these files beside it, its root resolved. */
-    static func package(files: [String: String]) throws -> URL {
+    static func package(files: [String: String], inRepository: Bool = true) throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-script-\(UUID().uuidString)",
             isDirectory: true,
@@ -45,8 +45,8 @@ struct StandaloneScriptTests {
             [
                 "Package.swift": PipelineControlTests.manifest,
                 "Sources/Control/Control.swift": PipelineControlTests.cleanSource,
-                ".git/info/exclude": "",
-            ],
+            ]
+            .merging(inRepository ? [".git/info/exclude": ""] : [:], uniquingKeysWith: { first, _ in first }),
             uniquingKeysWith: { first, _ in first },
         )
         for (path, text) in all {
@@ -243,6 +243,43 @@ struct StandaloneScriptTests {
         #expect(run.findings.isEmpty, "\(run.of("finding"))")
         #expect(run.exitCode == 0)
         #expect(run.typesBuild.hasSuffix("(1 for iOS)"), "\(run.typesBuild)")
+    }
+
+    /*
+     Outside a git repository, a `git archive` copy of ahraos-presence say, a script is checked and a file of
+     declarations named, as in a checkout: the walk reads the package's own ignore files as git would, so what they
+     ignore (here a build folder holding a generated script) is no more this run's than in a repository. Before, no
+     walk ran outside git, and the copy's two Glyph scripts were neither checked nor named (the presence Circle,
+     2026-11-07).
+     */
+    @Test func outsideAnyRepositoryAScriptIsCheckedAndADeclarationsFileNamed() async throws {
+        let root = try Self.package(
+            files: [
+                ".gitignore": "Build/\n",
+                "Icon/Glyph.swift": Self.appKitScript,
+                "Stray/Leftover.swift": "struct Leftover {\n    let value: Int\n}\n",
+                "Build/Generated.swift": "print(1)\n",
+            ],
+            inRepository: false,
+        )
+        defer { XcodeProjectPipelineTests.remove(root) }
+        #expect(
+            IgnoreRules.Repository.containing(root) == nil,
+            "the temporary directory sits inside a repository, so this test proves nothing",
+        )
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.findings.isEmpty, "\(run.of("finding"))")
+        #expect(Self.scriptTargets(run) == ["Glyph:1"])
+        #expect(
+            Self.excluded(run) == [
+                "Leftover.swift: no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+            ]
+        )
+        #expect(run.of("project").first?["filesOurs"] as? Int == 2)
+        #expect(run.typesRecord["files"] as? Int == 2)
+        #expect(run.complete == true)
     }
 
     /* A file of declarations no target compiles is no script: it stays a named gap, with the reason saying why. */

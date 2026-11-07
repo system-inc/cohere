@@ -43,7 +43,7 @@ public struct FileSet: Equatable, Sendable {
     /*
      What deciding the set read beyond the targets' files, for the run's inputs record (`RunInputs`): every ignore file
      and git config file consulted, there or not, and every directory the walk for files no target compiles listed.
-     Empty outside a git repository, where nothing is consulted or walked.
+     Outside a git repository that walk reads the package's own ignore files, so these are its.
      */
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
@@ -103,13 +103,25 @@ public struct FileSet: Equatable, Sendable {
          holding 56 force unwraps the target files do not. A script whose nearest project is this run's is ours,
          checked alone (`StandaloneScript`, #13nbb1s). Every other is named, so a clean verdict over the targets cannot
          read as a clean verdict over the directory, and a file below a project of its own is left to that project's run.
+
+         Outside a git repository, a `git archive` copy say, the walk reads the package's own ignore files as git would
+         were the package's root a repository's, which is what keeps its build output and dependencies out: before
+         this, no walk ran there, and a copy of ahraos-presence checked neither Glyph script nor named it, 1,342 files
+         where its checkout checks 1,343 (the presence Circle, 2026-11-07). A file a target compiles is still ours there,
+         ignored or not, as the note says.
          */
-        if let ignoreRules {
+        let walkRules =
+            ignoreRules
+            ?? IgnoreRules(
+                repository: IgnoreRules.Repository(root: package.root.resolvingSymlinksInPath(), commonDirectory: nil),
+                environment: environment,
+            )
+        do {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
             let visible = Set(
-                ignoreRules.visibleFiles(
+                walkRules.visibleFiles(
                     under: resolvedRoot,
                     skipping: Self.buildScratches(of: package),
                     skippingWhere: Self.isCohereCache,
@@ -178,11 +190,11 @@ public struct FileSet: Equatable, Sendable {
 
         let note =
             ignoreRules == nil
-            ? "not a git repository, so every file a target compiles was treated as ours"
+            ? "not a git repository, so every file a target compiles was treated as ours, and the Swift files no target compiles were found by the package's own ignore files"
             : ""
         var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
-        fileSet.ignoreFilesConsulted = (ignoreRules?.filesConsulted ?? []).sorted()
-        fileSet.directoriesListed = ignoreRules?.directoriesListed ?? []
+        fileSet.ignoreFilesConsulted = walkRules.filesConsulted.sorted()
+        fileSet.directoriesListed = walkRules.directoriesListed
         return fileSet
     }
 
