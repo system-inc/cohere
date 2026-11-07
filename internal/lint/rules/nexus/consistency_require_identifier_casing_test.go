@@ -169,6 +169,21 @@ func TestConsistencyRequireIdentifierCasingFires(test *testing.T) {
 			[]string{"iMessagecommandLineInterface", "iMessage_Thing"},
 		},
 		{"a brand spelled otherwise", "export class imessageThing {}\n", []string{"imessageThing"}},
+		// A leading underscore is flagged on every name we declare (us05), and a trailing one with it, as
+		// the Go and Swift engines flag both.
+		{
+			"underscores at either end",
+			"export function run(_cache: number, __meta__: number, event_: number, _Unit_Count: number) { let _running_total = 0; return _running_total; }\n",
+			[]string{"_cache", "__meta__", "event_", "_Unit_Count", "_running_total"},
+		},
+		{
+			"a local const with a leading underscore",
+			"export function hidden() { const _cache = 1; return _cache; }\n",
+			[]string{"_cache"},
+		},
+		{"a function with a leading underscore", "export function _helper(): void {}\n", []string{"_helper"}},
+		{"a method with a leading underscore", "export class Book { _load(): void {} }\n", []string{"_load"}},
+		{"a type with a leading underscore", "export interface _Row {}\n", []string{"_Row"}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -231,12 +246,12 @@ func TestConsistencyRequireIdentifierCasingStaysSilent(test *testing.T) {
 			"a shorthand element",
 			"export function read(row: { unit_price: number }) { let { unit_price } = row; return unit_price; }\n",
 		},
-		// Leading and trailing underscores wait on Kirk's call, and the bare discard carries no casing.
+		// The bare discard is no name, and neither is a name of underscores only, which has no word to advise.
+		{"the bare discard", "export function run(_: number, __: number, value: number) { return value; }\n"},
 		{
-			"underscores",
-			"export function run(_: number, _cache: number, __meta__: number, event_: number, _Unit_Count: number) { let _running_total = 0; return _running_total; }\n",
+			"a reserved word's escape",
+			"export function read(class_: string, _default: string) { return class_ + _default; }\n",
 		},
-		{"a reserved word's escape", "export function read(class_: string) { return class_; }\n"},
 		{
 			"a name the converter cannot advise",
 			"export function read($element: number) { let $Element = $element; return $Element; }\n",
@@ -436,6 +451,27 @@ func TestConsistencyRequireIdentifierCasingAdvice(test *testing.T) {
 			"requireUpperCamelCaseType",
 			`The interface "iMessage_thing" is a type, so spell it in UpperCamelCase: "iMessageThing".`,
 		},
+		// A leading underscore is told about itself, as the Go and Swift engines tell it, whatever casing the
+		// advice then takes.
+		{
+			"a leading underscore",
+			"export function hidden() { const _cache = 1; return _cache; }\n",
+			"noLeadingUnderscore",
+			`The variable "_cache" opens with an underscore; spell it "cache".`,
+		},
+		{
+			"a leading underscore on a type",
+			"export interface _Row {}\n",
+			"noLeadingUnderscore",
+			`The interface "_Row" opens with an underscore; spell it "Row".`,
+		},
+		// A component's capital is read past the underscore, so the advice keeps the capital JSX needs.
+		{
+			"a leading underscore on a rendered local",
+			"declare function pick(): () => JSX.Element;\nexport function Row() { const _Icon = pick(); return <_Icon />; }\n",
+			"noLeadingUnderscore",
+			`The variable "_Icon" opens with an underscore; spell it "Icon".`,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -487,6 +523,11 @@ func TestConsistencyRequireIdentifierCasingRenamesWhatTheFileOwns(test *testing.
 			"function format_value(value: number) { return String(value); }\nexport const shown = format_value(1);\n",
 			"function formatValue(value: number) { return String(value); }\nexport const shown = formatValue(1);\n",
 		},
+		{
+			"a leading underscore, dropped at every read",
+			"export function hiddenTotal() { const _cache = 1; return _cache + _cache; }\n",
+			"export function hiddenTotal() { const cache = 1; return cache + cache; }\n",
+		},
 	}
 	for _, testCase := range renamed {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -508,6 +549,7 @@ func TestConsistencyRequireIdentifierCasingRenamesWhatTheFileOwns(test *testing.
 		{"an exported function", "export function format_value(value: number) { return String(value); }\n"},
 		{"a method", "export class Book { do_work(): void {} }\n"},
 		{"a name opening on an acronym", "export function read(URLPath: string) { return URLPath; }\n"},
+		{"an acronym behind an underscore", "export function read(_URLPath: string) { return _URLPath; }\n"},
 	}
 	for _, testCase := range unfixed {
 		test.Run(testCase.name, func(test *testing.T) {
