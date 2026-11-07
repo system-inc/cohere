@@ -4841,7 +4841,7 @@
             },
             {
                 "name": "adamic/no-indexed-access-write",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "adamic/no-optional-widening",

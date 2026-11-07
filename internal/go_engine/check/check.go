@@ -42,6 +42,12 @@ type Options struct {
 	// and reads neither afterwards sets it, as the engine does. A caller that runs again over the same load, as the
 	// tests do over loads they share, leaves it unset.
 	ReleaseAnalyzed bool
+
+	// ReadFile is what every rule's pass.ReadFile reads a file through, or nil for the disk. A caller that holds the
+	// bytes its load parsed serves them, so a rule that reads the source, as the long-line rule reads every file it
+	// is given, reads exactly what the syntax was parsed from and never reads the disk again. The checker still
+	// refuses a file the pass was not given.
+	ReadFile func(filename string) ([]byte, error)
 }
 
 // Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
@@ -179,7 +185,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
-	checkerOptions := &checker.Options{Sequential: options.SingleThreaded}
+	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
