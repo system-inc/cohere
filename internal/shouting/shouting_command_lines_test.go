@@ -29,6 +29,7 @@ func TestCommandLinesAreMaskedAndProseOnThemIsRead(test *testing.T) {
 			nil,
 		},
 		{"sqlite3 after a blank line", "Read the rows\n\nsqlite3 db SELECT * FROM users", nil},
+		{"SQL in capitals, continuing a sentence", "read the rows with\nsqlite3 db SELECT * FROM users", nil},
 		{
 			"a run of command lines",
 			"Then land it\n\ngit fetch origin +<sha>:refs/heads/main\ngit push --force-with-lease=main NEVER\n" +

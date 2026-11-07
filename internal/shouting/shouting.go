@@ -377,9 +377,9 @@ func blankCommandLines(text string) string {
 //     blank line, or under another command follows a colon or a blank, and a table of commands set
 //     in under a sentence sits deeper than it, so each stays masked.
 //   - What follows the word is not shaped like a command's arguments: a flag, a path, a placeholder,
-//     an assignment, a file name, or the line's end, reached through at most two lowercase words
-//     such as `git merge-base` or `ahra os skills` take as subcommands. Prose reaches a capital, a
-//     comma, or a third plain word first.
+//     an assignment, a file name, a word in capitals, or the line's end, reached through at most two
+//     lowercase words such as `git merge-base` or `ahra os skills` take as subcommands. Prose
+//     reaches a capitalized word, a comma, or a third plain word first.
 //
 // Only a line passing both is read, so a command that wraps out of a sentence still stays masked.
 func commandWordReadsAsProse(previousLine string, line string, afterWord string) bool {
@@ -413,11 +413,17 @@ func indentation(line string) int {
 }
 
 // isCommandShaped reports whether a word is shaped like a command's argument rather than prose.
+//
+// A word wholly in capitals counts, as an SQL keyword after `sqlite3 db` or an environment variable
+// does. A sentence could shout that early too, and that shout goes unread, which is the side to err
+// on: a word in capitals this close to the command word is likelier its argument, and reading an
+// argument as a shout is a false finding.
 func isCommandShaped(word string) bool {
 	return strings.ContainsAny(word[:1], "-<[\"'`+/~.") ||
 		strings.ContainsAny(word, "/=") ||
 		dotBetweenLetters.MatchString(word) ||
-		strings.HasSuffix(word, ":")
+		strings.HasSuffix(word, ":") ||
+		uppercaseToken.FindString(word) == word
 }
 
 // TokensInMasked returns the distinct shouted tokens in text MaskCodeAndCommands has already masked, in first-seen
