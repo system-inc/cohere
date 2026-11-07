@@ -16,11 +16,17 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
-// renamingPipeline is a pipeline over a fresh copy of the rename fixture, described as a run describes it, with the
-// registry's rules, writing its records nowhere, and the copy's load from source.
+// renamingPipeline is renamingPipelineOver the rename fixture.
 func renamingPipeline(test *testing.T) (*pipeline, *load.Loaded) {
 	test.Helper()
-	root := copyFixture(test, filepath.Join("testdata", "rename"))
+	return renamingPipelineOver(test, "rename")
+}
+
+// renamingPipelineOver is a pipeline over a fresh copy of a fixture, described as a run describes it, with the
+// registry's rules, writing its records nowhere, and the copy's load from source.
+func renamingPipelineOver(test *testing.T, fixture string) (*pipeline, *load.Loaded) {
+	test.Helper()
+	root := copyFixture(test, filepath.Join("testdata", fixture))
 	request := invocation{root: root, switches: map[string]bool{}}
 	described, describeError := describeProject(request)
 	if describeError != nil {
@@ -121,13 +127,13 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 			}
 			space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
 			result := planParseUrl(test, space, loaded)
-			if proved := engine.prove(space, map[string][]byte{}, result); proved.proof == nil ||
-				len(proved.failures) > 0 {
+			proved := engine.prove(space, map[string][]byte{}, result, global_rename.Options{})
+			if proved.proof == nil || len(proved.failures) > 0 {
 				test.Fatalf("the plan's own rewrite failed its proof: %v", proved.failures)
 			}
 
 			testCase.plant(test, result, root)
-			failures := engine.prove(space, map[string][]byte{}, result).failures
+			failures := engine.prove(space, map[string][]byte{}, result, global_rename.Options{}).failures
 			reason, failed := failures[[2]string{"ParseURL", "ParseUrl"}]
 			if !failed || !strings.Contains(reason, testCase.reason) {
 				test.Fatalf("want ParseURL's rename failed as %q, got %v", testCase.reason, failures)
@@ -139,5 +145,50 @@ func TestAProofNamesTheRenamesItsRewriteBreaks(test *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A rename that reaches a file only windows builds is proven under windows through the engine's own load of it, so a
+// rewrite that leaves that file naming the old name fails there, naming the rename and the platform, though the
+// host's proof, which never reads the file, holds. The plan's own rewrite proves under windows and freebsd both.
+func TestAProofUnderAPlatformNamesTheRenameItsRewriteBreaks(test *testing.T) {
+	test.Parallel()
+
+	engine, loaded := renamingPipelineOver(test, "rename-platforms")
+	root := engine.described.workspace.Root
+	space := workspace.FromLoaded(root, loaded.Roots, loaded.Packages, nil)
+	options := global_rename.Options{LoadPlatform: engine.platformLoad(space, nil), RequireSoundPlatforms: true}
+	var proposals []global_rename.Proposal
+	for _, analyzed := range loaded.Packages {
+		for identifier, object := range analyzed.TypesInfo.Defs {
+			if object != nil && identifier.Name == "maxBytes" {
+				proposals = append(proposals,
+					global_rename.Proposal{Package: analyzed, Object: object, NewName: "maximumBytes"})
+			}
+		}
+	}
+	result := global_rename.Plan(space, proposals, options)
+	platforms := []string{}
+	for _, platform := range result.Platforms() {
+		platforms = append(platforms, platform.String())
+	}
+	if len(result.Accepted) != 1 || len(result.TwinEdits) != 2 || !slices.Equal(platforms,
+		[]string{"windows/amd64", "freebsd/amd64"}) {
+		test.Fatalf("want maxBytes renamed in both platforms' files and read under both, got %+v, %d twin edits, %v",
+			result.Accepted, len(result.TwinEdits), platforms)
+	}
+	if proved := engine.prove(space, map[string][]byte{}, result, options); proved.proof == nil ||
+		len(proved.failures) > 0 {
+		test.Fatalf("the plan's own rewrite failed its proof: %v", proved.failures)
+	}
+
+	windowsFile := filepath.Join(root, "internal", "limits", "limits_windows.go")
+	result.TwinEdits = slices.DeleteFunc(result.TwinEdits, func(edit rename.Edit) bool {
+		return edit.Filename == windowsFile
+	})
+	failures := engine.prove(space, map[string][]byte{}, result, options).failures
+	reason, failed := failures[[2]string{"maxBytes", "maximumBytes"}]
+	if !failed || !strings.Contains(reason, "windows/amd64") {
+		test.Fatalf("want maxBytes's rename failed under windows/amd64, got %v", failures)
 	}
 }

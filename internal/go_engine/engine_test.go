@@ -357,6 +357,18 @@ var endToEndCases = []endToEndCase{
 		name: "rename-wrap-declined", fixture: "rename", exitCode: 1, prepare: limitLongFiles(12),
 		rules: ownLongFileAnalyzer(), verify: renamedTree("rename", "rename-wrap-declined"),
 	},
+	// maxBytes is read by a file only windows builds and one only freebsd builds: it is renamed in all three, and
+	// the rewrite is proven under each platform with the engine's own load for it as well as the host's.
+	{
+		name: "rename-platforms-rewritten", fixture: "rename-platforms", exitCode: 0,
+		verify: renamedTree("rename-platforms", "rename-platforms-rewritten"),
+	},
+	// The same tree with a type error in the file only windows builds: nothing can prove the rename under windows,
+	// so it is declined, naming the platform, and every file but the one planted reads as its fixture.
+	{
+		name: "rename-platforms-broken", fixture: "rename-platforms", exitCode: 1, prepare: breakUnderWindows,
+		verify: unchangedBut("rename-platforms", platformsWindowsFile),
+	},
 	// With renameExports set on the initialism rule, ToHTML is renamed too, in the library and the command.
 	{
 		name: "rename-exports", fixture: "rename", exitCode: 1, prepare: renameExports, rules: renamingOwnAnalyzers(),
@@ -467,6 +479,30 @@ func renamedTreeUnder(fixture string, caseName string, extra ...string) func(tes
 			again, againError := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
 			if againError != nil || !bytes.Equal(again, after[relative]) {
 				test.Errorf("a second run changed %s (%v)", relative, againError)
+			}
+		}
+	}
+}
+
+// platformsWindowsFile is the rename-platforms fixture's file only windows builds.
+const platformsWindowsFile = "internal/limits/limits_windows.go"
+
+// breakUnderWindows plants a type error in the rename-platforms copy's file only windows builds, which the host's
+// load never reads.
+func breakUnderWindows(root string) error {
+	broken := "package limits\n\n// extra is what windows adds to a read, mistyped.\nfunc extra() int {\n" +
+		"\treturn maxBytes + \"half\"\n}\n"
+	return os.WriteFile(filepath.Join(root, filepath.FromSlash(platformsWindowsFile)), []byte(broken), 0o644)
+}
+
+// unchangedBut is a verify that every .go file of the copy but planted, which the case's prepare wrote, reads as it
+// does in its fixture.
+func unchangedBut(fixture string, planted string) func(test *testing.T, root string) {
+	return func(test *testing.T, root string) {
+		test.Helper()
+		for _, relative := range goFilesOf(test, filepath.Join("testdata", fixture)) {
+			if relative != planted {
+				unchanged(relative, fixture)(test, root)
 			}
 		}
 	}
