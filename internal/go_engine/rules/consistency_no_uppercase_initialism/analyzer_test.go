@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_uppercase_initialism"
 	"github.com/system-inc/cohere/policy"
 )
@@ -26,9 +27,13 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // the allowed and lookalike fixtures prove the rule stays quiet on names spelled as words, on uses and package names,
 // on methods an interface of another package fixes, on directive names and examples, on one capital before a word,
 // and on screaming snake case.
+//
+// Each .golden file beside a flagged file is that file with every offered rename applied to its declaring
+// identifier, the engine's part, renaming each reference, left out. Every finding offers one, to the name its
+// message suggests, so where a golden and a want disagree, the fix and the finding name two spellings.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(
+	analysistest.RunWithSuggestedFixes(
 		errorsOnly{test},
 		analysistest.TestData(),
 		consistency_no_uppercase_initialism.Analyzer,
@@ -36,6 +41,24 @@ func TestAnalyzer(test *testing.T) {
 		"allowed",
 		"lookalike",
 	)
+}
+
+// renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the
+// same fixtures, wants and goldens pass with it set.
+func TestRenameExportsChangesNoFinding(test *testing.T) {
+	test.Parallel()
+	analyzer := consistency_no_uppercase_initialism.NewAnalyzer()
+	if rule.RenamesExports(analyzer) {
+		test.Fatal("renameExports is on by default, so the fix would rename exports nobody asked it to")
+	}
+	if setError := analyzer.Flags.Set(rule.RenameExportsOption, "true"); setError != nil {
+		test.Fatal(setError)
+	}
+	if !rule.RenamesExports(analyzer) {
+		test.Fatal("renameExports set to true reads as off")
+	}
+	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), analyzer, "flagged", "allowed",
+		"lookalike")
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
