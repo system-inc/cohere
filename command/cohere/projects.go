@@ -162,7 +162,9 @@ func childArguments(arguments []string, lintConfigFileName string) []string {
 type projectRun struct {
 	open    *openReport
 	project discoveredProject
-	output  []byte
+	// label is the project's name in this run, unique among its projects (see runLabels).
+	label  string
+	output []byte
 	// standardError is the child's stderr when it is kept apart from output, under `--json`, and empty
 	// otherwise, when the two share output in the order they were written.
 	standardError []byte
@@ -202,6 +204,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	defer children.stop()
 
 	runs := make([]projectRun, len(found.Projects))
+	labels := runLabels(found.Projects)
 	var group sync.WaitGroup
 	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
@@ -219,6 +222,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		if writeProjectYieldError != nil {
 			runs[index] = projectRun{
 				project:  project,
+				label:    labels[index],
 				exitCode: 1,
 				runError: fmt.Errorf("writing what it yields: %w", writeProjectYieldError),
 			}
@@ -239,8 +243,8 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
-			runs[index] = runProject(executable, found.Root, project, projectArguments, yieldFile, openPath, children,
-				activeOutput.Mode == outputJson)
+			runs[index] = runProject(executable, found.Root, project, labels[index], projectArguments, yieldFile,
+				openPath, children, activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -277,7 +281,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			failureLine(out, unfinished)
 			// Under `--json` the project's record says it too, since a run that never finished printed none.
 			if activeOutput.Mode == outputJson {
-				line := summaryAsJson(runSummary{Label: projectLabel(checked.project), Total: checked.elapsed})
+				line := summaryAsJson(runSummary{Label: checked.label, Total: checked.elapsed})
 				line.Verdict = "fail"
 				line.Error = sentence.FromError(unfinished)
 				writeJsonLine(out, line)
@@ -300,7 +304,7 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		fmt.Fprintf(
 			account,
 			"  %s (%s): %s in %s\n",
-			projectLabel(checked.project),
+			checked.label,
 			checked.project.Engine,
 			verdict,
 			round(checked.elapsed),
@@ -359,7 +363,7 @@ func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
 		case checked.exitCode != 0:
 			facts.Failed = append(
 				facts.Failed,
-				fmt.Sprintf("%s (exit %d)", projectLabel(checked.project), checked.exitCode),
+				fmt.Sprintf("%s (exit %d)", checked.label, checked.exitCode),
 			)
 		}
 	}
@@ -383,6 +387,7 @@ func runProject(
 	executable string,
 	root string,
 	project discoveredProject,
+	label string,
 	arguments []string,
 	yieldFile string,
 	openPath string,
@@ -401,7 +406,7 @@ func runProject(
 	// The verdict descriptor is this run's: a child's verdict reaches this process as its exit code, and
 	// only the merged one may answer the caller.
 	child.Env = append(withoutVariable(withoutVariable(os.Environ(), VerdictVariable), projectYieldVariable),
-		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+projectLabel(project))
+		projectEngineVariable+"="+string(project.Engine), projectLabelVariable+"="+label)
 	if yieldFile != "" {
 		child.Env = append(child.Env, projectYieldVariable+"="+yieldFile)
 	}
@@ -420,6 +425,7 @@ func runProject(
 	runError := children.run(child)
 	run := projectRun{
 		project:       project,
+		label:         label,
 		output:        output.Bytes(),
 		standardError: standardError.Bytes(),
 		elapsed:       time.Since(started),
@@ -458,6 +464,24 @@ func projectLabel(project discoveredProject) string {
 		return path.Join(project.Directory, project.ConfigFile)
 	}
 	return project.Directory
+}
+
+// runLabels names each project of the run uniquely, in the run's order: its label, and for a project whose
+// directory an earlier one of the run shares, its engine beside it, as `. (Format)` beside the Go workspace at `.`
+// (#vyjvz9k). The first keeps the label alone, so a directory holding one project names it as it always did, and a
+// summary, a failure line and a run-cache record each name one project.
+func runLabels(projects []discoveredProject) []string {
+	labels := make([]string, len(projects))
+	taken := map[string]bool{}
+	for index, project := range projects {
+		label := projectLabel(project)
+		if taken[label] {
+			label = fmt.Sprintf("%s (%s)", label, project.Engine)
+		}
+		taken[label] = true
+		labels[index] = label
+	}
+	return labels
 }
 
 // sectionHeading opens a project's section.

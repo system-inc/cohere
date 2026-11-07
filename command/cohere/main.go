@@ -1208,6 +1208,10 @@ func run() error {
 				}
 				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 			}
+			if *formatOnly {
+				activeSummary.FilesInScope, activeSummary.FilesChecked, activeSummary.FilesCached =
+					formatOnlyCounts(scope, recordUniverse)
+			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}
 		switch {
