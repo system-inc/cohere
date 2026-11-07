@@ -279,6 +279,12 @@ the type errors it causes fold under it as one line counted by code (`--verbose`
 one), and the run fails, even when no type error follows from it. While it's missing every lint fix is held,
 since a rule would read the names it declares as unresolved, and only formatting runs: `⚠ 🪄 fixes held`.
 
+Any other input the program can't load holds the fixes the same way: an import, relative or a package, that
+resolves to nothing and no ambient module declares, a `/// <reference>` that finds nothing, or a
+`compilerOptions.types` entry with no type library behind it, as on a checkout whose `node_modules` was
+never installed. Each prints once as an `unresolved-input` warning at its first site, beside the type
+error the compiler gives it. Type errors in code that loaded hold nothing.
+
 On a terminal the verdict and time are bold, what was found is red, and the parentheses are dim. A
 pipe, a file or `NO_COLOR` gets no color codes at all.
 

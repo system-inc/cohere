@@ -807,14 +807,15 @@ func run() error {
 
 	// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads the output, and
 	// while one is missing every lint fix is held (#46ern7e): a rule reads the names that file declares as
-	// unresolved, and on a fresh Next clone one renamed PageProps to PageProperties in 39 files. Formatting
-	// reads no names, so it still runs. See missing_generated.go.
-	var missingGenerated []program.MissingInput
+	// unresolved, and on a fresh Next clone one renamed PageProps to PageProperties in 39 files. Any other
+	// input the program could not load, a package, a types entry or a source file, holds them the same way
+	// (#4jxsbzr). Formatting reads no names, so it still runs. See missing_generated.go.
+	var missingInputs []program.MissingInput
 	if graph != nil {
-		missingGenerated = graph.MissingGeneratedInputs(generatedOutputUnder(location.Root))
+		missingInputs = graph.MissingInputs(generatedOutputUnder(location.Root))
 	}
-	printMissingGenerated(missingGenerated)
-	activeSummary.Gaps.MissingGenerated = missingGeneratedTargets(missingGenerated, location.Root)
+	printMissingInputs(missingInputs)
+	activeSummary.Gaps.MissingGenerated = missingGeneratedTargets(missingInputs, location.Root)
 	activeSummary.Gaps.FormattingNotChecked = !runFix
 	report := &pipelineReport{
 		graph:          buildDuration,
@@ -1066,8 +1067,9 @@ func run() error {
 		if *formatOnly {
 			fixFiles, fixRules = nil, nil
 		}
-		// Held, as `--format-only` holds them, while a generated file is missing. See above.
-		fixesHeld := !*formatOnly && len(missingGenerated) > 0
+		// Held, as `--format-only` holds them, while an input the program was told to load is missing. See
+		// above.
+		fixesHeld := !*formatOnly && len(missingInputs) > 0
 		if fixesHeld {
 			fixFiles, fixRules = nil, nil
 			activeSummary.Gaps.FixesHeld = true
@@ -1197,8 +1199,10 @@ func run() error {
 		switch {
 		case *formatOnly:
 			report.narrow(phaseFix, "formatting only, no fixes proposed")
-		case fixesHeld:
+		case fixesHeld && generatedMissing(missingInputs):
 			report.narrow(phaseFix, "formatting only, fixes held while a generated file is missing")
+		case fixesHeld:
+			report.narrow(phaseFix, "formatting only, fixes held while an input did not load")
 		case formatLeftOut != "":
 			report.narrow(phaseFix, formatLeftOut)
 		}
@@ -1314,7 +1318,7 @@ func run() error {
 				typeErrorFiles[file.FileName().AsString()] = true
 			}
 		}
-		if !foldTypeDiagnostics(missingGenerated, typeDiagnostics) {
+		if !foldTypeDiagnostics(missingInputs, typeDiagnostics) {
 			for _, diagnostic := range typeDiagnostics {
 				printCompilerDiagnostic(diagnostic)
 			}

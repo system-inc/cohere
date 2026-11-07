@@ -29,9 +29,21 @@ import (
 // structure/react-component-require-properties-type-suffix took PageProps for the project's own type and
 // renamed it to PageProperties in 39 files, and a bare run wrote them. The fix phase then runs as
 // `--format-only` does, since formatting reads no names, and the footer says the fixes were held.
+//
+// The hold covers every input the program could not load, not only a generated one (#4jxsbzr). Loom's wire
+// project, with no node_modules, had its tsconfig's types entries and its package imports resolve to
+// nothing, and a bare run still let nexus/consistency-require-identifier-casing rewrite two files. An
+// import, a reference or a types entry that resolves to nothing prints its own line, once per name at its
+// first site, and holds the fixes the same way. It is a warning rather than an error: wherever the compiler
+// checks the file, it reports the same input as a type error, which is what fails the run, and this line
+// says what that did to the fix phase. The fold stays a generated file's: without one, the type errors are
+// what name each missing input, so they print as they are.
 
 // missingGeneratedRule is the name the cause prints under, where a finding prints its rule.
 const missingGeneratedRule = "missing-generated-file"
+
+// unresolvedInputRule is the name an input the program could not load, and did not generate, prints under.
+const unresolvedInputRule = "unresolved-input"
 
 // generatedOutputUnder answers whether an absolute path is generated output: inside root and ignored by
 // git there. Outside root, or when root's ignore files cannot be read, nothing is, so the cause is never
@@ -68,33 +80,89 @@ func missingGeneratedMessage(input program.MissingInput) string {
 	)
 }
 
-// printMissingGenerated prints each missing generated file as a finding, in every view, ahead of anything
-// the run found.
-func printMissingGenerated(missing []program.MissingInput) {
+// unresolvedInputMessage is an input the program could not load as its line says it, with how many other
+// sites ask for the same one, since only the first prints.
+func unresolvedInputMessage(input program.MissingInput, otherSites int) string {
+	var message string
+	switch input.Kind {
+	case program.UnresolvedTypes:
+		message = fmt.Sprintf(
+			"%s resolves to no type library: no file or installed package answers it, so every lint fix is held "+
+				"until one does",
+			input.Specifier,
+		)
+	case program.UnresolvedReference:
+		message = fmt.Sprintf("%s does not exist, so every lint fix is held until it does", input.Specifier)
+	default:
+		message = fmt.Sprintf(
+			"%s resolves to nothing: no file, installed package or ambient declaration answers it, so every lint "+
+				"fix is held until one does",
+			input.Specifier,
+		)
+	}
+	if otherSites > 0 {
+		message += fmt.Sprintf(" (and %s)", counted(otherSites, "other site", "other sites"))
+	}
+	return message
+}
+
+// printMissingInputs prints each input the program could not load as a finding, in every view, ahead of
+// anything the run found: every missing generated file, and each other input once, at its first site.
+func printMissingInputs(missing []program.MissingInput) {
+	sites := map[string]int{}
 	for _, input := range missing {
-		message := missingGeneratedMessage(input)
+		if input.Kind != program.MissingGenerated {
+			sites[input.Target]++
+		}
+	}
+	printed := map[string]bool{}
+	for _, input := range missing {
+		severity, rule := "error", missingGeneratedRule
+		var message string
+		if input.Kind == program.MissingGenerated {
+			message = missingGeneratedMessage(input)
+		} else {
+			if printed[input.Target] {
+				continue
+			}
+			printed[input.Target] = true
+			severity, rule = "warning", unresolvedInputRule
+			message = unresolvedInputMessage(input, sites[input.Target]-1)
+		}
 		printFinding(streams.Output, runFinding{
 			Path:     input.Importer,
 			Line:     input.Line,
 			Column:   input.Column,
-			Severity: "error",
-			Rule:     missingGeneratedRule,
+			Severity: severity,
+			Rule:     rule,
 			Message:  message,
 		}, fmt.Sprintf(
-			"%s:%d:%d - error %s: %s\n",
+			"%s:%d:%d - %s %s: %s\n",
 			input.Importer,
 			input.Line,
 			input.Column,
-			missingGeneratedRule,
+			severity,
+			rule,
 			message,
 		))
 	}
 }
 
+// generatedMissing reports whether any missing input is a generated file, which is what the fold, the gap
+// and the fix phase's note are about.
+func generatedMissing(missing []program.MissingInput) bool {
+	for _, input := range missing {
+		if input.Kind == program.MissingGenerated {
+			return true
+		}
+	}
+	return false
+}
+
 // foldTypeDiagnostics prints, in the human view, one line in place of the type errors when a generated file
 // is missing, and reports whether it did. Every other view prints them all.
 func foldTypeDiagnostics(missing []program.MissingInput, diagnostics []*ast.Diagnostic) bool {
-	if len(missing) == 0 || len(diagnostics) == 0 || activeOutput.Mode != outputHuman {
+	if !generatedMissing(missing) || len(diagnostics) == 0 || activeOutput.Mode != outputHuman {
 		return false
 	}
 	fmt.Fprintln(streams.Output, activeOutput.Style.dim(foldedLine(diagnostics)))
@@ -125,11 +193,14 @@ func foldedLine(diagnostics []*ast.Diagnostic) string {
 		counted(len(diagnostics), "type error", "type errors"), strings.Join(parts, ", "))
 }
 
-// missingGeneratedTargets is each missing file once, relative to root, for the footer and `--json`.
+// missingGeneratedTargets is each missing generated file once, relative to root, for the footer and `--json`.
 func missingGeneratedTargets(missing []program.MissingInput, root string) []string {
 	seen := map[string]bool{}
 	var targets []string
 	for _, input := range missing {
+		if input.Kind != program.MissingGenerated {
+			continue
+		}
 		target := input.Target
 		if relative, relativePathError := filepath.Rel(root, filepath.FromSlash(target)); relativePathError == nil {
 			target = filepath.ToSlash(relative)

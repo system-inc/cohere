@@ -144,7 +144,7 @@
                         "unread": { "type": "string", "description": "Files the run could not check for any other reason, as the run said it." },
                         "adamicIgnored": { "type": "integer", "description": "Adamic .a files the program holds that git's ignore rules leave out of the format walk: type-checked and linted, never formatted. Absent when there are none." },
                         "missingGenerated": { "type": "array", "items": { "type": "string" }, "description": "Generated files the program asks for that do not exist yet, relative to the project root: an import or reference path in a project file whose target git ignores, such as Next's .next/types before `next typegen`. They fail the run. Absent when there are none." },
-                        "fixesHeld": { "type": "boolean", "description": "Lint fixes were held because a generated file is missing: none was proposed or written, and formatting ran alone. Absent otherwise." },
+                        "fixesHeld": { "type": "boolean", "description": "Lint fixes were held because an input the program was told to load is missing: a generated file, or an import, reference or types entry that resolves to nothing. None was proposed or written, and formatting ran alone. Absent otherwise." },
                         "unclaimedSwift": {
                             "type": "array",
                             "items": {
