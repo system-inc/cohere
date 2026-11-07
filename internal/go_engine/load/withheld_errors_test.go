@@ -50,7 +50,9 @@ var otherFiles = map[string]string{
 // wraps them the same way, and its package other. A project with cgo of its own is loaded through go/packages, so
 // project is loaded from source by the tests alone, to judge that load on the project's own cgo package too. linux
 // is a package importing net and os/user, loaded for linux with cgo on, as the probe that settled the boundary
-// loaded it.
+// loaded it. The tests share these loads and only read them, in parallel: a test that hands one to
+// checker.Analyze loads its own, since the checker lets a dependency's syntax and type information go once its last
+// action has finished (its releaseSyntax), under every test still reading them.
 var cgoFixtures struct {
 	once    sync.Once
 	root    string
@@ -296,7 +298,12 @@ func TestADependencysFunctionsThatReachCgoComeWithoutTheirBodies(test *testing.T
 func TestPrintfFinishesOverNetAndOsUserForLinux(test *testing.T) {
 	test.Parallel()
 
-	loadedCgoFixtures(test)
+	root := loadedCgoFixtures(test)
+	// A load of its own, since the analysis lets go of the dependencies' syntax the other tests read.
+	linux, loadError := Packages(filepath.Join(root, "linux"), []string{"./..."}, cgoEnvironment, nil)
+	if loadError != nil {
+		test.Fatalf("loading the linux fixture: %v", loadError)
+	}
 	// A copy whose panic is its error, so a body the load left in fails this test and not the whole binary.
 	recovering := *printf.Analyzer
 	recovering.Run = func(pass *analysis.Pass) (result any, runError error) {
@@ -307,7 +314,7 @@ func TestPrintfFinishesOverNetAndOsUserForLinux(test *testing.T) {
 		}()
 		return printf.Analyzer.Run(pass)
 	}
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{&recovering}, cgoFixtures.linux.Packages, nil)
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{&recovering}, linux.Packages, nil)
 	if analyzeError != nil {
 		test.Fatal(analyzeError)
 	}
@@ -348,6 +355,9 @@ func TestOsUsersCgoInitializersLeaveTheSyntaxAndTheInitOrder(test *testing.T) {
 	})
 	if osUser == nil {
 		test.Fatal("os/user is not in the linux load")
+	}
+	if osUser.TypesInfo == nil {
+		test.Fatal("os/user has no type information: a test analyzed the shared load, which lets it go")
 	}
 	initialized := map[string]bool{}
 	for _, initializer := range osUser.TypesInfo.InitOrder {
