@@ -172,7 +172,17 @@ func land(arguments []string) int {
 			return 1
 		}
 		tree, mergeOntoMainError := mergeOntoMain(worktree, mainCommit, head)
-		if mergeOntoMainError != nil {
+		resolution := ""
+		var conflict *mergeConflict
+		switch {
+		case errors.As(mergeOntoMainError, &conflict):
+			// A conflict confined to generated files is regenerated rather than refused (land_regenerate.go).
+			resolved, said, code := resolveGeneratedConflict(worktree, head, conflict)
+			if code != 0 {
+				return code
+			}
+			tree, resolution = resolved, said
+		case mergeOntoMainError != nil:
 			fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", mergeOntoMainError)
 			return 1
 		}
@@ -227,7 +237,7 @@ func land(arguments []string) int {
 		landing, commitTreeError := commitTree(
 			worktree,
 			tree,
-			landingMessage(subject, branch, head, mainCommit, commits, gated),
+			landingMessage(subject, branch, head, mainCommit, commits, gated, resolution),
 			mainCommit,
 			head,
 		)
