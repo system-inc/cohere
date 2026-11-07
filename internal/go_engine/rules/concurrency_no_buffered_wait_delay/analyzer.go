@@ -19,6 +19,7 @@
 package concurrency_no_buffered_wait_delay
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -28,6 +29,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -48,7 +50,8 @@ func NewAnalyzer() *analysis.Analyzer {
 			"<reason> comment ends its line or sits directly above it. The cure option names the import path of " +
 			"the package whose Capture is the cure and whose Run and CombinedOutput buffer; the rule reports " +
 			"nothing when cure is empty.",
-		Run: run,
+		Requires: []*analysis.Analyzer{positions.Analyzer},
+		Run:      run,
 	}
 	// The cure package differs by repository, so the rule hardcodes none, and with no cure to name, a finding would
 	// tell its reader to reach for nothing; an empty cure turns the rule off.
@@ -103,10 +106,14 @@ func run(pass *analysis.Pass) (any, error) {
 	if strings.TrimSuffix(pass.Pkg.Path(), "_test") == cure {
 		return nil, nil
 	}
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	for _, file := range pass.Files {
-		excuses := excusedLines(pass, file)
+		excuses := excusedLines(table, file)
 		for _, declaration := range file.Decls {
-			check(pass, cure, declaration, excuses)
+			check(pass, table, cure, declaration, excuses)
 		}
 	}
 	return nil, nil
@@ -129,8 +136,9 @@ type delay struct {
 }
 
 // check reads one top-level declaration whole, function literals inside it included, since a closure that buffers
-// the command its function set WaitDelay on is the same mistake.
-func check(pass *analysis.Pass, cure string, declaration ast.Decl, excuses map[int]excuse) {
+// the command its function set WaitDelay on is the same mistake. A WaitDelay's line is read from table, without the
+// FileSet's lock.
+func check(pass *analysis.Pass, table *positions.Table, cure string, declaration ast.Decl, excuses map[int]excuse) {
 	var delays []delay
 	buffered := map[command]bool{}
 	returned := map[command]bool{}
@@ -244,7 +252,7 @@ func check(pass *analysis.Pass, cure string, declaration ast.Decl, excuses map[i
 			flagged = true
 		}
 		if flagged {
-			report(pass, cure, delay.identifier, excuses[pass.Fset.PositionFor(delay.identifier.Pos(), false).Line])
+			report(pass, cure, delay.identifier, excuses[table.Line(delay.identifier.Pos())])
 		}
 	}
 }
@@ -252,8 +260,9 @@ func check(pass *analysis.Pass, cure string, declaration ast.Decl, excuses map[i
 // excusedLines are the lines a // WaitDelay: comment covers, with what it says: its own line, for a comment at the
 // end of a line, and the line just after its comment group, so a reason may wrap onto lines of its own above the
 // code. The marker opens the comment, after its slashes and spaces, so a sentence that only mentions it excuses
-// nothing, and a block comment is not read, as Adamic reads none.
-func excusedLines(pass *analysis.Pass, file *ast.File) map[int]excuse {
+// nothing, and a block comment is not read, as Adamic reads none. Each comment's lines are read from table, without
+// the FileSet's lock.
+func excusedLines(table *positions.Table, file *ast.File) map[int]excuse {
 	lines := map[int]excuse{}
 	cover := func(line int, given excuse) {
 		lines[line] = max(lines[line], given)
@@ -272,8 +281,8 @@ func excusedLines(pass *analysis.Pass, file *ast.File) map[int]excuse {
 			if strings.TrimSpace(reason) == "" {
 				given = excuseWithoutReason
 			}
-			cover(pass.Fset.PositionFor(comment.Pos(), false).Line, given)
-			cover(pass.Fset.PositionFor(group.End(), false).Line+1, given)
+			cover(table.Line(comment.Pos()), given)
+			cover(table.Line(group.End())+1, given)
 		}
 	}
 	return lines
