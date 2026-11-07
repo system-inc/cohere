@@ -81,7 +81,7 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 	}
 
 	var none atomic.Int32
-	reference := speculateFormatOn(candidates, transformCounting(nil, &none), 1, 4, nil)
+	reference := speculateFormatOn(candidates, transformCounting(nil, &none), 1, 4, true, nil)
 	reference.wait()
 
 	for round := range 6 {
@@ -106,14 +106,14 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 			release()
 		}()
 		close(start)
-		during := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, &programs)
+		during := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, true, &programs)
 		during.wait()
 		binding.Wait()
 		sameResults(test, fmt.Sprintf("round %d, during binding", round), reference, during)
 
 		// Bound now: every file must be formatted from the program's tree, once each.
 		fromProgram.Store(0)
-		after := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, &programs)
+		after := speculateFormatOn(candidates, transformCounting(&programs, &fromProgram), 1, 8, true, &programs)
 		after.wait()
 		sameResults(test, fmt.Sprintf("round %d, after binding", round), reference, after)
 		if formatted := int(fromProgram.Load()); formatted != len(candidates) {
