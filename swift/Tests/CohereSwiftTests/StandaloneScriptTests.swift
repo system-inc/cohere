@@ -245,13 +245,8 @@ struct StandaloneScriptTests {
         #expect(run.typesBuild.hasSuffix("(1 for iOS)"), "\(run.typesBuild)")
     }
 
-    /*
-     A root holding no Package.swift and no Xcode project is the scripts-only root discovery gives the Swift no project
-     claims (#wpd36zj), ahra's shape: its scripts are checked alone with no target checked before them, a file of
-     declarations stays a named gap, and what discovery never enters or another project claims is not this run's.
-     Its coverage query names the root alone.
-     */
-    @Test func aRootHoldingNoProjectChecksItsScriptsAlone() async throws {
+    /* ahra's shape in a fresh repository with no project at its root: a script, a file of declarations, a dependency's Swift and a nested package's. */
+    static func scriptsOnlyRoot() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-scripts-root-\(UUID().uuidString)",
             isDirectory: true,
@@ -273,6 +268,17 @@ struct StandaloneScriptTests {
             )
             try text.write(to: file, atomically: true, encoding: .utf8)
         }
+        return root
+    }
+
+    /*
+     A root holding no Package.swift and no Xcode project is the scripts-only root discovery gives the Swift no project
+     claims (#wpd36zj), ahra's shape: its scripts are checked alone with no target checked before them, a file of
+     declarations stays a named gap, and what discovery never enters or another project claims is not this run's.
+     Its coverage query names the root alone.
+     */
+    @Test func aRootHoldingNoProjectChecksItsScriptsAlone() async throws {
+        let root = try Self.scriptsOnlyRoot()
         defer { XcodeProjectPipelineTests.remove(root) }
 
         let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
@@ -298,6 +304,38 @@ struct StandaloneScriptTests {
         let covered = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--covered-packages"])
         let record = try #require(covered.of("coveredPackages").first)
         #expect(record["checked"] as? [String] == [root.standardizedFileURL.path])
+    }
+
+    /*
+     What a scripts-only root's verdict is decided from, which its inputs record names so the front door replays it only
+     while none has moved (#wpd36zj): each script, each Swift file it read to tell whether it is one (a file of
+     declarations becomes a script by an edit), and each directory its walk listed, so a script added beside the others
+     moves a listing. It walks no root, so nothing under `node_modules`, which discovery never enters, is named, and a
+     dependency's install never stops a replay.
+     */
+    @Test func aScriptsOnlyRootsRecordNamesWhatDecidesItsVerdict() async throws {
+        let root = try Self.scriptsOnlyRoot()
+        defer { XcodeProjectPipelineTests.remove(root) }
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        let inputs = try #require(run.of("inputs").first)
+        let relative = { (key: String) -> Set<String> in
+            Set((inputs[key] as? [String] ?? []).map { CheckFixture.relative($0, to: root) })
+        }
+        let files = relative("files")
+        let directories = relative("directories")
+        #expect(files.contains("modules/ebay/EbayVision.swift"), "the script is not named: \(files.sorted())")
+        #expect(
+            files.contains("modules/stray/Leftover.swift"),
+            "the file read to tell it is no script: \(files.sorted())",
+        )
+        #expect(
+            directories.contains("modules/ebay"),
+            "a script added beside it moves no listing: \(directories.sorted())",
+        )
+        let dependency = (files.union(directories).union(relative("absent"))).filter { $0.hasPrefix("node_modules") }
+        #expect(dependency.isEmpty, "a dependency's install would stop a replay: \(dependency.sorted())")
     }
 
     /* A file of declarations no target compiles is no script: it stays a named gap, with the reason saying why. */

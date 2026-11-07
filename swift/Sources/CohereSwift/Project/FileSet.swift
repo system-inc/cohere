@@ -47,6 +47,11 @@ public struct FileSet: Equatable, Sendable {
      */
     public var ignoreFilesConsulted: [String] = []
     public var directoriesListed: [String] = []
+    /*
+     Every Swift file no target compiles that the walk read to tell whether it is a script, a file of declarations among
+     them, since an edit that gives one top-level code makes it a script the next run checks.
+     */
+    public var filesRead: [String] = []
 
     /* The files of ours a target compiles, which the package's or the Xcode project's types phase checks. */
     public var targetFiles: [OwnedFile] { owned.filter { $0.scriptPlatform == nil } }
@@ -104,6 +109,7 @@ public struct FileSet: Equatable, Sendable {
          checked alone (`StandaloneScript`, #13nbb1s). Every other is named, so a clean verdict over the targets cannot
          read as a clean verdict over the directory, and a file below a project of its own is left to that project's run.
          */
+        var filesRead: [String] = []
         if let ignoreRules {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
             let rootPath = resolvedRoot + "/"
@@ -158,6 +164,7 @@ public struct FileSet: Equatable, Sendable {
                     excluded.append(.init(file: path, reason: Self.notCompiledReason))
                     continue
                 }
+                filesRead.append(path)
                 guard let source = try? String(contentsOf: url, encoding: .utf8) else {
                     excluded.append(.init(file: path, reason: Self.unreadableReason))
                     continue
@@ -195,6 +202,7 @@ public struct FileSet: Equatable, Sendable {
         var fileSet = FileSet(filesInPackage: filesInPackage, owned: owned, excluded: excluded, note: note)
         fileSet.ignoreFilesConsulted = (ignoreRules?.filesConsulted ?? []).sorted()
         fileSet.directoriesListed = ignoreRules?.directoriesListed ?? []
+        fileSet.filesRead = filesRead
         return fileSet
     }
 
