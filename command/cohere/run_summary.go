@@ -85,6 +85,10 @@ type runSummary struct {
 	// EngineBuilds are the engines this invocation built before it checked, which no record or replay keeps,
 	// since a build is this invocation's (engine_build.go).
 	EngineBuilds []engineBuild `json:"-"`
+
+	// IgnorePatterns are the root's ignorePatterns as this invocation's discovery counted them, which no record
+	// keeps, since discovery runs again on every run (ignore_account.go).
+	IgnorePatterns []ignoreAccount `json:"-"`
 }
 
 // ruleSkip is a rule that declined every file it was offered: why, and the check that reports the same

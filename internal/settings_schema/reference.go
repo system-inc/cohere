@@ -18,7 +18,7 @@ var examples = map[string]string{
 	"departures":     `{ "no-console": "This command-line tool writes to the console by design." }`,
 	"reasons":        `{ "no-continue": "Style, with no bug class behind it." }`,
 	"overrides":      `[{ "files": ["**/*.test.ts"], "rules": { "no-console": "off" }, "reason": "Tests print their fixtures." }]`,
-	"ignorePatterns": `["dist/**", "data/**", "modules/*/data/**"]`,
+	"ignorePatterns": `["dist/**", { "pattern": "data/**", "reason": "Exports, kept as given.", "kind": "input" }]`,
 	"cohere":         `"^1.0.0"`,
 	"plugins":        `["react"]`,
 	"jsPlugins":      `["./code-quality/lint/rules/index.js"]`,
@@ -97,6 +97,13 @@ func reference(ruleNames []string) string {
 		if key.Name == "extends" {
 			write("The rule sets cohere carries: `%s`.\n\n", strings.Join(configuration.SetNames(), "`, `"))
 		}
+		if key.Name == "ignorePatterns" {
+			write("An entry written as an object takes:\n\n")
+			for _, name := range []string{"pattern", "reason", "kind", "check"} {
+				write("- `%s`: %s\n", name, ignoreEntryDescriptions[name])
+			}
+			write("\n")
+		}
 		if key.Name == "overrides" {
 			write("Each block takes:\n\n")
 			for _, field := range configuration.OverrideFields() {
@@ -172,6 +179,8 @@ func typeName(key configuration.TopLevelKey) string {
 		return "object"
 	case key.Field == configuration.ExtendsListType:
 		return "string or array of strings"
+	case key.Field == configuration.IgnoreEntryListType:
+		return "array of globs or entries"
 	case key.Field == nil:
 		return ignoredKeyShapes[key.Name]().Type
 	case key.Field.Kind() == reflect.String:

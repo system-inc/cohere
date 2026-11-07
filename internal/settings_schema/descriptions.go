@@ -39,7 +39,10 @@ var topLevelDescriptions = map[string]string{
 	"ignorePatterns": "Paths cohere never checks and the formatter never offers, one list for both, as globs " +
 		"relative to the directory of the settings file cohere reads first: * within a path segment, ** across " +
 		"any number of segments, ? one character, {a,b} alternation. A file's patterns follow those of the " +
-		"file it extends.",
+		"file it extends. An entry is a glob, or an object naming the glob and why, and in every set cohere " +
+		"carries each entry gives a reason, as an off does. " +
+		"--verbose lists every entry with its reason, kind, file and how many paths it matched, zero included, " +
+		"and --json carries the same.",
 
 	"plugins": "Rule namespaces whose rules apply without a rules entry naming them, at warn, as an oxlint " +
 		"plugins declaration does. A rules entry still sets any of them explicitly.",
@@ -81,6 +84,15 @@ var topLevelDescriptions = map[string]string{
 		"Package.swift, project.yml or .xcodeproj), or the file --lint-config names, and never follows extends, " +
 		"so a block in a file another extends, or beside no Swift project, is refused by name. Formatting is not " +
 		"configured here: Swift has one house format, and a format key in this block is refused.",
+}
+
+var ignoreEntryDescriptions = map[string]string{
+	"pattern": "The paths the entry ignores, as a glob.",
+	"reason":  "Why these paths are never checked, in a sentence. Required in cohere's sets.",
+	"kind": "What the paths are: input, data a program reads as it was given; generated, written by a tool; " +
+		"thirdParty, somebody else's code.",
+	"check": "A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet " +
+		"acted on.",
 }
 
 var overrideDescriptions = map[string]string{

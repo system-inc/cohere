@@ -17,8 +17,12 @@ type Configuration struct {
 	// Rules is the base configuration, applying to every file not excluded.
 	Rules map[string]RuleSetting
 
-	// IgnorePatterns are paths no rule runs on at all.
+	// IgnorePatterns are paths no rule runs on at all: each of IgnoreEntries' globs, in the same order.
 	IgnorePatterns []string
+
+	// IgnoreEntries are the chain's `ignorePatterns` whole, the base's first: each glob with its reason, kind and
+	// check when its author gave them, and the file that wrote it. What reports an ignore reads these.
+	IgnoreEntries []IgnoreEntry
 
 	// Overrides apply in order, later blocks winning over earlier ones, which is how both ESLint and
 	// oxlint resolve them. Order is preserved rather than sorted for exactly this reason.

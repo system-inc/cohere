@@ -153,6 +153,7 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 		}
 		// The house ignores what it ignores for every file, whichever set wrote the pattern.
 		loaded.IgnorePatterns = whole.IgnorePatterns
+		loaded.IgnoreEntries = whole.IgnoreEntries
 		house.variants[variant] = loaded
 	}
 

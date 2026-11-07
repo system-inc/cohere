@@ -71,6 +71,10 @@ var RuleValueType = reflect.TypeOf(rawConfiguration{}).Field(
 // schema renders it as either shape.
 var ExtendsListType = reflect.TypeOf(extendsList{})
 
+// IgnoreEntryListType is the type `ignorePatterns` decodes into: entries that are each a glob, or an object
+// with the glob and why it is ignored. The schema renders each entry as either shape.
+var IgnoreEntryListType = reflect.TypeOf([]IgnoreEntry{})
+
 // SeveritySpellings are the severities parseSeverity accepts, lowercase; it compares case-insensitively.
 // The schema test proves parseSeverity accepts exactly these.
 var SeveritySpellings = []string{"off", "allow", "warn", "warning", "error", "deny"}
