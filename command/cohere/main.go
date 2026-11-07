@@ -1187,26 +1187,29 @@ func run() error {
 				waitStart := time.Now()
 				answer := <-nestedCheck
 				fixDuration += time.Since(waitStart)
+				// A nested repository's drift is reported, never this project's to check, so a failure reading one is a
+				// gap the footer names, never a stop: at adamic's root one stopped the run before lint (#71njcj8).
 				if answer.checkError != nil {
-					return fmt.Errorf("reading the nested repositories: %w", answer.checkError)
+					activeSummary.Gaps.NestedUnread = sentence.FromError(answer.checkError)
+				} else {
+					nested := answer.check
+					for _, walk := range nested.Walks {
+						declareFormatWalk(walk)
+					}
+					for _, note := range nested.Notes {
+						fmt.Fprintln(accountOutput(streams.Errors), note)
+					}
+					showWarning()
+					printNestedDrift(streams.Output, nested)
+					findings += len(nested.Drift)
+					activeSummary.WouldChange += len(nested.Drift)
+					if *formatOnly {
+						printUnchecked(streams.Output, nestedUnchecked(nested))
+						findings += len(nested.Unchecked)
+						activeSummary.Findings += len(nested.Unchecked)
+					}
+					printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 				}
-				nested := answer.check
-				for _, walk := range nested.Walks {
-					declareFormatWalk(walk)
-				}
-				for _, note := range nested.Notes {
-					fmt.Fprintln(accountOutput(streams.Errors), note)
-				}
-				showWarning()
-				printNestedDrift(streams.Output, nested)
-				findings += len(nested.Drift)
-				activeSummary.WouldChange += len(nested.Drift)
-				if *formatOnly {
-					printUnchecked(streams.Output, nestedUnchecked(nested))
-					findings += len(nested.Unchecked)
-					activeSummary.Findings += len(nested.Unchecked)
-				}
-				printProvenance(accountOutput(streams.Output), "%s\n", nestedSummary(nested))
 			}
 			report.recordChecked(phaseFix, fixDuration, len(fixSummary.ChangedFiles))
 		}

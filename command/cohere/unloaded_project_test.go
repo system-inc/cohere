@@ -74,6 +74,11 @@ type jsonRecord struct {
 	Label   string `json:"label"`
 	Verdict string `json:"verdict"`
 	Error   string `json:"error"`
+	// Gaps are the two a stopped run, or one past an unreadable nested repository, says (#71njcj8).
+	Gaps struct {
+		NestedUnread string   `json:"nestedUnread"`
+		PhasesNotRun []string `json:"phasesNotRun"`
+	} `json:"gaps"`
 }
 
 // summariesOf parses every line of a --json stdout, failing on any line that is not JSON, and returns the
@@ -118,6 +123,10 @@ func TestAjsonRunWhoseGraphDoesNotBuildEndsOnAFailedSummary(test *testing.T) {
 		}
 		if summary.Verdict != "fail" || !strings.Contains(summary.Error, missing) {
 			test.Errorf("the summary does not fail naming the load error: %v", summary)
+		}
+		// It stopped before every phase, and says so as a gap rather than as 0 rules (#71njcj8).
+		if strings.Join(summary.Gaps.PhasesNotRun, ",") != "fix,types,lint" {
+			test.Errorf("the failed summary does not name the phases it never ran: %v", summary.Gaps.PhasesNotRun)
 		}
 		if !strings.HasSuffix(strings.TrimSpace(stdout), "}") || !strings.Contains(
 			stdout[strings.LastIndex(strings.TrimSuffix(stdout, "\n"), "\n")+1:],

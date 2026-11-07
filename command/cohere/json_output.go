@@ -193,6 +193,7 @@ func writeFailedRunSummary(out *bufio.Writer, runError error) {
 	if label := os.Getenv(projectLabelVariable); label != "" {
 		summary.Label = label
 	}
+	summary.Gaps.PhasesNotRun = summary.phasesNotRun()
 	line := summaryAsJson(summary)
 	line.Verdict = "fail"
 	line.Error = sentence.FromError(runError)

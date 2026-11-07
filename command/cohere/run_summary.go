@@ -194,6 +194,13 @@ type runGaps struct {
 	ModifiedBuild bool `json:"modifiedBuild"`
 	// Unread is files the run could not check for any other reason, said as the run said it.
 	Unread string `json:"unread,omitempty"`
+	// NestedUnread is why the nested repositories could not be read for drift, when they could not. Their
+	// files are never this run's to check, so the run goes on, and says so here (#71njcj8).
+	NestedUnread string `json:"nestedUnread,omitempty"`
+	// PhasesNotRun are the check's phases the run has no record of, so it stopped before them. A run that
+	// formatted and never type-checked or linted says it here, rather than reading as 0 rules that found
+	// nothing (#71njcj8). Set where a run stops: its failed summary, and a project's run that never finished.
+	PhasesNotRun []string `json:"phasesNotRun,omitempty"`
 	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
 	// format walk: checked, and never formatted (#6mhafvb).
 	AdamicIgnored int `json:"adamicIgnored,omitempty"`
@@ -243,6 +250,26 @@ type withheldCgoFile struct {
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings
 // stay in the finding total without failing it, including when the summary is replayed from the run cache.
+// phasesNotRun are the check's phases this summary has no record of: fix, types and lint, the opt-in phases
+// aside. Asked only of a run that stopped on an error, whose summary holds the phases it reached, if any; a
+// replay records no phase and stopped before nothing.
+func (summary runSummary) phasesNotRun() []string {
+	var missing []string
+	for _, name := range phaseOrder {
+		if optInPhases[name] {
+			continue
+		}
+		recorded := false
+		for _, record := range summary.Phases {
+			recorded = recorded || record.Name == name
+		}
+		if !recorded {
+			missing = append(missing, string(name))
+		}
+	}
+	return missing
+}
+
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0
