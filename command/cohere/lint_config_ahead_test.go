@@ -38,11 +38,10 @@ func TestAConfigReadAheadOfTheGraphRefusesWhatItAlwaysRefused(test *testing.T) {
 	for _, refused := range cases {
 		test.Run(refused.name, func(test *testing.T) {
 			test.Parallel()
-			output, exitCode := runCohereWithEnvironment(
+			output, exitCode := runCohere(
 				test,
 				binary,
 				project(test, refused.settings),
-				[]string{"COHERE_RUN_CACHE=off"},
 				"--no-fix",
 				"--no-cache",
 			)
@@ -60,11 +59,10 @@ func TestAConfigReadAheadOfTheGraphRefusesWhatItAlwaysRefused(test *testing.T) {
 	}
 	// The control: the same project with a config it can run with is checked, so the refusals above are about the
 	// config and not the project. It has findings of its own, so what it must not do is refuse.
-	output, _ := runCohereWithEnvironment(
+	output, _ := runCohere(
 		test,
 		binary,
 		project(test, `{"extends": ["cohere:react"]}`),
-		[]string{"COHERE_RUN_CACHE=off"},
 		"--no-fix",
 		"--no-cache",
 	)

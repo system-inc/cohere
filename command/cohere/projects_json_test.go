@@ -40,7 +40,8 @@ func TestAMixedRunUnderJsonWritesOnlyRecordsToStdout(test *testing.T) {
 
 	command := exec.Command(binary, "--no-fix", "--json")
 	command.Dir = root
-	command.Env = append(os.Environ(), "COHERE_RUN_CACHE=off", "COHERE_SWIFT_ENGINE="+engine)
+	// Never a replay: the run record lives in the root's own .cache/cohere, and the root is new.
+	command.Env = append(os.Environ(), "COHERE_SWIFT_ENGINE="+engine)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	command.Stdout, command.Stderr = &standardOutput, &standardError
