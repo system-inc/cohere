@@ -4871,7 +4871,12 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
-                "severity": "off"
+                "severity": "off",
+                "options": [
+                    {
+                        "runtimeChecksEmitted": false
+                    }
+                ]
             },
             {
                 "name": "adamic/no-void-widening",
@@ -6598,7 +6603,12 @@
             },
             {
                 "name": "adamic/no-unchecked-cast",
-                "severity": "off"
+                "severity": "off",
+                "options": [
+                    {
+                        "runtimeChecksEmitted": false
+                    }
+                ]
             },
             {
                 "name": "adamic/no-void-widening",

@@ -4677,8 +4677,12 @@
             "origin": "house",
             "category": "adamic",
             "typeAware": true,
+            "options": {
+                "elements": "one"
+            },
             "messageIds": [
-                "uncheckedCast"
+                "uncheckedCast",
+                "uncheckedDowncast"
             ],
             "sets": [
                 {
