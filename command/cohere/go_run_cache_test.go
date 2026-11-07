@@ -390,20 +390,20 @@ func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
 		summaryJson string
 	}{
 		{"a warm run", goStreamWithLintCache(test,
-			`{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,"factsSkipped":0}`),
+			`{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":1}`),
 			"  lint: package cache hit 412, missed 3, wrote 3\n",
 			`"packageCache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,` +
-				`"factsSkipped":0}`},
+				`"factsSkipped":0,"waves":1}`},
 		{"a run with unstorable packages and dropped and skipped facts", goStreamWithLintCache(test,
-			`{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,"factsSkipped":5}`),
+			`{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,"factsSkipped":5,"waves":2}`),
 			"  lint: package cache hit 1, missed 4, wrote 2, 2 unstorable, 7 facts dropped, 5 facts skipped\n",
 			`"packageCache":{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,` +
-				`"factsSkipped":5}`},
+				`"factsSkipped":5,"waves":2}`},
 		{"a run under --no-cache", goStreamWithLintCache(test,
-			`{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0}`),
+			`{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":0}`),
 			"  lint: package cache off\n",
 			`"packageCache":{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,` +
-				`"factsSkipped":0}`},
+				`"factsSkipped":0,"waves":0}`},
 		{"a record with no cache object", contractFixture(test, "GoClean.jsonl"), "", ""},
 	}
 	for _, testCase := range cases {

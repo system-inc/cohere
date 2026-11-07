@@ -404,12 +404,12 @@ func lineAt(lines []string, index int) string {
 var (
 	elapsedPattern = regexp.MustCompile(`"elapsedMilliseconds":\d+`)
 	packagesLoaded = regexp.MustCompile(`(holds its export data|restoring analysis only): \d+ packages`)
-	// The packages the findings cache missed, wrote and could not store, and the facts it dropped, count the
-	// toolchain's own packages, which a Go release changes, as it changes the packages loaded. Hit stays, since a
-	// fresh copy hits nothing.
+	// The packages the findings cache missed, wrote and could not store, the facts it dropped, and the waves it
+	// analyzed them in, count the toolchain's own packages, which a Go release changes, as it changes the packages
+	// loaded. Hit stays, since a fresh copy hits nothing.
 	// The milliseconds the cgo tool's load took vary like any elapsed time.
 	cgoMillisecondsPattern = regexp.MustCompile(`("cgoTranslation":\{"packages":\d+,"milliseconds":)\d+`)
-	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped)":\d+`)
+	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped|waves)":\d+`)
 	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
 	hostTarget             = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance   = contract.ProvenanceRecord{

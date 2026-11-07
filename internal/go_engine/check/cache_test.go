@@ -114,12 +114,12 @@ func keyOf(test *testing.T, caching *Caching, path string) cache.Key {
 	test.Helper()
 	keyContext := caching.Context
 	keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+load.LoaderSource)
-	keys, keysError := cache.Keys(fixtures.loaded.Packages, keyContext, nil)
+	keyed, keysError := cache.Keys(fixtures.loaded.Packages, keyContext, nil)
 	if keysError != nil {
 		test.Fatalf("computing the fixtures' keys: %v", keysError)
 	}
-	key, keyed := keys[fixturePackage(test, path)]
-	if !keyed {
+	key, hasKey := keyed.Keys[fixturePackage(test, path)]
+	if !hasKey {
 		test.Fatalf("no key for %s", path)
 	}
 	return key
@@ -132,21 +132,24 @@ func TestAWarmRunGivesTheColdRunsResultAndRunsNothing(test *testing.T) {
 
 	loadedFixtures(test)
 	for _, warmCase := range []struct {
-		name   string
-		module string
-		rules  func(counts *runCounts) []rule.Rule
+		name      string
+		module    string
+		coldWaves int
+		rules     func(counts *runCounts) []rule.Rule
 	}{
 		{
-			name:   "findings and facts",
-			module: ".",
+			name:      "findings and facts",
+			module:    ".",
+			coldWaves: 2,
 			rules: func(counts *runCounts) []rule.Rule {
 				return []rule.Rule{countedRule("countedFindings", counts), houseRule(targetAnalyzer), packageClauseRule,
 					houseRule(markedAnalyzer)}
 			},
 		},
 		{
-			name:   "withheld as generated",
-			module: "generated",
+			name:      "withheld as generated",
+			module:    "generated",
+			coldWaves: 1,
 			rules: func(counts *runCounts) []rule.Rule {
 				return []rule.Rule{countedRule("countedGenerated", counts), houseRule(targetAnalyzer)}
 			},
@@ -161,7 +164,9 @@ func TestAWarmRunGivesTheColdRunsResultAndRunsNothing(test *testing.T) {
 			analyzed := ownLoad(test, warmCase.module)
 			cold := runCached(test, analyzed, caching, rules)
 			packageCount := len(analyzed)
-			wantCold := CacheCounts{On: true, Missed: packageCount, Written: packageCount}
+			// Both modules' packages import nothing that misses but each other, so a cold run is one wave unless
+			// one of them waits on another.
+			wantCold := CacheCounts{On: true, Missed: packageCount, Written: packageCount, Waves: warmCase.coldWaves}
 			if !reflect.DeepEqual(cold.Cache, wantCold) {
 				test.Fatalf("want the cold run's cache %+v, got %+v", wantCold, cold.Cache)
 			}
@@ -207,7 +212,8 @@ func TestARestoredFactReachesAnImporterThatMissed(test *testing.T) {
 	coldRuns := counts.rule.Load()
 
 	warm := runCached(test, analyzed, caching, rules)
-	if wantWarm := (CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1}); !reflect.DeepEqual(warm.Cache, wantWarm) {
+	wantWarm := CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1, Waves: 1}
+	if !reflect.DeepEqual(warm.Cache, wantWarm) {
 		test.Fatalf("want base hit and user missed and written again, got %+v", warm.Cache)
 	}
 	if ran := counts.rule.Load() - coldRuns; ran != 1 {
@@ -249,8 +255,11 @@ func TestACorruptEntryIsAMiss(test *testing.T) {
 	}
 	coldRuns := counts.rule.Load()
 
-	warm := runCached(test, analyzed, caching, rules)
-	if wantWarm := (CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1}); !reflect.DeepEqual(warm.Cache, wantWarm) {
+	// A load of its own: the cold run's second wave restored base, which its first had analyzed, and let go of its
+	// syntax, which base, analyzed again, needs.
+	warm := runCached(test, ownLoad(test, "."), caching, rules)
+	wantWarm := CacheCounts{On: true, Hit: 1, Missed: 1, Written: 1, Waves: 1}
+	if !reflect.DeepEqual(warm.Cache, wantWarm) {
 		test.Fatalf("want user hit and base missed and written again, got %+v", warm.Cache)
 	}
 	if ran := counts.rule.Load() - coldRuns; ran != 1 {
@@ -274,7 +283,8 @@ func TestAnActionErrorLeavesNoEntry(test *testing.T) {
 	caching := testCaching(test, rules)
 	analyzed := ownLoad(test, ".")
 	cold := runCached(test, analyzed, caching, rules)
-	if wantCold := (CacheCounts{On: true, Missed: 2}); !reflect.DeepEqual(cold.Cache, wantCold) {
+	// base fails in the first wave, so the second analyzes it again with user, and reports the crash once.
+	if wantCold := (CacheCounts{On: true, Missed: 2, Waves: 2}); !reflect.DeepEqual(cold.Cache, wantCold) {
 		test.Fatalf("want both packages missed and none written, got %+v", cold.Cache)
 	}
 	for _, path := range []string{"example.com/fixture/base", "example.com/fixture/user"} {

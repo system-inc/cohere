@@ -33,11 +33,13 @@ type LintRecord struct {
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,
-// restored from an entry with nothing parsed, type-checked or run on it, or missed, checked and analyzed from source.
+// restored from an entry with nothing run on it, and on the load from source nothing parsed or type-checked unless
+// the early cutoff restored it by its second key, or missed, checked and analyzed from source.
 // Of the misses, written got an entry and unstorable held what no entry can hold. FactsDropped counts the facts the
 // written entries left out because nothing outside their package can name their object, and FactsSkipped the
-// restored facts whose object the package's export data does not hold. On is false, and every count 0, under
-// `--no-cache`.
+// restored facts whose object the package's export data does not hold. Waves counts the times the lint phase analyzed
+// packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
+// found among the packages above the first were restored. On is false, and every count 0, under `--no-cache`.
 type LintCache struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -46,6 +48,7 @@ type LintCache struct {
 	Unstorable   int  `json:"unstorable"`
 	FactsDropped int  `json:"factsDropped"`
 	FactsSkipped int  `json:"factsSkipped"`
+	Waves        int  `json:"waves"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

@@ -33,8 +33,17 @@ type CacheCounts struct {
 	// On is whether the run read and wrote the cache. A run without it counts nothing.
 	On bool
 
-	// Hit is the packages restored from an entry, which nothing parsed, type-checked or analyzed.
+	// Hit is the packages restored from an entry, which nothing analyzed, and on the load from source nothing parsed
+	// or type-checked unless the second key restored it (see SecondKeyHit).
 	Hit int
+
+	// SecondKeyHit is the hits restored by their second key, once their dependencies' analyses came out as before:
+	// the load had checked them, since only an analysis of what is below them could say they would hit.
+	SecondKeyHit int
+
+	// Waves is how many times the run analyzed packages: at most two, the packages whose own inputs moved, and then
+	// everything else that missed (see firstWave), and 0 when every package hit.
+	Waves int
 
 	// Missed is the packages checked and analyzed from source.
 	Missed int
@@ -74,6 +83,31 @@ type CacheSession struct {
 	opened bool
 	keys   map[*packages.Package]cache.Key
 	hits   map[*packages.Package]*restoredPackage
+
+	// own is each package's own digest (cache.Keyed), which its second key starts from.
+	own map[*packages.Package]cache.Key
+
+	// stored is where each hit's entry is: under its key, or the key an alias led to.
+	stored map[*packages.Package]cache.Key
+
+	// secondKeyHits are the packages the second key restored.
+	secondKeyHits map[*packages.Package]bool
+
+	// earlier are the packages the first wave analyzed and saved, which the second wave restores from the entries just
+	// encoded rather than analyzing them again.
+	earlier map[*packages.Package]*restoredPackage
+
+	// outputs are the output digests of the packages this run analyzed and saved; a hit's is in its entry.
+	outputs map[*packages.Package]cache.Key
+
+	// closures memoizes closureOf, and is cleared whenever outputs grow.
+	closures map[*packages.Package]closureDigest
+
+	// attempted are the misses a wave tried to save, so no miss is saved, or counted, twice.
+	attempted map[*packages.Package]bool
+
+	// knownFiles is every file of every package the load reached, for positionDependent, made once.
+	knownFiles map[string]bool
 
 	// given is the packages to analyze, as the load named them.
 	given map[*packages.Package]bool
@@ -124,6 +158,12 @@ func (session *CacheSession) Restore(
 ) map[*packages.Package]*load.Restored {
 	session.opened = true
 	session.hits = map[*packages.Package]*restoredPackage{}
+	session.stored = map[*packages.Package]cache.Key{}
+	session.secondKeyHits = map[*packages.Package]bool{}
+	session.earlier = map[*packages.Package]*restoredPackage{}
+	session.outputs = map[*packages.Package]cache.Key{}
+	session.closures = map[*packages.Package]closureDigest{}
+	session.attempted = map[*packages.Package]bool{}
 	session.given = make(map[*packages.Package]bool, len(analyzed))
 	for _, analyzedPackage := range analyzed {
 		session.given[analyzedPackage] = true
@@ -133,26 +173,18 @@ func (session *CacheSession) Restore(
 	}
 	keyContext := session.caching.Context
 	keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
-	keys, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs)
+	keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs)
 	if keysError != nil {
 		session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 		return nil
 	}
-	session.keys = keys
-	for _, keyed := range reachable {
-		key, hasKey := keys[keyed]
-		if !hasKey || len(keyed.Errors) > 0 {
+	session.keys, session.own = keyed.Keys, keyed.Own
+	for _, restoring := range reachable {
+		key, hasKey := keyed.Keys[restoring]
+		if !hasKey || len(restoring.Errors) > 0 {
 			continue
 		}
-		contents, stored := session.caching.Store.Get(key)
-		if !stored {
-			continue
-		}
-		restored, decodeError := decodeEntry(session.known, keyed, contents, session.exportDataReader(keyed, key))
-		if decodeError != nil {
-			continue
-		}
-		session.hits[keyed] = restored
+		session.hitAt(restoring, key)
 	}
 	// Each pass makes a hit that falls short a miss, which can only ask more of the rest.
 	dropping := true
@@ -189,6 +221,44 @@ func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 	return [sha256.Size]byte(digest.Sum(nil))
 }
 
+// hitAt makes a hit of restoring when the store holds a whole entry under key, directly or through an alias, and
+// reports whether it did. Which analyzers the entry must hold is dropShortHits' to judge.
+func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) bool {
+	contents, storedKey, found := session.entryAt(key)
+	if !found {
+		return false
+	}
+	restored, decodeError := decodeEntry(session.known, restoring, contents,
+		session.exportDataReader(restoring, storedKey))
+	if decodeError != nil {
+		return false
+	}
+	session.hits[restoring] = restored
+	session.stored[restoring] = storedKey
+	return true
+}
+
+// entryAt is the entry under key, or, when there is none, the entry the alias under key names, with the key it is
+// stored under.
+func (session *CacheSession) entryAt(key cache.Key) ([]byte, cache.Key, bool) {
+	if contents, stored := session.caching.Store.Get(key); stored {
+		return contents, key, true
+	}
+	target, aliased := session.caching.Store.Get(aliasKey(key))
+	if !aliased || len(target) != len(cache.Key{}) {
+		return nil, cache.Key{}, false
+	}
+	storedKey := cache.Key(target)
+	contents, stored := session.caching.Store.Get(storedKey)
+	return contents, storedKey, stored
+}
+
+// aliasKey is where the store keeps the key of the entry another key stands for: a second key, or the first key of a
+// package the second key restored, so the next run with the same inputs hits on its first.
+func aliasKey(key cache.Key) cache.Key {
+	return sha256.Sum256(append([]byte("alias "), key[:]...))
+}
+
 // exportDataReader reads the export data of the package under key from the store, for the load.
 func (session *CacheSession) exportDataReader(keyed *packages.Package, key cache.Key) func() ([]byte, error) {
 	return func() ([]byte, error) {
@@ -215,7 +285,7 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 		}
 	}
 	for _, each := range reachable {
-		if _, hit := session.hits[each]; session.given[each] && !hit {
+		if _, hit := session.hits[each]; session.given[each] && !hit && session.earlier[each] == nil {
 			reach(each)
 		}
 	}
@@ -229,16 +299,23 @@ func (session *CacheSession) dropShortHits(reachable []*packages.Package) bool {
 			askedForFacts[hit] && !covers(restored, session.known.facts)
 		if short {
 			delete(session.hits, hit)
+			delete(session.secondKeyHits, hit)
 			dropped = true
 		}
 	}
 	return dropped
 }
 
-// restored reports whether the run restores a package rather than analyzing it, for checker.Options.Restored.
+// restored reports whether the run restores a package rather than analyzing it.
 func (session *CacheSession) restored(restoring *packages.Package) bool {
 	_, hit := session.hits[restoring]
 	return hit
+}
+
+// restoredInWave reports whether a wave restores a package rather than analyzing it, for checker.Options.Restored: a
+// hit, or a package an earlier wave analyzed.
+func (session *CacheSession) restoredInWave(restoring *packages.Package) bool {
+	return session.restored(restoring) || session.earlier[restoring] != nil
 }
 
 // restore gives an action on a restored package its package's own facts from the entry, for
@@ -247,7 +324,14 @@ func (session *CacheSession) restored(restoring *packages.Package) bool {
 // is exactly what an importer can see of the package, so no importer can name that object, and no importer's
 // finding can read its fact.
 func (session *CacheSession) restore(action *checker.Action) error {
-	restored, held := session.hits[action.Package].analyses[action.Analyzer]
+	restoring, hit := session.hits[action.Package]
+	if !hit {
+		restoring = session.earlier[action.Package]
+	}
+	if restoring == nil {
+		return fmt.Errorf("restoring %s on %s: the run holds no entry of it", action.Analyzer.Name, action.Package.ID)
+	}
+	restored, held := restoring.analyses[action.Analyzer]
 	if !held {
 		// dropShortHits keeps no hit that falls short of an analyzer an action on it can be for, so this is a
 		// checker that made an action nobody expected, which reads as a crash rather than a rule that found nothing.
@@ -288,44 +372,76 @@ func (session *CacheSession) findingsOf(
 	return restored.analyses[analyzer].findings, true
 }
 
-// filesOf is the stored walk of a restored package Analyze was given, and false for one that missed or a run without
-// the cache.
+// filesOf is the stored walk of a restored package Analyze was given, or of one the first wave analyzed, whose
+// syntax the second let go of as of any package it restores, and false for one that missed or a run without the
+// cache.
 func (session *CacheSession) filesOf(analyzedPackage *packages.Package) ([]storedFile, bool) {
 	if session == nil {
 		return nil, false
 	}
 	restored, hit := session.hits[analyzedPackage]
 	if !hit {
+		restored = session.earlier[analyzedPackage]
+	}
+	if restored == nil {
 		return nil, false
 	}
 	return restored.files, true
 }
 
-// save counts every package the load reached as a hit or a miss, and writes the entry of each miss with no load
-// error on which every action finished without one, from its actions, its types and what the load withheld of it.
-// The entries are encoded and written as many at once as there are cores: writing a package's export data is most of
-// a cold run's save, and each package's is its own.
+// save writes the entry of every miss no wave has saved yet, from the last wave's graph, and counts every package the
+// load reached as a hit or a miss.
 func (session *CacheSession) save(
 	graph *checker.Graph,
 	withheld map[*packages.Package]load.PackageWithheld,
 	files map[*packages.Package][]storedFile,
 ) {
-	session.counts.FactsSkipped = int(session.factsSkipped.Load())
-	actionsOf := map[*packages.Package][]*checker.Action{}
-	for action := range graph.All() {
-		actionsOf[action.Package] = append(actionsOf[action.Package], action)
-	}
-	var saving []*packages.Package
+	var missed []*packages.Package
 	for keyed := range session.keys {
-		if session.restored(keyed) {
-			session.counts.Hit++
+		if !session.restored(keyed) {
+			missed = append(missed, keyed)
+		}
+	}
+	session.saveMisses([]*checker.Graph{graph}, missed, withheld, files)
+	session.counts.FactsSkipped = int(session.factsSkipped.Load())
+	session.counts.Hit = len(session.hits)
+	session.counts.Missed = len(session.keys) - len(session.hits)
+	session.counts.SecondKeyHit = len(session.secondKeyHits)
+}
+
+// saveMisses writes the entry of each of missed that no wave tried to save, has no load error, and on which every
+// action of graphs finished without one, from those actions, its types and what the load withheld of it, and returns
+// each one's encoded entry. A written entry whose package names no file outside it in a finding gets an alias under
+// its second key, once every output below it is known. The entries are encoded and written as many at once as there
+// are cores: writing a package's export data is most of a cold run's save, and each package's is its own.
+func (session *CacheSession) saveMisses(
+	graphs []*checker.Graph,
+	missed []*packages.Package,
+	withheld map[*packages.Package]load.PackageWithheld,
+	files map[*packages.Package][]storedFile,
+) map[*packages.Package]encodedEntry {
+	actionsOf := map[*packages.Package][]*checker.Action{}
+	for _, graph := range graphs {
+		if graph == nil {
 			continue
 		}
-		session.counts.Missed++
+		for action := range graph.All() {
+			actionsOf[action.Package] = append(actionsOf[action.Package], action)
+		}
+	}
+	knownFiles := session.allFiles()
+	var saving []*packages.Package
+	for _, keyed := range missed {
+		if session.attempted[keyed] {
+			continue
+		}
+		session.attempted[keyed] = true
 		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) {
 			saving = append(saving, keyed)
 		}
 	}
+	encoded := map[*packages.Package]encodedEntry{}
+	var written []*packages.Package
 	var countsLock sync.Mutex
 	var group sync.WaitGroup
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
@@ -335,18 +451,24 @@ func (session *CacheSession) save(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			entry, exportData, dropped, encodeError := encodeEntry(session.known, session.ruleOf, saved,
-				actionsOf[saved], withheld[saved], files[saved])
+			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
+				withheld[saved], files[saved], knownFiles)
 			var putError error
 			// The export data goes first, so an entry is never in the store before what it needs to be read.
-			if encodeError == nil && exportData != nil {
-				putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), exportData)
+			if encodeError == nil && entry.exportData != nil {
+				putError = session.caching.Store.Put(exportDataKey(session.keys[saved]), entry.exportData)
 			}
 			if encodeError == nil && putError == nil {
-				putError = session.caching.Store.Put(session.keys[saved], entry)
+				putError = session.caching.Store.Put(session.keys[saved], entry.entry)
 			}
 			countsLock.Lock()
 			defer countsLock.Unlock()
+			if encodeError == nil {
+				encoded[saved] = entry
+				if entry.hasOutput {
+					session.outputs[saved] = entry.output
+				}
+			}
 			switch {
 			case errors.Is(encodeError, errorUnstorable):
 				session.counts.Unstorable++
@@ -358,12 +480,62 @@ func (session *CacheSession) save(
 				}
 				session.counts.WriteFailed++
 			default:
-				session.counts.FactsDropped += dropped
+				session.counts.FactsDropped += entry.dropped
 				session.counts.Written++
+				written = append(written, saved)
 			}
 		}()
 	}
 	group.Wait()
+	clear(session.closures)
+	aliases := map[cache.Key]cache.Key{}
+	for _, saved := range written {
+		if encoded[saved].positionDependent {
+			continue
+		}
+		if second, known := session.secondKey(saved); known {
+			aliases[second] = session.keys[saved]
+		}
+	}
+	session.alias(aliases)
+	return encoded
+}
+
+// alias keeps under each key's alias the key of the entry it stands for, as many at once as there are cores: on
+// cohere's own root a cold run writes about a thousand, which one at a time took 0.2s, while hashing every second
+// key took 5ms. A failed write is a problem, never a finding: the next run misses where it would have hit.
+func (session *CacheSession) alias(aliases map[cache.Key]cache.Key) {
+	var group sync.WaitGroup
+	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
+	for key, target := range aliases {
+		group.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer group.Done()
+			defer func() { <-slots }()
+			if putError := session.caching.Store.Put(aliasKey(key), target[:]); putError != nil {
+				session.problem(putError.Error())
+			}
+		}()
+	}
+	group.Wait()
+}
+
+// allFiles is every file of every package the load reached, made on first use.
+func (session *CacheSession) allFiles() map[string]bool {
+	if session.knownFiles != nil {
+		return session.knownFiles
+	}
+	session.knownFiles = map[string]bool{}
+	for keyed := range session.keys {
+		for _, files := range [][]string{keyed.GoFiles, keyed.CompiledGoFiles, keyed.OtherFiles, keyed.EmbedFiles,
+			keyed.IgnoredFiles} {
+			for _, file := range files {
+				session.knownFiles[file] = true
+			}
+		}
+	}
+	return session.knownFiles
 }
 
 // problem records one reason the cache was not read or written.

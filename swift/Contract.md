@@ -466,12 +466,21 @@ the line then says so instead of printing a duration.
 
 The Go engine's lint record carries one more field, additive within contract 3 as the types record's
 are, so a front door that does not read it yet loses only what it counts:
-`"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0}`.
+`"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.
 It is what the engine's per-package findings cache did, by package. Every package the load reached,
 each analyzed package and test variant and each dependency, was either `hit` or `missed`. A hit is
-restored from its entry: the load from source neither parses nor type-checks it, and reads its types
-from the entry's export data only when a package that missed imports it, and no analyzer runs on it.
-A miss is checked and analyzed from source. Of the misses, `written` got an entry, and `unstorable`
+restored from its entry, and no analyzer runs on it. A package's key holds its dependencies' keys, so
+an edit misses every package above the one edited, though most come out of an analysis as before.
+So the packages whose own inputs moved are analyzed first, and each package above them is then
+restored by a second key, its own inputs and what the analysis of everything below it came out as
+(its types without positions and the facts it exported), when that key holds an entry; what still
+misses is analyzed together, so `waves`, the times the lint phase analyzed packages, is at most 2,
+and 0 when everything hit. A package one of whose findings names a file outside it, as vet's
+structtag names the line of a field embedded from another package, never takes the second key. On
+the load from source a hit by its first key is neither parsed nor type-checked, and its types are
+read from the entry's export data only when a package that missed imports it; one restored by its
+second key was type-checked, since only the first wave could say it would hit. A miss is checked
+and analyzed from source. Of the misses, `written` got an entry, and `unstorable`
 held what no entry can hold, a fact gob cannot encode or types export data cannot carry, so it got
 none and is checked again next run; a miss that is neither had a load error, had a rule fail on it,
 or its write failed, which the engine says on stderr. `factsDropped` counts the facts the written
