@@ -4281,7 +4281,7 @@
     {
         "name": "cohere:system-inc/base",
         "extends": ["cohere:typescript"],
-        "rulesOn": 293,
+        "rulesOn": 294,
         "rules": [
             {
                 "name": "@eslint-community/eslint-comments/require-description",
@@ -4829,7 +4829,7 @@
             },
             {
                 "name": "adamic/no-indexed-access-write",
-                "severity": "off"
+                "severity": "error"
             },
             {
                 "name": "adamic/no-optional-widening",
