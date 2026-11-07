@@ -1,0 +1,1 @@
+cohere-go: /project/internal/limits/limits.go:6:7: maxBytes was not renamed to maximumBytes, unsafe to rename (named in a file only another platform builds): the new name appears in internal/limits/limits_windows.go, which only windows/amd64 builds and the rename would edit

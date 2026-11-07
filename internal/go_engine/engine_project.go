@@ -67,10 +67,11 @@ func describeProject(request invocation) (*describedProject, error) {
 	}
 
 	described := &describedProject{
-		workspace:  workspace,
-		manifest:   manifest,
-		inScopeSet: map[string]bool{},
-		contents:   map[string][]byte{},
+		workspace:          workspace,
+		manifest:           manifest,
+		inScopeSet:         map[string]bool{},
+		constrainedInScope: map[string]bool{},
+		contents:           map[string][]byte{},
 	}
 	described.record = contract.ProjectRecord{
 		Root:             root,
@@ -120,6 +121,9 @@ func describeProject(request invocation) (*describedProject, error) {
 		if excluded {
 			described.record.Excluded = append(described.record.Excluded,
 				contract.ExcludedFile{File: file, Reason: reason})
+			if insideScope(file, scope) {
+				described.constrainedInScope[file] = true
+			}
 			continue
 		}
 		described.record.FilesOurs++

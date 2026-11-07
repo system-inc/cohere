@@ -6,6 +6,7 @@ import (
 	"go/token"
 	"go/types"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -40,7 +41,7 @@ const renameRounds = 3
 const (
 	refusedUnwritable    = "a reference in a file this run can't write"
 	refusedExported      = "an exported name in an importable package, which renameExports allows"
-	refusedPlatform      = "a package it reaches has files this platform doesn't build"
+	refusedPlatform      = "a package it reaches doesn't load or type-check under another platform"
 	refusedUnproven      = "not proven by a load of the rewrite"
 	refusedCgo           = "a project with cgo of its own, whose rewrite this run can't load"
 	refusedNotDeclared   = "no declaration where the finding stands"
@@ -312,18 +313,26 @@ func (engine *pipeline) writeRenamed(
 // and the rest planned and proven again, at most renameRounds times. Every rename asked for is accounted once: in
 // the proven rewrite, or refused with its reason. Its proof is nil when nothing was proven.
 func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]byte, asked []nameRename) renameRound {
-	writable := func(filename string) bool { return engine.described.inScopeSet[filename] }
+	// A file in scope, or one the build constraints leave out here inside the scope's paths, which a rename proven
+	// under the platform that builds it may write.
+	writable := func(filename string) bool {
+		return engine.described.inScopeSet[filename] || engine.described.constrainedInScope[filename]
+	}
 	space := workspace.FromLoaded(engine.described.workspace.Root, current.Roots, current.Packages, writable)
 	proposals, askedBy := engine.proposals(current, asked)
 	// Types can't prove a name nothing spells but a string: an encoder reading a field by its name, a template or
 	// reflect calling a member by it, a literal spelling it. So an untagged encoded field is declined rather than given
 	// a tag that keeps the old key (TagEncodedFields), and the string-literal guard reviews no literal away.
+	// A rename that reaches a package holding a file only another platform builds is read and proven under that
+	// platform, through the engine's own load of it (platformLoad), and refused, naming the platform, when that load
+	// fails or the package does not type-check there. Only a platform a planned rename reaches is loaded.
 	options := global_rename.Options{
 		RenameImplementations: true,
-		HostOnly:              true,
 		TagEncodedFields:      false,
 		ReviewedLiterals:      nil,
 		PinnedLibraries:       map[string]string{},
+		LoadPlatform:          engine.platformLoad(space, overlay),
+		RequireSoundPlatforms: true,
 	}
 	for _, on := range engine.renamingRulesOn() {
 		if !rule.RenamesExports(on.Analyzer) {
@@ -345,7 +354,7 @@ func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]by
 		if len(last.Accepted) == 0 {
 			break
 		}
-		proved := engine.prove(space, overlay, last)
+		proved := engine.prove(space, overlay, last, options)
 		failures := proved.failures
 		if len(failures) == 0 {
 			proven = renameRound{
@@ -492,7 +501,7 @@ type rewriteProof struct {
 // prove rewrites result's files over overlay, wraps each as the fix phase does, and loads the workspace from source
 // reading them (see rewriteProof).
 func (engine *pipeline) prove(
-	space *workspace.Workspace, overlay map[string][]byte, result *global_rename.Result,
+	space *workspace.Workspace, overlay map[string][]byte, result *global_rename.Result, options global_rename.Options,
 ) rewriteProof {
 	everyRename := func(reason string) map[[2]string]string {
 		failures := map[[2]string]string{}
@@ -539,28 +548,114 @@ func (engine *pipeline) prove(
 		keepFirst(failures, renamesIn(result, diagnostic.File, reason, everyRename))
 	}
 	proved := workspace.FromLoaded(engine.described.workspace.Root, proof.Roots, proof.Packages, nil)
-	for _, mismatch := range global_rename.Compare(expectation, proved).Mismatches {
-		reason := "the rewrite reads back otherwise: " + mismatch.String()
+	keepFirst(failures, mismatchedRenames(result, global_rename.Compare(expectation, proved).Mismatches,
+		"the rewrite reads back otherwise: ", everyRename))
+	// The rewrite is proven under every platform the plan read files under too, through the engine's own load for that
+	// platform (platformLoad), with no package that type-checked there before failing after and no mismatch. A
+	// failure there names the renames that reached that platform's files, or every rename when none did.
+	// held are the files a load that proved the rewrite type-checked: the host's, every one of which it checked with
+	// no error, and each platform's packages that type-check there.
+	held := map[string]bool{}
+	for _, root := range proof.Roots {
+		for _, file := range root.Syntax {
+			held[filepath.Clean(root.Fset.PositionFor(file.Pos(), false).Filename)] = true
+		}
+	}
+	for _, platform := range result.Platforms() {
+		reachedThere := func(reason string) map[[2]string]string {
+			named := map[[2]string]string{}
+			for _, renamed := range result.RenamesUnder(platform) {
+				named[[2]string{renamed.OldName, renamed.NewName}] = reason
+			}
+			if len(named) == 0 {
+				return everyRename(reason)
+			}
+			return named
+		}
+		verification := global_rename.ProvePlatform(space, expectation, platform, next, options)
+		keepFirst(failures, mismatchedRenames(result, verification.Mismatches,
+			"the rewrite as "+platform.String()+" fails its proof: ", reachedThere))
+		maps.Copy(held, verification.Files)
+	}
+	// Every file the rewrite edits must be held by a load that proved it. A file no load type-checks, as a cgo file
+	// another platform builds is to loads that run with cgo off, can be edited only by the plan's text guard, and a
+	// rewrite no types read back is unproven, however sound its text.
+	for _, file := range slices.Sorted(maps.Keys(rewritten)) {
+		if held[filepath.Clean(file)] {
+			continue
+		}
+		relative := strings.TrimPrefix(file, engine.described.workspace.Root+string(filepath.Separator))
+		keepFirst(failures, renamesIn(result, file, "no load type-checked "+relative+", the host's or any "+
+			"platform's, so its rewrite is unproven", everyRename))
+	}
+	return rewriteProof{proof: proof, overlay: next, wrapped: wrapped, declined: declined, failures: failures}
+}
+
+// platformLoad is the tree as a platform builds it, for the plan and the platform's proof: the engine's own load from
+// source, with `GOOS` and `GOARCH` set and cgo off, its root packages sorted into what type-checks there and what
+// does not (workspace.PlatformLoadOf), with space's judgment of which files may be written. It reads base, the
+// round's rewrite so far, in place of the disk, as the host's load of the round does, and each call's overlay over
+// that. The load of base alone is the plan's reading and every proof's load before its rewrite, the same bytes each
+// time, so it is made once per platform and kept for the round.
+func (engine *pipeline) platformLoad(
+	space *workspace.Workspace, base map[string][]byte,
+) func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
+	kept := map[workspace.Platform]*workspace.PlatformLoad{}
+	return func(platform workspace.Platform, overlay map[string][]byte) (*workspace.PlatformLoad, error) {
+		if held, known := kept[platform]; known && len(overlay) == 0 {
+			return held, nil
+		}
+		merged := map[string][]byte{}
+		maps.Copy(merged, base)
+		maps.Copy(merged, overlay)
+		environment := append(slices.Clone(engine.described.workspace.Environment()),
+			"GOOS="+platform.OperatingSystem, "GOARCH="+platform.Architecture, "CGO_ENABLED=0")
+		loaded, loadError := load.PackagesWithOverlay(engine.described.workspace.Root,
+			engine.described.workspace.Patterns(), environment, engine.described.readableOurs, merged)
+		if loadError != nil {
+			return nil, fmt.Errorf("loading as %s: %w", platform, loadError)
+		}
+		sorted := space.PlatformLoadOf(platform, loaded.Roots)
+		if len(overlay) == 0 {
+			kept[platform] = sorted
+		}
+		return sorted, nil
+	}
+}
+
+// mismatchedRenames are the renames mismatches name, by old and new name, each with reason before the mismatch: an
+// identifier's by its old or new name, an identifier count's by the renames with an edit in its file, and every
+// other, or one no rename can be told from, by fallback, which is every rename for the host's proof and the
+// renames that reached a platform for that platform's.
+func mismatchedRenames(
+	result *global_rename.Result,
+	mismatches []global_rename.Mismatch,
+	reason string,
+	fallback func(reason string) map[[2]string]string,
+) map[[2]string]string {
+	failures := map[[2]string]string{}
+	for _, mismatch := range mismatches {
+		why := reason + mismatch.String()
 		switch mismatch.Kind {
 		case global_rename.MismatchKindIdentifier:
 			named := map[[2]string]string{}
 			for _, accepted := range result.Accepted {
 				names := []string{accepted.OldName, accepted.NewName}
 				if slices.Contains(names, mismatch.Expected.Name) || slices.Contains(names, mismatch.Actual.Name) {
-					named[[2]string{accepted.OldName, accepted.NewName}] = reason
+					named[[2]string{accepted.OldName, accepted.NewName}] = why
 				}
 			}
 			if len(named) == 0 {
-				named = everyRename(reason)
+				named = fallback(why)
 			}
 			keepFirst(failures, named)
 		case global_rename.MismatchKindIdentifierCount:
-			keepFirst(failures, renamesIn(result, mismatch.Filename, reason, everyRename))
+			keepFirst(failures, renamesIn(result, mismatch.Filename, why, fallback))
 		default:
-			keepFirst(failures, everyRename(reason))
+			keepFirst(failures, fallback(why))
 		}
 	}
-	return rewriteProof{proof: proof, overlay: next, wrapped: wrapped, declined: declined, failures: failures}
+	return failures
 }
 
 // keepFirst adds to failures each rename of more it does not hold yet, so a rename's reason is the first failure found:

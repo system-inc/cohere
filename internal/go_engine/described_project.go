@@ -26,6 +26,11 @@ type describedProject struct {
 	inScope    []string
 	inScopeSet map[string]bool
 
+	// constrainedInScope are the readable files that are ours and inside the paths but that the build constraints
+	// leave out on this platform: no phase here reads them, and a rename proven under the platform that builds one
+	// may write it.
+	constrainedInScope map[string]bool
+
 	// contents are the in-scope files that could be read, as they were read.
 	contents map[string][]byte
 
