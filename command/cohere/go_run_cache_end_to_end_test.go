@@ -843,7 +843,11 @@ func TestAGoModuleAndItsFormatProjectEachReplay(test *testing.T) {
 		test.Helper()
 		command := exec.Command(binary, "--no-fix", "--verbose")
 		command.Dir = root
-		command.Env = append(withoutVariable(os.Environ(), goEngineChildVariable), "COHERE_VERDICT_FD=", "CGO_ENABLED=0")
+		command.Env = append(
+			withoutVariable(os.Environ(), goEngineChildVariable),
+			"COHERE_VERDICT_FD=",
+			"CGO_ENABLED=0",
+		)
 		output, runError := command.CombinedOutput()
 		var exitError *exec.ExitError
 		if runError != nil && !errors.As(runError, &exitError) {

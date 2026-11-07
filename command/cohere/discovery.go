@@ -66,6 +66,16 @@ var neverDescended = map[string]bool{
 	"testdata":     true,
 }
 
+// formattableExtensions are the file types the house formatter handles, the native printers', as discovery's
+// count of them reads them.
+var formattableExtensions = func() map[string]bool {
+	extensions := map[string]bool{}
+	for _, extension := range native.Extensions() {
+		extensions[strings.ToLower(extension)] = true
+	}
+	return extensions
+}()
+
 // discoveryParallelism is how many directories discovery reads at once.
 const discoveryParallelism = 16
 
@@ -769,16 +779,6 @@ func (found discovery) notes() []string {
 	return lines
 }
 
-// formattableExtensions are the file types the house formatter handles, the native printers', as discovery's
-// count of them reads them.
-var formattableExtensions = func() map[string]bool {
-	extensions := map[string]bool{}
-	for _, extension := range native.Extensions() {
-		extensions[strings.ToLower(extension)] = true
-	}
-	return extensions
-}()
-
 // addRootFormatProject adds the format project at the root when no TypeScript project runs there and the
 // root holds files the house formatter handles outside every TypeScript project's directory (#4wjhppw).
 //
@@ -787,11 +787,10 @@ var formattableExtensions = func() map[string]bool {
 // nothing that did: gofmt and the Swift engine format their own languages, and cohere's own policy/ JSON,
 // read by every engine, landed misformatted and green. So the root gets a project of its own, the format
 // phase alone over the same walk, leaving each TypeScript project's directory below it to that project's run.
+// The format project joins the projects found holds, which the caller runs.
 //
 // Not a marker, such as a CohereSettings.json without a tsconfig: a project nobody declares needs no file
 // every repository would then have to carry, and covers a repository that never added one.
-//
-// Mutates: found the caller runs the projects found holds, so the format project joins them here
 func (found *discovery) addRootFormatProject() {
 	typeScriptDirectories := []string{}
 	for _, project := range found.Projects {
@@ -825,7 +824,10 @@ func (found discovery) formatYield() projectYield {
 	yield := projectYield{}
 	for _, other := range found.Projects {
 		if other.Engine == engineTypeScript {
-			yield.Directories = append(yield.Directories, filepath.Join(found.Root, filepath.FromSlash(other.Directory)))
+			yield.Directories = append(
+				yield.Directories,
+				filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
+			)
 		}
 	}
 	sort.Strings(yield.Directories)

@@ -98,7 +98,7 @@ func Generate(moduleDirectory string) (Files, error) {
 	if renderThirdPartyNoticesError != nil {
 		return nil, renderThirdPartyNoticesError
 	}
-	// In the house format, as the format check at cohere's root reads it (#4wjhppw). NOTICE is plain text, which
+	// In the house format, as the format check at cohere's root reads it (#4wjhppw). `NOTICE` is plain text, which
 	// the formatter does not read.
 	thirdParty, formatHouseError := native.FormatHouse(ThirdPartyNoticesFileName, thirdParty)
 	if formatHouseError != nil {

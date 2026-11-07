@@ -15,6 +15,9 @@ type Formatter struct {
 	Options format_options.Options
 }
 
+// houseOptions reads the house options once: the block is compiled into the binary, so every read gives the same.
+var houseOptions = sync.OnceValues(format_options.HouseOptions)
+
 // FormatHouse is the house format of a file a program writes, named by its path so its printer is chosen as the
 // format phase chooses it. A generator writes through it, so what it writes is what the format check reads as
 // formatted, and a regeneration leaves the tree as it was (#4wjhppw). The house options, never a resolution from
@@ -30,9 +33,6 @@ func FormatHouse(fileName string, text []byte) ([]byte, error) {
 	}
 	return []byte(formatted), nil
 }
-
-// houseOptions reads the house options once: the block is compiled into the binary, so every read gives the same.
-var houseOptions = sync.OnceValues(format_options.HouseOptions)
 
 // Handles reports whether a printer is registered for the file's type.
 func (formatter Formatter) Handles(fileName string) bool {
