@@ -19,6 +19,8 @@ import (
 	"go/ast"
 	"go/token"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // Excuse is what a comment says about why a finding is excused. The values are ordered so a stronger excuse compares
@@ -62,11 +64,11 @@ func Read(group *ast.CommentGroup, marker string) Excuse {
 	return found
 }
 
-// NewIndex indexes file's comment groups. Where code sits on a line is read from where the file's nodes begin and end
-// in the AST, never from the source text.
-func NewIndex(fileSet *token.FileSet, file *ast.File) *Index {
+// NewIndex indexes file's comment groups, reading each position's line from table. Where code sits on a line is read
+// from where the file's nodes begin and end in the AST, never from the source text.
+func NewIndex(table *positions.Table, file *ast.File) *Index {
 	index := &Index{
-		fileSet:          fileSet,
+		table:            table,
 		ownLinesEndingOn: map[int]*ast.CommentGroup{},
 		startingOn:       map[int][]*ast.CommentGroup{},
 	}
