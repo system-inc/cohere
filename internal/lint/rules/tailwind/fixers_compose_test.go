@@ -58,6 +58,13 @@ func TestTailwindFixersComposeInOnePass(test *testing.T) {
 			source: `export const element = <div className=" items-center flex-grow  flex flex" />;`,
 			want:   `export const element = <div className="flex grow items-center" />;`,
 		},
+		{
+			// The same in the runs of a template: each rename at its own class, beside the order and the
+			// repeat, and the class glued to the hole left as written.
+			name:   "deprecated classes in the runs of a template",
+			source: "export const element = <div className={`items-center flex-grow  flex flex ${size} rounded px-2 shadow${tone}`} />;",
+			want:   "export const element = <div className={`flex grow items-center ${size} rounded-sm px-2 shadow${tone}`} />;",
+		},
 	}
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
