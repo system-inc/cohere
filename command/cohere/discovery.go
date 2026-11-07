@@ -48,10 +48,14 @@ import (
 // project.yml is nearer to its sources than the root's Package.swift is.
 //
 // Swift with no marker above it is checked by nothing, and beside a TypeScript program a green run read clean
-// over code nobody looked at. Such files are named by the top directory holding them, in the notes and on the
-// verdict line, and fail nothing: a run says what it covered as well as what it found. Files the walk never
-// enters, or that .gitignore or the root's ignorePatterns match, are not counted, since nobody expects those
-// checked.
+// over code nobody looked at. Inside a repository such files get a Swift project of their own at the root, a
+// scripts-only root with no Package.swift (#wpd36zj): the engine checks each standalone script among them alone,
+// as `swift <file>` runs it, and names every other file as not checked, by the same nearest-marker rule this walk
+// claims by, so ahra's four scripts under modules/ are checked rather than named. Outside a repository the engine
+// has no ignore rules to walk the root by, so the files are named by the top directory holding them, in the notes
+// and on the verdict line, and fail nothing: a run says what it covered as well as what it found. Files the walk
+// never enters, or that .gitignore or the root's ignorePatterns match, are not counted, since nobody expects
+// those checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
 // directory claims it, and the engine knows which files it checks. A standalone script there, one `swift <file>`
@@ -125,7 +129,8 @@ type discovery struct {
 	SwiftCoverage swiftCoverage
 
 	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package or Xcode
-	// project holds, which no run checks, in path order.
+	// project holds, which no run checks, in path order. Only outside a repository: inside one they are the
+	// scripts-only root's (see the header).
 	UnclaimedSwift []unclaimedSwiftDirectory
 
 	// Formattable counts the files the house formatter handles in each directory that holds any, by directory
@@ -199,6 +204,22 @@ func enclosingRepository(start string) string {
 		parent := filepath.Dir(directory)
 		if parent == directory {
 			return ""
+		}
+		directory = parent
+	}
+}
+
+// insideRepository reports whether a directory is at or below a `.git`, a directory or a worktree's or
+// submodule's file, as the Swift engine's ignore rules find a repository (IgnoreRules.Repository.containing).
+func insideRepository(start string) bool {
+	directory := filepath.Clean(start)
+	for {
+		if _, statError := os.Stat(filepath.Join(directory, ".git")); statError == nil {
+			return true
+		}
+		parent := filepath.Dir(directory)
+		if parent == directory {
+			return false
 		}
 		directory = parent
 	}
@@ -436,6 +457,12 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 
 	xcodeProjects, unclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
+	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only
+	// Swift project there. See the header for why only inside a repository.
+	if len(unclaimed) > 0 && insideRepository(root) {
+		found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
+		unclaimed = nil
+	}
 	found.UnclaimedSwift = unclaimed
 	found.sortProjects()
 	sort.Strings(found.Refused)

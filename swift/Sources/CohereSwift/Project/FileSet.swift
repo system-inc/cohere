@@ -108,11 +108,17 @@ public struct FileSet: Equatable, Sendable {
             let resolvedRoot = package.root.resolvingSymlinksInPath().path
             let rootPath = resolvedRoot + "/"
             let compiled = Set(filesInPackage.map { $0.resolvingSymlinksInPath().path })
+            /* A scripts-only root walks what discovery walks, which never enters these by name (`neverDescended` in command/cohere). */
+            let scriptsOnly = package.projectKind == .scripts
             let visible = Set(
                 ignoreRules.visibleFiles(
                     under: resolvedRoot,
                     skipping: Self.buildScratches(of: package),
-                    skippingWhere: Self.isCohereCache,
+                    skippingWhere: { directory in
+                        Self.isCohereCache(directory)
+                            || (scriptsOnly
+                                && Self.neverEnteredAtScriptsRoot.contains((directory as NSString).lastPathComponent))
+                    },
                 )
             )
             let coveredRoots = Dictionary(
@@ -127,6 +133,19 @@ public struct FileSet: Equatable, Sendable {
             var scriptModules = Set<String>()
             for path in visible.sorted()
             where path.hasPrefix(rootPath) && path.hasSuffix(".swift") && !compiled.contains(path) {
+                let packageRoot = Self.coveringRoot(
+                    of: path,
+                    resolvedRoot: resolvedRoot,
+                    coveredRoots: coveredRoots,
+                    projectDirectories: &projectDirectories,
+                )
+                /*
+                 At a scripts-only root a file below a project is that project's, by the rule discovery claims by, and that
+                 project runs on its own or is covered by one that does, so it is not this run's to name.
+                 */
+                if scriptsOnly && packageRoot == nil {
+                    continue
+                }
                 let underVendor = path.dropFirst(rootPath.count).split(separator: "/").dropLast().contains("Vendor")
                 if underVendor || path.hasSuffix("/Package.swift") {
                     excluded.append(
@@ -135,14 +154,7 @@ public struct FileSet: Equatable, Sendable {
                     continue
                 }
                 let url = URL(fileURLWithPath: path)
-                guard
-                    let packageRoot = Self.coveringRoot(
-                        of: path,
-                        resolvedRoot: resolvedRoot,
-                        coveredRoots: coveredRoots,
-                        projectDirectories: &projectDirectories,
-                    )
-                else {
+                guard let packageRoot else {
                     excluded.append(.init(file: path, reason: Self.notCompiledReason))
                     continue
                 }
@@ -192,6 +204,9 @@ public struct FileSet: Equatable, Sendable {
      below a project of its own is given, and that project's run accounts for it.
      */
     static let notCompiledReason = "no target of this package compiles it"
+
+    /* The directories discovery never enters, whatever any ignore file says, which a scripts-only root's walk skips too. */
+    static let neverEnteredAtScriptsRoot: Set<String> = ["node_modules", ".build", ".cache", ".git", "testdata"]
     static let unreadableReason =
         "no target of this package compiles it, and it could not be read as UTF-8 to tell whether it is a script"
     static let declarationsOnlyReason =

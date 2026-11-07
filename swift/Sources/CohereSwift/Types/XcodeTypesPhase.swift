@@ -123,7 +123,7 @@ struct XcodeTypesPhase {
                 candidate = package.root.appendingPathComponent(
                     "\(project.bundle.lastPathComponent)/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
                 )
-            case .swiftPackage:
+            case .swiftPackage, .scripts:
                 return nil
         }
         guard FileManager.default.fileExists(atPath: candidate.path) else { return nil }

@@ -57,7 +57,15 @@ struct RunInputs {
         environment: [String: String] = ProcessInfo.processInfo.environment,
     ) -> InputsRecord {
         var inputs = RunInputs()
-        for root in [package.root] + TypesPhase.inputRoots(of: package) + linkedPackageRoots {
+        /*
+         A scripts-only root has no build to walk the inputs of: each script is checked alone, from its own bytes, which
+         `owned` names, and the file set's listings name every directory whose contents decide which files are scripts.
+         Walked whole, the root of a repository like ahra would name every file under it, `node_modules` included.
+         */
+        let walkedRoots =
+            package.projectKind == .scripts
+            ? [] : [package.root] + TypesPhase.inputRoots(of: package) + linkedPackageRoots
+        for root in walkedRoots {
             inputs.walk(Self.path(root))
         }
         for directory in fileSet.directoriesListed {
@@ -122,7 +130,7 @@ struct RunInputs {
                 return [phase.keptResolved]
             case .xcodeProject:
                 return [phase.resolvedInBuild]
-            case .swiftPackage:
+            case .swiftPackage, .scripts:
                 return []
         }
     }

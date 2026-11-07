@@ -245,6 +245,61 @@ struct StandaloneScriptTests {
         #expect(run.typesBuild.hasSuffix("(1 for iOS)"), "\(run.typesBuild)")
     }
 
+    /*
+     A root holding no Package.swift and no Xcode project is the scripts-only root discovery gives the Swift no project
+     claims (#wpd36zj), ahra's shape: its scripts are checked alone with no target checked before them, a file of
+     declarations stays a named gap, and what discovery never enters or another project claims is not this run's.
+     Its coverage query names the root alone.
+     */
+    @Test func aRootHoldingNoProjectChecksItsScriptsAlone() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-scripts-root-\(UUID().uuidString)",
+            isDirectory: true,
+        )
+        for (path, text) in [
+            ".git/info/exclude": "",
+            "package.json": "{}\n",
+            "modules/ebay/EbayVision.swift":
+                "import Foundation\n\nlet words = CommandLine.arguments.count\nprint(words)\n",
+            "modules/stray/Leftover.swift": "struct Leftover {\n    let value: Int\n}\n",
+            "node_modules/dependency/Tool.swift": "print(1)\n",
+            "Nested/Package.swift": PipelineControlTests.manifest,
+            "Nested/run.swift": "print(2)\n",
+        ] {
+            let file = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(
+                at: file.deletingLastPathComponent(),
+                withIntermediateDirectories: true,
+            )
+            try text.write(to: file, atomically: true, encoding: .utf8)
+        }
+        defer { XcodeProjectPipelineTests.remove(root) }
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.findings.isEmpty, "\(run.of("finding"))")
+        #expect(run.exitCode == 0)
+        #expect(run.complete == true)
+        let project = try #require(run.of("project").first)
+        #expect(project["projectKind"] as? String == "Scripts")
+        #expect(project["filesOurs"] as? Int == 1)
+        #expect(Self.scriptTargets(run) == ["EbayVision:1"])
+        #expect(
+            Self.excluded(run) == [
+                "Leftover.swift: no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+            ]
+        )
+        #expect(run.typesRecord["files"] as? Int == 1)
+        #expect(
+            run.typesBuild.hasPrefix("a scripts-only root, which no package or Xcode project holds"),
+            "\(run.typesBuild)",
+        )
+
+        let covered = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--covered-packages"])
+        let record = try #require(covered.of("coveredPackages").first)
+        #expect(record["checked"] as? [String] == [root.standardizedFileURL.path])
+    }
+
     /* A file of declarations no target compiles is no script: it stays a named gap, with the reason saying why. */
     @Test func aFileOfDeclarationsOnlyStaysANamedGap() async throws {
         let root = try Self.package(files: ["Stray/Leftover.swift": "struct Leftover {\n    let value: Int\n}\n"])
