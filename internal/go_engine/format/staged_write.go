@@ -16,6 +16,16 @@ import (
 // unlikely, puts the files already replaced back as they were, and partlyWritten names any it could not put back, the
 // only case that leaves the set half written.
 func WriteAllAtomically(files map[string][]byte) (partlyWritten []string, writeError error) {
+	return writeAllAtomically(files, putInPlace)
+}
+
+// writeAllAtomically is WriteAllAtomically with the step that renames a staged file into place given, so a test can
+// fail a placement after others have succeeded, the one failure a real file system leaves too rare to stage, and see
+// the files already placed put back.
+func writeAllAtomically(
+	files map[string][]byte,
+	place func(stagedFile) error,
+) (partlyWritten []string, writeError error) {
 	names := slices.Sorted(maps.Keys(files))
 	originals := make(map[string][]byte, len(names))
 	staged := make([]stagedFile, 0, len(names))
@@ -40,7 +50,7 @@ func WriteAllAtomically(files map[string][]byte) (partlyWritten []string, writeE
 		staged = append(staged, each)
 	}
 	for index, each := range staged {
-		renameError := putInPlace(each)
+		renameError := place(each)
 		if renameError == nil {
 			continue
 		}

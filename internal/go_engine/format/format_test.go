@@ -559,6 +559,48 @@ func TestAVerdictWithoutTheWrapIsNotTrustedByARunThatWraps(test *testing.T) {
 // directory refuses a temporary file writes neither, leaving no temporary file behind. Written one by one, the first
 // would be replaced before the second failed. The read-only directory is made writable again before the test's
 // directory is removed.
+// A placement that fails once others are in place puts back every file already placed, so the set is never left
+// half written: of three files, the second placement fails, and all three read as they did before, with no temporary
+// file left beside them.
+func TestALatePlacementFailurePutsThePlacedFilesBack(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	files := map[string][]byte{}
+	for _, name := range []string{"first.go", "second.go", "third.go"} {
+		file := filepath.Join(root, name)
+		if writeError := os.WriteFile(file, []byte(formattedSource), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		files[file] = []byte(callSource)
+	}
+	placements := 0
+	failSecond := func(staged stagedFile) error {
+		placements++
+		if placements == 2 {
+			// Ignored: the temporary file is the test's to remove, as putInPlace removes it on a failed rename.
+			_ = os.Remove(staged.temporary)
+			return fmt.Errorf("renaming %s: the placement this test fails", staged.target)
+		}
+		return putInPlace(staged)
+	}
+	partlyWritten, writeError := writeAllAtomically(files, failSecond)
+	if writeError == nil || len(partlyWritten) != 0 {
+		test.Fatalf("want the set refused and every placed file put back, got %v, partly written %v", writeError,
+			partlyWritten)
+	}
+	if placements != 2 {
+		test.Fatalf("want the placements to stop at the failed second, got %d", placements)
+	}
+	for file := range files {
+		requireContents(test, file, formattedSource)
+	}
+	entries, readError := os.ReadDir(root)
+	if readError != nil || len(entries) != 3 {
+		test.Fatalf("want the three files alone in the directory, got %v (%v)", entries, readError)
+	}
+}
+
 func TestASetIsWrittenWholeOrNotAtAll(test *testing.T) {
 	test.Parallel()
 
