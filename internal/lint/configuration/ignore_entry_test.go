@@ -126,22 +126,41 @@ func TestASetsIgnoreGivesAReason(test *testing.T) {
 	}
 }
 
-// A project's own file in our tiers may still write a glob alone, until the refusal that holds it to a reason
-// lands after ahra's and api's settings carry theirs (#cxeq6jw). The real tier set, so the chain is one of ours
-// exactly as a repository's is, and the set's own entries, which load first, each say why.
-func TestInOurTiersAProjectsOwnGlobStillLoads(test *testing.T) {
+// The real tier set, so the chain is one of ours exactly as a repository's is, and the set's own entries, which
+// load first, are held to the same rule.
+func TestInOurTiersAnIgnoreGivesAReason(test *testing.T) {
 	test.Parallel()
+	want := `ignores "dist/**" and gives no reason: an ignore that says nothing reads as an allowance`
+	for name, entry := range map[string]string{
+		"a glob alone":             `"dist/**"`,
+		"an object with no reason": `{"pattern": "dist/**", "kind": "generated"}`,
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			directory := writeConfigs(test, map[string]string{
+				"CohereSettings.json": `{"extends": "cohere:system-inc/base", "ignorePatterns": [` + entry + `]}`,
+			})
+			settings := filepath.Join(directory, "CohereSettings.json")
+			refusedWith(test, settings, want)
+			if _, ignorePatternsOfError := IgnorePatternsOf(settings); ignorePatternsOfError == nil ||
+				!strings.Contains(ignorePatternsOfError.Error(), want) {
+				test.Errorf("IgnorePatternsOf did not refuse it saying %q: %v", want, ignorePatternsOfError)
+			}
+		})
+	}
+
 	directory := writeConfigs(test, map[string]string{
-		"CohereSettings.json": `{"extends": "cohere:system-inc/base", "ignorePatterns": ["dist/**"]}`,
+		"CohereSettings.json": `{"extends": "cohere:system-inc/base", "ignorePatterns": [{"pattern": "dist/**", ` +
+			`"reason": "Build output, written from sources that are checked.", "kind": "generated"}]}`,
 	})
 	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 	own := loaded.IgnoreEntries[len(loaded.IgnoreEntries)-1]
-	if own.Pattern != "dist/**" || own.Reason != "" {
-		test.Errorf("the project's own glob loaded as %+v", own)
+	if own.Pattern != "dist/**" || own.Kind != IgnoreKindGenerated || own.Reason == "" {
+		test.Errorf("the project's own entry loaded as %+v", own)
 	}
-	for _, entry := range loaded.IgnoreEntries[:len(loaded.IgnoreEntries)-1] {
-		if entry.Reason == "" || entry.Kind == "" {
-			test.Errorf("%s ignores %q with no reason or kind", entry.File, entry.Pattern)
+	for _, entry := range loaded.IgnoreEntries {
+		if entry.Reason == "" {
+			test.Errorf("%s ignores %q with no reason", entry.File, entry.Pattern)
 		}
 	}
 }

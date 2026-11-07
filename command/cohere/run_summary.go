@@ -87,7 +87,8 @@ type runSummary struct {
 	EngineBuilds []engineBuild `json:"-"`
 
 	// IgnorePatterns are the root's ignorePatterns as this invocation's discovery counted them, which no record
-	// keeps, since discovery runs again on every run (ignore_account.go).
+	// keeps, since discovery runs again on every run (ignore_account.go). Findings already counts each dead one
+	// (unused_ignore.go).
 	IgnorePatterns []ignoreAccount `json:"-"`
 }
 

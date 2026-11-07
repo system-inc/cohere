@@ -34,6 +34,10 @@ func startProfile(path string) error {
 // every exit goes through here, or a profiled run would leave a truncated profile behind, and the streams a
 // person reads would never be flushed.
 func exitProcess(code int) {
+	// A run whose path wrote no run end still says a dead ignore it fails on. See writeDiscoveredIgnores.
+	if unusedIgnoreCount(discoveredIgnores) > 0 {
+		writeDiscoveredIgnores(streams.Output)
+	}
 	finishOpen()
 	if profileFile != nil {
 		pprof.StopCPUProfile()
@@ -45,8 +49,9 @@ func exitProcess(code int) {
 	}
 	// The streams are flushed before the caller is answered, and the answer is 1 in place of a 0 when they
 	// could not be, since a report that never arrived is not a clean run (see package streams). A run cache
-	// that finished first has flushed them already, and then this changes nothing.
-	exitCode := streams.Finish(code)
+	// that finished first has flushed them already, and then this changes nothing. So is it 1 for a clean run
+	// when discovery found an ignore that matched nothing (see ignoreVerdict).
+	exitCode := streams.Finish(ignoreVerdict(code))
 	// Every exit answers the caller, if a run cache has not already: what follows, keeping what the run read
 	// in the content pack and the heap's teardown, is nothing the caller waits for. See sendVerdict.
 	sendVerdict(exitCode)

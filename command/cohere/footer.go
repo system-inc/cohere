@@ -257,6 +257,9 @@ type overallFacts struct {
 	Failed []string
 	// Unfinished is the projects whose run did not finish, which checked nothing anyone can rely on.
 	Unfinished int
+	// UnusedIgnores is the root's ignorePatterns entries that matched nothing, each a finding of this run's own
+	// that fails it, whatever its projects found (#cxeq6jw).
+	UnusedIgnores int
 	// CoverageUnknown is the Swift packages whose coverage query failed. Everything they might check ran as
 	// its own project too, so some files may be counted twice, and that is said here rather than only in
 	// `--verbose`'s notes (#sxs26s3).
@@ -286,12 +289,15 @@ func overallFooter(facts overallFacts, style textStyle) string {
 	}
 
 	verdict := "✓ 💎 "
-	if len(facts.Failed) > 0 || facts.Unfinished > 0 {
+	if len(facts.Failed) > 0 || facts.Unfinished > 0 || facts.UnusedIgnores > 0 {
 		verdict = "✗ ☠️ "
 	}
 	line := style.bold(verdict+footerSeconds(facts.Total)) + " • " + counted(total, "project", "projects")
 	if len(byEngine) > 1 {
 		line += ": " + strings.Join(byEngine, ", ")
+	}
+	if facts.UnusedIgnores > 0 {
+		line += " • " + style.red(counted(facts.UnusedIgnores, "unused ignore pattern", "unused ignore patterns"))
 	}
 	if len(facts.Failed) > 0 {
 		line += " → " + style.red("☠️ "+strings.Join(facts.Failed, ", "))

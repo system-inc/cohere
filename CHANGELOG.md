@@ -54,11 +54,13 @@ changed in cohere outside the sets is written under the same heading.
   as one in a TypeScript project always did. It needs no file of its own, and the summary counts it.
 - An `ignorePatterns` entry says why. It's a glob, as before, or an object,
   `{ "pattern": "dist/**", "reason": "Build output.", "kind": "generated" }`, whose `kind` is `input`,
-  `generated` or `thirdParty`, and whose optional `check`, `types`, is carried and not yet acted on. In
-  every set cohere carries, an entry with no reason is refused at load, as an off with none is, and the
-  sets' own entries each say why; a project's own file may still write a glob alone. `--verbose` lists every
-  entry with its reason, kind, file and how many paths it matched, a count of 0 included, and `--json`
-  carries the same, on the summary, or as an `ignorePatterns` record when several projects run.
+  `generated` or `thirdParty`, and whose optional `check`, `types`, is carried and not yet acted on. In a
+  chain extending a `cohere:system-inc` set, and in every set cohere carries, an entry with no reason is
+  refused at load, as an off with none is, and the sets' own entries each say why. `--verbose` lists every
+  entry with its reason, kind, file and how many paths it matched, and `--json` carries the same, on the
+  summary, or as an `ignorePatterns` record when several projects run. An entry a settings file writes that
+  matches nothing is a finding, `correctness-no-unused-ignore`, which fails the run, unless its `kind` is
+  `generated`, since build output may not exist yet; it's still listed, with its count of 0.
 
 ### Changed
 
