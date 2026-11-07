@@ -16,6 +16,7 @@ import (
 //	`w-8 h-8 ${x}`        collapses to size-8
 //	`px-4 py-4${x}`       collapses to p-4, the glued py-4 included
 //	`!px-4 !py-4 ${x}`    collapses to p-4!, with no single for either class
+//	`block ${x} px-4 py-4 ${y} flex`   collapses to p-4, in a middle run
 //	`px-4 ${x} py-4`      silent
 //	`z-[1] ${x}`          z-[1] to z-1, fixed
 //	`z-[1]${x} block`     z-[1] to z-1, which upstream fixes and cohere does not
@@ -57,6 +58,12 @@ func TestCanonicalClassesInTemplateRuns(test *testing.T) {
 			name:     "a collapse whose classes would each rewrite alone",
 			source:   "const element = <div className={`!px-4 !py-4 ${size}`} />;",
 			findings: []finding{{id: "canonicalCollapse", covered: "!px-4 !py-4 "}},
+		},
+		{
+			// The collapse sits on its own run, not the first.
+			name:     "a collapse in a middle run",
+			source:   "const element = <div className={`block ${size} px-4 py-4 ${tone} flex`} />;",
+			findings: []finding{{id: "canonicalCollapse", covered: " px-4 py-4 "}},
 		},
 		{
 			name:     "no collapse across a hole",
