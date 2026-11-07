@@ -178,6 +178,131 @@ struct CheckProofTests {
         #expect(edited.filesWithoutRecord.isEmpty)
     }
 
+    /*
+     A root that uses a local package whose tests are ours: App imports Shapes, and ShapesTests, which only Shapes'
+     own session checks, holds a warning on line 6.
+     */
+    static let localPackageFiles: [String: String] = [
+        "Package.swift": """
+        // swift-tools-version:6.2
+        import PackageDescription
+
+        let package = Package(
+            name: "App",
+            platforms: [.macOS(.v15)],
+            dependencies: [.package(path: "Libraries/Shapes")],
+            targets: [.target(name: "App", dependencies: [.product(name: "Shapes", package: "Shapes")])]
+        )
+
+        """,
+        "Sources/App/Area.swift": """
+        import Shapes
+
+        func area() -> Double {
+            Square(side: 2).area()
+        }
+
+        """,
+        "Libraries/Shapes/Package.swift": """
+        // swift-tools-version:6.2
+        import PackageDescription
+
+        let package = Package(
+            name: "Shapes",
+            platforms: [.macOS(.v15)],
+            products: [.library(name: "Shapes", targets: ["Shapes"])],
+            targets: [.target(name: "Shapes"), .testTarget(name: "ShapesTests", dependencies: ["Shapes"])]
+        )
+
+        """,
+        "Libraries/Shapes/Sources/Shapes/Square.swift": """
+        public struct Square {
+            public var side: Double
+
+            public init(side: Double) {
+                self.side = side
+            }
+
+            public func area() -> Double {
+                side * side
+            }
+        }
+
+        """,
+        "Libraries/Shapes/Tests/ShapesTests/SquareTests.swift": """
+        import Testing
+
+        @testable import Shapes
+
+        @Test func measures() {
+            let unused = Square(side: 3)
+            #expect(Square(side: 2).area() == 4)
+        }
+
+        """,
+    ]
+
+    /*
+     A local package's session is skipped only when no edit could change what it checks, and skipping it loses
+     nothing. An interface edit to App leaves Shapes' session out, and ShapesTests' old warning is still reported from
+     its records. An interface edit inside the package skipped just before, a type error added to SquareTests, starts
+     its session again and reports the error. And Square's `area()` renamed reaches across packages: App's Area.swift
+     and ShapesTests' SquareTests.swift, neither edited since the last check, each report it.
+     */
+    @Test func aLocalPackageSessionIsSkippedOnlyWhenNoEditCouldChangeIt() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-local-\(UUID().uuidString)",
+            isDirectory: true,
+        )
+        .resolvingSymlinksInPath()
+        defer { XcodeProjectPipelineTests.remove(root) }
+        for (path, text) in Self.localPackageFiles {
+            try CheckFixture.write(text, to: path, in: root)
+        }
+        let skippedWords = "no build server started for the local package Shapes"
+        let first = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(first.compilerFindings == ["SquareTests.swift:6:warning"], "\(first.of("finding"))")
+
+        let area = try #require(Self.localPackageFiles["Sources/App/Area.swift"])
+        try CheckFixture.write(
+            area + "\nfunc perimeter() -> Double {\n    8\n}\n",
+            to: "Sources/App/Area.swift",
+            in: root,
+        )
+        let elsewhere = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(elsewhere.typesBuild.contains(skippedWords), "\(elsewhere.typesBuild)")
+        #expect(elsewhere.compilerFindings == ["SquareTests.swift:6:warning"], "\(elsewhere.of("finding"))")
+        #expect(elsewhere.filesWithoutRecord.isEmpty)
+
+        let squareTests = "Libraries/Shapes/Tests/ShapesTests/SquareTests.swift"
+        let tests = try #require(Self.localPackageFiles[squareTests])
+        try CheckFixture.write(tests + "\nfunc broken() -> Int {\n    \"no\"\n}\n", to: squareTests, in: root)
+        let inside = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(!inside.typesBuild.contains(skippedWords), "\(inside.typesBuild)")
+        #expect(
+            inside.compilerFindings == ["SquareTests.swift:6:warning", "SquareTests.swift:11:error"],
+            "\(inside.typesBuild) \(inside.of("finding"))",
+        )
+        #expect(inside.filesWithoutRecord.isEmpty)
+
+        let square = try #require(Self.localPackageFiles["Libraries/Shapes/Sources/Shapes/Square.swift"])
+        try CheckFixture.write(
+            square.replacingOccurrences(of: "public func area()", with: "public func surface()"),
+            to: "Libraries/Shapes/Sources/Shapes/Square.swift",
+            in: root,
+        )
+        let across = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--types"])
+        #expect(!across.typesBuild.contains(skippedWords), "\(across.typesBuild)")
+        /* The compiler says nothing of `unused` once the function holding it has an error, so line 6's warning goes. */
+        #expect(
+            across.compilerFindings.sorted() == [
+                "Area.swift:4:error", "SquareTests.swift:11:error", "SquareTests.swift:7:error",
+            ],
+            "\(across.typesBuild) \(across.of("finding"))",
+        )
+        #expect(across.filesWithoutRecord.isEmpty)
+    }
+
     /* The plugins SwiftPM compiled this run are named by the executables it left in the plugin cache since the run began. */
     @Test func thePluginsCompiledAreReadFromThePluginCache() throws {
         let scratch = CheckFixture.scratch()
