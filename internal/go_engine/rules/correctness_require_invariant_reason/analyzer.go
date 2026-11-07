@@ -49,9 +49,6 @@ var invariantWithoutReasonMessage = policy.MessageOf(Name, "invariantWithoutReas
 
 var mustOutsideInitializationMessage = policy.MessageOf(Name, "mustOutsideInitialization")
 
-// invariantMarker opens the comment that says why a panic can never happen, matched as written.
-const invariantMarker = "Invariant:"
-
 func run(pass *analysis.Pass) (any, error) {
 	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
 	if !isIndexes {
@@ -114,7 +111,7 @@ func judgeFunctionPanics(
 		}
 		message := unexplainedPanicMessage
 		// The comment directly above the statement, on lines of its own, or at the end of its last line.
-		switch comments.ExcuseFor(node, invariantMarker) {
+		switch comments.ExcuseFor(node, marker.Invariant) {
 		case marker.WithReason:
 			return
 		case marker.WithoutReason:
