@@ -124,6 +124,7 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 	}{
 		"finding":              {schema.Defs["finding"], findingJson{}},
 		"changedFile":          {schema.Defs["changedFile"], changedFileJson{}},
+		"engineBuild":          {schema.Defs["engineBuild"], engineBuildJson{}},
 		"summary":              {summary, summaryJson{}},
 		"summary.phase":        {*summary.Properties["phases"].Items, phaseJson{}},
 		"summary.cache":        {summary.Properties["cache"], cacheUse{}},
