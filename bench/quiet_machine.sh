@@ -214,6 +214,10 @@ measure() {
   local log=$logs/$mode-$round.log
   run_cohere $log "$@"
   local after=$(load) idle_after=$(idle_over 1)
+  # One build per round: a run that ran any Swift engine but the pinned one measured another (#ywx8zgd).
+  local other_swift=$(swift_engine_named_otherwise $log)
+  [[ -z $other_swift ]] ||
+    fail "the $mode run of round $round ran the Swift engine $other_swift, not the pinned one; see $log"
   local quiet=loaded
   at_floor $idle_before && at_floor $idle_after && quiet=quiet
   # The run's engine seconds, findings and cache use, from its --json summary. A log the reader cannot
