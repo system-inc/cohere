@@ -309,6 +309,113 @@ func TestNoUnknownClassesStaysSilent(test *testing.T) {
 	}
 }
 
+// TestNoUnknownClassesAtHolesAndConcatenation is the one place the glued edges change a verdict.
+//
+// Measured on eslint-plugin-better-tailwindcss 4.9.1 under ESLint on 2026-11-07, with ahra's theme.
+// Each piece of a template is judged as a literal, and a class a hole or a `+` touches with no
+// whitespace between is skipped, since the value beside it completes it:
+//
+//	`block notaclass ${x}`              reports notaclass
+//	`notaclass ${x} block`              reports notaclass
+//	`block ${x} notaclass`              reports notaclass
+//	`a ${x}b c${y}d`                    reports a only
+//	`notaclass${x} block`               silent
+//	`block ${x}notaclass`               silent
+//	`block ${x}notaclass${y} flex`      silent
+//	'notaclass ' + x, x + ' notaclass'  reports notaclass
+//	'notaclass\u00a0' + x, x + '\u3000notaclass'   report notaclass, JavaScript's whitespace
+//	'notaclass' + x, x + 'notaclass'    silent
+//	'block notaclass' + x               silent
+func TestNoUnknownClassesAtHolesAndConcatenation(test *testing.T) {
+	test.Parallel()
+	testCases := []struct {
+		name    string
+		source  string
+		classes []string
+	}{
+		{
+			name:    "a run beside a hole",
+			source:  "const element = <div className={`block notaclass ${size}`} />;",
+			classes: []string{"notaclass"},
+		},
+		{
+			name:    "after a hole, with whitespace",
+			source:  "const element = <div className={`block ${size} notaclass`} />;",
+			classes: []string{"notaclass"},
+		},
+		{
+			name:    "only the unglued class of several runs",
+			source:  "const element = <div className={`a ${size}b c${tone}d`} />;",
+			classes: []string{"a"},
+		},
+		{
+			name:    "glued before a hole",
+			source:  "const element = <div className={`notaclass${size} block`} />;",
+			classes: []string{},
+		},
+		{
+			name:    "glued after a hole",
+			source:  "const element = <div className={`block ${size}notaclass`} />;",
+			classes: []string{},
+		},
+		{
+			name:    "glued on both sides",
+			source:  "const element = <div className={`block ${size}notaclass${tone} flex`} />;",
+			classes: []string{},
+		},
+		{
+			// Where a string literal is joined with `+`, the finding sits on the literal, as every
+			// literal finding here does today.
+			name:    "a concatenated literal that ends in whitespace",
+			source:  "const element = (size: string) => <div className={'notaclass ' + size} />;",
+			classes: []string{"notaclass "},
+		},
+		{
+			name:    "a concatenated literal that starts with whitespace",
+			source:  "const element = (size: string) => <div className={size + ' notaclass'} />;",
+			classes: []string{" notaclass"},
+		},
+		{
+			// JavaScript's whitespace, not ASCII's: a no-break space before the join sets the class
+			// apart, and an ideographic space after it does too.
+			name:    "a concatenated literal that ends in a no-break space",
+			source:  "const element = (size: string) => <div className={'notaclass\u00a0' + size} />;",
+			classes: []string{"notaclass\u00a0"},
+		},
+		{
+			name:    "a concatenated literal that starts with an ideographic space",
+			source:  "const element = (size: string) => <div className={size + '\u3000notaclass'} />;",
+			classes: []string{"\u3000notaclass"},
+		},
+		{
+			name:    "a literal concatenated on its right",
+			source:  "const element = (size: string) => <div className={'block notaclass' + size} />;",
+			classes: []string{},
+		},
+		{
+			name:    "a literal concatenated on its left",
+			source:  "const element = (size: string) => <div className={size + 'notaclass block'} />;",
+			classes: []string{},
+		},
+	}
+	for _, testCase := range testCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runUnknownFixture(test, "Component.tsx", testCase.source)
+			if len(result.Diagnostics) != len(testCase.classes) {
+				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.classes))
+			}
+			text := result.SourceFile.Text()
+			for index, diagnostic := range result.Diagnostics {
+				reported := text[diagnostic.Range.Pos():diagnostic.Range.End()]
+				if reported != testCase.classes[index] {
+					test.Errorf("finding %d covers %q, want %q", index, reported, testCase.classes[index])
+				}
+			}
+		})
+	}
+}
+
 // TestUnknownIgnoreExemptsProjectClasses covers the option this rule cannot ship without.
 //
 // Any project with hand-written CSS has class names Tailwind does not define. On the ahra tree those
