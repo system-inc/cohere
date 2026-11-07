@@ -95,7 +95,15 @@ var (
 	blockCommentGutter = regexp.MustCompile(`^[ \t]*\*(?: |\t|$)`)
 	exampleTag         = regexp.MustCompile(`^@example\b`)
 	anyJsDocTag        = regexp.MustCompile(`^@\w+`)
-	commandLine        = regexp.MustCompile(`^\s*(\$|ahra\s|git\s|pnpm\s|npm\s|sqlite3\s|curl\s|s\s+c\b)`)
+	// A line opening with a shell prompt or `s c` is a command whatever follows it.
+	promptLine = regexp.MustCompile(`^\s*(\$|s\s+c\b)`)
+	// A line opening with one of these words is a command unless it reads as prose, which
+	// commandWordReadsAsProse decides, since prose wraps onto a line that starts with them too.
+	commandWordLine = regexp.MustCompile(`^\s*(ahra|git|pnpm|npm|sqlite3|curl)\s`)
+	// A word an argument cannot be: a lowercase word, possibly hyphenated, as a subcommand is.
+	lowercaseWord = regexp.MustCompile(`^[a-z][a-z-]*$`)
+	// A dot between letters, as in a file name like PhiSocialUpload.ts.
+	dotBetweenLetters = regexp.MustCompile(`[A-Za-z]\.[A-Za-z]`)
 )
 
 // MaskCodeAndCommands blanks out anything that is code, so nothing inside it is ever read as
@@ -323,7 +331,15 @@ func maskCommandLines(text string) string {
 	if !containsAnyCommandStarter(text) {
 		return text
 	}
+	return blankCommandLines(text)
+}
 
+// blankCommandLines is maskCommandLines without its gate: every line that is a command, blanked.
+//
+// A line is read in the state the lines before it were left in, so a line already blanked as code,
+// by an earlier mask or as a command here, is blank to the line after it. That is what keeps a run
+// of commands masked: each one follows a blank line, so none of them continues a sentence.
+func blankCommandLines(text string) string {
 	lines := strings.Split(text, "\n")
 	for index, line := range lines {
 		// The gutter is stripped before matching, which the TypeScript original does not do. Its
@@ -331,11 +347,77 @@ func maskCommandLines(text string) string {
 		// a " * " gutter and never matches, and the rule reads the command as prose. The
 		// example-block masker in this same file already strips the gutter for exactly this reason,
 		// so this follows that convention rather than inventing one.
-		if commandLine.MatchString(jsDocGutter.ReplaceAllString(line, "")) {
+		content := jsDocGutter.ReplaceAllString(line, "")
+		isCommand := promptLine.MatchString(content)
+		if starter := commandWordLine.FindString(content); starter != "" {
+			// The first line has nothing before it, which reads as blank: a comment opening on a
+			// command word continues no sentence.
+			previousLine := ""
+			if index > 0 {
+				previousLine = lines[index-1]
+			}
+			isCommand = !commandWordReadsAsProse(previousLine, line, content[len(starter):])
+		}
+		if isCommand {
 			lines[index] = strings.Repeat(" ", len(line))
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// commandWordReadsAsProse reports whether a line opening with a command word is a sentence that
+// wrapped onto it, given the line before it as masked so far, the line, and what follows the word.
+//
+// The words are English too, so a comment rewrapped by a formatter puts "git and go are stand-ins"
+// or "ahra run, which waits" at the start of a line, and blanking it whole hid every shout on it.
+// A list of prose words would never be finished, so the test is structure, and it needs both halves:
+//
+//   - The line continues a sentence: the line before it holds text that does not end a sentence or
+//     open a block, and the line sits no deeper than it. A command shown after `Usage:`, after a
+//     blank line, or under another command follows a colon or a blank, and a table of commands set
+//     in under a sentence sits deeper than it, so each stays masked.
+//   - What follows the word is not shaped like a command's arguments: a flag, a path, a placeholder,
+//     an assignment, a file name, or the line's end, reached through at most two lowercase words
+//     such as `git merge-base` or `ahra os skills` take as subcommands. Prose reaches a capital, a
+//     comma, or a third plain word first.
+//
+// Only a line passing both is read, so a command that wraps out of a sentence still stays masked.
+func commandWordReadsAsProse(previousLine string, line string, afterWord string) bool {
+	previous := text.TrimWhitespace(jsDocGutter.ReplaceAllString(previousLine, ""))
+	// A block comment's opening line is its delimiter, with no sentence to continue.
+	previous = text.TrimWhitespace(strings.TrimLeft(strings.TrimPrefix(previous, "/*"), "*"))
+	if previous == "" || strings.ContainsAny(previous[len(previous)-1:], ".:!?;") {
+		return false
+	}
+	// Measured past blockCommentGutter, which keeps the indentation jsDocGutter strips from a line
+	// with no asterisk. A sentence wraps back to where it started, never further in.
+	if indentation(line) > indentation(previousLine) {
+		return false
+	}
+	words := strings.Fields(afterWord)
+	for index := range 3 {
+		if index == len(words) || isCommandShaped(words[index]) {
+			return false
+		}
+		if !lowercaseWord.MatchString(words[index]) {
+			return true
+		}
+	}
+	return true
+}
+
+// indentation is how many spaces or tabs a line's text sits in from its block comment gutter.
+func indentation(line string) int {
+	body := blockCommentGutter.ReplaceAllString(line, "")
+	return len(body) - len(strings.TrimLeft(body, " \t"))
+}
+
+// isCommandShaped reports whether a word is shaped like a command's argument rather than prose.
+func isCommandShaped(word string) bool {
+	return strings.ContainsAny(word[:1], "-<[\"'`+/~.") ||
+		strings.ContainsAny(word, "/=") ||
+		dotBetweenLetters.MatchString(word) ||
+		strings.HasSuffix(word, ":")
 }
 
 // TokensInMasked returns the distinct shouted tokens in text MaskCodeAndCommands has already masked, in first-seen
@@ -376,9 +458,10 @@ func ShoutedTokensInMasked(masked string) []ShoutedToken {
 	return tokens
 }
 
-// commandStarters are the literal prefixes commandLine can match after its optional leading space.
+// commandStarters are the literal prefixes promptLine and commandWordLine can match after their
+// optional leading space.
 //
-// Kept beside the pattern deliberately: if the pattern gains an alternative, this must gain it too,
+// Kept beside the patterns deliberately: if one gains an alternative, this must gain it too,
 // or maskCommandLines will stop masking that command and the rule will read it as prose. The gate is
 // a superset check, so an extra entry here costs one wasted line scan and a missing one costs a
 // false finding.
@@ -392,9 +475,10 @@ var structureCommandStarter = regexp.MustCompile(`s\s+c`)
 
 // containsAnyCommandStarter reports whether any command prefix appears anywhere in the text.
 //
-// A superset of what `commandLine` can match, never a subset, for the same reason the abbreviation
-// gate is: a gate that admits too much costs one wasted line scan, and a gate that admits too little
-// silently stops masking a command, so the rule reads it as prose and shouts at it.
+// A superset of what `promptLine` and `commandWordLine` can match, never a subset, for the same
+// reason the abbreviation gate is: a gate that admits too much costs one wasted line scan, and a
+// gate that admits too little silently stops masking a command, so the rule reads it as prose and
+// shouts at it.
 //
 // The `s\s+c` arm is the one that cannot be reduced to a literal, since the pattern accepts any run
 // of whitespace between the two letters. A fixture caught that: a hand-written `"s c"` entry misses

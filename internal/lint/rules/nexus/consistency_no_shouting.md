@@ -83,6 +83,16 @@ Go port afterwards and belongs in the original's list too.
   engines agree on that site.
 - **Command lines are matched after the JSDoc gutter is stripped**, so a command inside a block
   comment is masked. Recorded in `maskCommandLines`.
+- **A sentence that wraps onto a command word is read** (#tp7ahz0). The original masks every line
+  opening with `ahra`, `git`, `pnpm`, `npm`, `sqlite3` or `curl`, so a formatter's rewrap that put
+  `git and go are stand-ins: it marks HOME` at the start of a line hid the shout. Cohere reads such a
+  line only when it continues the line above (that line holds text not ending in `.`, `:`, `!`, `?`
+  or `;`, was not masked, and sits no shallower) and the words after the starter are not shaped like
+  arguments (a flag, path, placeholder, assignment, file name or the line's end, after at most two
+  lowercase words). A command after `Usage:`, after a blank line, in a run of commands, or in a table
+  set in under a sentence stays masked, and `$` and `s c` lines always are. The difference is in
+  cohere's favour: only true shouts are added. Recorded in `commandWordReadsAsProse`; corpus cases
+  `sh16` to `sh22`.
 
 Fixtures: `TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound` (the review's lines verbatim, both
 directions), `TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase`,

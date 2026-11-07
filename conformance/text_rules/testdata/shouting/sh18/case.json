@@ -1,0 +1,10 @@
+{
+    "why": "sh18: `sqlite3` after a blank line is a command, so the SQL it runs is masked",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go"
+    ]
+}
