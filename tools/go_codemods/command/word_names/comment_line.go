@@ -1,9 +1,9 @@
 package main
 
 import (
-	"strings"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/line_wrap"
 	"github.com/system-inc/cohere/tools/go_codemods/rename"
 )
 
@@ -21,16 +21,9 @@ func (line commentLine) width() int {
 	return columns(line.indentation) + utf8.RuneCountInString(line.text)
 }
 
-// inParagraph is whether the line is plain prose: `// ` and a word, not a list item, a heading or a directive.
+// inParagraph is whether the line is plain prose a reflow may refill, judged by line_wrap's own test so the
+// respelling's reflow and the line wrap read a paragraph alike: not a list item, a heading, a directive or a marker
+// line such as `// Serial:`, which a paragraph written straight above it must never be joined into.
 func (line commentLine) inParagraph() bool {
-	body, isProse := strings.CutPrefix(line.text, "// ")
-	if !isProse || body == "" || body[0] == ' ' || body[0] == '\t' {
-		return false
-	}
-	for _, opening := range []string{"- ", "* ", "+ ", "# "} {
-		if strings.HasPrefix(body, opening) {
-			return false
-		}
-	}
-	return !(body[0] >= '0' && body[0] <= '9' && strings.Contains(body[:min(len(body), 4)], ". "))
+	return line_wrap.ProseComment(line.text)
 }
