@@ -233,7 +233,9 @@ func TestSharedFillIsBilledToTheDerivationNotTheRuleThatAsked(test *testing.T) {
 	cache := rule.NewFileCache()
 	meter.watchFills(cache)
 	timing := &RuleTiming{Name: "asked-first"}
-	var askerSpent, outerSpent, innerSpent time.Duration
+	var askerSpent time.Duration
+	var outerSpent time.Duration
+	var innerSpent time.Duration
 
 	meter.call(timing, func(node *ast.Node) {
 		askerSpent = spinFor(test, 2*time.Millisecond)
