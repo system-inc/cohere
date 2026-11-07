@@ -11,11 +11,15 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 )
 
 // walker follows roots through one package until nothing more is learned.
 type walker struct {
 	pass *analysis.Pass
+	// table reads a position's file and line without the FileSet's lock.
+	table *positions.Table
 	// directory is the package's own directory, which every known path is read against.
 	directory   string
 	functions   map[*types.Func]*function
@@ -694,11 +698,12 @@ func (walker *walker) leavesPackage(path string) bool {
 
 // report flags each source that reaches a walk once, on the source, with the walk it reaches as related.
 func (walker *walker) report(readsFile string) {
-	declaredLines := map[*token.File]map[int]bool{}
-	globlessLines := map[*token.File]map[int]bool{}
+	// Each file's lines are held by its name, which the table reads for every source.
+	declaredLines := map[string]map[int]bool{}
+	globlessLines := map[string]map[int]bool{}
 	for _, file := range walker.pass.Files {
-		tokenFile := walker.pass.Fset.File(file.Pos())
-		declaredLines[tokenFile], globlessLines[tokenFile] = readsLines(walker.pass.Fset, file)
+		fileName := walker.table.Position(file.Pos()).Filename
+		declaredLines[fileName], globlessLines[fileName] = readsLines(walker.table, file)
 	}
 	walks := map[token.Pos]token.Pos{}
 	for _, declared := range walker.functions {
@@ -718,15 +723,15 @@ func (walker *walker) report(readsFile string) {
 	}
 	slices.Sort(sources)
 	for _, source := range sources {
-		file := walker.pass.Fset.File(source)
-		line := walker.pass.Fset.PositionFor(source, false).Line
-		if file == nil || declaredLines[file][line] {
+		// A source in no file reads as the zero Position, with no name.
+		position := walker.table.Position(source)
+		if position.Filename == "" || declaredLines[position.Filename][position.Line] {
 			continue
 		}
 		// A marker with no glob after it declares nothing, as Adamic reads it, but its writer meant to declare the
 		// walk, so the finding names the missing glob rather than saying nothing was written.
 		message := undeclaredWalkMessage
-		if globlessLines[file][line] {
+		if globlessLines[position.Filename][position.Line] {
 			message = readsWithoutGlobMessage
 		}
 		walker.pass.Report(analysis.Diagnostic{

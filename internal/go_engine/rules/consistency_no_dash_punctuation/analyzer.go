@@ -13,6 +13,7 @@
 package consistency_no_dash_punctuation
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"strconv"
@@ -22,6 +23,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -35,7 +37,8 @@ var Analyzer = &analysis.Analyzer{
 		"them as generated text and tune out. A dash spelled with an escape is data and is left alone, so a dash " +
 		"in an interpreted string comes with a fix that rewrites it as its escape, keeping the value the same. A " +
 		"dash in a raw string, which cannot hold an escape, or in a comment is reported with no fix.",
-	Run: run,
+	Requires: []*analysis.Analyzer{positions.Analyzer},
+	Run:      run,
 }
 
 // Rule is this rule's entry in the Go engine's registry.
@@ -73,11 +76,17 @@ const (
 )
 
 func run(pass *analysis.Pass) (any, error) {
+	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+	if !isTable {
+		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+	}
 	for _, file := range pass.Files {
+		// Each comment and literal starts a line in this file, so its line table is looked up once for all of them.
+		tokenFile := pass.Fset.File(file.FileStart)
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				// comment.Text is the comment's source from its first slash, so it starts at comment.Pos().
-				reportDashes(pass, comment.Pos(), comment.Text, commentText)
+				reportDashes(pass, table, tokenFile, comment.Pos(), comment.Text, commentText)
 			}
 		}
 		ast.Inspect(file, func(node ast.Node) bool {
@@ -89,9 +98,9 @@ func run(pass *analysis.Pass) (any, error) {
 			// literal.Value is the literal's source, quotes included, so it starts at literal.Pos(). Only a dash
 			// written as itself is in the source as a dash, so an escaped one is never seen here.
 			if strings.HasPrefix(literal.Value, "`") {
-				reportDashes(pass, literal.Pos(), literal.Value, rawStringText)
+				reportDashes(pass, table, tokenFile, literal.Pos(), literal.Value, rawStringText)
 			} else {
-				reportDashes(pass, literal.Pos(), literal.Value, interpretedStringText)
+				reportDashes(pass, table, tokenFile, literal.Pos(), literal.Value, interpretedStringText)
 			}
 			return true
 		})
@@ -99,14 +108,21 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// reportDashes reports each dash written as itself in source, the source text starting at start, as kind decides.
-func reportDashes(pass *analysis.Pass, start token.Pos, source string, kind textKind) {
+// reportDashes reports each dash written as itself in source, the source text starting at start in tokenFile, as kind
+// decides. start's line is read from table, without the FileSet's lock, which every comment and literal would take.
+func reportDashes(
+	pass *analysis.Pass,
+	table *positions.Table,
+	tokenFile *token.File,
+	start token.Pos,
+	source string,
+	kind textKind,
+) {
 	// The scanner drops every carriage return from a block comment's and a raw string's text, so in a file with CRLF
 	// line endings an offset into source falls one byte short of the file for each line it crosses. Each line is
 	// placed at the file's own start of that line instead, from the line table the scanner built from the real
 	// bytes. The line is the file's own, not one a //line directive gives, since LineStart counts the file's lines.
-	tokenFile := pass.Fset.File(start)
-	line := tokenFile.PositionFor(start, false).Line
+	line := table.Line(start)
 	lineStart := start
 	// lineOffset is where the current line begins in source.
 	lineOffset := 0
