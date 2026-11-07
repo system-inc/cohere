@@ -330,6 +330,15 @@ func TestNoDeprecatedClassesInTemplateRuns(test *testing.T) {
 			fixed:   "const element = <div className={`flex ${x} rounded-sm grow ${y} bg-opacity-50`} />;",
 		},
 		{
+			// Across a hole each run is its own literal, as upstream reads it, so both are renamed:
+			// 4.9.1 writes `rounded-sm ${x} rounded-sm`. no-duplicate-classes leaves a repeat across a
+			// hole as written.
+			name:    "the same class in two runs",
+			source:  "const element = <div className={`rounded ${x} rounded`} />;",
+			classes: []string{"rounded", "rounded"},
+			fixed:   "const element = <div className={`rounded-sm ${x} rounded-sm`} />;",
+		},
+		{
 			// The repeat is no-duplicate-classes's to delete, so only the first is renamed.
 			name:    "a repeat in one run",
 			source:  "const element = <div className={`rounded rounded ${x}`} />;",
