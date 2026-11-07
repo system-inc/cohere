@@ -156,10 +156,10 @@ func checkPackage(
 	}
 	// No root: both fingerprints read the same files over the same file set, so a file's own name is stable here,
 	// and lineAt finds a file by that name.
-	offsets := rename.IdentifierOffsets(goPackage.Fset, goPackage.Syntax, "")
-	expected := rename.Fingerprint(goPackage.Fset, goPackage.Types, goPackage.TypesInfo, goPackage.Syntax, "")
+	offsets := rename.IdentifierOffsets(goPackage.Fset, goPackage.Syntax, "", nil)
+	expected := rename.Fingerprint(goPackage.Fset, goPackage.Types, goPackage.TypesInfo, goPackage.Syntax, "", nil)
 	rename.Expect(expected, offsets, newNames, retargets, insertions)
-	actual := rename.Fingerprint(goPackage.Fset, checked, info, files, "")
+	actual := rename.Fingerprint(goPackage.Fset, checked, info, files, "", nil)
 	for filename, expectedRecords := range expected {
 		actualRecords := actual[filename]
 		if len(expectedRecords) != len(actualRecords) {

@@ -34,7 +34,8 @@ func cgoFixture(test *testing.T) string {
 	}
 	// A comment naming the root makes the cgo file's bytes this test's own: under -trimpath go keys cgo's translation
 	// without its directory, and would serve one cached for the same bytes in another test's directory, whose //line
-	// directives name that directory, which FileKey rightly leaves out.
+	// directives name that directory. FileKey keys that copy alike (rename's own test pins it), but translationOf
+	// finds the translation by the directory its directives name, so the test runs cgo here.
 	files["internal/archive/archive.go"] = "// Written under " + root + ".\n\n" + files["internal/archive/archive.go"]
 	for name, contents := range files {
 		path := filepath.Join(root, filepath.FromSlash(name))

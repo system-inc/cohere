@@ -17,21 +17,31 @@ type IdentifierRecord struct {
 	Key  string
 }
 
-// FileKey is the name a fingerprint keys a file by, and false for a file it leaves out. A file under root is keyed
-// by its own name. A file outside it, as cgo's translation of a source file in the build cache, is named by a hash
-// of the build's inputs, which a rewrite of any file of the package changes, so the same translation reads as gone
-// in one load and new in the other; it is keyed by the file its //line directives name at its package clause, the
-// source it translates, when that file is under root. A file outside root that names none under root, as cgo's
-// _cgo_gotypes.go, has no name that survives a changed hash, and is left out (see Fingerprint). With root empty
-// every file is keyed by its own name, for a caller that compares a load with a check of the same files.
-func FileKey(fileSet *token.FileSet, file *ast.File, root string) (string, bool) {
+// FileKey is the name a fingerprint keys a file by, and false for a file it leaves out. sources are the files of the
+// file's package as written (go/packages' GoFiles), which for a cgo package lists each cgo file beside the translation
+// CompiledGoFiles holds. A file under root is keyed by its own name. A file outside it, as cgo's translation of one of
+// those sources in the build cache, is named by a hash of the build's inputs, which a rewrite can change, so the same
+// translation would read as gone in one load and new in the other. It is keyed by the source under root whose base
+// name its //line directives name at its package clause, whatever directory they name: under -trimpath go serves a
+// translation cached for the same bytes in another directory, whose //line names that directory, and one load may get
+// that copy while another runs cgo here, so only the base name is the same in every load. A file outside root whose
+// directives name no source of its package, as cgo's _cgo_gotypes.go, has no name that survives a changed hash, and
+// is left out (see Fingerprint). With root empty every file is keyed by its own name, for a caller that compares a load
+// with a check of the same files.
+func FileKey(fileSet *token.FileSet, file *ast.File, root string, sources []string) (string, bool) {
 	filename := fileSet.PositionFor(file.Pos(), false).Filename
 	if root == "" || under(root, filename) {
 		return filename, true
 	}
-	translated := fileSet.PositionFor(file.Package, true).Filename
-	if translated != filename && under(root, translated) {
-		return translated, true
+	named := fileSet.PositionFor(file.Package, true).Filename
+	if named == filename {
+		return "", false
+	}
+	// A package's files are in one directory, so a base name names at most one of them.
+	for _, source := range sources {
+		if under(root, source) && filepath.Base(source) == filepath.Base(named) {
+			return filepath.Clean(source), true
+		}
 	}
 	return "", false
 }
@@ -47,19 +57,20 @@ func under(directory string, path string) bool {
 // changes either: such a file is generated outside the root, a rename never edits it (workspace.Editable reads it as
 // generated or outside), and what C reads of the package the //export guard keeps. Anything else is keyed by its
 // package path and description. Two fingerprints of a file taken before and after a rename must have the same keys
-// in the same order, and names that differ only where an edit was made. root is FileKey's.
+// in the same order, and names that differ only where an edit was made. root and sources are FileKey's.
 func Fingerprint(
 	fileSet *token.FileSet,
 	packageTypes *types.Package,
 	info *types.Info,
 	files []*ast.File,
 	root string,
+	sources []string,
 ) map[string][]IdentifierRecord {
 	ordinals := map[token.Pos]string{}
 	identifiersByFile := map[string][]*ast.Ident{}
 	leftOut := map[*token.File]bool{}
 	for _, file := range files {
-		filename, kept := FileKey(fileSet, file, root)
+		filename, kept := FileKey(fileSet, file, root, sources)
 		if !kept {
 			leftOut[fileSet.File(file.Pos())] = true
 			continue
@@ -232,14 +243,14 @@ func Expect(
 	}
 }
 
-// IdentifierOffsets lists, per file Fingerprint keeps and under the same key, the byte offset of each identifier in
-// the same order Fingerprint uses, so the expected names after a rename can be derived from the edits. An offset is
-// into the file as read: an edit is only ever made in a file under root, whose key is its own name, and that is
-// where an edit's offset is matched.
-func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File, root string) map[string][]int {
+// IdentifierOffsets lists, per file Fingerprint keeps and under the same key, root and sources being FileKey's, the
+// byte offset of each identifier in the same order Fingerprint uses, so the expected names after a rename can be
+// derived from the edits. An offset is into the file as read: an edit is only ever made in a file under root, whose
+// key is its own name, and that is where an edit's offset is matched.
+func IdentifierOffsets(fileSet *token.FileSet, files []*ast.File, root string, sources []string) map[string][]int {
 	offsets := map[string][]int{}
 	for _, file := range files {
-		filename, kept := FileKey(fileSet, file, root)
+		filename, kept := FileKey(fileSet, file, root, sources)
 		if !kept {
 			continue
 		}

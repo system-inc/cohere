@@ -28,7 +28,8 @@ func TestARenameReachingACgoPackageIsProvenAcrossItsTranslationsNewNames(test *t
 	})
 	archive := filepath.Join(fixture.root, "internal", "archive", "archive.go")
 	// The comment naming the root keeps another test's translation of the same bytes, cached under -trimpath with
-	// its own directory in its //line directives, from being served here.
+	// its own directory in its //line directives, from being served here, so the translations this test reads are
+	// ones cgo made in this directory and moved by the rewrite.
 	source := "// Written under " + fixture.root + ".\n\npackage archive\n\n/*\nstatic int twice(int value) { " +
 		"return value * 2; }\n*/\nimport \"C\"\n\n// Twice doubles a value through C.\n" +
 		"func Twice(value int) int {\n\t" +

@@ -39,7 +39,7 @@ func Fingerprint(
 				continue
 			}
 			seenFiles[read] = true
-			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root)
+			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root, rootsPackage.GoFiles)
 			if !kept {
 				leftOut[read] = true
 				continue
@@ -109,7 +109,7 @@ func Fingerprint(
 		byFile := map[string][]rename.IdentifierRecord{}
 		offsetsByFile := map[string][]int{}
 		for _, file := range rootsPackage.Syntax {
-			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root)
+			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root, rootsPackage.GoFiles)
 			if !kept {
 				continue
 			}

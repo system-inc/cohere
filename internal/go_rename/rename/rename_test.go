@@ -110,8 +110,9 @@ func renameFixtureProposing(test *testing.T, source string, propose func(Package
 		before.loadedPackage.Info,
 		before.loadedPackage.Files,
 		"",
+		nil,
 	)[filename]
-	offsets := IdentifierOffsets(before.loadedPackage.FileSet, before.loadedPackage.Files, "")[filename]
+	offsets := IdentifierOffsets(before.loadedPackage.FileSet, before.loadedPackage.Files, "", nil)[filename]
 	for _, edit := range edits {
 		for index, offset := range offsets {
 			if offset == edit.Offset {
@@ -134,6 +135,7 @@ func renameFixtureProposing(test *testing.T, source string, propose func(Package
 		after.loadedPackage.Info,
 		after.loadedPackage.Files,
 		"",
+		nil,
 	)[filename]
 	if len(actual) != len(expected) {
 		test.Fatalf("%d identifiers before, %d after", len(expected), len(actual))

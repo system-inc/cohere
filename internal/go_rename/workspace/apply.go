@@ -60,10 +60,11 @@ func ApplyVerifiedRetargeted(
 			rootsPackage.TypesInfo,
 			rootsPackage.Syntax,
 			loaded.Root,
+			rootsPackage.GoFiles,
 		)
 		rename.Expect(
 			fingerprint,
-			rename.IdentifierOffsets(rootsPackage.Fset, rootsPackage.Syntax, loaded.Root),
+			rename.IdentifierOffsets(rootsPackage.Fset, rootsPackage.Syntax, loaded.Root, rootsPackage.GoFiles),
 			newNameAt,
 			retargets,
 			insertions,
@@ -116,7 +117,7 @@ func ApplyVerifiedRetargeted(
 			continue
 		}
 		after := rename.Fingerprint(rootsPackage.Fset, rootsPackage.Types, rootsPackage.TypesInfo, rootsPackage.Syntax,
-			reloaded.Root)
+			reloaded.Root, rootsPackage.GoFiles)
 		expectedFiles := make([]string, 0, len(expected))
 		for filename := range expected {
 			expectedFiles = append(expectedFiles, filename)
