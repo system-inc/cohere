@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/sentence"
 	"github.com/system-inc/cohere/internal/streams"
 	"github.com/system-inc/cohere/internal/types/program"
@@ -185,4 +186,57 @@ func finishTypeCheck(
 		diagnostics = append(diagnostics, diagnostic)
 	}
 	return diagnostics
+}
+
+// finishScopedTypeCheck finishes the check over the files the settings leave type-checked, and returns them with
+// their diagnostics (#cxeq6jw). The settings say which files a plain ignore keeps out of every check, so a run
+// that neither fixes nor lints, lintConfiguration nil, loads them here: `--types` reported the type errors of
+// files the settings never check. Until lint counts its own, the summary counts here as in a run lint reaches:
+// a file a plain ignore matched is not checked, and one an entry keeping the type check matched is types-only.
+func finishScopedTypeCheck(
+	callerContext context.Context,
+	check *typeCheck,
+	graph *program.Graph,
+	location projectLocation,
+	lintConfiguration *configuration.Configuration,
+	projectFiles []*ast.SourceFile,
+	persist bool,
+) ([]*ast.SourceFile, []*ast.Diagnostic, error) {
+	settings := lintConfiguration
+	if settings == nil {
+		loaded, loadError := loadLintConfiguration(graph, location)
+		if loadError != nil {
+			return nil, nil, fmt.Errorf("loading the lint config: %w", loadError)
+		}
+		settings = loaded
+	}
+	typeChecked, typesOnly := typeCheckedFiles(projectFiles, settings)
+	activeSummary.FilesInScope = len(typeChecked) - typesOnly
+	activeSummary.FilesChecked, activeSummary.FilesTypesOnly = activeSummary.FilesInScope, typesOnly
+	return typeChecked, finishTypeCheck(callerContext, check, typeChecked, persist), nil
+}
+
+// typeCheckedFiles is files less those a plain ignore matched, the files the type check reports on, and how many
+// of those kept an entry naming `"check": "types"` matched (#cxeq6jw). A plain ignore means never checked at all,
+// so the files it matched are left out here and finishTypeCheck drops their type errors as it drops a
+// dependency's: the whole program is still checked, since our files' types depend on theirs, and nothing found in
+// them is said. An entry keeping the type check keeps them, never linted or formatted, and counted apart.
+// ignores is the run's settings, nil when there are none, which ignores nothing.
+func typeCheckedFiles(files []*ast.SourceFile, ignores *configuration.Configuration) ([]*ast.SourceFile, int) {
+	if ignores == nil {
+		return files, 0
+	}
+	checked := make([]*ast.SourceFile, 0, len(files))
+	typesOnly := 0
+	for _, sourceFile := range files {
+		resolved := ignores.Resolve(sourceFile.FileName().AsString())
+		if resolved.Ignored && !resolved.TypesOnly {
+			continue
+		}
+		if resolved.TypesOnly {
+			typesOnly++
+		}
+		checked = append(checked, sourceFile)
+	}
+	return checked, typesOnly
 }

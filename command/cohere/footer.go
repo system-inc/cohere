@@ -20,7 +20,12 @@ import (
 // The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
 // files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files
 // examined fresh this run, and cached the ones the cache answered for; together they are every file in
-// scope. A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
+// scope. Types-only is the files an ignore naming the type check matched, which only that check reads, and a
+// file a plain ignore matched is in no count (#cxeq6jw):
+//
+//	✓ 💎 2.4s (480 rules • 3,900 checked • 26 types-only)
+//
+// A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
 // and time, what was found, what was cohered, the parentheses, and anything the run did not check.
 //
 // With `--phases`, or `"output": { "phases": true }` in the settings, where the time went comes first
@@ -103,6 +108,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	}
 	if summary.FilesCached > 0 {
 		inside = append(inside, grouped(summary.FilesCached)+" cached")
+	}
+	if summary.FilesTypesOnly > 0 {
+		inside = append(inside, grouped(summary.FilesTypesOnly)+" types-only")
 	}
 	if options.Verbose && summary.Nodes > 0 {
 		inside = append(inside, counted(summary.Nodes, "node", "nodes"))

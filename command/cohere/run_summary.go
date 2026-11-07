@@ -67,6 +67,10 @@ type runSummary struct {
 	FilesInScope int
 	FilesChecked int
 	FilesCached  int
+	// FilesTypesOnly is the files an ignore naming `"check": "types"` matched, beside FilesInScope and not in it:
+	// type-checked, and never linted or formatted, so a reader sees how much of the program only the type check
+	// reads (#cxeq6jw). A file a plain ignore matched is in neither, since it is never checked at all.
+	FilesTypesOnly int
 	// Nodes is the syntax nodes walked this run, so only in the checked files.
 	Nodes int
 

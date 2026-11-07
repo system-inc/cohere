@@ -43,8 +43,9 @@ var IgnoreKinds = []IgnoreKind{IgnoreKindInput, IgnoreKindGenerated, IgnoreKindT
 // IgnoreCheck names a check that still reads an ignored path.
 type IgnoreCheck string
 
-// IgnoreCheckTypes names the type check as one that still reads an ignored path. The loader accepts and carries
-// it, and nothing acts on it yet: the type check's reading of it is the next piece of #cxeq6jw.
+// IgnoreCheckTypes names the type check as one that still reads an ignored path: the paths such an entry
+// matches are never linted or formatted, and their type errors are still reported, where a plain entry's are
+// dropped (see Resolved.TypesOnly). Where a plain entry and one naming it both match a path, it keeps types.
 const IgnoreCheckTypes IgnoreCheck = "types"
 
 // IgnoreChecks are the checks an entry may name.

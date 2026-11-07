@@ -117,6 +117,10 @@ type Coverage struct {
 	// never having looked.
 	FilesIgnored int
 
+	// FilesTypesOnly is how many of FilesIgnored an entry naming `"check": "types"` matched: never linted, and
+	// still type-checked, so a reader can tell them from the files never checked at all (#cxeq6jw).
+	FilesTypesOnly int
+
 	// RulesScopedOff counts, per rule name, how many files the config turned that rule off for.
 	//
 	// This is the narrower half of the same accounting. A rule can be enabled in the config, run on

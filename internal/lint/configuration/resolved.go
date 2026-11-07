@@ -38,8 +38,13 @@ type Resolved struct {
 	Ignored bool
 
 	// IgnoredBy is the pattern that excluded it, so a report can say which one rather than only that
-	// something did.
+	// something did: the entry that keeps the type check, when one matched, since that is the one that decided.
 	IgnoredBy string
+
+	// TypesOnly is true for an ignored file an entry naming `"check": "types"` matched: it is never linted or
+	// formatted, and its type errors are still reported. An ignored file no such entry matched is never checked
+	// at all, its type errors dropped with it (#cxeq6jw).
+	TypesOnly bool
 
 	// Rules is the effective setting per rule name after overrides are applied.
 	Rules map[string]RuleSetting
@@ -77,11 +82,13 @@ type resolutionMemo struct {
 	byMatch map[string]Resolved
 }
 
-// configurationGlobs is a Config's patterns compiled once (#hsd2dfb): ignore is IgnorePatterns by index, and
-// overrides holds each override's Files by the same indices as Overrides.
+// configurationGlobs is a Config's patterns compiled once (#hsd2dfb): ignore is IgnorePatterns by index,
+// ignoreTypes whether the entry at that index keeps the type check, and overrides holds each override's Files
+// by the same indices as Overrides.
 type configurationGlobs struct {
-	ignore    []glob
-	overrides [][]glob
+	ignore      []glob
+	ignoreTypes []bool
+	overrides   [][]glob
 }
 
 // Enabled reports whether a rule runs on this file.
