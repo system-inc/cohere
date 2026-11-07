@@ -4,8 +4,9 @@
 //
 //	run_output <log>
 //
-// It exits 1 when the log holds no summary it can read, so the benchmark stops rather than recording a
-// column it could not fill.
+// It exits 1 when the log holds no summary it can read, or one of its projects did less than a developer's
+// run would (an engine that did not run, a gap), so the benchmark stops rather than recording a column it
+// could not fill or a time for work that was never done.
 package main
 
 import (
