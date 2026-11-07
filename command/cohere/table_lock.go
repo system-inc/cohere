@@ -8,7 +8,7 @@ import (
 // The table's lock, which keeps back-to-back runs in order once a run can answer its caller before it has
 // written the cache table (sendVerdict).
 //
-// `s c` runs cohere's fix step and then its check, one straight after the other. With an early return the
+// A caller may run cohere's fix step and then its check, one straight after the other. With an early return the
 // second starts while the first is still recording, so it could read the table before the first one's
 // rename lands, and whichever rename came last would win, dropping what the other recorded. Neither is
 // ever corruption, since every entry carries its own proof, only a miss; but a miss on exactly the run

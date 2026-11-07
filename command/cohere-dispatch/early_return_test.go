@@ -257,7 +257,7 @@ func writeRepositoryProject(test *testing.T) string {
 }
 
 // A run holds off reading the table while another run holds the table's lock, and goes ahead the moment
-// the lock is released. `s c` runs its fix step and then its check back to back, and the first of a pair
+// the lock is released. A caller may run the fix step and then the check back to back, and the first of a pair
 // like that writes the table after its caller has its answer, so without the wait the second would read
 // around the write and miss what it recorded. The test stands in for a writer still finishing in the
 // background, which makes the wait certain rather than a race the writer usually wins on a fixture this
