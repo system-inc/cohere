@@ -1,0 +1,1 @@
+cohere-go: /project/crowded.go: its long lines were not wrapped, so they stay findings: the wrap would take it to 15 lines, past the long-file limit of 14 that cohere-go/consistency-no-long-file holds it to

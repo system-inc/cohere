@@ -1,0 +1,139 @@
+package go_engine
+
+import (
+	"cmp"
+	"slices"
+	"time"
+
+	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/format"
+	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+)
+
+// loadWorkspace loads the workspace's packages, through the findings cache when the run has one, and says on stderr
+// when the load fails.
+func (engine *pipeline) loadWorkspace() (*load.Loaded, error) {
+	workspace := engine.described.workspace
+	var loaded *load.Loaded
+	var loadError error
+	if engine.session != nil {
+		loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
+			engine.described.readableOurs, load.Caching{Restorer: engine.session, Listings: engine.session})
+	} else {
+		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
+			engine.described.readableOurs)
+	}
+	if loadError != nil {
+		engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
+	}
+	return loaded, loadError
+}
+
+// wrapAfterLoad is the fix phase's long-line wrap, run after the load and only over a load that found the types sound,
+// since every fix is held while they are not (#46ern7e): a load that failed, or found a type error, wraps nothing, and
+// gofmt's output stands. It wraps, in memory, each file gofmt formatted that holds a long line, through the hook the
+// fix phase has always used (longLineWrap) and format's checks that the wrap is the same program and gofmt's own
+// layout, writes each wrap it keeps, rereads the file, and adds what it did to the held fix record, under the
+// long-line rule. When it wrote a file it loads again and returns that load, since every phase after it must read the
+// bytes on disk. It returns the load it was given otherwise.
+func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error) (*load.Loaded, error) {
+	if engine.fix == nil || !engine.fix.wraps {
+		return loaded, loadError
+	}
+	started := time.Now()
+	sources := []format.Source{}
+	for _, file := range engine.fix.formatted {
+		contents, read := engine.described.contents[file]
+		if read && consistency_no_long_line.HasLongLine(contents) {
+			sources = append(sources, format.Source{File: file, Contents: contents})
+		}
+	}
+	engine.fix.elapsed += time.Since(started)
+	if len(sources) == 0 {
+		return loaded, loadError
+	}
+	if loadError != nil {
+		engine.note("the long-line fix was held, since the load failed and a fix waits for sound types")
+		return loaded, loadError
+	}
+	if len(loaded.Diagnostics) > 0 {
+		engine.note("the long-line fix was held, since the load found type errors and a fix waits for sound types")
+		return loaded, loadError
+	}
+	started = time.Now()
+	result := format.RunWrap(sources, format.Options{
+		Write:          true,
+		SingleThreaded: engine.request.switches["single-threaded"],
+		Known:          engine.fix.known,
+		Wrap:           engine.longLineWrap(),
+	})
+	engine.addWrapped(result.Changed)
+	for _, changed := range result.Changed {
+		engine.reread(changed.File)
+	}
+	for _, declined := range result.WrapDeclined {
+		// Not a gap: the file holds gofmt's output, and the lint phase still reports every long line in it.
+		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
+	}
+	engine.fix.elapsed += time.Since(started)
+	if len(result.Changed) == 0 {
+		return loaded, loadError
+	}
+	// The findings cache stays sound across the write: every package's key hashes the bytes of its files as they are on
+	// disk, which now hold the wrap, so this load misses on the packages the wrap wrote and those that import them,
+	// and restores every other one, as the next run would.
+	return engine.loadWorkspace()
+}
+
+// addWrapped adds the files the wrap wrote to the held fix record, each once: a file gofmt also rewrote keeps its entry
+// and gains the wrap's count under the long-line rule, and any other is a file rewritten that gofmt left alone. The
+// entries stay in the order of the files in scope, which is by name, as gofmt's alone were.
+func (engine *pipeline) addWrapped(wrapped []format.ChangedFile) {
+	for _, changed := range wrapped {
+		engine.fix.record.FixesApplied += changed.WrappedLines
+		index := slices.IndexFunc(engine.fix.record.ChangedFiles, func(entry contract.ChangedFile) bool {
+			return entry.File == changed.File
+		})
+		if index >= 0 {
+			engine.fix.record.ChangedFiles[index].FixedBy[consistency_no_long_line.Name] += changed.WrappedLines
+			continue
+		}
+		engine.fix.record.FilesRewritten++
+		engine.fix.record.ChangedFiles = append(engine.fix.record.ChangedFiles, contract.ChangedFile{
+			File:      changed.File,
+			FixedBy:   map[string]int{consistency_no_long_line.Name: changed.WrappedLines},
+			Formatted: false,
+		})
+	}
+	slices.SortStableFunc(engine.fix.record.ChangedFiles, func(left, right contract.ChangedFile) int {
+		return cmp.Compare(left.File, right.File)
+	})
+}
+
+// longLineWrap is the hook the wrap asks of each file: wrapLongLines, held to the long-file rule's limit while the
+// settings leave that rule on, so a fix for one rule never creates another's finding.
+func (engine *pipeline) longLineWrap() func(file string, formatted []byte) format.Wrapping {
+	limit, guarded := engine.longFileLimit()
+	return func(file string, formatted []byte) format.Wrapping {
+		if !guarded {
+			return wrapLongLines(formatted)
+		}
+		return heldToLongFileLimit(file, formatted, wrapLongLines(formatted), limit)
+	}
+}
+
+// longFileLimit is the long-file rule's limit as the settings configure it, read from the registered analyzer's max
+// option as the rule's own run reads it, and false when the registry lacks the rule or the settings turn it off.
+func (engine *pipeline) longFileLimit() (int, bool) {
+	if _, on := engine.severityOf(consistency_no_long_file.Name); !on {
+		return 0, false
+	}
+	for _, registered := range engine.registered {
+		if registered.Name == consistency_no_long_file.Name {
+			return consistency_no_long_file.LimitOf(registered.Analyzer), true
+		}
+	}
+	return 0, false
+}

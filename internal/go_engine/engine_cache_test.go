@@ -278,8 +278,8 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 	var standardError bytes.Buffer
 	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
 		rules.All())
-	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
-		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
+	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":2}`) {
+		test.Fatalf("want the run that writes to wrap two lines after gofmt's verdict was kept, got\n%s\n%s",
 			standardOutput.String(), standardError.String())
 	}
 	wrapped, readError := os.ReadFile(file)

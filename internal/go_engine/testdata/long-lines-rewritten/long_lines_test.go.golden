@@ -1,0 +1,18 @@
+package longlines
+
+import "fmt"
+
+// ExampleDescribe prints one delivery, as a courier reads it out at the door.
+func ExampleDescribe() {
+	description := Describe(
+		"Ada Lovelace",
+		"Grace Hopper",
+		"the cottage at the end of Long Meadow Lane",
+		"Little Wittering",
+		"Tuesday",
+	)
+	// Ignored: an Example writes to the output go test compares with its Output comment, and nowhere else.
+	_, _ = fmt.Println(description)
+	// Output:
+	// Ada Lovelace sends a parcel to Grace Hopper, who lives at the cottage at the end of Long Meadow Lane in Little Wittering, and it arrives on Tuesday
+}

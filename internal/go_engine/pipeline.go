@@ -48,6 +48,10 @@ type pipeline struct {
 	// session is the findings cache the load and the lint phase share, nil under `--no-cache` or when the cache
 	// sat the run out.
 	session *check.CacheSession
+
+	// fix is the fix phase's record, held unwritten from gofmt until the long-line wrap after the load has added to it,
+	// nil when the phase was not requested.
+	fix *heldFix
 }
 
 func newPipeline(
@@ -78,25 +82,26 @@ func (engine *pipeline) run() int {
 	}
 
 	needsTypes := engine.request.requests(contract.PhaseTypes) || engine.request.requests(contract.PhaseLint)
-	if needsTypes {
+	// The long-line wrap waits for a load that finds the types sound, so a run that wraps loads even when no phase
+	// reads the types.
+	wraps := engine.wrapsLongLines()
+	if needsTypes || wraps {
 		engine.session = engine.cacheSession()
 	}
-	engine.runFix()
+	engine.runFix(wraps)
 	var loaded *load.Loaded
 	var loadError error
-	// The load runs once, after the fix phase so it reads the formatted tree, whenever a phase needs types.
-	if needsTypes {
-		workspace := engine.described.workspace
-		if engine.session != nil {
-			loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
-				engine.described.readableOurs, load.Caching{Restorer: engine.session, Listings: engine.session})
-		} else {
-			loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
-				engine.described.readableOurs)
-		}
-		if loadError != nil {
-			engine.note("the load failed, so nothing was type-checked or linted: %v", loadError)
-		}
+	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file.
+	if needsTypes || wraps {
+		loaded, loadError = engine.loadWorkspace()
+	}
+	loaded, loadError = engine.wrapAfterLoad(loaded, loadError)
+	// The fix phase's records come before any of the types phase's, so the stream reads in phase order.
+	engine.writeFix()
+	if !needsTypes {
+		// A load made for the wrap alone feeds no phase, and writes no inputs, as a run that asked for no types never
+		// has.
+		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
 	engine.runLint(loaded, loadError)
@@ -164,56 +169,78 @@ func (engine *pipeline) severityOf(name string) (contract.Severity, bool) {
 	return contract.SeverityError, true
 }
 
-// runFix is the fix and format phase: gofmt over every readable file in scope, written unless `--no-fix`, and
-// under `--no-fix` one finding per file gofmt would change, at the first line it would change. A run that writes
-// and has the long-line rule on wraps the lines the rule reports too, after gofmt, counted under the rule. Analyzer
-// fixes are not applied yet, since applying them means loading again after the write.
-func (engine *pipeline) runFix() {
+// heldFix is the fix phase's record while the run holds it unwritten (pipeline.fix), from gofmt until the long-line
+// wrap after the load has added to it, with what the wrap needs.
+type heldFix struct {
+	record contract.FixRecord
+
+	// elapsed is the fix phase's own time, gofmt's and then the wrap's, never the load's between them.
+	elapsed time.Duration
+
+	// wraps is whether the long-line wrap runs after the load: a run that writes, formats and has the rule on.
+	wraps bool
+
+	// formatted are the readable files in scope that gofmt formatted or found formatted, the files the wrap may change:
+	// never one gofmt could not format, nor a generated one.
+	formatted []string
+
+	// known is gofmt's verdicts, which the wrap reads and adds to before the run keeps them.
+	known *format.KnownFiles
+}
+
+// runFix is the fix and format phase's gofmt: over every readable file in scope, written unless `--no-fix`, and
+// under `--no-fix` one finding per file gofmt would change, at the first line it would change. It holds the phase's
+// record unwritten in engine.fix, so the long-line wrap after the load (wrapAfterLoad) can add to it, and writeFix
+// writes it before the types phase. Analyzer fixes are not applied yet, since applying them means loading again after
+// the write.
+func (engine *pipeline) runFix(wraps bool) {
 	if !engine.request.requests(contract.PhaseFix) {
 		engine.phase(contract.PhaseFix, contract.OutcomeSkipped, 0, detailNotRequested)
 		return
 	}
 	started := time.Now()
 	candidates := engine.described.readable()
-	record := contract.FixRecord{
+	held := &heldFix{record: contract.FixRecord{
 		FilesConsidered:     len(candidates),
 		RefusalsByReason:    map[string]int{},
 		NotFormattedReasons: map[string]int{},
 		FormatScope:         engine.described.scopeWords(),
 		ChangedFiles:        []contract.ChangedFile{},
-	}
+	}}
+	engine.fix = held
 	if engine.request.switches["no-format"] {
-		record.FormatScope = noFormatScope
-		engine.write(record)
-		engine.phase(contract.PhaseFix, contract.OutcomeRan, time.Since(started), "")
+		held.record.FormatScope = noFormatScope
+		held.elapsed = time.Since(started)
 		return
 	}
 
 	severity, reported := engine.severityOf(ruleRequireFormatting)
-	known := engine.knownFiles()
-	options := format.Options{
+	held.known = engine.knownFiles()
+	held.wraps = wraps
+	result := format.Run(candidates, format.Options{
 		Write:          !engine.request.switches["no-fix"],
 		SingleThreaded: engine.request.switches["single-threaded"],
-		Known:          known,
+		Known:          held.known,
+	})
+	// Neither a file gofmt could not format nor a generated one is the wrap's to change.
+	skipped := map[string]bool{}
+	for _, generated := range result.Generated {
+		skipped[generated] = true
 	}
-	if engine.wrapsLongLines() {
-		options.Wrap = wrapLongLines
+	for _, notFormatted := range result.NotFormatted {
+		skipped[notFormatted.File] = true
 	}
-	result := format.Run(candidates, options)
-	engine.keepKnownFiles(known)
+	for _, file := range candidates {
+		if !skipped[file] {
+			held.formatted = append(held.formatted, file)
+		}
+	}
 	for _, changed := range result.Changed {
 		if changed.Written {
-			record.FilesRewritten++
-			fixedBy := map[string]int{}
-			if changed.WrappedLines > 0 {
-				fixedBy[consistency_no_long_line.Name] = changed.WrappedLines
-				record.FixesApplied += changed.WrappedLines
-			}
-			if changed.Formatted {
-				record.FilesReformatted++
-			}
-			record.ChangedFiles = append(record.ChangedFiles,
-				contract.ChangedFile{File: changed.File, FixedBy: fixedBy, Formatted: changed.Formatted})
+			held.record.FilesRewritten++
+			held.record.FilesReformatted++
+			held.record.ChangedFiles = append(held.record.ChangedFiles,
+				contract.ChangedFile{File: changed.File, FixedBy: map[string]int{}, Formatted: true})
 			engine.reread(changed.File)
 			continue
 		}
@@ -236,25 +263,32 @@ func (engine *pipeline) runFix() {
 		// Keyed by kind ("it does not parse"), so one count reads as one fact; the file and the whole reason
 		// go to stderr, where a reader can find which file it was.
 		kind, _, _ := strings.Cut(notFormatted.Reason, ":")
-		record.NotFormattedReasons[kind]++
-		record.FilesNotFormatted++
+		held.record.NotFormattedReasons[kind]++
+		held.record.FilesNotFormatted++
 		// A file nobody could format is one whose formatting nobody knows, so a run over it is not complete.
 		engine.incomplete = true
 		engine.note("%s was not formatted: %s", notFormatted.File, notFormatted.Reason)
 	}
-	for _, declined := range result.WrapDeclined {
-		// Not a gap: gofmt's output was written, and the lint phase still reports every long line in it.
-		engine.note("%s: its long lines were not wrapped, so they stay findings: %s", declined.File, declined.Reason)
-	}
-	engine.write(record)
-	engine.phase(contract.PhaseFix, contract.OutcomeRan, time.Since(started), "")
+	held.elapsed = time.Since(started)
 }
 
-// wrapsLongLines is whether the fix phase wraps the long-line rule's findings: only in a run that writes and asks
-// for fixes, so neither `--no-fix` nor `--format-only` gets one, and only while the registry holds the rule and the
-// settings leave it on, so the fix never acts for a rule that reports nothing.
+// writeFix writes the fix phase's record and its phase record, once the wrap after the load has added to them, and
+// keeps gofmt's verdicts and the wrap's for the next run.
+func (engine *pipeline) writeFix() {
+	if engine.fix == nil {
+		return
+	}
+	engine.keepKnownFiles(engine.fix.known)
+	engine.write(engine.fix.record)
+	engine.phase(contract.PhaseFix, contract.OutcomeRan, engine.fix.elapsed, "")
+}
+
+// wrapsLongLines is whether the fix phase wraps the long-line rule's findings: only in a run that writes, formats and
+// asks for fixes, so neither `--no-fix`, `--no-format` nor `--format-only` gets one, and only while the registry holds
+// the rule and the settings leave it on, so the fix never acts for a rule that reports nothing.
 func (engine *pipeline) wrapsLongLines() bool {
-	if engine.request.switches["no-fix"] || engine.request.switches["format-only"] {
+	if !engine.request.requests(contract.PhaseFix) || engine.request.switches["no-fix"] ||
+		engine.request.switches["no-format"] || engine.request.switches["format-only"] {
 		return false
 	}
 	if _, on := engine.severityOf(consistency_no_long_line.Name); !on {

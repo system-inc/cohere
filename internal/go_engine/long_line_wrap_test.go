@@ -1,9 +1,12 @@
 package go_engine
 
 import (
+	"bytes"
 	goformat "go/format"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_file"
 )
 
 // longCallBody is a function whose one statement is a call past the limit that a wrap breaks one argument per line.
@@ -58,5 +61,44 @@ func TestWrapLongLinesLeavesWhatTheRuleDoesNotReport(test *testing.T) {
 					wrapping.Lines, wrapping.Declined, wrapping.Output)
 			}
 		})
+	}
+}
+
+// The wrap never takes a file past the long-file limit: a file the rule does not report before the wrap and would
+// after it keeps gofmt's output, declined with why, while the same file with room for the wrap is wrapped. A file
+// already past the limit, and one whose generated name the rule exempts, may still be wrapped, since the wrap creates
+// no finding there.
+func TestTheWrapNeverTakesAFilePastTheLongFileLimit(test *testing.T) {
+	test.Parallel()
+
+	formatted := []byte("package fixture\n\n" + longCallBody)
+	wrapping := wrapLongLines(formatted)
+	if wrapping.Output == nil {
+		test.Fatalf("the fixture's call was not wrapped: %q", wrapping.Declined)
+	}
+	before := consistency_no_long_file.LineCount(formatted)
+	after := consistency_no_long_file.LineCount(wrapping.Output)
+	for _, testCase := range []struct {
+		name     string
+		file     string
+		limit    int
+		declined bool
+	}{
+		{name: "one line short of room", file: "report.go", limit: after - 1, declined: true},
+		{name: "room for the wrap", file: "report.go", limit: after},
+		{name: "already past the limit", file: "report.go", limit: before - 1},
+		{name: "a generated name", file: "report.generated.go", limit: after - 1},
+	} {
+		held := heldToLongFileLimit(testCase.file, formatted, wrapping, testCase.limit)
+		if testCase.declined {
+			if held.Output != nil || !strings.Contains(held.Declined, "past the long-file limit") {
+				test.Errorf("%s: want the wrap declined past the limit, got %d lines, %q", testCase.name, held.Lines,
+					held.Declined)
+			}
+			continue
+		}
+		if held.Declined != "" || !bytes.Equal(held.Output, wrapping.Output) || held.Lines != wrapping.Lines {
+			test.Errorf("%s: want the wrap kept, got %d lines, %q", testCase.name, held.Lines, held.Declined)
+		}
 	}
 }

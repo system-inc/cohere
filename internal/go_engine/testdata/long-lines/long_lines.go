@@ -1,4 +1,4 @@
-// Package longlines describes a delivery, and three of its lines run past the limit in ways a wrap can bring within it.
+// Package longlines describes a delivery, with three code lines past the limit that a wrap can bring within it.
 package longlines
 
 import "fmt"
@@ -11,6 +11,7 @@ func Describe(sender string, recipient string, street string, city string, weekd
 
 // Deliverable is whether a delivery has everything it needs to leave the depot.
 func Deliverable(sender string, recipient string, street string, city string) bool {
+	// Serial: the depot reads this check for one courier at a time, and its tooling reads this marker as one whole line of text
 	return len(sender) > 0 && len(recipient) > 0 && len(street) > 0 && len(city) > 0 && sender != recipient && street != city
 }
 
