@@ -219,10 +219,6 @@ type runGaps struct {
 	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
 	// None was proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
-	// UnclaimedSwift is the directories of Swift files no package holds that discovery found beside the one
-	// project it ran here (#ybspptb). Nothing checked them, and the run neither fails nor passes on them. It
-	// is this invocation's walk, never recorded, so a replay says what its own walk found.
-	UnclaimedSwift []unclaimedSwiftDirectory `json:"unclaimedSwift,omitempty"`
 	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
 	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
 	// them and they are no standalone script the run checks alone (#13nbb1s), less those the runs of the Swift

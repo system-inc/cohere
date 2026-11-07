@@ -75,13 +75,14 @@ their Swift files from the project file. A root holding two projects, or a works
 refused with exit 2 and a sentence, as is a spec xcodegen refuses and a machine without xcodegen.
 
 A root holding no project at all is a scripts-only root (#wpd36zj): discovery gives one to the Swift files no
-project claims, at the repository's root, as ahra's four scripts under `modules/` are. It has no target, so no
+project claims, at the discovery root, inside a repository or not, as ahra's four scripts under `modules/` are. It has no target, so no
 package or Xcode check runs, and its files are its standalone scripts (see `project`), each checked alone. Its
 walk skips what discovery never enters (`node_modules`, `.build`, `.cache`, `.git`, `testdata`), and a file
 below a project of its own is left out entirely, since that project runs or is covered by one that does. Its
-inputs record names no walk of the root, only the scripts and the file set's listings and ignore files.
-Outside a repository there are no ignore rules to walk by, so discovery names such files as the gap it always
-did, `Swift files no package checks`.
+inputs record names no walk of the root, only the scripts, the files it read and the file set's listings and
+ignore files. Outside a repository it walks by the tree's own ignore files, as a package root does there
+(#13nbb1s), so no Swift file is left to the gap the front door once named, `Swift files no package checks`, whose
+`gaps.unclaimedSwift` its `--json` summary no longer writes.
 
 `--contract` is the version the front door speaks. An engine speaking a different version refuses
 the run, prints a sentence on stderr naming both versions, and exits 2. The first record the engine

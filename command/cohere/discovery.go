@@ -48,15 +48,13 @@ import (
 // So ahraos-presence's CapturePhone, inside the root package's directory, is a project of its own, because its
 // project.yml is nearer to its sources than the root's Package.swift is.
 //
-// Swift with no marker above it is checked by nothing, and beside a TypeScript program a green run read clean
-// over code nobody looked at. Inside a repository such files get a Swift project of their own at the root, a
-// scripts-only root with no Package.swift (#wpd36zj): the engine checks each standalone script among them alone,
-// as `swift <file>` runs it, and names every other file as not checked, by the same nearest-marker rule this walk
-// claims by, so ahra's four scripts under modules/ are checked rather than named. Outside a repository the engine
-// has no ignore rules to walk the root by, so the files are named by the top directory holding them, in the notes
-// and on the verdict line, and fail nothing: a run says what it covered as well as what it found. Files the walk
-// never enters, or that .gitignore or the root's ignorePatterns match, are not counted, since nobody expects
-// those checked.
+// Swift with no marker above it was once checked by nothing, and beside a TypeScript program a green run read
+// clean over code nobody looked at. Such files get a Swift project of their own at the root, a scripts-only root
+// with no Package.swift (#wpd36zj): the engine checks each standalone script among them alone, as `swift <file>`
+// runs it, and names every other file as not checked, by the same nearest-marker rule this walk claims by, so
+// ahra's four scripts under modules/ are checked rather than named. Inside a repository or not: outside one the
+// engine walks by the tree's own ignore files, as this walk does (#13nbb1s). Files the walk never enters, or that
+// .gitignore or the root's ignorePatterns match, give no root, since nobody expects those checked.
 //
 // A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
 // directory claims it, and the engine knows which files it checks. A standalone script there, one `swift <file>`
@@ -136,11 +134,6 @@ type discovery struct {
 	// swift_coverage.go.
 	SwiftCoverage swiftCoverage
 
-	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package or Xcode
-	// project holds, which no run checks, in path order. Only outside a repository: inside one they are the
-	// scripts-only root's (see the header).
-	UnclaimedSwift []unclaimedSwiftDirectory
-
 	// Formattable counts the files the house formatter handles in each directory that holds any, by directory
 	// relative to Root, for addRootFormatProject to know whether a root no TypeScript project holds has
 	// anything to format. Counted from the listings the walk already read, as the Swift files are.
@@ -212,22 +205,6 @@ func enclosingRepository(start string) string {
 		parent := filepath.Dir(directory)
 		if parent == directory {
 			return ""
-		}
-		directory = parent
-	}
-}
-
-// insideRepository reports whether a directory is at or below a `.git`, a directory or a worktree's or
-// submodule's file, as the Swift engine's ignore rules find a repository (IgnoreRules.Repository.containing).
-func insideRepository(start string) bool {
-	directory := filepath.Clean(start)
-	for {
-		if _, statError := os.Stat(filepath.Join(directory, ".git")); statError == nil {
-			return true
-		}
-		parent := filepath.Dir(directory)
-		if parent == directory {
-			return false
 		}
 		directory = parent
 	}
@@ -484,15 +461,13 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		return discovery{}, countNamedPathsError
 	}
 	found.IgnoreMatched = ignoreTally.Matched
-	xcodeProjects, unclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
+	xcodeProjects, anyUnclaimed := claimSwiftFiles(swiftFiles, found.Projects, xcodeCandidates)
 	found.Projects = append(found.Projects, xcodeProjects...)
 	// No Swift project is at the root, or it would have claimed every file, so the scripts-only root is the only
-	// Swift project there. See the header for why only inside a repository.
-	if len(unclaimed) > 0 && insideRepository(root) {
+	// Swift project there (see the header).
+	if anyUnclaimed {
 		found.Projects = append(found.Projects, discoveredProject{Directory: ".", Engine: engineSwift})
-		unclaimed = nil
 	}
-	found.UnclaimedSwift = unclaimed
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
@@ -705,34 +680,20 @@ func xcodeMarker(entries []os.DirEntry, names map[string]bool) string {
 	return bundle
 }
 
-// unclaimedSwiftDirectory is one top directory holding .swift files no Swift package or Xcode project holds.
-type unclaimedSwiftDirectory struct {
-	// Directory is the shallowest directory under the root holding the files, relative to it and ending in
-	// a slash, such as "CapturePhone/", or "." for files directly in the root.
-	Directory string `json:"directory"`
-
-	// Files counts the unclaimed .swift files at any depth below it.
-	Files int `json:"files"`
-}
-
 // claimSwiftFiles gives each directory of .swift files to the nearest Swift marker at or above it: a Swift
 // package among projects, or one of the Xcode candidates. It returns the candidates that claimed any file, as
-// projects, and the files nothing claimed, grouped by the top directory holding them.
+// projects, and whether any file was claimed by nothing, which the scripts-only root takes.
 //
 // A package claims by its directory, whether it runs or another package's run covers it, since then the
 // covering run checks its files. Every Swift package discovery found is one or the other, so the claim is
 // decided here, before coverage is asked. Nearest, so a candidate inside a package's directory claims the
 // files below it, which no target of that package compiles, and a package inside a candidate's directory
 // claims its own.
-//
-// The top directory of unclaimed files is a path's first segment: no marker is at or above them, so none is
-// at that directory, and it is the shallowest one holding them. So CapturePhone/Sources/App and
-// CapturePhone/Tests are both CapturePhone/.
 func claimSwiftFiles(
 	swiftFiles map[string]int,
 	projects []discoveredProject,
 	xcodeCandidates map[string]bool,
-) ([]discoveredProject, []unclaimedSwiftDirectory) {
+) ([]discoveredProject, bool) {
 	packages := map[string]bool{}
 	for _, project := range projects {
 		if project.Engine == engineSwift {
@@ -740,37 +701,21 @@ func claimSwiftFiles(
 		}
 	}
 	claiming := map[string]bool{}
-	byTop := map[string]int{}
-	for directory, count := range swiftFiles {
+	anyUnclaimed := false
+	for directory := range swiftFiles {
 		if marker, isCandidate, claimed := nearestSwiftMarker(directory, packages, xcodeCandidates); claimed {
 			if isCandidate {
 				claiming[marker] = true
 			}
 			continue
 		}
-		top := "."
-		if directory != "." {
-			top, _, _ = strings.Cut(directory, "/")
-			top += "/"
-		}
-		byTop[top] += count
+		anyUnclaimed = true
 	}
-	unclaimed := make([]unclaimedSwiftDirectory, 0, len(byTop))
-	for top, count := range byTop {
-		unclaimed = append(unclaimed, unclaimedSwiftDirectory{Directory: top, Files: count})
-	}
-	// In path order, the root's first, so the report reads the same on every run.
-	sort.Slice(unclaimed, func(left, right int) bool {
-		return pathBefore(
-			strings.TrimSuffix(unclaimed[left].Directory, "/"),
-			strings.TrimSuffix(unclaimed[right].Directory, "/"),
-		)
-	})
 	xcodeProjects := make([]discoveredProject, 0, len(claiming))
 	for directory := range claiming {
 		xcodeProjects = append(xcodeProjects, discoveredProject{Directory: directory, Engine: engineSwift})
 	}
-	return xcodeProjects, unclaimed
+	return xcodeProjects, anyUnclaimed
 }
 
 // nearestSwiftMarker is the nearest directory at or above a slash directory holding a Swift marker, whether it
@@ -928,13 +873,6 @@ func (found discovery) notes() []string {
 			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
 			failed.Label,
 			failed.Reason,
-		))
-	}
-	for _, unclaimed := range found.UnclaimedSwift {
-		lines = append(lines, fmt.Sprintf(
-			"%s: %s no Swift package checks",
-			unclaimed.Directory,
-			counted(unclaimed.Files, "Swift file", "Swift files"),
 		))
 	}
 	// Last, since only these are sorted: a map has no order of its own.

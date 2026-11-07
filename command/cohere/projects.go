@@ -34,11 +34,6 @@ const projectLabelVariable = "COHERE_PROJECT_LABEL"
 // process, for its build to serve the tsconfig's include enumeration from. Nil otherwise. See #bjv0tg4.
 var discoveredListings *program.DirectoryListings
 
-// discoveredUnclaimedSwift is the Swift no package holds that discovery found, when the one project it found
-// runs in this process, for that run's footer to say. Nil otherwise: a project run as one of several says
-// nothing of it, since the overall verdict line does.
-var discoveredUnclaimedSwift []unclaimedSwiftDirectory
-
 // discoveryApplies reports whether a run discovers its projects. Anything that names one project, a
 // directory, a tsconfig or a path, narrows the run to it as it always did, and so do the listings, the
 // explanations and the editor's save, which answer about one project.
@@ -126,10 +121,8 @@ func checkDiscoveredProjects(
 	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
 	discoveredIgnores = ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root)
 	if found.isTheLocatedProject(location, locateError) {
-		// The project runs here, and its build lists the directories discovery just did. Its footer says the
-		// Swift no package checks, since a TypeScript program at the root beside an app's Swift is this path.
+		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
-		discoveredUnclaimedSwift = found.UnclaimedSwift
 		for _, note := range found.notes() {
 			fmt.Fprintf(accountOutput(streams.Errors), "cohere: %s\n", note)
 		}
@@ -329,7 +322,6 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// label, is the record, and a program reads the worst from them.
 	facts := overallFactsOf(runs, time.Since(processStart))
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
-	facts.UnclaimedSwift = found.UnclaimedSwift
 	facts.EngineBuilds = builtEngines()
 	if activeOutput.Mode != outputJson {
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
@@ -541,27 +533,13 @@ func summaryLine(found discovery, runs []projectRun) string {
 	if len(notRunParts) > 0 {
 		notRun = "; not run: " + strings.Join(notRunParts, ", ")
 	}
-	// Beside what was not run, since these files were not checked either, and nothing would have.
-	notChecked := ""
-	if len(found.UnclaimedSwift) > 0 {
-		files := 0
-		for _, unclaimed := range found.UnclaimedSwift {
-			files += unclaimed.Files
-		}
-		notChecked = fmt.Sprintf(
-			"; not checked: %s no Swift package checks, in %s",
-			counted(files, "Swift file", "Swift files"),
-			counted(len(found.UnclaimedSwift), "directory", "directories"),
-		)
-	}
 	return fmt.Sprintf(
-		"projects: %d checked (%s), %s%s%s; not searched for projects: %d directories .gitignore ignores, "+
+		"projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
 			"%d dependency, build, cache or fixture directories, %d nested repositories",
 		checkedCount,
 		strings.Join(engines, ", "),
 		verdict,
 		notRun,
-		notChecked,
 		found.Ignored,
 		found.NeverDescended,
 		len(found.NestedRepositories)+found.Submodules,

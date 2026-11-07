@@ -307,6 +307,35 @@ struct StandaloneScriptTests {
     }
 
     /*
+     A scripts-only root outside any repository, where discovery now gives one too (#wpd36zj), checks its scripts as
+     it does inside one: the walk reads the tree's own ignore files (#13nbb1s), so the script is checked, the file of
+     declarations named, and what discovery never enters left out.
+     */
+    @Test func aRootHoldingNoProjectOutsideAnyRepositoryChecksItsScriptsAlone() async throws {
+        let root = try Self.scriptsOnlyRoot()
+        defer { XcodeProjectPipelineTests.remove(root) }
+        let git = root.appendingPathComponent(".git", isDirectory: true)
+        try FileManager.default.removeItem(at: git.appendingPathComponent("info/exclude"))
+        try FileManager.default.removeItem(at: git.appendingPathComponent("info", isDirectory: true))
+        try FileManager.default.removeItem(at: git)
+        #expect(
+            IgnoreRules.Repository.containing(root) == nil,
+            "the temporary directory sits inside a repository, so this test proves nothing",
+        )
+
+        let run = try await XcodeProjectPipelineTests.run(root: root, arguments: ["--no-fix", "--no-cache"])
+
+        #expect(run.findings.isEmpty, "\(run.of("finding"))")
+        #expect(run.exitCode == 0)
+        #expect(Self.scriptTargets(run) == ["EbayVision:1"])
+        #expect(
+            Self.excluded(run) == [
+                "Leftover.swift: no target of this package compiles it, and it holds only declarations, so it is no script to check alone"
+            ]
+        )
+    }
+
+    /*
      What a scripts-only root's verdict is decided from, which its inputs record names so the front door replays it only
      while none has moved (#wpd36zj): each script, each Swift file it read to tell whether it is one (a file of
      declarations becomes a script by an edit), and each directory its walk listed, so a script added beside the others
