@@ -159,10 +159,8 @@ func reportTemplateVariantOrder(
 	if system == nil {
 		return
 	}
-	sourceText := ""
-	if ruleContext.SourceFile != nil {
-		sourceText = ruleContext.SourceFile.Text()
-	}
+	// The rule declines a file with no source before it listens, so the source is always here.
+	sourceText := ruleContext.SourceFile.Text()
 
 	for _, class := range TemplateClassesOf(sourceText, segments) {
 		sorted, needsReorder := sortedVariantSpelling(class.Text, system)
