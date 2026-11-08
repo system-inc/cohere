@@ -94,6 +94,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_version"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
@@ -214,6 +215,7 @@ var ports = map[string]*analysis.Analyzer{
 	"slog":             slog.Analyzer,
 	"sqlrowserr":       sql_rows_err.Analyzer,
 	"stdmethods":       std_methods.Analyzer,
+	"stdversion":       std_version.Analyzer,
 	"stringintconv":    string_int_conv.Analyzer,
 	"structtag":        struct_tag.Analyzer,
 	"testinggoroutine": testing_goroutine.Analyzer,
