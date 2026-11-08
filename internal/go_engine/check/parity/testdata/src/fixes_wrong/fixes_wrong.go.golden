@@ -1,0 +1,12 @@
+// Package fixes_wrong holds an upstream-style fixture whose golden file is wrong: it holds the second call left
+// alone, where the fix replaces both.
+package fixes_wrong
+
+func shared() {}
+
+func kept() {}
+
+func calls() {
+	kept()   // want "call to shared"
+	shared() // want "call to shared"
+}

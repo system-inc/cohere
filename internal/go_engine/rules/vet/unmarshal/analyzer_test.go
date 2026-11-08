@@ -13,9 +13,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	upstream "golang.org/x/tools/go/analysis/passes/unmarshal"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -108,7 +106,7 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 
 // The original leaves the four encoding packages alone, in-package tests included, which share the package's path,
 // and judges every other path, their external tests among them. parity's syntax and types are run under each path by
-// a pass built here, with a package of that path in place of parity's: both analyzers read the package only for its
+// passes built here, with a package of that path in place of parity's: both analyzers read the package only for its
 // path, and the callees they judge from the types are the real encoding packages', as in the encoding packages
 // themselves. A path judged must find what parity finds under its own path, on both sides, and a path left alone
 // nothing, so the comparison cannot pass on two empty sides.
@@ -226,26 +224,45 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 	return sorted(original), sorted(port)
 }
 
-// findingsUnder runs analyzer over fixture's syntax and types alone, through a pass whose package has path in place
-// of fixture's own, and returns its findings, sorted.
+// findingsUnder runs analyzer over fixture's syntax and types alone, through passes whose package has path in place
+// of fixture's own, and returns its findings, sorted. Everything analyzer requires runs first over the same package,
+// as a driver runs it: the original's inspector, and the port's syntax dispatcher with what that walk reads, the
+// dispatcher's analyzer itself reading the package's path where the port's listener does.
 func findingsUnder(test *testing.T, analyzer *analysis.Analyzer, fixture *packages.Package, path string) []finding {
 	test.Helper()
 	found := []finding{}
-	pass := &analysis.Pass{
-		Analyzer:   analyzer,
-		Fset:       fixture.Fset,
-		Files:      fixture.Syntax,
-		Pkg:        types.NewPackage(path, fixture.Types.Name()),
-		TypesInfo:  fixture.TypesInfo,
-		TypesSizes: fixture.TypesSizes,
-		ResultOf:   map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New(fixture.Syntax)},
-		Report: func(diagnostic analysis.Diagnostic) {
-			found = append(found, findingOf(fixture, diagnostic))
-		},
+	underPath := types.NewPackage(path, fixture.Types.Name())
+	results := map[*analysis.Analyzer]any{}
+	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic))
+	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) {
+		resultOf := map[*analysis.Analyzer]any{}
+		for _, required := range running.Requires {
+			if _, isRun := results[required]; !isRun {
+				run(required, func(analysis.Diagnostic) {
+					// A requirement's findings are not the analyzer's, and none of these makes any.
+				})
+			}
+			resultOf[required] = results[required]
+		}
+		pass := &analysis.Pass{
+			Analyzer:   running,
+			Fset:       fixture.Fset,
+			Files:      fixture.Syntax,
+			Pkg:        underPath,
+			TypesInfo:  fixture.TypesInfo,
+			TypesSizes: fixture.TypesSizes,
+			ResultOf:   resultOf,
+			Report:     report,
+		}
+		result, runError := running.Run(pass)
+		if runError != nil {
+			test.Fatalf("running %s under %s: %v", running.Name, path, runError)
+		}
+		results[running] = result
 	}
-	if _, runError := analyzer.Run(pass); runError != nil {
-		test.Fatalf("running %s under %s: %v", analyzer.Name, path, runError)
-	}
+	run(analyzer, func(diagnostic analysis.Diagnostic) {
+		found = append(found, findingOf(fixture, diagnostic))
+	})
 	return sorted(found)
 }
 

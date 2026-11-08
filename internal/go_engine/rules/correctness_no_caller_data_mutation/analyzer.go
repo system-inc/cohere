@@ -23,6 +23,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
@@ -30,19 +31,19 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-no-caller-data-mutation"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_no_caller_data_mutation",
-	Doc: "Flags a direct write at a declared function's slice, map or pointer parameter (parameter[index] =, " +
-		"parameter[key] =, parameter.Field = through a pointer, *parameter =, ++, --, op=, delete and clear), which " +
-		"lands in the caller's data with nothing at the call site to say so, unless the function's doc comment says " +
-		"// Mutates: <parameter> <why>. Receivers, the buffer of a Read that implements io.Reader, function " +
-		"literals' parameters and a parameter the function reassigns or takes the address of are not judged.",
-	Run: run,
-}
+// listener hears every function declaration of the syntax dispatcher's walk, each one at a file's top level.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.FuncDecl)(nil)}, Node: judgeFunction}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_caller_data_mutation", "Flags a direct write at a "+
+	"declared function's slice, map or pointer parameter (parameter[index] =, parameter[key] =, parameter.Field = "+
+	"through a pointer, *parameter =, ++, --, op=, delete and clear), which lands in the caller's data with nothing "+
+	"at the call site to say so, unless the function's doc comment says // Mutates: <parameter> <why>. Receivers, "+
+	"the buffer of a Read that implements io.Reader, function literals' parameters and a parameter the function "+
+	"reassigns or takes the address of are not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var callerDataMutationMessage = policy.MessageOf(Name, "callerDataMutation")
 
@@ -50,32 +51,27 @@ var mutatesWithoutReasonMessage = policy.MessageOf(Name, "mutatesWithoutReason")
 
 var mutatesUnknownParameterMessage = policy.MessageOf(Name, "mutatesUnknownParameter")
 
-func run(pass *analysis.Pass) (any, error) {
-	reader := &ioReader{pass: pass}
-	for _, file := range pass.Files {
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction {
-				continue
-			}
-			// The tags are read, and a malformed one reported, even on a function with no body to judge.
-			outParameters := readMutatesTags(pass, function)
-			if function.Body == nil {
-				continue
-			}
-			// io.Reader's contract is that Read fills its buffer, so a Read that implements it fills the caller's
-			// buffer by contract, as a Mutates tag would say.
-			if buffer := reader.bufferOf(function); buffer != nil {
-				outParameters[buffer] = true
-			}
-			parameters := judgedParameters(pass, function, outParameters)
-			if len(parameters) == 0 {
-				continue
-			}
-			judgeWrites(pass, function.Body, parameters)
-		}
+// judgeFunction judges the writes of a declared function at its parameters, once its Mutates tags are read.
+func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	function, isFunction := node.(*ast.FuncDecl)
+	if !isFunction {
+		return
 	}
-	return nil, nil
+	// The tags are read, and a malformed one reported, even on a function with no body to judge.
+	outParameters := readMutatesTags(context, function)
+	if function.Body == nil {
+		return
+	}
+	// io.Reader's contract is that Read fills its buffer, so a Read that implements it fills the caller's buffer by
+	// contract, as a Mutates tag would say.
+	if buffer := rule.State[ioReader](context).bufferOf(context, function); buffer != nil {
+		outParameters[buffer] = true
+	}
+	parameters := judgedParameters(context, function, outParameters)
+	if len(parameters) == 0 {
+		return
+	}
+	judgeWrites(context, function.Body, parameters)
 }
 
 // findIoReader is io.Reader's interface, found by walking the imports of analyzed and of each package they reach to
@@ -113,20 +109,20 @@ func findIoReader(analyzed *types.Package) *types.Interface {
 // that may land in a copy the function made rather than in the caller's data, and telling which needs the flow
 // analysis this rule does not do.
 func judgedParameters(
-	pass *analysis.Pass,
+	context *rule.Context,
 	function *ast.FuncDecl,
 	outParameters map[*types.Var]bool,
 ) map[*types.Var]bool {
 	parameters := map[*types.Var]bool{}
 	for _, field := range function.Type.Params.List {
 		for _, name := range field.Names {
-			parameter, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
+			parameter, isVariable := context.TypesInfo.Defs[name].(*types.Var)
 			if isVariable && !outParameters[parameter] {
 				parameters[parameter] = true
 			}
 		}
 	}
-	for parameter := range reassignedParameters(pass, function.Body, parameters) {
+	for parameter := range reassignedParameters(context, function.Body, parameters) {
 		delete(parameters, parameter)
 	}
 	return parameters
@@ -137,13 +133,13 @@ func judgedParameters(
 // pointer method on itself, which takes its address without an &. Function literals in body count, since they reach
 // the same variable.
 func reassignedParameters(
-	pass *analysis.Pass,
+	context *rule.Context,
 	body *ast.BlockStmt,
 	parameters map[*types.Var]bool,
 ) map[*types.Var]bool {
 	reassigned := map[*types.Var]bool{}
 	mark := func(expression ast.Expr) {
-		if parameter := parameterNamed(pass, expression, parameters); parameter != nil {
+		if parameter := parameterNamed(context, expression, parameters); parameter != nil {
 			reassigned[parameter] = true
 		}
 	}
@@ -166,7 +162,7 @@ func reassignedParameters(
 				mark(statement.X)
 			}
 		case *ast.SelectorExpr:
-			if callsPointerMethodOnValue(pass, statement) {
+			if callsPointerMethodOnValue(context, statement) {
 				mark(statement.X)
 			}
 		}
@@ -177,8 +173,8 @@ func reassignedParameters(
 
 // callsPointerMethodOnValue is whether selector is a method of pointer receiver selected on a value that is no
 // pointer, which Go turns into a call on the value's address.
-func callsPointerMethodOnValue(pass *analysis.Pass, selector *ast.SelectorExpr) bool {
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+func callsPointerMethodOnValue(context *rule.Context, selector *ast.SelectorExpr) bool {
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return false
 	}
@@ -194,7 +190,7 @@ func callsPointerMethodOnValue(pass *analysis.Pass, selector *ast.SelectorExpr) 
 }
 
 // judgeWrites reports every direct write in body at one of parameters that reaches the caller's data.
-func judgeWrites(pass *analysis.Pass, body *ast.BlockStmt, parameters map[*types.Var]bool) {
+func judgeWrites(context *rule.Context, body *ast.BlockStmt, parameters map[*types.Var]bool) {
 	ast.Inspect(body, func(node ast.Node) bool {
 		switch statement := node.(type) {
 		case *ast.AssignStmt:
@@ -203,18 +199,18 @@ func judgeWrites(pass *analysis.Pass, body *ast.BlockStmt, parameters map[*types
 				return true
 			}
 			for _, left := range statement.Lhs {
-				judgeTarget(pass, left, parameters)
+				judgeTarget(context, left, parameters)
 			}
 		case *ast.IncDecStmt:
-			judgeTarget(pass, statement.X, parameters)
+			judgeTarget(context, statement.X, parameters)
 		case *ast.RangeStmt:
 			// `for parameter[index] = range values` writes the element on every turn.
 			if statement.Tok == token.ASSIGN {
-				judgeTarget(pass, statement.Key, parameters)
-				judgeTarget(pass, statement.Value, parameters)
+				judgeTarget(context, statement.Key, parameters)
+				judgeTarget(context, statement.Value, parameters)
 			}
 		case *ast.CallExpr:
-			judgeBuiltinCall(pass, statement, parameters)
+			judgeBuiltinCall(context, statement, parameters)
 		}
 		return true
 	})
@@ -223,64 +219,64 @@ func judgeWrites(pass *analysis.Pass, body *ast.BlockStmt, parameters map[*types
 // judgeTarget reports target when it is a direct write at a parameter that lands in the caller's data: an element of
 // a slice, a map's entry, an element of an array behind a pointer, a field behind a pointer, or the pointer's whole
 // value. A deeper chain, parameter.Inner.Field or parameter[index].Field, is not judged.
-func judgeTarget(pass *analysis.Pass, target ast.Expr, parameters map[*types.Var]bool) {
+func judgeTarget(context *rule.Context, target ast.Expr, parameters map[*types.Var]bool) {
 	if target == nil {
 		return
 	}
 	reaches := false
 	switch written := ast.Unparen(target).(type) {
 	case *ast.IndexExpr:
-		if parameter := parameterNamed(pass, written.X, parameters); parameter != nil {
+		if parameter := parameterNamed(context, written.X, parameters); parameter != nil {
 			reaches = everyTerm(parameter.Type(), isSharedByIndex)
-		} else if parameter := dereferencedParameter(pass, written.X, parameters); parameter != nil {
+		} else if parameter := dereferencedParameter(context, written.X, parameters); parameter != nil {
 			// (*parameter)[index] is parameter[index] spelled out, and reaches the caller only for an array behind
 			// the pointer. Behind a pointer to a slice or map it is a second reach, which is not judged.
 			reaches = everyTerm(parameter.Type(), isPointerToArray)
 		}
 	case *ast.SelectorExpr:
 		// A field only: a method value writes nothing, and a qualified identifier has no parameter at its root.
-		selection, isSelection := pass.TypesInfo.Selections[written]
+		selection, isSelection := context.TypesInfo.Selections[written]
 		if !isSelection || selection.Kind() != types.FieldVal {
 			return
 		}
-		parameter := parameterNamed(pass, written.X, parameters)
+		parameter := parameterNamed(context, written.X, parameters)
 		if parameter == nil {
 			// (*parameter).Field is parameter.Field spelled out.
-			parameter = dereferencedParameter(pass, written.X, parameters)
+			parameter = dereferencedParameter(context, written.X, parameters)
 		}
 		// A struct passed by value is the function's own copy, even when one of its embedded fields is a pointer
 		// that a promoted field is reached through, so only a parameter that is itself a pointer is judged.
 		reaches = parameter != nil && everyTerm(parameter.Type(), isPointer)
 	case *ast.StarExpr:
-		if parameter := parameterNamed(pass, written.X, parameters); parameter != nil {
+		if parameter := parameterNamed(context, written.X, parameters); parameter != nil {
 			reaches = everyTerm(parameter.Type(), isPointer)
 		}
 	}
 	if reaches {
-		report(pass, target, callerDataMutationMessage)
+		report(context, target, callerDataMutationMessage)
 	}
 }
 
 // judgeBuiltinCall reports a call of the builtin delete or clear on a parameter, each of which empties the caller's
 // map or zeroes the caller's slice. A function of the package's own that is named delete or clear is not the builtin,
 // so it resolves to something else and is never judged.
-func judgeBuiltinCall(pass *analysis.Pass, call *ast.CallExpr, parameters map[*types.Var]bool) {
+func judgeBuiltinCall(context *rule.Context, call *ast.CallExpr, parameters map[*types.Var]bool) {
 	name, isIdentifier := ast.Unparen(call.Fun).(*ast.Ident)
 	if !isIdentifier || len(call.Args) == 0 {
 		return
 	}
-	builtin, isBuiltin := pass.TypesInfo.Uses[name].(*types.Builtin)
+	builtin, isBuiltin := context.TypesInfo.Uses[name].(*types.Builtin)
 	if !isBuiltin || (builtin.Name() != "delete" && builtin.Name() != "clear") {
 		return
 	}
-	parameter := parameterNamed(pass, call.Args[0], parameters)
+	parameter := parameterNamed(context, call.Args[0], parameters)
 	if parameter != nil && everyTerm(parameter.Type(), isSharedByIndex) {
-		report(pass, call, callerDataMutationMessage)
+		report(context, call, callerDataMutationMessage)
 	}
 }
 
 // parameterNamed is the parameter expression names, when it is one of parameters spelled as its bare name, or nil.
-func parameterNamed(pass *analysis.Pass, expression ast.Expr, parameters map[*types.Var]bool) *types.Var {
+func parameterNamed(context *rule.Context, expression ast.Expr, parameters map[*types.Var]bool) *types.Var {
 	if expression == nil {
 		return nil
 	}
@@ -288,7 +284,7 @@ func parameterNamed(pass *analysis.Pass, expression ast.Expr, parameters map[*ty
 	if !isIdentifier {
 		return nil
 	}
-	parameter, isVariable := pass.TypesInfo.Uses[name].(*types.Var)
+	parameter, isVariable := context.TypesInfo.Uses[name].(*types.Var)
 	if !isVariable || !parameters[parameter] {
 		return nil
 	}
@@ -296,12 +292,12 @@ func parameterNamed(pass *analysis.Pass, expression ast.Expr, parameters map[*ty
 }
 
 // dereferencedParameter is the parameter expression dereferences, *parameter, or nil.
-func dereferencedParameter(pass *analysis.Pass, expression ast.Expr, parameters map[*types.Var]bool) *types.Var {
+func dereferencedParameter(context *rule.Context, expression ast.Expr, parameters map[*types.Var]bool) *types.Var {
 	star, isStar := ast.Unparen(expression).(*ast.StarExpr)
 	if !isStar {
 		return nil
 	}
-	return parameterNamed(pass, star.X, parameters)
+	return parameterNamed(context, star.X, parameters)
 }
 
 // everyTerm is whether holds is true of candidate's underlying type, or, for a type parameter, of every type its
@@ -375,7 +371,7 @@ func isPointer(underlying types.Type) bool {
 // readMutatesTags is the parameters function's doc comment makes out-parameters by contract, one per Mutates line
 // that names a parameter of function and gives a reason. A line that names no parameter, or gives no reason, is
 // reported where it is written and exempts nothing, so a tag can never hide a write without saying why.
-func readMutatesTags(pass *analysis.Pass, function *ast.FuncDecl) map[*types.Var]bool {
+func readMutatesTags(context *rule.Context, function *ast.FuncDecl) map[*types.Var]bool {
 	outParameters := map[*types.Var]bool{}
 	if function.Doc == nil {
 		return outParameters
@@ -395,12 +391,12 @@ func readMutatesTags(pass *analysis.Pass, function *ast.FuncDecl) map[*types.Var
 			if space := strings.IndexFunc(tag, unicode.IsSpace); space >= 0 {
 				parameterName, reason = tag[:space], tag[space:]
 			}
-			parameter := parameterOf(pass, function, parameterName)
+			parameter := parameterOf(context, function, parameterName)
 			switch {
 			case parameter == nil:
-				report(pass, comment, mutatesUnknownParameterMessage)
+				report(context, comment, mutatesUnknownParameterMessage)
 			case strings.TrimSpace(reason) == "":
-				report(pass, comment, mutatesWithoutReasonMessage)
+				report(context, comment, mutatesWithoutReasonMessage)
 			default:
 				outParameters[parameter] = true
 			}
@@ -411,7 +407,7 @@ func readMutatesTags(pass *analysis.Pass, function *ast.FuncDecl) map[*types.Var
 
 // parameterOf is function's parameter called name, or nil. The receiver is no parameter here: its writes are never
 // judged, so a tag naming it would exempt nothing.
-func parameterOf(pass *analysis.Pass, function *ast.FuncDecl, name string) *types.Var {
+func parameterOf(context *rule.Context, function *ast.FuncDecl, name string) *types.Var {
 	if name == "" || name == "_" {
 		return nil
 	}
@@ -420,7 +416,7 @@ func parameterOf(pass *analysis.Pass, function *ast.FuncDecl, name string) *type
 			if parameterName.Name != name {
 				continue
 			}
-			if parameter, isVariable := pass.TypesInfo.Defs[parameterName].(*types.Var); isVariable {
+			if parameter, isVariable := context.TypesInfo.Defs[parameterName].(*types.Var); isVariable {
 				return parameter
 			}
 		}
@@ -428,8 +424,8 @@ func parameterOf(pass *analysis.Pass, function *ast.FuncDecl, name string) *type
 	return nil
 }
 
-func report(pass *analysis.Pass, node ast.Node, message policy.MessageHandle) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, node ast.Node, message policy.MessageHandle) {
+	context.Report(analysis.Diagnostic{
 		Pos:      node.Pos(),
 		End:      node.End(),
 		Category: message.Id,

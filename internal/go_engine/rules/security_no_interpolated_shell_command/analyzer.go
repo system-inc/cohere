@@ -39,6 +39,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inert_value"
 	"github.com/system-inc/cohere/policy"
 )
@@ -46,18 +47,17 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/security-no-interpolated-shell-command"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "security_no_interpolated_shell_command",
-	Doc: "Flags exec.Command and exec.CommandContext running sh, bash, zsh, dash, ksh or mksh with a -c script " +
-		"built by fmt.Sprintf or + from a value that is not a constant, a number or a boolean, since the shell " +
-		"parses that value as code. A script with << in it, or one not built at the call or in a local assigned " +
-		"once, is not judged.",
-	Run: run,
-}
+// listener hears every call of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "security_no_interpolated_shell_command", "Flags exec.Command and "+
+	"exec.CommandContext running sh, bash, zsh, dash, ksh or mksh with a -c script built by fmt.Sprintf or + from a "+
+	"value that is not a constant, a number or a boolean, since the shell parses that value as code. A script with "+
+	"<< in it, or one not built at the call or in a local assigned once, is not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var interpolatedShellCommandMessage = policy.MessageOf(Name, "interpolatedShellCommand")
 
@@ -97,47 +97,43 @@ const (
 	unknown
 )
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall {
-				return true
-			}
-			programIndex, isCommand := programIndexOf(pass, call)
-			if !isCommand || len(call.Args) <= programIndex {
-				return true
-			}
-			program, isConstant := constantString(pass, call.Args[programIndex])
-			// A path names the same program, so /bin/zsh is judged as zsh.
-			if !isConstant || !shellPrograms[path.Base(program)] {
-				return true
-			}
-			script := scriptOf(pass, argumentsOf(call, programIndex))
-			if script == nil || !isBuilt(pass, script, 0) {
-				return true
-			}
-			if splicesUnsafeValue(pass, script) {
-				pass.Report(analysis.Diagnostic{
-					Pos:      script.Pos(),
-					End:      script.End(),
-					Category: interpolatedShellCommandMessage.Id,
-					Message:  interpolatedShellCommandMessage.Render(nil),
-				})
-			}
-			return true
+// judgeCall reports the script of node when it is a shell command whose script splices in a value the shell parses
+// as code.
+func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
+	}
+	programIndex, isCommand := programIndexOf(context, call)
+	if !isCommand || len(call.Args) <= programIndex {
+		return
+	}
+	program, isConstant := constantString(context, call.Args[programIndex])
+	// A path names the same program, so /bin/zsh is judged as zsh.
+	if !isConstant || !shellPrograms[path.Base(program)] {
+		return
+	}
+	script := scriptOf(context, argumentsOf(call, programIndex))
+	if script == nil || !isBuilt(context, script, 0) {
+		return
+	}
+	if splicesUnsafeValue(context, script) {
+		context.Report(analysis.Diagnostic{
+			Pos:      script.Pos(),
+			End:      script.End(),
+			Category: interpolatedShellCommandMessage.Id,
+			Message:  interpolatedShellCommandMessage.Render(nil),
 		})
 	}
-	return nil, nil
 }
 
 // programIndexOf is where the program sits among a call's arguments when the call is os/exec's Command or
 // CommandContext, resolved by the callee's object so a function of the same name in another package is never one.
-func programIndexOf(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
-	if isFunction(pass, call, "os/exec", "Command") {
+func programIndexOf(context *rule.Context, call *ast.CallExpr) (int, bool) {
+	if isFunction(context, call, "os/exec", "Command") {
 		return 0, true
 	}
-	if isFunction(pass, call, "os/exec", "CommandContext") {
+	if isFunction(context, call, "os/exec", "CommandContext") {
 		// The context comes first.
 		return 1, true
 	}
@@ -145,8 +141,8 @@ func programIndexOf(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
 }
 
 // isFunction is whether call resolves to the package-level function name in the package at packagePath.
-func isFunction(pass *analysis.Pass, call *ast.CallExpr, packagePath string, name string) bool {
-	function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func isFunction(context *rule.Context, call *ast.CallExpr, packagePath string, name string) bool {
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	return isFunc && function.Pkg() != nil && function.Pkg().Path() == packagePath &&
 		function.Signature().Recv() == nil && function.Name() == name
 }
@@ -172,8 +168,8 @@ func argumentsOf(call *ast.CallExpr, programIndex int) []ast.Expr {
 }
 
 // constantString is expression's value when the type checker knows it as a constant string.
-func constantString(pass *analysis.Pass, expression ast.Expr) (string, bool) {
-	value := pass.TypesInfo.Types[expression].Value
+func constantString(context *rule.Context, expression ast.Expr) (string, bool) {
+	value := context.TypesInfo.Types[expression].Value
 	if value == nil || value.Kind() != constant.String {
 		return "", false
 	}
@@ -185,13 +181,13 @@ func constantString(pass *analysis.Pass, expression ast.Expr) (string, bool) {
 // takes the next argument as its value, -- or - ends the options, and a long option the rule does not know stops the
 // reading. An argument known only at run time before the c may be an option that changes everything after it, and
 // one after the c that starts like an option would make the script a later argument, so either stops the reading too.
-func scriptOf(pass *analysis.Pass, arguments []ast.Expr) ast.Expr {
+func scriptOf(context *rule.Context, arguments []ast.Expr) ast.Expr {
 	takesScript := false
 	index := 0
 	for index < len(arguments) {
-		option, isConstant := constantString(pass, arguments[index])
+		option, isConstant := constantString(context, arguments[index])
 		if !isConstant {
-			if !takesScript || startsLikeOption(pass, arguments[index]) {
+			if !takesScript || startsLikeOption(context, arguments[index]) {
 				return nil
 			}
 			break
@@ -234,8 +230,8 @@ func scriptOf(pass *analysis.Pass, arguments []ast.Expr) ast.Expr {
 
 // startsLikeOption is whether a value known only at run time opens with text the author wrote that begins with - or
 // +, which the shell would read as an option rather than the script.
-func startsLikeOption(pass *analysis.Pass, expression ast.Expr) bool {
-	pieces, isFlattened := flatten(pass, expression, 0, nil)
+func startsLikeOption(context *rule.Context, expression ast.Expr) bool {
+	pieces, isFlattened := flatten(context, expression, 0, nil)
 	if !isFlattened {
 		return true
 	}
@@ -252,22 +248,22 @@ func startsLikeOption(pass *analysis.Pass, expression ast.Expr) bool {
 
 // isBuilt is whether a script is built here: a call to fmt.Sprintf or a + concatenation that is not a constant,
 // through parentheses and locals assigned once. Anything else is an opaque script this rule does not judge.
-func isBuilt(pass *analysis.Pass, expression ast.Expr, depth int) bool {
+func isBuilt(context *rule.Context, expression ast.Expr, depth int) bool {
 	if depth > depthLimit {
 		return false
 	}
 	unwrapped := ast.Unparen(expression)
-	if pass.TypesInfo.Types[unwrapped].Value != nil {
+	if context.TypesInfo.Types[unwrapped].Value != nil {
 		return false
 	}
 	switch built := unwrapped.(type) {
 	case *ast.CallExpr:
-		return isFunction(pass, built, "fmt", "Sprintf")
+		return isFunction(context, built, "fmt", "Sprintf")
 	case *ast.BinaryExpr:
 		return built.Op == token.ADD
 	case *ast.Ident:
-		if initializer := onlyValue(pass, built); initializer != nil {
-			return isBuilt(pass, initializer, depth+1)
+		if initializer := onlyValue(context, built); initializer != nil {
+			return isBuilt(context, initializer, depth+1)
 		}
 	}
 	return false
@@ -276,8 +272,8 @@ func isBuilt(pass *analysis.Pass, expression ast.Expr, depth int) bool {
 // splicesUnsafeValue is whether a built script holds a value the shell parses as code. A << in the text the author
 // wrote may open a heredoc, whose body the twins read as data when its delimiter is quoted, so the rule declines
 // such a script rather than judge values the shell may never parse.
-func splicesUnsafeValue(pass *analysis.Pass, script ast.Expr) bool {
-	pieces, isFlattened := flatten(pass, script, 0, nil)
+func splicesUnsafeValue(context *rule.Context, script ast.Expr) bool {
+	pieces, isFlattened := flatten(context, script, 0, nil)
 	if !isFlattened {
 		return false
 	}
@@ -287,7 +283,7 @@ func splicesUnsafeValue(pass *analysis.Pass, script ast.Expr) bool {
 		}
 	}
 	for _, flattened := range pieces {
-		if flattened.value != nil && !flattened.unknown && judge(pass, flattened.value) == unsafe {
+		if flattened.value != nil && !flattened.unknown && judge(context, flattened.value) == unsafe {
 			return true
 		}
 	}
@@ -298,13 +294,13 @@ func splicesUnsafeValue(pass *analysis.Pass, script ast.Expr) bool {
 // + concatenation of strings and local assigned once it is built from. A Sprintf's format is one piece of text with
 // its verbs in it, and its arguments follow it, since which verb takes which argument changes no verdict: a string
 // under any verb still prints its text. Anything else is one value. It reports false when the walk runs too deep.
-func flatten(pass *analysis.Pass, expression ast.Expr, depth int, pieces []piece) ([]piece, bool) {
+func flatten(context *rule.Context, expression ast.Expr, depth int, pieces []piece) ([]piece, bool) {
 	if depth > depthLimit {
 		return nil, false
 	}
 	unwrapped := ast.Unparen(expression)
 	gathered := pieces
-	if value := pass.TypesInfo.Types[unwrapped].Value; value != nil {
+	if value := context.TypesInfo.Types[unwrapped].Value; value != nil {
 		// A numeric constant handed to Sprintf prints digits, which hold no shell syntax and no <<.
 		if value.Kind() == constant.String {
 			gathered = append(gathered, piece{text: constant.StringVal(value)})
@@ -313,30 +309,30 @@ func flatten(pass *analysis.Pass, expression ast.Expr, depth int, pieces []piece
 	}
 	switch built := unwrapped.(type) {
 	case *ast.CallExpr:
-		if isFunction(pass, built, "fmt", "Sprintf") && len(built.Args) > 0 {
+		if isFunction(context, built, "fmt", "Sprintf") && len(built.Args) > 0 {
 			if built.Ellipsis.IsValid() {
 				// The arguments are a slice built elsewhere, whose elements and their types are not seen here.
 				return append(gathered, piece{value: built, unknown: true}), true
 			}
 			for _, argument := range built.Args {
 				var isFlattened bool
-				if gathered, isFlattened = flatten(pass, argument, depth+1, gathered); !isFlattened {
+				if gathered, isFlattened = flatten(context, argument, depth+1, gathered); !isFlattened {
 					return nil, false
 				}
 			}
 			return gathered, true
 		}
 	case *ast.BinaryExpr:
-		if built.Op == token.ADD && isString(pass.TypesInfo.TypeOf(built)) {
+		if built.Op == token.ADD && isString(context.TypesInfo.TypeOf(built)) {
 			var isFlattened bool
-			if gathered, isFlattened = flatten(pass, built.X, depth+1, gathered); !isFlattened {
+			if gathered, isFlattened = flatten(context, built.X, depth+1, gathered); !isFlattened {
 				return nil, false
 			}
-			return flatten(pass, built.Y, depth+1, gathered)
+			return flatten(context, built.Y, depth+1, gathered)
 		}
 	case *ast.Ident:
-		if initializer := onlyValue(pass, built); initializer != nil {
-			return flatten(pass, initializer, depth+1, gathered)
+		if initializer := onlyValue(context, built); initializer != nil {
+			return flatten(context, initializer, depth+1, gathered)
 		}
 	}
 	return append(gathered, piece{value: unwrapped}), true
@@ -348,11 +344,11 @@ func flatten(pass *analysis.Pass, expression ast.Expr, depth int, pieces []piece
 // inert, and its text this rule cannot see, so it is not judged, nor is a type parameter. Everything else is text
 // the shell parses: a string, a named string type, an error, an interface that may hold a string, a slice, a struct
 // or a pointer, which print their contents.
-func judge(pass *analysis.Pass, value ast.Expr) verdict {
-	if inert_value.Is(pass.TypesInfo, value) {
+func judge(context *rule.Context, value ast.Expr) verdict {
+	if inert_value.Is(context.TypesInfo, value) {
 		return safe
 	}
-	valueType := pass.TypesInfo.TypeOf(value)
+	valueType := context.TypesInfo.TypeOf(value)
 	if valueType == nil {
 		return unknown
 	}
@@ -376,14 +372,14 @@ func isString(candidate types.Type) bool {
 // onlyValue is the initializer of the local variable an identifier names when that initializer is the only value it
 // ever holds: declared with := or var and one value for each name, never assigned again, and its address never taken.
 // A package-level variable may be assigned from any file, so it is never followed. Nil otherwise.
-func onlyValue(pass *analysis.Pass, identifier *ast.Ident) ast.Expr {
-	variable, isVariable := pass.TypesInfo.Uses[identifier].(*types.Var)
+func onlyValue(context *rule.Context, identifier *ast.Ident) ast.Expr {
+	variable, isVariable := context.TypesInfo.Uses[identifier].(*types.Var)
 	if !isVariable || variable.IsField() || variable.Pkg() == nil || variable.Parent() == nil ||
 		variable.Parent() == variable.Pkg().Scope() {
 		return nil
 	}
 	var file *ast.File
-	for _, candidate := range pass.Files {
+	for _, candidate := range context.Files {
 		if candidate.FileStart <= variable.Pos() && variable.Pos() < candidate.FileEnd {
 			file = candidate
 		}
@@ -401,30 +397,30 @@ func onlyValue(pass *analysis.Pass, identifier *ast.Ident) ast.Expr {
 				if !isName {
 					continue
 				}
-				if pass.TypesInfo.Defs[name] == variable && statement.Tok == token.DEFINE &&
+				if context.TypesInfo.Defs[name] == variable && statement.Tok == token.DEFINE &&
 					len(statement.Lhs) == len(statement.Rhs) {
 					initializer = statement.Rhs[index]
 				}
 				// A redeclaration in a later :=, `script, readError := ...`, records the name as a use.
-				if pass.TypesInfo.Uses[name] == variable {
+				if context.TypesInfo.Uses[name] == variable {
 					isAssignedAgain = true
 				}
 			}
 		case *ast.ValueSpec:
 			for index, name := range statement.Names {
-				if pass.TypesInfo.Defs[name] == variable && len(statement.Names) == len(statement.Values) {
+				if context.TypesInfo.Defs[name] == variable && len(statement.Names) == len(statement.Values) {
 					initializer = statement.Values[index]
 				}
 			}
 		case *ast.UnaryExpr:
 			// A pointer to the variable may be written through anywhere.
 			if name, isName := ast.Unparen(statement.X).(*ast.Ident); isName && statement.Op == token.AND &&
-				pass.TypesInfo.Uses[name] == variable {
+				context.TypesInfo.Uses[name] == variable {
 				isAssignedAgain = true
 			}
 		case *ast.RangeStmt:
 			for _, target := range []ast.Expr{statement.Key, statement.Value} {
-				if name, isName := target.(*ast.Ident); isName && pass.TypesInfo.Uses[name] == variable {
+				if name, isName := target.(*ast.Ident); isName && context.TypesInfo.Uses[name] == variable {
 					isAssignedAgain = true
 				}
 			}

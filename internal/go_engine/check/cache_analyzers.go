@@ -27,9 +27,12 @@ type cacheAnalyzers struct {
 }
 
 // newCacheAnalyzers reads the analyzers an entry holds: every rule's, and every analyzer below them that learns
-// facts. A rule's analyzer is held under the rule's name, which is unique. Any other is held under its name and its
-// fact types, since an analyzer's name alone is not: staticcheck's nilness learns facts, and vet's nilness is a
-// rule. Two analyzers that would still share a slot refuse the cache for the run.
+// facts, below them as the checker's graph has them, where a dispatcher's requirement for its listeners is kept only
+// when an analyzer that requires the dispatcher requires it too (see checker.Options.ForDependents). A fact analyzer
+// only a left-out rule's listener reads never runs, so an entry could never hold it, and counting it would make every
+// entry fall short of what the run asks. A rule's analyzer is held under the rule's name, which is unique. Any other
+// is held under its name and its fact types, since an analyzer's name alone is not: staticcheck's nilness learns
+// facts, and vet's nilness is a rule. Two analyzers that would still share a slot refuse the cache for the run.
 func newCacheAnalyzers(
 	ruleOf map[*analysis.Analyzer]rule.Rule,
 	analyzers []*analysis.Analyzer,
@@ -39,6 +42,7 @@ func newCacheAnalyzers(
 		factTypes: map[*analysis.Analyzer]map[string]reflect.Type{},
 		rules:     analyzers,
 	}
+	requires := requiredInRun(analyzers)
 	seen := map[*analysis.Analyzer]bool{}
 	var visit func(analyzer *analysis.Analyzer) error
 	visit = func(analyzer *analysis.Analyzer) error {
@@ -54,7 +58,7 @@ func newCacheAnalyzers(
 			}
 			known.factTypes[analyzer] = byTypeName
 		}
-		for _, required := range analyzer.Requires {
+		for _, required := range requires(analyzer) {
 			if requiredError := visit(required); requiredError != nil {
 				return requiredError
 			}
@@ -80,6 +84,28 @@ func newCacheAnalyzers(
 		known.slots[stored] = slot
 	}
 	return known, nil
+}
+
+// requirersBelow is, for every analyzer analyzers require, directly or not, those among them and below them that
+// require it, every edge followed, as the checker reads its graph before it drops any edge.
+func requirersBelow(analyzers []*analysis.Analyzer) map[*analysis.Analyzer][]*analysis.Analyzer {
+	requirers := map[*analysis.Analyzer][]*analysis.Analyzer{}
+	seen := map[*analysis.Analyzer]bool{}
+	var visit func(analyzer *analysis.Analyzer)
+	visit = func(analyzer *analysis.Analyzer) {
+		if seen[analyzer] {
+			return
+		}
+		seen[analyzer] = true
+		for _, required := range analyzer.Requires {
+			requirers[required] = append(requirers[required], analyzer)
+			visit(required)
+		}
+	}
+	for _, analyzer := range analyzers {
+		visit(analyzer)
+	}
+	return requirers
 }
 
 // slot is where an entry holds analyzer's analysis, and false for an analyzer it does not hold: one that is no

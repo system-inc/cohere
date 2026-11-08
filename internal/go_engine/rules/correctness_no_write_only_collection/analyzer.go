@@ -15,24 +15,32 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-no-write-only-collection"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_no_write_only_collection",
-	Doc: "Flags a map or slice declared in a function, fresh from a composite literal, make or its zero value, whose " +
-		"every use writes it (collection[key] = value, delete, clear, collection = append(collection, ...)) and at " +
-		"least one write is not an append. A slice only ever appended to is staticcheck's SA4010, which holds the " +
-		"append half, so this rule leaves it alone.",
-	Run: run,
+// listener gathers each file's fresh collections and what every reference does to them as the syntax dispatcher's
+// walk goes through the file, and judges them as it leaves the file. A local's scope opens after the statement that
+// declares it, so the walk meets that statement before any reference to the local.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.AssignStmt)(nil), (*ast.DeclStmt)(nil), (*ast.Ident)(nil)},
+	Node:      hearNode,
+	FileExit:  judgeFile,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_write_only_collection", "Flags a map or slice declared "+
+	"in a function, fresh from a composite literal, make or its zero value, whose every use writes it "+
+	"(collection[key] = value, delete, clear, collection = append(collection, ...)) and at least one write is not an "+
+	"append. A slice only ever appended to is staticcheck's SA4010, which holds the append half, so this rule leaves "+
+	"it alone.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var writeOnlyCollectionMessage = policy.MessageOf(Name, "writeOnlyCollection")
 
@@ -58,82 +66,99 @@ type collection struct {
 	isRead bool
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		collections := freshCollections(pass, file)
-		if len(collections) == 0 {
-			continue
-		}
-		byVariable := map[*types.Var]*collection{}
-		for _, found := range collections {
-			if variable, isVariable := pass.TypesInfo.Defs[found.name].(*types.Var); isVariable {
-				byVariable[variable] = found
-			}
-		}
-		judgeReferences(pass, file, byVariable)
-		for _, found := range collections {
-			// A write by append alone is SA4010's to report, and a collection never referenced is the compiler's.
-			if found.isRead || found.writes == 0 {
-				continue
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      found.name.Pos(),
-				End:      found.name.End(),
-				Category: writeOnlyCollectionMessage.Id,
-				Message:  writeOnlyCollectionMessage.Render(map[string]string{}),
-			})
-		}
-	}
-	return nil, nil
+// fileState is what the rule gathers over the file being walked, held in its context's state. A local is referenced
+// only in the file that declares it, so one file is the whole of its uses.
+type fileState struct {
+	// collections is every fresh collection declared in the file so far, in source order.
+	collections []*collection
+	// byVariable is each of collections by the variable it declares, so a reference finds its collection.
+	byVariable map[*types.Var]*collection
 }
 
-// freshCollections is every map or slice variable declared in a function body in file, in source order, whose value
-// starts out its own. A DeclStmt and a := only occur inside a function, so a package-level variable, which any file
-// of the package can read, is never one.
-func freshCollections(pass *analysis.Pass, file *ast.File) []*collection {
+// enterFile starts a file with no collection gathered.
+func enterFile(context *rule.Context, _ *ast.File) {
+	state := rule.State[fileState](context)
+	state.collections = nil
+	state.byVariable = map[*types.Var]*collection{}
+}
+
+// hearNode gathers the fresh collections a declaration makes, and records what a reference does to one gathered.
+func hearNode(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[fileState](context)
+	switch heard := node.(type) {
+	case *ast.Ident:
+		judgeReference(context, heard, stack, state.byVariable)
+	default:
+		for _, found := range freshCollections(context, node) {
+			// Defs holds only a new variable, which freshCollections has already asked of each name.
+			if variable, isVariable := context.TypesInfo.Defs[found.name].(*types.Var); isVariable {
+				state.byVariable[variable] = found
+			}
+			state.collections = append(state.collections, found)
+		}
+	}
+}
+
+// judgeFile reports every collection the file declares whose every reference writes it, as the walk leaves the file.
+func judgeFile(context *rule.Context, _ *ast.File) {
+	for _, found := range rule.State[fileState](context).collections {
+		// A write by append alone is SA4010's to report, and a collection never referenced is the compiler's.
+		if found.isRead || found.writes == 0 {
+			continue
+		}
+		context.Report(analysis.Diagnostic{
+			Pos:      found.name.Pos(),
+			End:      found.name.End(),
+			Category: writeOnlyCollectionMessage.Id,
+			Message:  writeOnlyCollectionMessage.Render(map[string]string{}),
+		})
+	}
+}
+
+// freshCollections is every map or slice variable declaration declares, in source order, whose value starts out its
+// own. A DeclStmt and a := only occur inside a function, so a package-level variable, which any file of the package
+// can read, is never one.
+func freshCollections(context *rule.Context, declaration ast.Node) []*collection {
 	var collections []*collection
 	consider := func(name *ast.Ident, initializer ast.Expr) {
 		// Defs holds only a new variable: a := that reuses a name records it in Uses, and the blank name has none.
-		variable, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
-		if !isVariable || !isCollection(variable.Type()) || !isFresh(pass, initializer) {
+		variable, isVariable := context.TypesInfo.Defs[name].(*types.Var)
+		if !isVariable || !isCollection(variable.Type()) || !isFresh(context, initializer) {
 			return
 		}
 		collections = append(collections, &collection{name: name})
 	}
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch declaration := node.(type) {
-		case *ast.AssignStmt:
-			// A := from one call of several results gives no initializer to read per name, so it is not judged.
-			if declaration.Tok != token.DEFINE || len(declaration.Lhs) != len(declaration.Rhs) {
-				return true
+	switch statement := declaration.(type) {
+	case *ast.AssignStmt:
+		// A := from one call of several results gives no initializer to read per name, so it is not judged.
+		if statement.Tok != token.DEFINE || len(statement.Lhs) != len(statement.Rhs) {
+			return nil
+		}
+		for index, left := range statement.Lhs {
+			if name, isIdentifier := left.(*ast.Ident); isIdentifier {
+				consider(name, statement.Rhs[index])
 			}
-			for index, left := range declaration.Lhs {
-				if name, isIdentifier := left.(*ast.Ident); isIdentifier {
-					consider(name, declaration.Rhs[index])
-				}
+		}
+	case *ast.DeclStmt:
+		general, isGeneral := statement.Decl.(*ast.GenDecl)
+		if !isGeneral || general.Tok != token.VAR {
+			return nil
+		}
+		for _, specification := range general.Specs {
+			value, isValue := specification.(*ast.ValueSpec)
+			if !isValue {
+				continue
 			}
-		case *ast.DeclStmt:
-			general, isGeneral := declaration.Decl.(*ast.GenDecl)
-			if !isGeneral || general.Tok != token.VAR {
-				return true
-			}
-			for _, specification := range general.Specs {
-				value, isValue := specification.(*ast.ValueSpec)
-				if !isValue {
-					continue
-				}
-				for index, name := range value.Names {
-					switch len(value.Values) {
-					case 0:
-						consider(name, nil)
-					case len(value.Names):
-						consider(name, value.Values[index])
-					}
+			for index, name := range value.Names {
+				switch len(value.Values) {
+				case 0:
+					consider(name, nil)
+				case len(value.Names):
+					consider(name, value.Values[index])
 				}
 			}
 		}
-		return true
-	})
+	}
 	return collections
 }
 
@@ -151,7 +176,7 @@ func isCollection(candidate types.Type) bool {
 // isFresh is whether an initializer makes a collection no other name shares: none (the zero value), a composite
 // literal, or the builtin make. Anything else may alias one held elsewhere (alias := source, window := buffer[:2],
 // cache := newCache()), and a write through the alias is a write someone else can read.
-func isFresh(pass *analysis.Pass, initializer ast.Expr) bool {
+func isFresh(context *rule.Context, initializer ast.Expr) bool {
 	if initializer == nil {
 		return true
 	}
@@ -159,50 +184,50 @@ func isFresh(pass *analysis.Pass, initializer ast.Expr) bool {
 	case *ast.CompositeLit:
 		return true
 	case *ast.CallExpr:
-		return builtinName(pass, value.Fun) == "make"
+		return builtinName(context, value.Fun) == "make"
 	}
 	return false
 }
 
-// judgeReferences records what every reference in file to one of the collections does to it. A local is referenced
-// only in the file that declares it, so one file is the whole of its uses.
-func judgeReferences(pass *analysis.Pass, file *ast.File, byVariable map[*types.Var]*collection) {
-	// The path from the file down to the node being visited, so a reference is judged by the nodes around it.
-	var stack []ast.Node
-	ast.Inspect(file, func(node ast.Node) bool {
-		if node == nil {
-			stack = stack[:len(stack)-1]
-			return true
-		}
-		stack = append(stack, node)
-		identifier, isIdentifier := node.(*ast.Ident)
-		if !isIdentifier || len(stack) < 3 {
-			return true
-		}
-		// Uses, by object, so a shadowing variable of the same name in an inner scope is never this one.
-		variable, isVariable := pass.TypesInfo.Uses[identifier].(*types.Var)
-		if !isVariable {
-			return true
-		}
-		found, isCandidate := byVariable[variable]
-		if !isCandidate {
-			return true
-		}
-		switch useOf(pass, identifier, variable, stack[len(stack)-2], stack[len(stack)-3]) {
-		case written:
-			found.writes++
-		case appended:
-			// Neither a read nor a write this rule counts, since a slice only appended to is SA4010's.
-		case read:
-			found.isRead = true
-		}
-		return true
-	})
+// judgeReference records what identifier, with its ancestors in stack, does to the collection it refers to, when it
+// refers to one of byVariable.
+func judgeReference(
+	context *rule.Context,
+	identifier *ast.Ident,
+	stack []ast.Node,
+	byVariable map[*types.Var]*collection,
+) {
+	if len(byVariable) == 0 || len(stack) < 2 {
+		return
+	}
+	// Uses, by object, so a shadowing variable of the same name in an inner scope is never this one.
+	variable, isVariable := context.TypesInfo.Uses[identifier].(*types.Var)
+	if !isVariable {
+		return
+	}
+	found, isCandidate := byVariable[variable]
+	if !isCandidate {
+		return
+	}
+	switch useOf(context, identifier, variable, stack[len(stack)-1], stack[len(stack)-2]) {
+	case written:
+		found.writes++
+	case appended:
+		// Neither a read nor a write this rule counts, since a slice only appended to is SA4010's.
+	case read:
+		found.isRead = true
+	}
 }
 
 // useOf judges one reference by its parent and grandparent. Each write is matched exactly, with no parentheses looked
 // through, and anything else is a read: a missed finding at worst, never a false one.
-func useOf(pass *analysis.Pass, identifier *ast.Ident, variable *types.Var, parent ast.Node, grandparent ast.Node) use {
+func useOf(
+	context *rule.Context,
+	identifier *ast.Ident,
+	variable *types.Var,
+	parent ast.Node,
+	grandparent ast.Node,
+) use {
 	switch around := parent.(type) {
 	case *ast.IndexExpr:
 		// collection[key] = value, alone or among several targets of one plain =. A compound op= and ++ read the
@@ -220,7 +245,7 @@ func useOf(pass *analysis.Pass, identifier *ast.Ident, variable *types.Var, pare
 		if len(around.Args) == 0 || around.Args[0] != identifier {
 			return read
 		}
-		switch builtinName(pass, around.Fun) {
+		switch builtinName(context, around.Fun) {
 		case "delete", "clear":
 			// Neither has a result, so wherever it stands, a statement, defer or go, it only writes.
 			return written
@@ -229,7 +254,8 @@ func useOf(pass *analysis.Pass, identifier *ast.Ident, variable *types.Var, pare
 			if !isAssignment {
 				return read
 			}
-			if index := rightIndex(assignment, around); index >= 0 && refersTo(pass, assignment.Lhs[index], variable) {
+			if index := rightIndex(assignment, around); index >= 0 &&
+				refersTo(context, assignment.Lhs[index], variable) {
 				return appended
 			}
 		}
@@ -244,8 +270,8 @@ func useOf(pass *analysis.Pass, identifier *ast.Ident, variable *types.Var, pare
 				continue
 			}
 			call, isCall := around.Rhs[index].(*ast.CallExpr)
-			if isCall && builtinName(pass, call.Fun) == "append" && len(call.Args) > 0 &&
-				refersTo(pass, call.Args[0], variable) {
+			if isCall && builtinName(context, call.Fun) == "append" && len(call.Args) > 0 &&
+				refersTo(context, call.Args[0], variable) {
 				return appended
 			}
 		}
@@ -267,19 +293,19 @@ func rightIndex(assignment *ast.AssignStmt, call *ast.CallExpr) int {
 }
 
 // refersTo is whether expression is the bare name of variable.
-func refersTo(pass *analysis.Pass, expression ast.Expr, variable *types.Var) bool {
+func refersTo(context *rule.Context, expression ast.Expr, variable *types.Var) bool {
 	identifier, isIdentifier := expression.(*ast.Ident)
-	return isIdentifier && pass.TypesInfo.Uses[identifier] == variable
+	return isIdentifier && context.TypesInfo.Uses[identifier] == variable
 }
 
 // builtinName is the name of the builtin function expression names, or "" when it names anything else, so a local
 // function called delete or append, which may read what it is given, is never taken for the builtin.
-func builtinName(pass *analysis.Pass, expression ast.Expr) string {
+func builtinName(context *rule.Context, expression ast.Expr) string {
 	identifier, isIdentifier := expression.(*ast.Ident)
 	if !isIdentifier {
 		return ""
 	}
-	builtin, isBuiltin := pass.TypesInfo.Uses[identifier].(*types.Builtin)
+	builtin, isBuiltin := context.TypesInfo.Uses[identifier].(*types.Builtin)
 	if !isBuiltin {
 		return ""
 	}

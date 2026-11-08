@@ -17,6 +17,9 @@
 // whether a function behaves like fmt.Print or fmt.Printf; nothing in cohere requires it, so the port has none. And
 // where the original asserts a type the type checker always gives, and would panic were it missing, the port checks
 // the assertion and passes the node by.
+//
+// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it exports and imports a fact, isWrapper,
+// through which a wrapper declared in a dependency is found, and a listener has no facts to export or import.
 package printf
 
 import (

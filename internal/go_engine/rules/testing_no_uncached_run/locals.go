@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // locals is what the rule knows about the package's local variables, gathered once so tracing a spread slice to its
@@ -20,7 +20,7 @@ type locals struct {
 // sequence is the elements of a slice expression spread into a command, when the rule can read them: a []string
 // literal, a call to the builtin append on a slice it can read, or a local declared with one of those and never
 // written since. Anything else, a slice from a call, a parameter or a package variable, is unreadable.
-func (known locals) sequence(pass *analysis.Pass, expression ast.Expr) ([]argument, bool) {
+func (known locals) sequence(context *rule.Context, expression ast.Expr) ([]argument, bool) {
 	switch shape := ast.Unparen(expression).(type) {
 	case *ast.CompositeLit:
 		var elements []argument
@@ -29,21 +29,21 @@ func (known locals) sequence(pass *analysis.Pass, expression ast.Expr) ([]argume
 			if _, isKeyed := element.(*ast.KeyValueExpr); isKeyed {
 				return nil, false
 			}
-			elements = append(elements, argumentOf(pass, element))
+			elements = append(elements, argumentOf(context, element))
 		}
 		return elements, true
 	case *ast.CallExpr:
-		return known.appended(pass, shape)
+		return known.appended(context, shape)
 	case *ast.Ident:
-		variable, isVariable := pass.TypesInfo.Uses[shape].(*types.Var)
-		if !isVariable || variable.Parent() == pass.Pkg.Scope() || known.written[variable] {
+		variable, isVariable := context.TypesInfo.Uses[shape].(*types.Var)
+		if !isVariable || variable.Parent() == context.Package.Scope() || known.written[variable] {
 			return nil, false
 		}
 		definition, isDefined := known.definitions[variable]
 		if !isDefined {
 			return nil, false
 		}
-		return known.sequence(pass, definition)
+		return known.sequence(context, definition)
 	}
 	return nil, false
 }
@@ -51,29 +51,29 @@ func (known locals) sequence(pass *analysis.Pass, expression ast.Expr) ([]argume
 // appended reads a call to the builtin append whose first argument is a slice the rule can read. What it appends is
 // read too, and a spread it cannot read holds one unknown place, since it can add arguments but not remove the
 // constants before it.
-func (known locals) appended(pass *analysis.Pass, call *ast.CallExpr) ([]argument, bool) {
+func (known locals) appended(context *rule.Context, call *ast.CallExpr) ([]argument, bool) {
 	identifier, isIdentifier := ast.Unparen(call.Fun).(*ast.Ident)
 	if !isIdentifier || len(call.Args) == 0 {
 		return nil, false
 	}
-	builtin, isBuiltin := pass.TypesInfo.Uses[identifier].(*types.Builtin)
+	builtin, isBuiltin := context.TypesInfo.Uses[identifier].(*types.Builtin)
 	if !isBuiltin || builtin.Name() != "append" {
 		return nil, false
 	}
-	elements, readable := known.sequence(pass, call.Args[0])
+	elements, readable := known.sequence(context, call.Args[0])
 	if !readable {
 		return nil, false
 	}
 	added := call.Args[1:]
 	if call.Ellipsis.IsValid() && len(added) == 1 {
-		spread, spreadReadable := known.sequence(pass, added[0])
+		spread, spreadReadable := known.sequence(context, added[0])
 		if !spreadReadable {
 			return append(elements, argument{node: added[0]}), true
 		}
 		return append(elements, spread...), true
 	}
 	for _, expression := range added {
-		elements = append(elements, argumentOf(pass, expression))
+		elements = append(elements, argumentOf(context, expression))
 	}
 	return elements, true
 }

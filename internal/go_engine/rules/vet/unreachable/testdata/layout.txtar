@@ -1,0 +1,108 @@
+Layouts of dead statements gofmt would change, each sharing its lines with other syntax or comments, laid out by
+hand, so that the edit of each fix is pinned to the character, and a file cut off in the middle of a function, which
+does not parse. Every package but truncated type-checks. The archive is extracted at test time, since cohere's gofmt
+guard reads every Go file under testdata.
+-- src/layout/layout.go --
+package layout
+
+import "fmt"
+
+var condition bool
+var number int
+var channel chan int
+
+func afterAStatementOnTheLine() {
+	return; fmt.Println("dead") // want "unreachable code"
+}
+
+func beforeAStatementOnTheLine() {
+	return; fmt.Println("dead"); fmt.Println("reached") // want "unreachable code"
+}
+
+func betweenComments() {
+	return /* A */; /* B */ fmt.Println("dead") /* C */; /* D */ fmt.Println("reached") // want "unreachable code"
+}
+
+func beforeTheClosingBrace() {
+	{ return; fmt.Println("dead") } // want "unreachable code"
+}
+
+func beforeCommentsAndTheClosingBrace() {
+	{ return; /* A */ fmt.Println("dead") /* B */ /* C */ } // want "unreachable code"
+}
+
+func aloneBeforeTheClosingBrace() {
+	return
+	fmt.Println("dead") /* A */ } // want "unreachable code"
+
+func inACaseClause() {
+	switch number { case 1: return; fmt.Println("dead") /* A */ } // want "unreachable code"
+	switch number { case 1: return; fmt.Println("dead"); case 2: } // want "unreachable code"
+	switch number {
+	case 1: return; fmt.Println("dead") // want "unreachable code"
+	case 2:
+	}
+}
+
+func inACommunicationClause() {
+	select { case <-channel: return; fmt.Println("dead") /* A */ } // want "unreachable code"
+	select {
+	case <-channel: return; fmt.Println("dead") // want "unreachable code"
+	default:
+	}
+}
+
+func overLinesAfterAStatement() {
+	return; if condition { // want "unreachable code"
+		fmt.Println()
+	}
+}
+
+func overLinesBeforeAStatement() {
+	return
+	if condition { // want "unreachable code"
+	}; fmt.Println("reached")
+}
+
+func afterAnEmptyStatement() {
+	return; ; fmt.Println("dead") // want "unreachable code"
+}
+
+func afterACommentOnTheLine() {
+	return
+	/* before */ fmt.Println("dead") // want "unreachable code"
+}
+
+func afterACommentOverLines() {
+	return
+	/* a comment
+	over lines */ fmt.Println("dead") // want "unreachable code"
+}
+
+func inATypeSwitch(value any) {
+	switch value.(type) { case int: panic("stop"); fmt.Println("dead") } // want "unreachable code"
+}
+
+func inALabeledLoop() {
+	loop: for { break loop; fmt.Println("dead") } // want "unreachable code"
+}
+
+func onTheFunctionsLine() { return; fmt.Println("dead") } // want "unreachable code"
+
+var literal = func() { panic("stop"); fmt.Println("dead") } // want "unreachable code"
+
+func indentedWithSpaces() {
+    return
+    fmt.Println("dead") // want "unreachable code"
+}
+
+func withTrailingSpace() {
+	return  
+	fmt.Println("dead")   // want "unreachable code"
+}
+-- src/truncated/truncated.go --
+package truncated
+
+func cut() {
+	return
+	println("dead")

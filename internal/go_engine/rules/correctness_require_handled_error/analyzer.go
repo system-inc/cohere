@@ -15,6 +15,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
@@ -22,19 +23,30 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-require-handled-error"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_require_handled_error",
-	Doc: "Flags a call that returns an error and drops it, as a statement of its own, as the operand of defer or " +
-		"go, or with the error assigned to _, unless a // Ignored: <reason> comment directly above the statement or " +
-		"at the end of its line says why. Writes whose error is documented never to be non-nil, such as those to a " +
-		"*strings.Builder, or to be kept for a later checked call, a *bufio.Writer's Flush, are exempt by type.",
-	Requires: []*analysis.Analyzer{marker.Analyzer},
-	Run:      run,
+// listener reads the package's comment indexes as the syntax dispatcher's walk enters each file, and hears every
+// statement or specification that can drop a call's error.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{marker.Analyzer},
+	FileEnter: enterFile,
+	Nodes: []ast.Node{
+		(*ast.ExprStmt)(nil),
+		(*ast.DeferStmt)(nil),
+		(*ast.GoStmt)(nil),
+		(*ast.AssignStmt)(nil),
+		(*ast.ValueSpec)(nil),
+	},
+	Node: judgeStatement,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_handled_error", "Flags a call that returns an "+
+	"error and drops it, as a statement of its own, as the operand of defer or go, or with the error assigned to _, "+
+	"unless a // Ignored: <reason> comment directly above the statement or at the end of its line says why. Writes "+
+	"whose error is documented never to be non-nil, such as those to a *strings.Builder, or to be kept for a later "+
+	"checked call, a *bufio.Writer's Flush, are exempt by type.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var unhandledErrorMessage = policy.MessageOf(Name, "unhandledError")
 
@@ -96,52 +108,74 @@ var (
 // so the Write of any type implementing hash.Hash is exempt.
 const hashPackagePath = "hash"
 
-func run(pass *analysis.Pass) (any, error) {
-	errorInterface, isInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
+// errorInterface is the predeclared error's, which a result implements to count as an error.
+var errorInterface = func() *types.Interface {
+	predeclared, isInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
 	if !isInterface {
-		return nil, fmt.Errorf("reading the predeclared error as an interface")
+		// Invariant: the predeclared error is an interface in every Go this engine is built with.
+		panic("the predeclared error is not an interface")
 	}
-	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
-	if !isIndexes {
-		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
+	return predeclared
+}()
+
+// packageState is what the rule reads once for its package and once for each file, held in its context's state.
+type packageState struct {
+	// indexes is the package's comment indexes, read as the walk enters its first file.
+	indexes *marker.Indexes
+	// checker is what every judgment in the package reads, made with indexes.
+	checker checker
+	// comments is the comment index of the file being walked. A comment excuses a statement from directly above it,
+	// on lines of its own, or from the end of its last line.
+	comments *marker.Index
+}
+
+// enterFile reads the package's comment indexes and its checker the first time, and file's comment index.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if state.indexes == nil {
+		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
+		if !isIndexes {
+			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
+		}
+		state.indexes = indexes
+		state.checker = checker{context: context, hashInterface: findHashInterface(context.Package)}
 	}
-	checker := checker{pass: pass, errorInterface: errorInterface, hashInterface: findHashInterface(pass.Pkg)}
-	for _, file := range pass.Files {
-		// A comment excuses a statement from directly above it, on lines of its own, or from the end of its last line.
-		comments := indexes.ForFile(file)
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch statement := node.(type) {
-			case *ast.ExprStmt:
-				if call, isCall := ast.Unparen(statement.X).(*ast.CallExpr); isCall && checker.returnsError(call) {
-					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
-				}
-			case *ast.DeferStmt:
-				// A deferred or started call's results go nowhere, whatever they are.
-				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, comments.ExcuseFor(statement, marker.Ignored))
-				}
-			case *ast.GoStmt:
-				if checker.returnsError(statement.Call) {
-					checker.report(statement.Call, comments.ExcuseFor(statement, marker.Ignored))
-				}
-			case *ast.AssignStmt:
-				for _, call := range checker.callsDroppingError(statement.Lhs, statement.Rhs) {
-					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
-				}
-			case *ast.ValueSpec:
-				// `var value, _ = strconv.Atoi(text)` drops the error as an assignment does.
-				names := make([]ast.Expr, 0, len(statement.Names))
-				for _, name := range statement.Names {
-					names = append(names, name)
-				}
-				for _, call := range checker.callsDroppingError(names, statement.Values) {
-					checker.report(call, comments.ExcuseFor(statement, marker.Ignored))
-				}
-			}
-			return true
-		})
+	state.comments = state.indexes.ForFile(file)
+}
+
+// judgeStatement reports every call node drops the error of, unless the comments speaking for node give a reason.
+func judgeStatement(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	switch statement := node.(type) {
+	case *ast.ExprStmt:
+		if call, isCall := ast.Unparen(statement.X).(*ast.CallExpr); isCall && state.checker.returnsError(call) {
+			state.checker.report(call, state.comments.ExcuseFor(statement, marker.Ignored))
+		}
+	case *ast.DeferStmt:
+		// A deferred or started call's results go nowhere, whatever they are.
+		if state.checker.returnsError(statement.Call) {
+			state.checker.report(statement.Call, state.comments.ExcuseFor(statement, marker.Ignored))
+		}
+	case *ast.GoStmt:
+		if state.checker.returnsError(statement.Call) {
+			state.checker.report(statement.Call, state.comments.ExcuseFor(statement, marker.Ignored))
+		}
+	case *ast.AssignStmt:
+		for _, call := range state.checker.callsDroppingError(statement.Lhs, statement.Rhs) {
+			state.checker.report(call, state.comments.ExcuseFor(statement, marker.Ignored))
+		}
+	case *ast.ValueSpec:
+		// `var value, _ = strconv.Atoi(text)` drops the error as an assignment does.
+		names := make([]ast.Expr, 0, len(statement.Names))
+		for _, name := range statement.Names {
+			names = append(names, name)
+		}
+		for _, call := range state.checker.callsDroppingError(names, statement.Values) {
+			state.checker.report(call, state.comments.ExcuseFor(statement, marker.Ignored))
+		}
 	}
-	return nil, nil
 }
 
 // isExemptWriterType is whether candidate is a pointer to one of exemptWriters.

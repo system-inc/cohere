@@ -1,0 +1,3 @@
+# A planted gains file whose gain has no reason directly above it.
+
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:15:9: nil dereference in load

@@ -9,8 +9,10 @@
 // calls from x/tools' internal packages, typesinternal.IsTypeNamed, translated beside it, and it reports the
 // original's messages word for word, at the same position and over the same range. Like the original it requires no
 // other analyzer: it reads each test file's top-level declarations in order and walks a Fuzz function's body with
-// ast.Inspect, whose pruning the fuzz checks rely on. The registry runs the port in the original's place, and the
-// original stays the oracle: the parity tests beside this file run both over the same packages.
+// ast.Inspect, whose pruning the fuzz checks rely on. It sits on the engine's syntax dispatcher, hearing each file as
+// the walk the dispatcher makes once for every syntax rule enters it, and no node within. The registry runs the port
+// in the original's place, and the original stays the oracle: the parity tests beside this file run both over the
+// same packages.
 //
 // It differs from the original only where the original's finding is false, each recorded in the differences fixture
 // with its reason, and all of them in a Fuzz function, where what go test checks when the fuzz test runs, through
@@ -41,56 +43,77 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "tests",
-	Doc: "check for common mistaken usages of tests and examples\n\n" +
-		"The tests checker walks Test, Benchmark, Fuzzing and Example functions checking\n" +
-		"malformed names, wrong signatures and examples documenting non-existent\n" +
-		"identifiers.\n\n" +
-		"Please see the documentation for package testing in golang.org/pkg/testing\n" +
-		"for the conventions that are enforced for Tests, Benchmarks, and Examples.",
-	URL: "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/tests",
-	Run: run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "tests"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for common mistaken usages of tests and examples\n\n" +
+	"The tests checker walks Test, Benchmark, Fuzzing and Example functions checking\n" +
+	"malformed names, wrong signatures and examples documenting non-existent\n" +
+	"identifiers.\n\n" +
+	"Please see the documentation for package testing in golang.org/pkg/testing\n" +
+	"for the conventions that are enforced for Tests, Benchmarks, and Examples."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/tests"
+
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it, in the order
+// the original reads the package's files. It reads a file's top-level declarations and comments itself, so it lists
+// no node kind.
+var Listener = rule.Listener{
+	FileEnter: checkFile,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// Only a _test.go file holds what go test runs. The name is the file's own, not one a //line directive gives
-		// it, as the original reads it.
-		if !strings.HasSuffix(pass.Fset.File(file.FileStart).Name(), "_test.go") {
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// checkFile judges each test, benchmark, fuzz test and example a _test.go file declares at its top level.
+func checkFile(context *rule.Context, file *ast.File) {
+	// Only a _test.go file holds what go test runs. The name is the file's own, not one a //line directive gives it,
+	// as the original reads it.
+	if !strings.HasSuffix(context.Fset.File(file.FileStart).Name(), "_test.go") {
+		return
+	}
+	for _, declaration := range file.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		// go test runs no method, whatever its name.
+		if !isFunction || function.Recv != nil {
 			continue
 		}
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			// go test runs no method, whatever its name.
-			if !isFunction || function.Recv != nil {
-				continue
-			}
-			switch {
-			case strings.HasPrefix(function.Name.Name, "Example"):
-				checkExampleName(pass, function)
-				checkExampleOutput(pass, function, file.Comments)
-			case strings.HasPrefix(function.Name.Name, "Test"):
-				checkTest(pass, function, "Test")
-			case strings.HasPrefix(function.Name.Name, "Benchmark"):
-				checkTest(pass, function, "Benchmark")
-			case strings.HasPrefix(function.Name.Name, "Fuzz"):
-				checkTest(pass, function, "Fuzz")
-				checkFuzz(pass, function)
-			}
+		switch {
+		case strings.HasPrefix(function.Name.Name, "Example"):
+			checkExampleName(context, function)
+			checkExampleOutput(context, function, file.Comments)
+		case strings.HasPrefix(function.Name.Name, "Test"):
+			checkTest(context, function, "Test")
+		case strings.HasPrefix(function.Name.Name, "Benchmark"):
+			checkTest(context, function, "Benchmark")
+		case strings.HasPrefix(function.Name.Name, "Fuzz"):
+			checkTest(context, function, "Fuzz")
+			checkFuzz(context, function)
 		}
 	}
-	return nil, nil
 }
 
 // checkTest judges a function whose name opens with prefix, Test, Benchmark or Fuzz, when it has go test's shape for
 // one: no results and one parameter, a pointer to a type named T, B or F. Such a function with type parameters, or
 // with a lowercase letter after its prefix, is one go test does not run. x/tools' checkTest.
-func checkTest(pass *analysis.Pass, function *ast.FuncDecl, prefix string) {
+func checkTest(context *rule.Context, function *ast.FuncDecl, prefix string) {
 	// The parser gives every function declaration its parameter list, so Params is never nil here; the original's
 	// guard is kept with the rest of its condition.
 	if function.Type.Results != nil && len(function.Type.Results.List) > 0 ||
@@ -105,7 +128,7 @@ func checkTest(pass *analysis.Pass, function *ast.FuncDecl, prefix string) {
 	if typeParameters := function.Type.TypeParams; typeParameters != nil && len(typeParameters.List) > 0 {
 		// The range runs from the opening bracket to the closing one, the closing bracket itself left out, as x/tools'
 		// astutil.RangeOf(Opening, Closing) gives it.
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos: typeParameters.Opening,
 			End: typeParameters.Closing,
 			Message: fmt.Sprintf(
@@ -115,7 +138,7 @@ func checkTest(pass *analysis.Pass, function *ast.FuncDecl, prefix string) {
 		})
 	}
 	if !isTestSuffix(function.Name.Name[len(prefix):]) {
-		pass.ReportRangef(
+		context.ReportRangef(
 			function.Name,
 			"%s has malformed name: first letter after '%s' must not be lowercase", function.Name.Name, prefix,
 		)
@@ -160,15 +183,15 @@ func isExampleSuffix(text string) bool {
 // `ExampleName`, `ExampleName_suffix`, `ExampleName_Member` and `ExampleName_Member_suffix`, where Name is an
 // identifier the package or one of its imports declares, Member is a field or method of it, and a suffix opens with a
 // lowercase letter. x/tools' checkExampleName.
-func checkExampleName(pass *analysis.Pass, function *ast.FuncDecl) {
+func checkExampleName(context *rule.Context, function *ast.FuncDecl) {
 	if len(function.Type.Params.List) != 0 {
-		pass.Reportf(function.Pos(), "%s should be niladic", function.Name.Name)
+		context.Reportf(function.Pos(), "%s should be niladic", function.Name.Name)
 	}
 	if results := function.Type.Results; results != nil && len(results.List) != 0 {
-		pass.Reportf(function.Pos(), "%s should return nothing", function.Name.Name)
+		context.Reportf(function.Pos(), "%s should return nothing", function.Name.Name)
 	}
 	if typeParameters := function.Type.TypeParams; typeParameters != nil && len(typeParameters.List) > 0 {
-		pass.Reportf(function.Pos(), "%s should not have type params", function.Name.Name)
+		context.Reportf(function.Pos(), "%s should not have type params", function.Name.Name)
 	}
 	// The package's own example names nothing more.
 	if function.Name.Name == "Example" {
@@ -176,10 +199,10 @@ func checkExampleName(pass *analysis.Pass, function *ast.FuncDecl) {
 	}
 	exampleName := strings.TrimPrefix(function.Name.Name, "Example")
 	elements := strings.SplitN(exampleName, "_", 3)
-	objects := lookupObjects(pass.Pkg, elements[0])
+	objects := lookupObjects(context.Package, elements[0])
 	if elements[0] != "" && len(objects) == 0 {
 		// Nothing is named, so there is no member or suffix left to judge.
-		pass.Reportf(function.Pos(), "%s refers to unknown identifier: %s", function.Name.Name, elements[0])
+		context.Reportf(function.Pos(), "%s refers to unknown identifier: %s", function.Name.Name, elements[0])
 		return
 	}
 	if len(elements) < 2 {
@@ -188,18 +211,18 @@ func checkExampleName(pass *analysis.Pass, function *ast.FuncDecl) {
 	if elements[0] == "" {
 		// `Example_suffix`, the package's own example with a suffix.
 		if residual := strings.TrimPrefix(exampleName, "_"); !isExampleSuffix(residual) {
-			pass.Reportf(function.Pos(), "%s has malformed example suffix: %s", function.Name.Name, residual)
+			context.Reportf(function.Pos(), "%s has malformed example suffix: %s", function.Name.Name, residual)
 		}
 		return
 	}
 	// The second element is a member when it does not open with a lowercase letter, and a suffix when it does.
 	if member := elements[1]; !isExampleSuffix(member) && !hasFieldOrMethod(objects, member) {
-		pass.Reportf(
+		context.Reportf(
 			function.Pos(), "%s refers to unknown field or method: %s.%s", function.Name.Name, elements[0], member,
 		)
 	}
 	if len(elements) == 3 && !isExampleSuffix(elements[2]) {
-		pass.Reportf(function.Pos(), "%s has malformed example suffix: %s", function.Name.Name, elements[2])
+		context.Reportf(function.Pos(), "%s has malformed example suffix: %s", function.Name.Name, elements[2])
 	}
 }
 
@@ -243,7 +266,7 @@ type exampleComment struct {
 // checkExampleOutput reports each output comment block of an example that is not the example's last comment block,
 // since go doc reads output only from the last one. With more than one output block, each is reported as one too
 // many. x/tools' checkExampleOutput.
-func checkExampleOutput(pass *analysis.Pass, function *ast.FuncDecl, fileComments []*ast.CommentGroup) {
+func checkExampleOutput(context *rule.Context, function *ast.FuncDecl, fileComments []*ast.CommentGroup) {
 	comments := []exampleComment{}
 	outputs := 0
 	// A file's comment blocks are in the order they appear, so the first to end past the function closes the search.
@@ -266,7 +289,7 @@ func checkExampleOutput(pass *analysis.Pass, function *ast.FuncDecl, fileComment
 	}
 	for index, comment := range comments {
 		if comment.isOutput && index != len(comments)-1 {
-			pass.Report(analysis.Diagnostic{Pos: comment.position, Message: message})
+			context.Report(analysis.Diagnostic{Pos: comment.position, Message: message})
 		}
 	}
 }

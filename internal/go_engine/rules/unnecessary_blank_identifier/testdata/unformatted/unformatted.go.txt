@@ -1,0 +1,27 @@
+package unformatted
+
+// Spacing gofmt rewrites, which the range fixes delete as the source spells it and the receive fixes print over.
+func spacing(m map[string]int, ch chan int) {
+	var key string
+	var x int
+	for key ,_ = range m {
+	}
+	for key	,	_	= range m {
+	}
+	for _  =  range m {
+	}
+	for index  ,  _  :=  range m {
+		_ = index
+	}
+	for _ ,_= range m {
+	}
+	x ,_ = <-ch
+	x,_=<-ch
+	_=<-ch
+	_ = <-  ch
+	x, _ = (( <-ch ))
+	_ = ((<-ch))
+	(( _ )) = <-ch
+	x, (( _ )) = <-ch
+	_, _ = key, x
+}

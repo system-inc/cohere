@@ -1,0 +1,185 @@
+x/tools@v0.50.0's own fixtures for buildtag, go/analysis/passes/buildtag/testdata, byte for byte. They are an
+archive because most are files gofmt would rewrite, adding or changing build lines, and cohere's gofmt guard reads
+every Go file under testdata.
+-- src/a/buildtag.go --
+// Copyright 2013 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// This file contains tests for the buildtag checker.
+
+// want +1 `possible malformed \+build comment`
+// +builder
+// +build ignore
+
+// Mention +build // want `possible malformed \+build comment`
+
+// want +1 `misplaced \+build comment`
+// +build nospace
+//go:build ok
+package a
+
+// want +1 `misplaced \+build comment`
+// +build toolate
+
+var _ = 3
+
+var _ = `
+// +build notacomment
+`
+-- src/a/buildtag2.go --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// +build no
+
+package a
+
+// want +1 `misplaced \+build comment`
+// +build toolate
+
+// want +1 `misplaced //go:build comment`
+//go:build toolate
+
+var _ = `
+// +build notacomment
+`
+-- src/a/buildtag3.go --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +3 `[+]build lines do not match //go:build condition`
+
+//go:build good
+// +build bad
+
+package a
+
+var _ = `
+// +build notacomment
+`
+-- src/a/buildtag4.go --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:build !(bad || worse)
+// +build !bad
+// +build !worse
+
+package a
+-- src/a/buildtag5.go --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:build !(bad || worse)
+// +build !bad,!worse
+
+package a
+
+//want +1 `misplaced \+build comment`
+// +build other
+-- src/a/buildtag6.s --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+#include "go_asm.h"
+
+// ok because we cannot parse assembly files.
+// +build no
+
+-- src/a/buildtag7.s --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// +build ignore
+
+#include "go_asm.h"
+
+// ok because we cannot parse assembly files
+// the assembler would complain if we did assemble this file.
+//go:build no
+-- src/a/buildtag8.s --
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +3 `\+build lines do not match //go:build condition`
+
+//go:build something
+// +build ignore
+
+#include "go_asm.h"
+
+// ok because we cannot parse assembly files
+// the assembler would complain if we did assemble this file.
+//go:build no
+-- src/b/vers.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +3 `invalid go version \"go1.20.1\" in build constraint`
+// want +1 `invalid go version \"go1.20.1\" in build constraint`
+//go:build go1.20.1
+// +build go1.20.1
+
+package b
+-- src/b/vers1.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// This file is intentionally so its build tags always match.
+
+package b
+-- src/b/vers2.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `invalid go version \"go120\" in build constraint`
+//go:build go120
+
+package b
+-- src/b/vers3.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `invalid go version \"go1..20\" in build constraint`
+//go:build go1..20
+
+package b
+-- src/b/vers4.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `invalid go version \"go.20\" in build constraint`
+//go:build go.20
+
+package b
+-- src/b/vers5.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `invalid go version \"g1.20\" in build constraint`
+//go:build g1.20
+
+package b
+-- src/b/vers6.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `invalid go version \"go20\" in build constraint`
+//go:build go20
+
+package b

@@ -20,6 +20,11 @@
 // region, as in the original, since the started goroutine is what is likely to call it. The other change is that the
 // original's unchecked assertion on a parameter's type, which panics on a parameter typed `*a.b.T`, is checked here;
 // such a parameter does not type-check, and the checker runs neither on a package that does not.
+//
+// The port sits on the engine's syntax dispatcher, hearing each go statement and each call on the walk the dispatcher
+// makes once for every syntax rule, and judges the regions they start once the walk has covered the package. The
+// original's walk does not descend into a function declaration that takes no test, and the dispatcher's descends into
+// everything, so the port leaves alone what it hears within such a declaration, which the stack names.
 package testing_goroutine
 
 import (
@@ -30,38 +35,56 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "testinggoroutine",
-	Doc: "report calls to (*testing.T).Fatal from goroutines started by a test\n\n" +
-		"Functions that abruptly terminate a test, such as the Fatal, Fatalf, FailNow, and\n" +
-		"Skip{,f,Now} methods of *testing.T, must be called from the test goroutine itself.\n" +
-		"This checker detects calls to these functions that occur within a goroutine\n" +
-		"started by the test. For example:\n\n" +
-		"\tfunc TestFoo(t *testing.T) {\n" +
-		"\t    go func() {\n" +
-		"\t        t.Fatal(\"oops\") // error: (*T).Fatal called from non-test goroutine\n" +
-		"\t    }()\n" +
-		"\t}",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/testinggoroutine",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming
+// it read the same as before the port took the original's place.
+const passName = "testinggoroutine"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "report calls to (*testing.T).Fatal from goroutines started by a test\n\n" +
+	"Functions that abruptly terminate a test, such as the Fatal, Fatalf, FailNow, and\n" +
+	"Skip{,f,Now} methods of *testing.T, must be called from the test goroutine itself.\n" +
+	"This checker detects calls to these functions that occur within a goroutine\n" +
+	"started by the test. For example:\n\n" +
+	"\tfunc TestFoo(t *testing.T) {\n" +
+	"\t    go func() {\n" +
+	"\t        t.Fatal(\"oops\") // error: (*T).Fatal called from non-test goroutine\n" +
+	"\t    }()\n" +
+	"\t}"
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/testinggoroutine"
+
+// subtestFlag is the experimental option whether a forbidden call in the function a t.Run starts, on a test declared
+// outside it, is reported too, under the original's name, since settings may set it.
+const subtestFlag = "subtest"
+
+// Listener is what the port hears of each package from the dispatcher: every go statement and every call, in
+// preorder, as the original's walk visits them, each a start of a region to judge, and, once the walk is over, the
+// package, whose regions it judges in the order they were found.
+var Listener = rule.Listener{
+	Nodes:       []ast.Node{(*ast.GoStmt)(nil), (*ast.CallExpr)(nil)},
+	Node:        gather,
+	PackageExit: judgeRegions,
 }
 
-// reportSubtest is the subtest flag, the original's, by name, default and usage: whether a forbidden call in the
-// function a t.Run starts, on a test declared outside it, is reported too.
-var reportSubtest bool
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
-func init() {
-	Analyzer.Flags.BoolVar(
-		&reportSubtest, "subtest", false, "whether to check if t.Run subtest is terminated correctly; experimental",
-	)
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset, and its subtest option, which the listener reads from the analyzer running it.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	// The option keeps the original's usage, word for word, and its default.
+	analyzer.Flags.Bool(subtestFlag, false, "whether to check if t.Run subtest is terminated correctly; experimental")
+	return analyzer
 }
 
 // forbidden is each method of the testing package that ends the test it is called on, and must be called from that
@@ -75,61 +98,45 @@ var forbidden = []string{
 	"SkipNow",
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("testing_goroutine: inspect's result is missing")
+// gather records the region node starts, a `go fun()` or a `t.Run(name, fun)`, unless the original's walk never
+// reaches node, whose ancestors are stack.
+func gather(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[packageState](context)
+	if !state.isRead {
+		state.isRead = true
+		state.importsTesting = imports(context.Package, "testing")
+		// newAnalyzer declares the option as a bool flag on every analyzer the port is built as, whose String is
+		// strconv.FormatBool of its value, so the option is always there and reads exactly true or false.
+		state.reportsSubtest = context.Option(subtestFlag).String() == "true"
+		state.declarationOf = localFunctionDeclarations(context.TypesInfo, context.Files)
+		state.takesTest = map[*ast.FuncDecl]bool{}
+		state.startedAt = map[ast.Node][]*asynchronousCall{}
 	}
-	// A package that imports no testing package calls none of its methods by its own hand.
-	if !imports(pass.Pkg, "testing") {
-		return nil, nil
+	if !state.importsTesting || state.isPruned(stack) {
+		return
 	}
-	declarationOf := localFunctionDeclarations(pass.TypesInfo, pass.Files)
-	// startedAt maps each region whose statements run concurrently with some test to the asynchronous calls that start
-	// it. A test helper may be started from several places, so one region may have several. regions holds them in the
-	// order they were first found, the order the original reports in.
-	startedAt := map[ast.Node][]*asynchronousCall{}
-	regions := []ast.Node{}
-	add := func(started *asynchronousCall) {
-		if started == nil {
-			return
-		}
-		if startedAt[started.region] == nil {
-			regions = append(regions, started.region)
-		}
-		startedAt[started.region] = append(startedAt[started.region], started)
+	switch visited := node.(type) {
+	case *ast.GoStmt:
+		state.add(goAsynchronousCall(context.TypesInfo, visited, state.declarationOf))
+	case *ast.CallExpr:
+		state.add(runAsynchronousCall(context.TypesInfo, visited))
 	}
-	// Every `go fun()` and `t.Run(name, fun)`, in preorder, as the original's Nodes visits them. A function declaration
-	// whose parameters take no *testing.T or *testing.B is not descended into, so what it starts is never judged, and
-	// that pruning is why the walk is the cursor's Inspect rather than inspector.All, which visits every node.
-	inspected.Root().Inspect(
-		[]ast.Node{(*ast.FuncDecl)(nil), (*ast.GoStmt)(nil), (*ast.CallExpr)(nil)},
-		func(cursor inspector.Cursor) bool {
-			switch node := cursor.Node().(type) {
-			case *ast.FuncDecl:
-				return hasBenchmarkOrTestParameters(node)
-			case *ast.GoStmt:
-				add(goAsynchronousCall(pass.TypesInfo, node, declarationOf))
-			case *ast.CallExpr:
-				add(runAsynchronousCall(pass.TypesInfo, node))
-			}
-			return true
-		},
-	)
-	// Each forbidden call within a region, which includes the region being a `go t.Fatal()` itself, is judged once for
-	// each call that starts the region.
-	for _, region := range regions {
-		judge(pass, region, startedAt)
+}
+
+// judgeRegions judges each region found once the walk has covered the package: each forbidden call within a region,
+// which includes the region being a `go t.Fatal()` itself, is judged once for each call that starts the region.
+func judgeRegions(context *rule.Context) {
+	state := rule.State[packageState](context)
+	for _, region := range state.regions {
+		judge(context, region, state.startedAt)
 	}
-	return nil, nil
 }
 
 // report reports call, a call of the forbidden method, whose name is forbiddenName, on receiver, made in the region
 // started. A function literal started directly is reported at the forbidden call; anything else, a variable, a
 // function or a method value, at the go statement or t.Run that starts it, a name saying what it calls.
 func report(
-	pass *analysis.Pass,
+	context *rule.Context,
 	started *asynchronousCall,
 	call *ast.CallExpr,
 	receiver *types.Var,
@@ -143,11 +150,11 @@ func report(
 		calledThrough = fmt.Sprintf(" (%s calls %s)", name.Name, forbiddenName)
 	}
 	if _, isGo := started.asynchronous.(*ast.GoStmt); isGo {
-		pass.ReportRangef(where, "call to %s from a non-test goroutine%s", forbiddenName, calledThrough)
+		context.ReportRangef(where, "call to %s from a non-test goroutine%s", forbiddenName, calledThrough)
 		return
 	}
-	if reportSubtest {
-		pass.ReportRangef(
+	if rule.State[packageState](context).reportsSubtest {
+		context.ReportRangef(
 			where, "call to %s on %s defined outside of the subtest%s", forbiddenName, receiver.Name(), calledThrough,
 		)
 	}

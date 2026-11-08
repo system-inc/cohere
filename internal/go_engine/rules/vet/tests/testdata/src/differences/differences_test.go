@@ -60,6 +60,7 @@ func FuzzAliasedT(f *testing.F) {
 	// testingT is *testing.T, so the target takes a *testing.T first.
 	f.Fuzz(func(t testingT, value string) {}) // port drops: the first parameter of a fuzz target must be *testing.T
 	f.Add("right")
+	// The target takes a string, and 1 is an int, so this seed can never reach it.
 	f.Add(1) // port finds: mismatched type in call to (*testing.F).Add: int, fuzz target expects string
 }
 
@@ -92,6 +93,7 @@ func FuzzInterfaceValues(f *testing.F) {
 
 func FuzzInterfaceAmongMismatches(f *testing.F) {
 	var value any = "text"
+	// The any value may hold the string the target takes, so only the int against int64 is a mismatch.
 	f.Add(value, 1) // port renames: mismatched types in call to (*testing.F).Add: [any int], fuzz target expects [string int64] => mismatched type in call to (*testing.F).Add: int, fuzz target expects int64
 	f.Fuzz(func(t *testing.T, value string, number int64) {})
 }
@@ -107,7 +109,9 @@ func FuzzTypeParameterValue[Value string](f *testing.F, value Value) {
 func FuzzMethodExpression(f *testing.F) {
 	// The call hands Add one value, the string the target takes.
 	(*testing.F).Add(f, "text") // port drops: wrong number of values in call to (*testing.F).Add: 2, fuzz target expects 1
-	(*testing.F).Add(f)         // port renames: mismatched type in call to (*testing.F).Add: *testing.F, fuzz target expects string => wrong number of values in call to (*testing.F).Add: 0, fuzz target expects 1
-	(*testing.F).Add(f, 5)      // port renames: wrong number of values in call to (*testing.F).Add: 2, fuzz target expects 1 => mismatched type in call to (*testing.F).Add: int, fuzz target expects string
+	// The call hands Add no value at all, where the target takes one.
+	(*testing.F).Add(f) // port renames: mismatched type in call to (*testing.F).Add: *testing.F, fuzz target expects string => wrong number of values in call to (*testing.F).Add: 0, fuzz target expects 1
+	// The call hands Add one value, an int, where the target takes a string.
+	(*testing.F).Add(f, 5) // port renames: wrong number of values in call to (*testing.F).Add: 2, fuzz target expects 1 => mismatched type in call to (*testing.F).Add: int, fuzz target expects string
 	f.Fuzz(func(t *testing.T, value string) {})
 }

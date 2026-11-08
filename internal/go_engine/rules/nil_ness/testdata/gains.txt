@@ -1,0 +1,17 @@
+# The findings the nilness port makes over whole trees that x/tools' nilness does not, each exactly as cohere-parity
+# prints it, the path relative to the tree's root, with why on the comment lines above it. cohere-parity reads this
+# file; a finding only the port makes that no line here records fails as an unexplained gain.
+
+# The standard library (cohere-parity "$(go env GOROOT)/src" std). prev is only ever assigned nil, at nodes.go:624 and
+# :628, so it is nil on every edge into the loop's comparison. staticcheck merges the same constant from every edge
+# into that constant, where x/tools keeps a phi over the loop's back edge whose inputs are all nil and never folds it:
+# the onlyEverNil class of differences.go. Confirmed on a reproduction of the loop beside the differences fixture: the
+# port alone reports it, and with prev assigned a value that can be non-nil neither side does.
+go/printer/nodes.go:613:13: impossible condition: nil != nil
+
+# cmd (cohere-parity "$(go env GOROOT)/src" cmd/...). source is nil on the branch that compares it, being assigned only
+# on the other, and the closure handed to LookupInit at obj9.go:436 captures it later. x/tools keeps a captured
+# variable in memory for the whole function, its value unknown, where staticcheck lifts it up to the capture: the
+# capturedLater class of differences.go. Confirmed on a reproduction of rewriteToUseTOC beside the differences
+# fixture: the port alone reports it, and with the closure no longer capturing source both sides do.
+cmd/internal/obj/ppc64/obj9.go:416:13: impossible condition: nil != nil

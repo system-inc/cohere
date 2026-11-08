@@ -60,6 +60,11 @@ type inProcessLister struct {
 	prefetchSlots chan struct{}
 	pending       sync.WaitGroup
 
+	// prefetchDone closes when the listing ends, after which the prefetch starts no read, and prefetching counts the
+	// prefetch's walk and every read it started, which the listing waits for before it returns (see stopPrefetch).
+	prefetchDone chan struct{}
+	prefetching  sync.WaitGroup
+
 	// visited is how far order's walk has got with each package, by import path.
 	visited map[string]visitState
 
@@ -107,7 +112,16 @@ func listInProcess(workspace string, environment []string, patterns []string, he
 	if doubt != "" {
 		return nil, doubt
 	}
+	return lister.list(patterns)
+}
+
+// list is listInProcess's listing of patterns by a lister already built, the standard library prefetched while it
+// lists and the prefetch ended before it returns.
+func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 	lister.prefetchStandardLibrary()
+	// The prefetch reads through held, whose bytes the caller writes again once the listing returns, so nothing it
+	// started may outlive the listing, whatever the listing answers.
+	defer lister.stopPrefetch()
 	rootPaths, doubt := lister.match(patterns)
 	if doubt != "" {
 		return nil, doubt
@@ -194,6 +208,7 @@ func newInProcessLister(workspace string, environment []string, held Held) (*inP
 		required:      map[string]bool{},
 		slots:         make(chan struct{}, 2*runtime.GOMAXPROCS(0)),
 		prefetchSlots: make(chan struct{}, max(1, runtime.GOMAXPROCS(0)/2)),
+		prefetchDone:  make(chan struct{}),
 		byPath:        map[string]*inProcessPackage{},
 		visited:       map[string]visitState{},
 		reads:         map[string]*directoryRead{},
@@ -358,12 +373,15 @@ func (lister *inProcessLister) packagesIn(
 // testdata, without waiting. A package's imports are known only once it is read, so the standard library's long chain
 // of packages, each importing the next down to runtime, would otherwise be read one link at a time; read all at
 // once, every link is ready when the walk reaches it. What no package imports costs CPU and no time, since the
-// prefetch holds at most half the read slots.
+// prefetch holds at most half the read slots. It runs until the listing ends, when stopPrefetch stops it.
 func (lister *inProcessLister) prefetchStandardLibrary() {
 	source := filepath.Join(lister.context.GOROOT, "src")
-	go func() {
+	lister.prefetching.Go(func() {
 		// Ignored: a directory the walk cannot read is read again, and its error reported, when an import reaches it.
 		_ = filepath.WalkDir(source, func(directory string, entry fs.DirEntry, pathError error) error {
+			if lister.prefetchStopped() {
+				return filepath.SkipAll
+			}
 			if pathError != nil || !entry.IsDir() {
 				return nil
 			}
@@ -372,14 +390,41 @@ func (lister *inProcessLister) prefetchStandardLibrary() {
 				strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
 				return filepath.SkipDir
 			}
-			go func() {
-				lister.prefetchSlots <- struct{}{}
+			// The walk is counted in prefetching until it returns, so this adds to a count above zero, which may
+			// happen while stopPrefetch waits.
+			lister.prefetching.Go(func() {
+				select {
+				case lister.prefetchSlots <- struct{}{}:
+				case <-lister.prefetchDone:
+					return
+				}
 				defer func() { <-lister.prefetchSlots }()
+				// A slot and the end can be ready together, and select takes either, so the end is asked again.
+				if lister.prefetchStopped() {
+					return
+				}
 				lister.readDirectory(directory)
-			}()
+			})
 			return nil
 		})
-	}()
+	})
+}
+
+// stopPrefetch ends the prefetch: no read starts after it, and it returns once every read already started has ended,
+// so none reads through held after the listing returns. What it waits for is at most one read per prefetch slot.
+func (lister *inProcessLister) stopPrefetch() {
+	close(lister.prefetchDone)
+	lister.prefetching.Wait()
+}
+
+// prefetchStopped reports whether the listing has ended, after which the prefetch starts nothing.
+func (lister *inProcessLister) prefetchStopped() bool {
+	select {
+	case <-lister.prefetchDone:
+		return true
+	default:
+		return false
+	}
 }
 
 // load reads importPath and, in parallel, everything it imports, each package once.

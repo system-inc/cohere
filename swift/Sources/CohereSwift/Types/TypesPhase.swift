@@ -40,6 +40,11 @@ struct TypesPhase {
          findings, so lint never asks sourcekitd to check that file again (`SymbolProvider.answered`).
          */
         var symbols: [String: FileSymbols] = [:]
+        /*
+         Why the check never started, when it did not (`notChecked`): its finding is the run's gap, no type error in
+         any file, so lint still runs behind it and the typed rules say this is why they could not judge a file.
+         */
+        var notStarted: String? = nil
     }
 
     let package: PackageModel
@@ -205,7 +210,15 @@ struct TypesPhase {
         let scopeChanges = begun.snapshot.flatMap { snapshot in
             lastRecorded.flatMap { snapshot.changes(since: $0, allowingFileSetChanges: true) }
         }
-        let checked = try check(scope: scopeChanges.flatMap(scope(of:)))
+        let checked: CheckRun
+        do {
+            checked = try check(scope: scopeChanges.flatMap(scope(of:)))
+        }
+        catch let notStarted as CheckNotStarted {
+            BuildInputSnapshot.forget(scratchPath: scratchPath)
+            BuildInputSnapshot.forget(scratchPath: scratchPath, kind: .lastRecorded)
+            return notChecked(because: notStarted, start: begun.date)
+        }
         if var snapshot = begun.snapshot, checked.succeeded {
             snapshot.interfaces = fingerprints.interfaces
             snapshot.contents = fingerprints.contents
@@ -348,8 +361,9 @@ struct TypesPhase {
 
     /*
      The checks themselves: each package's build server session, then its owned modules not yet checked by an
-     earlier session, then its owned C-family files. A server that fails is thrown as the named gap it is. With a
-     scope, only its targets are checked again and every other one's records from the last check are read.
+     earlier session, then its owned C-family files. A server that fails is thrown as the named gap it is
+     (`CheckNotStarted`), which `run` reports. With a scope, only its targets are checked again and every other one's
+     records from the last check are read.
      */
     private func check(scope given: Scope?) throws -> CheckRun {
         var run = CheckRun()
@@ -513,7 +527,7 @@ struct TypesPhase {
                 )
             }
             catch {
-                throw TypesFailure(
+                throw CheckNotStarted(
                     description:
                         "the check of \(session.root.path) failed before compiling anything, so the compiler never ran: \(error)\(unresolvableWords(error.description))"
                 )
@@ -1502,6 +1516,44 @@ struct TypesPhase {
     /* The check could not run, or its records could not be read at all. */
     struct TypesFailure: Error, CustomStringConvertible {
         var description: String
+    }
+
+    /*
+     A build server that failed before the compiler ran, a package `--no-fix` cannot resolve among them: the named gap
+     the header promises, which `run` reports as the run's finding (`notChecked`) rather than ending the run.
+     */
+    struct CheckNotStarted: Error, CustomStringConvertible {
+        var description: String
+    }
+
+    /*
+     The result of a check that never started (#4txsasr): a finding at the package's Package.swift in the failure's
+     own words, and every file of ours without a record, so the run is incomplete and names what went unchecked and
+     why, and lint still runs over every file (`Result.notStarted`). Thrown out of the run, it ended the engine with
+     nothing checked, and the front door could say only that the engine did not run: measured 2026-11-07 on a copy of
+     ahraos-presence at 190bfa8c, where CapturePhone/PhoneCapture names a remote package and keeps no Package.resolved,
+     so `--no-fix` cannot resolve it, and its 13 files went unnamed while the same package with its pins checks all
+     13.
+     */
+    func notChecked(because failure: CheckNotStarted, start: Date) -> Result {
+        let finding = FindingRecord(
+            source: .compiler,
+            file: package.root.appendingPathComponent("Package.swift").path,
+            line: 1,
+            column: 1,
+            severity: .error,
+            rule: "",
+            messageId: "buildFailed",
+            message: failure.description,
+        )
+        let record = TypesRecord(
+            diagnostics: 1,
+            files: files.count,
+            elapsedMilliseconds: Pipeline.milliseconds(since: start),
+            filesWithoutRecord: files.map(\.url.path).sorted(),
+            build: "not checked: \(failure.description)",
+        )
+        return Result(findings: [finding], record: record, hasErrors: true, notStarted: failure.description)
     }
 
     /* The record directory a check into this scratch left for each target we own files in, `<Target>.build`, with that target's name. */

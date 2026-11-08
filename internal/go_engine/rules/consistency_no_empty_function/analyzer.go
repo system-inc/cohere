@@ -38,6 +38,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker_type"
 	"github.com/system-inc/cohere/policy"
 )
@@ -45,29 +46,55 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-empty-function"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_empty_function",
-	Doc: "Flags a function, method or function literal whose body holds no statement and no comment with words in " +
-		"it between its braces, tests included, since an empty test can never fail. A doc comment above the " +
-		"function does not count. A declaration with no body, implemented in assembly or linked by name, has " +
-		"nothing to judge, and neither has a sealed union's marker: the never used method of a one-method " +
-		"unexported interface, which marks its variants' membership and does nothing by design.",
-	Run: run,
+// listener reads the package's unused markers and each file's comments as the syntax dispatcher's walk enters the
+// file, and hears every function declaration and literal in it.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	Node:      judgeFunction,
 }
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_empty_function", "Flags a function, method or function "+
+	"literal whose body holds no statement and no comment with words in it between its braces, tests included, "+
+	"since an empty test can never fail. A doc comment above the function does not count. A declaration with no "+
+	"body, implemented in assembly or linked by name, has nothing to judge, and neither has a sealed union's marker: "+
+	"the never used method of a one-method unexported interface, which marks its variants' membership and does "+
+	"nothing by design.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. It reads the syntax tree and its comments, and the type
 // information that tells a sealed union's marker from any other empty method.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var emptyFunctionMessage = policy.MessageOf(Name, "emptyFunction")
 
-func run(pass *analysis.Pass) (any, error) {
-	unusedMarkers := unusedMarkerInterfaces(pass)
-	for _, file := range pass.Files {
-		judgeFile(pass, file, unusedMarkers)
+// packageState is what the rule reads once for its package and once for each file, held in its context's state.
+type packageState struct {
+	// unusedMarkers is unusedMarkerInterfaces of the package, read as the walk enters its first file.
+	unusedMarkers map[string][]*types.Interface
+	// markersRead is whether unusedMarkers has been read, since a package with no marker reads as an empty map.
+	markersRead bool
+	// commentOpenings is each comment of the file being walked that has words in it, by where it opens. The parser
+	// gathers file.Comments in source order, so the slice is sorted and a body's comments are found by a binary
+	// search for its opening brace.
+	commentOpenings []token.Pos
+}
+
+// enterFile reads the package's unused markers the first time, and file's comments with words in them.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if !state.markersRead {
+		state.unusedMarkers = unusedMarkerInterfaces(context)
+		state.markersRead = true
 	}
-	return nil, nil
+	state.commentOpenings = state.commentOpenings[:0]
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			if hasWords(comment) {
+				state.commentOpenings = append(state.commentOpenings, comment.Slash)
+			}
+		}
+	}
 }
 
 // unusedMarkerInterfaces gathers, once for the package, every interface that can seal a union, by its one method's
@@ -75,9 +102,9 @@ func run(pass *analysis.Pass) (any, error) {
 // here with exactly one method, unexported, and nothing embedded. A use is any selector, a call, a method value or a
 // method expression, that resolves to a method of that name whose receiver implements the interface: the interface's
 // own method, a variant's, or one promoted through an embedding, all of which name the same membership.
-func unusedMarkerInterfaces(pass *analysis.Pass) map[string][]*types.Interface {
+func unusedMarkerInterfaces(context *rule.Context) map[string][]*types.Interface {
 	markerInterfaces := map[string][]*types.Interface{}
-	for _, object := range pass.TypesInfo.Defs {
+	for _, object := range context.TypesInfo.Defs {
 		typeName, isTypeName := object.(*types.TypeName)
 		if !isTypeName {
 			continue
@@ -105,7 +132,7 @@ func unusedMarkerInterfaces(pass *analysis.Pass) map[string][]*types.Interface {
 	// selector's name, so reading Uses as well would find nothing more. A method of a generic type is read through its
 	// origin, whose receiver is the type as declared rather than one instantiation of it.
 	usedReceivers := map[string][]types.Type{}
-	for _, selection := range pass.TypesInfo.Selections {
+	for _, selection := range context.TypesInfo.Selections {
 		method, isMethod := selection.Obj().(*types.Func)
 		if !isMethod {
 			continue
@@ -131,11 +158,11 @@ func unusedMarkerInterfaces(pass *analysis.Pass) map[string][]*types.Interface {
 
 // isUnusedMarker is whether function is a sealed union's marker, as the package comment reads one: marker_type's
 // marker shape, on a receiver that implements an interface in unusedMarkers under the method's own name.
-func isUnusedMarker(pass *analysis.Pass, function *ast.FuncDecl, unusedMarkers map[string][]*types.Interface) bool {
+func isUnusedMarker(context *rule.Context, function *ast.FuncDecl, unusedMarkers map[string][]*types.Interface) bool {
 	if !marker_type.IsMarkerMethod(function) {
 		return false
 	}
-	method, isMethod := pass.TypesInfo.Defs[function.Name].(*types.Func)
+	method, isMethod := context.TypesInfo.Defs[function.Name].(*types.Func)
 	if !isMethod {
 		return false
 	}
@@ -144,48 +171,35 @@ func isUnusedMarker(pass *analysis.Pass, function *ast.FuncDecl, unusedMarkers m
 	})
 }
 
-// judgeFile reports every empty function body in file that holds no comment saying why and is no sealed union's
-// marker.
-func judgeFile(pass *analysis.Pass, file *ast.File, unusedMarkers map[string][]*types.Interface) {
-	// Each comment that has words in it, by where it opens. The parser gathers file.Comments in source order, so the
-	// slice is sorted and a body's comments are found by a binary search for its opening brace.
-	commentOpenings := []token.Pos{}
-	for _, group := range file.Comments {
-		for _, comment := range group.List {
-			if hasWords(comment) {
-				commentOpenings = append(commentOpenings, comment.Slash)
-			}
+// judgeFunction reports node's body when it is empty, holds no comment saying why and is no sealed union's marker.
+func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	var body *ast.BlockStmt
+	switch function := node.(type) {
+	case *ast.FuncDecl:
+		if isUnusedMarker(context, function, state.unusedMarkers) {
+			return
 		}
+		body = function.Body
+	case *ast.FuncLit:
+		body = function.Body
+	default:
+		return
 	}
-	ast.Inspect(file, func(node ast.Node) bool {
-		var body *ast.BlockStmt
-		switch function := node.(type) {
-		case *ast.FuncDecl:
-			if isUnusedMarker(pass, function, unusedMarkers) {
-				return true
-			}
-			body = function.Body
-		case *ast.FuncLit:
-			body = function.Body
-		default:
-			return true
-		}
-		// A declaration without a body is implemented elsewhere, in assembly or through a linkname directive.
-		if body == nil || !holdsNoStatement(body) {
-			return true
-		}
-		// The first comment opening after the brace is inside the body when it opens before the closing brace.
-		index, _ := slices.BinarySearch(commentOpenings, body.Lbrace+1)
-		if index < len(commentOpenings) && commentOpenings[index] < body.Rbrace {
-			return true
-		}
-		pass.Report(analysis.Diagnostic{
-			Pos:      body.Lbrace,
-			End:      body.Rbrace + 1,
-			Category: emptyFunctionMessage.Id,
-			Message:  emptyFunctionMessage.Render(map[string]string{}),
-		})
-		return true
+	// A declaration without a body is implemented elsewhere, in assembly or through a linkname directive.
+	if body == nil || !holdsNoStatement(body) {
+		return
+	}
+	// The first comment opening after the brace is inside the body when it opens before the closing brace.
+	index, _ := slices.BinarySearch(state.commentOpenings, body.Lbrace+1)
+	if index < len(state.commentOpenings) && state.commentOpenings[index] < body.Rbrace {
+		return
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      body.Lbrace,
+		End:      body.Rbrace + 1,
+		Category: emptyFunctionMessage.Id,
+		Message:  emptyFunctionMessage.Render(map[string]string{}),
 	})
 }
 

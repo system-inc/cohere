@@ -17,25 +17,32 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-console"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_console",
-	Doc: "Flags fmt.Print, Printf and Println, fmt.Fprint, Fprintf and Fprintln handed os.Stdout or os.Stderr, the " +
-		"builtins print and println, and the standard logger's log.Print, log.Fatal and log.Panic functions in a " +
-		"package other than main, outside a _test.go file, since only a command knows where the process's " +
-		"standard output and error go. A write to any other writer, fmt.Fprintln given one or a *log.Logger's " +
-		"method, is left alone.",
-	Run: run,
+// listener reads as the syntax dispatcher's walk enters each file whether the file is judged, and hears every call,
+// selector and identifier in it. Every use of a function is found, not only a call: fmt.Println handed on as a
+// callback, or kept in a variable and called later, writes to standard output just the same, and a check shaped like
+// a call would report that route clean.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil), (*ast.SelectorExpr)(nil), (*ast.Ident)(nil)},
+	Node:      judgeNode,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_console", "Flags fmt.Print, Printf and Println, "+
+	"fmt.Fprint, Fprintf and Fprintln handed os.Stdout or os.Stderr, the builtins print and println, and the "+
+	"standard logger's log.Print, log.Fatal and log.Panic functions in a package other than main, outside a _test.go "+
+	"file, since only a command knows where the process's standard output and error go. A write to any other writer, "+
+	"fmt.Fprintln given one or a *log.Logger's method, is left alone.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry. It reads the types to tell fmt's Println from any other.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var consistencyNoConsoleMessage = policy.MessageOf(Name, "consistencyNoConsole")
 
@@ -60,51 +67,59 @@ var writerFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln
 // standardStreams are os's package-level variables for the process's own standard output and error.
 var standardStreams = map[string]bool{"Stdout": true, "Stderr": true}
 
-func run(pass *analysis.Pass) (any, error) {
-	// package main is the command entry point, the one place whose standard output is the program's own.
-	if pass.Pkg.Name() == "main" {
-		return nil, nil
+// fileState is whether the file being walked is judged, held in the rule's context's state.
+type fileState struct {
+	// judged is whether the file being walked is judged: one outside package main and outside a _test.go file.
+	judged bool
+}
+
+// enterFile reads whether file is judged. package main is the command entry point, the one place whose standard
+// output is the program's own, and a test's output is read by the person running it. The file's own name is read, not
+// one a //line directive gives it, since only a real _test.go file is a test's.
+func enterFile(context *rule.Context, file *ast.File) {
+	rule.State[fileState](context).judged = context.Package.Name() != "main" &&
+		!strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+}
+
+// judgeNode reports a call, selector or identifier of a judged file that writes to the process's own standard output
+// or error, its ancestors in stack.
+func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
+	if !rule.State[fileState](context).judged {
+		return
 	}
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a real _test.go file is a test's.
-		if strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
-			continue
+	switch expression := node.(type) {
+	case *ast.CallExpr:
+		// The writer is an argument, so only a call is judged here, and its arguments are heard on their own, since
+		// one may itself be a print.
+		if call, found := standardStreamWrite(context, expression); found {
+			report(context, expression, call)
 		}
-		// Every use of the function is found, not only a call: fmt.Println handed on as a callback, or kept in a
-		// variable and called later, writes to standard output just the same, and a check shaped like a call would
-		// report that route clean.
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch expression := node.(type) {
-			case *ast.CallExpr:
-				// The writer is an argument, so only a call is judged here, and its children are still visited, since
-				// an argument may itself be a print.
-				if call, found := standardStreamWrite(pass, expression); found {
-					report(pass, expression, call)
-				}
-			case *ast.SelectorExpr:
-				if call, found := standardOutputCall(pass, expression.Sel); found {
-					report(pass, expression, call)
-					// The selector's own identifier is the use just reported, so it is not visited again.
-					return false
-				}
-			case *ast.Ident:
-				// A bare identifier reaches here as a dot-imported Println or a builtin println.
-				if call, found := standardOutputCall(pass, expression); found {
-					report(pass, expression, call)
-				}
+	case *ast.SelectorExpr:
+		if call, found := standardOutputCall(context, expression.Sel); found {
+			report(context, expression, call)
+		}
+	case *ast.Ident:
+		// A selector's own identifier is judged with its selector, as the same use, so it is not judged again. What a
+		// reported selector selects from is a package's name, which is never a write.
+		if len(stack) > 0 {
+			selector, isSelector := stack[len(stack)-1].(*ast.SelectorExpr)
+			if isSelector && selector.Sel == expression {
+				return
 			}
-			return true
-		})
+		}
+		// A bare identifier reaches here as a dot-imported Println or a builtin println.
+		if call, found := standardOutputCall(context, expression); found {
+			report(context, expression, call)
+		}
 	}
-	return nil, nil
 }
 
 // standardOutputCall is how the message names what identifier uses, `fmt.Println` or `println`, and whether it is one
 // of the writes to standard output. It resolves identifier by its object, so a local function, closure or parameter
 // named print, a method named Println on any type, a *log.Logger's included, and a package of another path that is
 // also called fmt are none of them.
-func standardOutputCall(pass *analysis.Pass, identifier *ast.Ident) (string, bool) {
-	switch object := pass.TypesInfo.Uses[identifier].(type) {
+func standardOutputCall(context *rule.Context, identifier *ast.Ident) (string, bool) {
+	switch object := context.TypesInfo.Uses[identifier].(type) {
 	case *types.Builtin:
 		if object.Name() == "print" || object.Name() == "println" {
 			return object.Name(), true
@@ -127,11 +142,11 @@ func standardOutputCall(pass *analysis.Pass, identifier *ast.Ident) (string, boo
 // writes to a writer handed os.Stdout or os.Stderr itself. The callee and the writer are both resolved by object, so
 // a writer the caller passed in, a local value with a field named Stdout, and os.Stderr given as a value to print
 // rather than as the writer are none of them.
-func standardStreamWrite(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
+func standardStreamWrite(context *rule.Context, call *ast.CallExpr) (string, bool) {
 	if len(call.Args) == 0 {
 		return "", false
 	}
-	function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "fmt" || !writerFunctions[function.Name()] {
 		return "", false
 	}
@@ -145,7 +160,7 @@ func standardStreamWrite(pass *analysis.Pass, call *ast.CallExpr) (string, bool)
 	default:
 		return "", false
 	}
-	variable, isVariable := pass.TypesInfo.Uses[writer].(*types.Var)
+	variable, isVariable := context.TypesInfo.Uses[writer].(*types.Var)
 	if !isVariable || variable.Pkg() == nil || variable.Pkg().Path() != "os" || !standardStreams[variable.Name()] {
 		return "", false
 	}
@@ -157,8 +172,8 @@ func standardStreamWrite(pass *analysis.Pass, call *ast.CallExpr) (string, bool)
 }
 
 // report flags node, naming call as the message's call.
-func report(pass *analysis.Pass, node ast.Node, call string) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, node ast.Node, call string) {
+	context.Report(analysis.Diagnostic{
 		Pos:      node.Pos(),
 		End:      node.End(),
 		Category: consistencyNoConsoleMessage.Id,

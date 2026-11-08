@@ -3,6 +3,9 @@ package load
 import (
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -80,5 +83,61 @@ func TestTheListerReadsTheHeldBytes(test *testing.T) {
 	}
 	if listed.byPath["strings"] == nil {
 		test.Error("the lister did not list strings, which only the held bytes import")
+	}
+}
+
+// The lister's prefetch of the standard library reads through held, and the caller writes what held reads once the
+// listing returns, as the pipeline's reread does (#5qhgt92), so the listing returns only after every read the prefetch
+// started has ended. heldModule imports nothing on disk, so every read of the standard library here is the prefetch's.
+// The fixture's own read waits until the prefetch's first read has begun, so a read is under way before the listing
+// can end, and that first read waits until the listing has stopped the prefetch, so it is still under way when the
+// listing's own work is done: it has ended when the listing returns only if the listing waited for it.
+func TestThePrefetchEndsWithTheListing(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	writeListingFiles(test, directory, heldModule)
+	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
+	if environmentError != nil {
+		test.Fatal(environmentError)
+	}
+	// abandoned frees the first read when the test ends, so a listing that never stops the prefetch leaves nothing
+	// waiting on it.
+	abandoned := make(chan struct{})
+	test.Cleanup(func() { close(abandoned) })
+	prefetchReading := make(chan struct{})
+	var firstRead sync.Once
+	var firstReadEnded atomic.Bool
+	// lister is set before the listing starts the prefetch, whose first read is the only one that reads it.
+	var lister *inProcessLister
+	held := Held(func(file string) ([]byte, bool) {
+		if strings.HasPrefix(file, directory+string(filepath.Separator)) {
+			<-prefetchReading
+			return nil, false
+		}
+		isFirst := false
+		firstRead.Do(func() {
+			isFirst = true
+			close(prefetchReading)
+		})
+		if isFirst {
+			select {
+			case <-lister.prefetchDone:
+			case <-abandoned:
+			}
+			firstReadEnded.Store(true)
+		}
+		return nil, false
+	})
+	built, doubt := newInProcessLister(directory, environment, held)
+	if doubt != "" {
+		test.Fatalf("the lister could not be built: %s", doubt)
+	}
+	lister = built
+	if _, doubt = lister.list([]string{"./..."}); doubt != "" {
+		test.Fatalf("the lister did not answer: %s", doubt)
+	}
+	if !firstReadEnded.Load() {
+		test.Error("the listing returned while a read the prefetch started was still under way")
 	}
 }

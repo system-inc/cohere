@@ -1,0 +1,27 @@
+package unformatted
+
+// gofmt would rewrite both shapes below, the parentheses around a loop's condition away and a loop of empty
+// clauses around a condition to the condition alone, and the guard holds every .go file of the tree to gofmt, so this
+// one is kept as text and written out as Go where the test loads it. A parenthesized condition is no identifier, so
+// IsBoolConst refuses it and the original leaves the loop alone, and empty clauses parse as no initializer and no post
+// statement, so the original reports the loop, its header running from the keyword to the end of the condition.
+
+func leftAloneParenthesized() {
+	for (true) {
+	}
+}
+
+func leftAloneDoublyParenthesized() {
+	for ((true)) {
+	}
+}
+
+func reportedEmptyClauses() {
+	for ; true; {
+	}
+}
+
+func leftAloneParenthesizedEmptyClauses() {
+	for ; (true); {
+	}
+}

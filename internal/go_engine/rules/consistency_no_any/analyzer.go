@@ -20,56 +20,92 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-any"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_any",
-	Doc: "Flags any or interface{} written as the type of a parameter, result, struct field, interface method, " +
-		"variable or named type this package declares, a type argument inside one included, since the house states " +
-		"a value's type. Left alone: a method matching a method of another package in the import graph, a value " +
-		"handed to a place whose type is no interface or taken from another package's declaration of the same " +
-		"type, a constraint, and a type written inside an expression.",
-	Run: run,
+// listener follows values and gathers candidates over the syntax dispatcher's walk of every file, hearing each node
+// that hands a value on and each that could be any or an empty interface, and judges the candidates once the whole
+// package has been walked, since a place anywhere in it may fix a declaration's type.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes: []ast.Node{
+		(*ast.CallExpr)(nil),
+		(*ast.AssignStmt)(nil),
+		(*ast.ValueSpec)(nil),
+		(*ast.ReturnStmt)(nil),
+		(*ast.CompositeLit)(nil),
+		(*ast.SendStmt)(nil),
+		(*ast.Ident)(nil),
+		(*ast.InterfaceType)(nil),
+	},
+	Node:        judgeNode,
+	PackageExit: exitPackage,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_any", "Flags any or interface{} written as the type of a "+
+	"parameter, result, struct field, interface method, variable or named type this package declares, a type "+
+	"argument inside one included, since the house states a value's type. Left alone: a method matching a method of "+
+	"another package in the import graph, a value handed to a place whose type is no interface or taken from another "+
+	"package's declaration of the same type, a constraint, and a type written inside an expression.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry. It reads the types to tell whose a type is.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var anyTypeMessage = policy.MessageOf(Name, "anyType")
 
-func run(pass *analysis.Pass) (any, error) {
-	flows := &flowAnalysis{
-		pass:        pass,
+// packageState is what the rule gathers over its package, held in its context's state.
+type packageState struct {
+	// flows follows the package's values, made as the walk enters its first file.
+	flows *flowAnalysis
+	// candidates are the any and interface{} words written in a declaration's type, in the order the walk met them.
+	candidates []candidate
+}
+
+// enterFile makes the package's flow analysis, the first time the walk enters one of its files.
+func enterFile(context *rule.Context, _ *ast.File) {
+	state := rule.State[packageState](context)
+	if state.flows != nil {
+		return
+	}
+	state.flows = &flowAnalysis{
+		context:     context,
 		sinkFixed:   map[flowKey]bool{},
 		definedFrom: map[flowKey][]flowKey{},
 		sourceFixed: map[flowKey]bool{},
 		feeds:       map[flowKey][]flowKey{},
 	}
-	candidates := []candidate{}
-	for _, file := range pass.Files {
-		stack := []ast.Node{}
-		ast.Inspect(file, func(node ast.Node) bool {
-			if node == nil {
-				stack = stack[:len(stack)-1]
-				return true
-			}
-			flows.record(node, stack)
-			if found, isCandidate := flows.candidateAt(node, stack); isCandidate {
-				candidates = append(candidates, found)
-			}
-			stack = append(stack, node)
-			return true
-		})
+	state.candidates = []candidate{}
+}
+
+// judgeNode notes every place node hands a value on, and keeps node as a candidate when it is any or an empty
+// interface written in a declaration's type, its ancestors in stack.
+func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[packageState](context)
+	if state.flows == nil {
+		return
 	}
-	flows.settle(candidates)
-	for _, found := range candidates {
-		if !flows.anyFixed(found.declarations) {
-			pass.Report(analysis.Diagnostic{
+	state.flows.record(node, stack)
+	if found, isCandidate := state.flows.candidateAt(node, stack); isCandidate {
+		state.candidates = append(state.candidates, found)
+	}
+}
+
+// exitPackage settles the package's flows and reports each candidate none of whose declarations has its type fixed
+// elsewhere.
+func exitPackage(context *rule.Context) {
+	state := rule.State[packageState](context)
+	if state.flows == nil {
+		return
+	}
+	state.flows.settle(state.candidates)
+	for _, found := range state.candidates {
+		if !state.flows.anyFixed(found.declarations) {
+			context.Report(analysis.Diagnostic{
 				Pos:      found.node.Pos(),
 				End:      found.node.End(),
 				Category: anyTypeMessage.Id,
@@ -77,7 +113,6 @@ func run(pass *analysis.Pass) (any, error) {
 			})
 		}
 	}
-	return nil, nil
 }
 
 // flowKey names a declaration whose type the rule may find fixed elsewhere: a variable, field, parameter, result or

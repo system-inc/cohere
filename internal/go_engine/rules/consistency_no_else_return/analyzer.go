@@ -19,65 +19,61 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-else-return"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_else_return",
-	Doc: "Flags the final else of an if or else-if chain whose every branch always returns, since the code after " +
-		"the chain runs only when no branch returned and the else adds a level of indentation to say nothing. An " +
-		"else that reads a variable declared in an if's init statement is left alone, since dropping it would mean " +
-		"widening that variable's scope, and so is a labeled if.",
-	Run: run,
-}
+// listener hears every if of the syntax dispatcher's walk, with its parent, which says whether it heads a chain.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.IfStmt)(nil)}, Node: judgeIf}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_else_return", "Flags the final else of an if or else-if "+
+	"chain whose every branch always returns, since the code after the chain runs only when no branch returned and "+
+	"the else adds a level of indentation to say nothing. An else that reads a variable declared in an if's init "+
+	"statement is left alone, since dropping it would mean widening that variable's scope, and so is a labeled if.",
+	&listener)
 
 // Rule is this rule's entry in the Go engine's registry. It reads type information to tell whether an else uses a
 // variable an if's init statement declared.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var elseAfterReturnMessage = policy.MessageOf(Name, "elseAfterReturn")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// An if that is another if's else, or that a label holds, is no chain head and is never judged on its own.
-		// The walk reaches a parent before its children, so each is set aside before the walk arrives at it.
-		notHeads := map[*ast.IfStmt]bool{}
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch statement := node.(type) {
-			case *ast.LabeledStmt:
-				// The core port judges only an if whose parent holds a statement list, and a label holds one
-				// statement. Go would allow the unwrap here, but a labeled if is rare enough that matching upstream's
-				// silence costs nothing and spares a goto target's reader a surprise.
-				if labeled, isIf := statement.Stmt.(*ast.IfStmt); isIf {
-					notHeads[labeled] = true
-				}
-			case *ast.IfStmt:
-				if elseIf, isIf := statement.Else.(*ast.IfStmt); isIf {
-					notHeads[elseIf] = true
-				}
-				if !notHeads[statement] {
-					judgeChain(pass, statement)
-				}
-			}
-			// An if nested inside a branch heads a chain of its own, and the walk going on reaches it.
-			return true
-		})
+// judgeIf judges the chain node heads. An if that is another if's else, or that a label holds, is no chain head and
+// is never judged on its own; its parent, the last of its ancestors, says which it is. An if nested inside a branch
+// heads a chain of its own, and the walk going on reaches it.
+func judgeIf(context *rule.Context, node ast.Node, stack []ast.Node) {
+	statement, isIf := node.(*ast.IfStmt)
+	if !isIf {
+		return
 	}
-	return nil, nil
+	if len(stack) > 0 {
+		switch parent := stack[len(stack)-1].(type) {
+		case *ast.IfStmt:
+			if parent.Else == ast.Stmt(statement) {
+				return
+			}
+		case *ast.LabeledStmt:
+			// The core port judges only an if whose parent holds a statement list, and a label holds one statement.
+			// Go would allow the unwrap here, but a labeled if is rare enough that matching upstream's silence costs
+			// nothing and spares a goto target's reader a surprise.
+			return
+		}
+	}
+	judgeChain(context, statement)
 }
 
 // judgeChain reports the final else of the chain that head opens when every branch before it always returns. A chain
 // with no final else, or with any branch that can fall through, is left alone, as the core port leaves it.
-func judgeChain(pass *analysis.Pass, head *ast.IfStmt) {
+func judgeChain(context *rule.Context, head *ast.IfStmt) {
 	// Every variable an init statement in the chain declares is in scope in the final else, and nowhere after the
 	// chain, so those are the ones an unwrapped else would lose.
 	declaredByInit := map[types.Object]bool{}
 	for current := head; ; {
-		recordInitDeclarations(pass, current, declaredByInit)
+		recordInitDeclarations(context, current, declaredByInit)
 		if current.Else == nil || !alwaysReturns(current.Body) {
 			return
 		}
@@ -85,10 +81,10 @@ func judgeChain(pass *analysis.Pass, head *ast.IfStmt) {
 		case *ast.IfStmt:
 			current = alternate
 		case *ast.BlockStmt:
-			if usesAny(pass, alternate, declaredByInit) {
+			if usesAny(context, alternate, declaredByInit) {
 				return
 			}
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos:      alternate.Lbrace,
 				End:      alternate.Rbrace + 1,
 				Category: elseAfterReturnMessage.Id,
@@ -106,7 +102,7 @@ func judgeChain(pass *analysis.Pass, head *ast.IfStmt) {
 // variable declaration declares in an init; an assignment, a send or a call there names nothing new.
 //
 // Mutates: declared gains each variable the init declares, so the caller's set covers every init of the chain
-func recordInitDeclarations(pass *analysis.Pass, statement *ast.IfStmt, declared map[types.Object]bool) {
+func recordInitDeclarations(context *rule.Context, statement *ast.IfStmt, declared map[types.Object]bool) {
 	assignment, isAssignment := statement.Init.(*ast.AssignStmt)
 	if !isAssignment {
 		return
@@ -118,7 +114,7 @@ func recordInitDeclarations(pass *analysis.Pass, statement *ast.IfStmt, declared
 		}
 		// Defs holds only what this statement declares, and a blank identifier declares nothing, so neither an
 		// assignment's targets nor `_` is recorded.
-		if object := pass.TypesInfo.Defs[identifier]; object != nil {
+		if object := context.TypesInfo.Defs[identifier]; object != nil {
 			declared[object] = true
 		}
 	}
@@ -126,7 +122,7 @@ func recordInitDeclarations(pass *analysis.Pass, statement *ast.IfStmt, declared
 
 // usesAny is whether any identifier inside block resolves to one of objects. A use inside a function literal counts,
 // since the literal still needs the variable in scope where it is written.
-func usesAny(pass *analysis.Pass, block *ast.BlockStmt, objects map[types.Object]bool) bool {
+func usesAny(context *rule.Context, block *ast.BlockStmt, objects map[types.Object]bool) bool {
 	if len(objects) == 0 {
 		return false
 	}
@@ -135,7 +131,7 @@ func usesAny(pass *analysis.Pass, block *ast.BlockStmt, objects map[types.Object
 		if found {
 			return false
 		}
-		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier && objects[pass.TypesInfo.Uses[identifier]] {
+		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier && objects[context.TypesInfo.Uses[identifier]] {
 			found = true
 		}
 		return !found

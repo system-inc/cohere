@@ -51,6 +51,10 @@ type Rule struct {
 	// While any of them is empty the engine lists the rule in the lint record's rulesNotConfigured, so a rule
 	// that cannot report reads as not configured rather than as quiet.
 	ConfiguredBy []string
+	// Listener is what a dispatched rule hears of each package, and nil for a rule whose analyzer walks the package
+	// itself. A dispatched rule keeps its own Analyzer all the same, for its identity, options and docs: its run
+	// reports what the dispatcher found under its name, so settings, suppression and crashes read as any rule's.
+	Listener *Listener
 }
 
 // Validate refuses a rule the registry should never hold, so a malformed rule fails a test at the
@@ -90,6 +94,11 @@ func (rule Rule) Validate() error {
 			"rule %q has origin %q, which is none of %q, %q, %q and %q",
 			rule.Name, rule.Origin, OriginHouse, OriginVet, OriginStaticcheck, OriginTools,
 		)
+	}
+	if rule.Listener != nil {
+		if listenerError := rule.Listener.Validate(); listenerError != nil {
+			return fmt.Errorf("rule %q has a listener that %w", rule.Name, listenerError)
+		}
 	}
 	// A name with no flag behind it could never be set, so the rule would read as not configured forever.
 	for _, option := range rule.ConfiguredBy {
