@@ -16,66 +16,65 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-use-before-define"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_use_before_define",
-	Doc: "Flags a reference to a package-level var or const that is declared further down the same file, because a " +
-		"reader meets the name before the value it holds. Functions, types and references from other files are not " +
-		"judged.",
-	Run: run,
-}
+// listener hears every identifier of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.Ident)(nil)}, Node: judgeIdentifier}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_use_before_define", "Flags a reference to a package-level "+
+	"var or const that is declared further down the same file, because a reader meets the name before the value it "+
+	"holds. Functions, types and references from other files are not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. It resolves each reference to the object it names, so it
 // reads types.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var useBeforeDefinitionMessage = policy.MessageOf(Name, "useBeforeDefinition")
 
-func run(pass *analysis.Pass) (any, error) {
-	packageScope := pass.Pkg.Scope()
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			identifier, isIdentifier := node.(*ast.Ident)
-			if !isIdentifier {
-				return true
-			}
-			// Uses, not the spelling: a local of the same name, a struct field or another package's name resolves to
-			// an object of its own, and only one that lives in the package's own scope is judged.
-			object := pass.TypesInfo.Uses[identifier]
-			if object == nil || object.Parent() != packageScope {
-				return true
-			}
-			kind := ""
-			switch object.(type) {
-			case *types.Var:
-				kind = "variable"
-			case *types.Const:
-				kind = "constant"
-			default:
-				return true
-			}
-			// Positions are compared as token.Pos, which runs in file order whatever a //line directive says. A
-			// declaration outside this file's span is in another file of the package, which has no order to keep.
-			if object.Pos() < file.FileStart || object.Pos() > file.FileEnd || identifier.Pos() >= object.Pos() {
-				return true
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      identifier.Pos(),
-				End:      identifier.End(),
-				Category: useBeforeDefinitionMessage.Id,
-				Message: useBeforeDefinitionMessage.Render(map[string]string{
-					"name": identifier.Name,
-					"kind": kind,
-				}),
-			})
-			return true
-		})
+// judgeIdentifier reports an identifier in the file that heads its ancestors when it reads a package-level variable
+// or constant declared further down that file.
+func judgeIdentifier(context *rule.Context, node ast.Node, stack []ast.Node) {
+	identifier, isIdentifier := node.(*ast.Ident)
+	if !isIdentifier || len(stack) == 0 {
+		return
 	}
-	return nil, nil
+	file, isFile := stack[0].(*ast.File)
+	if !isFile {
+		return
+	}
+	// Uses, not the spelling: a local of the same name, a struct field or another package's name resolves to an
+	// object of its own, and only one that lives in the package's own scope is judged.
+	object := context.TypesInfo.Uses[identifier]
+	if object == nil || object.Parent() != context.Package.Scope() {
+		return
+	}
+	kind := ""
+	switch object.(type) {
+	case *types.Var:
+		kind = "variable"
+	case *types.Const:
+		kind = "constant"
+	default:
+		return
+	}
+	// Positions are compared as token.Pos, which runs in file order whatever a //line directive says. A declaration
+	// outside this file's span is in another file of the package, which has no order to keep.
+	if object.Pos() < file.FileStart || object.Pos() > file.FileEnd || identifier.Pos() >= object.Pos() {
+		return
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      identifier.Pos(),
+		End:      identifier.End(),
+		Category: useBeforeDefinitionMessage.Id,
+		Message: useBeforeDefinitionMessage.Render(map[string]string{
+			"name": identifier.Name,
+			"kind": kind,
+		}),
+	})
 }

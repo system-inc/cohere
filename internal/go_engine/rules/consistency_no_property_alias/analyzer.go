@@ -49,25 +49,25 @@ import (
 	"golang.org/x/tools/go/ast/astutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-property-alias"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_property_alias",
-	Doc: "Flags a local inside a function that binds one name to a field read of the same name, name := " +
-		"server.name, and is read exactly once with nothing that could run code or write between, so the reach " +
-		"written at the read reads the same field, and a nil root panics there rather than at the declaration. A " +
-		"local read again, in a closure or a loop, written through, or read after a call, may be a snapshot, so " +
-		"it is not judged.",
-	Run: run,
-}
+// listener hears every assignment and declaration statement of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.AssignStmt)(nil), (*ast.DeclStmt)(nil)}, Node: judgeStatement}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_property_alias", "Flags a local inside a function that "+
+	"binds one name to a field read of the same name, name := server.name, and is read exactly once with nothing that "+
+	"could run code or write between, so the reach written at the read reads the same field, and a nil root panics "+
+	"there rather than at the declaration. A local read again, in a closure or a loop, written through, or read after "+
+	"a call, may be a snapshot, so it is not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var noPropertyAliasMessage = policy.MessageOf(Name, "noPropertyAlias")
 
@@ -79,55 +79,59 @@ var measuringBuiltins = map[string]bool{
 	"make": true,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch function := node.(type) {
-			case *ast.FuncDecl:
-				if function.Body != nil {
-					judgeFunction(pass, file, function.Body)
-				}
-			case *ast.FuncLit:
-				judgeFunction(pass, file, function.Body)
-			}
-			return true
-		})
+// judgeStatement judges a declaration of one local in the body of the function or function literal that most
+// closely encloses it, among its ancestors in stack, which head with its file. A function literal declares its own
+// locals, so a declaration inside one is judged against the literal's body and never its enclosing function's.
+func judgeStatement(context *rule.Context, node ast.Node, stack []ast.Node) {
+	if len(stack) == 0 {
+		return
 	}
-	return nil, nil
-}
-
-// judgeFunction reports each alias declared directly in body. A function literal inside it declares its own locals
-// and is judged when the file's walk reaches it, so the walk here stops at one.
-func judgeFunction(pass *analysis.Pass, file *ast.File, body *ast.BlockStmt) {
-	ast.Inspect(body, func(node ast.Node) bool {
-		switch statement := node.(type) {
-		case *ast.FuncLit:
-			return false
-		case *ast.AssignStmt:
-			if statement.Tok == token.DEFINE && len(statement.Lhs) == 1 && len(statement.Rhs) == 1 {
-				if local, isIdentifier := statement.Lhs[0].(*ast.Ident); isIdentifier {
-					judge(pass, file, body, statement, local, statement.Rhs[0])
-				}
-			}
-		case *ast.DeclStmt:
-			declaration, isGeneral := statement.Decl.(*ast.GenDecl)
-			if !isGeneral || declaration.Tok != token.VAR || len(declaration.Specs) != 1 {
-				return true
-			}
-			// A declared type may convert, to an interface or from an untyped value, so the local is not the field.
-			specification, isValue := declaration.Specs[0].(*ast.ValueSpec)
-			if isValue && specification.Type == nil && len(specification.Names) == 1 && len(specification.Values) == 1 {
-				judge(pass, file, body, statement, specification.Names[0], specification.Values[0])
+	file, isFile := stack[0].(*ast.File)
+	if !isFile {
+		return
+	}
+	body := enclosingBody(stack)
+	if body == nil {
+		return
+	}
+	switch statement := node.(type) {
+	case *ast.AssignStmt:
+		if statement.Tok == token.DEFINE && len(statement.Lhs) == 1 && len(statement.Rhs) == 1 {
+			if local, isIdentifier := statement.Lhs[0].(*ast.Ident); isIdentifier {
+				judge(context, file, body, statement, local, statement.Rhs[0])
 			}
 		}
-		return true
-	})
+	case *ast.DeclStmt:
+		declaration, isGeneral := statement.Decl.(*ast.GenDecl)
+		if !isGeneral || declaration.Tok != token.VAR || len(declaration.Specs) != 1 {
+			return
+		}
+		// A declared type may convert, to an interface or from an untyped value, so the local is not the field.
+		specification, isValue := declaration.Specs[0].(*ast.ValueSpec)
+		if isValue && specification.Type == nil && len(specification.Names) == 1 && len(specification.Values) == 1 {
+			judge(context, file, body, statement, specification.Names[0], specification.Values[0])
+		}
+	}
+}
+
+// enclosingBody is the body of the innermost function declaration or function literal among stack, or nil when
+// there is none.
+func enclosingBody(stack []ast.Node) *ast.BlockStmt {
+	for index := len(stack) - 1; index >= 0; index-- {
+		switch function := stack[index].(type) {
+		case *ast.FuncLit:
+			return function.Body
+		case *ast.FuncDecl:
+			return function.Body
+		}
+	}
+	return nil
 }
 
 // judge reports the declaration of local from value when it is a pure alias of a field: the same name, a chain of
 // names and field reads, and one read of the local that the reach could stand in for unchanged.
 func judge(
-	pass *analysis.Pass,
+	context *rule.Context,
 	file *ast.File,
 	body *ast.BlockStmt,
 	statement ast.Stmt,
@@ -138,19 +142,19 @@ func judge(
 	if !isSelector || selector.Sel.Name != local.Name || local.Name == "_" {
 		return
 	}
-	localObject, isVariable := pass.TypesInfo.Defs[local].(*types.Var)
+	localObject, isVariable := context.TypesInfo.Defs[local].(*types.Var)
 	if !isVariable {
 		return
 	}
-	root := chainRoot(pass, selector)
+	root := chainRoot(context, selector)
 	if root == nil {
 		return
 	}
-	rootObject, rootIsVariable := pass.TypesInfo.Uses[root].(*types.Var)
+	rootObject, rootIsVariable := context.TypesInfo.Uses[root].(*types.Var)
 	if !rootIsVariable {
 		return
 	}
-	read := onlyRead(pass, body, localObject)
+	read := onlyRead(context, body, localObject)
 	if read == nil || containsGoto(body) {
 		return
 	}
@@ -158,22 +162,22 @@ func judge(
 	if len(path) == 0 || path[0] != read {
 		return
 	}
-	if runsApartFromTheDeclaration(path, statement) || writesThroughTheRead(pass, path) {
+	if runsApartFromTheDeclaration(path, statement) || writesThroughTheRead(context, path) {
 		return
 	}
 	// The reach written at the read must name the same object the declaration read, so a declaration between them
 	// that shadows the chain's first name leaves the alias alone.
-	scope := pass.Pkg.Scope().Innermost(read.Pos())
+	scope := context.Package.Scope().Innermost(read.Pos())
 	if scope == nil {
 		return
 	}
 	if _, found := scope.LookupParent(root.Name, read.Pos()); found != rootObject {
 		return
 	}
-	if codeRunsBetween(pass, body, statement, read, evaluationUnit(path)) {
+	if codeRunsBetween(context, body, statement, read, evaluationUnit(path)) {
 		return
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      local.Pos(),
 		End:      value.End(),
 		Category: noPropertyAliasMessage.Id,
@@ -187,10 +191,10 @@ func judge(
 // chainRoot is the first name of a chain of field reads, through parentheses, or nil when any link is something
 // else: a call, an index, a dereference, an assertion, a method, or a package's qualified identifier, which go/types
 // records as no selection at all.
-func chainRoot(pass *analysis.Pass, selector *ast.SelectorExpr) *ast.Ident {
+func chainRoot(context *rule.Context, selector *ast.SelectorExpr) *ast.Ident {
 	current := selector
 	for {
-		selection, isSelection := pass.TypesInfo.Selections[current]
+		selection, isSelection := context.TypesInfo.Selections[current]
 		if !isSelection || selection.Kind() != types.FieldVal {
 			return nil
 		}
@@ -208,10 +212,10 @@ func chainRoot(pass *analysis.Pass, selector *ast.SelectorExpr) *ast.Ident {
 // onlyRead is the one identifier in body that uses local, or nil when there are none or more than one. A function
 // literal's body is searched too, since a read there is still a read, and go/types records a write to the name
 // among its uses, so a local assigned again is never taken for read once.
-func onlyRead(pass *analysis.Pass, body *ast.BlockStmt, local *types.Var) *ast.Ident {
+func onlyRead(context *rule.Context, body *ast.BlockStmt, local *types.Var) *ast.Ident {
 	var reads []*ast.Ident
 	ast.Inspect(body, func(node ast.Node) bool {
-		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier && pass.TypesInfo.Uses[identifier] == local {
+		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier && context.TypesInfo.Uses[identifier] == local {
 			reads = append(reads, identifier)
 		}
 		return true
@@ -264,7 +268,7 @@ func runsApartFromTheDeclaration(path []ast.Node, statement ast.Stmt) bool {
 // writesThroughTheRead is whether the read writes to the local or through it, or takes an address in it, which on a
 // copy lands somewhere the field never sees. The walk climbs from the read through what keeps reaching into the
 // local, a field, an index, a dereference or parentheses, and asks what the outermost of those is used for.
-func writesThroughTheRead(pass *analysis.Pass, path []ast.Node) bool {
+func writesThroughTheRead(context *rule.Context, path []ast.Node) bool {
 	for index := 1; index < len(path); index++ {
 		child := path[index-1]
 		switch parent := path[index].(type) {
@@ -275,7 +279,7 @@ func writesThroughTheRead(pass *analysis.Pass, path []ast.Node) bool {
 				continue
 			}
 		case *ast.SelectorExpr:
-			selection, isSelection := pass.TypesInfo.Selections[parent]
+			selection, isSelection := context.TypesInfo.Selections[parent]
 			if !isSelection {
 				return false
 			}
@@ -288,13 +292,13 @@ func writesThroughTheRead(pass *analysis.Pass, path []ast.Node) bool {
 				return false
 			}
 			receiver := method.Signature().Recv()
-			return receiver != nil && isPointer(receiver.Type()) && !isPointer(pass.TypesInfo.TypeOf(parent.X))
+			return receiver != nil && isPointer(receiver.Type()) && !isPointer(context.TypesInfo.TypeOf(parent.X))
 		case *ast.SliceExpr:
 			// Slicing an array takes its address, so the slice shares the copy's elements, not the field's.
 			if parent.X != child {
 				return false
 			}
-			_, isArray := pass.TypesInfo.TypeOf(parent.X).Underlying().(*types.Array)
+			_, isArray := context.TypesInfo.TypeOf(parent.X).Underlying().(*types.Array)
 			return isArray
 		case *ast.AssignStmt:
 			for _, left := range parent.Lhs {
@@ -347,7 +351,7 @@ func evaluationUnit(path []ast.Node) ast.Node {
 // it, but its other parts are looked at like anything else. A function literal's body counts although it may never
 // run there, which can only add silence.
 func codeRunsBetween(
-	pass *analysis.Pass,
+	context *rule.Context,
 	body *ast.BlockStmt,
 	statement ast.Stmt,
 	read *ast.Ident,
@@ -359,7 +363,7 @@ func codeRunsBetween(
 			return false
 		}
 		holdsTheRead := node.Pos() <= read.Pos() && read.End() <= node.End()
-		if !holdsTheRead && node.Pos() >= statement.End() && mayRunCode(pass, node) {
+		if !holdsTheRead && node.Pos() >= statement.End() && mayRunCode(context, node) {
 			runs = true
 		}
 		return !runs
@@ -370,14 +374,15 @@ func codeRunsBetween(
 // mayRunCode is whether node, by itself, may run code or write: a call that is no conversion or measuring builtin, an
 // assignment to anything already declared, an increment, a send, a receive, a select, or a range that assigns,
 // receives from a channel, or calls an iterator.
-func mayRunCode(pass *analysis.Pass, node ast.Node) bool {
+func mayRunCode(context *rule.Context, node ast.Node) bool {
 	switch expression := node.(type) {
 	case *ast.CallExpr:
-		if typeAndValue, recorded := pass.TypesInfo.Types[expression.Fun]; recorded && typeAndValue.IsType() {
+		if typeAndValue, recorded := context.TypesInfo.Types[expression.Fun]; recorded && typeAndValue.IsType() {
 			return false
 		}
 		if name, isIdentifier := ast.Unparen(expression.Fun).(*ast.Ident); isIdentifier {
-			if _, isBuiltin := pass.TypesInfo.Uses[name].(*types.Builtin); isBuiltin && measuringBuiltins[name.Name] {
+			_, isBuiltin := context.TypesInfo.Uses[name].(*types.Builtin)
+			if isBuiltin && measuringBuiltins[name.Name] {
 				return false
 			}
 		}
@@ -389,7 +394,7 @@ func mayRunCode(pass *analysis.Pass, node ast.Node) bool {
 		}
 		for _, left := range expression.Lhs {
 			identifier, isIdentifier := left.(*ast.Ident)
-			if !isIdentifier || (identifier.Name != "_" && pass.TypesInfo.Defs[identifier] == nil) {
+			if !isIdentifier || (identifier.Name != "_" && context.TypesInfo.Defs[identifier] == nil) {
 				return true
 			}
 		}
@@ -402,7 +407,7 @@ func mayRunCode(pass *analysis.Pass, node ast.Node) bool {
 		if expression.Tok == token.ASSIGN {
 			return true
 		}
-		switch pass.TypesInfo.TypeOf(expression.X).Underlying().(type) {
+		switch context.TypesInfo.TypeOf(expression.X).Underlying().(type) {
 		case *types.Chan, *types.Signature:
 			return true
 		}

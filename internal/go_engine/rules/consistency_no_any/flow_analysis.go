@@ -5,8 +5,9 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // flowAnalysis follows values through the package to learn which declarations have a type fixed elsewhere.
@@ -16,7 +17,7 @@ import (
 // that package hands it: sourceFixed. The two are kept apart, because a place fixing a value's type says nothing
 // about where the value came from, and joining them would let two of our own declarations excuse each other.
 type flowAnalysis struct {
-	pass      *analysis.Pass
+	context   *rule.Context
 	sinkFixed map[flowKey]bool
 	// definedFrom maps a variable a short declaration, or a var with no type, defines to the declaration its value
 	// came from. Its type is that declaration's, so a place that fixes it fixes that declaration.
@@ -49,7 +50,7 @@ func (flows *flowAnalysis) record(node ast.Node, stack []ast.Node) {
 
 // recordCall notes each argument handed to its parameter, and a conversion's operand handed to the type it names.
 func (flows *flowAnalysis) recordCall(call *ast.CallExpr) {
-	info := flows.pass.TypesInfo
+	info := flows.context.TypesInfo
 	if info.Types[call.Fun].IsType() {
 		if len(call.Args) == 1 {
 			flows.sink(info.TypeOf(call), flows.valueOf(call.Args[0]))
@@ -79,7 +80,8 @@ func (flows *flowAnalysis) recordCall(call *ast.CallExpr) {
 	// another package hands it. The declared parameters are the generic origin's, whose objects the declaration
 	// defines, while the expected types are the instantiation's, which the arguments are checked against.
 	var declaredParameters *types.Tuple
-	if function, isFunc := typeutil.Callee(info, call).(*types.Func); isFunc && function.Pkg() == flows.pass.Pkg {
+	function, isFunc := typeutil.Callee(info, call).(*types.Func)
+	if isFunc && function.Pkg() == flows.context.Package {
 		declaredParameters = function.Origin().Signature().Params()
 	}
 	for index, argument := range call.Args {
@@ -106,12 +108,12 @@ func (flows *flowAnalysis) recordAssignment(assignment *ast.AssignStmt) {
 		}
 		if identifier, isIdentifier := left.(*ast.Ident); isIdentifier && assignment.Tok == token.DEFINE {
 			// A name := declares anew is defined by its value; one it redeclares is assigned like any other.
-			if defined := flows.pass.TypesInfo.Defs[identifier]; defined != nil {
+			if defined := flows.context.TypesInfo.Defs[identifier]; defined != nil {
 				flows.define(defined, values[index])
 				continue
 			}
 		}
-		leftType := flows.pass.TypesInfo.TypeOf(left)
+		leftType := flows.context.TypesInfo.TypeOf(left)
 		flows.sink(leftType, values[index])
 		flows.source(flows.referenceOf(left, -1), leftType, values[index])
 	}
@@ -121,7 +123,7 @@ func (flows *flowAnalysis) recordAssignment(assignment *ast.AssignStmt) {
 func (flows *flowAnalysis) recordValueSpec(spec *ast.ValueSpec) {
 	values := flows.valuesOf(spec.Values, len(spec.Names))
 	for index, name := range spec.Names {
-		variable, isVariable := flows.pass.TypesInfo.Defs[name].(*types.Var)
+		variable, isVariable := flows.context.TypesInfo.Defs[name].(*types.Var)
 		if !isVariable || index >= len(values) {
 			continue
 		}
@@ -149,7 +151,7 @@ func (flows *flowAnalysis) recordReturn(statement *ast.ReturnStmt, signature *ty
 
 // recordCompositeLiteral notes each element a composite literal hands to its field, element or key type.
 func (flows *flowAnalysis) recordCompositeLiteral(literal *ast.CompositeLit) {
-	literalType := flows.pass.TypesInfo.TypeOf(literal)
+	literalType := flows.context.TypesInfo.TypeOf(literal)
 	if literalType == nil {
 		return
 	}
@@ -163,7 +165,7 @@ func (flows *flowAnalysis) recordCompositeLiteral(literal *ast.CompositeLit) {
 		for index, element := range literal.Elts {
 			if keyValue, isKeyValue := element.(*ast.KeyValueExpr); isKeyValue {
 				if identifier, isIdentifier := keyValue.Key.(*ast.Ident); isIdentifier {
-					if field, isField := flows.pass.TypesInfo.Uses[identifier].(*types.Var); isField {
+					if field, isField := flows.context.TypesInfo.Uses[identifier].(*types.Var); isField {
 						flows.recordField(field, keyValue.Value)
 					}
 				}
@@ -206,7 +208,7 @@ func (flows *flowAnalysis) recordElements(literal *ast.CompositeLit, keyType typ
 
 // recordSend notes the value a send statement hands to its channel's element type.
 func (flows *flowAnalysis) recordSend(statement *ast.SendStmt) {
-	channelType := flows.pass.TypesInfo.TypeOf(statement.Chan)
+	channelType := flows.context.TypesInfo.TypeOf(statement.Chan)
 	if channelType == nil {
 		return
 	}
@@ -225,10 +227,10 @@ func (flows *flowAnalysis) enclosingSignature(stack []ast.Node) *types.Signature
 	for index := len(stack) - 1; index >= 0; index-- {
 		switch function := stack[index].(type) {
 		case *ast.FuncLit:
-			signature, _ := flows.pass.TypesInfo.TypeOf(function).(*types.Signature)
+			signature, _ := flows.context.TypesInfo.TypeOf(function).(*types.Signature)
 			return signature
 		case *ast.FuncDecl:
-			if object, isFunc := flows.pass.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
+			if object, isFunc := flows.context.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
 				return object.Signature()
 			}
 			return nil
@@ -238,7 +240,7 @@ func (flows *flowAnalysis) enclosingSignature(stack []ast.Node) *types.Signature
 }
 
 func (flows *flowAnalysis) valueOf(expression ast.Expr) flowingValue {
-	return flowingValue{expression: expression, resultIndex: -1, valueType: flows.pass.TypesInfo.TypeOf(expression)}
+	return flowingValue{expression: expression, resultIndex: -1, valueType: flows.context.TypesInfo.TypeOf(expression)}
 }
 
 // valuesOf pairs count receivers with the values right of an assignment or return: one expression each, or one
@@ -254,7 +256,7 @@ func (flows *flowAnalysis) valuesOf(right []ast.Expr, count int) []flowingValue 
 	if len(right) != 1 {
 		return nil
 	}
-	tuple, isTuple := flows.pass.TypesInfo.TypeOf(right[0]).(*types.Tuple)
+	tuple, isTuple := flows.context.TypesInfo.TypeOf(right[0]).(*types.Tuple)
 	if !isTuple || tuple.Len() != count {
 		return nil
 	}
@@ -329,9 +331,9 @@ func (flows *flowAnalysis) referenceOf(expression ast.Expr, resultIndex int) ref
 	}
 	switch operand := unwrapped.(type) {
 	case *ast.Ident:
-		return flows.referenceToObject(flows.pass.TypesInfo.Uses[operand])
+		return flows.referenceToObject(flows.context.TypesInfo.Uses[operand])
 	case *ast.SelectorExpr:
-		return flows.referenceToObject(flows.pass.TypesInfo.Uses[operand.Sel])
+		return flows.referenceToObject(flows.context.TypesInfo.Uses[operand.Sel])
 	case *ast.FuncLit:
 		return reference{key: flowKey{literal: operand}}
 	case *ast.IndexExpr:
@@ -353,7 +355,7 @@ func (flows *flowAnalysis) referenceOf(expression ast.Expr, resultIndex int) ref
 // package, which is judged where it is declared, another package's function, or the function value called, whose
 // own type gives the result its type.
 func (flows *flowAnalysis) referenceToResult(call *ast.CallExpr, index int) reference {
-	info := flows.pass.TypesInfo
+	info := flows.context.TypesInfo
 	if info.Types[call.Fun].IsType() {
 		return reference{}
 	}
@@ -370,7 +372,7 @@ func (flows *flowAnalysis) referenceToResult(call *ast.CallExpr, index int) refe
 		if function.Pkg() == nil {
 			return reference{}
 		}
-		if function.Pkg() != flows.pass.Pkg {
+		if function.Pkg() != flows.context.Package {
 			return reference{foreign: true}
 		}
 		results := function.Origin().Signature().Results()
@@ -397,7 +399,7 @@ func (flows *flowAnalysis) referenceToObject(object types.Object) reference {
 	if origin.Pkg() == nil {
 		return reference{}
 	}
-	if origin.Pkg() != flows.pass.Pkg {
+	if origin.Pkg() != flows.context.Package {
 		return reference{foreign: true}
 	}
 	return reference{key: flowKey{object: origin}}
@@ -409,7 +411,7 @@ func (flows *flowAnalysis) candidateAt(node ast.Node, stack []ast.Node) (candida
 	switch written := node.(type) {
 	case *ast.Ident:
 		// The predeclared any by its object, so a local type named any, or a parameter named any, is not it.
-		if flows.pass.TypesInfo.Uses[written] != types.Universe.Lookup("any") {
+		if flows.context.TypesInfo.Uses[written] != types.Universe.Lookup("any") {
 			return candidate{}, false
 		}
 		spelling = "any"
@@ -451,7 +453,7 @@ func (flows *flowAnalysis) declarationsAround(node ast.Node, stack []ast.Node) (
 			if child != parent.Type {
 				return nil, false
 			}
-			if object := flows.pass.TypesInfo.Defs[parent.Name]; object != nil {
+			if object := flows.context.TypesInfo.Defs[parent.Name]; object != nil {
 				declarations = append(declarations, flowKey{object: object})
 			}
 			return declarations, true
@@ -467,7 +469,7 @@ func (flows *flowAnalysis) declarationsAround(node ast.Node, stack []ast.Node) (
 				return nil, false
 			}
 			for _, name := range parent.Names {
-				if object := flows.pass.TypesInfo.Defs[name]; object != nil {
+				if object := flows.context.TypesInfo.Defs[name]; object != nil {
 					declarations = append(declarations, flowKey{object: object})
 				}
 			}
@@ -511,7 +513,7 @@ func (flows *flowAnalysis) fieldDeclarations(field *ast.Field, above []ast.Node)
 		}
 		return declarations, true
 	case *ast.StructType:
-		structure, isStruct := flows.pass.TypesInfo.TypeOf(owner).(*types.Struct)
+		structure, isStruct := flows.context.TypesInfo.TypeOf(owner).(*types.Struct)
 		if !isStruct {
 			return nil, true
 		}
@@ -525,7 +527,7 @@ func (flows *flowAnalysis) fieldDeclarations(field *ast.Field, above []ast.Node)
 		if len(field.Names) == 0 {
 			return nil, false
 		}
-		if method := flows.pass.TypesInfo.Defs[field.Names[0]]; method != nil {
+		if method := flows.context.TypesInfo.Defs[field.Names[0]]; method != nil {
 			return []flowKey{{object: method}}, true
 		}
 		return nil, true
@@ -541,11 +543,12 @@ func (flows *flowAnalysis) signatureOwning(functionType *ast.FuncType, above []a
 	}
 	switch owner := above[len(above)-1].(type) {
 	case *ast.FuncDecl:
-		if object, isFunc := flows.pass.TypesInfo.Defs[owner.Name].(*types.Func); isFunc && owner.Type == functionType {
+		object, isFunc := flows.context.TypesInfo.Defs[owner.Name].(*types.Func)
+		if isFunc && owner.Type == functionType {
 			return object.Signature()
 		}
 	case *ast.FuncLit:
-		signature, _ := flows.pass.TypesInfo.TypeOf(owner).(*types.Signature)
+		signature, _ := flows.context.TypesInfo.TypeOf(owner).(*types.Signature)
 		return signature
 	case *ast.Field:
 		// A method of an interface: a named field whose type is this function type, inside an interface.
@@ -555,7 +558,7 @@ func (flows *flowAnalysis) signatureOwning(functionType *ast.FuncType, above []a
 		if _, isInterface := above[len(above)-3].(*ast.InterfaceType); !isInterface {
 			return nil
 		}
-		if method, isFunc := flows.pass.TypesInfo.Defs[owner.Names[0]].(*types.Func); isFunc {
+		if method, isFunc := flows.context.TypesInfo.Defs[owner.Names[0]].(*types.Func); isFunc {
 			return method.Signature()
 		}
 	}
@@ -629,7 +632,7 @@ func (flows *flowAnalysis) seedSignature(key flowKey) {
 	var signature *types.Signature
 	switch {
 	case key.literal != nil:
-		signature, _ = flows.pass.TypesInfo.TypeOf(key.literal).(*types.Signature)
+		signature, _ = flows.context.TypesInfo.TypeOf(key.literal).(*types.Signature)
 	default:
 		if function, isFunc := key.object.(*types.Func); isFunc {
 			signature = function.Signature()
@@ -666,7 +669,7 @@ func (flows *flowAnalysis) anyFixed(declarations []flowKey) bool {
 // what it matches.
 func (flows *flowAnalysis) matchesForeignMethod(method *types.Func) bool {
 	if flows.foreign == nil {
-		flows.foreign = buildForeignMethods(flows.pass.Pkg)
+		flows.foreign = buildForeignMethods(flows.context.Package)
 	}
 	for _, foreignSignature := range flows.foreign.byName[method.Name()] {
 		if types.Identical(method.Signature(), foreignSignature) {

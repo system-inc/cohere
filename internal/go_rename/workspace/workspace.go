@@ -122,8 +122,10 @@ func loadPackages(root string, overlay map[string][]byte, environment []string) 
 		Dir:   root,
 		Env:   environment,
 		Tests: true,
+		// TypesSizes too, which an analysis driver requires of every package it runs over: the octal-prefix
+		// codemod runs its rule through x/tools' checker, so the dispatcher the rule reads runs first.
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedCompiledGoFiles | packages.NeedSyntax |
-			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedImports,
+			packages.NeedTypes | packages.NeedTypesInfo | packages.NeedTypesSizes | packages.NeedImports,
 		Overlay: overlay,
 	}
 	return packages.Load(configuration, patterns...)
