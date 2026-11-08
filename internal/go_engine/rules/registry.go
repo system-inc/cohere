@@ -290,7 +290,7 @@ var ports = map[string]port{
 	"copylocks":        {analyzer: copy_lock.Analyzer},
 	"defers":           {analyzer: defers.Analyzer, listener: &defers.Listener},
 	"directive":        {analyzer: directive.Analyzer},
-	"errorsas":         {analyzer: errors_as.Analyzer},
+	"errorsas":         {analyzer: errors_as.Analyzer, listener: &errors_as.Listener},
 	"framepointer":     {analyzer: frame_pointer.Analyzer},
 	"hostport":         {analyzer: host_port.Analyzer},
 	"httpresponse":     {analyzer: http_response.Analyzer},
