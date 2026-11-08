@@ -84,6 +84,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/shift"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
 )
@@ -186,6 +187,7 @@ var ports = map[string]*analysis.Analyzer{
 	"nilfunc":      nil_func.Analyzer,
 	"printf":       printf.Analyzer,
 	"scannererr":   scanner_error.Analyzer,
+	"shift":        shift.Analyzer,
 	"sqlrowserr":   sql_rows_err.Analyzer,
 	"stdmethods":   std_methods.Analyzer,
 }
