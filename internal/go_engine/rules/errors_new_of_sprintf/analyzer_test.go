@@ -142,6 +142,9 @@ func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 	original, port := parity.Findings(test, s1028.Analyzer, Analyzer, analysistest.TestData(),
 		differencesFixtures...)
 	test.Logf("the original found %d, the port %d", len(original), len(port))
+	if len(original) == 0 {
+		test.Fatal("the original found nothing in the differences fixture, so the comparison proves nothing")
+	}
 	unpaired := withoutEditText(original)
 	for _, portFinding := range withoutEditText(port) {
 		index := slices.IndexFunc(unpaired, func(originalFinding parity.Finding) bool {

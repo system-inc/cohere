@@ -225,6 +225,9 @@ func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 	original, port := parity.Findings(test, s1025.Analyzer, Analyzer, analysistest.TestData(),
 		sharedDifferencesFixtures...)
 	test.Logf("the original found %d, the port %d", len(original), len(port))
+	if len(original) == 0 {
+		test.Fatal("the original found nothing in the differences fixture, so the comparison proves nothing")
+	}
 	unpaired := withoutEditText(original)
 	for _, portFinding := range withoutEditText(port) {
 		index := slices.IndexFunc(unpaired, func(originalFinding parity.Finding) bool {
@@ -360,7 +363,10 @@ func differencesFiles(test *testing.T) []string {
 			test.Fatalf("listing %s: %v", pattern, globError)
 		}
 		for _, name := range names {
-			if slices.ContainsFunc(files, func(other string) bool { return filepath.Base(other) == filepath.Base(name) }) {
+			isShared := slices.ContainsFunc(files, func(other string) bool {
+				return filepath.Base(other) == filepath.Base(name)
+			})
+			if isShared {
 				test.Fatalf("%s shares its base name with another file of the fixture, which the findings cannot tell "+
 					"apart", name)
 			}
