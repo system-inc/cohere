@@ -185,7 +185,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
-	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile}
+	// Dependents hands each dispatcher the rules of this run that require it on a package, so it calls only their
+	// listeners, never those of a rule the run left out that registered on it all the same.
+	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile,
+		Dependents: rule.Dependents}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}

@@ -12,8 +12,9 @@ import (
 )
 
 // listeners is what every dispatcher keeps of the rules registered on it, whichever walk it makes: the dispatcher's
-// analyzer, each rule with its listener, and which listeners each kind reaches. Ir and Syntax each hold one and walk
-// over it, so registration, a rule's analyzer, its context and its outcome are built one way for both.
+// analyzer, and each rule with its listener and the kinds it hears. Ir and Syntax each hold one and walk over what it
+// starts on a package, so registration, which rules a pass calls, a rule's analyzer, its context and its outcome are
+// built one way for both.
 //
 // Every rule is registered before the first run, since the checker reads the analyzer's requirements as a run starts,
 // and a run reads the registered rules without a lock.
@@ -24,9 +25,6 @@ type listeners struct {
 	analyzer *analysis.Analyzer
 	// registered is each rule registered on the dispatcher, in the order it was registered.
 	registered []registeredRule
-	// byKind is, for each kind any listener lists, the indexes in registered of the listeners that list it, so a node
-	// or an instruction reaches only the listeners declaring its kind, at the cost of one lookup.
-	byKind map[reflect.Type][]int
 }
 
 // registeredRule is one rule a dispatcher calls.
@@ -36,6 +34,8 @@ type registeredRule struct {
 	// analyzer is the rule's own analyzer, whose name a crash names and whose flags are the rule's options.
 	analyzer *analysis.Analyzer
 	listener *rule.Listener
+	// kinds is the node or instruction kinds the listener lists, each once.
+	kinds []reflect.Type
 }
 
 // Result is what a dispatcher found over one package, each rule's outcome under the rule's name.
@@ -66,7 +66,6 @@ func newListeners(
 			ResultType:       reflect.TypeFor[Result](),
 			Run:              run,
 		},
-		byKind: map[reflect.Type][]int{},
 	}
 }
 
@@ -111,7 +110,8 @@ func (listeners *listeners) ruleAnalyzer(
 			outcome, found := result[ruleName]
 			if !found {
 				return nil, fmt.Errorf("the dispatcher holds no outcome for %s, so its listener was never "+
-					"registered on the dispatcher the rule requires", ruleName)
+					"registered on the dispatcher the rule requires, or that dispatcher's pass did not count the "+
+					"rule among its dependents", ruleName)
 			}
 			if outcome.Crash != nil {
 				return nil, outcome.Crash
@@ -144,31 +144,46 @@ func (listeners *listeners) register(
 				"keyed by rule name", name))
 		}
 	}
-	index := len(listeners.registered)
-	listeners.registered = append(listeners.registered, registeredRule{
-		name:     name,
-		analyzer: analyzer,
-		listener: listener,
-	})
 	for _, required := range listener.Requires {
 		if !slices.Contains(listeners.analyzer.Requires, required) {
 			listeners.analyzer.Requires = append(listeners.analyzer.Requires, required)
 		}
 	}
 	// A kind listed twice is the registry's to refuse; here it is heard once all the same.
-	listed := map[reflect.Type]bool{}
+	heard := []reflect.Type{}
 	for _, kind := range kinds {
-		if kind == nil || listed[kind] {
-			continue
+		if kind != nil && !slices.Contains(heard, kind) {
+			heard = append(heard, kind)
 		}
-		listed[kind] = true
-		listeners.byKind[kind] = append(listeners.byKind[kind], index)
 	}
+	listeners.registered = append(listeners.registered, registeredRule{
+		name:     name,
+		analyzer: analyzer,
+		listener: listener,
+		kinds:    heard,
+	})
 }
 
-// start is every registered listener ready to hear pass's package, each with a context of its own, all judging the
-// package's generated files by one reading of staticcheck's generated pass.
-func (listeners *listeners) start(pass *analysis.Pass) ([]*listenerRun, error) {
+// startedRuns is the listeners a dispatcher calls over one package, each ready with a context of its own.
+type startedRuns struct {
+	// runs is each started listener, in the order its rule was registered.
+	runs []*listenerRun
+	// byKind is, for each kind a started listener lists, the started listeners that list it, in runs' order, so a
+	// node or an instruction reaches only the listeners declaring its kind, at the cost of one lookup.
+	byKind map[reflect.Type][]*listenerRun
+}
+
+// start is the listeners to call over pass's package, each ready with a context of its own, all judging the package's
+// generated files by one reading of staticcheck's generated pass. They are those of the rules whose analyzers require
+// the dispatcher on this package in this run, the set the engine's checker hands the pass under rule.Dependents, so a
+// rule the run left out, by its settings, a filter, or by being registered from a package the process merely
+// imports, costs no call and no context: its analyzer is not in the graph, and a dispatcher's outcome is read only by
+// the analyzers that require it.
+//
+// A pass without the set comes from a driver that is not the engine's, such as analysistest's or a test calling
+// checker.Analyze with no Options.Dependents, and there every registered listener starts, as before the set existed.
+// That costs only calls, never output: an outcome no analyzer of the graph requires is never read.
+func (listeners *listeners) start(pass *analysis.Pass) (*startedRuns, error) {
 	generatedFiles, isGeneratedFiles := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
 	if !isGeneratedFiles {
 		return nil, fmt.Errorf("reading %s's result: it is %T, where staticcheck's map of generated files was "+
@@ -181,14 +196,24 @@ func (listeners *listeners) start(pass *analysis.Pass) ([]*listenerRun, error) {
 		_, found := generatedFiles[filename]
 		return found
 	}
-	runs := make([]*listenerRun, len(listeners.registered))
+	dependents, knowsDependents := pass.ResultOf[rule.Dependents].(map[*analysis.Analyzer]bool)
+	started := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}}
 	for index := range listeners.registered {
-		runs[index] = newListenerRun(&listeners.registered[index], pass, isGenerated)
+		registered := &listeners.registered[index]
+		if knowsDependents && !dependents[registered.analyzer] {
+			continue
+		}
+		run := newListenerRun(registered, pass, isGenerated)
+		started.runs = append(started.runs, run)
+		for _, kind := range registered.kinds {
+			started.byKind[kind] = append(started.byKind[kind], run)
+		}
 	}
-	return runs, nil
+	return started, nil
 }
 
-// finish calls every PackageExit once the walk is over and returns each rule's outcome.
+// finish calls every started PackageExit once the walk is over and returns each started rule's outcome, which is
+// every outcome a rule analyzer of the run reads.
 func finish(runs []*listenerRun) Result {
 	for _, run := range runs {
 		run.packageExit()

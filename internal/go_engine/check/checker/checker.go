@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are six.
+// The changes are seven.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -103,6 +103,16 @@
 //
 // Peak RSS, 8.4 to 8.5 GB, and involuntary context switches, 82,000 to
 // 123,000, did not move.
+//
+// The seventh is Options.Dependents. When it is set, each pass holds,
+// in its ResultOf under that analyzer, the set of analyzers whose
+// actions on the same package require this action: the horizontal
+// dependents the first change already counts as readers of its Result.
+// The engine's dispatchers walk a package once for every rule
+// registered on them, and a rule registers as its package initializes,
+// whether or not a run enables it; the set is how a dispatcher calls
+// only the listeners of the rules this graph runs, per graph, with no
+// state shared between runs.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -205,6 +215,14 @@ type Options struct {
 	// are (see releaseSyntax). Unset, a given package keeps them.
 	Finished func(*packages.Package)
 
+	// cohere: Dependents, when set, keys a set in every pass's ResultOf:
+	// a map[*analysis.Analyzer]bool holding each analyzer whose action on
+	// the pass's package requires this action, so an analyzer that serves
+	// several can serve only those this graph runs. It is a key, never
+	// run, and nothing should require it. Unset, ResultOf holds exactly
+	// the results of what the analyzer requires, as upstream's does.
+	Dependents *analysis.Analyzer
+
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
 	// in place of the default; workers, above 0, is how many actions; and
@@ -285,6 +303,10 @@ type Action struct {
 	// this action's Result, its horizontal dependents. The last of them
 	// releases a non-root Result (see releaseInputs).
 	resultReaders atomic.Int32
+
+	// cohere: dependents is the analyzers of those readers, which a pass
+	// reads under Options.Dependents, and nil while that is unset.
+	dependents map[*analysis.Analyzer]bool
 
 	// cohere: syntax is shared by every action on this action's package,
 	// so the last of them to finish can release the package's syntax
@@ -391,11 +413,18 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 
 	// cohere: count each action's horizontal dependents, the readers
-	// of its Result, so the last of them can release it.
+	// of its Result, so the last of them can release it, and, under
+	// Options.Dependents, gather their analyzers.
 	for _, act := range actions {
 		for _, dep := range act.Deps {
 			if dep.Package == act.Package {
 				dep.resultReaders.Add(1)
+				if opts.Dependents != nil {
+					if dep.dependents == nil {
+						dep.dependents = make(map[*analysis.Analyzer]bool)
+					}
+					dep.dependents[act.Analyzer] = true
+				}
 			}
 		}
 	}
@@ -526,6 +555,12 @@ func (act *Action) execOnce() {
 			// become available to this analysis pass.
 			inheritFacts(act, dep)
 		}
+	}
+	// cohere: Options.Dependents, the set Analyze gathered for this action.
+	// An action nothing on its package requires holds a nil map, an empty
+	// set, which still reads as one, never as a graph that gathered none.
+	if act.opts.Dependents != nil {
+		inputs[act.opts.Dependents] = act.dependents
 	}
 
 	// cohere: a restored package's own facts come from the cache, in
