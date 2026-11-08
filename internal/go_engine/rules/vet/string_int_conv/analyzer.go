@@ -12,16 +12,16 @@
 // position. Its suggested fixes are the original's, edit for edit, but in two places, where the port withholds the
 // original's "Format the number as a decimal" because applying it would be wrong. One is a conversion to a type
 // parameter whose one term is string, `AllString(x)`, which the fix would replace with `fmt.Sprint(x)`, a string, not
-// an AllString. The other is a value of a type parameter whose constraint gives it a String method, which fmt.Sprint
-// would print in place of the number; the original reads only the methods of the constraint's one term. The registry
-// runs the port in the original's place, and the original stays the oracle: the parity tests beside this file run
-// both over the same packages and compare findings and fixes, and the differences fixture pins each fix withheld.
+// an AllString. The other is a value of a type parameter whose constraint gives it a Format, Error or String method,
+// which fmt.Sprint would print through in place of the number; the original reads only the methods of the
+// constraint's one term. The registry runs the port in the original's place, and the original stays the oracle: the
+// parity tests beside this file run both over the same packages and compare findings and fixes, and the differences
+// fixture pins each fix withheld.
 package string_int_conv
 
 import (
 	"fmt"
 	"go/ast"
-	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
@@ -153,10 +153,11 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	// the source's type has no methods, since a String, GoString or Format method may change what fmt.Sprint prints.
 	// The port withholds it in two more places, where it would be wrong: where `fmt.Sprint(x)` would replace a
 	// conversion whose type is not string, and where the value's type, a type parameter whose constraint has a
-	// String method, prints itself. A term of the constraint with a String method is passed over already: it is the
-	// one term, sourceInteger, whose methods the original's check reads. Every other suggestion is the original's.
+	// Format, Error or String method, prints itself. A term of the constraint with such a method is passed over
+	// already: it is the one term, sourceInteger, whose methods the original's check reads. Every other suggestion is
+	// the original's.
 	if len(targetTypes) == 1 && len(sourceTypes) == 1 && types.NewMethodSet(sourceInteger).Len() == 0 &&
-		!types.Implements(sourceType, stringerInterface) {
+		!printsItself(sourceType) {
 		prefix, importEdits := addImport(pass.TypesInfo, file, "fmt", "fmt", "Sprint", argument.Pos())
 		switch {
 		case !types.Identical(targetString, types.Typ[types.String]):
@@ -195,15 +196,6 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	}
 	pass.Report(diagnostic)
 }
-
-// stringerInterface is `interface{ String() string }`, fmt.Stringer's method set, built here so the port imports
-// nothing to name it: a value whose type implements it, a type parameter's through its constraint included, is
-// printed by fmt.Sprint with that method, not as a number.
-var stringerInterface = types.NewInterfaceType([]*types.Func{
-	types.NewFunc(token.NoPos, nil, "String", types.NewSignatureType(
-		nil, nil, nil, nil, types.NewTuple(types.NewVar(token.NoPos, nil, "", types.Typ[types.String])), false,
-	)),
-}, nil).Complete()
 
 // convertibleToRune is whether every one of candidates converts to a rune.
 func convertibleToRune(candidates []types.Type) bool {
