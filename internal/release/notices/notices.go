@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/format/native"
+	"github.com/system-inc/cohere/internal/listed_directories"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -115,7 +116,7 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 	byPath := map[string]Module{}
 	for _, target := range release.Targets {
 		command := exec.Command("go", "list", "-deps", "-f",
-			"{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{end}}", "./command/cohere")
+			"{{.Dir}}\t{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{end}}", "./command/cohere")
 		command.Dir = moduleDirectory
 		command.Env = append(
 			os.Environ(),
@@ -134,9 +135,18 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 				standardError.String(),
 			)
 		}
+		var listed []listed_directories.Package
 		for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
-			fields := strings.Split(line, "\t")
-			if len(fields) != 3 || isCohere(fields[0]) || strings.HasPrefix(fields[0], compilerModulePrefix) {
+			packageFields := strings.Split(line, "\t")
+			if len(packageFields) > 0 {
+				listed = append(listed, listed_directories.Package{Directory: packageFields[0]})
+			}
+			// The package's own directory, then its module's path, version and directory.
+			if len(packageFields) != 4 {
+				continue
+			}
+			fields := packageFields[1:]
+			if isCohere(fields[0]) || strings.HasPrefix(fields[0], compilerModulePrefix) {
 				continue
 			}
 			module := byPath[fields[0]]
@@ -146,6 +156,9 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 			}
 			byPath[fields[0]] = module
 		}
+		// What go list read, read again in this process, so the test that holds the committed notices current has
+		// its result keyed on a package of ours that starts importing a module (#cmpsz8p).
+		listed_directories.Open(moduleDirectory, []string{"./command/cohere"}, listed)
 	}
 	for path, module := range byPath {
 		if len(module.Targets) == len(release.Targets) {
