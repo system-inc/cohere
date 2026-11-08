@@ -232,11 +232,15 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromBinary and factsSkipped."
                         },
                         "hit": {
                             "type": "integer",
                             "description": "Packages restored from an entry, with nothing run on them."
+                        },
+                        "standardLibraryFromBinary": {
+                            "type": "integer",
+                            "description": "Go standard-library packages restored from the entries a release binary carries, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
                         },
                         "missed": { "type": "integer", "description": "Packages analyzed from source." },
                         "written": { "type": "integer", "description": "Missed packages that got an entry." },

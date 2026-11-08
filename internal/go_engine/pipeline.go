@@ -34,6 +34,9 @@ type pipeline struct {
 	writer        *contract.Writer
 	standardError io.Writer
 
+	// memory is what Main decided about the process's memory limit, written on the types record, nil in a test.
+	memory *contract.Memory
+
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
 	// ends as a broken stream.
 	writeError error
@@ -45,8 +48,8 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
-	// session is the findings cache the load and the lint phase share, nil under `--no-cache` or when the cache
-	// sat the run out.
+	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, and under
+	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads.
 	session *check.CacheSession
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -69,6 +72,7 @@ func newPipeline(
 	registered []rule.Rule,
 	standardOutput io.Writer,
 	standardError io.Writer,
+	memory *contract.Memory,
 ) *pipeline {
 	return &pipeline{
 		request:       request,
@@ -77,6 +81,7 @@ func newPipeline(
 		registered:    registered,
 		writer:        contract.NewWriter(standardOutput),
 		standardError: standardError,
+		memory:        memory,
 	}
 }
 
@@ -315,9 +320,10 @@ func (engine *pipeline) wrapsLongLines() bool {
 // knownFilesLabel names gofmt's verdicts among what the findings cache keeps.
 const knownFilesLabel = "gofmt verdicts"
 
-// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache.
+// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache or its store, so
+// a run under `--no-cache` neither reads nor keeps them.
 func (engine *pipeline) knownFiles() *format.KnownFiles {
-	if engine.session == nil {
+	if engine.session == nil || !engine.session.HasStore() {
 		return nil
 	}
 	encoded, _ := engine.session.Kept(engine.session.KeyFor(knownFilesLabel))
@@ -439,6 +445,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			Packages:     loaded.CgoTranslatedPackages,
 			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
 		},
+		Memory: engine.memory,
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }
