@@ -1090,6 +1090,7 @@ var portedPasses = []string{
 	"sliding_copy",
 	"sort_helper_call",
 	"sort_slice_on_non_slice",
+	"spaced_compiler_directive",
 	"spinning_empty_loop",
 	"struct_conversion_by_field_copy",
 	"swapped_seek_arguments",
