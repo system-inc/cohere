@@ -31,6 +31,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
@@ -38,25 +39,40 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-screaming-snake-case"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_screaming_snake_case",
-	Doc: "Flags a name we declare that is in SCREAMING_SNAKE_CASE or has an underscore in it, suggesting its " +
-		"MixedCaps form with exported names kept exported, and a value local to a function that opens with a " +
-		"capital, suggesting its lowerCamel form, because Go marks word boundaries and export with capitals. Not " +
-		"judged: the blank identifier, the name of a test, benchmark, fuzz test or example in a _test.go file with " +
-		"go test's signature for it, whose underscores separate UpperCamel words or digits (TestParser_Errors, " +
-		"TestTokenizer_310, ExampleClient_Send_withRetries), a " +
-		"name an //export or //go:linkname directive gives out, a constant named exactly as the constant of " +
-		"syscall or golang.org/x/sys it is assigned from or compared against, a name declared from a call whose " +
-		"constant string argument is exactly that name (os.Getenv(\"DATABASE_URL\")), and a name whose " +
-		"suggested form would not be an identifier (type_ would be the keyword type).",
-	Requires: []*analysis.Analyzer{positions.Analyzer},
-	Run:      run,
+// listener reads the package's system files and directed names as the syntax dispatcher's walk enters its first file,
+// and whether each file is a test. It hears every declaring identifier and type switch, which it judges, and every
+// declaration, comparison and assignment, which say whether a name mirrors a system constant or an external key. A
+// comparison in any file can mirror a constant declared in any other, so findings are held until the whole package is
+// walked, and reported then.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{positions.Analyzer},
+	FileEnter: enterFile,
+	Nodes: []ast.Node{
+		(*ast.Ident)(nil),
+		(*ast.TypeSwitchStmt)(nil),
+		(*ast.GenDecl)(nil),
+		(*ast.BinaryExpr)(nil),
+		(*ast.AssignStmt)(nil),
+		(*ast.ValueSpec)(nil),
+	},
+	Node:        hearNode,
+	PackageExit: reportUnmirrored,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_screaming_snake_case", "Flags a name we declare that is "+
+	"in SCREAMING_SNAKE_CASE or has an underscore in it, suggesting its MixedCaps form with exported names kept "+
+	"exported, and a value local to a function that opens with a capital, suggesting its lowerCamel form, because "+
+	"Go marks word boundaries and export with capitals. Not judged: the blank identifier, the name of a test, "+
+	"benchmark, fuzz test or example in a _test.go file with go test's signature for it, whose underscores separate "+
+	"UpperCamel words or digits (TestParser_Errors, TestTokenizer_310, ExampleClient_Send_withRetries), a name an "+
+	"//export or //go:linkname directive gives out, a constant named exactly as the constant of syscall or "+
+	"golang.org/x/sys it is assigned from or compared against, a name declared from a call whose constant string "+
+	"argument is exactly that name (os.Getenv(\"DATABASE_URL\")), and a name whose suggested form would not be an "+
+	"identifier (type_ would be the keyword type).", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var screamingSnakeCaseMessage = policy.MessageOf(Name, "screamingSnakeCase")
 
@@ -75,45 +91,109 @@ var testWords = []struct {
 // a last segment in lower case, Example_suffix, names one of several.
 const examplePrefix = "Example"
 
-func run(pass *analysis.Pass) (any, error) {
-	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
-	if !isTable {
-		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+// packageState is what the rule gathers over its package, held in its context's state.
+type packageState struct {
+	// table is the package's line table, which reads a declaration's file without the FileSet's lock.
+	table *positions.Table
+	// systemFiles are the package's files importing a system package, by name as table reads them, read as the walk
+	// enters its first file, since a comparison in one file can name a constant declared in another.
+	systemFiles map[string]bool
+	// directed is directedNames of the package, read as the walk enters its first file.
+	directed map[string]bool
+	// mirrored is every constant that mirrors a system constant (markAssignedConstants, markComparedConstants).
+	mirrored map[types.Object]bool
+	// keyed is every name declared from a call reading an external key spelled as it (markKeyMirrorsAssigned,
+	// markKeyMirrorsDeclared).
+	keyed map[types.Object]bool
+	// held is each finding of the walk, in the order the walk made it, reported once the package is walked unless
+	// its name turns out to mirror a constant or a key.
+	held []heldFinding
+	// isTestFile is whether the file being walked is a _test.go file.
+	isTestFile bool
+}
+
+// heldFinding is a finding on a declared name, held until the package is walked.
+type heldFinding struct {
+	// object is the object the name declares, or nil for a type switch's binding, which mirrors nothing.
+	object     types.Object
+	diagnostic analysis.Diagnostic
+}
+
+// enterFile reads the line table, the system files and the directed names the first time, and whether file is a test
+// file.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if state.table == nil {
+		table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
+		if !isTable {
+			// Invariant: the listener requires positions, whose result is always a table, so anything else is a
+			// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
+			panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
+		}
+		state.table = table
+		state.systemFiles = systemFilesOf(context, table)
+		state.directed = directedNames(context)
+		state.mirrored = map[types.Object]bool{}
+		state.keyed = map[types.Object]bool{}
 	}
-	mirrored := mirroredConstants(pass, table)
-	keyed := keyMirrors(pass)
-	directed := directedNames(pass)
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-		isTestFile := strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go")
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch declaring := node.(type) {
-			case *ast.Ident:
-				// Defs holds an identifier only where it declares, so a use is never judged, and a name another
-				// package declared, `syscall.O_RDONLY` or `unix.Stat_t`, is never reported here.
-				object := pass.TypesInfo.Defs[declaring]
-				if !isJudged(object) || mirrored[object] || keyed[object] {
-					return true
-				}
-				if object.Parent() == pass.Pkg.Scope() && directed[object.Name()] {
-					return true
-				}
-				testWord := ""
-				if isTestFile && isTopLevelFunction(object) {
-					testWord = goTestWord(object)
-				}
-				judge(pass, declaring, isExported(object), testWord, isLocalValue(pass, object))
-			case *ast.TypeSwitchStmt:
-				// go/types gives the name a type switch binds, `switch value := subject.(type)`, no object of its own,
-				// only one per case clause, so it is judged here. It is a value local to the switch, so never exported.
-				if identifier := typeSwitchGuard(declaring); identifier != nil {
-					judge(pass, identifier, false, "", true)
-				}
+	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
+	state.isTestFile = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+}
+
+// hearNode judges a declaring identifier or a type switch's binding, holding its finding, and marks the names a
+// declaration, a comparison or an assignment says mirror a system constant or an external key.
+func hearNode(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	switch heard := node.(type) {
+	case *ast.Ident:
+		// Defs holds an identifier only where it declares, so a use is never judged, and a name another package
+		// declared, `syscall.O_RDONLY` or `unix.Stat_t`, is never reported here.
+		object := context.TypesInfo.Defs[heard]
+		if !isJudged(object) {
+			return
+		}
+		if object.Parent() == context.Package.Scope() && state.directed[object.Name()] {
+			return
+		}
+		testWord := ""
+		if state.isTestFile && isTopLevelFunction(object) {
+			testWord = goTestWord(object)
+		}
+		diagnostic, found := judge(context, heard, isExported(object), testWord, isLocalValue(context, object))
+		if found {
+			state.held = append(state.held, heldFinding{object: object, diagnostic: diagnostic})
+		}
+	case *ast.TypeSwitchStmt:
+		// go/types gives the name a type switch binds, `switch value := subject.(type)`, no object of its own, only
+		// one per case clause, so it is judged here. It is a value local to the switch, so never exported.
+		if identifier := typeSwitchGuard(heard); identifier != nil {
+			if diagnostic, found := judge(context, identifier, false, "", true); found {
+				state.held = append(state.held, heldFinding{diagnostic: diagnostic})
 			}
-			return true
-		})
+		}
+	case *ast.GenDecl:
+		if heard.Tok == token.CONST && state.systemFiles[state.table.Position(heard.Pos()).Filename] {
+			markAssignedConstants(context, heard, state.mirrored)
+		}
+	case *ast.BinaryExpr:
+		markComparedConstants(context, state, heard)
+	case *ast.AssignStmt:
+		markKeyMirrorsAssigned(context, heard, state.keyed)
+	case *ast.ValueSpec:
+		markKeyMirrorsDeclared(context, heard, state.keyed)
 	}
-	return nil, nil
+}
+
+// reportUnmirrored reports every held finding whose name mirrors neither a system constant nor an external key, once
+// every file has said which do.
+func reportUnmirrored(context *rule.Context) {
+	state := rule.State[packageState](context)
+	for _, held := range state.held {
+		if held.object != nil && (state.mirrored[held.object] || state.keyed[held.object]) {
+			continue
+		}
+		context.Report(held.diagnostic)
+	}
 }
 
 // isJudged is whether object is a declaration this rule reads: a variable, which in go/types is also a parameter,
@@ -155,7 +235,7 @@ func isExported(object types.Object) bool {
 // which in go/types is also a parameter, a result, a receiver and a range binding. Such a name is never exported
 // whatever its case, so a capital first letter on it marks nothing Go can read. A field is a struct's, and Go's
 // casing exports it, and a type is UpperCamel wherever it is declared, so neither is a local value.
-func isLocalValue(pass *analysis.Pass, object types.Object) bool {
+func isLocalValue(context *rule.Context, object types.Object) bool {
 	switch declared := object.(type) {
 	case *types.Var:
 		if declared.IsField() {
@@ -165,7 +245,7 @@ func isLocalValue(pass *analysis.Pass, object types.Object) bool {
 	default:
 		return false
 	}
-	return object.Parent() != nil && object.Parent() != pass.Pkg.Scope()
+	return object.Parent() != nil && object.Parent() != context.Package.Scope()
 }
 
 // isTopLevelFunction is whether object is a package-level function, the only kind go test runs or go doc reads as an
@@ -189,26 +269,28 @@ func typeSwitchGuard(statement *ast.TypeSwitchStmt) *ast.Ident {
 	return identifier
 }
 
-// judge reports identifier when its name has an underscore in it, suggesting the MixedCaps form, or when it names a
-// local value and opens with a capital, suggesting the lowerCamel form. exported decides whether the MixedCaps form
-// opens with a capital, testWord is the word go test runs identifier's function by, empty for any other name (see
-// goTestWord), and localValue is whether it names a value declared inside a function. A test's name spelled in go
-// test's grammar is clean; one that is not keeps its word, go test's, and has the rest judged as ours.
-func judge(pass *analysis.Pass, identifier *ast.Ident, exported bool, testWord string, localValue bool) {
+// judge is the finding on identifier when its name has an underscore in it, suggesting the MixedCaps form, or when it
+// names a local value and opens with a capital, suggesting the lowerCamel form. exported decides whether the
+// MixedCaps form opens with a capital, testWord is the word go test runs identifier's function by, empty for any other
+// name (see goTestWord), and localValue is whether it names a value declared inside a function. A test's name spelled
+// in go test's grammar is clean; one that is not keeps its word, go test's, and has the rest judged as ours.
+func judge(
+	context *rule.Context, identifier *ast.Ident, exported bool, testWord string, localValue bool,
+) (analysis.Diagnostic, bool) {
 	// The blank identifier is Go's grammar for no name, not a name.
 	if identifier.Name == "_" {
-		return
+		return analysis.Diagnostic{}, false
 	}
 	if !strings.Contains(identifier.Name, "_") {
 		if localValue {
-			judgeLocalOpening(pass, identifier)
+			return judgeLocalOpening(identifier)
 		}
-		return
+		return analysis.Diagnostic{}, false
 	}
 	prefix := ""
 	if testWord != "" {
-		if testNameIsGo(pass, identifier.Name, testWord) {
-			return
+		if testNameIsGo(context, identifier.Name, testWord) {
+			return analysis.Diagnostic{}, false
 		}
 		prefix = testWord
 	}
@@ -218,38 +300,39 @@ func judge(pass *analysis.Pass, identifier *ast.Ident, exported bool, testWord s
 	// A name that only escapes a keyword, type_, or is nothing but underscores, or would open with a digit, has no
 	// MixedCaps form that compiles, and a suggestion that cannot be typed is worse than none.
 	if !token.IsIdentifier(suggestion) {
-		return
+		return analysis.Diagnostic{}, false
 	}
 	message := underscoreInNameMessage
 	if isScreamingSnakeCase(body) {
 		message = screamingSnakeCaseMessage
 	}
-	report(pass, identifier, message, suggestion)
+	return diagnosticOf(identifier, message, suggestion), true
 }
 
-// judgeLocalOpening reports a local value whose name, with no underscore in it, opens with a capital: `MaxSize :=
-// 10` inside a function. Go reads a capital first letter as exported, which a local can never be, so the lowerCamel
-// form is suggested, its opening lowered as an unexported MixedCaps name's is.
-func judgeLocalOpening(pass *analysis.Pass, identifier *ast.Ident) {
+// judgeLocalOpening is the finding on a local value whose name, with no underscore in it, opens with a capital:
+// `MaxSize := 10` inside a function. Go reads a capital first letter as exported, which a local can never be, so the
+// lowerCamel form is suggested, its opening lowered as an unexported MixedCaps name's is.
+func judgeLocalOpening(identifier *ast.Ident) (analysis.Diagnostic, bool) {
 	first, _ := utf8.DecodeRuneInString(identifier.Name)
 	if !unicode.IsUpper(first) {
-		return
+		return analysis.Diagnostic{}, false
 	}
 	suggestion := mixedCaps(identifier.Name, false)
 	// Lowered, a name can become a keyword, Type to type, and a suggestion that cannot be typed is worse than none.
 	if !token.IsIdentifier(suggestion) {
-		return
+		return analysis.Diagnostic{}, false
 	}
-	report(pass, identifier, capitalizedLocalValueMessage, suggestion)
+	return diagnosticOf(identifier, capitalizedLocalValueMessage, suggestion), true
 }
 
-func report(pass *analysis.Pass, identifier *ast.Ident, message policy.MessageHandle, suggestion string) {
-	pass.Report(analysis.Diagnostic{
+// diagnosticOf is the finding on identifier, rendering message with its name and suggestion.
+func diagnosticOf(identifier *ast.Ident, message policy.MessageHandle, suggestion string) analysis.Diagnostic {
+	return analysis.Diagnostic{
 		Pos:      identifier.Pos(),
 		End:      identifier.End(),
 		Category: message.Id,
 		Message:  message.Render(map[string]string{"name": identifier.Name, "suggestion": suggestion}),
-	})
+	}
 }
 
 // goTestWord is the word go test runs a top-level function in a _test.go file by, Test, Benchmark, Fuzz or Example,
@@ -293,7 +376,7 @@ func isTestingPointer(parameter types.Type, name string) bool {
 // segment may be the exact name of a method or field of the type it names, `ExampleResource_URL`. A segment in
 // capitals alone, `TestFOO_BAR`, one in lower case anywhere else, `Test_parse`, and an empty one are not go's grammar
 // but ours.
-func testNameIsGo(pass *analysis.Pass, name string, word string) bool {
+func testNameIsGo(context *rule.Context, name string, word string) bool {
 	segments := strings.Split(strings.TrimPrefix(name, word), "_")
 	later := segments[1:]
 	for index, segment := range later {
@@ -303,7 +386,7 @@ func testNameIsGo(pass *analysis.Pass, name string, word string) bool {
 		case strings.Trim(segment, "0123456789") == "":
 		case isUpperCamelWord(segment):
 		case word == examplePrefix && index == len(later)-1 && isLowerWord(segment):
-		case word == examplePrefix && index == 0 && isMemberOf(pass, segments[0], segment):
+		case word == examplePrefix && index == 0 && isMemberOf(context, segments[0], segment):
 		default:
 			return false
 		}
@@ -346,10 +429,10 @@ func isLowerWord(segment string) bool {
 // isMemberOf is whether member is the exact name of a method or field of the type named typeName in the package under
 // test: this package, or for an external test package the package it tests. An example names it as go doc reads it,
 // ExampleResource_URL, whatever its case.
-func isMemberOf(pass *analysis.Pass, typeName string, member string) bool {
-	scopes := []*types.Scope{pass.Pkg.Scope()}
-	if tested, isExternal := strings.CutSuffix(pass.Pkg.Path(), "_test"); isExternal {
-		for _, imported := range pass.Pkg.Imports() {
+func isMemberOf(context *rule.Context, typeName string, member string) bool {
+	scopes := []*types.Scope{context.Package.Scope()}
+	if tested, isExternal := strings.CutSuffix(context.Package.Path(), "_test"); isExternal {
+		for _, imported := range context.Package.Imports() {
 			if imported.Path() == tested {
 				scopes = append(scopes, imported.Scope())
 			}
@@ -459,18 +542,18 @@ func isSystemPackage(path string) bool {
 	return path == "syscall" || path == "golang.org/x/sys" || strings.HasPrefix(path, "golang.org/x/sys/")
 }
 
-// mirroredConstants is every constant declared in a file importing a system package that mirrors one of that
-// package's constants, decided by types and spelled exactly as it: its value is computed from the system constant of
-// its own name, `O_CLOEXEC = unix.O_CLOEXEC`, or it is compared directly against that constant somewhere in the
-// package. Such a name keeps the system's spelling so it reads as the thing it stands for. `O_CLOEXEC_FLAGS` is not
-// the system's spelling of anything, so it mirrors nothing, and a constant in such a file with no such tie is judged
-// like any other.
+// systemFilesOf is the package's files that import a system package, by name, which table reads for every constant
+// and declaration without the FileSet's lock.
 //
-// The files importing a system package are held by name, which table reads for every constant and declaration
-// without the FileSet's lock.
-func mirroredConstants(pass *analysis.Pass, table *positions.Table) map[types.Object]bool {
+// A constant declared in such a file mirrors one of that package's constants when it is decided by types and spelled
+// exactly as it: its value is computed from the system constant of its own name, `O_CLOEXEC = unix.O_CLOEXEC`
+// (markAssignedConstants), or it is compared directly against that constant somewhere in the package
+// (markComparedConstants). Such a name keeps the system's spelling so it reads as the thing it stands for.
+// `O_CLOEXEC_FLAGS` is not the system's spelling of anything, so it mirrors nothing, and a constant in such a file with
+// no such tie is judged like any other.
+func systemFilesOf(context *rule.Context, table *positions.Table) map[string]bool {
 	systemFiles := map[string]bool{}
-	for _, file := range pass.Files {
+	for _, file := range context.Files {
 		for _, specification := range file.Imports {
 			if path, unquoteError := strconv.Unquote(specification.Path.Value); unquoteError == nil &&
 				isSystemPackage(path) {
@@ -478,38 +561,31 @@ func mirroredConstants(pass *analysis.Pass, table *positions.Table) map[types.Ob
 			}
 		}
 	}
-	mirrored := map[types.Object]bool{}
-	if len(systemFiles) == 0 {
-		return mirrored
+	return systemFiles
+}
+
+// markComparedConstants marks a constant of ours, declared in a system file, that comparison compares directly
+// against the system constant of its own name.
+//
+// Mutates: state gains in mirrored each constant comparison ties to a system constant, for reportUnmirrored to leave
+// unreported
+func markComparedConstants(context *rule.Context, state *packageState, comparison *ast.BinaryExpr) {
+	if len(state.systemFiles) == 0 || !isComparison(comparison.Op) {
+		return
 	}
 	isOurs := func(object types.Object) bool {
 		constant, isConstant := object.(*types.Const)
-		return isConstant && constant.Pkg() == pass.Pkg && systemFiles[table.Position(constant.Pos()).Filename]
+		return isConstant && constant.Pkg() == context.Package &&
+			state.systemFiles[state.table.Position(constant.Pos()).Filename]
 	}
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch inspected := node.(type) {
-			case *ast.GenDecl:
-				if inspected.Tok == token.CONST && systemFiles[table.Position(inspected.Pos()).Filename] {
-					markAssignedConstants(pass, inspected, mirrored)
-				}
-			case *ast.BinaryExpr:
-				if !isComparison(inspected.Op) {
-					return true
-				}
-				left, right := constantOf(pass, inspected.X), constantOf(pass, inspected.Y)
-				// Both sides are constants here, so neither is nil when the names are read.
-				if isOurs(left) && isSystemConstant(right) && left.Name() == right.Name() {
-					mirrored[left] = true
-				}
-				if isOurs(right) && isSystemConstant(left) && right.Name() == left.Name() {
-					mirrored[right] = true
-				}
-			}
-			return true
-		})
+	left, right := constantOf(context, comparison.X), constantOf(context, comparison.Y)
+	// Both sides are constants here, so neither is nil when the names are read.
+	if isOurs(left) && isSystemConstant(right) && left.Name() == right.Name() {
+		state.mirrored[left] = true
 	}
-	return mirrored
+	if isOurs(right) && isSystemConstant(left) && right.Name() == left.Name() {
+		state.mirrored[right] = true
+	}
 }
 
 // markAssignedConstants marks each constant in declaration whose own value mentions the system constant of its name,
@@ -519,7 +595,7 @@ func mirroredConstants(pass *analysis.Pass, table *positions.Table) map[types.Ob
 //
 // Mutates: mirrored gains each constant whose value mentions the system constant of its name, for the caller to leave
 // unreported
-func markAssignedConstants(pass *analysis.Pass, declaration *ast.GenDecl, mirrored map[types.Object]bool) {
+func markAssignedConstants(context *rule.Context, declaration *ast.GenDecl, mirrored map[types.Object]bool) {
 	for _, specification := range declaration.Specs {
 		valueSpecification, isValueSpecification := specification.(*ast.ValueSpec)
 		if !isValueSpecification {
@@ -527,19 +603,19 @@ func markAssignedConstants(pass *analysis.Pass, declaration *ast.GenDecl, mirror
 		}
 		for index, name := range valueSpecification.Names {
 			if index < len(valueSpecification.Values) &&
-				mentionsSystemConstant(pass, valueSpecification.Values[index], name.Name) {
-				mirrored[pass.TypesInfo.Defs[name]] = true
+				mentionsSystemConstant(context, valueSpecification.Values[index], name.Name) {
+				mirrored[context.TypesInfo.Defs[name]] = true
 			}
 		}
 	}
 }
 
 // mentionsSystemConstant is whether expression uses the constant of a system package named name anywhere inside it.
-func mentionsSystemConstant(pass *analysis.Pass, expression ast.Expr, name string) bool {
+func mentionsSystemConstant(context *rule.Context, expression ast.Expr, name string) bool {
 	found := false
 	ast.Inspect(expression, func(node ast.Node) bool {
 		identifier, isIdentifier := node.(*ast.Ident)
-		if isIdentifier && identifier.Name == name && isSystemConstant(pass.TypesInfo.Uses[identifier]) {
+		if isIdentifier && identifier.Name == name && isSystemConstant(context.TypesInfo.Uses[identifier]) {
 			found = true
 		}
 		return !found
@@ -556,12 +632,12 @@ func isComparison(operator token.Token) bool {
 }
 
 // constantOf is the object an operand names, when it is a bare or qualified name, or nil for anything computed.
-func constantOf(pass *analysis.Pass, operand ast.Expr) types.Object {
+func constantOf(context *rule.Context, operand ast.Expr) types.Object {
 	switch named := ast.Unparen(operand).(type) {
 	case *ast.Ident:
-		return pass.TypesInfo.Uses[named]
+		return context.TypesInfo.Uses[named]
 	case *ast.SelectorExpr:
-		return pass.TypesInfo.Uses[named.Sel]
+		return context.TypesInfo.Uses[named.Sel]
 	}
 	return nil
 }
@@ -571,38 +647,36 @@ func isSystemConstant(object types.Object) bool {
 	return isConstant && constant.Pkg() != nil && isSystemPackage(constant.Pkg().Path())
 }
 
-// keyMirrors is every name declared from a call that reads an external key spelled exactly as the name is, as
-// `DATABASE_URL := os.Getenv("DATABASE_URL")` reads the environment's. Such a name keeps the other system's spelling so
-// a reader can find it on both sides of the boundary. Only the initializer of that one declaration counts, and the key
-// is the argument's constant value as go/types computed it, so a named string constant counts and a key spelled any
-// other way does not.
-func keyMirrors(pass *analysis.Pass) map[types.Object]bool {
-	mirrored := map[types.Object]bool{}
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch declaring := node.(type) {
-			case *ast.AssignStmt:
-				if declaring.Tok != token.DEFINE {
-					return true
-				}
-				for index, target := range declaring.Lhs {
-					identifier, isIdentifier := target.(*ast.Ident)
-					if isIdentifier && readsKey(pass, initializerOf(declaring.Rhs, index, len(declaring.Lhs)),
-						identifier.Name) {
-						markDeclared(pass, identifier, mirrored)
-					}
-				}
-			case *ast.ValueSpec:
-				for index, identifier := range declaring.Names {
-					if readsKey(pass, initializerOf(declaring.Values, index, len(declaring.Names)), identifier.Name) {
-						markDeclared(pass, identifier, mirrored)
-					}
-				}
-			}
-			return true
-		})
+// markKeyMirrorsAssigned marks every name assignment declares from a call that reads an external key spelled exactly
+// as the name is, as `DATABASE_URL := os.Getenv("DATABASE_URL")` reads the environment's. Such a name keeps the other
+// system's spelling so a reader can find it on both sides of the boundary. Only the initializer of that one
+// declaration counts, and the key is the argument's constant value as go/types computed it, so a named string
+// constant counts and a key spelled any other way does not.
+//
+// Mutates: mirrored gains each name assignment declares from its own key, for the caller to leave unreported
+func markKeyMirrorsAssigned(context *rule.Context, assignment *ast.AssignStmt, mirrored map[types.Object]bool) {
+	if assignment.Tok != token.DEFINE {
+		return
 	}
-	return mirrored
+	for index, target := range assignment.Lhs {
+		identifier, isIdentifier := target.(*ast.Ident)
+		if isIdentifier && readsKey(context, initializerOf(assignment.Rhs, index, len(assignment.Lhs)),
+			identifier.Name) {
+			markDeclared(context, identifier, mirrored)
+		}
+	}
+}
+
+// markKeyMirrorsDeclared marks every name a var or const specification declares from its own key, as
+// markKeyMirrorsAssigned does for an assignment.
+//
+// Mutates: mirrored gains each name specification declares from its own key, for the caller to leave unreported
+func markKeyMirrorsDeclared(context *rule.Context, specification *ast.ValueSpec, mirrored map[types.Object]bool) {
+	for index, identifier := range specification.Names {
+		if readsKey(context, initializerOf(specification.Values, index, len(specification.Names)), identifier.Name) {
+			markDeclared(context, identifier, mirrored)
+		}
+	}
 }
 
 // initializerOf is the expression that gives the name at index of count its value: its own, or the one call that
@@ -619,13 +693,13 @@ func initializerOf(values []ast.Expr, index int, count int) ast.Expr {
 
 // readsKey is whether expression is a call with a constant string argument exactly name. A conversion, string("KEY"),
 // reads nothing from outside, so it mirrors no key.
-func readsKey(pass *analysis.Pass, expression ast.Expr, name string) bool {
+func readsKey(context *rule.Context, expression ast.Expr, name string) bool {
 	call, isCall := ast.Unparen(expression).(*ast.CallExpr)
-	if !isCall || pass.TypesInfo.Types[call.Fun].IsType() {
+	if !isCall || context.TypesInfo.Types[call.Fun].IsType() {
 		return false
 	}
 	for _, argument := range call.Args {
-		value := pass.TypesInfo.Types[argument].Value
+		value := context.TypesInfo.Types[argument].Value
 		if value != nil && value.Kind() == constant.String && constant.StringVal(value) == name {
 			return true
 		}
@@ -637,8 +711,8 @@ func readsKey(pass *analysis.Pass, expression ast.Expr, name string) bool {
 // already in scope is assigned, not declared, and its own declaration is judged where it stands.
 //
 // Mutates: mirrored gains identifier's object, for the caller to leave unreported
-func markDeclared(pass *analysis.Pass, identifier *ast.Ident, mirrored map[types.Object]bool) {
-	if object := pass.TypesInfo.Defs[identifier]; object != nil {
+func markDeclared(context *rule.Context, identifier *ast.Ident, mirrored map[types.Object]bool) {
+	if object := context.TypesInfo.Defs[identifier]; object != nil {
 		mirrored[object] = true
 	}
 }
@@ -646,9 +720,9 @@ func markDeclared(pass *analysis.Pass, identifier *ast.Ident, mirrored map[types
 // directedNames are the package-level names a directive hands to something outside Go's naming: `//export name`, which
 // cgo writes into a C header, and `//go:linkname localname`, which the linker binds to another package's symbol. The
 // spelling there is whatever the other side needs. Directives are read from the comments' AST, never the source text.
-func directedNames(pass *analysis.Pass) map[string]bool {
+func directedNames(context *rule.Context) map[string]bool {
 	directed := map[string]bool{}
-	for _, file := range pass.Files {
+	for _, file := range context.Files {
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				for _, directive := range []string{"//export ", "//go:linkname "} {

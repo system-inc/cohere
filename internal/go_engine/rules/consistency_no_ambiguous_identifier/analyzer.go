@@ -12,30 +12,36 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 	"unicode"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-ambiguous-identifier"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_ambiguous_identifier",
-	Doc: "Flags a single lowercase letter as a name where it is declared: a variable, constant, parameter, result, " +
-		"receiver, type parameter, function, method, type or struct field, apart from the coordinates x, y and z, " +
-		"because a letter makes every reader find the declaration to learn what it holds. An uppercase letter, a " +
-		"type parameter by convention, is not judged.",
-	Run: run,
+// listener hears every identifier and type switch of the syntax dispatcher's walk, with their ancestors, which an `e`
+// finding reads its suggestion from.
+var listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.Ident)(nil), (*ast.TypeSwitchStmt)(nil)},
+	Node:  judgeNode,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_ambiguous_identifier", "Flags a single lowercase letter "+
+	"as a name where it is declared: a variable, constant, parameter, result, receiver, type parameter, function, "+
+	"method, type or struct field, apart from the coordinates x, y and z, because a letter makes every reader find "+
+	"the declaration to learn what it holds. An uppercase letter, a type parameter by convention, is not judged.",
+	&listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var singleLetterMessage = policy.MessageOf(Name, "noSingleLetter")
 
@@ -64,23 +70,18 @@ var errorInterface = func() *types.Interface {
 	return errorType
 }()
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.PreorderStack(file, nil, func(node ast.Node, stack []ast.Node) bool {
-			switch declaring := node.(type) {
-			case *ast.Ident:
-				// Defs holds an identifier only where it declares, so a use of a letter declared elsewhere is never
-				// reported again, and a name another package declared is never reported here.
-				if object := pass.TypesInfo.Defs[declaring]; isJudged(object) {
-					judge(pass, declaring, []types.Type{object.Type()}, stack)
-				}
-			case *ast.TypeSwitchStmt:
-				judgeTypeSwitchGuard(pass, declaring, stack)
-			}
-			return true
-		})
+// judgeNode judges a declaring identifier, or the name a type switch binds, with stack, the node's ancestors.
+func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
+	switch declaring := node.(type) {
+	case *ast.Ident:
+		// Defs holds an identifier only where it declares, so a use of a letter declared elsewhere is never reported
+		// again, and a name another package declared is never reported here.
+		if object := context.TypesInfo.Defs[declaring]; isJudged(object) {
+			judge(context, declaring, []types.Type{object.Type()}, stack)
+		}
+	case *ast.TypeSwitchStmt:
+		judgeTypeSwitchGuard(context, declaring, stack)
 	}
-	return nil, nil
 }
 
 // isJudged is whether object is a declaration this rule reads: a variable, which in go/types is also a parameter,
@@ -99,7 +100,7 @@ func isJudged(object types.Object) bool {
 // judgeTypeSwitchGuard judges the name a type switch binds, `switch value := subject.(type)`. go/types gives that
 // identifier no object of its own: each case clause holds an implicit one, typed for its case, so the name is judged
 // here once with every clause's type.
-func judgeTypeSwitchGuard(pass *analysis.Pass, statement *ast.TypeSwitchStmt, stack []ast.Node) {
+func judgeTypeSwitchGuard(context *rule.Context, statement *ast.TypeSwitchStmt, stack []ast.Node) {
 	assignment, isAssignment := statement.Assign.(*ast.AssignStmt)
 	if !isAssignment || len(assignment.Lhs) != 1 {
 		return
@@ -110,16 +111,17 @@ func judgeTypeSwitchGuard(pass *analysis.Pass, statement *ast.TypeSwitchStmt, st
 	}
 	var clauseTypes []types.Type
 	for _, clause := range statement.Body.List {
-		if object := pass.TypesInfo.Implicits[clause]; object != nil {
+		if object := context.TypesInfo.Implicits[clause]; object != nil {
 			clauseTypes = append(clauseTypes, object.Type())
 		}
 	}
-	judge(pass, identifier, clauseTypes, append(stack, statement, assignment))
+	// The walk reuses stack and holds more of it past its end, so the guard's own ancestors are appended to a copy.
+	judge(context, identifier, clauseTypes, append(slices.Clip(stack), statement, assignment))
 }
 
 // judge reports identifier when it is a single letter other than a coordinate. declaredTypes is every type the name
 // holds, one except in a type switch, and stack is the nodes enclosing identifier, its parent last.
-func judge(pass *analysis.Pass, identifier *ast.Ident, declaredTypes []types.Type, stack []ast.Node) {
+func judge(context *rule.Context, identifier *ast.Ident, declaredTypes []types.Type, stack []ast.Node) {
 	// One lowercase ASCII letter, the line both twins draw: an uppercase letter is a type parameter by convention, so
 	// the TypeScript and Swift rules leave it alone and the three engines judge the same names. The blank identifier is
 	// out too: it is Go's grammar for no name, not a name.
@@ -130,7 +132,7 @@ func judge(pass *analysis.Pass, identifier *ast.Ident, declaredTypes []types.Typ
 		return
 	}
 	if identifier.Name != "e" {
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos:      identifier.Pos(),
 			End:      identifier.End(),
 			Category: singleLetterMessage.Id,
@@ -138,12 +140,12 @@ func judge(pass *analysis.Pass, identifier *ast.Ident, declaredTypes []types.Typ
 		})
 		return
 	}
-	suggestedName, context := suggestionFor(pass, identifier, declaredTypes, stack)
-	pass.Report(analysis.Diagnostic{
+	suggestedName, guess := suggestionFor(context, identifier, declaredTypes, stack)
+	context.Report(analysis.Diagnostic{
 		Pos:      identifier.Pos(),
 		End:      identifier.End(),
 		Category: ambiguousEMessage.Id,
-		Message:  ambiguousEMessage.Render(map[string]string{"suggestedName": suggestedName}, context),
+		Message:  ambiguousEMessage.Render(map[string]string{"suggestedName": suggestedName}, guess),
 	})
 }
 
@@ -152,7 +154,7 @@ func judge(pass *analysis.Pass, identifier *ast.Ident, declaredTypes []types.Typ
 // (`parseError`), or the function it is declared in (`loadError`). Anything else is unclear, and the rule says so
 // rather than guess a word for it.
 func suggestionFor(
-	pass *analysis.Pass,
+	context *rule.Context,
 	identifier *ast.Ident,
 	declaredTypes []types.Type,
 	stack []ast.Node,
@@ -169,7 +171,7 @@ func suggestionFor(
 		// The callee's object, so a method, a qualified function and a function held in a variable all give their own
 		// name, and a call of a literal, which has none, falls through. So does an error constructor, whose name says
 		// only that an error was made, never what failed.
-		if callee := typeutil.Callee(pass.TypesInfo, call); callee != nil && !isErrorConstructor(callee) {
+		if callee := typeutil.Callee(context.TypesInfo, call); callee != nil && !isErrorConstructor(callee) {
 			return asCode(lowerCamel(callee.Name()) + "Error"), errorContext
 		}
 	}
