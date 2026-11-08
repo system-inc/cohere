@@ -1,5 +1,7 @@
 package flagged
 
+import "testing"
+
 // Package-level names keep their export in the suggestion.
 const MAX_RETRIES = 3 // want "`MAX_RETRIES` is in screaming snake case; spell it `MaxRetries`"
 
@@ -91,3 +93,6 @@ func mention_only() {} // want "`mention_only` has an underscore in it; spell it
 
 // Outside a _test.go file an Example name is an ordinary function, and the underscore is ours.
 func Example_helper() {} // want "`Example_helper` has an underscore in it; spell it `ExampleHelper`"
+
+// Outside a _test.go file a test's name is no test's, so the whole name is ours.
+func TestOutside_File(test *testing.T) {} // want "`TestOutside_File` has an underscore in it; spell it `TestOutsideFile`"

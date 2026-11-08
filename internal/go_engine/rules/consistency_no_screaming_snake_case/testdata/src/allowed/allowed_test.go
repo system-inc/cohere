@@ -20,3 +20,19 @@ func Example_basic() {
 func ExampleHttpClient_SendRequest() {}
 
 func ExampleHttpClient_SendRequest_withRetries() {}
+
+// go test's grammar: after the word, underscores separate UpperCamel words or digits, which -run patterns read.
+func TestProduct_BridgeInputProofs(test *testing.T) {}
+
+func TestTokenizerEvents_310(test *testing.T) {}
+
+func Test_Parse(test *testing.T) {}
+
+func TestParser_V2_X(test *testing.T) {}
+
+func BenchmarkParse_Line(benchmark *testing.B) {}
+
+func FuzzParse_Input(fuzz *testing.F) {}
+
+// An example's method segment is the method's own name, whatever its case.
+func ExampleResource_URL() {}
