@@ -96,10 +96,17 @@ public enum EngineVersion {
         versionOutput.range(of: #"swiftlang-[0-9.]+"#, options: .regularExpression).map { String(versionOutput[$0]) }
     }
 
+    /*
+     What `swift --version` printed on standard output, as the launcher reads it (`dispatch.SwiftVersionOutput`), so an
+     engine run alone and one the front door started read one toolchain: the driver's own version line goes to standard
+     error, and keyed in, it made the two compute different SDK index seeds (#f6pqraj). Standard error joins only an
+     answer whose standard output names no toolchain, so the words for an unknown one say what it printed.
+     */
     private static func askVersionOutput(runner: ProcessRunner) -> String {
         do {
             let result = try runner.run("swift", ["--version"], in: URL(fileURLWithPath: "/"))
-            return String(decoding: result.standardOutput, as: UTF8.self) + result.standardError
+            let printed = String(decoding: result.standardOutput, as: UTF8.self)
+            return toolchainNamed(in: printed) == nil ? printed + result.standardError : printed
         }
         catch {
             return "unknown (\(error))"

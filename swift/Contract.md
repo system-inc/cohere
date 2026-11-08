@@ -483,10 +483,11 @@ index seed (#f6pqraj): a store of the SDK's units alone, never a project's, unde
 depend on, each part compared: the seed's format, the contract, `swift --version`'s whole output, the SDK's path and
 build version, the target, the index flags, the job's whole argument list without its own file and outputs, and the
 modules the scripts import, since Clang writes an SDK header's record differently in another import context. A
-unit the seed cannot vouch for (its bytes, its records, or the module file it was indexed from not as recorded) is
-taken out with every unit that imports it, and indexed afresh; a seed that cannot be read, or none, is a miss, and
+unit the seed cannot vouch for (its bytes, the bytes of a record it names, or the module file it was indexed from
+not as recorded) is taken out with every unit that imports it, and indexed afresh; a seed that cannot be read, or none, is a miss, and
 the check indexes everything, then makes the key's seed from what it wrote, in a folder of its own renamed into
-place, never changed after. The types record says so, additive within contract 3, as
+place, never changed after. A hit touches its key's folder, and a publish removes every key's folder untouched for
+fourteen days that no reader holds. The types record says so, additive within contract 3, as
 `"sdkIndexSeed": {"key": "<the key's SHA-256>", "hit": true}`, absent when the store was not empty or no seed
 applied; the front door names it under `--verbose` and in `--json`'s summary as `swift.sdkIndexSeed`, never in
 the default line. `COHERE_SDK_INDEX_SEED_ROOT` points the seeds elsewhere, for a bench or a proof.

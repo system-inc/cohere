@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Synchronization
 
 /*
  The SDK's index units, kept once per toolchain and SDK outside every project, so a check into an empty index store
@@ -79,6 +80,15 @@ struct SDKIndexSeed: Sendable {
         }
     }
 
+    /*
+     The toolchain as one string, what `swift --version` printed with its words joined by single spaces, as the
+     launcher's own key reads it (`dispatch.swiftToolchain`): the front door hands its engines the text it read, and an
+     engine run alone asks for its own, and the two must name one seed (cache's note on #f6pqraj).
+     */
+    static func toolchainIdentity(_ versionOutput: String) -> String {
+        versionOutput.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+
     /* The arguments that belong to one job's file and outputs, each taken out of the key with its value. */
     static let ownArguments: Set<String> = [
         "-module-name", "-primary-file", "-o", "-serialize-diagnostics-path", "-index-unit-output-path",
@@ -121,7 +131,7 @@ struct SDKIndexSeed: Sendable {
         return Key(
             format: format,
             contract: contract,
-            swiftVersion: swiftVersion,
+            swiftVersion: toolchainIdentity(swiftVersion),
             sdkPath: sdkPath.path,
             sdkBuild: build,
             target: target,
@@ -163,6 +173,15 @@ struct SDKIndexSeed: Sendable {
     struct Manifest: Codable, Equatable {
         var key: Key
         var units: [Unit]
+        /* Every record the units name, as it stood when the seed was made. */
+        var records: [Record]
+
+        /* One record: its name, a content address the store computed, and the bytes that name stands for. */
+        struct Record: Codable, Equatable {
+            var name: String
+            var size: Int
+            var sha256: String
+        }
 
         /* One SDK unit: its file, the module file it was indexed from, as both stood when the seed was made, and its records. */
         struct Unit: Codable, Equatable {
@@ -197,21 +216,34 @@ struct SDKIndexSeed: Sendable {
 
     /*
      The empty store at `store` seeded from the seed of `key`. A hit clones the seed's `v5` in, then takes back out
-     every unit that is not, byte for byte, the one the seed recorded, or whose module file is not the one it was
-     indexed from, so the frontend indexes those modules. A miss leaves the store empty: no seed, an unreadable one,
-     one of another key, or one none of whose units holds.
+     every unit that is not, byte for byte, the one the seed recorded, that names a record whose bytes are not the
+     ones recorded, or whose module file is not the one it was indexed from, with every unit importing one, and every
+     such record, so the frontend indexes those modules and writes those records afresh. A miss leaves the store empty:
+     no seed, an unreadable one, one of another key, or one none of whose units holds. The key's folder is held shared
+     while it is read, so no prune can take it away mid-read (`pruneStaleKeys`), and touched, so a key in use is never
+     stale.
      */
     func seed(store: URL, key: Key) -> Use {
         let miss = Use(key: key, hit: false)
-        let current = directory(of: key).appendingPathComponent("current").resolvingSymlinksInPath()
+        let folder = directory(of: key)
+        guard let held = KeyLock(folder: folder, exclusive: false) else { return miss }
+        defer { withExtendedLifetime(held) {} }
+        let current = folder.appendingPathComponent("current").resolvingSymlinksInPath()
         guard let data = FileManager.default.contents(atPath: current.appendingPathComponent(Self.manifestName).path),
             let manifest = try? JSONDecoder().decode(Manifest.self, from: data),
             manifest.key == key
         else { return miss }
+        Self.touch(folder)
         let units = current.appendingPathComponent("v5/units", isDirectory: true)
         let records = current.appendingPathComponent("v5/records", isDirectory: true)
+        let badRecords = Self.failing(manifest.records, records: records)
         let setAside = Self.importers(
-            of: Set(manifest.units.filter { !Self.holds($0, units: units, records: records) }.map(\.name)),
+            of: Set(
+                manifest.units.filter { unit in
+                    !Self.holds(unit, units: units, records: records) || !badRecords.isDisjoint(with: unit.records)
+                }
+                .map(\.name)
+            ),
             in: manifest.units,
         )
         guard setAside.count < manifest.units.count else { return miss }
@@ -221,6 +253,10 @@ struct SDKIndexSeed: Sendable {
             guard unsafe clonefile(current.appendingPathComponent("v5").path, seeded.path, 0) == 0 else { return miss }
             for name in setAside {
                 try Self.remove(seeded.appendingPathComponent("units").appendingPathComponent(name))
+            }
+            /* A record's name is its content's address, so the store never writes one again while a file of that name stands. */
+            for name in badRecords {
+                try Self.remove(Self.recordPath(in: seeded.appendingPathComponent("records"), name))
             }
         }
         catch {
@@ -261,6 +297,27 @@ struct SDKIndexSeed: Sendable {
         return reached
     }
 
+    /*
+     The records whose bytes are not the ones the seed recorded, hashed side by side. Measured 2026-11-07 on ahra's
+     seed, 2,580 records of 24.5 MB in a debug build: 64ms one after another with the files cached, 300ms the first time.
+     */
+    static func failing(_ records: [Manifest.Record], records folder: URL) -> Set<String> {
+        let failed = Mutex(Set<String>())
+        DispatchQueue.concurrentPerform(iterations: records.count) { index in
+            guard !holds(records[index], records: folder) else { return }
+            failed.withLock { _ = $0.insert(records[index].name) }
+        }
+        return failed.withLock { $0 }
+    }
+
+    /* Whether a seed's record is still the bytes it recorded. */
+    static func holds(_ record: Manifest.Record, records: URL) -> Bool {
+        guard let data = FileManager.default.contents(atPath: recordPath(in: records, record.name).path) else {
+            return false
+        }
+        return data.count == record.size && sha256(data) == record.sha256
+    }
+
     /* Whether a seed's unit is still the one it recorded: its file, every record it names, and the module file it was indexed from. */
     static func holds(_ unit: Manifest.Unit, units: URL, records: URL) -> Bool {
         let file = units.appendingPathComponent(unit.name)
@@ -290,6 +347,16 @@ struct SDKIndexSeed: Sendable {
         let system = index.units().filter(\.isSystem)
         guard !system.isEmpty else { return }
         let folder = directory(of: key)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        catch {
+            /* No folder to make it in, so no seed: the next check of this key indexes the SDK again. */
+            return
+        }
+        guard let held = KeyLock(folder: folder, exclusive: false) else { return }
+        defer { withExtendedLifetime(held) {} }
+        Self.touch(folder)
         let current = folder.appendingPathComponent("current").resolvingSymlinksInPath()
         /* A seed is never changed once made: one another run made since this run's miss stands. */
         if let data = FileManager.default.contents(atPath: current.appendingPathComponent(Self.manifestName).path),
@@ -306,12 +373,16 @@ struct SDKIndexSeed: Sendable {
             let records = making.appendingPathComponent("v5/records", isDirectory: true)
             try FileManager.default.createDirectory(at: units, withIntermediateDirectories: true)
             try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
-            var manifest = Manifest(key: key, units: [])
+            var manifest = Manifest(key: key, units: [], records: [])
             for unit in system.sorted(by: { $0.name < $1.name }) {
                 guard let entry = try Self.copy(unit, from: (storeUnits, storeRecords), to: (units, records)) else {
                     continue
                 }
                 manifest.units.append(entry)
+            }
+            for name in Set(manifest.units.flatMap(\.records)).sorted() {
+                let data = try Data(contentsOf: Self.recordPath(in: records, name))
+                manifest.records.append(Manifest.Record(name: name, size: data.count, sha256: Self.sha256(data)))
             }
             guard !manifest.units.isEmpty else {
                 Self.discard(making)
@@ -332,6 +403,7 @@ struct SDKIndexSeed: Sendable {
                 return
             }
             prune(versions: versions, keeping: identifier)
+            pruneStaleKeys(keeping: key)
         }
         catch {
             /* Not made, so the next check of this key indexes the SDK again: slower, and still right. */
@@ -427,6 +499,81 @@ struct SDKIndexSeed: Sendable {
                 Date().timeIntervalSince(modified) > ScratchPrune.inUseWindow
             else { continue }
             Self.discard(entry)
+        }
+    }
+
+    /* How long a key's folder may go untouched, by any hit or publish, before a publish of another key removes it. */
+    static let staleAfter: TimeInterval = 14 * 24 * 60 * 60
+
+    /*
+     Every key's folder no hit or publish has touched in `staleAfter`, removed, so seeds do not pile up: each new import
+     set makes a seed of its own, about 30 MB for ahra's scripts (cache's review of 0d4f07c8f). A folder being read is
+     never removed. A reader holds the folder's lock shared from before it resolves `current` until its clone is done,
+     and the prune takes it exclusive without waiting, so a folder anyone holds is skipped. A folder the prune does
+     take is first renamed out of every reader's path, under the lock, so a reader arriving after finds no key and
+     misses, and only then removed. Leftovers of a removal cut short are removed too, since no path reaches them.
+     */
+    func pruneStaleKeys(keeping kept: Key, now: Date = Date()) {
+        let entries =
+            (try? FileManager.default.contentsOfDirectory(
+                at: root,
+                includingPropertiesForKeys: [.contentModificationDateKey],
+            )) ?? []
+        for entry in entries where entry.lastPathComponent != kept.name {
+            if entry.lastPathComponent.hasPrefix(".removing-") {
+                Self.discard(entry)
+                continue
+            }
+            guard !entry.lastPathComponent.hasPrefix("."), Self.isStale(entry, now: now),
+                let held = KeyLock(folder: entry, exclusive: true, waiting: false)
+            else { continue }
+            /* Asked again under the lock: a reader may have touched it between the listing and the lock. */
+            guard Self.isStale(entry, now: now) else { continue }
+            let removing = root.appendingPathComponent(".removing-\(UUID().uuidString)", isDirectory: true)
+            let renamed = unsafe rename(entry.path, removing.path) == 0
+            withExtendedLifetime(held) {}
+            if renamed {
+                Self.discard(removing)
+            }
+        }
+    }
+
+    private static func isStale(_ folder: URL, now: Date) -> Bool {
+        guard
+            let modified = try? folder.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+        else { return false }
+        return now.timeIntervalSince(modified) > staleAfter
+    }
+
+    /* Marks a key's folder used now, so the prune leaves it for another `staleAfter`. */
+    private static func touch(_ folder: URL) {
+        do {
+            try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: folder.path)
+        }
+        catch {
+            /* Untouched, the key may be pruned after `staleAfter`, and the next check of it indexes the SDK again. */
+        }
+    }
+
+    /*
+     An `flock` on a key folder's `lock` file, shared for a reader or a publisher, exclusive for the prune, released when
+     this is. Nil when the folder is not there, or the lock is held exclusive and the caller would not wait.
+     */
+    final class KeyLock {
+        private let descriptor: Int32
+
+        init?(folder: URL, exclusive: Bool, waiting: Bool = true) {
+            let opened = unsafe open(folder.appendingPathComponent("lock").path, O_CREAT | O_RDWR, 0o644)
+            guard opened >= 0 else { return nil }
+            guard flock(opened, (exclusive ? LOCK_EX : LOCK_SH) | (waiting ? 0 : LOCK_NB)) == 0 else {
+                close(opened)
+                return nil
+            }
+            descriptor = opened
+        }
+
+        deinit {
+            close(descriptor)
         }
     }
 

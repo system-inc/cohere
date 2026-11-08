@@ -190,6 +190,92 @@ struct SDKIndexSeedTests {
         }
     }
 
+    /*
+     A record whose bytes are not the ones the seed recorded is never read: one record of the seed truncated, the hit
+     sets aside every unit naming it with their importers, takes the record out of the store, and the check writes it
+     again, so the store holds what fresh indexing writes. Red under the mutant that checks records only by name.
+     */
+    @Test func aTruncatedRecordSetsAsideTheUnitsNamingIt() throws {
+        let root = try Self.folder("root")
+        let seeds = try Self.folder("seeds")
+        let scripts = [try Self.script(Self.foundationScript, named: "Clock.swift", in: root)]
+        let fresh = try Self.check(scripts, root: root, seeds: seeds)
+        let key = try #require(fresh.result.sdkIndexSeed).key
+        let seed = Self.current(key, seeds: seeds)
+        let manifest = try JSONDecoder().decode(
+            SDKIndexSeed.Manifest.self,
+            from: Data(contentsOf: seed.appendingPathComponent(SDKIndexSeed.manifestName)),
+        )
+        let record = try #require(manifest.records.first { $0.size > 64 })
+        let path = SDKIndexSeed.recordPath(in: seed.appendingPathComponent("v5/records"), record.name)
+        try Data(contentsOf: path).prefix(record.size / 2).write(to: path)
+        let naming = Set(manifest.units.filter { $0.records.contains(record.name) }.map(\.name))
+        #expect(!naming.isEmpty)
+
+        let checked = try Self.check(scripts, root: root, seeds: seeds)
+        let use = try #require(checked.result.sdkIndexSeed)
+        #expect(use.hit && use.unitsSetAside >= naming.count)
+        let units = Dictionary(
+            try Self.store(checked.store).units().map { ($0.name, $0) },
+            uniquingKeysWith: { first, _ in first },
+        )
+        for name in naming {
+            #expect((units[name]?.written ?? .distantPast) >= checked.started, "\(name) was not indexed again")
+        }
+        let written = try Data(
+            contentsOf: SDKIndexSeed.recordPath(in: checked.store.appendingPathComponent("v5/records"), record.name)
+        )
+        #expect(written.count == record.size && SDKIndexSeed.sha256(written) == record.sha256)
+        #expect(try Self.sdkRecords(checked.store) == (try Self.sdkRecords(fresh.store)))
+    }
+
+    /*
+     Seeds do not pile up: a publish removes every key's folder no hit or publish touched in fourteen days, keeps a
+     fresh one, and never removes one a reader holds, since the prune takes a key's lock without waiting and skips a
+     folder it cannot. A hit touches its key's folder, so a key in use is never stale. Red under the mutant that
+     prunes without the lock: the held folder goes.
+     */
+    @Test func staleKeysGoAndHeldOnesStay() throws {
+        let root = try Self.folder("root")
+        let seeds = try Self.folder("seeds")
+        let scripts = [try Self.script(Self.foundationScript, named: "Clock.swift", in: root)]
+        let made = try Self.check(scripts, root: root, seeds: seeds)
+        let key = try #require(made.result.sdkIndexSeed).key
+        let seed = SDKIndexSeed(root: seeds, swiftVersion: key.swiftVersion)
+        let old = Date().addingTimeInterval(-15 * 24 * 60 * 60)
+        func plant(_ name: String, modified: Date) throws -> URL {
+            let folder = seeds.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            FileManager.default.createFile(atPath: folder.appendingPathComponent("lock").path, contents: Data())
+            try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: folder.path)
+            return folder
+        }
+        let stale = try plant("stale", modified: old)
+        let fresh = try plant("fresh", modified: Date())
+        let held = try plant("held", modified: old)
+        try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: seed.directory(of: key).path)
+
+        let hit = try Self.check(scripts, root: root, seeds: seeds)
+        #expect(hit.result.sdkIndexSeed?.hit == true)
+        let touched =
+            try seed.directory(of: key).resourceValues(forKeys: [.contentModificationDateKey])
+            .contentModificationDate ?? .distantPast
+        #expect(touched >= hit.started, "a hit left its key's folder untouched")
+
+        do {
+            /* As a reader in the middle of a hit holds it. */
+            let reading = try #require(SDKIndexSeed.KeyLock(folder: held, exclusive: false))
+            seed.pruneStaleKeys(keeping: key)
+            #expect(!FileManager.default.fileExists(atPath: stale.path))
+            #expect(FileManager.default.fileExists(atPath: fresh.path))
+            #expect(FileManager.default.fileExists(atPath: held.path), "a folder being read was removed")
+            #expect(FileManager.default.fileExists(atPath: seed.directory(of: key).path))
+            withExtendedLifetime(reading) {}
+        }
+        seed.pruneStaleKeys(keeping: key)
+        #expect(!FileManager.default.fileExists(atPath: held.path), "a stale folder no one holds stayed")
+    }
+
     /* A seed whose manifest cannot be read is a miss: the check indexes everything, and finds what it found before. */
     @Test func aCorruptSeedIsAMiss() throws {
         let root = try Self.folder("root")
@@ -320,6 +406,10 @@ struct SDKIndexSeedTests {
         #expect(key(replacing("/SDKs/A.sdk", with: "/SDKs/B.sdk")) != base)
         #expect(key(arguments, build: "26B119") != base)
         #expect(key(arguments, version: "6.4.3") != base)
+        #expect(
+            key(arguments, version: "Apple Swift\nversion  6.4.2\n")
+                == key(arguments, version: "Apple Swift version 6.4.2")
+        )
         #expect(key(replacing("arm64-apple-macosx27.2.0", with: "arm64-apple-ios27.0")) != base)
         #expect(key(arguments + ["-index-ignore-clang-modules"]) != base)
         #expect(key(replacing("6", with: "5")) != base)
