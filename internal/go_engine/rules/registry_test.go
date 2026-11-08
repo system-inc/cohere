@@ -872,6 +872,7 @@ var portedPasses = []string{
 	"never_nil_comparison",
 	"nil_ness",
 	"receiver_name",
+	"regular_expression_raw_string",
 	"repeated_if_else_condition",
 	"self_assignment",
 	"single_argument_append",
