@@ -310,7 +310,7 @@ var ports = map[string]port{
 	"structtag":        {analyzer: struct_tag.Analyzer, listener: &struct_tag.Listener},
 	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
 	"tests":            {analyzer: tests.Analyzer},
-	"timeformat":       {analyzer: time_format.Analyzer},
+	"timeformat":       {analyzer: time_format.Analyzer, listener: &time_format.Listener},
 	"unmarshal":        {analyzer: unmarshal.Analyzer, listener: &unmarshal.Listener},
 	"unreachable":      {analyzer: unreachable.Analyzer},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer, listener: &unsafe_ptr.Listener},
