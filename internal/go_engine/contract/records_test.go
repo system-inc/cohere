@@ -36,7 +36,7 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
-	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache"},
+	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds"},
 	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
 }
 
@@ -325,6 +325,10 @@ func populatedRecords() []Record {
 			WithheldBySuppression: map[string]int{"cohere-go/printf": 1},
 			WithheldAsGenerated:   map[string]int{"cohere-go/x": 2},
 			WithheldAsCopied:      map[string]int{"cohere-go/y": 3},
+			Builds: []BuildRecord{
+				{Target: "darwin/arm64 cgo", Host: true, CompiledFiles: 2, AnalyzedPackages: 1},
+				{Target: "windows/arm64", CompiledFiles: 2, AnalyzedPackages: 1, Seeds: 1, FindingsAdded: 1},
+			},
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
@@ -519,6 +523,39 @@ func TestLintRecordWritesEmptyWithheldCountsAsObjects(test *testing.T) {
 	for _, field := range []string{`"withheldBySuppression":{}`, `"withheldAsGenerated":{}`, `"withheldAsCopied":{}`} {
 		if !strings.Contains(output.String(), field) {
 			test.Errorf("an empty lint record wrote %s, want %s in it", output.String(), field)
+		}
+	}
+}
+
+// TestLintRecordWritesBuildsOnlyForMoreThanOne keeps a run of one build writing the lint record it always has, with no
+// builds key, and a run of several naming each build (#72n9mq0).
+func TestLintRecordWritesBuildsOnlyForMoreThanOne(test *testing.T) {
+	test.Parallel()
+	encode := func(record LintRecord) string {
+		encoded, encodeError := json.Marshal(record)
+		if encodeError != nil {
+			test.Fatal(encodeError)
+		}
+		return string(encoded)
+	}
+	if one := encode(LintRecord{}); strings.Contains(one, `"builds"`) {
+		test.Errorf("a run of one build wrote %s, with a builds key", one)
+	}
+	several := encode(LintRecord{Builds: []BuildRecord{
+		{Target: "darwin/arm64 cgo", Host: true, CompiledFiles: 3, AnalyzedPackages: 2},
+		{
+			Target: "windows/arm64", CompiledFiles: 3, AnalyzedPackages: 1, Seeds: 1, FindingsAdded: 2,
+			FindingsDropped: 1,
+		},
+	}})
+	for _, field := range []string{
+		`"builds":[{"target":"darwin/arm64 cgo","host":true,"compiledFiles":3,"analyzedPackages":2,"seeds":0,` +
+			`"references":0,"importers":0,"findingsAdded":0,"findingsDropped":0},`,
+		`{"target":"windows/arm64","host":false,"compiledFiles":3,"analyzedPackages":1,"seeds":1,"references":0,` +
+			`"importers":0,"findingsAdded":2,"findingsDropped":1}]`,
+	} {
+		if !strings.Contains(several, field) {
+			test.Errorf("a run of two builds wrote %s, want %s in it", several, field)
 		}
 	}
 }
