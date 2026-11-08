@@ -103,7 +103,8 @@ var listingEnvironment = []string{
 }
 
 // listingKey is where a workspace's listing is kept: one per workspace, patterns and go environment (see
-// listingEnvironment), so another target, toolchain or flag never reads it. It returns the go environment too.
+// listingEnvironment), so another target, toolchain or flag never reads it, but for the flags VerdictFlags leaves out,
+// which change only what go prints. It returns the go environment too, as go env reported it.
 func listingKey(
 	workspace string,
 	environment []string,
@@ -125,7 +126,13 @@ func listingKey(
 	digest := sha256.New()
 	writeParts(digest, []string{listingFormatVersion, workspace})
 	for _, name := range listingEnvironment {
-		writeParts(digest, []string{name, goEnvironment[name]})
+		value := goEnvironment[name]
+		// What go list answers never depends on the flags VerdictFlags leaves out, -p among them, which cohere-dev's
+		// pool sets to each token's share: with them in the key, a run under another share missed every listing.
+		if name == "GOFLAGS" {
+			value = VerdictFlags(value)
+		}
+		writeParts(digest, []string{name, value})
 	}
 	writeParts(digest, patterns)
 	return [sha256.Size]byte(digest.Sum(nil)), goEnvironment, nil
