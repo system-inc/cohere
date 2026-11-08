@@ -19,52 +19,45 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1030",
-	Doc:      "Flags a bytes.Buffer's contents converted to what its other method gives: staticcheck's S1030, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, judged beside the
+// node that holds it, as the original walks the inspector's cursor. The original matches each call through
+// code.Match, which asks the type index nothing, and code.IsCallTo names the callee by its object, not through the
+// index, so every package is walked and a package's own calls are judged like any other's.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("buffer_string_conversion: the dispatcher handed over a node that is not a call")
+		}
+		if len(stack) == 0 {
+			// Invariant: a call stands inside a file, which the walk holds among its ancestors.
+			panic("buffer_string_conversion: the dispatcher handed over a call with no ancestor")
+		}
+		// The call's parent is the last of its ancestors, the node the cursor's Parent names.
+		Check(context, call, stack[len(stack)-1])
+	},
 }
 
-// run builds the pass's context and judges every call of the package beside the node that holds it, as the
-// original walks the inspector's cursor. The original matches each call through code.Match, which asks the type
-// index nothing, and code.IsCallTo names the callee by its object, not through the index, so every package is walked
-// and a package's own calls are judged like any other's.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("buffer_string_conversion: the inspect pass's result is missing")
-	}
-	for cursor := range inspected.Root().Preorder((*ast.CallExpr)(nil)) {
-		call, isCall := cursor.Node().(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands over only the calls it was asked for.
-			panic("buffer_string_conversion: the cursor handed over a node that is not a call")
-		}
-		Check(context, call, cursor.Parent().Node())
-	}
-	return nil, nil
-}
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1030",
+	"S1030",
+	"Flags a bytes.Buffer's contents converted to what its other method gives: staticcheck's S1030, ported.",
+	&Listener,
+)
 
 // Check judges one call, held by parent: a conversion to string of a call of (*bytes.Buffer).Bytes, or to a slice of
 // byte of a call of (*bytes.Buffer).String, both with no arguments, asks for what the buffer's other method returns,
@@ -102,7 +95,7 @@ func Check(context *rule.Context, call *ast.CallExpr, parent ast.Node) {
 	converted := types.Unalias(context.TypesInfo.TypeOf(call.Fun))
 	if converted == types.Universe.Lookup("string").Type() &&
 		staticcheck_code.IsCallTo(context, inner, "(*bytes.Buffer).Bytes") {
-		// The parent is the cursor's, the node that holds the conversion directly, of any of its fields: a
+		// The parent is the walk's, the node that holds the conversion directly, of any of its fields: a
 		// parenthesized index, `m[(string(buffer.Bytes()))]`, is held by its parentheses, and a conversion indexed
 		// itself, `string(buffer.Bytes())[0]`, is held by the index too.
 		if _, isIndex := parent.(*ast.IndexExpr); isIndex {
