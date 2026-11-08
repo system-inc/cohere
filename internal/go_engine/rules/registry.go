@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/suite/vet"
+	"honnef.co/go/tools/analysis/lint"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
@@ -501,12 +502,11 @@ func All() []rule.Rule {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		registered = append(registered, borrowedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
+		registered = append(registered, staticcheckRule(wrapped, portOrOriginal(wrapped.Analyzer, ports)))
 	}
 	for _, wrapped := range stylecheck.Analyzers {
 		if stylecheckRuledOn[wrapped.Analyzer.Name] {
-			chosen := portOrOriginal(wrapped.Analyzer, ports)
-			registered = append(registered, borrowedRule(chosen, rule.OriginStaticcheck))
+			registered = append(registered, staticcheckRule(wrapped, portOrOriginal(wrapped.Analyzer, ports)))
 		}
 	}
 	registered = append(registered, rule.Rule{
@@ -515,6 +515,9 @@ func All() []rule.Rule {
 		UpstreamName: unused_code.Analyzer.Name,
 		TypeAware:    true,
 		Analyzer:     unused_code.Analyzer,
+		// Staticcheck's runner merges U1000 this way by hand rather than from its documentation
+		// (honnef.co/go/tools@v0.8.1 lintcmd/lint.go:264): code is unused only if it is unused in every build.
+		MergeIfAll: true,
 	})
 	// The house rules come last, each from its own package, which holds its name, origin and analyzer
 	// together so the registry restates none of them.
@@ -585,6 +588,14 @@ func House() []rule.Rule {
 // for listener, under the name it has upstream.
 func dispatchedRule(analyzer *analysis.Analyzer, listener *rule.Listener, origin rule.Origin) rule.Rule {
 	return borrowedRule(port{analyzer: analyzer, listener: listener}, origin)
+}
+
+// staticcheckRule is the rule that runs chosen, the port of staticcheck's check wrapped or wrapped itself, merged
+// across builds as wrapped's documentation says, so a port merges as its original does.
+func staticcheckRule(wrapped *lint.Analyzer, chosen port) rule.Rule {
+	registered := borrowedRule(chosen, rule.OriginStaticcheck)
+	registered.MergeIfAll = wrapped.Doc != nil && wrapped.Doc.MergeIf == lint.MergeIfAll
+	return registered
 }
 
 // borrowedRule is the rule that runs chosen, a borrowed check's port or its original, under the name it has upstream,

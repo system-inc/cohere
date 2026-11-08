@@ -55,6 +55,11 @@ type Rule struct {
 	// itself. A dispatched rule keeps its own Analyzer all the same, for its identity, options and docs: its run
 	// reports what the dispatcher found under its name, so settings, suppression and crashes read as any rule's.
 	Listener *Listener
+	// MergeIfAll is whether, where more than one build checks a file, a finding of the rule stands only if every build
+	// with a say on the file reports it, as staticcheck's runner merges a check whose documentation says MergeIfAll:
+	// code is unused only if it is unused in every build. A rule without it, every rule cohere did not borrow from
+	// staticcheck among them, keeps a finding any one build reports.
+	MergeIfAll bool
 }
 
 // Validate refuses a rule the registry should never hold, so a malformed rule fails a test at the
