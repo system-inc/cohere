@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/go/ir"
 )
 
@@ -59,6 +60,9 @@ type Context struct {
 	// state is what the check gathers over the package, made by State on first use as the type the check asks for.
 	//cohere:ignore consistency-no-any each check chooses its own state type, read back through State's type parameter
 	state any
+	// cursor is the inspector's cursor of the node the syntax dispatcher is calling Node on, and the zero cursor, which
+	// is not valid, between those calls.
+	cursor inspector.Cursor
 }
 
 // NewContext is the context a check registered as ruleName reads over the package pass analyzes, its findings handed
@@ -133,6 +137,32 @@ func (context *Context) Option(name string) flag.Value {
 		panic(fmt.Sprintf("rule %s reads option %s, which its analyzer has no flag for", context.ruleName, name))
 	}
 	return option.Value
+}
+
+// Cursor is the inspector's cursor of the node a syntax listener's Node is called on, for a check that reads what only
+// a cursor answers: the node's siblings, the field of its parent that holds it (ParentEdge), a node found beneath it
+// (FindNode). It holds only during that call, since the context is the same for every call on the package. Called
+// anywhere else, in FileEnter, FileExit, PackageExit, a walk of the intermediate representation, or after Node
+// returned, Cursor panics, for ResultOf's reason, since a cursor it handed there would be another node's.
+func (context *Context) Cursor() inspector.Cursor {
+	if !context.cursor.Valid() {
+		// Invariant: a check reads the cursor only during its Node call. A read anywhere else is a mistake in the
+		// check, and the dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+		panic(fmt.Sprintf("rule %s reads the cursor outside a Node call, where there is no node to hand it; read it "+
+			"in Node, or keep what it answers there", context.ruleName))
+	}
+	return context.cursor
+}
+
+// EnterNode makes cursor the one Cursor hands the check, as the syntax dispatcher calls Node on cursor's node, and
+// LeaveNode takes it back once Node returns. Only the syntax dispatcher calls them, never a check.
+func (context *Context) EnterNode(cursor inspector.Cursor) {
+	context.cursor = cursor
+}
+
+// LeaveNode makes Cursor panic again, as Node returns. See EnterNode.
+func (context *Context) LeaveNode() {
+	context.cursor = inspector.Cursor{}
 }
 
 // State is the check's own state over the package context covers, a new Kind made on the first call and the same one
