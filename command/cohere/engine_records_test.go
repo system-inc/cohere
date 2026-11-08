@@ -841,6 +841,42 @@ func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
 	)
 }
 
+// TestSwiftRunNamesFilesNothingCheckedWhenTypesBail holds #4txsasr: files without a compiler record behind a types
+// bail, here a finding at the manifest from a check that never started. The footer said only "1 type error (2
+// checked) • lint did not run" over files the compiler never saw, since the files without a record were counted
+// only when every requested phase ran. They are named whatever ran.
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+func TestSwiftRunNamesFilesNothingCheckedWhenTypesBail(test *testing.T) {
+	lines := contractFixture(test, "TypesBail.jsonl")
+	for index, line := range lines {
+		switch {
+		case strings.HasPrefix(line, `{"kind":"finding"`):
+			lines[index] = `{"kind":"finding","source":"compiler","file":"/project/Package.swift",` +
+				`"line":1,"column":1,"severity":"error","rule":"","messageId":"buildFailed",` +
+				`"message":"the check of /project failed before compiling anything, so the compiler never ran",` +
+				`"fixes":[],"suggestions":[]}`
+		case strings.HasPrefix(line, `{"kind":"types"`):
+			lines[index] = strings.Replace(
+				line,
+				`"filesWithoutRecord":[]`,
+				`"filesWithoutRecord":["/project/Sources/Example/Broken.swift",`+
+					`"/project/Sources/Example/Example.swift"]`,
+				1,
+			)
+		}
+	}
+
+	activeSummary = runSummary{}
+	output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, lines, 1)
+	if renderRecordsError != nil || exitCode != 1 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
+	}
+	markers := uncheckedMarkers(activeSummary)
+	if !slices.Contains(markers, "⚠ 2 files nothing checked: 2 with no compiler record") {
+		test.Errorf("the footer's markers are %q, want the two files the compiler never saw named", markers)
+	}
+}
+
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
 func TestSwiftRunListingModes(test *testing.T) {
 	test.Parallel()

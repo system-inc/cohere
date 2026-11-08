@@ -1178,10 +1178,16 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
+	// The files nothing checked are named whichever phases ran (#4txsasr). A build that failed before compiling, an
+	// Xcode root's resolve that failed among them, is a type error that keeps lint from being reached, and the footer
+	// said only that, "1 type error (13 checked) • lint did not run", over files the compiler never saw: measured on
+	// ahraos-presence's CapturePhone/PhoneCapture before its unstarted check let lint run.
+	if namedGaps {
+		activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
+	}
 	if !*record.Complete && run.report.checkedEveryRequestedPhase() {
 		if namedGaps {
 			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
-			activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
 		} else {
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
