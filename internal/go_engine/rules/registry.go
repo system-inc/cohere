@@ -92,6 +92,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -200,6 +201,7 @@ var ports = map[string]*analysis.Analyzer{
 	"stdmethods":    std_methods.Analyzer,
 	"stringintconv": string_int_conv.Analyzer,
 	"structtag":     struct_tag.Analyzer,
+	"tests":         tests.Analyzer,
 }
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
