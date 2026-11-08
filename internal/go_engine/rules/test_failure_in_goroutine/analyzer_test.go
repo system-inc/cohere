@@ -63,8 +63,8 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 
 // The original and the port run in one checker over the same fixture packages, staticcheck's and parity's, the second
 // holding the shapes the check depends on, and their findings must be the same multiset of file, line, column, end,
-// message and related entries. Each side's count is logged, since two empty sides would match and prove nothing, and the test fails if
-// the original finds nothing at all.
+// message and related entries. Each side's count is logged, since two empty sides would match and prove nothing, and
+// the test fails if the original finds nothing at all.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	original, port := findingsOf(test, upstreamPackage, "parity")
