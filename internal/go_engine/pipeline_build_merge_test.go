@@ -7,6 +7,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
@@ -234,5 +235,33 @@ func TestWhatEveryBuildSaysAlikeIsWrittenOnce(test *testing.T) {
 	}
 	if !slices.Equal(merged.typeErrors, []load.Diagnostic{windowsError, sharedError}) {
 		test.Errorf("type errors %+v, where each build's were expected once", merged.typeErrors)
+	}
+}
+
+// The registry decides how each rule's findings merge, through mergeIfAllRules: a finding of a rule the registry marks
+// MergeIfAll, U1000 here, that one build of two with a say on its file reports is dropped and counted to that build as
+// dropped, and a finding of a rule it does not mark, SA4023, that one build reports stands and is counted to that build
+// as added. In cohere's own tree that step alone keeps windows's four U1000 findings on stampedBinary's fields, used on
+// every other build, out of the verdict, so the test goes through the real registry rather than a map of its own.
+func TestTheRegistryDecidesWhichFindingsMergeIfAll(test *testing.T) {
+	test.Parallel()
+	strategies := mergeIfAllRules(rules.All())
+	if !strategies["cohere-go/U1000"] || strategies["cohere-go/SA4023"] {
+		test.Fatalf("the registry merges U1000 if all (%t) and SA4023 if all (%t), want true and false",
+			strategies["cohere-go/U1000"], strategies["cohere-go/SA4023"])
+	}
+	unused := check.Finding{Rule: "cohere-go/U1000", File: "binary.go", Line: 12, Column: 2, Message: "field is unused"}
+	neverNil := check.Finding{
+		Rule: "cohere-go/SA4023", File: "binary.go", Line: 30, Column: 5, Message: "this comparison is never true",
+	}
+	merged := mergeBuilds([]buildOutcome{
+		{said: saying("binary.go")},
+		{said: saying("binary.go"), kept: []check.Finding{unused, neverNil}},
+	}, strategies)
+	if !reflect.DeepEqual(merged.kept, []check.Finding{neverNil}) {
+		test.Errorf("kept %+v, where the SA4023 finding alone was expected", merged.kept)
+	}
+	if !slices.Equal(merged.dropped, []int{0, 1}) || !slices.Equal(merged.added, []int{0, 1}) {
+		test.Errorf("dropped %v and added %v, where [0 1] and [0 1] were expected", merged.dropped, merged.added)
 	}
 }
