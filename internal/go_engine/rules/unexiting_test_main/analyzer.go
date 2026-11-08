@@ -14,8 +14,9 @@
 // package level, in a variable's initializer, counts for the TestMain after it, which is then not reported. The port
 // keeps the same state in the same walk, so that false negative is the original's and stays (differences'
 // exitAtPackageLevel shows it), as does the original's false positive, a TestMain whose os.Exit is in a function it
-// calls (upstream's CheckTestMainExit-4). The registry still runs the original, which stays the oracle: the parity
-// tests beside this file run both over the same modules, and the two differ nowhere they hold.
+// calls (upstream's CheckTestMainExit-4). The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same modules, and the two
+// differ nowhere they hold.
 package unexiting_test_main
 
 import (

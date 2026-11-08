@@ -11,8 +11,9 @@
 // which the port calls itself. The message renders the selector with staticcheck's report.Render, called with a pass
 // that holds only the file set, which is all it reads; wave 5 ports it. The pattern names no symbol, so the original
 // walks every package, and so does the port. It reports through staticcheck_report.Report with no option, so a
-// generated file is judged like any other. The registry still runs the original, which stays the oracle: the parity
-// tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// generated file is judged like any other. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
+// differ nowhere they hold.
 package assigned_benchmark_iterations
 
 import (
