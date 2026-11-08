@@ -15,8 +15,9 @@
 // findings, in another order. The pattern has no field for a call's ellipsis, so neither does the port. It then asks
 // staticcheck_code.IsOfStringConvertibleByteSlice, the port of the helper the original asks, of the converted argument
 // with its parentheses removed, as the pattern binds it, and that helper reads the file's language version. The
-// original keeps nothing from one call to the next, and stays the oracle: the parity tests beside this file run both
-// over the same modules, and the two differ nowhere they hold.
+// original keeps nothing from one call to the next. The registry runs the port in the original's place, under its name,
+// and the original stays only as the oracle: the parity tests beside this file run both over the same modules, and the
+// two differ nowhere they hold.
 package byte_slice_write_string
 
 import (

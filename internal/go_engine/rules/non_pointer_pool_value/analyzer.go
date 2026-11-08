@@ -6,9 +6,10 @@
 // whose message it reports word for word over the same range, the value's expression. It reads the position of Put's
 // value from staticcheck's knowledge package, the table of argument positions the original reads, which this wave
 // imports as data and a later wave ports, and judges the value's type with staticcheck's typeutil, as the original
-// does. The original stays the oracle: the parity tests beside this file run both over staticcheck's own fixture and
-// the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic, on calls
-// Put is never part of, as testdata/src/differences records.
+// does. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ nowhere:
+// staticcheck_call departs from callcheck only where it would panic, on calls Put is never part of, as
+// testdata/src/differences records.
 package non_pointer_pool_value
 
 import (

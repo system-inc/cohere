@@ -4,9 +4,10 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa6000/sa6000.go, whose rules it keeps
 // and whose message it reports word for word over the same range, the call. It finds loops with irutil.FindLoops, as
-// the original does. The original stays the oracle: the parity tests beside this file run both over staticcheck's own
-// fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic,
-// on calls the regexp functions are never part of, as testdata/src/differences records.
+// the original does. The registry runs the port in the original's place, under its name, and the original stays only as
+// the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
+// nowhere: staticcheck_call departs from callcheck only where it would panic, on calls the regexp functions are never
+// part of, as testdata/src/differences records.
 package regular_expression_match_in_loop
 
 import (

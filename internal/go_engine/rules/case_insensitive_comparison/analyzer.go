@@ -16,8 +16,9 @@
 // names the package strings whatever name the file imports it under. The original first asks whether the package
 // depends on the strings package at all, code.CouldMatchAny; any comparison the pattern matches calls into it, so the
 // question changes no finding, and the port, asking nothing, walks every binary expression. It reports with no
-// option, so a generated file is judged like any other. The registry still runs the original, which stays the
-// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// option, so a generated file is judged like any other. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// and the two differ nowhere they hold.
 package case_insensitive_comparison
 
 import (

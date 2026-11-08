@@ -7,10 +7,11 @@
 // puts it. It reads a conversion's type set through honnef.co/go/tools/go/types/typeutil, as the original does, so a
 // type parameter whose set holds a byte slice counts as one. The original walks every source function of a package in
 // one run, but keeps nothing from one function to the next: each conversion is judged by its own readers. So the port
-// judges one function at a time and finds what the original finds. The original stays the oracle: the parity tests
-// beside this file run both over the same packages, and they differ nowhere. The one place the port could differ is a
-// conversion with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every
-// conversion a map lookup reads from its call expression, so no such conversion reaches either.
+// judges one function at a time and finds what the original finds. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and they differ nowhere. The one place the port could differ is a conversion with no syntax, where
+// staticcheck's report panics and the port reports nothing; staticcheck builds every conversion a map lookup reads from
+// its call expression, so no such conversion reaches either.
 package hoisted_map_key_conversion
 
 import (
