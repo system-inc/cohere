@@ -437,7 +437,7 @@ var ports = map[string]port{
 	"ST1019":           {analyzer: duplicate_import.Analyzer, listener: &duplicate_import.Listener},
 	"appends":          {analyzer: appends.Analyzer, listener: &appends.Listener},
 	"asmdecl":          {analyzer: asm_decl.Analyzer},
-	"assign":           {analyzer: assign.Analyzer},
+	"assign":           {analyzer: assign.Analyzer, listener: &assign.Listener},
 	"atomic":           {analyzer: atomic.Analyzer, listener: &atomic.Listener},
 	"bools":            {analyzer: bools.Analyzer, listener: &bools.Listener},
 	"buildtag":         {analyzer: build_tag.Analyzer},
