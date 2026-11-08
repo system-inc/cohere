@@ -52,24 +52,35 @@ struct SymbolProvider {
         for files: [ParsedFile],
         replaying: (ParsedFile, IndexStore.FreshRecord.Identity) -> Bool = { _, _ in false },
     ) -> Result {
-        var result = Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
-        guard !files.isEmpty else { return result }
-        /*
-         The demangler tells the standard library's declarations from an extension of ours on its types
-         (`FileSymbols.Occurrence.isStandardLibrary`), so a file is judged only once it is loaded. Without it, no file
-         is: each says why, as a file no source could describe does.
-         */
+        symbols(for: files, from: indexed(for: files, replaying: replaying))
+    }
+
+    /*
+     What the index says of the files, read before the names the types phase's in-process check gave are known, so the
+     pipeline reads it while that check runs (`symbols(for:from:)`).
+     */
+    struct Indexed {
+        /* The demangler, or why it would not load. */
+        var demangler: Swift.Result<SwiftDemangler, any Error>
+        var replayed: [String: IndexStore.FreshRecord.Identity] = [:]
+        /* Each file the caller holds no verdict for, with the names its first readable fresh record holds, nil for none. */
+        var read: [(file: ParsedFile, read: (symbols: FileSymbols, record: IndexStore.FreshRecord)?)] = []
+    }
+
+    /* What the index says of these files, nil for none, `replaying` asked as `symbols(for:replaying:)` asks it. */
+    func indexed(
+        for files: [ParsedFile],
+        replaying: (ParsedFile, IndexStore.FreshRecord.Identity) -> Bool = { _, _ in false },
+    ) -> Indexed? {
+        guard !files.isEmpty else { return nil }
         let demangler: SwiftDemangler
         do {
             demangler = try loadDemangler(runner)
         }
         catch {
-            for file in files {
-                result.unavailable[file.url.path] =
-                    "the demangler that tells the standard library's declarations from ours could not load: \(error)"
-            }
-            return result
+            return Indexed(demangler: .failure(error))
         }
+        var indexed = Indexed(demangler: .success(demangler))
         var stores: [IndexStore] = []
         if let library = try? IndexStore.toolchainLibraryPath(runner: runner) {
             stores = layouts.compactMap {
@@ -93,14 +104,39 @@ struct SymbolProvider {
         }
         for ((file, candidates), chosen) in zip(offered, IndexStore.readableRecords(in: offered.map(\.candidates))) {
             if let chosen, replaying(file, chosen.identity) {
-                result.replayed[file.url.path] = chosen.identity
+                indexed.replayed[file.url.path] = chosen.identity
             }
             else {
                 toRead.append((file, candidates))
             }
         }
+        indexed.read = Array(zip(toRead.map(\.file), IndexStore.symbols(in: toRead.map(\.candidates))))
+        return indexed
+    }
+
+    /* The symbols of the files `indexed` read, completed by the names the in-process check gave (`answered`) and by sourcekitd. */
+    func symbols(for files: [ParsedFile], from indexed: Indexed?) -> Result {
+        var result = Result(symbols: [:], unavailable: [:], fromIndex: 0, fromSourcekitd: 0)
+        guard let indexed else { return result }
+        /*
+         The demangler tells the standard library's declarations from an extension of ours on its types
+         (`FileSymbols.Occurrence.isStandardLibrary`), so a file is judged only once it is loaded. Without it, no file
+         is: each says why, as a file no source could describe does.
+         */
+        let demangler: SwiftDemangler
+        switch indexed.demangler {
+            case .success(let loaded):
+                demangler = loaded
+            case .failure(let error):
+                for file in files {
+                    result.unavailable[file.url.path] =
+                        "the demangler that tells the standard library's declarations from ours could not load: \(error)"
+                }
+                return result
+        }
+        result.replayed = indexed.replayed
         var needSourcekitd: [ParsedFile] = []
-        for (file, read) in zip(toRead.map(\.file), IndexStore.symbols(in: toRead.map(\.candidates))) {
+        for (file, read) in indexed.read {
             if let read {
                 var found = read.symbols
                 found.ownedModules = ownedModules

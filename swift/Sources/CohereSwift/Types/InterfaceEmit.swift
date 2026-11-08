@@ -80,8 +80,9 @@ struct InterfaceEmit {
          otherwise send the other's importers to the older `Products` copy, and two ledger writes would lose one
          (cache's review of 04d698c1f). An exclusive `flock`, which the kernel drops however the holder ends, as
          TypeScript's `table.lock` does. Nil when the scratch cannot hold one, and then nothing reads the ledger.
+         Sendable, since it holds only its descriptor: the in-process check carries it to the queue it asks on.
          */
-        final class Lock {
+        final class Lock: Sendable {
             private let descriptor: Int32
 
             init?(scratchPath: URL) {
