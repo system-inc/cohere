@@ -57,7 +57,8 @@ func identityOf(found check.Finding) findingIdentity {
 // the host's findings as they are.
 //
 //   - A finding stands if any build with a say on its file kept it, but for a rule mergeIfAll names, which keeps it
-//     only if every build with a say kept it: code is unused only if it is unused in every build.
+//     only if every build with a say kept it: code is unused only if it is unused in every build. A file no build has
+//     a say on, a `//line` directive's target, has none to disagree, so what any build kept there stands.
 //   - A directive is unused only if every build with a say on its file found it unused, so a directive one build
 //     needed stays, even over a mergeIfAll finding the merge drops: removing it would bring the finding back in that
 //     build's own run. What else is wrong with a directive, a missing reason, a malformed comment or an unknown rule,
@@ -130,13 +131,15 @@ func mergeBuilds(builds []buildOutcome, mergeIfAll map[string]bool) mergedBuilds
 		}
 	}
 
+	// A file no build has a say on is one a finding's position names but no build compiled, a `//line` directive's
+	// target such as a .y file or a template, where no build disagrees, so what any build says there stands.
 	for _, found := range kept {
-		if !mergeIfAll[found.Rule] || keptBy[identityOf(found)] == sayers[found.File] {
+		if !mergeIfAll[found.Rule] || sayers[found.File] == 0 || keptBy[identityOf(found)] == sayers[found.File] {
 			merged.kept = append(merged.kept, found)
 		}
 	}
 	for _, directiveFinding := range unused {
-		if unusedBy[directiveFinding] == sayers[directiveFinding.File] {
+		if sayers[directiveFinding.File] == 0 || unusedBy[directiveFinding] == sayers[directiveFinding.File] {
 			merged.directiveFindings = append(merged.directiveFindings, directiveFinding)
 		}
 	}

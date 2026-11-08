@@ -59,6 +59,30 @@ func TestAMergeIfAllFindingStandsOnlyWhereEveryBuildWithASayKeepsIt(test *testin
 	}
 }
 
+// A finding whose position a `//line` directive maps to a file no build compiled, so no build has a say on it, has no
+// build to disagree: a mergeIfAll finding there that one build of two kept stands, and so does a directive there
+// that one build found unused.
+func TestWhatNoBuildHasASayOnStandsAsAnyBuildSaysIt(test *testing.T) {
+	test.Parallel()
+	found := mergeTestFinding(mergeAllRule, "grammar.y")
+	dead := unusedDirective("grammar.y", mergeAllRule)
+	merged := mergeBuilds([]buildOutcome{
+		{
+			said:              saying("parser.go"),
+			kept:              []check.Finding{found},
+			directiveFindings: []suppression.DirectiveFinding{dead},
+		},
+		{said: saying("parser.go")},
+	}, mergeTestStrategies)
+	if !reflect.DeepEqual(merged.kept, []check.Finding{found}) {
+		test.Errorf("kept %+v, where the finding no build has a say on was expected", merged.kept)
+	}
+	if !slices.Equal(merged.directiveFindings, []suppression.DirectiveFinding{dead}) {
+		test.Errorf("directive findings %+v, where the unused one no build has a say on was expected",
+			merged.directiveFindings)
+	}
+}
+
 // A mergeIfAny finding stands when any build with a say kept it, and one finding two builds kept is written once,
 // the host's copy.
 func TestAMergeIfAnyFindingStandsOnceWhereAnyBuildKeepsIt(test *testing.T) {
