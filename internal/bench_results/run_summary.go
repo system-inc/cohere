@@ -22,7 +22,12 @@ type runSummary struct {
 	WouldChange  int `json:"wouldChange"`
 	FilesInScope int `json:"filesInScope"`
 	Cached       int `json:"cached"`
-	Gaps         struct {
+	Phases       []struct {
+		Name    string `json:"name"`
+		Outcome string `json:"outcome"`
+		Detail  string `json:"detail"`
+	} `json:"phases"`
+	Gaps struct {
 		ProgramFiles         int      `json:"programFiles"`
 		CrashedFiles         int      `json:"crashedFiles"`
 		RuleCrashes          int      `json:"ruleCrashes"`
@@ -43,6 +48,10 @@ type runSummary struct {
 //
 // A failed project that reports nothing it failed on is refused too, whether or not it says why, so a
 // refusal that forgets to name its reason in a field is never timed as a run.
+//
+// A phase the run never reached is refused too, though no gap names it: when type-checking finds an error,
+// lint is "not reached", and the run is timed without its rules (#r1kf434: ahra's October tree on today's
+// dependencies read 2.4s with 2 type errors and no rule run, and the reader took it).
 //
 // What a developer's run meets too is no refusal: rules no file offered work, nested repositories' files,
 // Swift no target compiles, and a dependency's cgo. A modified build is the record's to refuse.
@@ -67,8 +76,20 @@ func (summary runSummary) checkedLess() string {
 		return fmt.Sprintf("the run was narrowed from a program of %d files", gaps.ProgramFiles)
 	case gaps.FormattingNotChecked:
 		return "its formatting was not checked"
+	case summary.phaseNotReached() != "":
+		return summary.phaseNotReached()
 	case summary.Verdict == "fail" && summary.Findings+summary.TypeErrors+summary.WouldChange == 0:
 		return "it failed with nothing reported"
+	}
+	return ""
+}
+
+// phaseNotReached says which phase the run never reached and why, or "" when it reached every one.
+func (summary runSummary) phaseNotReached() string {
+	for _, phase := range summary.Phases {
+		if phase.Outcome == "not reached" {
+			return fmt.Sprintf("its %s phase was not reached (%s)", phase.Name, phase.Detail)
+		}
 	}
 	return ""
 }

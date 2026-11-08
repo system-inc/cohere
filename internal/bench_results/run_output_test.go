@@ -58,13 +58,15 @@ func TestRunOutputReadsRealRuns(test *testing.T) {
 // Swift error but would have timed a pass had the projects printed in another order. On ahra, a copy without
 // the route types Next's dev server generates: 161 type errors, fixes held, and no rule run. And the cohere
 // root's log again with the reasons taken out of its failed projects (`error` and `phasesNotRun`), so a
-// refusal that forgets to say why is still never timed.
+// refusal that forgets to say why is still never timed. And ahra's October tree on today's dependencies under
+// main's engine, whose 2 type errors kept lint from running though no gap says so.
 func TestRunOutputRefusesARunThatCheckedLess(test *testing.T) {
 	test.Parallel()
 	for name, wantReason := range map[string]string{
 		"no-git-cohere-root.txt":         `the project "." did less than a developer's run: The Go engine did not run`,
 		"missing-generated-ahra.txt":     `the project "." did less than a developer's run: generated files it asks for are missing`,
 		"failed-unnamed-cohere-root.txt": `the project "." did less than a developer's run: it failed with nothing reported`,
+		"lint-not-reached-ahra.txt":      `the project "." did less than a developer's run: its lint phase was not reached`,
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
