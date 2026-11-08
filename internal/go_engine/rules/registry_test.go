@@ -957,6 +957,7 @@ var portedPasses = []string{
 	"shell_command_as_program",
 	"single_argument_append",
 	"sort_slice_on_non_slice",
+	"spinning_empty_loop",
 	"swapped_seek_arguments",
 	"timer_reset_result_used",
 	"typed_nil_interface_comparison",
