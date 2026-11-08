@@ -8,4 +8,3 @@
 //go:debug 00a0
 
 package main
-
