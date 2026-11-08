@@ -21,11 +21,21 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
+	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
+	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
 // registry is All() built once, for every test in the package to read.
@@ -155,6 +165,25 @@ var ruledStylecheck = []string{
 	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1016", "ST1017", "ST1018", "ST1019",
 }
 
+// portedStylecheck is each ST check switched to its port, with the port, written out here rather than read from
+// ports, so a line dropped from or wrongly mapped in that table fails TestEveryPortedStylecheckRunsItsPort: a test
+// that read ports would expect whatever the table says and pass with the original back in place. One check a line.
+var portedStylecheck = []struct {
+	name string
+	port *analysis.Analyzer
+}{
+	{"ST1001", dot_import.Analyzer},
+	{"ST1006", receiver_name.Analyzer},
+	{"ST1008", misplaced_error_result.Analyzer},
+	{"ST1011", duration_unit_suffix.Analyzer},
+	{"ST1012", error_variable_name.Analyzer},
+	{"ST1013", http_status_literal.Analyzer},
+	{"ST1016", inconsistent_receiver_name.Analyzer},
+	{"ST1017", yoda_condition.Analyzer},
+	{"ST1018", invisible_character.Analyzer},
+	{"ST1019", duplicate_import.Analyzer},
+}
+
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
 // they follow the x/tools passes in, each as the registry runs it: its port when ports holds one.
 func staticcheckAnalyzers() []*analysis.Analyzer {
@@ -163,7 +192,7 @@ func staticcheckAnalyzers() []*analysis.Analyzer {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
+		analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports).analyzer)
 	}
 	return analyzers
 }
@@ -174,7 +203,7 @@ func stylecheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range stylecheck.Analyzers {
 		if slices.Contains(ruledStylecheck, wrapped.Analyzer.Name) {
-			analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
+			analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports).analyzer)
 		}
 	}
 	return analyzers
@@ -187,7 +216,7 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 	test.Parallel()
 	expected := []*analysis.Analyzer{}
 	for _, pass := range vet.Suite {
-		expected = append(expected, portOrOriginal(pass, ports))
+		expected = append(expected, portOrOriginal(pass, ports).analyzer)
 	}
 	expectBlock(test, 0, expected, rule.OriginVet)
 }
@@ -252,20 +281,21 @@ func TestEveryPortStandsInForABorrowedCheck(test *testing.T) {
 	for _, pass := range vet.Suite {
 		vetPasses[pass.Name] = true
 	}
-	for name, port := range ports {
+	for name, ported := range ports {
 		original, borrowed := originals[name]
 		switch {
 		case !borrowed:
 			test.Errorf("ports holds a port for %q, which neither vet nor staticcheck names", name)
-		case port == original:
+		case ported.analyzer == original:
 			test.Errorf("ports maps %q to the original's own analyzer, so nothing is ported", name)
-		case port.Name != name:
-			test.Errorf("the port for %q is named %q, so its rule would be renamed", name, port.Name)
-		case vetPasses[name] && (port.Doc != original.Doc || port.URL != original.URL):
+		case ported.analyzer.Name != name:
+			test.Errorf("the port for %q is named %q, so its rule would be renamed", name,
+				ported.analyzer.Name)
+		case vetPasses[name] && (ported.analyzer.Doc != original.Doc || ported.analyzer.URL != original.URL):
 			test.Errorf("the port for vet's %q is documented differently from the original", name)
-		case !maps.Equal(flagDefaults(port), flagDefaults(original)):
+		case !maps.Equal(flagDefaults(ported.analyzer), flagDefaults(original)):
 			test.Errorf("the port for %q takes flags %v, and the original %v, so a setting would read differently",
-				name, flagDefaults(port), flagDefaults(original))
+				name, flagDefaults(ported.analyzer), flagDefaults(original))
 		}
 	}
 }
@@ -307,25 +337,26 @@ func TestFlagDefaultsTellFlagSetsApart(test *testing.T) {
 // leave every check borrowed.
 func TestAPortRunsInItsOriginalsPlace(test *testing.T) {
 	test.Parallel()
-	planted := map[string]*analysis.Analyzer{}
+	planted := map[string]port{}
 	for _, name := range []string{"bools", "SA4006"} {
-		planted[name] = &analysis.Analyzer{
+		planted[name] = port{analyzer: &analysis.Analyzer{
 			Name: name,
 			Doc:  "planted finds nothing; it stands in for a port of " + name,
 			Run: func(pass *analysis.Pass) (any, error) {
 				return nil, nil
 			},
-		}
+		}}
 	}
 	replaced := 0
 	for name, original := range borrowedChecks() {
-		running := portOrOriginal(original, planted)
+		running := portOrOriginal(original, planted).analyzer
+		plantedPort, isPlanted := planted[name]
 		switch {
-		case planted[name] != nil && running != planted[name]:
+		case isPlanted && running != plantedPort.analyzer:
 			test.Errorf("%s runs its original, expected the planted port", name)
-		case planted[name] == nil && running != original:
+		case !isPlanted && running != original:
 			test.Errorf("%s runs a planted port, expected its original", name)
-		case running == planted[name]:
+		case isPlanted:
 			replaced++
 		}
 	}
@@ -396,6 +427,28 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 	if len(dispatcherOf) != 2 {
 		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
 			"and the syntax's were expected", len(dispatcherOf))
+	}
+}
+
+// TestEveryRuleRequiringADispatcherCarriesItsListener holds every registered rule whose analyzer reads a dispatcher's
+// outcome to carrying its listener, a port from the ports table as much as a house rule, so rule.Validate checks the
+// listener and the test above holds the rule to the dispatcher that walks for it. A rule that required a dispatcher
+// with no listener would run, reading its outcome from a dispatcher no check ties it to, so a port whose listener
+// was left out of the table would pass every other test.
+func TestEveryRuleRequiringADispatcherCarriesItsListener(test *testing.T) {
+	test.Parallel()
+	dispatched := 0
+	for _, registered := range All() {
+		if !slices.ContainsFunc(registered.Analyzer.Requires, dispatch.IsDispatcher) {
+			continue
+		}
+		dispatched++
+		if registered.Listener == nil {
+			test.Errorf("%s's analyzer requires a dispatcher, and the rule carries no listener", registered.Name)
+		}
+	}
+	if dispatched == 0 {
+		test.Fatal("no registered rule requires a dispatcher, so nothing here was checked")
 	}
 }
 
@@ -523,6 +576,33 @@ func TestU1000RunsThePort(test *testing.T) {
 		!registeredRule.TypeAware {
 		test.Errorf("cohere-go/U1000 is %+v, expected upstream U1000, origin staticcheck and type aware",
 			registeredRule)
+	}
+}
+
+// TestEveryPortedStylecheckRunsItsPort holds each switched ST check to its port: the registered rule under the
+// check's name runs the port's own analyzer, and not stylecheck's original, which the switch replaced.
+func TestEveryPortedStylecheckRunsItsPort(test *testing.T) {
+	test.Parallel()
+	originals := map[string]*analysis.Analyzer{}
+	for _, wrapped := range stylecheck.Analyzers {
+		originals[wrapped.Analyzer.Name] = wrapped.Analyzer
+	}
+	for _, ported := range portedStylecheck {
+		registeredRule, found := registeredRuleNamed(rule.Namespace + ported.name)
+		if !found {
+			test.Errorf("%s%s is not registered", rule.Namespace, ported.name)
+			continue
+		}
+		original, named := originals[ported.name]
+		switch {
+		case !named:
+			test.Errorf("stylecheck names no check %s, so there is no original for its port to replace", ported.name)
+		case registeredRule.Analyzer == original:
+			test.Errorf("%s runs stylecheck's original, where its port was switched in", registeredRule.Name)
+		case registeredRule.Analyzer != ported.port:
+			test.Errorf("%s runs %q, where its port's own analyzer was expected", registeredRule.Name,
+				registeredRule.Analyzer.Name)
+		}
 	}
 }
 
@@ -656,10 +736,20 @@ var sharedReaders = []string{
 // name in the original's place (#pn1xvnd), so House never lists it. One entry a line, and this comment names none, so
 // each port's branch adds its own line and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
+	"dot_import",
+	"duplicate_import",
+	"duration_unit_suffix",
+	"error_variable_name",
+	"http_status_literal",
+	"inconsistent_receiver_name",
+	"invisible_character",
+	"misplaced_error_result",
 	"nil_ness",
+	"receiver_name",
 	"unused_code",
 	"unused_write",
 	"vet",
+	"yoda_condition",
 }
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
