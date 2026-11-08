@@ -24,6 +24,9 @@ import (
 // testdata/src. The fixture uses nothing newer than Go 1.0, so it needs no version of its own.
 const upstreamPackage = "CheckIneffectiveURLQueryModification"
 
+// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
+const differencesFile = "differences/differences.go"
+
 // Staticcheck's own fixture marks each finding the original makes with `//@ diag(...)`, read by staticcheck_wants and
 // matched as staticcheck's own test runner matches them, each by one finding on its line whose message contains the
 // mark's text. Every mark the original expects, the port reports, and any finding no mark expects fails as much as a
@@ -136,9 +139,6 @@ func compareAdjudicated(test *testing.T, side string, actual []finding, expected
 		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
 	}
 }
-
-// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
-const differencesFile = "differences/differences.go"
 
 // finding is one finding as the differential compares it, its file named by its path below testdata/src, so two
 // fixtures of one name in two packages stay apart. Staticcheck's report gives a finding the end of its call's
