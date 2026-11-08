@@ -274,9 +274,11 @@ The words mean exactly this:
 
 - **cohered:** files cohere rewrote, fixed or formatted, which are the files listed above the footer.
   Shown only when there were any.
-- **checked:** files examined fresh in this run.
+- **checked:** files a phase examined fresh in this run, by type-checking or linting them. A file no phase
+  reached isn't checked, and the line names it as a gap instead, so a run whose files nothing checked shows no
+  checked count beside that gap.
 - **cached:** files the cache answered for, unchanged since a run that checked them. Checked and cached
-  together are every file in scope.
+  together are every file in scope but the ones a gap on the line names.
 - **rules:** the rules that ran.
 - **Adamic-ready:** shown only with `--adamic-readiness`. The share of linted files whose types are true: no
   type error and no `cohere:adamic` finding, counted before any disable comment and whatever your settings turn on, since Adamic, which
