@@ -2,7 +2,6 @@ package cgo_call
 
 import (
 	"bufio"
-	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,56 +15,80 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cgo_testing"
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
-// x/tools' own fixtures for cgocall, copied unchanged into testdata/src and run as x/tools' test runs them, with no
-// flags: every `// want` the original expects, the port reports at the same line with the same message, and
-// analysistest fails on a finding no want expects as much as on a want nothing found, so the port adds nothing there
-// either. a and typeparams have cgo of their own, so the load has the cgo tool translate them, and the pass judges
-// them through the translation's `//line` directives; b and c name a C that is not cgo, and import no runtime/cgo.
-// The translation needs a go that compiles and a toolchain with cgo, so the test skips, named, where either is
-// missing, as every test of the engine that translates cgo does.
+// x/tools' own fixtures for cgocall, copied unchanged into testdata/src, hold the port to every want the original
+// expects, and to nothing more. a and typeparams have cgo of their own, so the load has the cgo tool translate them,
+// and the pass judges them through the translation's `//line` directives; b and c name a C that is not cgo, and
+// import no runtime/cgo. The translation needs a go that compiles and a toolchain with cgo, so the test skips, named,
+// where either is missing, as every test of the engine that translates cgo does.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "a", "b", "c", "typeparams")
+	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), "a", "b", "c", "typeparams")
 }
 
-// upstreamPackages are x/tools' fixture packages, every one its test runs.
-var upstreamPackages = []string{"a", "b", "c", "typeparams"}
-
-// parityPackages are the fixture packages written for the differential, each a path of the original's through a
-// package, and illTyped those of them that hold type errors on purpose: parity, a cgo package the cgo tool
-// translates, with every branch of the judgment; illtyped, one whose type errors leave an address untyped beside a
-// typed value; faked, one the cgo tool fails on, so the load type-checks it from its files as written with package
-// "C" faked; and runtimecgo, one that imports runtime/cgo with no file importing "C".
-var (
-	parityPackages = []string{"parity", "illtyped", "faked", "runtimecgo"}
-	illTyped       = map[string]bool{"illtyped": true, "faked": true, "differences": true}
-)
-
-// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, and their
-// findings must be the same multiset of file, line, column and message. Each side's count is logged, since two empty
-// sides would match and prove nothing, and the test fails if the original finds nothing at all.
+// Over x/tools' fixtures and the clean parity fixtures, parity, a cgo package the cgo tool translates, with every
+// branch of the judgment, and runtimecgo, one that imports runtime/cgo with no file importing "C", the original and
+// the port find the same findings, each the same in every field.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)
-	compared := findingsOf(test, slices.Concat(upstreamPackages, parityPackages)...)
-	test.Logf("the original found %d, the port %d", len(compared.original), len(compared.port))
-	for _, failure := range compared.originalFailures {
-		test.Errorf("the original failed: %v", failure)
-	}
-	if len(compared.original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(compared.original, compared.port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
-	}
-	for _, extra := range difference(compared.port, compared.original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
-	}
+	parity.RequireIdentical(test, cgocall.Analyzer, Analyzer, analysistest.TestData(), "a", "b", "c", "typeparams",
+		"parity", "runtimecgo")
+}
+
+// illTypedLoadErrors are the errors the parity fixtures that hold type errors on purpose load with, each one the
+// fixture is written for. illtyped's are the type checker refusing each address its Untyped takes, of a map's element
+// as the cgo tool rewrites the map, of a call's result, and of a name never declared. faked's one is the cgo tool
+// failing on the header it includes, which does not exist, named at no position since go list reports it for the
+// package; its words are the C compiler's, clang's here.
+var illTypedLoadErrors = []parity.LoadError{
+	{
+		Position: "illtyped/illtyped.go:15:25",
+		Message: `invalid operation: cannot take address of (*_cgoIndex0)["key"] (map index expression of type ` +
+			`[]int)`,
+	},
+	{
+		Position: "illtyped/illtyped.go:16:10",
+		Message: `invalid operation: cannot take address of (*_cgoIndex0)["key"] (map index expression of type ` +
+			`[]int)`,
+	},
+	{
+		Position: "illtyped/illtyped.go:18:25",
+		Message:  `invalid operation: cannot take address of (*_cgoIndex0)["key"] (map index expression of type int)`,
+	},
+	{
+		Position: "illtyped/illtyped.go:19:25",
+		Message:  "invalid operation: cannot take address of Values() (value of type []int)",
+	},
+	{
+		Position: "illtyped/illtyped.go:20:25",
+		Message:  "invalid operation: cannot take address of Number() (value of type int)",
+	},
+	{Position: "illtyped/illtyped.go:21:25", Message: "undefined: undeclared"},
+	{
+		Position: "illtyped/illtyped.go:23:52",
+		Message: `invalid operation: cannot take address of (*_cgoIndex1)["key"] (map index expression of type ` +
+			`[]int)`,
+	},
+	{
+		Position: "",
+		Message: `# faked src/faked/faked.go:6:11: fatal error: 'missing.h' file not found 6 | #include ` +
+			`"missing.h" | ^~~~~~~~~~~ 1 error generated.`,
+	},
+}
+
+// Over the parity fixtures that hold type errors on purpose, the original and the port find the same findings, each
+// the same in every field: illtyped, one whose type errors leave an address untyped beside a typed value, and faked,
+// one the cgo tool fails on, so the load type-checks it from its files as written with package "C" faked.
+func TestPortMatchesOriginalOverIllTypedFixtures(test *testing.T) {
+	test.Parallel()
+	cgo_testing.RequireTranslation(test)
+	parity.RequireIdenticalDespiteLoadErrors(test, cgocall.Analyzer, Analyzer, analysistest.TestData(),
+		illTypedLoadErrors, "illtyped", "faked")
 }
 
 // adjudicatedPattern is one comment in the differences fixture, the message after its `// port finds: ` opening, of
@@ -80,20 +103,25 @@ const refusedImportPanic = "interface conversion: types.Object is nil, not *type
 // favour: the original panics over its refused import and finds nothing, and the port finds exactly what the fixture
 // records on each line. A finding the original makes, or a failure other than that panic, fails, since the port is
 // never worse than the original.
+//
+// The harness's form for a fixture the original panics on, RequirePortWhereOriginalPanics, loads it clean, and this
+// one holds a type error on purpose, the refused import the panic comes from, so the harness refuses it before
+// running either side. So this tier keeps its own load and its reading of the records, and compares through the
+// harness's Analyze, Finding and Difference.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)
-	compared := findingsOf(test, "differences")
-	test.Logf("the original found %d, the port %d", len(compared.original), len(compared.port))
-	if len(compared.originalFailures) != 1 ||
-		!strings.Contains(compared.originalFailures[0].Error(), refusedImportPanic) {
+	outcome := illTypedOutcome(test, "differences")
+	test.Logf("the original found %d, the port %d", len(outcome.Original.Findings), len(outcome.Port.Findings))
+	if len(outcome.Original.Failures) != 1 ||
+		!strings.Contains(outcome.Original.Failures[0].Error, refusedImportPanic) {
 		test.Errorf("expected the original to fail once, panicking with %q, got %v", refusedImportPanic,
-			compared.originalFailures)
+			outcome.Original.Failures)
 	}
-	for _, found := range compared.original {
-		test.Errorf("the original found %s, and is expected to find nothing", described(found))
+	for _, found := range outcome.Original.Findings {
+		test.Errorf("the original found %s, and is expected to find nothing", found)
 	}
-	expected := []finding{}
+	expected := []parity.Finding{}
 	path := filepath.Join(analysistest.TestData(), "src", "differences", "differences.go")
 	file, openError := os.Open(path)
 	if openError != nil {
@@ -105,7 +133,7 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
 		if match := adjudicatedPattern.FindStringSubmatch(scanner.Text()); match != nil {
-			expected = append(expected, finding{file: "differences.go", line: line, message: match[1]})
+			expected = append(expected, parity.Finding{File: "differences.go", Line: line, Message: match[1]})
 		}
 	}
 	if scanError := scanner.Err(); scanError != nil {
@@ -114,37 +142,17 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	if len(expected) == 0 {
 		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
 	}
-	actual := []finding{}
-	for _, found := range compared.port {
-		actual = append(actual, finding{file: found.file, line: found.line, message: found.message})
+	// A record names a line and a message, so the port's findings are matched by those alone.
+	actual := []parity.Finding{}
+	for _, found := range outcome.Port.Findings {
+		actual = append(actual, parity.Finding{File: found.File, Line: found.Line, Message: found.Message})
 	}
-	for _, unrecorded := range difference(actual, expected) {
-		test.Errorf("the port alone found %s, which the fixture does not record", described(unrecorded))
+	for _, unrecorded := range parity.Difference(actual, expected) {
+		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)
 	}
-	for _, unmatched := range difference(expected, actual) {
-		test.Errorf("the fixture records that the port alone finds %s, and it does not", described(unmatched))
+	for _, unmatched := range parity.Difference(expected, actual) {
+		test.Errorf("the fixture records that the port alone finds %s, and it does not", unmatched)
 	}
-}
-
-// finding is one finding as the differential compares it.
-type finding struct {
-	file    string
-	line    int
-	column  int
-	message string
-}
-
-// described is found as a finding line prints it.
-func described(found finding) string {
-	return fmt.Sprintf("%s:%d:%d: %s", found.file, found.line, found.column, found.message)
-}
-
-// comparison is what the original and the port found over the same packages, each side's findings sorted, and the
-// failures of the original's runs, each a panic recovered.
-type comparison struct {
-	original         []finding
-	port             []finding
-	originalFailures []error
 }
 
 // recoveringOriginal is x/tools' cgocall with a recover around its Run, so a panic of the original over a fixture
@@ -162,9 +170,10 @@ var recoveringOriginal = func() *analysis.Analyzer {
 	return &recovering
 }()
 
-// findingsOf loads the fixture packages patterns name, runs x/tools' cgocall and the port over them in one checker,
-// and returns what each found.
-func findingsOf(test *testing.T, patterns ...string) comparison {
+// illTypedOutcome loads the fixture packages patterns name, each of which must hold type errors, so it proves the
+// path it was written for, and runs the recovering original and the port over them in one checker, through the
+// harness's Analyze, each side's findings in their files' base names. The port failing on one fails the test.
+func illTypedOutcome(test *testing.T, patterns ...string) parity.Outcome {
 	test.Helper()
 	directory := analysistest.TestData()
 	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
@@ -177,79 +186,28 @@ func findingsOf(test *testing.T, patterns ...string) comparison {
 	if len(loaded.Roots) != len(patterns) {
 		test.Fatalf("loading %v found %d packages, expected one a pattern", patterns, len(loaded.Roots))
 	}
-	// Both run despite type errors, so a fixture that does not type-check is still compared. Each must be as its
-	// pattern says, so a fixture meant to hold type errors proves the path it was written for, and one meant to be
-	// clean is not compared with half its types missing.
+	// Both run despite type errors, so a fixture that does not type-check is still compared, and each of these must
+	// not, since one that loads clean would not prove the path it was written for.
+	failed := parity.LoadFailures(loaded.Roots)
 	for _, root := range loaded.Roots {
-		if loadsClean := len(root.Errors) == 0; loadsClean == illTyped[root.PkgPath] {
-			test.Fatalf("fixture package %s loaded with errors %v, expected errors: %t", root.ID, root.Errors,
-				illTyped[root.PkgPath])
+		if !slices.ContainsFunc(failed, func(failure parity.Failure) bool { return failure.Package == root.ID }) {
+			test.Fatalf("fixture package %s loaded clean, where it is written to hold type errors", root.ID)
 		}
 	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{recoveringOriginal, Analyzer}, loaded.Roots, &checker.Options{},
+	outcomes, analyzeError := parity.Analyze(
+		[]parity.Pair{{Name: "cgocall", Original: recoveringOriginal, Port: Analyzer}}, loaded.Roots,
 	)
 	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
+		test.Fatalf("%v", analyzeError)
 	}
-	compared := comparison{}
-	for _, action := range graph.Roots {
-		switch {
-		case action.Err != nil && action.Analyzer == recoveringOriginal:
-			compared.originalFailures = append(compared.originalFailures, action.Err)
-			continue
-		case action.Err != nil:
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			position := action.Package.Fset.Position(diagnostic.Pos)
-			found := finding{
-				file:    filepath.Base(position.Filename),
-				line:    position.Line,
-				column:  position.Column,
-				message: diagnostic.Message,
-			}
-			switch action.Analyzer {
-			case recoveringOriginal:
-				compared.original = append(compared.original, found)
-			case Analyzer:
-				compared.port = append(compared.port, found)
-			}
+	outcome := outcomes[0]
+	for _, failure := range outcome.Port.Failures {
+		test.Fatalf("the port failed on %s: %s", failure.Package, failure.Error)
+	}
+	for _, side := range []*parity.Side{&outcome.Original, &outcome.Port} {
+		for index, found := range side.Findings {
+			side.Findings[index] = found.WithFileNames(filepath.Base)
 		}
 	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(compared.original, compare)
-	slices.SortFunc(compared.port, compare)
-	return compared
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs go list, and the cgo tool through go list -compiled, which cgo_testing.RequireTranslation
-// asks for first.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
+	return outcome
 }
