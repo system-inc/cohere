@@ -36,6 +36,14 @@ func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipe
 // runOverWith is runOver with the findings cache as extra leaves it, on and in root's own store by default.
 func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
 	test.Helper()
+	engine, stream := runOverRaw(test, root, wantExit, extra...)
+	return engine, normalize(stream, root)
+}
+
+// runOverRaw is runOverWith's run with its stream as written, for a test that reads what normalize hides, such as
+// the inputs outside the root.
+func runOverRaw(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
@@ -58,7 +66,7 @@ func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*
 	if exitCode := engine.run(); exitCode != wantExit {
 		test.Fatalf("the run exited %d, want %d:\n%s", exitCode, wantExit, standardOutput.String())
 	}
-	return engine, normalize(standardOutput.String(), root)
+	return engine, standardOutput.String()
 }
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
@@ -290,6 +298,38 @@ func TestOtherBuildsHonorADirectiveInAFileOnlyAnotherBuildCompiles(test *testing
 	_, stream := runOver(test, root, exitClean, "--other-builds")
 	if !strings.Contains(stream, `"withheldBySuppression":{"`+consistency_no_else_return.Name+`":1}`) {
 		test.Errorf("the run withheld nothing of %s:\n%s", consistency_no_else_return.Name, stream)
+	}
+}
+
+// Under `--other-builds` the inputs record names what every build's load read, not the host's alone (#e4b08k7), so
+// the front door's replay misses when a file only another build reads moves. A windows-only file of the fixture's
+// imports os, which nothing the host's build compiles imports, so the standard library's os/file_windows.go is read
+// by windows's load alone, and the record must name it.
+func TestOtherBuildsNameEveryBuildsInputs(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	console := "package separator\n\nimport \"os\"\n\n" +
+		"// Console is where a write is discarded, as windows names it.\nvar Console = os.DevNull\n"
+	consoleFile := filepath.Join(root, "internal", "separator", "console_windows.go")
+	if writeError := os.WriteFile(consoleFile, []byte(console), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	var inputs contract.InputsRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		if strings.Contains(line, `"kind":"inputs"`) {
+			if decodeError := json.Unmarshal([]byte(line), &inputs); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	windowsOnly := filepath.Join("src", "os", "file_windows.go")
+	named := slices.ContainsFunc(inputs.Files, func(file string) bool {
+		return strings.HasSuffix(file, string(filepath.Separator)+windowsOnly)
+	})
+	if !named {
+		test.Errorf("the inputs record names %d files and not the standard library's %s, which only windows's load "+
+			"read", len(inputs.Files), windowsOnly)
 	}
 }
 

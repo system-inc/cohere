@@ -26,14 +26,27 @@ import (
 //
 // The rules read more: staticcheck's config analyzer reads a staticcheck.conf in each analyzed package's directory
 // and every directory above it, to the filesystem's root, so each is named, there or absent.
+//
+// Under `--other-builds` the record is every build's (#e4b08k7): each build's load is named, and the directories of
+// the files each build compiled are read for staticcheck.conf, so a replay misses when anything any build read moves.
 func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord {
 	files := map[string]bool{}
 	absent := map[string]bool{}
-	for _, file := range loaded.Inputs.Files {
-		files[file] = true
-	}
-	for _, path := range loaded.Inputs.Absent {
-		absent[path] = true
+	directories := map[string]bool{}
+	// Under `--other-builds` every build's load is named beside the host's (#e4b08k7): another build reads files the
+	// host's never does, the standard library's and a module's that only its platform builds among them, and its
+	// verdict is the run's as much as the host's is, so a replay keyed on the host's load alone would serve a stale
+	// verdict after an edit to one of them.
+	for _, inputs := range append([]load.Inputs{loaded.Inputs}, engine.buildInputs()...) {
+		for _, file := range inputs.Files {
+			files[file] = true
+		}
+		for _, path := range inputs.Absent {
+			absent[path] = true
+		}
+		for _, directory := range inputs.Directories {
+			directories[directory] = true
+		}
 	}
 	fileOrAbsent := func(path string) {
 		cleaned := filepath.Clean(path)
@@ -80,7 +93,7 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 		for _, directory := range above {
 			fileOrAbsent(filepath.Join(directory, ".gitignore"))
 		}
-		for _, directory := range loaded.Inputs.Directories {
+		for _, directory := range slices.Sorted(maps.Keys(directories)) {
 			// A `.gitignore` appearing here changes the directory's listing, which is named already, so only one
 			// that is there is named, as a file.
 			if !insideScope(directory, []string{repository}) {
@@ -93,11 +106,21 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 		}
 	}
 
+	analyzedDirectories := map[string]bool{}
 	for _, analyzed := range loaded.Packages {
-		if analyzed.Dir == "" {
-			continue
+		if analyzed.Dir != "" {
+			analyzedDirectories[filepath.Clean(analyzed.Dir)] = true
 		}
-		for directory := filepath.Clean(analyzed.Dir); ; directory = filepath.Dir(directory) {
+	}
+	// Another build analyzes a package of ours the host's never loads when every file of it is one only that build
+	// compiles, so the directory of each file it compiled is one the rules read staticcheck.conf from too.
+	for _, run := range engine.buildRuns {
+		for file := range run.compiled {
+			analyzedDirectories[filepath.Dir(filepath.Clean(file))] = true
+		}
+	}
+	for start := range analyzedDirectories {
+		for directory := start; ; directory = filepath.Dir(directory) {
 			fileOrAbsent(filepath.Join(directory, "staticcheck.conf"))
 			if filepath.Dir(directory) == directory {
 				break
@@ -107,9 +130,23 @@ func (engine *pipeline) inputsRecord(loaded *load.Loaded) contract.InputsRecord 
 
 	return contract.InputsRecord{
 		Files:       slices.Sorted(maps.Keys(files)),
-		Directories: slices.Clone(loaded.Inputs.Directories),
+		Directories: slices.Sorted(maps.Keys(directories)),
 		Absent:      slices.Sorted(maps.Keys(absent)),
 	}
+}
+
+// buildInputs is what every build beside the host's loaded, in the order the merge was handed them, and nil for a run
+// of one build. The host's run is first in engine.buildRuns and carries the host's load's inputs, which the record
+// names already.
+func (engine *pipeline) buildInputs() []load.Inputs {
+	if len(engine.buildRuns) < 2 {
+		return nil
+	}
+	inputs := make([]load.Inputs, 0, len(engine.buildRuns)-1)
+	for _, run := range engine.buildRuns[1:] {
+		inputs = append(inputs, run.inputs)
+	}
+	return inputs
 }
 
 // gitIndex is the index git reads for the repository whose `.git` is marker: `.git/index` when it is a directory, and
