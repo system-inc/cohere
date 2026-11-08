@@ -17,7 +17,8 @@ import (
 // dispatcher recovers per check per package, and never names its rule, since Context.Report stamps the name it was
 // registered under.
 type Listener struct {
-	// Requires are the analyzers whose results the check reads through Context.ResultOf.
+	// Requires are the analyzers whose results the check reads through Context.ResultOf. One failing on a package
+	// fails this rule there and no other on its dispatcher, as it did when the rule walked by itself.
 	Requires []*analysis.Analyzer
 
 	// Function is called once for each function of the package's intermediate representation, in the order

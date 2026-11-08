@@ -60,14 +60,15 @@ func (dispatcher *Syntax) RuleAnalyzer(
 // run walks the package's files once, calling every started listener, each with its own context and its own recover,
 // and returns each started rule's outcome.
 func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
+	// Started first, which refuses a pass whose inspector failed, so that failure is named as one.
+	started, startError := dispatcher.start(pass)
+	if startError != nil {
+		return nil, startError
+	}
 	walker, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	if !isInspector {
 		return nil, fmt.Errorf("reading %s's result: it is %T, where an inspector was expected", inspect.Analyzer.Name,
 			pass.ResultOf[inspect.Analyzer])
-	}
-	started, startError := dispatcher.start(pass)
-	if startError != nil {
-		return nil, startError
 	}
 	// The inspector walks for every kind a started listener lists, and the file, which FileEnter and FileExit hear,
 	// and skips a subtree holding none of them, so a kind that only an unstarted listener lists is never visited. It
@@ -98,5 +99,5 @@ func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 		}
 		return true
 	})
-	return finish(started.runs), nil
+	return finish(started), nil
 }

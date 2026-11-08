@@ -66,13 +66,14 @@ func (dispatcher *Ir) RuleAnalyzer(
 // run walks the package's functions once, calling every started listener, each with its own context and its own
 // recover, and returns each started rule's outcome.
 func (dispatcher *Ir) run(pass *analysis.Pass) (any, error) {
-	functions, readError := staticcheck_ir.Functions(pass)
-	if readError != nil {
-		return nil, readError
-	}
+	// Started first, which refuses a pass whose intermediate representation failed, so that failure is named as one.
 	started, startError := dispatcher.start(pass)
 	if startError != nil {
 		return nil, startError
+	}
+	functions, readError := staticcheck_ir.Functions(pass)
+	if readError != nil {
+		return nil, readError
 	}
 	for _, function := range functions {
 		for _, run := range started.runs {
@@ -92,5 +93,5 @@ func (dispatcher *Ir) run(pass *analysis.Pass) (any, error) {
 			run.functionExit(function)
 		}
 	}
-	return finish(started.runs), nil
+	return finish(started), nil
 }

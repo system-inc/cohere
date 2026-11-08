@@ -1,7 +1,10 @@
 package check
 
 import (
+	"fmt"
 	"go/ast"
+	"go/token"
+	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -178,6 +181,139 @@ func TestADispatchedRuleTheRunLeavesOutIsNeverCalled(test *testing.T) {
 			if !slices.Equal(messages, expected) || len(result.Crashes) != 0 {
 				subtest.Errorf("the run found %q and crashed %+v, where exactly %q and no crash were expected",
 					messages, result.Crashes, expected)
+			}
+		})
+	}
+}
+
+// failsOnBase fails on the fixtures' base package and hands every other package a result, standing in for an
+// analyzer a listener requires that can fail on a package, as staticcheck's config does on a malformed
+// staticcheck.conf.
+var failsOnBase = &analysis.Analyzer{
+	Name:             "fails_on_base",
+	Doc:              "fails on base and hands every other package a result",
+	RunDespiteErrors: true,
+	ResultType:       reflect.TypeFor[string](),
+	Run: func(pass *analysis.Pass) (any, error) {
+		if pass.Pkg.Path() == "example.com/fixture/base" {
+			return nil, fmt.Errorf("planted failure on %s", pass.Pkg.Path())
+		}
+		return "the result of fails_on_base", nil
+	},
+}
+
+// A listener whose requirement fails on a package fails only its own rule there, on either dispatcher, though the
+// dispatcher requires that requirement for it: the rule's crash reads exactly as check.Run writes it for the same
+// rule as a plain analyzer requiring the failing one, cause and all, and is the only crash, while the rule beside it
+// on the same dispatcher reports every function, base's included, and the failing rule still reports on user, where
+// its requirement held, reading the result it was handed.
+func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
+	test.Parallel()
+
+	// reportDeclared reports every function as declaring its name, for a listener of either walk.
+	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
+		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
+	}
+	// readsItsRequirement panics, which the dispatcher makes the rule's crash, unless the listener was handed the
+	// result it requires.
+	readsItsRequirement := func(context *rule.Context) {
+		if result, isResult := context.ResultOf(failsOnBase).(string); !isResult || result == "" {
+			panic(fmt.Sprintf("the listener was handed %v for %s", result, failsOnBase.Name))
+		}
+	}
+	cases := []struct {
+		name string
+		// register registers a listener that requires failsOnBase and one that does not, each reporting every
+		// function it is called for, on a fresh dispatcher of the walk the case is for, and returns their rules.
+		register func(failingName string, besideName string) (rule.Rule, rule.Rule)
+	}{
+		{"syntax", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewSyntax()
+			listener := func(requires []*analysis.Analyzer) *rule.Listener {
+				return &rule.Listener{
+					Requires: requires,
+					Nodes:    []ast.Node{(*ast.FuncDecl)(nil)},
+					Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+						declaration, isDeclaration := node.(*ast.FuncDecl)
+						if !isDeclaration {
+							return
+						}
+						if len(requires) > 0 {
+							readsItsRequirement(context)
+						}
+						reportDeclared(context, declaration.Name.Pos(), declaration.Name.Name)
+					},
+				}
+			}
+			failingListener, besideListener := listener([]*analysis.Analyzer{failsOnBase}), listener(nil)
+			return rule.Rule{Name: failingName, Origin: rule.OriginHouse, Listener: failingListener,
+					Analyzer: dispatcher.RuleAnalyzer(failingName, "failing_syntax", "requires fails_on_base",
+						failingListener)},
+				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
+					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_syntax", "requires nothing",
+						besideListener)}
+		}},
+		{"intermediate representation", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewIr()
+			listener := func(requires []*analysis.Analyzer) *rule.Listener {
+				return &rule.Listener{
+					Requires: requires,
+					Function: func(context *rule.Context, function *ir.Function) {
+						// The package initializer is synthetic and declared by no one.
+						if function.Synthetic != "" {
+							return
+						}
+						if len(requires) > 0 {
+							readsItsRequirement(context)
+						}
+						reportDeclared(context, function.Pos(), function.Name())
+					},
+				}
+			}
+			failingListener, besideListener := listener([]*analysis.Analyzer{failsOnBase}), listener(nil)
+			return rule.Rule{Name: failingName, Origin: rule.OriginHouse, Listener: failingListener,
+					Analyzer: dispatcher.RuleAnalyzer(failingName, "failing_ir", "requires fails_on_base",
+						failingListener)},
+				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
+					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_ir", "requires nothing", besideListener)}
+		}},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(subtest *testing.T) {
+			subtest.Parallel()
+			failing, beside := testCase.register(rule.Namespace+"test-failing-requirement",
+				rule.Namespace+"test-beside-the-failing")
+			dispatched := runRules(subtest, Options{}, failing, beside)
+			// The same rule walking by itself: an analyzer of its own that requires the failing one.
+			alone := runRules(subtest, Options{}, rule.Rule{Name: failing.Name, Origin: rule.OriginHouse,
+				Analyzer: &analysis.Analyzer{
+					Name:     "failing_alone_" + strings.ReplaceAll(testCase.name, " ", "_"),
+					Doc:      "requires fails_on_base and reports nothing",
+					Requires: []*analysis.Analyzer{failsOnBase},
+					Run:      func(*analysis.Pass) (any, error) { return nil, nil },
+				}})
+			if len(alone.Crashes) != 1 || !strings.Contains(alone.Crashes[0].Error, "planted failure on") {
+				subtest.Fatalf("the rule alone crashed %+v, where one crash naming the planted failure was expected",
+					alone.Crashes)
+			}
+			if !slices.Equal(dispatched.Crashes, alone.Crashes) {
+				subtest.Errorf("the dispatched rules crashed\n%+v\nwhere exactly what the rule alone crashed was "+
+					"expected,\n%+v", dispatched.Crashes, alone.Crashes)
+			}
+			if !slices.Equal(dispatched.CrashedRules, []string{failing.Name}) {
+				subtest.Errorf("the run lists %q as crashed, where %s alone was expected", dispatched.CrashedRules,
+					failing.Name)
+			}
+			messages := []string{}
+			for _, finding := range dispatched.Findings {
+				messages = append(messages, finding.Rule+": "+finding.Message)
+			}
+			slices.Sort(messages)
+			expected := []string{beside.Name + ": declares Marked", beside.Name + ": declares Target",
+				beside.Name + ": declares Use", failing.Name + ": declares Use"}
+			slices.Sort(expected)
+			if !slices.Equal(messages, expected) {
+				subtest.Errorf("the run found %q, where exactly %q was expected", messages, expected)
 			}
 		})
 	}
