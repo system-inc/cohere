@@ -21,11 +21,21 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
+	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
+	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
 // registry is All() built once, for every test in the package to read.
@@ -153,6 +163,25 @@ func expectBlock(test *testing.T, offset int, analyzers []*analysis.Analyzer, or
 // table, so a check added to or dropped from that table by mistake fails the test.
 var ruledStylecheck = []string{
 	"ST1001", "ST1006", "ST1008", "ST1011", "ST1012", "ST1013", "ST1016", "ST1017", "ST1018", "ST1019",
+}
+
+// portedStylecheck is each ST check switched to its port, with the port, written out here rather than read from
+// ports, so a line dropped from or wrongly mapped in that table fails TestEveryPortedStylecheckRunsItsPort: a test
+// that read ports would expect whatever the table says and pass with the original back in place. One check a line.
+var portedStylecheck = []struct {
+	name string
+	port *analysis.Analyzer
+}{
+	{"ST1001", dot_import.Analyzer},
+	{"ST1006", receiver_name.Analyzer},
+	{"ST1008", misplaced_error_result.Analyzer},
+	{"ST1011", duration_unit_suffix.Analyzer},
+	{"ST1012", error_variable_name.Analyzer},
+	{"ST1013", http_status_literal.Analyzer},
+	{"ST1016", inconsistent_receiver_name.Analyzer},
+	{"ST1017", yoda_condition.Analyzer},
+	{"ST1018", invisible_character.Analyzer},
+	{"ST1019", duplicate_import.Analyzer},
 }
 
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
@@ -487,6 +516,33 @@ func TestU1000RunsThePort(test *testing.T) {
 		!registeredRule.TypeAware {
 		test.Errorf("cohere-go/U1000 is %+v, expected upstream U1000, origin staticcheck and type aware",
 			registeredRule)
+	}
+}
+
+// TestEveryPortedStylecheckRunsItsPort holds each switched ST check to its port: the registered rule under the
+// check's name runs the port's own analyzer, and not stylecheck's original, which the switch replaced.
+func TestEveryPortedStylecheckRunsItsPort(test *testing.T) {
+	test.Parallel()
+	originals := map[string]*analysis.Analyzer{}
+	for _, wrapped := range stylecheck.Analyzers {
+		originals[wrapped.Analyzer.Name] = wrapped.Analyzer
+	}
+	for _, ported := range portedStylecheck {
+		registeredRule, found := registeredRuleNamed(rule.Namespace + ported.name)
+		if !found {
+			test.Errorf("%s%s is not registered", rule.Namespace, ported.name)
+			continue
+		}
+		original, named := originals[ported.name]
+		switch {
+		case !named:
+			test.Errorf("stylecheck names no check %s, so there is no original for its port to replace", ported.name)
+		case registeredRule.Analyzer == original:
+			test.Errorf("%s runs stylecheck's original, where its port was switched in", registeredRule.Name)
+		case registeredRule.Analyzer != ported.port:
+			test.Errorf("%s runs %q, where its port's own analyzer was expected", registeredRule.Name,
+				registeredRule.Analyzer.Name)
+		}
 	}
 }
 
