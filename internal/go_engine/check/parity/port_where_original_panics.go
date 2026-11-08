@@ -35,7 +35,8 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // than by panicking, fails, since the fixture then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of
 // any other kind fails, since with no finding of the original's there is nothing for it to pair or rename, and so does
 // a fixture that records nothing, a `// port ` comment the harness cannot read, and a package the port did not run
-// on. Like RequireOnlyAdjudicated, it reads the one package directory fixture names.
+// on. Like RequireOnlyAdjudicated, it reads the one package directory fixture names. It loads for the machine's own
+// target, and Target.RequirePortWhereOriginalPanics for another.
 func RequirePortWhereOriginalPanics(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -44,8 +45,21 @@ func RequirePortWhereOriginalPanics(
 	fixture string,
 ) {
 	test.Helper()
+	requirePortWhereOriginalPanics(test, Target{}, original, port, testdata, fixture)
+}
+
+// requirePortWhereOriginalPanics is RequirePortWhereOriginalPanics with the fixture loaded for target.
+func requirePortWhereOriginalPanics(
+	test testing.TB,
+	target Target,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	fixture string,
+) {
+	test.Helper()
 	portFindings := []Finding{}
-	loads := loadFixtures(test, Target{}, testdata, []string{fixture})
+	loads := loadFixtures(test, target, testdata, []string{fixture})
 	for _, fixtures := range loads {
 		outcomes, analyzeError := Analyze([]Pair{{Original: recovering(original), Port: port}}, fixtures.roots)
 		if analyzeError != nil {

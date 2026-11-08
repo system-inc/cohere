@@ -82,6 +82,18 @@ func (target Target) RequireStaticcheckGolden(
 	requireStaticcheckGolden(test, target, port, testdata, patterns...)
 }
 
+// RequirePortWhereOriginalPanics is the package's RequirePortWhereOriginalPanics with the fixture loaded for target.
+func (target Target) RequirePortWhereOriginalPanics(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	fixture string,
+) {
+	test.Helper()
+	requirePortWhereOriginalPanics(test, target, original, port, testdata, fixture)
+}
+
 // environmentOf is the environment fixtures load under for target: the fixture load's own, then target's. A variable
 // target names that has no value, or that the fixture load already sets, fails the test, since the second would
 // override how the fixtures are found rather than the target they are checked for.

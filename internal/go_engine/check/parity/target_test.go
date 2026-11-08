@@ -77,6 +77,23 @@ func TestRequireStaticcheckGoldenLoadsForTheTargetNamed(test *testing.T) {
 	}), "the fixtures hold no golden file, so the comparison proves nothing")
 }
 
+// The call the original panics on is in narrow.go, so on the machine's own target the original runs and the record
+// there is unmatched.
+func TestRequirePortWhereOriginalPanicsLoadsForTheTargetNamed(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		on386.RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
+			"targeted_panicking")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
+			"targeted_panicking")
+	}),
+		"the original no longer panics on 1 of the 1 packages of targeted_panicking",
+		"the fixture records that the port finds narrow.go:8:0: call to gained, and it does not",
+	)
+}
+
 // A target that sets what a fixture load sets itself is refused, the tree's `GOPATH` and a module's `GOPROXY`, and so
 // is a variable with no value.
 func TestTargetRefusesAVariableTheLoadSets(test *testing.T) {
