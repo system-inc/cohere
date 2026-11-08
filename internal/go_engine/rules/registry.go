@@ -292,7 +292,7 @@ var ports = map[string]port{
 	"directive":        {analyzer: directive.Analyzer},
 	"errorsas":         {analyzer: errors_as.Analyzer, listener: &errors_as.Listener},
 	"framepointer":     {analyzer: frame_pointer.Analyzer},
-	"hostport":         {analyzer: host_port.Analyzer},
+	"hostport":         {analyzer: host_port.Analyzer, listener: &host_port.Listener},
 	"httpresponse":     {analyzer: http_response.Analyzer, listener: &http_response.Listener},
 	"ifaceassert":      {analyzer: iface_assert.Analyzer, listener: &iface_assert.Listener},
 	"loopclosure":      {analyzer: loop_closure.Analyzer},
