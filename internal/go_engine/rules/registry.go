@@ -311,7 +311,7 @@ var ports = map[string]port{
 	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
 	"tests":            {analyzer: tests.Analyzer},
 	"timeformat":       {analyzer: time_format.Analyzer},
-	"unmarshal":        {analyzer: unmarshal.Analyzer},
+	"unmarshal":        {analyzer: unmarshal.Analyzer, listener: &unmarshal.Listener},
 	"unreachable":      {analyzer: unreachable.Analyzer},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer, listener: &unsafe_ptr.Listener},
 	"unusedresult":     {analyzer: unused_result.Analyzer},
