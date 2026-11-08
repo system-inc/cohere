@@ -4,17 +4,22 @@
 // with the finding in hand, the reason written above the record that drops it; nothing else can record one. A finding
 // both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
 // withholds the one fix of the original's it leaves out, or that it omits the one related entry. Every record gives
-// its reason, on the line above it or in the doc comment of the declaration it is in.
+// its reason: a drop on the line directly above it, and any other there or in the doc comment of the declaration it
+// is in.
 //
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
+// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, or
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
-// RequireOnlyAdjudicated over its differences fixture, and RequireStaticcheckGolden over staticcheck's golden files for
-// a port that offers fixes. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a
-// go.mod loads that folder as a module (see fixtureLoad). The census command, command/cohere-parity, runs Analyze over
-// a real tree.
+// RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
+// RequireOnlyAdjudicated over its differences fixture, RequireStaticcheckGolden over staticcheck's golden files for
+// a port that offers fixes, and RequirePortWhereOriginalPanics over a fixture the original panics on. Each takes
+// testdata and patterns, and a pattern naming a folder of testdata that holds a go.mod loads that folder as a module
+// (see fixtureLoad). Each loads for the machine's own target, and a port whose check judges another calls the same on
+// the target it judges, as `parity.On("GOOS=linux", "GOARCH=386", "CGO_ENABLED=0").RequireIdentical(...)` (see
+// Target). The census command, command/cohere-parity, runs Analyze over a real tree.
 package parity
 
 import (
@@ -139,9 +144,10 @@ func LoadFailures(loadedPackages []*packages.Package) []Failure {
 }
 
 // Findings loads the fixture packages patterns name from testdata, runs original and port over them in one checker
-// for each load, and returns each one's findings, sorted, each in its file's base name, after its module's pattern in
-// a fixture module (see fixtureLoad). A load that found nothing, a fixture package that did not load clean, and an
-// analyzer that did not run on a fixture package each fail the test, since silence there would read as agreement.
+// for each load, and returns each one's findings, sorted, each file named by its path below the fixtures' root, after
+// its module's pattern in a fixture module (see fixtureLoad.fileName). A load that found nothing, a fixture package
+// that did not load clean, and an analyzer that did not run on a fixture package each fail the test, since silence
+// there would read as agreement. It loads for the machine's own target, and Target.Findings for another.
 func Findings(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -150,7 +156,7 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
-	return findingsOver(test, original, port, loadFixtures(test, testdata, patterns))
+	return findingsOver(test, original, port, loadFixtures(test, Target{}, testdata, patterns, nil))
 }
 
 // findingsOver is Findings over loads already made, so a caller that reads the loaded packages as well, as
@@ -188,7 +194,7 @@ func findingsOver(
 // RequireIdentical runs original and port over the fixture packages patterns name, and their findings must be the
 // same multiset, each the same in every field: its range, its message, its related entries and its fixes. Each side's
 // count is logged, since two empty sides would match and prove nothing, and the test fails if the original finds
-// nothing at all.
+// nothing at all. It loads for the machine's own target, and Target.RequireIdentical for another.
 func RequireIdentical(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -197,7 +203,23 @@ func RequireIdentical(
 	patterns ...string,
 ) {
 	test.Helper()
-	originalFindings, portFindings := Findings(test, original, port, testdata, patterns...)
+	requireIdentical(test, Target{}, original, port, testdata, nil, patterns...)
+}
+
+// requireIdentical is RequireIdentical with the fixtures loaded for target, over fixture packages that load with
+// exactly the errors expected, or clean when it expects none (see loadFixtures).
+func requireIdentical(
+	test testing.TB,
+	target Target,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	expected []LoadError,
+	patterns ...string,
+) {
+	test.Helper()
+	originalFindings, portFindings := findingsOver(test, original, port,
+		loadFixtures(test, target, testdata, patterns, expected))
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	if len(originalFindings) == 0 {
 		test.Fatalf("the original found nothing in the fixtures, so the comparison proves nothing")
@@ -217,7 +239,8 @@ func RequireIdentical(
 // message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
 // original offers on a finding both make there and the port leaves out; or `omits:` and the message of a related
 // entry the original's finding carries there and the port's leaves out. Each record's reason is in the comment above
-// it, and each matches one finding on its own line.
+// it, or for any but a drop in the doc comment of the declaration it is in, and each matches one finding on its own
+// line.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?))\s*$`,
 )
@@ -232,13 +255,15 @@ var adjudicatedPattern = regexp.MustCompile(
 // leaves out as omitted, each pairing the two sides' findings and nothing more; and every record is matched by a
 // finding on its own line, never another's. A finding the original makes and the port does not, unrecorded, is a
 // regression and fails, and so does any fix or related entry one side alone offers that no record withholds or omits.
-// Every record must give its reason, on the line above it or in the doc comment of the declaration it is in, and one
-// with none fails, named by file and line. A `// port ` comment it cannot read fails, and so does a fixture that
-// records nothing. The census has no fixture, so no record covers anything there.
+// Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
+// of the declaration it is in, and one with none fails, named by file and line. A `// port ` comment it cannot read
+// fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
 //
 // A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
 // or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
-// nested below it, so a fixture tree with nested packages takes one call for each.
+// nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
+// target, and Target.RequireOnlyAdjudicated for another, and reads the records of every file of that directory,
+// whichever target builds it, so a record in a file the target does not build fails unmatched.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -247,7 +272,20 @@ func RequireOnlyAdjudicated(
 	fixture string,
 ) {
 	test.Helper()
-	loads := loadFixtures(test, testdata, []string{fixture})
+	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture)
+}
+
+// requireOnlyAdjudicated is RequireOnlyAdjudicated with the fixtures loaded for target.
+func requireOnlyAdjudicated(
+	test testing.TB,
+	target Target,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	fixture string,
+) {
+	test.Helper()
+	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
@@ -419,9 +457,18 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
 					match := adjudicatedPattern.FindStringSubmatch(record)
 					at := Finding{File: fileName(name), Line: line}
-					if match != nil && !reasoned(line) {
-						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in the "+
-							"doc comment of the declaration it is in", at.File, line)
+					switch {
+					case match == nil || reasoned.above(line):
+						// Unreadable, which the switch below fails, or reasoned on the line above, as any record may
+						// be.
+					case match[4] != "":
+						// A drop is ruled with its own finding in hand, so a declaration's doc, which often rules a
+						// whole group of records, rules no drop.
+						test.Errorf("%s:%d holds a drop with no reason: write why on the line directly above it, "+
+							"since a doc comment rules no drop", at.File, line)
+					case !reasoned.isDocumented(line):
+						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in "+
+							"the doc comment of the declaration it is in", at.File, line)
 					}
 					switch {
 					case match == nil:
@@ -455,15 +502,29 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 	return recorded
 }
 
-// reasonedLines is, for file, whether a record on a line has its reason, the Square's term for every record: a
-// comment that is no record ending on the line directly above, or the doc comment of the top-level declaration, or
-// of the declaration in a group, that the line is in. Wave 1's fixtures give their reasons as the doc comment of the
-// function the records are in.
-func reasonedLines(fileSet *token.FileSet, file *ast.File) func(line int) bool {
+// directivePrefixes open the directives a comment can be, to the go command, the compiler or cohere, as `//go:build
+// never` is. A directive explains nothing, so it is no record's reason.
+var directivePrefixes = []string{"//go:", "//line ", "//cohere:"}
+
+// lineReasons is where a file gives its records' reasons, the Square's term for every record. above is whether a
+// comment that is neither a record nor a directive ends on the line directly above line, the one reason a drop
+// takes, and isDocumented whether line is in a declaration with a doc comment, the top-level one or the one in a
+// group, a reason for every record but a drop. Wave 1's fixtures give their reasons as the doc comment of the function
+// the records are in.
+type lineReasons struct {
+	above        func(line int) bool
+	isDocumented func(line int) bool
+}
+
+// reasonedLines is where file gives its records' reasons.
+func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 	reasonEndsOn := map[int]bool{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			if !strings.Contains(comment.Text, "// port ") {
+			isDirective := slices.ContainsFunc(directivePrefixes, func(prefix string) bool {
+				return strings.HasPrefix(comment.Text, prefix)
+			})
+			if !isDirective && !strings.Contains(comment.Text, "// port ") {
 				reasonEndsOn[fileSet.Position(comment.End()).Line] = true
 			}
 		}
@@ -499,16 +560,16 @@ func reasonedLines(fileSet *token.FileSet, file *ast.File) func(line int) bool {
 			}
 		}
 	}
-	return func(line int) bool {
-		if reasonEndsOn[line-1] {
-			return true
-		}
-		for _, each := range documented {
-			if each.first <= line && line <= each.last {
-				return true
+	return lineReasons{
+		above: func(line int) bool { return reasonEndsOn[line-1] },
+		isDocumented: func(line int) bool {
+			for _, each := range documented {
+				if each.first <= line && line <= each.last {
+					return true
+				}
 			}
-		}
-		return false
+			return false
+		},
 	}
 }
 

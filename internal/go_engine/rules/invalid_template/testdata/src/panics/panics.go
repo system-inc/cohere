@@ -5,6 +5,9 @@ package panics
 
 import "text/template"
 
+// panicking holds the records, each ruled in this doc comment: both templates end with no action open, a syntax error
+// the original reports on the plain call wherever it runs, and the port rightly finds it on both calls here, the
+// parenthesized one the original panics on and the plain one it loses with the package.
 func panicking() {
 	(template.New("").Parse)(`{{end}}`) // port finds: template: :1: unexpected {{end}}
 	template.New("").Parse(`{{end}}`)   // port finds: template: :1: unexpected {{end}}

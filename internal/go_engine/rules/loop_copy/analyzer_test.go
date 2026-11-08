@@ -50,9 +50,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		original, port := parity.Findings(test, s1001.Analyzer, Analyzer, analysistest.TestData(), upstream.pattern)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below testdata's src.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("in %s the fixture expects %d, the original found %d, the port %d", upstream.pattern, len(wants),
@@ -90,7 +91,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("%s's golden file holds %d sections, one a fix's message, which this test does not read",
 				upstream.file, len(archive.Files))
 		}
-		edits := editsIn(port, upstream.file)
+		edits := editsIn(port, upstream.pattern+"/"+upstream.file)
 		test.Logf("in %s the port found %d, with %d edits", upstream.file, len(port), len(edits))
 		if len(edits) == 0 {
 			test.Fatalf("the port made no edit to %s, so the comparison proves nothing", upstream.file)
@@ -157,7 +158,7 @@ func unformattedTree(test *testing.T) string {
 	return directory
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below testdata's src.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

@@ -110,9 +110,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		original, port := parity.Findings(test, s1024.Analyzer, Analyzer, module(version), "./"+upstream)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below its module's folder.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("under %s the fixture expects %d, the original found %d, the port %d", version, len(wants),
@@ -155,7 +156,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 		test.Fatalf("the golden file holds %d sections, one a fix's message, which this test does not read",
 			len(archive.Files))
 	}
-	edits := editsIn(port, upstreamFile)
+	edits := editsIn(port, upstream+"/"+upstreamFile)
 	test.Logf("the port found %d, with %d edits", len(port), len(edits))
 	if len(edits) == 0 {
 		test.Fatal("the port made no edit to the upstream fixture, so the comparison proves nothing")
@@ -262,8 +263,13 @@ func TestPortMovedFixesMakeGoldens(test *testing.T) {
 	}
 	compared := 0
 	for _, file := range differencesFiles(test) {
+		// The findings name a file by its path below its module's folder.
+		below, relativeError := filepath.Rel(module("go1.8"), file)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		golden, goldenError := os.ReadFile(file + ".golden")
-		isMoved := slices.Contains(moved, filepath.Base(file))
+		isMoved := slices.Contains(moved, filepath.ToSlash(below))
 		if os.IsNotExist(goldenError) && !isMoved {
 			continue
 		}
@@ -278,7 +284,7 @@ func TestPortMovedFixesMakeGoldens(test *testing.T) {
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		edits := editsIn(port, filepath.Base(file))
+		edits := editsIn(port, filepath.ToSlash(below))
 		test.Logf("%s: the port made %d edits", filepath.Base(file), len(edits))
 		formatted, formatError := format.Source(applied(test, filepath.Base(file), source, edits))
 		if formatError != nil {
@@ -380,7 +386,12 @@ func fixedErrors(test *testing.T, files []string, findings []parity.Finding) []s
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		overlay[file] = applied(test, filepath.Base(file), source, editsIn(findings, filepath.Base(file)))
+		// The findings name a file by its path below its module's folder.
+		below, relativeError := filepath.Rel(directory, file)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		overlay[file] = applied(test, filepath.Base(file), source, editsIn(findings, filepath.ToSlash(below)))
 	}
 	// The differences module is loaded through go1.8's workspace, as the harness loads it.
 	loaded, loadError := load.PackagesWithOverlay(directory, differencesFixtures, moduleEnvironment("go1.8"), nil,
@@ -404,7 +415,7 @@ func fixedErrors(test *testing.T, files []string, findings []parity.Finding) []s
 	return errors
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below its module's folder.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

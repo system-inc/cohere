@@ -112,6 +112,12 @@ func listInProcess(workspace string, environment []string, patterns []string, he
 	if doubt != "" {
 		return nil, doubt
 	}
+	return lister.list(patterns)
+}
+
+// list is listInProcess's listing of patterns by a lister already built, the standard library prefetched while it
+// lists and the prefetch ended before it returns.
+func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 	lister.prefetchStandardLibrary()
 	// The prefetch reads through held, whose bytes the caller writes again once the listing returns, so nothing it
 	// started may outlive the listing, whatever the listing answers.

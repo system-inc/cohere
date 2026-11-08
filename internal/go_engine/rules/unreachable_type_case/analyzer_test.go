@@ -1,291 +1,36 @@
 package unreachable_type_case
 
 import (
-	"bufio"
-	"cmp"
-	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
-	"slices"
-	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/staticcheck/sa4020"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
-// moduleEnvironment loads a fixture module as analysistest does, in module mode with nothing fetched.
-var moduleEnvironment = []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"}
-
-// upstreamModules are staticcheck's own fixtures for SA4020, copied unchanged from
-// staticcheck/sa4020/testdata/<version>/<Package> into testdata/<version>/<Package>. Each version's folder holds the
-// go.mod staticcheck's testutil lays over it, naming module example.com, whose path the notes' messages print in a
-// type's name (example.com/CheckUnreachableTypeCases.T), and naming the version. SA4020 reads no version; go1.18's
-// package needs type parameters, which its module's version allows.
-var upstreamModules = []string{"go1.0", "go1.18"}
-
-// Every `//@ diag(...)` note the original expects in staticcheck's fixtures, the port reports on the same line with a
-// message the note matches, and the port reports nothing no note expects, as staticcheck_wants matches them, each
-// version's fixture loaded as the module of its version.
+// staticcheck's own fixtures for SA4020, copied unchanged from staticcheck/sa4020/testdata/<version>/<Package> into
+// testdata/<version>/<Package>, hold the port to every `//@ diag(...)` note the original expects, and to nothing more.
+// Each version's folder holds the go.mod staticcheck's testutil lays over it, naming module example.com, whose path the
+// notes' messages print in a type's name (example.com/CheckUnreachableTypeCases.T), and naming the version. SA4020
+// reads no version; go1.18's package needs type parameters, which its module's version allows.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	wanted := 0
-	for _, module := range upstreamModules {
-		directory := filepath.Join(analysistest.TestData(), module)
-		wants, readError := staticcheck_wants.Read(directory)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		wanted += len(wants)
-		graph := analyze(test, []*analysis.Analyzer{Analyzer}, module)
-		findings := []staticcheck_wants.Finding{}
-		for _, action := range graph.Roots {
-			if action.Err != nil {
-				test.Fatalf("running %s: %v", action, action.Err)
-			}
-			for _, diagnostic := range action.Diagnostics {
-				position := action.Package.Fset.Position(diagnostic.Pos)
-				findings = append(findings, staticcheck_wants.Finding{
-					File:    position.Filename,
-					Line:    position.Line,
-					Message: diagnostic.Message,
-				})
-			}
-		}
-		test.Logf("%s: the fixture wants %d, the port reported %d", module, len(wants), len(findings))
-		unexpected, untaken := staticcheck_wants.Compare(wants, findings)
-		for _, found := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", found.File, found.Line,
-				found.Message)
-		}
-		for _, want := range untaken {
-			test.Errorf("the port reported nothing matching %s", want)
-		}
-	}
-	if wanted == 0 {
-		test.Fatal("the upstream fixtures hold no notes, so the comparison proves nothing")
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "go1.0", "go1.18")
 }
 
-// The original and the port run in one checker over the same fixture modules, staticcheck's and the house's parity
-// module, holding type switches over interfaces embedding others, aliases, receivers of both kinds, identical
-// interfaces, a sealed interface of another package, nils and defaults in every place, type parameters on either side
-// and a generated file, and their findings must be the same multiset of file, start, end and message, the messages
-// printing the types. Each side's count is logged, since two empty sides would match and prove nothing, and the test
-// fails if the original finds nothing at all.
+// Over staticcheck's fixture modules and the house's parity module, the original and the port find the same findings.
+// parity holds type switches over interfaces embedding others, aliases, receivers of both kinds, identical interfaces,
+// a sealed interface of another package, nils and defaults in every place, type parameters on either side and a
+// generated file, the messages printing the types.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original := []finding{}
-	port := []finding{}
-	for _, module := range append(slices.Clone(upstreamModules), "parity") {
-		moduleOriginal, modulePort := findingsOf(test, module)
-		test.Logf("%s: the original found %d, the port %d", module, len(moduleOriginal), len(modulePort))
-		original = append(original, moduleOriginal...)
-		port = append(port, modulePort...)
-	}
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
-	}
-	for _, extra := range difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
-	}
+	parity.RequireIdentical(test, sa4020.Analyzer, Analyzer, analysistest.TestData(), "go1.0", "go1.18", "parity")
 }
 
-// adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes, or `renames:`, the original's message, `=>` and the port's, for a
-// finding both make in words that differ.
-var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => (.+?))\s*$`)
-
-// Over the differences fixture the two may disagree only where each disagreement was adjudicated in the port's
-// favour: every finding the port alone makes is recorded on its line, as found or as a renaming, every finding the
-// original alone makes is the original's side of a recorded renaming, and every record is matched. A finding the
-// original makes and the port does not, unrecorded, fails, since the port is never worse than the original. The
-// fixture holds the type switches whose types, printing or range the two could read apart, and records no
-// difference, since there is none, so the test holds that the two agree there, and fails should the original find
-// nothing in it.
+// The differences fixture holds the type switches whose types, printing or range the two could read apart. It records
+// no difference, since there is none, so the two must agree there finding for finding.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, "differences")
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the differences fixture, so the agreement proves nothing")
-	}
-	expectedPort, expectedOriginal := recorded(test, "differences")
-	test.Logf("the fixture records %d differences", len(expectedPort))
-	compareAdjudicated(test, "the port", withoutColumns(difference(port, original)), expectedPort)
-	compareAdjudicated(test, "the original", withoutColumns(difference(original, port)), expectedOriginal)
-}
-
-// recorded is what the comments of the fixture module name record, its one file named for it: the findings the
-// port alone makes, and the original's side of each renaming.
-func recorded(test *testing.T, name string) (expectedPort []finding, expectedOriginal []finding) {
-	test.Helper()
-	expectedPort = []finding{}
-	expectedOriginal = []finding{}
-	relative := filepath.Join(name, name+".go")
-	file, openError := os.Open(filepath.Join(analysistest.TestData(), relative))
-	if openError != nil {
-		test.Fatal(openError)
-	}
-	defer func() {
-		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
-	}()
-	fileScanner := bufio.NewScanner(file)
-	for line := 1; fileScanner.Scan(); line++ {
-		for _, comment := range strings.Split(fileScanner.Text(), "// port ")[1:] {
-			match := adjudicatedPattern.FindStringSubmatch(comment)
-			switch {
-			case match == nil:
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", relative, line, comment)
-			case match[1] != "":
-				expectedPort = append(expectedPort, finding{file: relative, line: line, message: match[1]})
-			default:
-				expectedOriginal = append(expectedOriginal, finding{file: relative, line: line, message: match[2]})
-				expectedPort = append(expectedPort, finding{file: relative, line: line, message: match[3]})
-			}
-		}
-	}
-	if scanError := fileScanner.Err(); scanError != nil {
-		test.Fatal(scanError)
-	}
-	return expectedPort, expectedOriginal
-}
-
-// compareAdjudicated fails the test unless the findings side alone makes are exactly those the fixture records.
-func compareAdjudicated(test *testing.T, side string, actual []finding, expected []finding) {
-	test.Helper()
-	for _, unrecorded := range difference(actual, expected) {
-		test.Errorf("%s alone found %s, which the fixture does not record", side, described(unrecorded))
-	}
-	for _, unmatched := range difference(expected, actual) {
-		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
-	}
-}
-
-// finding is one finding as the differential compares it, its file named from the fixtures' folder, since every
-// upstream module holds a file of the same name, and its range from start to end.
-type finding struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	message   string
-}
-
-// described is found as a finding line prints it, with its end.
-func described(found finding) string {
-	return fmt.Sprintf("%s:%d:%d-%d:%d: %s", found.file, found.line, found.column, found.endLine, found.endColumn,
-		found.message)
-}
-
-// findingOf is diagnostic, reported by action, as a finding.
-func findingOf(test *testing.T, action *checker.Action, diagnostic analysis.Diagnostic) finding {
-	test.Helper()
-	position := action.Package.Fset.Position(diagnostic.Pos)
-	end := action.Package.Fset.Position(diagnostic.End)
-	relative, relativeError := filepath.Rel(analysistest.TestData(), position.Filename)
-	if relativeError != nil {
-		test.Fatal(relativeError)
-	}
-	return finding{
-		file:      relative,
-		line:      position.Line,
-		column:    position.Column,
-		endLine:   end.Line,
-		endColumn: end.Column,
-		message:   diagnostic.Message,
-	}
-}
-
-// analyze loads every package of the fixture module in testdata/<module> and runs analyzers over them in one
-// checker. A root package that does not type-check fails the test, since the checker skips it and would compare
-// nothing.
-func analyze(test *testing.T, analyzers []*analysis.Analyzer, module string) *checker.Graph {
-	test.Helper()
-	directory := filepath.Join(analysistest.TestData(), module)
-	loaded, loadError := load.Packages(directory, []string{"./..."}, moduleEnvironment, nil)
-	if loadError != nil {
-		test.Fatalf("loading %s: %v", module, loadError)
-	}
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %s found no package", module)
-	}
-	for _, loadedPackage := range loaded.Roots {
-		if len(loadedPackage.Errors) > 0 {
-			test.Fatalf("loading %s: %v", loadedPackage.PkgPath, loadedPackage.Errors)
-		}
-	}
-	// Packages holds one variant of each package, as staticcheck's runner analyzes them, where Roots would hand a
-	// package with tests of its own to the checker twice.
-	graph, analyzeError := checker.Analyze(analyzers, loaded.Packages, &checker.Options{})
-	if analyzeError != nil {
-		test.Fatalf("analyzing %s: %v", module, analyzeError)
-	}
-	return graph
-}
-
-// findingsOf runs staticcheck's SA4020 and the port over the fixture module in testdata/<module> in one checker, and
-// returns each one's findings, sorted.
-func findingsOf(test *testing.T, module string) (original []finding, port []finding) {
-	test.Helper()
-	graph := analyze(test, []*analysis.Analyzer{sa4020.Analyzer, Analyzer}, module)
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			found := findingOf(test, action, diagnostic)
-			switch action.Analyzer {
-			case sa4020.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
-	return original, port
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// withoutColumns is findings with their columns and ends dropped, for comparing with the differences fixture's
-// comments, which name a line.
-func withoutColumns(findings []finding) []finding {
-	dropped := []finding{}
-	for _, found := range findings {
-		dropped = append(dropped, finding{file: found.file, line: found.line, message: found.message})
-	}
-	return dropped
+	parity.RequireIdentical(test, sa4020.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
