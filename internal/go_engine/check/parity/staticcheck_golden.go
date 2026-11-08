@@ -27,12 +27,25 @@ import (
 //
 // testutil holds only the files a fix edits. Here every golden file of a fixture package is held, so a port that
 // offers no fix where the original's golden file holds one fails. A fix in a file with no golden file fails, as it
-// does there, and so do fixtures with no golden file at all, since the comparison would prove nothing.
+// does there, and so do fixtures with no golden file at all, since the comparison would prove nothing. It loads for
+// the machine's own target, and Target.RequireStaticcheckGolden for another.
 func RequireStaticcheckGolden(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
+	test.Helper()
+	requireStaticcheckGolden(test, Target{}, port, testdata, patterns...)
+}
+
+// requireStaticcheckGolden is RequireStaticcheckGolden with the fixtures loaded for target.
+func requireStaticcheckGolden(
+	test testing.TB,
+	target Target,
+	port *analysis.Analyzer,
+	testdata string,
+	patterns ...string,
+) {
 	test.Helper()
 	suggested := 0
 	held := 0
-	for _, fixtures := range loadFixtures(test, testdata, patterns) {
+	for _, fixtures := range loadFixtures(test, target, testdata, patterns) {
 		for _, action := range portActions(test, port, fixtures.roots) {
 			// editsByFile is the package's edits by the file they edit, and in each by their fix's message.
 			editsByFile := map[string]map[string][]Edit{}
