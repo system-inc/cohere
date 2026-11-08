@@ -61,6 +61,10 @@ require (
 	// that reproduces our formatter is our formatter, and goja is what runs it in-process.
 	github.com/dop251/goja v0.0.0-20260822123354-58e940e0d230
 
+	// A type parameter's terms, read as staticcheck reads them: SA4023's port asks it what the original
+	// asks (internal/go_engine/rules/typed_nil_interface_comparison).
+	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678
+
 	// cohere-dev reads go.work and each module's go.mod with the parser go itself uses, to gate every
 	// module the repository builds (command/cohere-dev/workspace.go).
 	golang.org/x/mod v0.41.0
@@ -87,7 +91,6 @@ require (
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )
