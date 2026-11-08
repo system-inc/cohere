@@ -718,6 +718,7 @@ var portedPasses = []string{
 	"nan_comparison",
 	"nil_ness",
 	"receiver_name",
+	"repeated_if_else_condition",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unobserved_append",
