@@ -305,7 +305,7 @@ var ports = map[string]port{
 	"slog":             {analyzer: slog.Analyzer, listener: &slog.Listener},
 	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
 	"stdmethods":       {analyzer: std_methods.Analyzer, listener: &std_methods.Listener},
-	"stdversion":       {analyzer: std_version.Analyzer},
+	"stdversion":       {analyzer: std_version.Analyzer, listener: &std_version.Listener},
 	"stringintconv":    {analyzer: string_int_conv.Analyzer, listener: &string_int_conv.Listener},
 	"structtag":        {analyzer: struct_tag.Analyzer, listener: &struct_tag.Listener},
 	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
