@@ -21,13 +21,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// name is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same as before the port took the original's place.
-const name = "appends"
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "appends"
 
-// doc is the section of the original's doc.go its analyzerutil.MustExtractDoc extracts, written out, since production
-// code must not import the original.
-const doc = "check for missing values after append\n\n" +
+// passDoc is the section of the original's doc.go its analyzerutil.MustExtractDoc extracts, written out, since
+// production code must not import the original.
+const passDoc = "check for missing values after append\n\n" +
 	"This checker reports calls to append that pass\n" +
 	"no values to be appended to the slice.\n\n" +
 	"\ts := []string{\"a\", \"b\", \"c\"}\n" +
@@ -35,8 +35,8 @@ const doc = "check for missing values after append\n\n" +
 	"Such calls are always no-ops and often indicate an\n" +
 	"underlying mistake."
 
-// url is the original's address.
-const url = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/appends"
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/appends"
 
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
 // Preorder visits them, so a call nested in another's arguments is reported after the call that holds it.
@@ -52,8 +52,8 @@ var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 // newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
 // RuleAnalyzer leaves unset.
 func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
-	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+name, name, doc, &Listener)
-	analyzer.URL = url
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
 	return analyzer
 }
 
