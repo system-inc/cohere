@@ -22,6 +22,7 @@ use (
 	./TypeScript-shim/vfs
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
+	./git_tree
 	./mutation_aliasing
 	./static_single_assignment
 )
