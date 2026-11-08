@@ -774,9 +774,13 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	naming := make([]rule.Rule, 0, len(on))
 	names := make([]string, 0, len(on))
 	for _, name := range slices.Sorted(maps.Keys(on)) {
-		if len(on[name].Analyzer.FactTypes) > 0 {
-			// A rule that learns facts would be analyzed on every dependency, which lets go of their syntax.
-			engine.note("%s learns facts, so its renames are not asked for again after a round", name)
+		// A rule that learns facts, itself or through anything it requires, as through its dispatcher, which requires
+		// what every listener on it does, is analyzed on every dependency, which lets go of their syntax and types. A
+		// package with tests is a root of current beside its test variant, and a dependency of every package that
+		// imports it, so the next round, which plans over current's roots, would read a root with no types.
+		if learner := check.FactLearner(on[name].Analyzer); learner != nil {
+			engine.note("%s learns facts through %s, so its renames are not asked for again after a round", name,
+				learner.Name)
 			return nil
 		}
 		naming = append(naming, on[name])

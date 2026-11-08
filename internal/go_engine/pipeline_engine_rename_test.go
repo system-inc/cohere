@@ -1,6 +1,9 @@
 package go_engine
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -8,9 +11,14 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_abbreviated_identifier"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_uppercase_initialism"
 	"github.com/system-inc/cohere/internal/go_rename/global_rename"
 	"github.com/system-inc/cohere/internal/go_rename/rename"
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
@@ -259,5 +267,52 @@ func TestAPlatformProofRefusesARenameThatCapturesAUse(test *testing.T) {
 			global_rename.MismatchKindPlatformLoad {
 			test.Fatalf("want windows to type-check the captured rewrite, got %s", mismatch)
 		}
+	}
+}
+
+// A naming rule that learns facts only through what it requires gets one round, never a second planned over roots
+// whose types its run let go of. On Nov 8 a syntax listener required staticcheck's purity, so the syntax dispatcher
+// did, and so both naming rules did. Their run over the first round's proof analyzed every dependency for purity's
+// facts and let go of plain store's syntax and types, store being a root of the load beside "store [store.test]" and a
+// dependency of every package importing it, and the second round's plan read store with no types (#dtyzaf7). Here
+// both naming rules require ctrlflow, which learns facts: the run renames, says why there is no second round, and ends
+// as a run does.
+func TestANamingRuleLearningFactsThroughItsRequirementsGetsOneRound(test *testing.T) {
+	test.Parallel()
+
+	learners := map[string]*analysis.Analyzer{
+		consistency_no_abbreviated_identifier.Name: consistency_no_abbreviated_identifier.NewAnalyzer(),
+		consistency_no_uppercase_initialism.Name:   consistency_no_uppercase_initialism.NewAnalyzer(),
+	}
+	registered := slices.Clone(rules.All())
+	for index, each := range registered {
+		if learner, naming := learners[each.Name]; naming {
+			learner.Requires = append(learner.Requires, ctrlflow.Analyzer)
+			registered[index].Analyzer = learner
+		}
+	}
+	root := copyFixture(test, filepath.Join("testdata", "rename"))
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
+	exitCode := run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"},
+		&standardOutput, &standardError, registered, nil)
+	if exitCode != exitClean && exitCode != exitFindings {
+		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
+	}
+	var record contract.FixRecord
+	for line := range strings.Lines(standardOutput.String()) {
+		if strings.HasPrefix(line, `{"kind":"fix"`) {
+			if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
+				test.Fatalf("reading the fix record %s: %v", line, decodeError)
+			}
+		}
+	}
+	if record.FilesRewritten == 0 {
+		test.Fatalf("want the first round to rename, got\n%s\n%s", standardOutput.String(), standardError.String())
+	}
+	note := consistency_no_abbreviated_identifier.Name + " learns facts through ctrlflow, so its renames are not " +
+		"asked for again after a round"
+	if !strings.Contains(standardError.String(), note) {
+		test.Fatalf("want stderr to say %q, got:\n%s", note, standardError.String())
 	}
 }
