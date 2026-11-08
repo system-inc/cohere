@@ -37,11 +37,7 @@ func ExcludedByConstraints(directory string, environment []string, files []strin
 	if len(files) == 0 {
 		return nil, nil
 	}
-	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
-	if environmentError != nil {
-		return nil, environmentError
-	}
-	buildContext, _, contextError := constraintContext(workspace, fullEnvironment, held)
+	_, buildContext, _, contextError := sourceContext(workspace, environment, held)
 	if contextError != nil {
 		return nil, contextError
 	}

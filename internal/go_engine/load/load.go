@@ -175,11 +175,7 @@ func loadWorkspace(
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
-	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
-	if environmentError != nil {
-		return nil, environmentError
-	}
-	buildContext, reported, contextError := constraintContext(workspace, fullEnvironment, caching.Held)
+	fullEnvironment, buildContext, reported, contextError := sourceContext(workspace, environment, caching.Held)
 	if contextError != nil {
 		return nil, contextError
 	}
@@ -350,7 +346,34 @@ func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) in
 // lists: a command with a default.pgo profile would otherwise have go list print a second variant of every package
 // the command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
 func sourceEnvironment(workspace string, environment []string) ([]string, error) {
-	return withGoFlags(workspace, environment, func(flags []string) []string { return append(flags, "-pgo=off") })
+	fullEnvironment, _, _, contextError := sourceContext(workspace, environment, nil)
+	return fullEnvironment, contextError
+}
+
+// sourceContext is sourceEnvironment with the build target and the go environment the inputs record names, as
+// constraintContext reads them under it, from one go command where two ran one after the other (#3epjyj2). go env
+// is asked once under the environment as given, and the whole environment follows from its `GOFLAGS`: the same
+// flags, -pgo=off last. Asked again under that, go env would print the same target and paths, since -pgo=off moves
+// none of them, and that `GOFLAGS` exactly, so it is not asked.
+func sourceContext(
+	workspace string,
+	environment []string,
+	held Held,
+) ([]string, *build.Context, reportedEnvironment, error) {
+	given := append(os.Environ(), environment...)
+	buildContext, reported, contextError := constraintContext(workspace, given, held)
+	if contextError != nil {
+		return nil, nil, reportedEnvironment{}, contextError
+	}
+	reported.goFlags = append(reported.goFlags, "-pgo=off")
+	fullEnvironment := []string{}
+	for _, variable := range given {
+		if !strings.HasPrefix(variable, "GOFLAGS=") {
+			fullEnvironment = append(fullEnvironment, variable)
+		}
+	}
+	fullEnvironment = append(fullEnvironment, "GOFLAGS="+strings.Join(reported.goFlags, " "))
+	return fullEnvironment, buildContext, reported, nil
 }
 
 // translatedEnvironment is the whole environment go list -compiled runs with in workspace when it translates the
