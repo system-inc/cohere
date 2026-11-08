@@ -19,26 +19,42 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1017",
-	Doc:      "Flags an if statement that only trims what its condition checks for: staticcheck's S1017, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every if statement, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		ifStatement, isIf := node.(*ast.IfStmt)
+		if !isIf {
+			// Invariant: the dispatcher hands Node only the if statements it was asked for.
+			panic("manual_prefix_trim: the dispatcher handed over a node that is not an if statement")
+		}
+		// The check depends on the preorder's order, as the original's seen set does: an if statement comes before
+		// its else, so an else if is in seen by the time the preorder reaches it, and is left alone. The set is the
+		// rule's state over the package, made empty on its first if statement.
+		seen := rule.State[Seen](context)
+		if elseStatement := Check(context, ifStatement, seen); elseStatement != nil {
+			seen.record(elseStatement)
+		}
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1017",
+	"S1017",
+	"Flags an if statement that only trims what its condition checks for: staticcheck's S1017, ported.",
+	&Listener,
+)
 
 // guard is what one function a condition may call stands for: the package and function the original's switch
 // spells, the call that does its work unconditionally, and the trimming function a manual slice is replaced with.
@@ -71,33 +87,6 @@ var guards = map[string]guard{
 		packageName: "bytes", function: "HasSuffix", unconditional: "bytes.TrimSuffix", trim: "TrimSuffix",
 	},
 	"bytes.Contains": {packageName: "bytes", function: "Contains", unconditional: "bytes.Replace"},
-}
-
-// run builds the pass's context and judges every if statement of the package, in one preorder.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("manual_prefix_trim: the inspect pass's result is missing")
-	}
-	// The check depends on the preorder's order, as the original's seen set does: an if statement comes before its
-	// else, so an else if is in seen by the time the preorder reaches it, and is left alone.
-	seen := &Seen{}
-	inspected.Preorder([]ast.Node{(*ast.IfStmt)(nil)}, func(node ast.Node) {
-		ifStatement, isIf := node.(*ast.IfStmt)
-		if !isIf {
-			// Invariant: Preorder hands this function only the if statements it was asked for.
-			panic("manual_prefix_trim: the inspector handed over a node that is not an if statement")
-		}
-		if elseStatement := Check(context, ifStatement, seen); elseStatement != nil {
-			seen.record(elseStatement)
-		}
-	})
-	return nil, nil
 }
 
 // Check judges one if statement against seen, which it reads and never writes, and returns its else, for the caller
