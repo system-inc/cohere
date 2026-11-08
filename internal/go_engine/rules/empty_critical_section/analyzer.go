@@ -19,54 +19,42 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
-
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA2001",
-	Doc: "Flags a lock released at once, an empty critical section: staticcheck's SA2001, ported as a check on " +
-		"syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
 
 // exemptPackage is the package staticcheck exempts: the sync package's external tests, which lock and unlock at once
 // on purpose.
 const exemptPackage = "sync_test"
 
-// run builds the pass's context and judges every block of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	if context.Package.Path() == exemptPackage {
-		return nil, nil
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("empty_critical_section: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BlockStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every block, in preorder, but none of the
+// exempt package's.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BlockStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		if context.Package.Path() == exemptPackage {
+			return
+		}
 		block, isBlock := node.(*ast.BlockStmt)
 		if !isBlock {
-			// Invariant: Preorder hands this function only the blocks it was asked for.
-			panic("empty_critical_section: the inspector handed over a node that is not a block")
+			// Invariant: the dispatcher hands Node only the blocks it was asked for.
+			panic("empty_critical_section: the dispatcher handed over a node that is not a block")
 		}
 		Check(context, block)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA2001",
+	"SA2001",
+	"Flags a lock released at once, an empty critical section: staticcheck's SA2001, ported as a check on "+
+		"syntax.",
+	&Listener,
+)
 
 // Check judges one block: each statement calling Unlock right after one calling Lock, or RUnlock right after RLock,
 // on a receiver that prints the same, is reported.
