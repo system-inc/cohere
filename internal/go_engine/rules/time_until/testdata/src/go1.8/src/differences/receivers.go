@@ -3,7 +3,7 @@ package differences
 import (
 	"time"
 
-	"example.com/differences/embedder"
+	"differences/embedder"
 )
 
 type embedding struct{ time.Time }
@@ -41,23 +41,23 @@ func receivers(
 	hidden embedder.Hidden,
 ) {
 	// The original writes time.Until(pointer), and the port time.Until(*pointer).
-	_ = time.Until(*pointer) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = pointer.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until((pointer)), and the port time.Until(*(pointer)).
-	_ = time.Until(*(pointer)) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = (pointer).Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(embedded), and the port time.Until(embedded.Time).
-	_ = time.Until(embedded.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = embedded.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(embeddedPointer), and the port time.Until(embeddedPointer.Time).
-	_ = time.Until(embeddedPointer.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = embeddedPointer.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(pointed), and the port time.Until(*pointed.Time).
-	_ = time.Until(*pointed.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = pointed.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(deep), and the port time.Until(deep.Time), the name alone reaching two deep.
-	_ = time.Until(deep.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = deep.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(cover), and the port time.Until(cover.inner.Time), since cover.Time is an int.
-	_ = time.Until(cover.inner.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = cover.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(promoted), and the port time.Until(promoted.Time), through an unexported field.
-	_ = time.Until(promoted.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = promoted.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// The original writes time.Until(two), and the port time.Until(two.inner.Time), since two.Time is another time.
-	_ = time.Until(two.inner.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	_ = two.Sub(time.Now()) // port moves: should use time.Until instead of t.Sub(time.Now())
 	// hidden.Time is an int, and the time.Time is behind another package's unexported field, which nothing here names.
 	_ = hidden.Sub(time.Now()) // port withholds: Replace with call to time.Until
 }
