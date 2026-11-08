@@ -86,6 +86,9 @@ type summaryJson struct {
 
 	// PackageCache is what the Go engine's per-package findings cache did, absent for every other run.
 	PackageCache *packageCacheUse `json:"packageCache,omitempty"`
+	// Builds is every build a Go run checked when it checked more than one, the host's first, absent for a run of
+	// one build and every other run.
+	Builds []checkedBuild `json:"builds,omitempty"`
 
 	TypeErrors     int `json:"typeErrors"`
 	Findings       int `json:"findings"`
@@ -164,6 +167,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		FormattingSeconds: summary.Formatting.Seconds(),
 		Cache:             summary.Cache,
 		PackageCache:      summary.PackageCache,
+		Builds:            summary.Builds,
 		TypeErrors:        summary.TypeErrors,
 		Findings:          summary.Findings,
 		FilesFixed:        summary.filesFixed(),

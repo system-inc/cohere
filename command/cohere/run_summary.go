@@ -48,6 +48,9 @@ type runSummary struct {
 	Cache cacheUse
 	// PackageCache is what the Go engine's per-package findings cache did, nil for every other run.
 	PackageCache *packageCacheUse
+	// Builds is every build a Go run checked when it checked more than one, the host's first, nil for a run of one
+	// build and every other run. A replay keeps them, since the verdict it repeats was merged from them.
+	Builds []checkedBuild
 
 	TypeErrors int
 	Findings   int

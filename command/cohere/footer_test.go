@@ -198,6 +198,30 @@ func TestFooterGolden(test *testing.T) {
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},
 		{
+			name: "a Go run that checked its files under two builds",
+			summary: func(summary *runSummary) {
+				summary.Builds = []checkedBuild{{Target: "darwin/arm64 cgo", Host: true}, {Target: "windows/arm64"}}
+			},
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked • 2 builds)",
+		},
+		{
+			name: "two builds, with --verbose: the count before the nodes",
+			summary: func(summary *runSummary) {
+				warmSummary(summary)
+				summary.Builds = []checkedBuild{{Target: "darwin/arm64 cgo", Host: true}, {Target: "windows/arm64"}}
+			},
+			options: footerOptions{Verbose: true},
+			want:    "✓ 💎 0.7s (480 rules • 3 checked • 3,923 cached • 2 builds • 4,100 nodes)",
+		},
+		{
+			// The engine writes no builds for a run of one, and one says nothing a footer does not already.
+			name: "a Go run of the host's build alone",
+			summary: func(summary *runSummary) {
+				summary.Builds = []checkedBuild{{Target: "darwin/arm64", Host: true}}
+			},
+			want: "✓ 💎 2.4s (480 rules • 3,926 checked)",
+		},
+		{
 			name:    "labelled, in a repository with several projects",
 			summary: func(summary *runSummary) { summary.Label = "projects/www" },
 			want:    "projects/www  ✓ 💎 2.4s (480 rules • 3,926 checked)",

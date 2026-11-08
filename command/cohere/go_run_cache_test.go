@@ -391,14 +391,14 @@ func TestGoInputsUnreplayableRefusesWhatWouldNeverReplay(test *testing.T) {
 	}
 }
 
-// goStreamWithLintCache is the Go contract's clean stream with a `cache` object on its lint record, as the engine's
-// per-package findings cache writes it.
-func goStreamWithLintCache(test *testing.T, cacheObject string) []string {
+// goStreamWithLintField is the Go contract's clean stream with one more field on its lint record, as the engine writes
+// its `cache` object and its `builds`.
+func goStreamWithLintField(test *testing.T, name, value string) []string {
 	test.Helper()
 	lines := contractFixture(test, "GoClean.jsonl")
 	for index, line := range lines {
 		if strings.HasPrefix(line, `{"kind":"lint"`) {
-			lines[index] = strings.TrimSuffix(line, "}") + `,"cache":` + cacheObject + "}"
+			lines[index] = strings.TrimSuffix(line, "}") + `,"` + name + `":` + value + "}"
 			return lines
 		}
 	}
@@ -419,17 +419,17 @@ func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
 		line        string
 		summaryJson string
 	}{
-		{"a warm run", goStreamWithLintCache(test,
+		{"a warm run", goStreamWithLintField(test, "cache",
 			`{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":1}`),
 			"  lint: package cache hit 412, missed 3, wrote 3\n",
 			`"packageCache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":0,` +
 				`"factsSkipped":0,"waves":1}`},
-		{"a run with unstorable packages and dropped and skipped facts", goStreamWithLintCache(test,
+		{"a run with unstorable packages and dropped and skipped facts", goStreamWithLintField(test, "cache",
 			`{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,"factsSkipped":5,"waves":2}`),
 			"  lint: package cache hit 1, missed 4, wrote 2, 2 unstorable, 7 facts dropped, 5 facts skipped\n",
 			`"packageCache":{"on":true,"hit":1,"missed":4,"written":2,"unstorable":2,"factsDropped":7,` +
 				`"factsSkipped":5,"waves":2}`},
-		{"a run under --no-cache", goStreamWithLintCache(test,
+		{"a run under --no-cache", goStreamWithLintField(test, "cache",
 			`{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,"factsSkipped":0,"waves":0}`),
 			"  lint: package cache off\n",
 			`"packageCache":{"on":false,"hit":0,"missed":0,"written":0,"unstorable":0,"factsDropped":0,` +
@@ -461,5 +461,109 @@ func TestAGoRunSaysWhatItsPackageCacheDid(test *testing.T) {
 	}
 	if strings.Contains(swift, "package cache") || activeSummary.PackageCache != nil {
 		test.Errorf("a Swift run said a package cache:\n%s", swift)
+	}
+}
+
+// goBuildsObject is a lint record's `builds` as the Go engine writes it on a Mac whose project has files only Windows
+// compiles: the host's build, which the merge dropped two findings of, and Windows', which added six and lost one.
+const goBuildsObject = `[` +
+	`{"target":"darwin/arm64 cgo","host":true,"compiledFiles":412,"analyzedPackages":349,"findingsAdded":0,` +
+	`"findingsDropped":2},` +
+	`{"target":"windows/arm64","host":false,"compiledFiles":1398,"analyzedPackages":349,"findingsAdded":6,` +
+	`"findingsDropped":1}]`
+
+// goBuildsLines is the account's line for each build of goBuildsObject.
+const goBuildsLines = "  lint: the host's build, darwin/arm64 cgo: 412 files compiled, 349 packages analyzed, " +
+	"2 findings dropped by the merge\n" +
+	"  lint: build windows/arm64: 1,398 files compiled, 349 packages analyzed, 6 findings added, 1 dropped by the " +
+	"merge\n"
+
+// goBuildsJson is goBuildsObject as the `--json` summary writes it.
+const goBuildsJson = goBuildsObject
+
+// goCleanLintLine is the lint line of the Go contract's clean stream, which the builds' lines follow.
+const goCleanLintLine = "lint: 0 findings \u2014 5 rules over 3 files, 1408 nodes visited, walked by the fix phase " +
+	"(nothing was rewritten, so its findings still hold)\n"
+
+// goCleanAccount is the --verbose account of the Go contract's clean stream, its footer aside, as it read before the
+// lint record's `builds` was read, written out so anything added to it shows here.
+const goCleanAccount = "module described in 96ms: 4 Go files in the module, 3 of them ours\n" +
+	"fix: 0 of 3 files rewritten, 0 fixes applied, 0 refused\n" +
+	"format scope: changed files (working tree against HEAD): 0\n" +
+	"types: 0 diagnostics over 3 files in 240ms\n" +
+	goCleanLintLine +
+	"coverage: 5 rules = 5 ran and found nothing\n" +
+	"  0 files crashed \u00b7 details: cohere --coverage\n" +
+	"  not checked: /project/internal/schema/schema_generated.go (marked // Code generated)\n" +
+	"phases: fix ran in 18ms \u00b7 types ran in 240ms \u00b7 " +
+	"lint reused the fix phase's walk (nothing was rewritten) \u00b7 unused skipped (not requested)\n" +
+	"  total 0s: module 96ms plus phases, overlapping by 354ms\n" +
+	"  memory: the collector runs at Go's default, since this is a test binary\n"
+
+// goCleanSummaryJson is the `--json` summary of the Go contract's clean stream with its seconds set to 0, as it read
+// before the lint record's `builds` was read, written out so a field added to it shows here.
+const goCleanSummaryJson = `{"kind":"summary","schemaVersion":1,"verdict":"pass","seconds":0,"graphSeconds":0.096,` +
+	`"rules":5,"phases":[{"name":"fix","outcome":"ran","seconds":0.018},{"name":"types","outcome":"ran",` +
+	`"seconds":0.24},{"name":"lint","outcome":"reused","seconds":0,` +
+	`"detail":"the fix phase's walk (nothing was rewritten)"},{"name":"unused","outcome":"skipped","seconds":0,` +
+	`"detail":"not requested"}],"cache":{"replayed":false,"filesReplayed":0,"off":false},"typeErrors":0,` +
+	`"findings":0,"filesFixed":0,"filesFormatted":0,"wouldChange":0,"cohered":0,"filesInScope":3,"checked":3,` +
+	`"cached":0,"nodes":1408,"gaps":{"programFiles":0,"crashedFiles":0,"ruleCrashes":0,` +
+	`"rulesSkippingEverything":0,"formattingNotChecked":false,"nothingToCheck":false,"modifiedBuild":false}}`
+
+// TestAGoRunSaysWhichBuildsItChecked: a Go lint record's `builds` is one line of the --verbose account per build, the
+// host's first, after the lint line and its cache line, a count in the footer's parentheses, and a field of the
+// `--json` summary of its own, each entry as the engine wrote it but for the counts of why a build analyzed each
+// package, which the front door does not read. A record without it, as a run of one build's is, prints none of them,
+// and its account, footer and summary are byte for byte what they were before the field was read (#72n9mq0). The
+// time a render took is the one thing that moves, so the footer is read off the summary with no time, and the
+// summary's seconds are set to 0.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestAGoRunSaysWhichBuildsItChecked(test *testing.T) {
+	savedOutput, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = savedOutput, savedSummary }()
+	footerLine := regexp.MustCompile(`(?m)^✓ 💎 .*\n`)
+	secondsField := regexp.MustCompile(`^(\{"kind":"summary","schemaVersion":1,"verdict":"pass","seconds":)[0-9.e-]+,`)
+	for _, testCase := range []struct {
+		name    string
+		lines   []string
+		account string
+		footer  string
+		verbose string
+		summary string
+	}{
+		{
+			name:    "two builds",
+			lines:   goStreamWithLintField(test, "builds", goBuildsObject),
+			account: strings.Replace(goCleanAccount, goCleanLintLine, goCleanLintLine+goBuildsLines, 1),
+			footer:  "✓ 💎 0.000s (5 rules • 3 checked • 2 builds)",
+			verbose: "✓ 💎 0.000s (5 rules • 3 checked • 2 builds • 1,408 nodes)",
+			summary: strings.Replace(goCleanSummaryJson, `,"typeErrors":`, `,"builds":`+goBuildsJson+`,"typeErrors":`,
+				1),
+		},
+		{
+			name:    "no builds",
+			lines:   contractFixture(test, "GoClean.jsonl"),
+			account: goCleanAccount,
+			footer:  "✓ 💎 0.000s (5 rules • 3 checked)",
+			verbose: "✓ 💎 0.000s (5 rules • 3 checked • 1,408 nodes)",
+			summary: goCleanSummaryJson,
+		},
+	} {
+		verbose, summary := renderGoStreamAs(test, outputVerbose, testCase.lines)
+		if account := footerLine.ReplaceAllString(verbose, ""); account != testCase.account {
+			test.Errorf("%s: the account is\n%s\nwant\n%s", testCase.name, account, testCase.account)
+		}
+		summary.Total = 0
+		if got := footer(summary, plain, footerOptions{}); got != testCase.footer {
+			test.Errorf("%s: the footer is %q, want %q", testCase.name, got, testCase.footer)
+		}
+		if got := footer(summary, plain, footerOptions{Verbose: true}); got != testCase.verbose {
+			test.Errorf("%s: the footer under --verbose is %q, want %q", testCase.name, got, testCase.verbose)
+		}
+		asJson, _ := renderGoStreamAs(test, outputJson, testCase.lines)
+		if got := secondsField.ReplaceAllString(summaryJsonOf(test, asJson), "${1}0,"); got != testCase.summary {
+			test.Errorf("%s: the summary is\n%s\nwant\n%s", testCase.name, got, testCase.summary)
+		}
 	}
 }

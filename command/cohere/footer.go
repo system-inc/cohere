@@ -27,6 +27,11 @@ import (
 //
 //	✓ 💎 2.4s (480 rules • 3,900 checked • 26 types-only)
 //
+// A Go run that checked its files under more builds than the host's, since some file of ours compiles only for
+// another platform, says how many, and `--verbose` says each (#72n9mq0):
+//
+//	✓ 💎 4.1s (480 rules • 3,926 checked • 2 builds)
+//
 // A Go run whose standard library came from the entries a release binary carries says how many packages did, since
 // no file count holds them:
 //
@@ -118,6 +123,10 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	}
 	if summary.FilesTypesOnly > 0 {
 		inside = append(inside, grouped(summary.FilesTypesOnly)+" types-only")
+	}
+	// One build is every run's, so only a Go run that checked others beside the host's says how many.
+	if len(summary.Builds) > 1 {
+		inside = append(inside, counted(len(summary.Builds), "build", "builds"))
 	}
 	if options.Verbose && summary.Nodes > 0 {
 		inside = append(inside, counted(summary.Nodes, "node", "nodes"))

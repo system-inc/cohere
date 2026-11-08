@@ -180,6 +180,9 @@ type engineLintRecord struct {
 	// Cache is what the Go engine's per-package findings cache did, additive within contract 3. A Swift engine
 	// sends none, which decodes as nil and prints nothing.
 	Cache *packageCacheUse `json:"cache"`
+	// Builds is every build the Go engine checked when it checked more than one, the host's first, additive within
+	// contract 3. A run of one build and a Swift engine send none, which decodes as nil and prints nothing.
+	Builds []checkedBuild `json:"builds"`
 }
 
 type enginePhaseRecord struct {
@@ -897,6 +900,12 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 		printInvocation(accountOutput(run.out), "  lint: %s\n", record.Cache.line())
 		activeSummary.PackageCache = record.Cache
 	}
+	// The tree's, unlike the cache's line: the builds are what the verdict was merged from, so a replay that repeats
+	// the verdict says them too, from the run that checked them.
+	for _, build := range record.Builds {
+		printProvenance(accountOutput(run.out), "  lint: %s\n", build.line())
+	}
+	activeSummary.Builds = record.Builds
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
 	activeSummary.Nodes = record.NodesVisited
