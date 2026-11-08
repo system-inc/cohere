@@ -80,12 +80,33 @@ type listing struct {
 
 	// testOnly are the packages listed for no reason but that a root's tests import them.
 	testOnly map[string]bool
+
+	// inProcess is set when the listing was read in this process, and goListReason, when it was not, says why go list
+	// answered instead (see listInProcess).
+	inProcess    bool
+	goListReason string
 }
 
-// list lists the patterns in workspace under environment, the whole environment, with `go list -deps -json -e`
-// alone, the one go command a runner of prebuilt tests answers. go list -deps follows no test's imports, and -test
-// is refused there, so what only the tests import is listed a second time by name, and added after.
+// list lists the patterns in workspace under environment, the whole environment, as `go list -deps -json -e` lists
+// them: read in this process when the lister can answer exactly, and by go list itself when it has any doubt.
 func list(workspace string, environment []string, patterns []string) (*listing, error) {
+	listed, doubt := listInProcess(workspace, environment, patterns)
+	if doubt == "" {
+		listed.inProcess = true
+		return listed, nil
+	}
+	listed, listError := listWithGoList(workspace, environment, patterns)
+	if listError != nil {
+		return nil, listError
+	}
+	listed.goListReason = doubt
+	return listed, nil
+}
+
+// listWithGoList is list by `go list -deps -json -e` alone, the one go command a runner of prebuilt tests answers.
+// go list -deps follows no test's imports, and -test is refused there, so what only the tests import is listed a
+// second time by name, and added after.
+func listWithGoList(workspace string, environment []string, patterns []string) (*listing, error) {
 	listed, listError := runList(workspace, environment, patterns)
 	if listError != nil {
 		return nil, listError

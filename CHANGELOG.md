@@ -54,16 +54,29 @@ changed in cohere outside the sets is written under the same heading.
   as one in a TypeScript project always did. It needs no file of its own, and the summary counts it.
 - An `ignorePatterns` entry says why. It's a glob, as before, or an object,
   `{ "pattern": "dist/**", "reason": "Build output.", "kind": "generated" }`, whose `kind` is `input`,
-  `generated` or `thirdParty`, and whose optional `check`, `types`, is carried and not yet acted on. In a
+  `generated` or `thirdParty`, and whose optional `check` is `types` (see below). In a
   chain extending a `cohere:system-inc` set, and in every set cohere carries, an entry with no reason is
   refused at load, as an off with none is, and the sets' own entries each say why. `--verbose` lists every
   entry with its reason, kind, file and how many paths it matched, and `--json` carries the same, on the
   summary, or as an `ignorePatterns` record when several projects run. An entry a settings file writes that
   matches nothing is a finding, `correctness-no-unused-ignore`, which fails the run, unless its `kind` is
   `generated`, since build output may not exist yet; it's still listed, with its count of 0.
+- A plain `ignorePatterns` entry means never checked at all: the type errors of the files it matches are
+  dropped too, `--types` included, and they're in no count. An entry with `"check": "types"` keeps the type
+  check: its files' type errors are reported, they're never linted or formatted, and the footer counts them as
+  `types-only`, as `typesOnly` in `--json`. Where both match a file, the entry naming `types` wins. `--verbose`
+  and `--json` also list cohere's own defaults, `testdata` (kind `input`) and `Vendor` (kind `thirdParty`), with
+  their reasons. Each holds only where its tree is already skipped, by the Go engine, the format walk and the
+  Swift engine, so a file a tsconfig includes under either is still type-checked and linted, and neither is
+  ever an unused ignore.
 
 ### Changed
 
+- A repository with several projects ends its default run on one footer line, the way a single project does:
+  the run's time and every project's rules, checked, cached and cohered files summed. Each project's gap is on
+  the line with its name, as in `⚠ 👑 lint did not run (CapturePhone)`, and a project that didn't finish or
+  failed without a summary is named too. `--verbose` and `--phases` print each project's footer and the line
+  counting the projects, as before, and `--json` is unchanged.
 - The format walk never enters `testdata`, whose fixtures are what their tests read, and the account counts
   each one it skipped.
 - A declared submodule the root's `ignorePatterns` name isn't read by the nested format check, and a note

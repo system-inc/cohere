@@ -146,6 +146,7 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 		// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 		// and what follows reads the files' contents the project description holds, and the types.
 		ReleaseAnalyzed: true,
+		ReadFile:        engine.sourceReader(nil),
 	})
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}

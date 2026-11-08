@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are four.
+// The changes are five.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -74,6 +74,16 @@
 // importer then inherits them as it would have inherited them from a run.
 // ExportedFacts is what such an entry is written from: the facts an
 // action exported that its importers read.
+//
+// The fifth is Options.ReadFile, the option upstream keeps unexported
+// under its "TODO(adonovan): expose ReadFile", exported. The engine
+// holds every file in scope as its load parsed it, and gives each pass
+// those bytes, so a rule that reads the source, as the long-line rule
+// reads every file, reads none from disk again. CheckedReadFile still
+// guards which files a pass may read. Measured on cohere's own root,
+// the engine alone, cold, two runs each at a load average of 13 to 17,
+// the long-line rule's CPU went from 0.56 to 0.65s, 0.53 to 0.59s of it
+// in os.ReadFile, to 0.19 to 0.20s, none of it reading a file.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -155,7 +165,12 @@ type Options struct {
 	// TODO(adonovan): expose ReadFile so that an Overlay specified
 	// in the [packages.Config] can be communicated via
 	// Pass.ReadFile to each Analyzer.
-	readFile driverutil.ReadFileFunc
+	// cohere: exposed, as the TODO above asks. ReadFile, when set, is
+	// what every Pass.ReadFile reads through, behind CheckedReadFile's
+	// guard on which files a pass may read, so a driver that holds the
+	// bytes its load parsed can serve them rather than have each reader
+	// read the file from disk again. Unset, it is os.ReadFile.
+	ReadFile driverutil.ReadFileFunc
 
 	// cohere: Restored reports whether a package's analysis is restored
 	// rather than run. Every action on such a package skips its pass and
@@ -547,8 +562,9 @@ func (act *Action) execOnce() {
 		AllPackageFacts:   act.AllPackageFacts,
 	}
 	readFile := os.ReadFile
-	if act.opts.readFile != nil {
-		readFile = act.opts.readFile
+	// cohere: Options.ReadFile, the field upstream's TODO asks to expose.
+	if act.opts.ReadFile != nil {
+		readFile = act.opts.ReadFile
 	}
 	pass.ReadFile = driverutil.CheckedReadFile(pass, readFile)
 	act.pass = pass

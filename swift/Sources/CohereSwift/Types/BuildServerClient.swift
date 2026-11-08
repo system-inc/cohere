@@ -247,14 +247,15 @@ final class BuildServerClient {
 
     /*
      The whole session the check needs, in order: initialize, wait for the build description, list the buildable
-     targets and their sources, ask each target's arguments of one file per language, prepare `prepare` of them (all
-     when nil, none when empty), and shut down. `alongside`, when given, is started on another thread as soon as the
-     targets and their arguments are known, with no prepare yet, and is waited for before this returns or throws, so
-     work that needs no newly prepared module overlaps prepare.
+     targets and their sources, ask each target's arguments of one file per language, prepare the targets `prepare`
+     names once it has seen them and their arguments (all when it answers nil, none when empty), and shut down.
+     `alongside`, when given, is started on another thread as soon as the targets and their arguments are known, with
+     no prepare yet, and is waited for before this returns or throws, so work that needs no newly prepared module
+     overlaps prepare.
      */
     static func describe(
         configuration: Configuration,
-        prepare: Set<String>? = nil,
+        prepare: (Description) -> Set<String>? = { _ in nil },
         alongside: (@Sendable (Description) -> Void)? = nil,
     ) throws(Failure) -> Description {
         let client = try BuildServerClient(configuration: configuration)
@@ -271,9 +272,15 @@ final class BuildServerClient {
         defer { group.wait() }
         if let alongside {
             let known = description
-            DispatchQueue.global().async(group: group) { alongside(known) }
+            /*
+             A queue of its own, which always gets a thread: a caller on a Swift concurrency thread blocks on this group,
+             and the global queue's threads are the ones such callers hold. Measured 2026-11-07 in the full test run,
+             sixteen tests at once each blocked waiting on work queued on the global queue, and none of it started.
+             */
+            DispatchQueue(label: "cohere-swift.build-server.alongside").async(group: group) { alongside(known) }
         }
-        let preparing = targets.filter { prepare?.contains($0.displayName) ?? true }
+        let named = prepare(description)
+        let preparing = targets.filter { named?.contains($0.displayName) ?? true }
         description.prepared = preparing.isEmpty ? nil : try client.prepare(preparing)
         try client.shutdown()
         return description

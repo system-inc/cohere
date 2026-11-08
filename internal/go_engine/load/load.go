@@ -76,6 +76,12 @@ type Loaded struct {
 	// (see cachedList).
 	ListingKept bool
 
+	// ListedInProcess is set when the listing was read in this process rather than by go list, and GoListReason, when
+	// go list read it, says what the in-process lister could not answer exactly (see listInProcess). A kept listing
+	// is neither: nothing was listed.
+	ListedInProcess bool
+	GoListReason    string
+
 	// FilesParsed counts the files the load parsed, and PackagesFromExportData the packages whose types it read
 	// from the findings cache's export data rather than checking them.
 	FilesParsed            int
@@ -211,6 +217,8 @@ func loadWorkspace(
 		}
 	}
 	loaded.ListingKept = listingKept
+	loaded.ListedInProcess = listed.inProcess
+	loaded.GoListReason = listed.goListReason
 	loaded.Roots = roots
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)

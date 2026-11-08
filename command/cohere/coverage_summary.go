@@ -24,7 +24,9 @@ type coverageSummary struct {
 	Crashes      []runCrash
 	RuleCrashes  []coverageRuleCrash
 	FilesIgnored int
-	Suppression  *suppressionCoverage
+	// FilesTypesOnly is how many of FilesIgnored an ignore naming the type check matched, which it still reads.
+	FilesTypesOnly int
+	Suppression    *suppressionCoverage
 	// Notes is what rules counted rather than reported (rule.Context.Note), summed across files: rule
 	// name to note key to count. Listed under `--coverage`, so an exemption reads as a number.
 	Notes map[string]map[string]int
@@ -97,7 +99,11 @@ func (summary coverageSummary) coverageFilesLine(details bool) string {
 		terms = append(terms, fmt.Sprintf("%d rule crashes, each costing one rule one file", len(summary.RuleCrashes)))
 	}
 	if summary.FilesIgnored > 0 {
-		terms = append(terms, fmt.Sprintf("%d files excluded by ignorePatterns", summary.FilesIgnored))
+		excluded := fmt.Sprintf("%d files excluded by ignorePatterns", summary.FilesIgnored)
+		if summary.FilesTypesOnly > 0 {
+			excluded += fmt.Sprintf(", %d of them still type-checked", summary.FilesTypesOnly)
+		}
+		terms = append(terms, excluded)
 	}
 	if summary.Suppression != nil {
 		terms = append(terms, fmt.Sprintf("%d findings suppressed, %d without a reason",

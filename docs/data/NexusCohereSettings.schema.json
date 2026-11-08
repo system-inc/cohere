@@ -1726,7 +1726,7 @@
                         "additionalProperties": false,
                         "properties": {
                             "check": {
-                                "description": "A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet acted on.",
+                                "description": "A check that still reads the ignored paths: types, the type check, whose errors in them are still reported while they are never linted or formatted. Without it an ignored path is never checked at all, and where both kinds of entry match a path, the one naming types keeps it.",
                                 "enum": ["types"],
                                 "type": "string"
                             },

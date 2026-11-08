@@ -1203,6 +1203,87 @@ func TestEngineRunSaysNothingWhenAGoRunWithheldNothing(test *testing.T) {
 	forbidLines(test, summaryJsonOf(test, jsonOutput), "withheldInDependencyCgo", "withheldDependencyCgoDeclarations")
 }
 
+// swiftStreamSeeded is the clean Swift stream with these fields added to its types record.
+func swiftStreamSeeded(test *testing.T, seedFields string) []string {
+	test.Helper()
+	lines := contractFixture(test, "Clean.jsonl")
+	for index, line := range lines {
+		if strings.HasPrefix(line, `{"kind":"types"`) {
+			lines[index] = strings.TrimSuffix(line, "}") + "," + seedFields + "}"
+			return lines
+		}
+	}
+	test.Fatal("Clean.jsonl holds no types record")
+	return nil
+}
+
+// renderSwiftStreamAs renders a Swift stream under one output mode from a fresh summary, and gives the output with
+// the summary the run left.
+func renderSwiftStreamAs(test *testing.T, mode outputMode, lines []string) (string, runSummary) {
+	test.Helper()
+	activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
+	output, exitCode, renderRecordsInError := renderRecordsIn(test, swiftLanguage, engineModeCheck, lines, 0, nil)
+	if renderRecordsInError != nil || exitCode != 0 {
+		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsInError, output)
+	}
+	return output, activeSummary
+}
+
+// A Swift run whose scripts' check took the toolchain's SDK index units from a seed says so where #f6pqraj ruled:
+// one line in the account `--verbose` prints, `swift.sdkIndexSeed` in `--json`'s summary, nothing in the default
+// view. A miss is said as plainly, and a run with no seed field says nothing of one.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestEngineRunNamesTheSdkIndexSeed(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	hit := swiftStreamSeeded(test, `"sdkIndexSeed":{"key":"81593ad4","hit":true}`)
+
+	verbose, summary := renderSwiftStreamAs(test, outputVerbose, hit)
+	requireLines(test, verbose, "  types: SDK index units from the toolchain seed 81593ad4\n")
+	if want := (&swiftSummary{SdkIndexSeed: &sdkIndexSeedUse{Key: "81593ad4", Hit: true}}); !reflect.DeepEqual(
+		summary.Swift,
+		want,
+	) {
+		test.Errorf("the summary's swift is %+v, want %+v", summary.Swift, want)
+	}
+	human, _ := renderSwiftStreamAs(test, outputHuman, hit)
+	forbidLines(test, human, "seed", "81593ad4")
+
+	jsonOutput, _ := renderSwiftStreamAs(test, outputJson, hit)
+	var decoded struct {
+		Swift struct {
+			SdkIndexSeed sdkIndexSeedUse `json:"sdkIndexSeed"`
+		} `json:"swift"`
+	}
+	summaryLine := summaryJsonOf(test, jsonOutput)
+	if decodeError := json.Unmarshal([]byte(summaryLine), &decoded); decodeError != nil {
+		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, summaryLine)
+	}
+	if decoded.Swift.SdkIndexSeed != (sdkIndexSeedUse{Key: "81593ad4", Hit: true}) {
+		test.Errorf("under --json the seed is %+v:\n%s", decoded.Swift.SdkIndexSeed, summaryLine)
+	}
+
+	missed, _ := renderSwiftStreamAs(
+		test,
+		outputVerbose,
+		swiftStreamSeeded(test, `"sdkIndexSeed":{"key":"81593ad4","hit":false}`),
+	)
+	requireLines(
+		test,
+		missed,
+		"  types: no toolchain seed 81593ad4 held the SDK's index units, so they were indexed afresh\n",
+	)
+
+	plain := contractFixture(test, "Clean.jsonl")
+	plainVerbose, plainSummary := renderSwiftStreamAs(test, outputVerbose, plain)
+	forbidLines(test, plainVerbose, "seed")
+	plainJson, _ := renderSwiftStreamAs(test, outputJson, plain)
+	forbidLines(test, summaryJsonOf(test, plainJson), `"swift"`)
+	if plainSummary.Swift != nil {
+		test.Errorf("a run with no seed field left %+v", plainSummary.Swift)
+	}
+}
+
 // The count line says each part only when there is some, in the singular where there is one.
 func TestWithheldCgoSentenceCountsEachPartItHas(test *testing.T) {
 	test.Parallel()

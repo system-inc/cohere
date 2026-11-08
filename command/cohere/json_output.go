@@ -97,18 +97,24 @@ type summaryJson struct {
 	FilesInScope int `json:"filesInScope"`
 	Checked      int `json:"checked"`
 	Cached       int `json:"cached"`
-	Nodes        int `json:"nodes"`
+	// TypesOnly is the files an ignore naming the type check matched, beside FilesInScope: type-checked, never
+	// linted or formatted. Absent when there were none.
+	TypesOnly int `json:"typesOnly,omitempty"`
+	Nodes     int `json:"nodes"`
 	// Gaps is every way the run fell short of checking everything. A reader deciding whether a green run
 	// can be trusted reads this, not the verdict alone.
 	Gaps runGaps `json:"gaps"`
+	// Swift is what only a Swift run says of itself: the SDK index seed its scripts' check used, as
+	// `swift.sdkIndexSeed`. Absent for every other run.
+	Swift *swiftSummary `json:"swift,omitempty"`
 	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
 	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
 	Adamic *readinessSummary `json:"adamic,omitempty"`
 	// Error is why the run stopped before it could judge anything, in the words the human view prints, as
 	// a tsconfig that does not load (#9zqayzh). Present only then, and the verdict is fail.
 	Error string `json:"error,omitempty"`
-	// IgnorePatterns is the root's ignorePatterns, each with its reason, kind, file and the paths it matched,
-	// present when the run discovered its project and the root has any (#cxeq6jw).
+	// IgnorePatterns is the root's ignorePatterns, each with its reason, kind, file and the paths it matched, then
+	// cohere's defaults, present when the run discovered its project (#cxeq6jw).
 	IgnorePatterns []ignoreAccount `json:"ignorePatterns,omitempty"`
 }
 
@@ -167,8 +173,10 @@ func summaryAsJson(summary runSummary) summaryJson {
 		FilesInScope:      summary.FilesInScope,
 		Checked:           summary.FilesChecked,
 		Cached:            summary.FilesCached,
+		TypesOnly:         summary.FilesTypesOnly,
 		Nodes:             summary.Nodes,
 		Gaps:              summary.Gaps,
+		Swift:             summary.Swift,
 		Adamic:            adamic,
 		IgnorePatterns:    summary.IgnorePatterns,
 	}

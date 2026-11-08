@@ -88,8 +88,8 @@ func land(arguments []string) int {
 		)
 		return 2
 	}
-	if !runsMainsLand(worktree) {
-		return runMainsLand(worktree, mainCheckout, arguments)
+	if isMains, differs := runsMainsLand(worktree); !isMains {
+		return runMainsLand(worktree, mainCheckout, differs, arguments)
 	}
 
 	head, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
