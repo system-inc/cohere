@@ -262,6 +262,45 @@
                         }
                     }
                 },
+                "builds": {
+                    "type": "array",
+                    "description": "Every build a Go run checked when it checked more than one, since some file of the project compiles only for another platform, the host's first. Its findings are the merge of every build's. Absent for a run of one build and every other run. A replay keeps it, since the verdict it repeats was merged from these builds.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "target",
+                            "host",
+                            "compiledFiles",
+                            "analyzedPackages",
+                            "findingsAdded",
+                            "findingsDropped"
+                        ],
+                        "properties": {
+                            "target": {
+                                "type": "string",
+                                "description": "The build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after ` tags `: `darwin/arm64 cgo`, `windows/arm64`."
+                            },
+                            "host": { "type": "boolean", "description": "The host's build, which is the first." },
+                            "compiledFiles": {
+                                "type": "integer",
+                                "description": "The project's files the build compiles."
+                            },
+                            "analyzedPackages": {
+                                "type": "integer",
+                                "description": "The packages the build analyzed: every root for the host's, and for another only those that could find what the host's did not."
+                            },
+                            "findingsAdded": {
+                                "type": "integer",
+                                "description": "Findings that stand which this build reported and the host's did not. Zero for the host's."
+                            },
+                            "findingsDropped": {
+                                "type": "integer",
+                                "description": "Findings this build reported that the merge left out, since their rule keeps only what every build with a say on the file reports."
+                            }
+                        }
+                    }
+                },
                 "typeErrors": { "type": "integer" },
                 "findings": { "type": "integer", "description": "Rule findings, type errors not included." },
                 "filesFixed": { "type": "integer" },

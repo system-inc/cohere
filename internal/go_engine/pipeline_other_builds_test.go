@@ -1,0 +1,339 @@
+package go_engine
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/rules"
+	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_else_return"
+)
+
+// separatorPackage is the other-builds fixture's package with a file only windows builds, and labelPackage the one
+// with a file only a build with the cohere_extra tag builds.
+const (
+	separatorPackage = "example.com/builds/internal/separator"
+	labelPackage     = "example.com/builds/internal/label"
+)
+
+// runOver runs the engine over root with the registry's rules and the findings cache off, so two runs over copies of
+// one fixture read alike, with extra after the root, and returns the pipeline it ran and its stream, normalized. The
+// run must exit wantExit.
+func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
+	test.Helper()
+	return runOverWith(test, root, wantExit, append([]string{"--no-cache"}, extra...)...)
+}
+
+// runOverWith is runOver with the findings cache as extra leaves it, on and in root's own store by default.
+func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
+	test.Helper()
+	engine, stream := runOverRaw(test, root, wantExit, extra...)
+	return engine, normalize(stream, root)
+}
+
+// runOverRaw is runOverWith's run with its stream as written, for a test that reads what normalize hides, such as
+// the inputs outside the root.
+func runOverRaw(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
+	test.Helper()
+	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
+	request, parseError := parseInvocation(arguments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	registered := rules.All()
+	ruleSettings, settingsError := loadSettings(request, registered)
+	if settingsError != nil {
+		test.Fatal(settingsError)
+	}
+	if optionsError := configureRules(ruleSettings, registered); optionsError != nil {
+		test.Fatal(optionsError)
+	}
+	described, describeError := describeProject(request)
+	if describeError != nil {
+		test.Fatal(describeError)
+	}
+	var standardOutput bytes.Buffer
+	engine := newPipeline(request, described, ruleSettings, registered, &standardOutput, io.Discard, nil)
+	if exitCode := engine.run(); exitCode != wantExit {
+		test.Fatalf("the run exited %d, want %d:\n%s", exitCode, wantExit, standardOutput.String())
+	}
+	return engine, standardOutput.String()
+}
+
+// Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
+// checked under three builds, the host's first, and mergeBuildRuns is handed a run for each: every extra build
+// analyzes every package its load holds, as the host's does, and has a say on every file it compiles, and every run
+// carries the inputs its load read. Only windows's run finds the else after a return planted in its windows file.
+// Without the switch nothing is handed over and the run is clean, as it was.
+func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
+	test.Parallel()
+	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitClean)
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	on, _ := runOver(test, root, exitFindings, "--other-builds")
+	if off.buildRuns != nil {
+		test.Errorf("without the switch the merge was handed %d runs, want none", len(off.buildRuns))
+	}
+
+	if len(on.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(on.buildRuns))
+	}
+	host := on.buildRuns[0]
+	if slices.Contains(host.build.Tags, "cohere_extra") {
+		test.Errorf("the host's build %s sets the fixture's tag", host.build)
+	}
+	if host.result == nil || len(host.said) == 0 {
+		test.Errorf("the host's run has no result (%t) or says nothing (%d files)", host.result == nil,
+			len(host.said))
+	}
+	windowsFile := filepath.Join(root, "internal", "separator", "separator_windows.go")
+	taggedFile := filepath.Join(root, "internal", "label", "prefix_extra.go")
+	if host.compiled[windowsFile] || host.compiled[taggedFile] {
+		test.Errorf("the host compiled a file only another build compiles")
+	}
+
+	// The extra builds are in the order BuildsFor prefers them, which puts the host's own `GOOS` first, so the tagged
+	// build comes before windows on any host but windows, and each is found by what it builds.
+	windowsAt := slices.IndexFunc(
+		on.buildRuns,
+		func(run buildRun) bool { return run.build.OperatingSystem == "windows" },
+	)
+	taggedAt := slices.IndexFunc(on.buildRuns, func(run buildRun) bool {
+		return slices.Contains(run.build.Tags, "cohere_extra")
+	})
+	if windowsAt < 1 || taggedAt < 1 || windowsAt == taggedAt {
+		test.Fatalf("the extra builds are %s and %s, want one for windows and one with the cohere_extra tag",
+			on.buildRuns[1].build, on.buildRuns[2].build)
+	}
+	windows, tagged := on.buildRuns[windowsAt], on.buildRuns[taggedAt]
+	// Every build of the fixture loads the same three packages, so an extra build that analyzed every package its load
+	// holds analyzed what the host's did.
+	for _, extra := range on.buildRuns[1:] {
+		if extra.result == nil || len(extra.typeErrors) > 0 {
+			test.Errorf("%s ran no rules (%t) or found type errors: %v", extra.build, extra.result == nil,
+				extra.typeErrors)
+		}
+		if !maps.Equal(extra.analyzed, host.analyzed) || !extra.analyzed[separatorPackage] ||
+			!extra.analyzed[labelPackage] {
+			test.Errorf("%s analyzed %s, want every package its load holds, %s", extra.build,
+				sortedKeys(extra.analyzed), sortedKeys(host.analyzed))
+		}
+		for file := range extra.compiled {
+			if !extra.said[file] {
+				test.Errorf("%s compiles %s and has no say on it", extra.build, file)
+			}
+		}
+	}
+	if !windows.said[windowsFile] || windows.said[taggedFile] {
+		test.Errorf("windows says on %s, want %s and not %s", sortedKeys(windows.said), windowsFile, taggedFile)
+	}
+	if !tagged.said[taggedFile] || tagged.said[windowsFile] {
+		test.Errorf("%s says on %s, want %s and not %s", tagged.build, sortedKeys(tagged.said), taggedFile,
+			windowsFile)
+	}
+	for _, run := range on.buildRuns {
+		if len(run.inputs.Files) == 0 || len(run.inputs.Directories) == 0 {
+			test.Errorf("%s's run carries no inputs: %+v", run.build, run.inputs)
+		}
+	}
+	if !slices.Contains(windows.inputs.Files, windowsFile) {
+		test.Errorf("windows's inputs %v leave out %s, which it compiles", windows.inputs.Files, windowsFile)
+	}
+
+	// The windows file's else after a return is found by windows's run and by no other, since no other build
+	// compiles that file.
+	elseReturn := consistency_no_else_return.Name
+	foundIn := func(run buildRun) bool {
+		return slices.ContainsFunc(run.result.Findings, func(finding check.Finding) bool {
+			return finding.Rule == elseReturn && finding.File == windowsFile
+		})
+	}
+	if !foundIn(windows) {
+		test.Errorf("windows's run found %v, want %s in %s", windows.result.Findings, elseReturn, windowsFile)
+	}
+	if foundIn(host) || foundIn(tagged) {
+		test.Errorf("a build that never compiles %s found %s in it", windowsFile, elseReturn)
+	}
+}
+
+// With the findings cache on, each extra build keeps its own entries, keyed on its own target, cgo and flags: a first
+// run over the fixture hits nothing another build wrote and writes an entry for every package of every build, and a
+// second over the same tree restores every package of every build from them, writing nothing, as the host's build
+// does. Its verdict is the first run's.
+func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	cold, coldStream := runOverWith(test, root, exitFindings, "--other-builds")
+	warm, warmStream := runOverWith(test, root, exitFindings, "--other-builds")
+	if len(cold.buildRuns) != 3 || len(warm.buildRuns) != 3 {
+		test.Fatalf("the runs handed the merge %d and %d runs, want 3 each", len(cold.buildRuns), len(warm.buildRuns))
+	}
+	for index, warmRun := range warm.buildRuns {
+		coldCounts, warmCounts := cold.buildRuns[index].result.Cache, warmRun.result.Cache
+		// The first run's builds run one after another into one store, so a build whose keys met another's would hit
+		// what that build wrote.
+		if !coldCounts.On || coldCounts.Hit != 0 || coldCounts.Missed == 0 || coldCounts.Written != coldCounts.Missed {
+			test.Errorf("%s's first run hit %d and wrote %d of %d misses (on %t), want none hit and every one written",
+				warmRun.build, coldCounts.Hit, coldCounts.Written, coldCounts.Missed, coldCounts.On)
+		}
+		if warmCounts.Hit != coldCounts.Hit+coldCounts.Missed || warmCounts.Missed != 0 || warmCounts.Written != 0 {
+			test.Errorf("%s's second run hit %d, missed %d and wrote %d, want every one of %d hit and none written",
+				warmRun.build, warmCounts.Hit, warmCounts.Missed, warmCounts.Written,
+				coldCounts.Hit+coldCounts.Missed)
+		}
+	}
+	if withoutCache(coldStream) != withoutCache(warmStream) {
+		test.Errorf("the warm run's stream differs from the cold run's:\ncold\n%s\nwarm\n%s", coldStream, warmStream)
+	}
+}
+
+// withoutCache is a normalized stream with its lint record's cache counts left out, the one field a warm run writes
+// otherwise than a cold one.
+func withoutCache(stream string) string {
+	lines := strings.Split(stream, "\n")
+	for index, line := range lines {
+		if start := strings.Index(line, `"cache":{`); start >= 0 {
+			end := strings.Index(line[start:], "}")
+			lines[index] = line[:start] + line[start+end+1:]
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the
+// run writes the stream it writes without the switch, byte for byte, with no builds in its lint record.
+func TestOtherBuildsOverOneBuildRunNothingExtra(test *testing.T) {
+	test.Parallel()
+	clean := filepath.Join("testdata", "clean")
+	engine, onStream := runOver(test, copyFixture(test, clean), exitClean, "--other-builds")
+	if engine.buildRuns != nil {
+		test.Errorf("the merge was handed %d runs over a module one build covers", len(engine.buildRuns))
+	}
+	_, offStream := runOver(test, copyFixture(test, clean), exitClean)
+	if onStream != offStream {
+		test.Errorf("the switch changed the stream over one build:\nwith it\n%s\nwithout it\n%s", onStream,
+			offStream)
+	}
+}
+
+// Under `--other-builds` the lint phase writes the merge of every build's findings (#72n9mq0): the windows file's else
+// after a return, which only windows's run finds, is written as a finding, the run exits with findings, and the lint
+// record names the three builds, the host's first, with windows's the one that added it. Without the switch the same
+// tree reads clean, since the host never compiles that file.
+func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	engine, stream := runOver(test, root, exitFindings, "--other-builds")
+	var lint contract.LintRecord
+	var found []contract.FindingRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		switch {
+		case strings.Contains(line, `"kind":"lint"`):
+			if decodeError := json.Unmarshal([]byte(line), &lint); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		case strings.Contains(line, `"kind":"finding"`):
+			var finding contract.FindingRecord
+			if decodeError := json.Unmarshal([]byte(line), &finding); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+			found = append(found, finding)
+		}
+	}
+	windowsFile := "/project/internal/separator/separator_windows.go"
+	if len(found) != 1 || found[0].Rule != consistency_no_else_return.Name || found[0].File != windowsFile {
+		test.Errorf("the run wrote %+v, want the one %s in %s", found, consistency_no_else_return.Name, windowsFile)
+	}
+	if len(lint.Builds) != 3 || !lint.Builds[0].Host || lint.Builds[1].Host || lint.Builds[2].Host {
+		test.Fatalf("the lint record names the builds %+v, want three, the host's first", lint.Builds)
+	}
+	// The stream reads every target as `target` (normalize), so each record is known by the run it came from, which
+	// the merge writes in the order it was handed the runs.
+	for index, build := range lint.Builds {
+		wantAdded := 0
+		if engine.buildRuns[index].build.OperatingSystem == "windows" {
+			wantAdded = 1
+		}
+		if build.AnalyzedPackages != len(engine.buildRuns[0].analyzed) {
+			test.Errorf("the build %s analyzed %d packages, want every one of the %d its load holds",
+				engine.buildRuns[index].build, build.AnalyzedPackages, len(engine.buildRuns[0].analyzed))
+		}
+		if build.FindingsAdded != wantAdded || build.FindingsDropped != 0 {
+			test.Errorf("the build %s added %d and dropped %d, want %d and 0", engine.buildRuns[index].build,
+				build.FindingsAdded, build.FindingsDropped, wantAdded)
+		}
+	}
+}
+
+// A //cohere:ignore in a file only another build compiles is read and honored: the merge indexes the directives of a
+// file the host's build constraints leave out, from its contents as the run read them, so the windows file's else
+// after a return, ignored with a reason on the line above, is withheld and counted, the run is clean, and no build
+// calls the directive unused.
+func TestOtherBuildsHonorADirectiveInAFileOnlyAnotherBuildCompiles(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	windowsFile := filepath.Join(root, "internal", "separator", "separator_windows.go")
+	source, readError := os.ReadFile(windowsFile)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	lines := strings.Split(string(source), "\n")
+	elseAt := slices.IndexFunc(lines, func(line string) bool { return strings.Contains(line, "} else {") })
+	if elseAt < 0 {
+		test.Fatalf("%s has no else to ignore", windowsFile)
+	}
+	directive := "\t//cohere:ignore " + consistency_no_else_return.Name + " the fixture's planted finding, ignored here"
+	lines = slices.Insert(lines, elseAt, directive)
+	if writeError := os.WriteFile(windowsFile, []byte(strings.Join(lines, "\n")), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, stream := runOver(test, root, exitClean, "--other-builds")
+	if !strings.Contains(stream, `"withheldBySuppression":{"`+consistency_no_else_return.Name+`":1}`) {
+		test.Errorf("the run withheld nothing of %s:\n%s", consistency_no_else_return.Name, stream)
+	}
+}
+
+// Under `--other-builds` the inputs record names what every build's load read, not the host's alone (#e4b08k7), so
+// the front door's replay misses when a file only another build reads moves. A windows-only file of the fixture's
+// imports os, which nothing the host's build compiles imports, so the standard library's os/file_windows.go is read
+// by windows's load alone, and the record must name it.
+func TestOtherBuildsNameEveryBuildsInputs(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	console := "package separator\n\nimport \"os\"\n\n" +
+		"// Console is where a write is discarded, as windows names it.\nvar Console = os.DevNull\n"
+	consoleFile := filepath.Join(root, "internal", "separator", "console_windows.go")
+	if writeError := os.WriteFile(consoleFile, []byte(console), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, stream := runOverRaw(test, root, exitFindings, "--no-cache", "--other-builds")
+	var inputs contract.InputsRecord
+	for _, line := range strings.Split(strings.TrimSpace(stream), "\n") {
+		if strings.Contains(line, `"kind":"inputs"`) {
+			if decodeError := json.Unmarshal([]byte(line), &inputs); decodeError != nil {
+				test.Fatal(decodeError)
+			}
+		}
+	}
+	windowsOnly := filepath.Join("src", "os", "file_windows.go")
+	named := slices.ContainsFunc(inputs.Files, func(file string) bool {
+		return strings.HasSuffix(file, string(filepath.Separator)+windowsOnly)
+	})
+	if !named {
+		test.Errorf("the inputs record names %d files and not the standard library's %s, which only windows's load "+
+			"read", len(inputs.Files), windowsOnly)
+	}
+}
+
+// sortedKeys is a set's members, sorted and joined, for a message.
+func sortedKeys(set map[string]bool) string {
+	return strings.Join(slices.Sorted(maps.Keys(set)), ", ")
+}

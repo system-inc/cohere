@@ -63,6 +63,10 @@ type pipeline struct {
 	// refusedRenames are the renames refused so far, by file, old name and new name, so a rename a round refused and
 	// whose finding still stands is not asked for, and counted, again by the next.
 	refusedRenames map[[3]string]bool
+
+	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
+	// beside the host's to check.
+	buildRuns []buildRun
 }
 
 func newPipeline(
@@ -99,7 +103,7 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession()
+		engine.session = engine.cacheSession(engine.described.workspace.Environment())
 	}
 	engine.runFix(wraps)
 	var loaded *load.Loaded

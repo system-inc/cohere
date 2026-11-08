@@ -1,4 +1,4 @@
-//go:build !unix
+//go:build !unix && !windows
 
 package dispatch
 
@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-// lockExclusive refuses on a platform without flock.
+// lockExclusive refuses on a platform with neither flock nor LockFileEx.
 //
 // Two runs building the committed Swift engine at once would check out different commits in one
 // worktree under each other. Refusing is loud; racing would build an engine from a tree neither run

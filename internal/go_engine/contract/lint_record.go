@@ -36,6 +36,27 @@ type LintRecord struct {
 	// Cache is what the Go engine's per-package findings cache did in the lint phase, additive within contract 3
 	// as the withheld counts are. It changes no finding and no count above.
 	Cache LintCache `json:"cache"`
+
+	// Builds is additive within contract 3: every build a run checked when it checked more than one, the host's first
+	// (#72n9mq0). It is absent for a run of one build, so such a run writes the record it always has.
+	Builds []BuildRecord `json:"builds,omitempty"`
+}
+
+// BuildRecord is what one build of a run covered, and what the merge of every build's findings kept of it.
+type BuildRecord struct {
+	// Target names the build as go env would make it: `windows/arm64`, with ` cgo` when cgo is on and its tags after
+	// ` tags `.
+	Target string `json:"target"`
+	Host   bool   `json:"host"`
+	// CompiledFiles counts the files of ours the build compiles, and AnalyzedPackages the packages it analyzed: every
+	// package its load holds, and none for a build whose load found a type error.
+	CompiledFiles    int `json:"compiledFiles"`
+	AnalyzedPackages int `json:"analyzedPackages"`
+	// FindingsAdded counts the findings that stand which this build kept and the host's did not, and FindingsDropped
+	// the findings this build kept that the merge left out, since their rule keeps only what every build with a say
+	// on the file reports.
+	FindingsAdded   int `json:"findingsAdded"`
+	FindingsDropped int `json:"findingsDropped"`
 }
 
 // LintCache counts, by package, what the per-package findings cache did: every package the load reached was hit,

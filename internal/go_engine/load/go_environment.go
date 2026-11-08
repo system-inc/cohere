@@ -45,6 +45,14 @@ func (goEnvironment *GoEnvironment) answers(workspace string, environment []stri
 		slices.Equal(goEnvironment.environment, environment)
 }
 
+// Target is the build target go env reported, a copy of the context the census judged the files by, and the
+// `GOFLAGS` every load under the answer runs with, so the engine reads the host's build (project.HostBuild) from
+// what its loads read rather than asking go env again.
+func (goEnvironment *GoEnvironment) Target() (*build.Context, []string) {
+	buildContext := *goEnvironment.buildContext
+	return &buildContext, slices.Clone(goEnvironment.reported.goFlags)
+}
+
 // contextFor is the build target as a build context that opens a file held holds from its held bytes, and any other
 // on disk, whichever bytes the asker held.
 func (goEnvironment *GoEnvironment) contextFor(held Held) *build.Context {

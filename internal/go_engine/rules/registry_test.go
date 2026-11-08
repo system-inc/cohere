@@ -837,6 +837,7 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 		UpstreamName: "U1000",
 		TypeAware:    true,
 		Analyzer:     unused_code.Analyzer,
+		MergeIfAll:   true,
 	}
 	// reflect.DeepEqual because ConfiguredBy is a slice, which leaves rule.Rule without ==.
 	if unusedRule := registry[unusedIndex]; !reflect.DeepEqual(unusedRule, expectedUnused) {
@@ -895,6 +896,51 @@ func TestEveryPortedStylecheckRunsItsPort(test *testing.T) {
 			test.Errorf("%s runs %q, where its port's own analyzer was expected", registeredRule.Name,
 				registeredRule.Analyzer.Name)
 		}
+	}
+}
+
+// mergedIfAll is every registered rule whose finding stands, where builds differ, only if every build with a say on
+// its file reports it, written out here rather than read from staticcheck's documentation, so a strategy the registry
+// drops, or a port that stops merging as its original does, fails TestExactlyTheMergeIfAllChecksMergeIfAll. They are
+// the registered checks whose documentation says MergeIfAll, and U1000, which staticcheck's runner merges that way by
+// hand. One check a line.
+var mergedIfAll = []string{
+	"S1001",
+	"S1002",
+	"S1011",
+	"S1016",
+	"S1019",
+	"S1025",
+	"S1031",
+	"S1039",
+	"S1040",
+	"SA4003",
+	"SA4004",
+	"SA4006",
+	"SA4008",
+	"SA4010",
+	"SA4014",
+	"SA4015",
+	"SA4017",
+	"SA4020",
+	"SA9005",
+	"SA9010",
+	"U1000",
+}
+
+// TestExactlyTheMergeIfAllChecksMergeIfAll holds the registry's merge strategies to staticcheck's, both ways: every
+// check mergedIfAll names merges if all, a port as its original, and every other rule merges if any.
+func TestExactlyTheMergeIfAllChecksMergeIfAll(test *testing.T) {
+	test.Parallel()
+	var merged []string
+	for _, registered := range registry {
+		if registered.MergeIfAll {
+			merged = append(merged, strings.TrimPrefix(registered.Name, rule.Namespace))
+		}
+	}
+	slices.Sort(merged)
+	if !slices.Equal(merged, mergedIfAll) {
+		test.Errorf("the rules that merge if all are %v, where %v were expected", merged, mergedIfAll)
 	}
 }
 

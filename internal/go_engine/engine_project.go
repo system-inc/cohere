@@ -68,6 +68,7 @@ func describeProject(request invocation) (*describedProject, error) {
 
 	described := &describedProject{
 		workspace:          workspace,
+		census:             census,
 		manifest:           manifest,
 		inScopeSet:         map[string]bool{},
 		constrainedInScope: map[string]bool{},
@@ -129,6 +130,9 @@ func describeProject(request invocation) (*describedProject, error) {
 				contract.ExcludedFile{File: file, Reason: reason})
 			if insideScope(file, scope) {
 				described.constrainedInScope[file] = true
+				// Kept for another build that compiles it, whose //cohere:ignore comments here the merge across
+				// builds reads (#72n9mq0); no phase of the host's build reads it.
+				described.contents[file] = contents[file]
 			}
 			continue
 		}

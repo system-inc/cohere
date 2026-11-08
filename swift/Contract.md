@@ -702,6 +702,31 @@ mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, w
 build but a release does, writes the field as it always has. Under `--no-cache` it, and
 `factsSkipped` of what it restored, are the only counts that can be other than 0.
 
+The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
+which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive
+within contract 3, the host's first:
+
+```
+{
+    "builds": [
+        { "target": "darwin/arm64 cgo", "host": true, "compiledFiles": 412, "analyzedPackages": 349,
+          "findingsAdded": 0, "findingsDropped": 0 },
+        { "target": "windows/arm64", "host": false, "compiledFiles": 398, "analyzedPackages": 351,
+          "findingsAdded": 6, "findingsDropped": 1 }
+    ]
+}
+```
+
+`target` names the build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after `tags`. Every build
+analyzes every package its load holds, through a findings cache of its own keyed on its target, cgo and flags, and
+`analyzedPackages` counts them; a build whose load found a type error analyzes none. The findings, the withheld
+counts and the crashes above are the merge of every build's: a finding stands if any build that compiled its file
+and analyzed its package reports it, but for a rule whose findings stand only where every such build reports them
+(U1000, and each staticcheck check whose documentation says so), and a `//cohere:ignore` is unused only if it is
+unused in every such build. `findingsAdded` counts the findings that stand which this build reported and the host's
+did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
+its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
+
 ### `phase`
 
 ```json

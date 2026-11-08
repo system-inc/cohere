@@ -17,8 +17,9 @@ const plantedPanicMarker = "cohere-test: panic here"
 func init() {
 	rule.Register(rule.Registration[rule.NoOptions]{Rule: rule.Rule[rule.NoOptions]{
 		Name: "cohere-test/panics-on-marked-file",
-		Run: func(ctx rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-			if strings.Contains(ctx.SourceFile.Text(), plantedPanicMarker) {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
+			if strings.Contains(ruleContext.SourceFile.Text(), plantedPanicMarker) {
+				//cohere:ignore correctness-require-invariant-reason this crash is the test's plant, meant to happen
 				panic("planted: Unhandled case in Node.Text: *ast.ComputedPropertyName")
 			}
 			return nil

@@ -34,17 +34,22 @@ func finishedExitCode() int {
 		streams.Show(streams.Errors)
 		streams.Show(streams.Output)
 	}()
-	if runError := run(); runError != nil {
+	exitCode, runError := run()
+	if runError != nil {
 		// The launcher's report writes to stderr itself, so what this process said first is delivered first.
 		streams.Show(streams.Errors)
 		dispatch.Report.Fail("cohere: %s", sentence.FromError(runError))
 		return streams.Finish(1)
 	}
-	// Every path out finishes, this one too, so none can leave what was written in the buffers.
-	return streams.Finish(0)
+	// Every path out finishes, this one too, so none can leave what was written in the buffers. A run comes back
+	// here only when the binary ran as a child and handed back its exit code, as on Windows; exec and the early
+	// return end this process from inside.
+	return streams.Finish(exitCode)
 }
 
-func run() error {
+// run resolves the binary this invocation runs and runs it, returning the exit code to end with, or why it could
+// not run it.
+func run() (int, error) {
 	// The dispatcher owns exactly four flags and forwards everything else. They are matched
 	// positionally at the front rather than with the flag package, because flag.Parse would stop at
 	// the first argument it does not recognize and swallow flags meant for the real binary.
@@ -82,14 +87,14 @@ func run() error {
 	if frozen {
 		binaryPath, resolveFrozenBinaryError := resolveFrozenBinary()
 		if resolveFrozenBinaryError != nil {
-			return resolveFrozenBinaryError
+			return 0, resolveFrozenBinaryError
 		}
 		return execute(binaryPath, arguments, wait)
 	}
 
 	binaryPath, resolveBinaryError := resolveBinary(development, verbose)
 	if resolveBinaryError != nil {
-		return resolveBinaryError
+		return 0, resolveBinaryError
 	}
 
 	// The launcher's report writes to stderr itself, so what resolving said is delivered before it clears.
@@ -133,7 +138,10 @@ func waitIsRequested() bool {
 // and the moment it writes its exit code there, this process exits with that code while the child finishes
 // alone. Every byte the caller reads still comes from the child's own inherited stdout and stderr. A child
 // that exits without a verdict, crashing or killed, hands back its exit status as exec would have.
-func execute(binaryPath string, arguments []string, wait bool) error {
+//
+// Exec and the early return end this process themselves, so the code comes back only from Windows, which has
+// no exec and waits for the binary as a child.
+func execute(binaryPath string, arguments []string, wait bool) (int, error) {
 	if wait || runtime.GOOS == "windows" {
 		return replaceProcess(binaryPath, arguments)
 	}

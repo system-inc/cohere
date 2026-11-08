@@ -24,6 +24,12 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // scope like any other: the driver itself withholds a house rule's findings there and counts them, and a vet or
 // tools finding there is still a bug in what ships, so it is written. earlier is the pass the rename already ran
 // over this load, written as it is, or nil to run one here.
+//
+// Under the hidden `--other-builds`, every other build the census needs checks what can differ from the host's,
+// read beside the host's pass before anything is written, and the phase writes the merge of every build's findings
+// (#72n9mq0): the findings, the withheld counts and the crashes are every build's, merged; another build's type
+// errors are written as the compiler's findings, since the host's lint ran only on a host load without any; and the
+// lint record names each build.
 func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
@@ -57,6 +63,24 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		return
 	}
 	result, outcome := pass.result, pass.outcome
+	var verdict *buildsVerdict
+	if engine.request.switches["other-builds"] {
+		if runs := engine.otherBuilds(loaded, pass); len(runs) > 0 {
+			ran := make([]string, 0, len(pass.enabled))
+			for _, enabledRule := range pass.enabled {
+				ran = append(ran, enabledRule.Name)
+			}
+			verdict = engine.mergeBuildRuns(runs, ran)
+			outcome = suppressedFindings{
+				kept:              verdict.merged.kept,
+				directiveFindings: verdict.merged.directiveFindings,
+				withheldByRule:    verdict.merged.withheldByRule,
+			}
+			for _, typeError := range verdict.merged.typeErrors {
+				engine.write(engine.compilerFinding(typeError))
+			}
+		}
+	}
 
 	findings := make([]contract.FindingRecord, 0, len(outcome.kept)+len(outcome.directiveFindings))
 	for _, kept := range outcome.kept {
@@ -111,6 +135,13 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)
 	}
+	if verdict != nil {
+		record.Crashes = make([]contract.Crash, 0, len(verdict.merged.crashes))
+		for _, crash := range verdict.merged.crashes {
+			record.Crashes = append(record.Crashes, contract.Crash{File: crash.File, Error: crash.Error})
+		}
+		record.Builds = verdict.records
+	}
 	if len(record.Crashes) > 0 {
 		engine.incomplete = true
 	}
@@ -160,7 +191,7 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 		result:    result,
 		enabled:   enabled,
 		turnedOff: turnedOff,
-		outcome:   engine.suppress(ran, engine.inScope(result.Findings)),
+		outcome:   engine.suppress(ran, engine.inScope(result.Findings), engine.described.readable()),
 		elapsed:   time.Since(started),
 	}
 }
@@ -188,12 +219,12 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 	return enabled, turnedOff
 }
 
-// cacheSession is the findings cache for the run's enabled rules, made before the load so the load restores what
-// it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries,
-// or when what every key shares cannot be read, which the run says on stderr.
-func (engine *pipeline) cacheSession() *check.CacheSession {
+// cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
+// so the load restores what it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no
+// standard-library entries, or when what every key shares cannot be read, which the run says on stderr.
+func (engine *pipeline) cacheSession(environment []string) *check.CacheSession {
 	enabled, _ := engine.enabledRules()
-	caching, cachingError := lintCache(engine.request, engine.described.workspace, enabled)
+	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {
 		engine.note("the findings cache sat this run out: %v", cachingError)
 	}
@@ -203,23 +234,24 @@ func (engine *pipeline) cacheSession() *check.CacheSession {
 	return check.NewCacheSession(caching, enabled)
 }
 
-// suppressedFindings is what the //cohere:ignore comments left of the lint phase's findings.
+// suppressedFindings is what the //cohere:ignore comments left of the lint phase's findings, and what they withheld.
 type suppressedFindings struct {
 	kept              []check.Finding
+	withheld          []check.Finding
 	directiveFindings []suppression.DirectiveFinding
 	withheldByRule    map[string]int
 }
 
-// suppress applies the //cohere:ignore comments of every readable file in scope, read from the contents the
-// project description read, to the findings in scope. ran are the analyzer rules that ran: a directive naming a
-// rule the settings turned off is neither used nor unused. The files are indexed as many at once as there are cores,
-// since each index is its own file's.
-func (engine *pipeline) suppress(ran []string, inScope []check.Finding) suppressedFindings {
-	readable := engine.described.readable()
-	indexes := make([]*suppression.Index, len(readable))
+// suppress applies the //cohere:ignore comments of files, readable files in scope, read from the contents the project
+// description read, to the findings in scope: every readable file for one build's run, and those a build has a say on
+// when builds merge (see outcomeOf). ran are the analyzer rules that ran: a directive naming a rule the settings
+// turned off is neither used nor unused. The files are indexed as many at once as there are cores, since each index
+// is its own file's.
+func (engine *pipeline) suppress(ran []string, inScope []check.Finding, files []string) suppressedFindings {
+	indexes := make([]*suppression.Index, len(files))
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
 	var group sync.WaitGroup
-	for index, file := range readable {
+	for index, file := range files {
 		slots <- struct{}{}
 		group.Go(func() {
 			defer func() { <-slots }()
@@ -237,15 +269,21 @@ func (engine *pipeline) suppress(ran []string, inScope []check.Finding) suppress
 	// only on its rule, file and line, so two findings alike in those are kept or withheld together, and walking
 	// both lists in step pairs each kept one with the finding it came from.
 	kept := make([]check.Finding, 0, len(applied.Kept))
+	var withheld []check.Finding
 	next := 0
 	for index, found := range inScope {
 		if next < len(applied.Kept) && applied.Kept[next] == located[index] {
 			kept = append(kept, found)
 			next++
+			continue
 		}
+		withheld = append(withheld, found)
 	}
 	return suppressedFindings{
-		kept: kept, directiveFindings: applied.DirectiveFindings, withheldByRule: applied.WithheldByRule,
+		kept:              kept,
+		withheld:          withheld,
+		directiveFindings: applied.DirectiveFindings,
+		withheldByRule:    applied.WithheldByRule,
 	}
 }
 

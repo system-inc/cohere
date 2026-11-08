@@ -15,10 +15,10 @@ import (
 
 // returnEarly runs the engine as a child and exits with its exit code as soon as the engine writes it to
 // the verdict descriptor, leaving the child to finish alone. See execute.
-func returnEarly(binaryPath string, arguments []string) error {
+func returnEarly(binaryPath string, arguments []string) (int, error) {
 	verdictReader, verdictWriter, pipeError := os.Pipe()
 	if pipeError != nil {
-		return fmt.Errorf("opening the verdict pipe: %w", pipeError)
+		return 0, fmt.Errorf("opening the verdict pipe: %w", pipeError)
 	}
 	command := exec.Command(binaryPath, arguments...)
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
@@ -33,7 +33,7 @@ func returnEarly(binaryPath string, arguments []string) error {
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	if startError := command.Start(); startError != nil {
-		return fmt.Errorf("running %s: %w", binaryPath, startError)
+		return 0, fmt.Errorf("running %s: %w", binaryPath, startError)
 	}
 	// Ignored: this process's copy of the write end, never written. A close fails only on a descriptor already
 	// closed, and then nothing here holds the pipe open either, which is all the read below needs.
@@ -57,7 +57,7 @@ func returnEarly(binaryPath string, arguments []string) error {
 	if waitError := command.Wait(); waitError != nil {
 		var exitError *exec.ExitError
 		if !errors.As(waitError, &exitError) {
-			return fmt.Errorf("waiting for %s: %w", binaryPath, waitError)
+			return 0, fmt.Errorf("waiting for %s: %w", binaryPath, waitError)
 		}
 	}
 	signal.Stop(signals)
@@ -69,5 +69,5 @@ func returnEarly(binaryPath string, arguments []string) error {
 		_ = syscall.Kill(os.Getpid(), status.Signal())
 	}
 	os.Exit(streams.Finish(command.ProcessState.ExitCode()))
-	return nil
+	return 0, nil
 }
