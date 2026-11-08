@@ -17,8 +17,9 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to sync.Pool's Put.
@@ -26,13 +27,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"(*sync.Pool).Put": checkValue,
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA6002",
 	"SA6002",
 	"Flags a value given to sync.Pool's Put that is not like a pointer, or is a slice, so putting it allocates: "+
 		"staticcheck's SA6002, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkValue marks the value Put is given, as the kit hands it, the value before its conversion to Put's interface,

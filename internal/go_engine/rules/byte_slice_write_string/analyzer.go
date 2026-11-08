@@ -22,51 +22,38 @@ package byte_slice_write_string
 import (
 	"go/ast"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA6006",
-	Doc: "Flags io.WriteString given a byte slice converted to a string: staticcheck's SA6006, ported as a check " +
-		"on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("byte_slice_write_string: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA6006",
+	"SA6006",
+	"Flags io.WriteString given a byte slice converted to a string: staticcheck's SA6006, ported as a check "+
+		"on syntax.",
+	&Listener,
+)
 
 // message is the original's, word for word.
 const message = "use io.Writer.Write instead of converting from []byte to string to use io.WriteString"
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("byte_slice_write_string: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("byte_slice_write_string: the inspector handed over a node that is not a call")
-		}
-		Check(context, call)
-	})
-	return nil, nil
-}
 
 // Check judges one call: io.WriteString given, as its string, a conversion of a slice that converts to a string
 // directly.

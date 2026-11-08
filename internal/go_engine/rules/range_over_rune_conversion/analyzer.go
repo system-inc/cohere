@@ -15,17 +15,22 @@ import (
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA6003",
 	"SA6003",
 	"Flags ranging over a string converted to a slice of runes when the index goes unused: staticcheck's SA6003, "+
 		"ported onto its intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // Check judges one function, as staticcheck_code.RangeStringRunes does for SA6003 and S1029 alike.
