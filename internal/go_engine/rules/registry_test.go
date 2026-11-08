@@ -838,6 +838,7 @@ var portedPasses = []string{
 	"address_compared_to_nil",
 	"argument_overwritten_before_use",
 	"boolean_constant_comparison",
+	"boolean_return_of_condition",
 	"bytes_compare_equality",
 	"discarded_pure_call",
 	"dot_import",
