@@ -46,23 +46,29 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-require-response-status-check"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_require_response_status_check",
-	Doc: "Flags the body of a local *http.Response from net/http's Get, Post, Head, PostForm or a *http.Client's " +
-		"Do, Get, Post, Head or PostForm read in a function that never reads its StatusCode or Status nor hands it " +
-		"elsewhere, because net/http returns a nil error on a 4xx or 5xx and the error body then reads as data.",
-	Run: run,
+// listener hears every identifier of the syntax dispatcher's walk, with its ancestors, gathering what each use does
+// to its response, and judges the responses once the package is walked.
+var listener = rule.Listener{
+	Nodes:       []ast.Node{(*ast.Ident)(nil)},
+	Node:        hearIdentifier,
+	PackageExit: judgeResponses,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_response_status_check", "Flags the body of a local "+
+	"*http.Response from net/http's Get, Post, Head, PostForm or a *http.Client's Do, Get, Post, Head or PostForm "+
+	"read in a function that never reads its StatusCode or Status nor hands it elsewhere, because net/http returns a "+
+	"nil error on a 4xx or 5xx and the error body then reads as data.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var bodyReadWithoutStatusCheckMessage = policy.MessageOf(Name, "bodyReadWithoutStatusCheck")
 
@@ -90,44 +96,52 @@ type response struct {
 	bodyReads []ast.Expr
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	// A local variable lives in one file, so every reference to it is met in that file's walk, but one map for the
-	// package costs nothing and the order of findings follows the order variables are met.
-	responses := map[*types.Var]*response{}
-	var order []*types.Var
-	for _, file := range pass.Files {
-		var stack []ast.Node
-		ast.Inspect(file, func(node ast.Node) bool {
-			if node == nil {
-				stack = stack[:len(stack)-1]
-				return true
-			}
-			stack = append(stack, node)
-			identifier, isIdentifier := node.(*ast.Ident)
-			if !isIdentifier {
-				return true
-			}
-			variable := responseVariable(pass, identifier)
-			if variable == nil {
-				return true
-			}
-			found, seen := responses[variable]
-			if !seen {
-				found = &response{}
-				responses[variable] = found
-				order = append(order, variable)
-			}
-			classify(pass, stack, identifier, found)
-			return true
-		})
+// packageState is what the rule gathers over its package, held in its context's state. A local variable lives in one
+// file, so every reference to it is met in that file's walk, but one map for the package costs nothing and the order
+// of findings follows the order variables are met.
+type packageState struct {
+	responses map[*types.Var]*response
+	order     []*types.Var
+	// path is the identifier being classified with its ancestors before it, from the file down, copied out of the
+	// walk's stack, which the walk reuses and which leaves the identifier out.
+	path []ast.Node
+}
+
+// hearIdentifier records what identifier, with its ancestors in stack, does to its response when it names one.
+func hearIdentifier(context *rule.Context, node ast.Node, stack []ast.Node) {
+	identifier, isIdentifier := node.(*ast.Ident)
+	if !isIdentifier {
+		return
 	}
-	for _, variable := range order {
-		found := responses[variable]
+	variable := responseVariable(context, identifier)
+	if variable == nil {
+		return
+	}
+	state := rule.State[packageState](context)
+	if state.responses == nil {
+		state.responses = map[*types.Var]*response{}
+	}
+	found, seen := state.responses[variable]
+	if !seen {
+		found = &response{}
+		state.responses[variable] = found
+		state.order = append(state.order, variable)
+	}
+	state.path = append(append(state.path[:0], stack...), identifier)
+	classify(context, state.path, identifier, found)
+}
+
+// judgeResponses reports every body read of a tracked response whose status is never checked, once the package is
+// walked.
+func judgeResponses(context *rule.Context) {
+	state := rule.State[packageState](context)
+	for _, variable := range state.order {
+		found := state.responses[variable]
 		if !found.declared || !found.producerWritten || found.otherWritten || found.checked {
 			continue
 		}
 		for _, body := range found.bodyReads {
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos:      body.Pos(),
 				End:      body.End(),
 				Category: bodyReadWithoutStatusCheckMessage.Id,
@@ -135,15 +149,14 @@ func run(pass *analysis.Pass) (any, error) {
 			})
 		}
 	}
-	return nil, nil
 }
 
 // responseVariable is the variable identifier defines or refers to when it is a *http.Response that is not a
 // package variable or a struct field, or nil otherwise.
-func responseVariable(pass *analysis.Pass, identifier *ast.Ident) *types.Var {
-	object := pass.TypesInfo.Defs[identifier]
+func responseVariable(context *rule.Context, identifier *ast.Ident) *types.Var {
+	object := context.TypesInfo.Defs[identifier]
 	if object == nil {
-		object = pass.TypesInfo.Uses[identifier]
+		object = context.TypesInfo.Uses[identifier]
 	}
 	variable, isVariable := object.(*types.Var)
 	if !isVariable || variable.IsField() || variable.Pkg() == nil || variable.Parent() == variable.Pkg().Scope() {
@@ -159,7 +172,7 @@ func responseVariable(pass *analysis.Pass, identifier *ast.Ident) *types.Var {
 // down to the identifier.
 //
 // Mutates: found records what this use does to the response, gathered over every use the caller walks
-func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, found *response) {
+func classify(context *rule.Context, stack []ast.Node, identifier *ast.Ident, found *response) {
 	switch parent := stack[len(stack)-2].(type) {
 	case *ast.AssignStmt:
 		for _, left := range parent.Lhs {
@@ -168,10 +181,10 @@ func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, foun
 			}
 			// A := declares the names it is the first to define, and reuses any already declared in its scope, so
 			// a := is a declaration only for a name it defines, and a write for every name.
-			if parent.Tok == token.DEFINE && pass.TypesInfo.Defs[identifier] != nil {
+			if parent.Tok == token.DEFINE && context.TypesInfo.Defs[identifier] != nil {
 				found.declared = true
 			}
-			if isProducerAssignment(pass, parent.Lhs, parent.Rhs, left) {
+			if isProducerAssignment(context, parent.Lhs, parent.Rhs, left) {
 				found.producerWritten = true
 			} else {
 				found.otherWritten = true
@@ -191,7 +204,7 @@ func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, foun
 		for index, declared := range parent.Names {
 			left[index] = declared
 		}
-		if isProducerAssignment(pass, left, parent.Values, identifier) {
+		if isProducerAssignment(context, left, parent.Values, identifier) {
 			found.producerWritten = true
 		} else {
 			found.otherWritten = true
@@ -215,12 +228,13 @@ func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, foun
 	switch parent := stack[index-1].(type) {
 	case *ast.SelectorExpr:
 		if parent.X == stack[index] {
-			classifySelection(pass, stack, index-1, parent, found)
+			classifySelection(context, stack, index-1, parent, found)
 			return
 		}
 	case *ast.BinaryExpr:
 		// Comparing the response with nil asks whether one arrived, not whether the request succeeded.
-		if (parent.Op == token.EQL || parent.Op == token.NEQ) && (isNil(pass, parent.X) || isNil(pass, parent.Y)) {
+		if (parent.Op == token.EQL || parent.Op == token.NEQ) &&
+			(isNil(context, parent.X) || isNil(context, parent.Y)) {
 			return
 		}
 	}
@@ -232,8 +246,14 @@ func classify(pass *analysis.Pass, stack []ast.Node, identifier *ast.Ident, foun
 // classifySelection records what resp.<selector>, the node at stack[index], does to its response.
 //
 // Mutates: found records a status check or a body read through the selection, for the caller's verdict
-func classifySelection(pass *analysis.Pass, stack []ast.Node, index int, selector *ast.SelectorExpr, found *response) {
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+func classifySelection(
+	context *rule.Context,
+	stack []ast.Node,
+	index int,
+	selector *ast.SelectorExpr,
+	found *response,
+) {
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	if !isSelection {
 		return
 	}
@@ -260,7 +280,7 @@ func classifySelection(pass *analysis.Pass, stack []ast.Node, index int, selecto
 		found.checked = true
 		return
 	}
-	if selection.Obj().Name() == "Body" && isBodyRead(pass, stack, outer) {
+	if selection.Obj().Name() == "Body" && isBodyRead(context, stack, outer) {
 		found.bodyReads = append(found.bodyReads, selector)
 	}
 }
@@ -268,7 +288,7 @@ func classifySelection(pass *analysis.Pass, stack []ast.Node, index int, selecto
 // isBodyRead is whether resp.Body, the node at stack[index] seen from outside its parentheses, is read there: passed
 // to a call, or the receiver of a method other than Close. A deferred call is cleanup on the way out, and a copy into
 // io.Discard drains the body unread, so neither reads it.
-func isBodyRead(pass *analysis.Pass, stack []ast.Node, index int) bool {
+func isBodyRead(context *rule.Context, stack []ast.Node, index int) bool {
 	if index == 0 {
 		return false
 	}
@@ -291,10 +311,10 @@ func isBodyRead(pass *analysis.Pass, stack []ast.Node, index int) bool {
 			return false
 		}
 		// A conversion, io.Reader(resp.Body), is spelled as a call and reads nothing.
-		if typeAndValue, isRecorded := pass.TypesInfo.Types[parent.Fun]; isRecorded && typeAndValue.IsType() {
+		if typeAndValue, isRecorded := context.TypesInfo.Types[parent.Fun]; isRecorded && typeAndValue.IsType() {
 			return false
 		}
-		return !isDeferred(stack, index-1) && !isDiscardCopy(pass, parent)
+		return !isDeferred(stack, index-1) && !isDiscardCopy(context, parent)
 	}
 	return false
 }
@@ -310,8 +330,8 @@ func isDeferred(stack []ast.Node, index int) bool {
 
 // isDiscardCopy is whether call is io.Copy, io.CopyN or io.CopyBuffer into io.Discard, the drain a caller writes to
 // let the connection be reused, which reads the body only to throw it away.
-func isDiscardCopy(pass *analysis.Pass, call *ast.CallExpr) bool {
-	function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func isDiscardCopy(context *rule.Context, call *ast.CallExpr) bool {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "io" || len(call.Args) == 0 {
 		return false
 	}
@@ -325,9 +345,9 @@ func isDiscardCopy(pass *analysis.Pass, call *ast.CallExpr) bool {
 	var destination types.Object
 	switch written := ast.Unparen(call.Args[0]).(type) {
 	case *ast.SelectorExpr:
-		destination = pass.TypesInfo.Uses[written.Sel]
+		destination = context.TypesInfo.Uses[written.Sel]
 	case *ast.Ident:
-		destination = pass.TypesInfo.Uses[written]
+		destination = context.TypesInfo.Uses[written]
 	}
 	variable, isVariable := destination.(*types.Var)
 	if !isVariable || variable.Pkg() == nil || variable.Name() != "Discard" {
@@ -338,18 +358,18 @@ func isDiscardCopy(pass *analysis.Pass, call *ast.CallExpr) bool {
 
 // isProducerAssignment is whether target, one of left, takes the response a tracked call returns: right is that
 // one call, its two results go to two names, and target is the first.
-func isProducerAssignment(pass *analysis.Pass, left []ast.Expr, right []ast.Expr, target ast.Expr) bool {
+func isProducerAssignment(context *rule.Context, left []ast.Expr, right []ast.Expr, target ast.Expr) bool {
 	if len(right) != 1 || len(left) != 2 || left[0] != target {
 		return false
 	}
 	call, isCall := ast.Unparen(right[0]).(*ast.CallExpr)
-	return isCall && isProducer(pass, call)
+	return isCall && isProducer(context, call)
 }
 
 // isProducer is whether call reaches one of net/http's package functions or *http.Client's methods that return the
 // response whatever its status. A method of another type with the same name, or a function value, is never one.
-func isProducer(pass *analysis.Pass, call *ast.CallExpr) bool {
-	function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func isProducer(context *rule.Context, call *ast.CallExpr) bool {
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != "net/http" {
 		return false
 	}
@@ -391,11 +411,11 @@ func outward(stack []ast.Node, index int) int {
 }
 
 // isNil is whether expression is the predeclared nil, by its object, so a variable a package names nil is not.
-func isNil(pass *analysis.Pass, expression ast.Expr) bool {
+func isNil(context *rule.Context, expression ast.Expr) bool {
 	identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
 	if !isIdentifier {
 		return false
 	}
-	_, isNilObject := pass.TypesInfo.Uses[identifier].(*types.Nil)
+	_, isNilObject := context.TypesInfo.Uses[identifier].(*types.Nil)
 	return isNilObject
 }
