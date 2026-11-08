@@ -1033,6 +1033,7 @@ var portedPasses = []string{
 	"find_all_zero_limit",
 	"guarded_delete",
 	"guarded_map_access",
+	"hoisted_map_key_conversion",
 	"http_status_literal",
 	"identical_operands",
 	"impossible_target_comparison",
