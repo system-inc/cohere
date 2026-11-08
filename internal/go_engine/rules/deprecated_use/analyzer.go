@@ -6,9 +6,9 @@
 // whose messages it reports word for word, where staticcheck's report puts them: over a selector, or over its name
 // alone when it selects from a type, over a struct literal's key, and over an import's path. It reads what is
 // deprecated from staticcheck's deprecated facts, which cross from every dependency, and which file a generator made
-// from staticcheck's generated pass, keyed by the name a file was parsed from, both straight from the pass, as a check
-// on the engine's dispatcher will read them from its ResultOf. It reads the standard library's deprecations, with the
-// Go version each came in, from honnef.co/go/tools/knowledge, a table of data rather than framework, allowed in this
+// from staticcheck's generated pass, keyed by the name a file was parsed from, both read through the context's
+// ResultOf, since its listener requires both passes. It reads the standard library's deprecations, with the Go
+// version each came in, from honnef.co/go/tools/knowledge, a table of data rather than framework, allowed in this
 // wave and to be ported with the rest of knowledge later. It names a selector with staticcheck_code.SelectorName, asks
 // staticcheck_report.StandardLibraryVersion where the original asks code.StdlibVersion, and reports through
 // staticcheck_report.Report, each the port of the one the original calls, proven against it beside it.
@@ -16,9 +16,9 @@
 // The original keeps state across its walk of every node of the package: the function declaration it is in, whose
 // own deprecation lets it use deprecated objects, is cleared only at a file's start and replaced only at the next
 // declaration, so a package-level variable after a deprecated function in its file is judged as if inside it. The port
-// keeps the same state in the same walk, so that false negative is the original's and stays (parity's
-// afterDeprecatedFunction shows it). Like the original, it misses dot-imported objects, and leaves alone a deprecated
-// object of the standard library its knowledge does not date. The registry still runs the original, which stays the
+// keeps the same state over the dispatcher's walk, in rule.State, cleared as each file is entered, so that false
+// negative is the original's and stays (parity's afterDeprecatedFunction shows it). Like the original, it misses
+// dot-imported objects, and leaves alone a deprecated object of the standard library its knowledge does not date. The registry still runs the original, which stays the
 // oracle: the parity tests beside this file run both over the same modules, and the two differ nowhere they hold.
 package deprecated_use
 
@@ -30,91 +30,82 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/facts/deprecated"
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
-
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// deprecated pass, whose facts say what is deprecated, and its generated pass, which says which generator made a file.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA1019",
-	Doc: "Flags a use of a deprecated function, variable, constant, field or package: staticcheck's SA1019, ported " +
-		"as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, deprecated.Analyzer, generated.Analyzer},
-	Run:      run,
-}
 
 // protobufPath is the deprecated protobuf package that code protoc-gen-go generated may import, which is left alone
 // there, since the code cannot choose.
 const protobufPath = "github.com/golang/protobuf/proto"
 
-// run builds the pass's context, reads the deprecated facts and the generated files from the pass, and judges the
-// package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	deprecations, isDeprecations := pass.ResultOf[deprecated.Analyzer].(deprecated.Result)
-	generators, isGenerators := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isDeprecations || !isGenerators || !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("deprecated_use: a required pass's result is missing")
-	}
-	Check(context, deprecations, generators, inspected)
-	return nil, nil
+// Listener is what the port hears of each package from the dispatcher: each file as the walk enters it, and every
+// function declaration, selector, composite literal and import, in preorder. It requires staticcheck's deprecated
+// pass, whose facts say what is deprecated, and its generated pass, which says which generator made a file.
+var Listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{deprecated.Analyzer, generated.Analyzer},
+	FileEnter: enterFile,
+	Nodes: []ast.Node{
+		(*ast.FuncDecl)(nil), (*ast.SelectorExpr)(nil), (*ast.CompositeLit)(nil), (*ast.ImportSpec)(nil),
+	},
+	Node: Check,
 }
 
-// Check judges every selector, struct literal and import of the package: each that reaches a deprecated object or
-// package of another package, but the package's own tests, is reported, unless the function declaration it is in is
-// itself deprecated, or the standard library's deprecation came after the version the code targets.
-func Check(
-	context *rule.Context,
-	deprecations deprecated.Result,
-	generators map[string]generated.Generator,
-	inspected *inspector.Inspector,
-) {
-	// The function declaration the walk is in, or was last in, since the file began; nil before a file's first.
-	var enclosing types.Object
-	depth := 0
-	inspected.Nodes(nil, func(node ast.Node, push bool) bool {
-		if !push {
-			depth--
-			return false
-		}
-		depth++
-		// The walk's root is each file, where the enclosing declaration is cleared.
-		if depth == 1 {
-			enclosing = nil
-		}
-		if declaration, isDeclaration := node.(*ast.FuncDecl); isDeclaration {
-			enclosing = context.TypesInfo.ObjectOf(declaration.Name)
-		}
-		switch node := node.(type) {
-		case *ast.SelectorExpr:
-			checkSelector(context, deprecations, node, enclosing)
-		case *ast.CompositeLit:
-			checkStructKeys(context, deprecations, node, enclosing)
-		}
-		return true
-	})
-	inspected.Preorder([]ast.Node{(*ast.ImportSpec)(nil)}, func(node ast.Node) {
-		specification, isImport := node.(*ast.ImportSpec)
-		if !isImport {
-			// Invariant: Preorder hands this function only the imports it was asked for.
-			panic("deprecated_use: the inspector handed over a node that is not an import")
-		}
-		checkImport(context, deprecations, generators, specification)
-	})
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1019",
+	"SA1019",
+	"Flags a use of a deprecated function, variable, constant, field or package: staticcheck's SA1019, ported "+
+		"as a check on syntax.",
+	&Listener,
+)
+
+// walkState is what the walk carries from node to node over a package, kept in the context's rule.State.
+type walkState struct {
+	// enclosing is the function declaration the walk is in, or was last in, since the file began; nil before a
+	// file's first.
+	enclosing types.Object
+}
+
+// enterFile clears the enclosing declaration as the walk enters a file, as the original clears it at each file, the
+// root of its walk.
+func enterFile(context *rule.Context, _ *ast.File) {
+	rule.State[walkState](context).enclosing = nil
+}
+
+// Check judges one node of the walk: a function declaration becomes the enclosing one, and a selector, struct literal
+// or import that reaches a deprecated object or package of another package, but the package's own tests, is reported,
+// unless the function declaration it is in is itself deprecated, or the standard library's deprecation came after
+// the version the code targets.
+func Check(context *rule.Context, node ast.Node, _ []ast.Node) {
+	deprecations, isDeprecations := context.ResultOf(deprecated.Analyzer).(deprecated.Result)
+	generators, isGenerators := context.ResultOf(generated.Analyzer).(map[string]generated.Generator)
+	if !isDeprecations || !isGenerators {
+		// Invariant: the dispatcher hands every check the results of what its listener requires, of the types they
+		// declare.
+		panic("deprecated_use: a required pass's result is missing")
+	}
+	state := rule.State[walkState](context)
+	switch node := node.(type) {
+	case *ast.FuncDecl:
+		state.enclosing = context.TypesInfo.ObjectOf(node.Name)
+	case *ast.SelectorExpr:
+		checkSelector(context, deprecations, node, state.enclosing)
+	case *ast.CompositeLit:
+		checkStructKeys(context, deprecations, node, state.enclosing)
+	case *ast.ImportSpec:
+		checkImport(context, deprecations, generators, node)
+	default:
+		// Invariant: the dispatcher hands Node only the kinds Listener lists.
+		panic("deprecated_use: the dispatcher handed over a node of a kind the listener does not list")
+	}
 }
 
 // checkSelector judges what selector selects: a deprecated object of another package, one that is not the package's
