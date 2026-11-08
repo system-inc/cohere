@@ -298,6 +298,120 @@ func TestLoadFailuresNamesEachIllTypedPackage(test *testing.T) {
 	}
 }
 
+// A finding only the original makes, recorded on its line as dropped, passes.
+func TestRequireOnlyAdjudicatedPassesARecordedDrop(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "dropped")
+	}))
+}
+
+// A drop recorded where the original makes no lone finding fails: here both sides find the call.
+func TestRequireOnlyAdjudicatedFailsADropThatDidNotHappen(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_unmatched")
+	}), "the fixture records that the port drops drop_unmatched.go:7:0: call to shared, and the original alone does "+
+		"not find it")
+}
+
+// A drop covers a finding on its own line and no other: one on the line above leaves the finding a regression, and
+// the drop itself unmatched.
+func TestRequireOnlyAdjudicatedFailsADropOnAnotherLine(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_misplaced")
+	}),
+		"the original found drop_misplaced.go:9:0: call to lost, and the port did not, a regression",
+		"the fixture records that the port drops drop_misplaced.go:8:0: call to lost, and the original alone does "+
+			"not find it",
+	)
+}
+
+// A finding both make in other spans, recorded as moved, pairs, and so does one in other fixes.
+func TestRequireOnlyAdjudicatedPairsAMove(test *testing.T) {
+	test.Parallel()
+	for _, shapedBy := range []func(shortBy token.Pos) shape{endingShort, fixingShort} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(sharedMessages, shapedBy(0)),
+				calling(sharedMessages, shapedBy(1)), analysistest.TestData(), "moved")
+		}))
+	}
+}
+
+// A move recorded where the two find the same finding whole does not happen, and fails.
+func TestRequireOnlyAdjudicatedFailsAMoveThatDidNotHappen(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0)),
+			calling(sharedMessages, endingShort(0)), analysistest.TestData(), "moved")
+	}), "the fixture records that the port moves moved.go:9:0: call to shared, and the two do not both find it")
+}
+
+// The original's fix the port leaves out, recorded as withheld, pairs the two findings.
+func TestRequireOnlyAdjudicatedPairsAWithheldFix(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "withheld")
+	}))
+}
+
+// A withheld fix recorded where both offer it does not happen, and fails.
+func TestRequireOnlyAdjudicatedFailsAWithholdThatDidNotHappen(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)),
+			calling(sharedMessages, fixingShort(0)), analysistest.TestData(), "withheld")
+	}), `the fixture records that the port withholds the fix "delete the call" at withheld.go:9, and no finding`)
+}
+
+// A withheld record covers only the original's fix: a fix the port alone offers is unrecorded on its side and leaves
+// the original's finding a regression, and the record fails too.
+func TestRequireOnlyAdjudicatedWithholdsOnlyTheOriginalsFix(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(sharedMessages, fixingShort(0)),
+			analysistest.TestData(), "withheld")
+	}),
+		`the fixture records that the port withholds the fix "delete the call" at withheld.go:9, and no finding`,
+		"the port alone found withheld.go:9:0: call to shared, which the fixture does not record",
+		"the original found withheld.go:9:0: call to shared, and the port did not, a regression",
+	)
+}
+
+// The original's related entry the port leaves out, recorded as omitted, pairs the two findings.
+func TestRequireOnlyAdjudicatedPairsAnOmittedRelatedEntry(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, relatingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "omitted")
+	}))
+}
+
+// An omitted related entry recorded where both carry it does not happen, and fails.
+func TestRequireOnlyAdjudicatedFailsAnOmitThatDidNotHappen(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, relatingShort(0)),
+			calling(sharedMessages, relatingShort(0)), analysistest.TestData(), "omitted")
+	}), `the fixture records that the port omits the related entry "the function called" at omitted.go:9, and no`)
+}
+
+// An omitted record covers only the original's related entry: one the port alone adds is unrecorded on its side and
+// leaves the original's finding a regression, and the record fails too.
+func TestRequireOnlyAdjudicatedOmitsOnlyTheOriginalsRelatedEntry(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(sharedMessages, relatingShort(0)),
+			analysistest.TestData(), "omitted")
+	}),
+		`the fixture records that the port omits the related entry "the function called" at omitted.go:9, and no`,
+		"the port alone found omitted.go:9:0: call to shared, which the fixture does not record",
+		"the original found omitted.go:9:0: call to shared, and the port did not, a regression",
+	)
+}
+
 // Each planted pair agrees in everything but one part of a finding, and RequireIdentical fails on that part alone,
 // naming both calls on each side. With both sides shaped alike it passes, so what fails is the difference, not the
 // shape.

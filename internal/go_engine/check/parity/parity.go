@@ -1,7 +1,9 @@
 // Package parity is the one bar every port of a borrowed checker is held to: a port matches its original finding
 // for finding, or differs only where it is right, each difference adjudicated with the finding in hand and pinned in
-// a fixture. A finding the original makes and the port misses is a regression, never an adjudicated difference, so
-// nothing here can record one.
+// a fixture. A finding the original makes and the port misses is a regression, unless it was ruled a false positive
+// with the finding in hand, the reason written above the record that drops it; nothing else can record one. A finding
+// both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
+// withholds the one fix of the original's it leaves out, or that it omits the one related entry.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, RequireIdentical
 // over those and the port's parity fixtures, RequireOnlyAdjudicated over its differences fixture. The census command,
@@ -212,16 +214,28 @@ func RequireIdentical(
 }
 
 // adjudicatedPattern is one comment in a differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes, or `renames:`, the original's message, `=>` and the port's, for a
-// finding both make in words that differ, as where the two forms number their registers differently.
-var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => (.+?))\s*$`)
+// the message of a finding only the port makes; `renames:`, the original's message, `=>` and the port's, for a
+// finding both make in words that differ, as where the two forms number their registers differently; or `drops:` and
+// the message of a finding only the original makes, ruled a false positive with the finding in hand; `moves:` and the
+// message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
+// original offers on a finding both make there and the port leaves out; or `omits:` and the message of a related
+// entry the original's finding carries there and the port's leaves out. Each record's reason is in the comment above
+// it, and each matches one finding on its own line.
+var adjudicatedPattern = regexp.MustCompile(
+	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?))\s*$`,
+)
 
 // RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture under testdata's
-// src, where the two disagree, and only where each disagreement was adjudicated in the port's favour: every finding
-// the port alone makes is recorded on its line, as found or as the port's side of a renaming, every finding the
-// original alone makes is the original's side of a recorded renaming, and every record is matched. A finding the
-// original makes and the port does not, unrecorded, is a regression and fails, since the port is never worse than the
-// original. A `// port ` comment it cannot read fails, and so does a fixture that records nothing.
+// src, where the two disagree, and only where each disagreement was adjudicated: every finding the port alone makes
+// is recorded on its line, as found or as the port's side of a renaming; every finding the original alone makes is
+// recorded on its line, as the original's side of a renaming or as dropped, a false positive ruled with the finding
+// in hand; a finding both make in other spans or fixes is recorded as moved, one the original offers a fix on that
+// the port leaves out as withheld, and one whose related entry the port leaves out as omitted, each pairing the two
+// sides' findings and nothing more; and every record is matched by a finding on its own line, never another's. A
+// finding the original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or
+// related entry one side alone offers that no record withholds or omits. A
+// `// port ` comment it cannot read fails, and so does a fixture that records nothing. The census has no fixture, so
+// no record covers anything there.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -232,36 +246,158 @@ func RequireOnlyAdjudicated(
 	test.Helper()
 	originalFindings, portFindings := Findings(test, original, port, testdata, fixture)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
-	expectedPort, expectedOriginal := adjudicated(test, filepath.Join(testdata, "src", filepath.FromSlash(fixture)))
-	if len(expectedPort) == 0 {
+	recorded := adjudicated(test, filepath.Join(testdata, "src", filepath.FromSlash(fixture)))
+	if len(recorded.portAlone)+len(recorded.dropped)+len(recorded.moved)+len(recorded.withheld)+
+		len(recorded.omitted) == 0 {
 		test.Fatalf("the differences fixture %s records nothing, so the comparison proves nothing", fixture)
 	}
-	portAlone := asRecorded(Difference(portFindings, originalFindings))
-	for _, unrecorded := range Difference(portAlone, expectedPort) {
+	// A withheld fix, an omitted related entry and a move each pair one finding of each side's, compared whole, before
+	// what is left of each is matched by line and message alone.
+	originalOnly, portOnly := pairLeftOut(test, "withholds the fix", recorded.withheld, withoutFix,
+		Difference(originalFindings, portFindings), Difference(portFindings, originalFindings))
+	originalOnly, portOnly = pairLeftOut(test, "omits the related entry", recorded.omitted, withoutRelated,
+		originalOnly, portOnly)
+	originalOnly, portOnly = pairMoved(test, recorded.moved, originalOnly, portOnly)
+	portAlone := asRecorded(portOnly)
+	for _, unrecorded := range Difference(portAlone, recorded.portAlone) {
 		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)
 	}
-	for _, unmatched := range Difference(expectedPort, portAlone) {
+	for _, unmatched := range Difference(recorded.portAlone, portAlone) {
 		test.Errorf("the fixture records that the port alone finds %s, and it does not", unmatched)
 	}
-	originalAlone := asRecorded(Difference(originalFindings, portFindings))
-	for _, missed := range Difference(originalAlone, expectedOriginal) {
+	// The original's lone findings are matched against the renamings, then what is left against the drops, so a
+	// finding one record covers is never counted against another.
+	originalAlone := asRecorded(originalOnly)
+	notRenamed := Difference(originalAlone, recorded.renamed)
+	for _, missed := range Difference(notRenamed, recorded.dropped) {
 		test.Errorf("the original found %s, and the port did not, a regression", missed)
 	}
-	for _, unmatched := range Difference(expectedOriginal, originalAlone) {
+	for _, unmatched := range Difference(recorded.renamed, originalAlone) {
 		test.Errorf("the fixture records that the original alone finds %s, renamed, and it does not", unmatched)
+	}
+	for _, unmatched := range Difference(recorded.dropped, notRenamed) {
+		test.Errorf("the fixture records that the port drops %s, and the original alone does not find it", unmatched)
 	}
 }
 
-// adjudicated reads every `// port ` comment of the .go files in directory: what the port alone finds there, from
-// `finds:` and the port's side of `renames:`, and what the original alone finds, the original's side of `renames:`,
-// each on the comment's line with no column. It reads comments as the parser finds them, so a `// port ` inside a
-// string is no record.
-func adjudicated(test testing.TB, directory string) (expectedPort []Finding, expectedOriginal []Finding) {
+// records are a differences fixture's records, each a file, a line and a message with no column: portAlone, what the
+// port alone finds, from `finds:` and the port's side of `renames:`; renamed, the original's side of `renames:`; and
+// dropped, what the original alone finds and the port rightly does not, from `drops:`; moved, a finding both make in
+// other spans or fixes, from `moves:`; withheld, from `withholds:`, whose Message is the fix's message, not the
+// finding's; and omitted, from `omits:`, whose Message is the related entry's.
+type records struct {
+	portAlone []Finding
+	renamed   []Finding
+	dropped   []Finding
+	moved     []Finding
+	withheld  []Finding
+	omitted   []Finding
+}
+
+// pairLeftOut takes out of originalOnly and portOnly each pair a record covers: a finding of the original's on the
+// record's line from which leaveOut can take one part with the record's message, and a finding of the port's that is
+// the same finding without it, whole in every other field. A record that pairs nothing fails, saying that the port
+// leaves out what, as in "withholds the fix".
+func pairLeftOut(
+	test testing.TB,
+	leavesOut string,
+	recorded []Finding,
+	leaveOut func(finding Finding, message string) (Finding, bool),
+	originalOnly []Finding,
+	portOnly []Finding,
+) (remainingOriginal []Finding, remainingPort []Finding) {
+	test.Helper()
+	// Cloned, since a pair is deleted from each in place.
+	remainingOriginal, remainingPort = slices.Clone(originalOnly), slices.Clone(portOnly)
+	for _, record := range recorded {
+		paired := false
+		for originalIndex, candidate := range remainingOriginal {
+			if candidate.File != record.File || candidate.Line != record.Line {
+				continue
+			}
+			without, held := leaveOut(candidate, record.Message)
+			if !held {
+				continue
+			}
+			portIndex := slices.IndexFunc(remainingPort, func(finding Finding) bool {
+				return finding.key() == without.key()
+			})
+			if portIndex < 0 {
+				continue
+			}
+			remainingOriginal = slices.Delete(remainingOriginal, originalIndex, originalIndex+1)
+			remainingPort = slices.Delete(remainingPort, portIndex, portIndex+1)
+			paired = true
+			break
+		}
+		if !paired {
+			test.Errorf("the fixture records that the port %s %q at %s:%d, and no finding of the original's there "+
+				"holds it beside the same finding of the port's without it", leavesOut, record.Message, record.File,
+				record.Line)
+		}
+	}
+	return remainingOriginal, remainingPort
+}
+
+// withoutFix is finding without its first fix with message, and whether it had one.
+func withoutFix(finding Finding, message string) (Finding, bool) {
+	index := slices.IndexFunc(finding.Fixes, func(fix Fix) bool { return fix.Message == message })
+	if index < 0 {
+		return finding, false
+	}
+	finding.Fixes = slices.Delete(slices.Clone(finding.Fixes), index, index+1)
+	return finding, true
+}
+
+// withoutRelated is finding without its first related entry with message, and whether it had one.
+func withoutRelated(finding Finding, message string) (Finding, bool) {
+	index := slices.IndexFunc(finding.Related, func(related Related) bool { return related.Message == message })
+	if index < 0 {
+		return finding, false
+	}
+	finding.Related = slices.Delete(slices.Clone(finding.Related), index, index+1)
+	return finding, true
+}
+
+// pairMoved takes out of originalOnly and portOnly each pair a moved record covers: a finding of each side's on the
+// record's line with the record's message, which differ in span or fixes. A record that pairs nothing fails.
+func pairMoved(
+	test testing.TB,
+	moved []Finding,
+	originalOnly []Finding,
+	portOnly []Finding,
+) (remainingOriginal []Finding, remainingPort []Finding) {
+	test.Helper()
+	// Cloned, since a pair is deleted from each in place.
+	remainingOriginal, remainingPort = slices.Clone(originalOnly), slices.Clone(portOnly)
+	onRecordedLine := func(record Finding) func(Finding) bool {
+		return func(finding Finding) bool {
+			return finding.File == record.File && finding.Line == record.Line && finding.Message == record.Message
+		}
+	}
+	for _, record := range moved {
+		originalIndex := slices.IndexFunc(remainingOriginal, onRecordedLine(record))
+		portIndex := slices.IndexFunc(remainingPort, onRecordedLine(record))
+		if originalIndex < 0 || portIndex < 0 {
+			test.Errorf("the fixture records that the port moves %s, and the two do not both find it there in "+
+				"other spans or fixes", record)
+			continue
+		}
+		remainingOriginal = slices.Delete(remainingOriginal, originalIndex, originalIndex+1)
+		remainingPort = slices.Delete(remainingPort, portIndex, portIndex+1)
+	}
+	return remainingOriginal, remainingPort
+}
+
+// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line. It
+// reads comments as the parser finds them, so a `// port ` inside a string is no record.
+func adjudicated(test testing.TB, directory string) records {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
 	if globError != nil {
 		test.Fatalf("listing the differences fixture %s: %v", directory, globError)
 	}
+	recorded := records{}
 	fileSet := token.NewFileSet()
 	for _, name := range names {
 		file, parseError := parser.ParseFile(fileSet, name, nil, parser.ParseComments|parser.SkipObjectResolution)
@@ -279,19 +415,31 @@ func adjudicated(test testing.TB, directory string) (expectedPort []Finding, exp
 						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, line, record)
 					case match[1] != "":
 						at.Message = match[1]
-						expectedPort = append(expectedPort, at)
+						recorded.portAlone = append(recorded.portAlone, at)
+					case match[4] != "":
+						at.Message = match[4]
+						recorded.dropped = append(recorded.dropped, at)
+					case match[5] != "":
+						at.Message = match[5]
+						recorded.moved = append(recorded.moved, at)
+					case match[6] != "":
+						at.Message = match[6]
+						recorded.withheld = append(recorded.withheld, at)
+					case match[7] != "":
+						at.Message = match[7]
+						recorded.omitted = append(recorded.omitted, at)
 					default:
 						renamed := at
 						renamed.Message = match[2]
-						expectedOriginal = append(expectedOriginal, renamed)
+						recorded.renamed = append(recorded.renamed, renamed)
 						at.Message = match[3]
-						expectedPort = append(expectedPort, at)
+						recorded.portAlone = append(recorded.portAlone, at)
 					}
 				}
 			}
 		}
 	}
-	return expectedPort, expectedOriginal
+	return recorded
 }
 
 // asRecorded is findings as the differences fixture's comments record them, by file, line and message alone: the
