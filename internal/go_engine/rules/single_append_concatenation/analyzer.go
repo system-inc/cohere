@@ -26,28 +26,52 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/facts/purity"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them, and its
-// purity pass, whose facts say which calls in the loop's slices may have side effects.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1011",
-	Doc: "Flags a range loop that appends each element of one slice to another, which one append says: " +
-		"staticcheck's S1011, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer, purity.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every range statement, in preorder. It
+// requires staticcheck's purity pass, whose facts say which calls in the loop's slices may have side effects.
+var Listener = rule.Listener{
+	Requires: []*analysis.Analyzer{purity.Analyzer},
+	Nodes:    []ast.Node{(*ast.RangeStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		statement, isRange := node.(*ast.RangeStmt)
+		if !isRange {
+			// Invariant: the dispatcher hands Node only the range statements it was asked for.
+			panic("single_append_concatenation: the dispatcher handed over a node that is not a range statement")
+		}
+		pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
+		if !isPurity {
+			// Invariant: the listener requires purity, whose result is always a purity.Result, so anything else is a
+			// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
+			panic("single_append_concatenation: the purity pass's result is missing")
+		}
+		// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function
+		// is pure where the map holds it.
+		isPure := func(function *types.Func) bool {
+			_, isHeld := pure[function]
+			return isHeld
+		}
+		Check(context, isPure, statement)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1011",
+	"S1011",
+	"Flags a range loop that appends each element of one slice to another, which one append says: "+
+		"staticcheck's S1011, ported.",
+	&Listener,
+)
 
 // loopAppend is what one range statement bound, as the original's query binds it: destination is lhs, the slice
 // appended to, and source is x, the slice ranged over, each with its parentheses removed as the pattern language
@@ -59,39 +83,6 @@ type loopAppend struct {
 	value       types.Object
 	index       types.Object
 	call        *ast.CallExpr
-}
-
-// run builds the pass's context and judges every range statement of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("single_append_concatenation: the inspect pass's result is missing")
-	}
-	pure, isPurity := pass.ResultOf[purity.Analyzer].(purity.Result)
-	if !isPurity {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("single_append_concatenation: the purity pass's result is missing")
-	}
-	// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function is
-	// pure where the map holds it.
-	isPure := func(function *types.Func) bool {
-		_, isHeld := pure[function]
-		return isHeld
-	}
-	inspected.Preorder([]ast.Node{(*ast.RangeStmt)(nil)}, func(node ast.Node) {
-		statement, isRange := node.(*ast.RangeStmt)
-		if !isRange {
-			// Invariant: Preorder hands this function only the range statements it was asked for.
-			panic("single_append_concatenation: the inspector handed over a node that is not a range statement")
-		}
-		Check(context, isPure, statement)
-	})
-	return nil, nil
 }
 
 // Check judges one range statement, with isPure judging which functions the purity facts hold pure: a loop that
