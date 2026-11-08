@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -636,4 +637,55 @@ func TestRequireOnlyAdjudicatedFailsAFixesRecordThatFollowsNoFinds(test *testing
 			"fixes_unanchored")
 	}), "fixes_unanchored/fixes_unanchored.go:11 records `fixes:` with no `finds:` record on its line or the line "+
 		"above it")
+}
+
+// withheldBesideTheCall are records given beside the call for same, a file with no record in it, each withholding the
+// original's fix on one of its two calls.
+var withheldBesideTheCall = []Record{
+	{File: "same/same.go", Line: 7, Text: "withholds: delete the call", Reason: "the first call's fix is ruled wrong"},
+	{File: "same/same.go", Line: 8, Text: "withholds: delete the call", Reason: "the second call's fix is ruled wrong"},
+}
+
+// Records given beside the call for a file that holds none are met as the same records written as comments would be,
+// and without them the fixture records nothing.
+func TestRequireOnlyAdjudicatedMeetsRecordsGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "same", withheldBesideTheCall...)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "same")
+	}), "the differences fixture same records nothing")
+}
+
+// A drop given beside the call carries its own reason, so it is met as one with its reason on the line above is.
+func TestRequireOnlyAdjudicatedMeetsADropGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(nil), analysistest.TestData(), "same",
+			Record{File: "same/same.go", Line: 7, Text: "drops: call to shared", Reason: "ruled a false positive"},
+			Record{File: "same/same.go", Line: 8, Text: "drops: call to shared", Reason: "ruled a false positive"})
+	}))
+}
+
+// A record given beside the call that no finding meets fails, named by its file and line.
+func TestRequireOnlyAdjudicatedFailsARecordGivenBesideTheCallThatDidNotHappen(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(sharedMessages), analysistest.TestData(),
+			"same", Record{File: "same/same.go", Line: 9, Text: "finds: call to shared", Reason: "planted unmet"})
+	}), "the fixture records that the port alone finds same/same.go:9:0: call to shared, and it does not")
+}
+
+// A record given beside the call with no reason fails, named by its file and line, though it is met.
+func TestRequireOnlyAdjudicatedFailsARecordGivenBesideTheCallWithNoReason(test *testing.T) {
+	test.Parallel()
+	unreasoned := slices.Clone(withheldBesideTheCall)
+	unreasoned[0].Reason = " "
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)), calling(sharedMessages),
+			analysistest.TestData(), "same", unreasoned...)
+	}), "same/same.go:7 is given beside the call a record with no reason: write why in its Reason")
 }

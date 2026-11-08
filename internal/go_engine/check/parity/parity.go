@@ -279,6 +279,12 @@ func fixesText(written string) (string, bool) {
 // of the declaration it is in, and one with none fails, named by file and line. A `// port ` comment it cannot read
 // fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
 //
+// A file that cannot carry a comment, as x/tools' fixtures copied byte for byte cannot, takes its records beside the
+// call, as given: each a Record, held as a comment record is, matched by a finding on its own line, met, and one with
+// no reason failing, named by file and line. Its Reason is its own, so a drop given there holds the drop's rule. The
+// test logs how many fixes the records withhold and related entries they omit beside each side's count, so the counts
+// read as one line.
+//
 // A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
 // or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
 // nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
@@ -290,9 +296,21 @@ func RequireOnlyAdjudicated(
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	given ...Record,
 ) {
 	test.Helper()
-	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture)
+	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture, given)
+}
+
+// Record is a record of a differences fixture's given beside the call, for a file that cannot carry it as a comment:
+// File, the file as findings name it, by its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the
+// line it is on; Text, the record as a comment writes it after `// port `, as `withholds: Format the number as a
+// decimal`; and Reason, why, as the comment above a record says it.
+type Record struct {
+	File   string
+	Line   int
+	Text   string
+	Reason string
 }
 
 // requireOnlyAdjudicated is RequireOnlyAdjudicated with the fixtures loaded for target.
@@ -303,12 +321,14 @@ func requireOnlyAdjudicated(
 	port *analysis.Analyzer,
 	testdata string,
 	fixture string,
+	given []Record,
 ) {
 	test.Helper()
 	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
-	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
-	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
+	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, given)
+	test.Logf("the original found %d, the port %d, and the records withhold %d fixes and omit %d related entries",
+		len(originalFindings), len(portFindings), len(recorded.withheld), len(recorded.omitted))
 	if len(recorded.portAlone)+len(recorded.dropped)+len(recorded.moved)+len(recorded.withheld)+
 		len(recorded.omitted) == 0 {
 		test.Fatalf("the differences fixture %s records nothing, so the comparison proves nothing", fixture)
@@ -490,11 +510,12 @@ func pairMoved(
 }
 
 // adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, its
-// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines). A
-// `fixes:` record is put on the line of the `finds:` record it follows, on its own line or the line above, and one
-// that follows none fails. It reads comments as the parser finds them, so a `// port ` inside a string is no record.
-// It reads that one directory, not those below it.
-func adjudicated(test testing.TB, directory string, fileName func(string) string) records {
+// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines), and
+// then the records given beside the call, each failed that gives no Reason. A `fixes:` record is put on the line of
+// the `finds:` record it follows, on its own line or the line above, written as a comment or given, and one that
+// follows none fails. It reads comments as the parser finds them, so a `// port ` inside a string is no record. It
+// reads that one directory, not those below it.
+func adjudicated(test testing.TB, directory string, fileName func(string) string, given []Record) records {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
 	if globError != nil {
@@ -512,12 +533,11 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 			for _, comment := range group.List {
 				line := fileSet.Position(comment.Slash).Line
 				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
-					match := adjudicatedPattern.FindStringSubmatch(record)
+					match, text, isReadable := readRecord(record)
 					at := Finding{File: fileName(name), Line: line}
 					switch {
-					case match == nil || reasoned.above(line):
-						// Unreadable, which the switch below fails, or reasoned on the line above, as any record may
-						// be.
+					case !isReadable || reasoned.above(line):
+						// Unreadable, which fails below, or reasoned on the line above, as any record may be.
 					case match[4] != "":
 						// A drop is ruled with its own finding in hand, so a declaration's doc, which often rules a
 						// whole group of records, rules no drop.
@@ -527,44 +547,75 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in "+
 							"the doc comment of the declaration it is in", at.File, line)
 					}
-					text, isText := "", true
-					if match != nil && match[8] != "" {
-						text, isText = fixesText(match[8])
-					}
-					switch {
-					case match == nil || !isText:
+					if !isReadable {
 						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, line, record)
-					case match[1] != "":
-						at.Message = match[1]
-						recorded.portAlone = append(recorded.portAlone, at)
-						recorded.found = append(recorded.found, at)
-					case match[4] != "":
-						at.Message = match[4]
-						recorded.dropped = append(recorded.dropped, at)
-					case match[5] != "":
-						at.Message = match[5]
-						recorded.moved = append(recorded.moved, at)
-					case match[6] != "":
-						at.Message = match[6]
-						recorded.withheld = append(recorded.withheld, at)
-					case match[7] != "":
-						at.Message = match[7]
-						recorded.omitted = append(recorded.omitted, at)
-					case match[8] != "":
-						at.Message = text
-						recorded.fixed = append(recorded.fixed, at)
-					default:
-						renamed := at
-						renamed.Message = match[2]
-						recorded.renamed = append(recorded.renamed, renamed)
-						at.Message = match[3]
-						recorded.portAlone = append(recorded.portAlone, at)
 					}
+					recorded = withRecord(recorded, at, match, text)
 				}
 			}
 		}
 	}
+	for _, record := range given {
+		match, text, isReadable := readRecord(record.Text)
+		if !isReadable {
+			test.Fatalf("%s:%d is given beside the call a record the harness cannot read: %q", record.File,
+				record.Line, record.Text)
+		}
+		// A given record's reason is its own, as a drop's is, so it rules a drop as much as any other.
+		if strings.TrimSpace(record.Reason) == "" {
+			test.Errorf("%s:%d is given beside the call a record with no reason: write why in its Reason",
+				record.File, record.Line)
+		}
+		recorded = withRecord(recorded, Finding{File: record.File, Line: record.Line}, match, text)
+	}
 	recorded.fixed = followingFinds(test, recorded.fixed, recorded.found)
+	return recorded
+}
+
+// readRecord is written, a record's text after its `// port ` opening, read: the submatches of adjudicatedPattern,
+// the new text of a `fixes:` record (see fixesText), and whether it could be read at all.
+func readRecord(written string) (match []string, text string, isReadable bool) {
+	match = adjudicatedPattern.FindStringSubmatch(written)
+	if match == nil {
+		return nil, "", false
+	}
+	if match[8] == "" {
+		return match, "", true
+	}
+	text, isReadable = fixesText(match[8])
+	return match, text, isReadable
+}
+
+// withRecord is recorded with the record read as match, and for a `fixes:` record text, at at's file and line, among
+// the records of its kind.
+func withRecord(recorded records, at Finding, match []string, text string) records {
+	switch {
+	case match[1] != "":
+		at.Message = match[1]
+		recorded.portAlone = append(recorded.portAlone, at)
+		recorded.found = append(recorded.found, at)
+	case match[4] != "":
+		at.Message = match[4]
+		recorded.dropped = append(recorded.dropped, at)
+	case match[5] != "":
+		at.Message = match[5]
+		recorded.moved = append(recorded.moved, at)
+	case match[6] != "":
+		at.Message = match[6]
+		recorded.withheld = append(recorded.withheld, at)
+	case match[7] != "":
+		at.Message = match[7]
+		recorded.omitted = append(recorded.omitted, at)
+	case match[8] != "":
+		at.Message = text
+		recorded.fixed = append(recorded.fixed, at)
+	default:
+		renamed := at
+		renamed.Message = match[2]
+		recorded.renamed = append(recorded.renamed, renamed)
+		at.Message = match[3]
+		recorded.portAlone = append(recorded.portAlone, at)
+	}
 	return recorded
 }
 

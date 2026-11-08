@@ -86,7 +86,7 @@ func requirePortWhereOriginalPanics(
 			portFindings = append(portFindings, finding.WithFileNames(fixtures.fileName))
 		}
 	}
-	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
+	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, nil)
 	refusedAny := false
 	for _, refused := range []struct {
 		kind    string
