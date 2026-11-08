@@ -18,9 +18,9 @@ type Finding struct {
 	message string
 }
 
-// Findings is the state one run of the check keeps across the functions of its preorder, the original's allErrors:
-// every finding each function judged, reported once the preorder ends. Its zero value is a run that has found
-// nothing, so whatever hands one out per rule per package hands out a new one.
+// Findings is the state the check keeps across the functions of the dispatcher's walk over one package, the original's
+// allErrors: every finding each function judged, reported once the walk ends. Its zero value is a package where
+// nothing has been found, so rule.State, which hands the rule one per package, makes it new.
 type Findings struct {
 	// all is every finding recorded, in the order recorded, a call in a function literal once for each function
 	// around it.

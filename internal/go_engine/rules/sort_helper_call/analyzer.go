@@ -10,7 +10,7 @@
 // of its own, and the original reports none of that function's calls, so a reader is not told to write sort.Ints
 // beside a sort.Sort that has to stay. A call in a function literal is judged once for each function around it, and
 // reported once. The port keeps all of that, and gathers its findings across the package, as the original does, in
-// one Findings made in run.
+// one Findings, the rule's state over the package, reported once the dispatcher's walk has covered it.
 //
 // It differs in one place, adjudicated: the port judges the argument by the type it converts to, not by how the
 // conversion is spelled. The original's selector misses a conversion to sort.IntSlice written through a dot import,
@@ -26,53 +26,42 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1032",
-	Doc: "Flags sort.Sort called on a conversion to sort.IntSlice, sort.Float64Slice or sort.StringSlice, in place " +
-		"of sort.Ints, sort.Float64s or sort.Strings: staticcheck's S1032, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every function declaration and function
+// literal, in preorder, each judged and what it finds gathered in the rule's state over the package, and all of it
+// reported once the walk has covered the package.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		rule.State[Findings](context).record(Check(context, node))
+	},
+	PackageExit: func(context *rule.Context) {
+		rule.State[Findings](context).report(context)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1032",
+	"S1032",
+	"Flags sort.Sort called on a conversion to sort.IntSlice, sort.Float64Slice or sort.StringSlice, in place "+
+		"of sort.Ints, sort.Float64s or sort.Strings: staticcheck's S1032, ported.",
+	&Listener,
+)
 
 // helperMessages is the original's message for each of package sort's helper slices, keyed by the type's name.
 var helperMessages = map[string]string{
 	"IntSlice":     "should use sort.Ints(...) instead of sort.Sort(sort.IntSlice(...))",
 	"Float64Slice": "should use sort.Float64s(...) instead of sort.Sort(sort.Float64Slice(...))",
 	"StringSlice":  "should use sort.Strings(...) instead of sort.Sort(sort.StringSlice(...))",
-}
-
-// run builds the pass's context, judges every function declaration and function literal of the package in one
-// preorder, gathering what each finds, and reports it all once the preorder ends.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("sort_helper_call: the inspect pass's result is missing")
-	}
-	findings := &Findings{}
-	inspected.Preorder([]ast.Node{(*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)}, func(node ast.Node) {
-		findings.record(Check(context, node))
-	})
-	findings.report(context)
-	return nil, nil
 }
 
 // Check judges one function declaration or function literal, and returns the calls of sort.Sort on a helper slice
@@ -86,9 +75,9 @@ func Check(context *rule.Context, node ast.Node) []Finding {
 	case *ast.FuncDecl:
 		body = function.Body
 	default:
-		// Invariant: the preorder hands Check only the function literals and declarations it was asked for, as the
+		// Invariant: the dispatcher hands Check only the function literals and declarations Listener lists, as the
 		// original's lint.ExhaustiveTypeSwitch holds.
-		panic("sort_helper_call: the inspector handed over a node that is neither a function literal nor a declaration")
+		panic("sort_helper_call: the dispatcher handed over a node neither a function literal nor a declaration")
 	}
 	if body == nil {
 		return nil
