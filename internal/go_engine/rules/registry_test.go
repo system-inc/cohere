@@ -1076,6 +1076,7 @@ var portedPasses = []string{
 	"redundant_slice_length",
 	"redundant_sprintf_of_string",
 	"regular_expression_raw_string",
+	"removed_user_directory",
 	"repeated_if_else_condition",
 	"replace_zero_count",
 	"reversed_errors_is_arguments",
