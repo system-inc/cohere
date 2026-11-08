@@ -3,6 +3,8 @@ package parity
 import (
 	"testing"
 
+	"golang.org/x/tools/go/analysis"
+
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 )
 
@@ -53,4 +55,40 @@ func TestRequireStaticcheckWantsFailsFixturesWithNoNote(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckWants(recording, port, analysistest.TestData(), "silent")
 	}), "the fixtures hold no note, so the comparison proves nothing")
+}
+
+// A fact note is met by a fact the port exports about the object it names on its line, and fails both ways: a fact
+// it expects that the port does not export, and a fact the port exports that no note expects, each named.
+func TestRequireStaticcheckWantsHoldsFactNotes(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireStaticcheckWants(recording, marking[portSide]("First"), analysistest.TestData(), "staticcheck_facts")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireStaticcheckWants(recording, marking[portSide](), analysistest.TestData(), "staticcheck_facts")
+	}), `staticcheck_facts/staticcheck_facts.go:5: fact(First, "marked"): the port exported nothing in `+
+		"staticcheck_facts matching it")
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireStaticcheckWants(recording, marking[portSide]("First", "Second"), analysistest.TestData(),
+			"staticcheck_facts")
+	}), `staticcheck_facts/staticcheck_facts.go:7: the port exported "marked" about Second in staticcheck_facts, `+
+		"which no note on the line expects")
+}
+
+// Fixtures with no fact note hold no fact, so a port that meets every diag note and marks shared as well passes, as
+// before fact notes were read.
+func TestRequireStaticcheckWantsHoldsNoFactWithoutAFactNote(test *testing.T) {
+	test.Parallel()
+	marked := marking[portSide]("shared")
+	reportingAndMarking := *port
+	reportingAndMarking.FactTypes = marked.FactTypes
+	reportingAndMarking.Run = func(pass *analysis.Pass) (any, error) {
+		if _, markError := marked.Run(pass); markError != nil {
+			return nil, markError
+		}
+		return port.Run(pass)
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireStaticcheckWants(recording, &reportingAndMarking, analysistest.TestData(), "staticcheck_notes")
+	}))
 }

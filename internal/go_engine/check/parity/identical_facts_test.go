@@ -79,3 +79,17 @@ func TestRequireIdenticalFactsFailsWhenTheOriginalExportsNothing(test *testing.T
 			"facts")
 	}), "the original exported no fact in the fixtures, so the comparison proves nothing")
 }
+
+// The facts on a package the fixture imports are compared as much as the fixture's own: over facts_importer, whose
+// own First both sides mark, a port that leaves out the mark on Second of facts, the dependency, fails on it.
+func TestRequireIdenticalFactsComparesTheFactsOfADependency(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireIdenticalFacts(recording, marking[originalSide]("First", "Second"),
+			marking[portSide]("First", "Second"), analysistest.TestData(), "facts_importer")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireIdenticalFacts(recording, marking[originalSide]("First", "Second"), marking[portSide]("First"),
+			analysistest.TestData(), "facts_importer")
+	}), "the original exported facts/facts.go:7:6: Second marked, and the port did not")
+}
