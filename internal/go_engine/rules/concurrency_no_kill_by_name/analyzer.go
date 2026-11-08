@@ -18,24 +18,25 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/concurrency-no-kill-by-name"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "concurrency_no_kill_by_name",
-	Doc: "Flags exec.Command and exec.CommandContext running pkill or killall, kill with an operand that is not a " +
-		"pid, or sh, bash or zsh -c with a script that runs pkill or killall, since stopping by name takes every " +
-		"matching process on the machine with it. Only constant programs and arguments are judged, and a script is " +
-		"read as words, not parsed as a shell would parse it, so a quoted or commented pkill is flagged too.",
-	Run: run,
-}
+// listener hears every call of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "concurrency_no_kill_by_name", "Flags exec.Command and "+
+	"exec.CommandContext running pkill or killall, kill with an operand that is not a pid, or sh, bash or zsh -c with "+
+	"a script that runs pkill or killall, since stopping by name takes every matching process on the machine with "+
+	"it. Only constant programs and arguments are judged, and a script is read as words, not parsed as a shell would "+
+	"parse it, so a quoted or commented pkill is flagged too.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var killByNameMessage = policy.MessageOf(Name, "killByName")
 
@@ -51,35 +52,30 @@ type argument struct {
 	isConstant bool
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall {
-				return true
-			}
-			programIndex, isCommand := programIndexOf(pass, call)
-			if !isCommand || len(call.Args) <= programIndex {
-				return true
-			}
-			program, isConstant := constantString(pass, call.Args[programIndex])
-			if !isConstant {
-				return true
-			}
-			// A path names the same program, so /usr/bin/pkill is judged as pkill.
-			if killer, killsByName := judge(path.Base(program), argumentsOf(pass, call, programIndex)); killsByName {
-				report(pass, call.Args[programIndex], killer)
-			}
-			return true
-		})
+// judgeCall reports node when it is a command that stops processes by name.
+func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	return nil, nil
+	programIndex, isCommand := programIndexOf(context, call)
+	if !isCommand || len(call.Args) <= programIndex {
+		return
+	}
+	program, isConstant := constantString(context, call.Args[programIndex])
+	if !isConstant {
+		return
+	}
+	// A path names the same program, so /usr/bin/pkill is judged as pkill.
+	if killer, killsByName := judge(path.Base(program), argumentsOf(context, call, programIndex)); killsByName {
+		report(context, call.Args[programIndex], killer)
+	}
 }
 
 // programIndexOf is where the program sits among a call's arguments when the call is os/exec's Command or
 // CommandContext, resolved by the callee's object so a function of the same name in another package is never one.
-func programIndexOf(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
-	function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func programIndexOf(context *rule.Context, call *ast.CallExpr) (int, bool) {
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "os/exec" || function.Signature().Recv() != nil {
 		return 0, false
 	}
@@ -95,7 +91,7 @@ func programIndexOf(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
 
 // argumentsOf is what a command is given after its program. A spread is read when it is a slice literal written in
 // place; any other spread is a slice built elsewhere, so its arguments are unknown and the result is nil.
-func argumentsOf(pass *analysis.Pass, call *ast.CallExpr, programIndex int) []argument {
+func argumentsOf(context *rule.Context, call *ast.CallExpr, programIndex int) []argument {
 	expressions := call.Args[programIndex+1:]
 	if call.Ellipsis.IsValid() {
 		literal, isLiteral := ast.Unparen(expressions[len(expressions)-1]).(*ast.CompositeLit)
@@ -112,15 +108,15 @@ func argumentsOf(pass *analysis.Pass, call *ast.CallExpr, programIndex int) []ar
 	}
 	arguments := make([]argument, 0, len(expressions))
 	for _, expression := range expressions {
-		text, isConstant := constantString(pass, expression)
+		text, isConstant := constantString(context, expression)
 		arguments = append(arguments, argument{text: text, isConstant: isConstant})
 	}
 	return arguments
 }
 
 // constantString is expression's value when the type checker knows it as a constant string.
-func constantString(pass *analysis.Pass, expression ast.Expr) (string, bool) {
-	value := pass.TypesInfo.Types[expression].Value
+func constantString(context *rule.Context, expression ast.Expr) (string, bool) {
+	value := context.TypesInfo.Types[expression].Value
 	if value == nil || value.Kind() != constant.String {
 		return "", false
 	}
@@ -266,8 +262,8 @@ func continuesName(character byte) bool {
 }
 
 // report flags the program argument, naming the program that stops processes by name.
-func report(pass *analysis.Pass, program ast.Expr, killer string) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, program ast.Expr, killer string) {
+	context.Report(analysis.Diagnostic{
 		Pos:      program.Pos(),
 		End:      program.End(),
 		Category: killByNameMessage.Id,

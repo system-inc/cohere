@@ -16,6 +16,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
@@ -23,95 +24,113 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-require-parallel"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "testing_require_parallel",
-	Doc: "Flags a test or subtest in a _test.go file whose first statement is not Parallel on its own *testing.T, " +
-		"unless a // Not parallel: <reason> comment directly above it says why. A subtest whose function is not a " +
-		"literal or a function declared in the same package is not judged, because its body cannot be seen.",
-	Requires: []*analysis.Analyzer{marker.Analyzer},
-	Run:      run,
+// listener judges each _test.go file's tests as the syntax dispatcher's walk enters it, and hears every call in it
+// for the subtests.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{marker.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      judgeSubtest,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "testing_require_parallel", "Flags a test or subtest in a _test.go file "+
+	"whose first statement is not Parallel on its own *testing.T, unless a // Not parallel: <reason> comment "+
+	"directly above it says why. A subtest whose function is not a literal or a function declared in the same "+
+	"package is not judged, because its body cannot be seen.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var notParallelMessage = policy.MessageOf(Name, "notParallel")
 
 var notParallelWithoutReasonMessage = policy.MessageOf(Name, "notParallelWithoutReason")
 
-func run(pass *analysis.Pass) (any, error) {
-	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
-	if !isIndexes {
-		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
-	}
-	// A subtest may name a function rather than spell a literal, and a function declared in this package has a body
-	// the rule can judge the same way, so every declaration is found by its object.
-	declarations := map[*types.Func]*ast.FuncDecl{}
-	for _, file := range pass.Files {
-		for _, declaration := range file.Decls {
-			if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
-				if object, isFunc := pass.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
-					declarations[object] = function
+// packageState is what the rule reads once for its package and once for each file, held in its context's state.
+type packageState struct {
+	// indexes is the package's comment indexes, read as the walk enters its first file.
+	indexes *marker.Indexes
+	// declarations is every function declared in the package, by its object, read with indexes. A subtest may name
+	// a function rather than spell a literal, and a function declared in this package has a body the rule can judge
+	// the same way, so every declaration is found by its object.
+	declarations map[*types.Func]*ast.FuncDecl
+	// isTest is whether the file being walked is a _test.go file, the only kind whose tests are judged.
+	isTest bool
+	// comments is the comment index of the file being walked, when it is a _test.go file.
+	comments *marker.Index
+}
+
+// enterFile reads the package's comment indexes and declarations the first time, and reports every top-level test in
+// file, when it is a _test.go file, that is serial and does not say why.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if state.indexes == nil {
+		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
+		if !isIndexes {
+			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
+		}
+		state.indexes = indexes
+		state.declarations = map[*types.Func]*ast.FuncDecl{}
+		for _, packageFile := range context.Files {
+			for _, declaration := range packageFile.Decls {
+				if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
+					if object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func); isFunc {
+						state.declarations[object] = function
+					}
 				}
 			}
 		}
 	}
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
+	state.isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.comments = nil
+	if !state.isTest {
+		return
+	}
+	state.comments = state.indexes.ForFile(file)
+	for _, declaration := range file.Decls {
+		function, isFunction := declaration.(*ast.FuncDecl)
+		if !isFunction {
 			continue
 		}
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction {
-				continue
-			}
-			parameter := testParameter(pass, function)
-			if parameter == nil || firstStatementCallsParallel(pass, function.Body, parameter) {
-				continue
-			}
-			report(pass, function.Name, marker.Read(function.Doc, marker.NotParallel))
+		parameter := testParameter(context, function)
+		if parameter == nil || firstStatementCallsParallel(context, function.Body, parameter) {
+			continue
 		}
-		judgeSubtests(pass, file, indexes.ForFile(file), declarations)
+		report(context, function.Name, marker.Read(function.Doc, marker.NotParallel))
 	}
-	return nil, nil
 }
 
-// judgeSubtests reports every (*testing.T).Run in file whose subtest is serial and does not say why.
-func judgeSubtests(
-	pass *analysis.Pass,
-	file *ast.File,
-	comments *marker.Index,
-	declarations map[*types.Func]*ast.FuncDecl,
-) {
-	ast.Inspect(file, func(node ast.Node) bool {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall || len(call.Args) != 2 {
-			return true
-		}
-		selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr)
-		if !isSelector {
-			return true
-		}
-		// A method value only: a method expression, (*testing.T).Run(test, ...), shifts its arguments by one.
-		selection, isSelection := pass.TypesInfo.Selections[selector]
-		if !isSelection || selection.Kind() != types.MethodVal {
-			return true
-		}
-		if method, isFunc := selection.Obj().(*types.Func); !isFunc || !isTestingTMethod(method, "Run") {
-			return true
-		}
-		body, parameter, doc := subtestFunction(pass, call.Args[1], declarations)
-		if body == nil || firstStatementCallsParallel(pass, body, parameter) {
-			return true
-		}
-		// A named function may carry the reason on its own doc comment, which then excuses every Run that names
-		// it; the comment directly above the call speaks for this one subtest.
-		above := marker.Read(comments.Above(call), marker.NotParallel)
-		report(pass, selector, max(above, marker.Read(doc, marker.NotParallel)))
-		return true
-	})
+// judgeSubtest reports node when it is a (*testing.T).Run in a _test.go file whose subtest is serial and does not say
+// why.
+func judgeSubtest(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	call, isCall := node.(*ast.CallExpr)
+	if !state.isTest || !isCall || len(call.Args) != 2 {
+		return
+	}
+	selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr)
+	if !isSelector {
+		return
+	}
+	// A method value only: a method expression, (*testing.T).Run(test, ...), shifts its arguments by one.
+	selection, isSelection := context.TypesInfo.Selections[selector]
+	if !isSelection || selection.Kind() != types.MethodVal {
+		return
+	}
+	if method, isFunc := selection.Obj().(*types.Func); !isFunc || !isTestingTMethod(method, "Run") {
+		return
+	}
+	body, parameter, doc := subtestFunction(context, call.Args[1], state.declarations)
+	if body == nil || firstStatementCallsParallel(context, body, parameter) {
+		return
+	}
+	// A named function may carry the reason on its own doc comment, which then excuses every Run that names it; the
+	// comment directly above the call speaks for this one subtest.
+	above := marker.Read(state.comments.Above(call), marker.NotParallel)
+	report(context, selector, max(above, marker.Read(doc, marker.NotParallel)))
 }
 
 // subtestFunction is the body, *testing.T parameter, and doc comment of the function a Run call runs, when the rule
@@ -119,13 +138,13 @@ func judgeSubtests(
 // one included. Otherwise body is nil, since a closure held in a variable or built by a call has a body the rule
 // would have to guess at.
 func subtestFunction(
-	pass *analysis.Pass,
+	context *rule.Context,
 	argument ast.Expr,
 	declarations map[*types.Func]*ast.FuncDecl,
 ) (*ast.BlockStmt, *types.Var, *ast.CommentGroup) {
 	unwrapped := ast.Unparen(argument)
 	if literal, isLiteral := unwrapped.(*ast.FuncLit); isLiteral {
-		signature, isSignature := pass.TypesInfo.TypeOf(literal).(*types.Signature)
+		signature, isSignature := context.TypesInfo.TypeOf(literal).(*types.Signature)
 		if !isSignature || signature.Params().Len() != 1 {
 			return nil, nil, nil
 		}
@@ -143,13 +162,13 @@ func subtestFunction(
 	var object types.Object
 	switch named := unwrapped.(type) {
 	case *ast.Ident:
-		object = pass.TypesInfo.Uses[named]
+		object = context.TypesInfo.Uses[named]
 	case *ast.SelectorExpr:
 		// A method value, suite.serial, or a qualified function, which is another package's and so never found.
-		if selection, isSelection := pass.TypesInfo.Selections[named]; isSelection {
+		if selection, isSelection := context.TypesInfo.Selections[named]; isSelection {
 			object = selection.Obj()
 		} else {
-			object = pass.TypesInfo.Uses[named.Sel]
+			object = context.TypesInfo.Uses[named.Sel]
 		}
 	}
 	function, isFunc := object.(*types.Func)
@@ -171,11 +190,11 @@ func subtestFunction(
 // test runs as one: named Test, or Test followed by anything but a lower-case letter, with no receiver, no type
 // parameters, no results, and one *testing.T parameter. Benchmarks, fuzz targets, examples and TestMain take
 // something else or are named otherwise, so none of them is a test here.
-func testParameter(pass *analysis.Pass, function *ast.FuncDecl) *types.Var {
+func testParameter(context *rule.Context, function *ast.FuncDecl) *types.Var {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return nil
 	}
-	object, isFunc := pass.TypesInfo.Defs[function.Name].(*types.Func)
+	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
 	if !isFunc {
 		return nil
 	}
@@ -207,7 +226,7 @@ func isTestName(name string) bool {
 // firstStatementCallsParallel is whether body's first statement is parameter.Parallel(). A Parallel later in the
 // body leaves the test serial until then, and one on another test's *testing.T, the enclosing test's inside a
 // subtest, marks that other test, so neither counts.
-func firstStatementCallsParallel(pass *analysis.Pass, body *ast.BlockStmt, parameter *types.Var) bool {
+func firstStatementCallsParallel(context *rule.Context, body *ast.BlockStmt, parameter *types.Var) bool {
 	if len(body.List) == 0 {
 		return false
 	}
@@ -224,10 +243,10 @@ func firstStatementCallsParallel(pass *analysis.Pass, body *ast.BlockStmt, param
 		return false
 	}
 	receiver, isIdentifier := ast.Unparen(selector.X).(*ast.Ident)
-	if !isIdentifier || pass.TypesInfo.Uses[receiver] != parameter {
+	if !isIdentifier || context.TypesInfo.Uses[receiver] != parameter {
 		return false
 	}
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return false
 	}
@@ -258,7 +277,7 @@ func isPointerToTestingT(candidate types.Type) bool {
 }
 
 // report flags node unless its excuse gives a reason, with the message that names what is missing.
-func report(pass *analysis.Pass, node ast.Node, given marker.Excuse) {
+func report(context *rule.Context, node ast.Node, given marker.Excuse) {
 	message := notParallelMessage
 	switch given {
 	case marker.WithReason:
@@ -267,7 +286,7 @@ func report(pass *analysis.Pass, node ast.Node, given marker.Excuse) {
 		message = notParallelWithoutReasonMessage
 	case marker.None:
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      node.Pos(),
 		End:      node.End(),
 		Category: message.Id,

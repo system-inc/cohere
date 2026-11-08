@@ -14,6 +14,7 @@ package concurrency_require_escape_hatch_reason
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 
@@ -21,6 +22,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
@@ -28,20 +30,26 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/concurrency-require-escape-hatch-reason"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "concurrency_require_escape_hatch_reason",
-	Doc: "Flags a conversion to or from unsafe.Pointer, a call to unsafe.Add, unsafe.Slice, unsafe.SliceData, " +
-		"unsafe.String or unsafe.StringData, and a //go:linkname directive, unless a // Unsafe: <reason> comment " +
-		"says why it is safe: for an expression, directly above it or above a statement or declaration holding it, " +
-		"or at the end of its line or its statement's; for a directive, directly above it. unsafe.Sizeof, " +
-		"unsafe.Alignof and unsafe.Offsetof are not judged, since they only measure a type.",
-	Requires: []*analysis.Analyzer{marker.Analyzer},
-	Run:      run,
+// listener reads the file's comments as the syntax dispatcher's walk enters each file, hears every call in it, and
+// judges the file's //go:linkname directives as the walk leaves it.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{marker.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      judgeCall,
+	FileExit:  judgeLinknames,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "concurrency_require_escape_hatch_reason", "Flags a conversion to or "+
+	"from unsafe.Pointer, a call to unsafe.Add, unsafe.Slice, unsafe.SliceData, unsafe.String or unsafe.StringData, "+
+	"and a //go:linkname directive, unless a // Unsafe: <reason> comment says why it is safe: for an expression, "+
+	"directly above it or above a statement or declaration holding it, or at the end of its line or its statement's; "+
+	"for a directive, directly above it. unsafe.Sizeof, unsafe.Alignof and unsafe.Offsetof are not judged, since "+
+	"they only measure a type.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var escapeHatchWithoutReasonMessage = policy.MessageOf(Name, "escapeHatchWithoutReason")
 
@@ -55,64 +63,69 @@ const linknameDirective = "//go:linkname"
 // check. Sizeof, Alignof and Offsetof are left out: they are constants about a type and reach no memory.
 var pointerEscapingFunctions = []string{"Add", "Slice", "SliceData", "String", "StringData"}
 
-func run(pass *analysis.Pass) (any, error) {
-	escaping := map[types.Object]bool{}
-	for _, name := range pointerEscapingFunctions {
-		escaping[types.Unsafe.Scope().Lookup(name)] = true
-	}
-	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
-	if !isIndexes {
-		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
-	}
-	for _, file := range pass.Files {
-		judgeExpressions(pass, file, indexes.ForFile(file), escaping)
-		judgeLinknames(pass, file)
-	}
-	return nil, nil
+// packageState is what the rule reads once for its package and once for each file, held in its context's state.
+type packageState struct {
+	// escaping is the objects of pointerEscapingFunctions in package unsafe, read as the walk enters its first file.
+	escaping map[types.Object]bool
+	// indexes is the package's comment indexes, read with escaping.
+	indexes *marker.Indexes
+	// comments is the comment index of the file being walked.
+	comments *marker.Index
+	// hatchStart and hatchEnd span the last hatch reported in the file being walked. A hatch is judged once with
+	// everything inside it, so `uintptr(unsafe.Pointer(&value))` is one finding and one reason covers it: a call that
+	// opens within the span is inside the hatch, since the walk is in preorder and whatever follows the hatch outside
+	// it opens at or after its end.
+	hatchStart token.Pos
+	hatchEnd   token.Pos
 }
 
-// judgeExpressions reports every unsafe conversion and call in file whose comments give no reason. A hatch is judged
-// once with everything inside it, so `uintptr(unsafe.Pointer(&value))` is one finding and one reason covers it.
-func judgeExpressions(
-	pass *analysis.Pass,
-	file *ast.File,
-	comments *marker.Index,
-	escaping map[types.Object]bool,
-) {
-	// enclosing is the path from the file down to the node being visited, so a hatch finds the statements and
-	// declarations that hold it.
-	enclosing := []ast.Node{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		if node == nil {
-			enclosing = enclosing[:len(enclosing)-1]
-			return true
+// enterFile reads the package's escaping functions and comment indexes the first time, and file's comment index.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if state.indexes == nil {
+		state.escaping = map[types.Object]bool{}
+		for _, name := range pointerEscapingFunctions {
+			state.escaping[types.Unsafe.Scope().Lookup(name)] = true
 		}
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			enclosing = append(enclosing, node)
-			return true
+		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
+		if !isIndexes {
+			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}
-		spelling := hatchSpelling(pass, call, escaping)
-		if spelling == "" {
-			enclosing = append(enclosing, node)
-			return true
-		}
-		report(pass, call, spelling, excuseForExpression(comments, call, enclosing))
-		// Returning false skips the children and the nil visit that would pop this node, so it is never pushed.
-		return false
-	})
+		state.indexes = indexes
+	}
+	state.comments = state.indexes.ForFile(file)
+	state.hatchStart, state.hatchEnd = token.NoPos, token.NoPos
+}
+
+// judgeCall reports node when it is an unsafe conversion or call whose comments give no reason, and is not inside a
+// hatch already reported. stack is the path from the file down to it, so a hatch finds the statements and
+// declarations that hold it.
+func judgeCall(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[packageState](context)
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall || (call.Pos() >= state.hatchStart && call.Pos() < state.hatchEnd) {
+		return
+	}
+	spelling := hatchSpelling(context, call, state.escaping)
+	if spelling == "" {
+		return
+	}
+	report(context, call, spelling, excuseForExpression(state.comments, call, stack))
+	state.hatchStart, state.hatchEnd = call.Pos(), call.End()
 }
 
 // hatchSpelling is how the message names the escape hatch call is, or "" when it is none. A conversion is found by
 // its types, so a named type whose underlying type is unsafe.Pointer is one too, and a call by the object it
 // resolves to, so a function or field named Pointer or String elsewhere is never mistaken for package unsafe's.
-func hatchSpelling(pass *analysis.Pass, call *ast.CallExpr, escaping map[types.Object]bool) string {
-	if function, isTypeAndValue := pass.TypesInfo.Types[call.Fun]; isTypeAndValue && function.IsType() {
+func hatchSpelling(context *rule.Context, call *ast.CallExpr, escaping map[types.Object]bool) string {
+	if function, isTypeAndValue := context.TypesInfo.Types[call.Fun]; isTypeAndValue && function.IsType() {
 		if len(call.Args) != 1 {
 			return ""
 		}
-		target := pass.TypesInfo.TypeOf(call)
-		source := pass.TypesInfo.TypeOf(call.Args[0])
+		target := context.TypesInfo.TypeOf(call)
+		source := context.TypesInfo.TypeOf(call.Args[0])
 		if target == nil || source == nil {
 			return ""
 		}
@@ -126,7 +139,7 @@ func hatchSpelling(pass *analysis.Pass, call *ast.CallExpr, escaping map[types.O
 		}
 		return "Converting from `unsafe.Pointer`"
 	}
-	callee := typeutil.Callee(pass.TypesInfo, call)
+	callee := typeutil.Callee(context.TypesInfo, call)
 	if callee == nil || !escaping[callee] {
 		return ""
 	}
@@ -167,7 +180,7 @@ func excuseForExpression(comments *marker.Index, hatch ast.Node, enclosing []ast
 }
 
 // judgeLinknames reports every //go:linkname directive in file with no reason directly above it.
-func judgeLinknames(pass *analysis.Pass, file *ast.File) {
+func judgeLinknames(context *rule.Context, file *ast.File) {
 	for _, group := range file.Comments {
 		for index, comment := range group.List {
 			arguments, isDirective := strings.CutPrefix(comment.Text, linknameDirective)
@@ -178,14 +191,14 @@ func judgeLinknames(pass *analysis.Pass, file *ast.File) {
 			// are the group's comments before it. A comment a blank line away, or trailing the code on the line
 			// above, is a group of its own and speaks for nothing here.
 			above := &ast.CommentGroup{List: group.List[:index]}
-			report(pass, comment, "Linking to another package's symbol with `//go:linkname`",
+			report(context, comment, "Linking to another package's symbol with `//go:linkname`",
 				marker.Read(above, marker.Unsafe))
 		}
 	}
 }
 
 // report flags node unless its excuse gives a reason, with the message that names what is missing.
-func report(pass *analysis.Pass, node ast.Node, spelling string, given marker.Excuse) {
+func report(context *rule.Context, node ast.Node, spelling string, given marker.Excuse) {
 	message := escapeHatchWithoutReasonMessage
 	switch given {
 	case marker.WithReason:
@@ -194,7 +207,7 @@ func report(pass *analysis.Pass, node ast.Node, spelling string, given marker.Ex
 		message = unsafeMarkerWithoutReasonMessage
 	case marker.None:
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      node.Pos(),
 		End:      node.End(),
 		Category: message.Id,

@@ -20,6 +20,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/policy"
 )
@@ -27,21 +28,25 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-no-timing-assertion"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "testing_no_timing_assertion",
-	Doc: "Flags, in a test in a _test.go file, an if whose condition fails the test when a duration measured with " +
-		"time.Since, or Time.Sub with a time.Now reading on one side, directly or through a local assigned once, " +
-		"comes out too long, and whose body calls a *testing.T failure method directly, unless a // Timing " +
-		"assertion: <reason> comment directly above the if says why it holds under load. A busy machine makes such " +
-		"a test fail by chance. Date math between times not read from the clock, context deadlines and benchmarks " +
-		"are not judged.",
-	Requires: []*analysis.Analyzer{marker.Analyzer},
-	Run:      run,
+// listener reads each _test.go file's comments as the syntax dispatcher's walk enters it, and hears every function
+// declaration in it.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{marker.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil)},
+	Node:      judgeFunction,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "testing_no_timing_assertion", "Flags, in a test in a _test.go file, an "+
+	"if whose condition fails the test when a duration measured with time.Since, or Time.Sub with a time.Now reading "+
+	"on one side, directly or through a local assigned once, comes out too long, and whose body calls a *testing.T "+
+	"failure method directly, unless a // Timing assertion: <reason> comment directly above the if says why it holds "+
+	"under load. A busy machine makes such a test fail by chance. Date math between times not read from the clock, "+
+	"context deadlines and benchmarks are not judged.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var timingAssertionMessage = policy.MessageOf(Name, "timingAssertion")
 
@@ -58,26 +63,42 @@ var failureMethods = map[string]bool{
 	"FailNow": true,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
-	if !isIndexes {
-		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
-	}
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
-			continue
+// packageState is what the rule reads once for its package and once for each file, held in its context's state.
+type packageState struct {
+	// indexes is the package's comment indexes, read as the walk enters its first file.
+	indexes *marker.Indexes
+	// comments is the comment index of the file being walked, or nil when it is no _test.go file, the only kind
+	// whose tests are judged.
+	comments *marker.Index
+}
+
+// enterFile reads the package's comment indexes the first time, and file's comment index when it is a _test.go file.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[packageState](context)
+	if state.indexes == nil {
+		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
+		if !isIndexes {
+			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}
-		comments := indexes.ForFile(file)
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction || !isTest(pass, function) {
-				continue
-			}
-			judgeTest(pass, function.Body, comments)
-		}
+		state.indexes = indexes
 	}
-	return nil, nil
+	state.comments = nil
+	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
+	if strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
+		state.comments = state.indexes.ForFile(file)
+	}
+}
+
+// judgeFunction judges node when it is a test in a _test.go file.
+func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	function, isFunction := node.(*ast.FuncDecl)
+	if state.comments == nil || !isFunction || !isTest(context, function) {
+		return
+	}
+	judgeTest(context, function.Body, state.comments)
 }
 
 // clockLocals is what one test's body holds of the clock, each a variable declared once and never written again:
@@ -89,24 +110,24 @@ type clockLocals struct {
 
 // judgeTest reports every timing assertion in one test's body, its subtests' function literals included, since a
 // subtest's deadline is as much at the pool's mercy as its parent's.
-func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, comments *marker.Index) {
-	written := writtenVariables(pass, body)
+func judgeTest(context *rule.Context, body *ast.BlockStmt, comments *marker.Index) {
+	written := writtenVariables(context, body)
 	// The readings are found first, since a Sub measures the clock only when one of its sides is a reading.
-	readings := localsDeclaredWith(pass, body, written, func(value ast.Expr) bool {
-		return isClockReading(pass, value, nil)
+	readings := localsDeclaredWith(context, body, written, func(value ast.Expr) bool {
+		return isClockReading(context, value, nil)
 	})
 	clock := clockLocals{
 		readings: readings,
-		measured: localsDeclaredWith(pass, body, written, func(value ast.Expr) bool {
-			return isMeasurement(pass, value, readings)
+		measured: localsDeclaredWith(context, body, written, func(value ast.Expr) bool {
+			return isMeasurement(context, value, readings)
 		}),
 	}
 	ast.Inspect(body, func(node ast.Node) bool {
 		statement, isIf := node.(*ast.IfStmt)
-		if !isIf || !failsTestDirectly(pass, statement.Body) {
+		if !isIf || !failsTestDirectly(context, statement.Body) {
 			return true
 		}
-		comparisons := slowFailingComparisons(pass, statement.Cond, true, clock)
+		comparisons := slowFailingComparisons(context, statement.Cond, true, clock)
 		if len(comparisons) == 0 {
 			return true
 		}
@@ -114,7 +135,7 @@ func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, comments *marker.Index)
 		// `work() // Timing assertion: ...`, speaks for that code.
 		given := marker.Read(comments.Above(statement), marker.TimingAssertion)
 		for _, comparison := range comparisons {
-			report(pass, comparison, given)
+			report(context, comparison, given)
 		}
 		return true
 	})
@@ -123,7 +144,7 @@ func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, comments *marker.Index)
 // localsDeclaredWith is every variable body declares with a value holds accepts, `elapsed := time.Since(start)` or
 // `var finished = time.Now()`, that nothing writes again, so reading the variable reads that value.
 func localsDeclaredWith(
-	pass *analysis.Pass,
+	context *rule.Context,
 	body *ast.BlockStmt,
 	written map[*types.Var]bool,
 	holds func(value ast.Expr) bool,
@@ -135,7 +156,7 @@ func localsDeclaredWith(
 			return
 		}
 		for index, name := range names {
-			variable, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
+			variable, isVariable := context.TypesInfo.Defs[name].(*types.Var)
 			if isVariable && !written[variable] && holds(values[index]) {
 				declared[variable] = true
 			}
@@ -166,13 +187,13 @@ func localsDeclaredWith(
 // writtenVariables is every variable body writes after declaring it: assigned, redeclared by a define, stepped,
 // ranged into with `=`, or given away by its address. Such a variable may hold something other than the measurement
 // it was declared with when the comparison reads it.
-func writtenVariables(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]bool {
+func writtenVariables(context *rule.Context, body *ast.BlockStmt) map[*types.Var]bool {
 	written := map[*types.Var]bool{}
 	mark := func(expression ast.Expr) {
 		// A declaration's own name is in Defs, never Uses, so only a later write is marked. A define that redeclares
 		// a variable records it in Uses, which marks it too.
 		if name, isIdentifier := ast.Unparen(expression).(*ast.Ident); isIdentifier {
-			if variable, isVariable := pass.TypesInfo.Uses[name].(*types.Var); isVariable {
+			if variable, isVariable := context.TypesInfo.Uses[name].(*types.Var); isVariable {
 				written[variable] = true
 			}
 		}
@@ -204,12 +225,12 @@ func writtenVariables(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]b
 // of the clock on one side, found by the function object, so a Since or Sub of any other package or type is never
 // mistaken for one. A Sub between two times that were not read from the clock, `expiry.Sub(issued)`, is date math,
 // whose result a busy machine cannot change.
-func isMeasurement(pass *analysis.Pass, expression ast.Expr, readings map[*types.Var]bool) bool {
+func isMeasurement(context *rule.Context, expression ast.Expr, readings map[*types.Var]bool) bool {
 	call, isCall := ast.Unparen(expression).(*ast.CallExpr)
 	if !isCall {
 		return false
 	}
-	function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "time" {
 		return false
 	}
@@ -225,13 +246,13 @@ func isMeasurement(pass *analysis.Pass, expression ast.Expr, readings map[*types
 		// start), passes it as the first argument, which the arguments already hold.
 		operands := call.Args
 		if selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr); isSelector {
-			if selection, isSelection := pass.TypesInfo.Selections[selector]; isSelection &&
+			if selection, isSelection := context.TypesInfo.Selections[selector]; isSelection &&
 				selection.Kind() == types.MethodVal {
 				operands = append([]ast.Expr{selector.X}, call.Args...)
 			}
 		}
 		for _, operand := range operands {
-			if isClockReading(pass, operand, readings) {
+			if isClockReading(context, operand, readings) {
 				return true
 			}
 		}
@@ -241,13 +262,13 @@ func isMeasurement(pass *analysis.Pass, expression ast.Expr, readings map[*types
 
 // isClockReading is whether expression is what time.Now returned: the call itself, found by the function object, or
 // a local in readings holding one.
-func isClockReading(pass *analysis.Pass, expression ast.Expr, readings map[*types.Var]bool) bool {
+func isClockReading(context *rule.Context, expression ast.Expr, readings map[*types.Var]bool) bool {
 	switch value := ast.Unparen(expression).(type) {
 	case *ast.Ident:
-		variable, isVariable := pass.TypesInfo.Uses[value].(*types.Var)
+		variable, isVariable := context.TypesInfo.Uses[value].(*types.Var)
 		return isVariable && readings[variable]
 	case *ast.CallExpr:
-		function, isFunc := typeutil.Callee(pass.TypesInfo, value).(*types.Func)
+		function, isFunc := typeutil.Callee(context.TypesInfo, value).(*types.Func)
 		return isFunc && function.Pkg() != nil && function.Pkg().Path() == "time" && function.Name() == "Now" &&
 			function.Signature().Recv() == nil
 	}
@@ -255,12 +276,12 @@ func isClockReading(pass *analysis.Pass, expression ast.Expr, readings map[*type
 }
 
 // isMeasured is whether operand is a measured duration: the measuring call itself, or a local holding one.
-func isMeasured(pass *analysis.Pass, operand ast.Expr, clock clockLocals) bool {
+func isMeasured(context *rule.Context, operand ast.Expr, clock clockLocals) bool {
 	if name, isIdentifier := ast.Unparen(operand).(*ast.Ident); isIdentifier {
-		variable, isVariable := pass.TypesInfo.Uses[name].(*types.Var)
+		variable, isVariable := context.TypesInfo.Uses[name].(*types.Var)
 		return isVariable && clock.measured[variable]
 	}
-	return isMeasurement(pass, operand, clock.readings)
+	return isMeasurement(context, operand, clock.readings)
 }
 
 // slowFailingComparisons is every comparison in condition that makes it true when a measured duration is long, so
@@ -268,7 +289,7 @@ func isMeasured(pass *analysis.Pass, operand ast.Expr, clock clockLocals) bool {
 // body: a ! turns it over, and && and || keep it, since either side of them being true moves the whole the same
 // way. A comparison inside a call's argument or anything else is not read, since what it decides is out of sight.
 func slowFailingComparisons(
-	pass *analysis.Pass,
+	context *rule.Context,
 	condition ast.Expr,
 	positive bool,
 	clock clockLocals,
@@ -276,18 +297,18 @@ func slowFailingComparisons(
 	switch expression := ast.Unparen(condition).(type) {
 	case *ast.UnaryExpr:
 		if expression.Op == token.NOT {
-			return slowFailingComparisons(pass, expression.X, !positive, clock)
+			return slowFailingComparisons(context, expression.X, !positive, clock)
 		}
 	case *ast.BinaryExpr:
 		switch expression.Op {
 		case token.LAND, token.LOR:
 			return append(
-				slowFailingComparisons(pass, expression.X, positive, clock),
-				slowFailingComparisons(pass, expression.Y, positive, clock)...,
+				slowFailingComparisons(context, expression.X, positive, clock),
+				slowFailingComparisons(context, expression.Y, positive, clock)...,
 			)
 		case token.LSS, token.GTR, token.LEQ, token.GEQ, token.EQL, token.NEQ:
-			leftFails := isMeasured(pass, expression.X, clock) && failsWhenLong(expression.Op, true, positive)
-			rightFails := isMeasured(pass, expression.Y, clock) && failsWhenLong(expression.Op, false, positive)
+			leftFails := isMeasured(context, expression.X, clock) && failsWhenLong(expression.Op, true, positive)
+			rightFails := isMeasured(context, expression.Y, clock) && failsWhenLong(expression.Op, false, positive)
 			if leftFails || rightFails {
 				return []*ast.BinaryExpr{expression}
 			}
@@ -326,7 +347,7 @@ func failsWhenLong(operator token.Token, measuredOnLeft bool, positive bool) boo
 
 // failsTestDirectly is whether body calls a failure method on a *testing.T, in it or in a block nested in it. A
 // function literal there runs whenever it is called, and a helper handed the test is out of sight, so neither counts.
-func failsTestDirectly(pass *analysis.Pass, body *ast.BlockStmt) bool {
+func failsTestDirectly(context *rule.Context, body *ast.BlockStmt) bool {
 	fails := false
 	ast.Inspect(body, func(node ast.Node) bool {
 		if fails {
@@ -345,7 +366,7 @@ func failsTestDirectly(pass *analysis.Pass, body *ast.BlockStmt) bool {
 		}
 		// A method value only, read by the type it is called on: Error and its siblings are declared on testing's
 		// unexported common and promoted to *testing.T, so the receiver is what says it is a test's.
-		selection, isSelection := pass.TypesInfo.Selections[selector]
+		selection, isSelection := context.TypesInfo.Selections[selector]
 		if !isSelection || selection.Kind() != types.MethodVal || !isPointerToTestingT(selection.Recv()) {
 			return true
 		}
@@ -359,11 +380,11 @@ func failsTestDirectly(pass *analysis.Pass, body *ast.BlockStmt) bool {
 // isTest is whether function is what go test runs as a test: named Test, or Test followed by anything but a
 // lower-case letter, with no receiver, no type parameters, no results, and one *testing.T parameter. Benchmarks,
 // fuzz targets, examples and TestMain take something else or are named otherwise, so none of them is judged.
-func isTest(pass *analysis.Pass, function *ast.FuncDecl) bool {
+func isTest(context *rule.Context, function *ast.FuncDecl) bool {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return false
 	}
-	object, isFunc := pass.TypesInfo.Defs[function.Name].(*types.Func)
+	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
 	if !isFunc {
 		return false
 	}
@@ -401,7 +422,7 @@ func isNamed(candidate types.Type, packagePath string, name string) bool {
 }
 
 // report flags comparison unless its excuse gives a reason, with the message that names what is missing.
-func report(pass *analysis.Pass, comparison *ast.BinaryExpr, given marker.Excuse) {
+func report(context *rule.Context, comparison *ast.BinaryExpr, given marker.Excuse) {
 	message := timingAssertionMessage
 	switch given {
 	case marker.WithReason:
@@ -410,7 +431,7 @@ func report(pass *analysis.Pass, comparison *ast.BinaryExpr, given marker.Excuse
 		message = timingAssertionWithoutReasonMessage
 	case marker.None:
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      comparison.Pos(),
 		End:      comparison.End(),
 		Category: message.Id,
