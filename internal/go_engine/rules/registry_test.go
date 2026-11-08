@@ -35,6 +35,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/deferred_lock_after_lock"
+	"github.com/system-inc/cohere/internal/go_engine/rules/deprecated_use"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
@@ -370,6 +371,7 @@ var portedStaticcheck = []struct {
 	{"SA1016", untrappable_signal.Analyzer},
 	{"SA1017", unbuffered_signal_channel.Analyzer},
 	{"SA1018", replace_zero_count.Analyzer},
+	{"SA1019", deprecated_use.Analyzer},
 	{"SA1020", invalid_listen_address.Analyzer},
 	{"SA1021", ip_compared_as_bytes.Analyzer},
 	{"SA1023", modified_writer_buffer.Analyzer},
