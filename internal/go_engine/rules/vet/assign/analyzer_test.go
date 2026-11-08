@@ -3,6 +3,7 @@ package assign
 import (
 	"cmp"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/assign"
+	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
@@ -25,13 +27,25 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a", "typeparams")
 }
 
-// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
-// holding every branch of the judgment and of the fix and the shapes most likely to differ, and their findings must be
-// the same multiset of file, line, column, message and fix, edit for edit. Each side's count is logged, since two
-// empty sides would match and prove nothing, and the test fails if the original finds nothing at all.
+// The original and the port run in one checker over the same fixture packages, x/tools', parity's and statements',
+// the last two holding every branch of the judgment and of the fix and the shapes most likely to differ, and their
+// findings must be the same multiset of file, line, column, message and fix, edit for edit. statements is laid out by
+// hand, which no .go file in the module may be, so it lives in testdata/statements.txtar and is extracted into a tree
+// of its own. Each side's count is logged, since two empty sides would match and prove nothing, and the test fails if
+// the original finds nothing at all.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, "a", "typeparams", "parity")
+	original, port := findingsOf(test, analysistest.TestData(), "a", "typeparams", "parity")
+	statementsOriginal, statementsPort := findingsOf(
+		test, extracted(test, filepath.Join(analysistest.TestData(), "statements.txtar")), "statements",
+	)
+	test.Logf("in statements, the original found %d, the port %d", len(statementsOriginal), len(statementsPort))
+	original, port = append(original, statementsOriginal...), append(port, statementsPort...)
+	compare := func(first finding, second finding) int {
+		return cmp.Compare(described(first), described(second))
+	}
+	slices.SortFunc(original, compare)
+	slices.SortFunc(port, compare)
 	test.Logf("the original found %d, the port %d", len(original), len(port))
 	if len(original) == 0 {
 		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
@@ -60,11 +74,34 @@ func described(found finding) string {
 	return fmt.Sprintf("%s:%d:%d: %s %s", found.file, found.line, found.column, found.message, found.fixes)
 }
 
-// findingsOf loads the fixture packages patterns name, runs x/tools' assign and the port over them in one checker,
-// and returns each one's findings, sorted.
-func findingsOf(test *testing.T, patterns ...string) (original []finding, port []finding) {
+// extracted is the directory holding the files of the txtar archive at path, written out under their names, so a
+// fixture laid out by hand reaches the loader byte for byte.
+func extracted(test *testing.T, path string) string {
 	test.Helper()
-	directory := analysistest.TestData()
+	archive, parseError := txtar.ParseFile(path)
+	if parseError != nil {
+		test.Fatalf("reading %s: %v", path, parseError)
+	}
+	if len(archive.Files) == 0 {
+		test.Fatalf("%s holds no file, so the comparison would prove nothing", path)
+	}
+	directory := test.TempDir()
+	for _, file := range archive.Files {
+		filePath := filepath.Join(directory, filepath.FromSlash(file.Name))
+		if directoryError := os.MkdirAll(filepath.Dir(filePath), 0o755); directoryError != nil {
+			test.Fatalf("making the directory of %s: %v", filePath, directoryError)
+		}
+		if writeError := os.WriteFile(filePath, file.Data, 0o644); writeError != nil {
+			test.Fatalf("writing %s: %v", filePath, writeError)
+		}
+	}
+	return directory
+}
+
+// findingsOf loads the fixture packages patterns name from the `GOPATH` tree at directory, runs x/tools' assign and the
+// port over them in one checker, and returns each one's findings.
+func findingsOf(test *testing.T, directory string, patterns ...string) (original []finding, port []finding) {
+	test.Helper()
 	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
 	loaded, loadError := load.Packages(directory, patterns, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
@@ -110,11 +147,6 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 			}
 		}
 	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
 	return original, port
 }
 

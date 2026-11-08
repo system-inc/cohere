@@ -1,4 +1,8 @@
-package parity
+statements.go is laid out by hand, not by gofmt, so a statement shares its lines with neighbours and comments,
+which is what the fix that removes a whole statement must get right. A .go file in the module must be gofmt clean,
+so it lives here, and the differential test extracts it into a `GOPATH` tree of its own and loads it as a root.
+-- src/statements/statements.go --
+package statements
 
 // Every place a statement can stand, for the fix that removes a whole self-assignment, each beside its neighbours
 // and comments on the same line, so the file is laid out by hand and is not gofmt's: gofmt would put each statement
