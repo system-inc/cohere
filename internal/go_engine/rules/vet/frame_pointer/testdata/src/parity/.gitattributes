@@ -1,0 +1,3 @@
+# carriage_returns.s is the fixture for lines that end in a carriage return and a line feed, so git keeps its bytes
+# as they are rather than normalizing them to the line feeds the root's attributes give every other file.
+carriage_returns.s -text
