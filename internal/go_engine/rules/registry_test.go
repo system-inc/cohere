@@ -925,6 +925,7 @@ var portedPasses = []string{
 	"ineffective_random_integer",
 	"ineffective_sort",
 	"ineffective_url_query_modification",
+	"infinite_recursion",
 	"integer_division_to_zero",
 	"invalid_listen_address",
 	"invalid_regular_expression",
