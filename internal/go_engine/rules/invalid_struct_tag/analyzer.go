@@ -8,8 +8,8 @@
 // literal's text between its quotes, as the original does, so a tag written as an interpreted string, its quotes
 // escaped, holds no key the parser can find, and the port leaves it alone as the original does. Duplicate `choice`,
 // `optional-value` and `default` keys are left alone in a package any of whose files imports
-// github.com/jessevdk/go-flags, which accepts them; whether it does is read once per package, in the analyzer's run,
-// and handed to each struct's check. The `json` grammar is not judged in encoding/json, encoding/json/v2 or their
+// github.com/jessevdk/go-flags, which accepts them; whether it does is read once per package, on its first struct
+// type, kept in the context's state, and handed to each struct's check. The `json` grammar is not judged in encoding/json, encoding/json/v2 or their
 // external tests, which test themselves; no fixture proves it, since a module's package of that path is ambiguous with
 // the standard library's and never loads.
 //
@@ -30,54 +30,55 @@ import (
 	"go/types"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/staticcheck/fakereflect"
 	"honnef.co/go/tools/staticcheck/fakexml"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA5008",
-	Doc: "Flags a struct tag that does not parse, names a key twice, or holds a json or xml value its package " +
+// Listener is what the port hears of each package from the dispatcher: every struct type, in preorder, each judged
+// with whether the package imports go-flags, which it reads once for the package, on the first struct type, and keeps
+// in the context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.StructType)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		structure, isStructure := node.(*ast.StructType)
+		if !isStructure {
+			// Invariant: the dispatcher hands Node only the struct types it was asked for.
+			panic("invalid_struct_tag: the dispatcher handed over a node that is not a struct type")
+		}
+		flags := rule.State[packageFlags](context)
+		if !flags.decided {
+			flags.decided, flags.importsGoFlags = true, importsGoFlags(context)
+		}
+		Check(context, structure, flags.importsGoFlags)
+	},
+}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA5008",
+	"SA5008",
+	"Flags a struct tag that does not parse, names a key twice, or holds a json or xml value its package "+
 		"would refuse: staticcheck's SA5008, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+	&Listener,
+)
+
+// packageFlags is what the port reads once of a package, in the context's state: whether any of its files imports
+// go-flags, as the original reads it before it walks anything.
+type packageFlags struct {
+	// decided is whether importsGoFlags has been read of the package yet.
+	decided bool
+	// importsGoFlags is its answer, once decided.
+	importsGoFlags bool
 }
 
 // goFlagsPath is the import path of the command-line package whose tags repeat keys on purpose.
 const goFlagsPath = "github.com/jessevdk/go-flags"
-
-// run builds the pass's context, reads whether the package imports go-flags, and judges every struct type of the
-// package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("invalid_struct_tag: the inspect pass's result is missing")
-	}
-	importsGoFlags := importsGoFlags(context)
-	inspected.Preorder([]ast.Node{(*ast.StructType)(nil)}, func(node ast.Node) {
-		structure, isStructure := node.(*ast.StructType)
-		if !isStructure {
-			// Invariant: Preorder hands this function only the struct types it was asked for.
-			panic("invalid_struct_tag: the inspector handed over a node that is not a struct type")
-		}
-		Check(context, structure, importsGoFlags)
-	})
-	return nil, nil
-}
 
 // importsGoFlags is whether any file of the package imports go-flags. It reads the import's text, not the package's
 // imports, as the original does, so a package vendored under `GOPATH`, whose path carries the vendor tree before it,
