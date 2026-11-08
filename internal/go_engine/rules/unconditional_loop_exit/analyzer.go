@@ -59,7 +59,8 @@ func Check(context *rule.Context, function ast.Node) {
 	case *ast.FuncLit:
 		body = function.Body
 	default:
-		// Invariant: run hands over only the function declarations and literals it asked the inspector for.
+		// Invariant: the dispatcher hands Node only the function declarations and literals it was asked for, and Node
+		// hands each on to Check.
 		panic(fmt.Sprintf("unconditional_loop_exit: Check was handed a %T, not a function", function))
 	}
 	if body == nil {
