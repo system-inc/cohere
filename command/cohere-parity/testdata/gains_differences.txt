@@ -1,0 +1,18 @@
+# A planted gains file: the nilness port's differences fixture as a tree, each finding only the port makes recorded
+# with the class differences.go adjudicates it under, and one gain the tree does not produce.
+
+# valueMethodCall: staticcheck reads a value receiver through the nil pointer in the caller.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:15:9: nil dereference in load
+# valueMethodValue: the same, for the method taken as a value.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:22:11: nil dereference in load
+# addressTakenLater: staticcheck lifts the variable up to the first use that takes its address.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:32:13: tautological condition: nil == nil
+# capturedLater: staticcheck lifts the variable up to the closure that captures it.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:44:13: impossible condition: nil != nil
+# onlyEverNil: staticcheck merges the same constant from every edge into that constant.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:55:15: impossible condition: nil != nil
+# initialized: buildir's functions include the closures of package-level initializers.
+internal/go_engine/rules/nil_ness/testdata/src/differences/differences.go:68:9: nil dereference in load
+
+# Recorded for a file this tree does not hold, so it is listed as not seen and fails nothing.
+elsewhere/elsewhere.go:1:1: impossible condition: nil != nil
