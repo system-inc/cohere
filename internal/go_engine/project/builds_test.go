@@ -1,6 +1,7 @@
 package project
 
 import (
+	"encoding/json"
 	"go/build"
 	"os"
 	"os/exec"
@@ -357,30 +358,37 @@ func TestBuildsForCoheresOwnCensus(test *testing.T) {
 	}
 }
 
-// hostAt is the host's build in root as go reads it: the target, cgo and tags from go list's own build context,
-// and `GOFLAGS` from go env, so the test reads no `GOFLAGS` of its own.
+// hostAt is the host's build in root as the engine's loader reads it: the target, cgo and `GOFLAGS` from go env, as
+// load's constraintContext asks, with `GOFLAGS`' `-tags` as the context's tags. go env reads no package, so the
+// test's cache key needs nothing recorded for it, and the test reads no `GOFLAGS` of its own.
 func hostAt(test *testing.T, root string) Build {
 	test.Helper()
-	listCommand := exec.Command("go", "list", "-f",
-		"{{join context.BuildTags \",\"}}\n{{context.GOOS}}\n{{context.GOARCH}}\n{{context.CgoEnabled}}", "runtime")
-	listCommand.Dir = root
-	listed, listError := listCommand.CombinedOutput()
-	if listError != nil {
-		test.Fatalf("go list: %v\n%s", listError, listed)
-	}
-	lines := strings.Split(strings.TrimSuffix(string(listed), "\n"), "\n")
-	if len(lines) != 4 {
-		test.Fatalf("go list printed %q, want the tags, the target and cgo on four lines", listed)
-	}
-	buildContext := build.Default
-	buildContext.GOOS, buildContext.GOARCH, buildContext.CgoEnabled = lines[1], lines[2], lines[3] == "true"
-	buildContext.BuildTags = strings.FieldsFunc(lines[0], func(character rune) bool { return character == ',' })
-	environmentCommand := exec.Command("go", "env", "GOFLAGS")
+	environmentCommand := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS")
 	environmentCommand.Dir = root
 	environmentCommand.Env = os.Environ()
-	goFlags, environmentError := environmentCommand.Output()
+	reported, environmentError := environmentCommand.Output()
 	if environmentError != nil {
 		test.Fatalf("go env: %v", environmentError)
 	}
-	return HostBuild(&buildContext, strings.Fields(string(goFlags)))
+	var values struct {
+		Goos       string `json:"GOOS"`
+		Goarch     string `json:"GOARCH"`
+		CgoEnabled string `json:"CGO_ENABLED"`
+		Goflags    string `json:"GOFLAGS"`
+	}
+	if decodeError := json.Unmarshal(reported, &values); decodeError != nil {
+		test.Fatalf("reading go env's answer %q: %v", reported, decodeError)
+	}
+	goFlags := strings.Fields(values.Goflags)
+	buildContext := build.Default
+	buildContext.GOOS, buildContext.GOARCH, buildContext.CgoEnabled = values.Goos, values.Goarch,
+		values.CgoEnabled == "1"
+	buildContext.BuildTags = nil
+	for _, flag := range goFlags {
+		if tags, isTags := strings.CutPrefix(strings.TrimLeft(flag, "-"), "tags="); isTags {
+			buildContext.BuildTags = append(buildContext.BuildTags,
+				strings.FieldsFunc(tags, func(character rune) bool { return character == ',' })...)
+		}
+	}
+	return HostBuild(&buildContext, goFlags)
 }
