@@ -94,6 +94,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -204,6 +205,7 @@ var ports = map[string]*analysis.Analyzer{
 	"structtag":        struct_tag.Analyzer,
 	"testinggoroutine": testing_goroutine.Analyzer,
 	"tests":            tests.Analyzer,
+	"waitgroup":        wait_group.Analyzer,
 }
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
