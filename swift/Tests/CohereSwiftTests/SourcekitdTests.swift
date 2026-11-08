@@ -88,4 +88,46 @@ struct SourcekitdTests {
         #expect(type(of: "[\"a\", \"b\"]") == "[String]")
         #expect(type(of: "names.count") == "Int")
     }
+
+    /*
+     The record sourcekitd writes from the AST its diagnostics built names the same names the check's record does,
+     for every Swift file of the check's fixture, a C module's import, string interpolation and a `@testable import`
+     among them. A record's name is a hash of every symbol, occurrence and relation it holds, so the same name is the
+     same record: lint reads one file's names alike whichever path answered for it. Red under an index request that
+     records what the build does not, `key.include_locals` among them.
+     */
+    @Test func aRecordFromTheDiagnosticsCheckIsTheChecksOwnRecord() throws {
+        let root = try CheckFixture.package()
+        let scratch = CheckFixture.scratch()
+        let checked = try CheckFixture.check(root, scratch: scratch)
+        try #require(checked.swift.failedJobs.isEmpty, "the fixture must check: \(checked.swift.failedJobs)")
+        let library = try IndexStore.toolchainLibraryPath()
+        let checkStore = try IndexStore(libraryPath: library, storePath: checked.description.indexStorePath)
+        let commands = try CompileCommands.read(layout: .check(scratchPath: scratch))
+        let files = CheckFixture.ownedFiles(root).filter { $0.url.pathExtension == "swift" }.map(\.url)
+        try #require(files.count == 4, "\(files)")
+        let answers = scratch.appendingPathComponent("answers-index", isDirectory: true)
+        for (position, file) in files.enumerated() {
+            let command = try #require(commands.command(for: file), "the check kept no command for \(file.path)")
+            let path = file.resolvingSymlinksInPath().path
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let answer = try Self.session().diagnostics(
+                file: path,
+                arguments: command.arguments,
+                text: text,
+                indexingInto: answers,
+                unitOutputPath: "/answers/\(position).o",
+            )
+            #expect(answer.indexFailure == nil, "\(answer.indexFailure.map(\.description) ?? "")")
+        }
+        let answerStore = try IndexStore(libraryPath: library, storePath: answers)
+        let checkRecords = IndexStore.freshRecords(of: files, in: [checkStore]).map { $0.first?.record }
+        let answerRecords = IndexStore.freshRecords(of: files, in: [answerStore]).map { $0.first?.record }
+        #expect(checkRecords.allSatisfy { $0 != nil }, "the control: the check recorded every file: \(checkRecords)")
+        #expect(answerRecords == checkRecords)
+        let units = try FileManager.default.contentsOfDirectory(
+            atPath: answers.appendingPathComponent("v5/units").path
+        )
+        #expect(units.count == files.count, "the store holds more than the asked files' units: \(units)")
+    }
 }

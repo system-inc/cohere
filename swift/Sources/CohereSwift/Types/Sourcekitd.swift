@@ -147,6 +147,12 @@ import Synchronization
     private let responseDispose: CohereSourcekitdResponseDispose
     /* Held for one whole question, open to close, so two callers never interleave requests. */
     private let asking = Mutex(())
+    /*
+     How many times each file was type-checked here, by the path it was asked under: once for every opened
+     document, however many requests read its AST, and once for every `indexsource`, which builds its own. The seam
+     the tests count a run's questions through.
+     */
+    private let typeChecks = Mutex<[String: Int]>([:])
 
     /* The process's session, loaded the first time anyone asks. A load that failed is retried, since nothing was initialized. */
     private static let loaded = Mutex<Sourcekitd?>(nil)
@@ -244,6 +250,57 @@ import Synchronization
         }
     }
 
+    /*
+     The diagnostics above and, from the same type check, the file's index unit and record, written into the store at
+     `indexStore` under `unitOutputPath`, a name a unit is filed under and never a file written. sourcekitd's
+     `source.request.indexsource` builds a compiler of its own and checks the file again (SwiftIndexing.cpp,
+     `indexSource`), but `source.request.index_to_store` runs on the AST its AST manager already holds, as
+     `source.request.diagnostics` does, and while the document is open that AST matches it, so the file is checked
+     once. Clang modules and system modules are left out, so the store holds this file's unit and record and nothing
+     else: no dependency is indexed again for it. Measured on ahraos-presence's body edit, 2026-11-07 (#ng5b4nx): the
+     lint phase, which had asked `indexsource`, fell from 0.79s to 0.30s, and the types phase took no longer.
+
+     A store that could not be written is said beside the diagnostics, never thrown over them: the diagnostics stand
+     either way, and the names are then asked the way any other file's are.
+     */
+    func diagnostics(
+        file: String,
+        arguments: [String],
+        text: String?,
+        indexingInto indexStore: URL,
+        unitOutputPath: String,
+    ) throws -> (diagnostics: [Diagnostic], indexFailure: Failure?) {
+        try withOpenDocument(file: file, arguments: arguments, text: text) {
+            let response: DiagnosticsResponse = try send("source.request.diagnostics") { request in
+                set(request, "key.sourcefile", file)
+                set(request, "key.compilerargs", arguments)
+            }
+            var indexFailure: Failure?
+            do {
+                let _: Acknowledgement = try send("source.request.index_to_store") { request in
+                    set(request, "key.sourcefile", file)
+                    set(request, "key.compilerargs", arguments)
+                    set(request, "key.index_store_path", indexStore.path)
+                    set(request, "key.index_unit_output_path", unitOutputPath)
+                    set(request, "key.ignore_clang_modules", 1)
+                    set(request, "key.include_system_modules", 0)
+                }
+            }
+            catch let failure as Failure {
+                indexFailure = failure
+            }
+            catch {
+                indexFailure = Failure(description: "\(error)")
+            }
+            return (response.diagnostics ?? [], indexFailure)
+        }
+    }
+
+    /* How many times this file, by the path it was asked under, was type-checked in this process. */
+    func typeChecks(of file: String) -> Int {
+        typeChecks.withLock { $0[file, default: 0] }
+    }
+
     /* The type of every expression in one file, after type checking. */
     func expressionTypes(file: String, arguments: [String], text: String? = nil) throws -> [ExpressionType] {
         try withOpenDocument(file: file, arguments: arguments, text: text) {
@@ -263,7 +320,8 @@ import Synchronization
      */
     func symbols(file: String, arguments: [String]) throws -> FileSymbols {
         let response: IndexResponse = try asking.withLock { _ in
-            try send("source.request.indexsource") { request in
+            typeChecks.withLock { $0[file, default: 0] += 1 }
+            return try send("source.request.indexsource") { request in
                 set(request, "key.sourcefile", file)
                 set(request, "key.compilerargs", arguments)
             }
@@ -293,7 +351,10 @@ import Synchronization
         text: String?,
         _ body: () throws -> Answer,
     ) throws -> Answer {
-        try asking.withLock { _ in try answerWithOpenDocument(file: file, arguments: arguments, text: text, body) }
+        try asking.withLock { _ in
+            typeChecks.withLock { $0[file, default: 0] += 1 }
+            return try answerWithOpenDocument(file: file, arguments: arguments, text: text, body)
+        }
     }
 
     private func answerWithOpenDocument<Answer>(

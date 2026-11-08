@@ -22,6 +22,11 @@ import Foundation
    cannot outlive a widening of that rule;
  - the engine binary that turned sourcekitd's answer into findings, by path, size and time.
 
+ The names in the file come from the same check (`Sourcekitd.diagnostics(file:arguments:text:indexingInto:unitOutputPath:)`),
+ so they are kept beside its findings under the same key, which holds everything they read too, and lint reads them
+ instead of asking sourcekitd to check the file a second time. An answer whose names could not be written keeps
+ none, and lint asks for them as it asks for any file's.
+
  Only the files edited now are kept, and the store is written only after the whole check succeeded, so a run
  that fell back to building leaves the last good answers, which that build's new snapshot no longer matches.
  */
@@ -29,6 +34,8 @@ struct BodiesOnlyAnswers: Codable, Equatable {
     struct Answer: Codable, Equatable {
         var key: String
         var findings: [FindingRecord]
+        /* The file's names as the same check recorded them, nil when they could not be. */
+        var names: [FileSymbols.Occurrence]?
     }
 
     /* Each checked file's answer, by resolved path. */
@@ -75,22 +82,23 @@ struct BodiesOnlyAnswers: Codable, Equatable {
     }
 
     /*
-     One file's findings: replayed from `earlier` when it holds an answer under this key, otherwise asked. Either
+     One file's answer: replayed from `earlier` when it holds an answer under this key, otherwise asked. Either
      way the answer is kept here under the key, for the run after this one.
      */
     mutating func answer(
         path: String,
         key: String,
         replaying earlier: BodiesOnlyAnswers,
-        ask: () throws -> [FindingRecord],
-    ) rethrows -> (findings: [FindingRecord], replayed: Bool) {
+        ask: () throws -> (findings: [FindingRecord], names: [FileSymbols.Occurrence]?),
+    ) rethrows -> (answer: Answer, replayed: Bool) {
         if let kept = earlier.answers[path], kept.key == key {
             answers[path] = kept
-            return (kept.findings, true)
+            return (kept, true)
         }
-        let findings = try ask()
-        answers[path] = Answer(key: key, findings: findings)
-        return (findings, false)
+        let asked = try ask()
+        let answer = Answer(key: key, findings: asked.findings, names: asked.names)
+        answers[path] = answer
+        return (answer, false)
     }
 
     /*

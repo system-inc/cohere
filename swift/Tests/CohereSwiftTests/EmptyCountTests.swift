@@ -146,6 +146,37 @@ struct EmptyCountTests {
     }
 
     /*
+     A body edit's run type-checks the edited file once: the types phase's check answers for its diagnostics and,
+     from the same AST, its names, which lint reads instead of asking sourcekitd again (#ng5b4nx). The run after it,
+     with nothing changed, replays both and checks it not at all. Counted through the session's own tally of the
+     files it type-checked. Red under a pipeline that does not hand the types phase's names to lint, which checks
+     the file twice, and once more on the replaying run.
+     */
+    @Test func aBodyEditIsTypeCheckedOnceForTypesAndLint() async throws {
+        let package = try Package(source: Self.source)
+        _ = try await package.run()
+        try package.write(
+            Self.source.replacingOccurrences(
+                of: "    items.count == 0 ||",
+                with: "    let none = items.count != 0\n    return none || items.count == 0 ||",
+            )
+        )
+        let edited = package.root.appendingPathComponent("Sources/Control/Control.swift").resolvingSymlinksInPath()
+        let session = try Sourcekitd.shared()
+        #expect(session.typeChecks(of: edited.path) == 0, "the control: nothing asked about the fresh file yet")
+        let run = try await package.run()
+        #expect(
+            run.build.contains(TypesPhase.checkedInProcessWords),
+            "the edit was built, so this test did not reach sourcekitd: \(run.build)",
+        )
+        #expect(run.lines == [6, 7, 7], "\(run.lines)")
+        #expect(session.typeChecks(of: edited.path) == 1, "the edited file was type-checked more than once")
+        let again = try await package.run()
+        #expect(again.lines == [6, 7, 7], "\(again.lines)")
+        #expect(session.typeChecks(of: edited.path) == 1, "a run that replayed the answer type-checked the file")
+    }
+
+    /*
      Lint alone on a package never built, whose build fails before compiling (a dependency `--no-fix` cannot
      resolve): no index, no recorded compile, so the file is unchecked and the run says so.
      */
