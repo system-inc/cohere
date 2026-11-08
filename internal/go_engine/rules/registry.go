@@ -58,7 +58,16 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_wrapped_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
+	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
+	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_machine_path"
@@ -99,6 +108,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
+	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -183,6 +193,16 @@ var duplicatesOfVet = map[string]string{
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
+	"ST1001":           dot_import.Analyzer,
+	"ST1006":           receiver_name.Analyzer,
+	"ST1008":           misplaced_error_result.Analyzer,
+	"ST1011":           duration_unit_suffix.Analyzer,
+	"ST1012":           error_variable_name.Analyzer,
+	"ST1013":           http_status_literal.Analyzer,
+	"ST1016":           inconsistent_receiver_name.Analyzer,
+	"ST1017":           yoda_condition.Analyzer,
+	"ST1018":           invisible_character.Analyzer,
+	"ST1019":           duplicate_import.Analyzer,
 	"appends":          appends.Analyzer,
 	"assign":           assign.Analyzer,
 	"atomic":           atomic.Analyzer,
