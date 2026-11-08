@@ -59,3 +59,37 @@ func ParenthesizedMethodExpressions() {
 	// Record.Add's one pair has no value, and the original calls the receiver a misplaced key.
 	((*slog.Record).Add)(&record, "k") // port renames: slog.Record.Add arg "&record" should be a string or a slog.Attr (possible missing key or value) => call to slog.Record.Add missing a final value
 }
+
+// StringOnly is a constraint whose one term is exactly string.
+type StringOnly interface{ string }
+
+// AliasOnly spells its one exact string term through an alias.
+type AliasOnly interface{ StringAlias }
+
+// EmbedsStringOnly embeds a string-only constraint and adds nothing.
+type EmbedsStringOnly interface{ StringOnly }
+
+// A type parameter every term of whose constraint is exactly string is string under every instantiation, so a key of
+// it is a string to slog, which the original calls neither a string nor an Attr.
+func StringOnlyTypeParameters[
+	Exact string,
+	Literal interface{ string },
+	Named StringOnly,
+	Aliased AliasOnly,
+	Embedding EmbedsStringOnly,
+](exact Exact, literal Literal, named Named, aliased Aliased, embedding Embedding, value int) {
+	// Exact can only be string, so exact is a key and value its value.
+	slog.Info("m", exact, value) // port drops: slog.Info arg "exact" should be a string or a slog.Attr (possible missing key or value)
+	// The same constraint written as an interface literal.
+	slog.Info("m", literal, value) // port drops: slog.Info arg "literal" should be a string or a slog.Attr (possible missing key or value)
+	// The same constraint by name.
+	slog.Info("m", named, value) // port drops: slog.Info arg "named" should be a string or a slog.Attr (possible missing key or value)
+	// The one term spelled through an alias of string is still exactly string.
+	slog.Info("m", aliased, value) // port drops: slog.Info arg "aliased" should be a string or a slog.Attr (possible missing key or value)
+	// A constraint embedding a string-only one is string-only.
+	slog.Info("m", embedding, value) // port drops: slog.Info arg "embedding" should be a string or a slog.Attr (possible missing key or value)
+	// A string key after a right pair, in Logger.With.
+	_ = logger.With("k", value, exact, value) // port drops: slog.Logger.With arg "exact" should be a string or a slog.Attr (possible missing key or value)
+	// The key is right and its value is missing, which the port names; the original calls the key misplaced.
+	slog.Info("m", exact) // port renames: slog.Info arg "exact" should be a string or a slog.Attr (possible missing key or value) => call to slog.Info missing a final value
+}

@@ -399,6 +399,30 @@ func Generic[Key ~string, Anything any, Attribute interface{ ~struct{} | slog.At
 	logger.Info("m", value, value)
 }
 
+// The constraints below admit a type that is not string, so a key of a type parameter they constrain is reported by
+// both: a tilde admits a named string type, which slog logs as !BADKEY, as do a union with another type and a method
+// no string has. A key of any is reported as well, and only in a key's place.
+func NotStringOnly[
+	Tilde interface{ ~string },
+	Mixed ~string | ~int,
+	Stringer interface {
+		~string
+		String() string
+	},
+	Nested interface{ interface{ ~string } },
+	Anything any,
+	Comparable comparable,
+](tilde Tilde, mixed Mixed, stringer Stringer, nested Nested, anything Anything, comparableKey Comparable) {
+	slog.Info("m", tilde, 1)
+	slog.Info("m", mixed, 1)
+	slog.Info("m", stringer, 1)
+	slog.Info("m", nested, 1)
+	slog.Info("m", anything, 1)
+	slog.Info("m", comparableKey, 1)
+	slog.Info("m", "k", anything)
+	slog.Info("m", "k", anything, "j", tilde)
+}
+
 // GenericLogger holds a logger in a generic type.
 type GenericLogger[Element any] struct {
 	*slog.Logger

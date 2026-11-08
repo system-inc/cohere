@@ -9,10 +9,15 @@
 // beside this file run both over the same packages.
 //
 // The two differ only where adjudicated, each case in testdata/src/differences and held by
-// TestPortDiffersFromOriginalOnlyWhereItIsRight, and in both the original is wrong. A key whose type is an alias of
+// TestPortDiffersFromOriginalOnlyWhereItIsRight, and in each the original is wrong. A key whose type is an alias of
 // string is a string, `type Name = string` denotes string itself, and slog takes it as a key; the original compares
 // the alias the checker records with the predeclared string, so it calls such a key neither a string nor an Attr, and
-// an unknown argument before one a key that cannot be. The port looks through the alias (isString). And a
+// an unknown argument before one a key that cannot be. The port looks through the alias (isString). A key whose type
+// is a type parameter every term of whose constraint is exactly string, `[Key string]`, is a string whatever Key is
+// instantiated to; the original calls any type parameter neither, since no string is assignable to one. The port
+// takes such a key as a string (isString), and only such a key: a term `~string` admits a named string type, which
+// slog logs as `!BADKEY` as the original reports it, so a tilde, a union with another type or a method keeps the
+// original's finding. And a
 // parenthesized method expression, `((*slog.Logger).Debug)(logger, "message", "key", 1)`, still passes its receiver
 // first; the original looks for the method expression without looking through the parentheses, so it reads the pairs
 // one argument early, reports pairs that are right and misses ones that are wrong. The port looks through them
@@ -52,8 +57,8 @@ var Analyzer = &analysis.Analyzer{
 	Run:      run,
 }
 
-// stringType is the predeclared string, which a key's static type must be, through any alias (isString): a key of a
-// named string type is no key to slog, which reports it as `!BADKEY`.
+// stringType is the predeclared string, which a key's static type must be (isString): slog reads a key with a type
+// switch whose case is string, which a named string type's value does not match, so it logs such a key as `!BADKEY`.
 var stringType = types.Universe.Lookup("string").Type()
 
 // keyValueFunctions is the original's kvFuncs, entry for entry: the functions and methods of log/slog that take
@@ -247,11 +252,42 @@ func receiverNamed(receiver *types.Var) *types.Named {
 	return named
 }
 
-// isString reports whether valueType is the predeclared string, or an alias of it. The original compares valueType
-// with string itself, and the checker records a value of an alias's type as the alias, so the original calls a key of
-// `type Name = string` no string; the port looks through the alias, as isAttr does for Attr.
+// isString reports whether every type valueType can stand for is the predeclared string, so a value of it is a string
+// to slog's type switch: string itself, through any alias, which the original misses since it compares valueType with
+// string and the checker records a value of an alias's type as the alias; a type parameter whose constraint is
+// string-only, which the original misses since no string is assignable to a type parameter; and, as such a
+// constraint, an interface every embedded element of which is string-only and which declares no method, or a union
+// every term of which is exactly string. A tilde admits named string types and is never string-only. An interface a
+// value can have embeds no type term, so it bottoms out empty or at a method, and is never string-only either.
 func isString(valueType types.Type) bool {
-	return types.Unalias(valueType) == stringType
+	switch typed := types.Unalias(valueType).(type) {
+	case *types.Basic:
+		return typed == stringType
+	case *types.TypeParam:
+		return isString(typed.Constraint())
+	case *types.Union:
+		// A union of exact terms all string would repeat a term, which does not type-check, so only a lone tilde
+		// term, `~string`, reaches here in practice, and is refused.
+		for index := range typed.Len() {
+			term := typed.Term(index)
+			if term.Tilde() || !isString(term.Type()) {
+				return false
+			}
+		}
+		return true
+	}
+	constraint, isInterface := valueType.Underlying().(*types.Interface)
+	if !isInterface || constraint.NumExplicitMethods() > 0 || constraint.NumEmbeddeds() == 0 {
+		// Not a constraint of type terms, or one with a method no string has, or `any`, whose type set is every
+		// type.
+		return false
+	}
+	for index := range constraint.NumEmbeddeds() {
+		if !isString(constraint.EmbeddedType(index)) {
+			return false
+		}
+	}
+	return true
 }
 
 // isAttr reports whether valueType is log/slog's Attr, or an alias of it. x/tools' typesinternal.IsTypeNamed, for the
