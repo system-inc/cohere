@@ -32,7 +32,8 @@ type loader struct {
 	slots chan struct{}
 
 	// parsed is each file parsed once, by path: a package and its test variant hold the same syntax, as under
-	// go/packages.
+	// go/packages. Its lock is also held while a package reserves its files' ranges in fileSet, so no other package's
+	// reservations fall between them.
 	parsedLock sync.Mutex
 	parsed     map[string]*parsedFile
 
@@ -51,11 +52,21 @@ type loader struct {
 	fromExportData atomic.Int64
 }
 
-// parsedFile is one file's parse, ready once done is closed.
+// parsedFile is one file's parse, ready once done is closed. reserved is closed once the package that claimed the file
+// has reserved its range in the file set, or found it has none to reserve, since it did not read.
 type parsedFile struct {
+	reserved   chan struct{}
 	done       chan struct{}
 	file       *ast.File
 	parseError error
+}
+
+// claim is a package's files as it took them: each one's parse, in the package's order, and which of them it claimed
+// and so reads, reserves and parses, the rest being another package's.
+type claim struct {
+	files   []string
+	parses  []*parsedFile
+	claimed []bool
 }
 
 // connect materializes each package's Imports from the roots down, depth first, as go/packages does: an import
@@ -129,6 +140,14 @@ func identifiersOf(stack []*node) string {
 // imports it, directly or through other packages the cache holds, and are never read otherwise (see needed).
 func (loader *loader) load(reachable []*node) {
 	needed := loader.needed(reachable)
+	// Every package checked from source claims its files before any parse starts, in reachable's order, which connect
+	// fixes, so which package parses a file two packages share, as p and "p [p.test]" do, is the same every run.
+	claims := map[*node]*claim{}
+	for _, current := range reachable {
+		if _, held := loader.restored[current.loaded]; !held {
+			claims[current] = loader.claim(current.loaded.CompiledGoFiles)
+		}
+	}
 	var group sync.WaitGroup
 	for _, current := range reachable {
 		if restored, held := loader.restored[current.loaded]; held {
@@ -152,8 +171,10 @@ func (loader *loader) load(reachable []*node) {
 				if readError == nil {
 					return
 				}
-				// Export data that does not read is a package checked from source after all, its imports done.
-				syntax, parseErrors := loader.parseFiles(current.loaded.CompiledGoFiles)
+				// Export data that does not read is a package checked from source after all, its imports done. It
+				// claims its files only now, after every package checked from source, so it waits only on claims
+				// made before its own.
+				syntax, parseErrors := loader.parseClaimed(loader.claim(current.loaded.CompiledGoFiles))
 				loader.slots <- struct{}{}
 				loader.check(current, syntax, parseErrors)
 				<-loader.slots
@@ -164,7 +185,7 @@ func (loader *loader) load(reachable []*node) {
 		go func() {
 			defer group.Done()
 			defer close(current.done)
-			syntax, parseErrors := loader.parseFiles(current.loaded.CompiledGoFiles)
+			syntax, parseErrors := loader.parseClaimed(claims[current])
 			for _, imported := range current.loaded.Imports {
 				<-loader.graph.nodes[imported.ID].done
 			}
@@ -248,32 +269,83 @@ func (loader *loader) readExportData(current *node, restored *Restored) error {
 	return nil
 }
 
-// parseFiles parses each of files, each file once however many packages hold it, and returns the syntax of those
-// that parsed at all, in order, and every error. The parser goes as far as it can, so a file with errors still
-// gives its syntax.
-func (loader *loader) parseFiles(files []string) ([]*ast.File, []error) {
-	parses := make([]*parsedFile, len(files))
+// claim takes each of files no package has taken yet, under one hold of the lock, so a package's claim never
+// interleaves with another's: every file of an earlier claim is that claim's or an even earlier one's, which is why a
+// claim waiting on the reservations of files others claimed (see parseClaimed) never waits on itself.
+func (loader *loader) claim(files []string) *claim {
+	taken := &claim{files: files, parses: make([]*parsedFile, len(files)), claimed: make([]bool, len(files))}
+	loader.parsedLock.Lock()
+	defer loader.parsedLock.Unlock()
 	for index, file := range files {
-		loader.parsedLock.Lock()
 		parse, found := loader.parsed[file]
 		if !found {
-			parse = &parsedFile{done: make(chan struct{})}
+			parse = &parsedFile{reserved: make(chan struct{}), done: make(chan struct{})}
 			loader.parsed[file] = parse
+			taken.claimed[index] = true
 		}
-		loader.parsedLock.Unlock()
-		parses[index] = parse
-		if !found {
-			go func() {
-				defer close(parse.done)
-				loader.slots <- struct{}{}
-				defer func() { <-loader.slots }()
-				parse.file, parse.parseError = loader.parseFile(file)
-			}()
+		taken.parses[index] = parse
+	}
+	return taken
+}
+
+// parseClaimed parses the files a claim took, each file once however many packages hold it, and returns the syntax
+// of the claim's files that parsed at all, in order, and every error. The parser goes as far as it can, so a file
+// with errors still gives its syntax.
+//
+// A file's base in the file set is fixed when its range is added, and a check that compares positions across a
+// package's files, or orders findings by position, reads which file sorts first from the bases. So the claimed files
+// are read in parallel, then their ranges reserved in the package's order once every file of the claim another
+// package took has its own, and only then parsed, in parallel, each into the range reserved for it. Their bases then
+// follow the claim's order, and the files others took come first, whatever order the reads and parses finish in.
+func (loader *loader) parseClaimed(taken *claim) ([]*ast.File, []error) {
+	contents := make([][]byte, len(taken.files))
+	readErrors := make([]error, len(taken.files))
+	var reads sync.WaitGroup
+	for index, file := range taken.files {
+		if !taken.claimed[index] {
+			continue
 		}
+		loader.filesParsed.Add(1)
+		reads.Go(func() {
+			loader.slots <- struct{}{}
+			defer func() { <-loader.slots }()
+			contents[index], readErrors[index] = loader.readFile(file)
+		})
+	}
+	reads.Wait()
+	for index, parse := range taken.parses {
+		if !taken.claimed[index] {
+			<-parse.reserved
+		}
+	}
+	placeholders := make([]*token.File, len(taken.files))
+	loader.parsedLock.Lock()
+	for index, file := range taken.files {
+		if taken.claimed[index] && readErrors[index] == nil {
+			placeholders[index] = loader.fileSet.AddFile(file, -1, len(contents[index]))
+		}
+	}
+	loader.parsedLock.Unlock()
+	for index, parse := range taken.parses {
+		if !taken.claimed[index] {
+			continue
+		}
+		close(parse.reserved)
+		if readErrors[index] != nil {
+			parse.parseError = readErrors[index]
+			close(parse.done)
+			continue
+		}
+		go func() {
+			defer close(parse.done)
+			loader.slots <- struct{}{}
+			defer func() { <-loader.slots }()
+			parse.file, parse.parseError = loader.parseInto(taken.files[index], contents[index], placeholders[index])
+		}()
 	}
 	var syntax []*ast.File
 	var parseErrors []error
-	for _, parse := range parses {
+	for _, parse := range taken.parses {
 		<-parse.done
 		if parse.file != nil {
 			syntax = append(syntax, parse.file)
@@ -285,18 +357,38 @@ func (loader *loader) parseFiles(files []string) ([]*ast.File, []error) {
 	return syntax, parseErrors
 }
 
-// parseFile reads and parses one file in the mode go/packages parses in, from the overlay when it holds the file, else
-// from the bytes the run holds of it, else from disk.
-func (loader *loader) parseFile(file string) (*ast.File, error) {
-	loader.filesParsed.Add(1)
+// readFile is one file's bytes: the overlay's when it holds the file, else the ones the run holds of it, else the
+// disk's.
+func (loader *loader) readFile(file string) ([]byte, error) {
 	if contents, overlaid := loader.overlay[file]; overlaid {
-		return parser.ParseFile(loader.fileSet, file, contents, parser.AllErrors|parser.ParseComments)
+		return contents, nil
 	}
-	contents, readError := loader.held.read(file)
-	if readError != nil {
-		return nil, readError
+	return loader.held.read(file)
+}
+
+// parseInto parses one file's contents in the mode go/packages parses in, into the range placeholder reserved for it
+// in the file set. The parse runs in a file set of its own, whose next base is the reservation's: go/token gives the
+// first file of a new set base 1 and the file after one of size n the base after it plus n plus 1, so a first file of
+// size base-2 leaves the next at exactly base, and a base of 1 needs none. The parsed file then takes the
+// placeholder's place.
+//
+// Between the removal and the add the range belongs to no file, which no reader can see: no position in it exists
+// until the parse that returns here is published, by the file's done, and every other file the set adds, as export
+// data's, takes a base past every reservation, since removing a file never lowers the set's next base.
+func (loader *loader) parseInto(file string, contents []byte, placeholder *token.File) (*ast.File, error) {
+	own := token.NewFileSet()
+	if placeholder.Base() >= 2 {
+		own.AddFile("", -1, placeholder.Base()-2)
 	}
-	return parser.ParseFile(loader.fileSet, file, contents, parser.AllErrors|parser.ParseComments)
+	syntax, parseError := parser.ParseFile(own, file, contents, parser.AllErrors|parser.ParseComments)
+	parsed := own.File(token.Pos(placeholder.Base()))
+	if parsed == nil || parsed.Base() != placeholder.Base() || parsed.Size() != placeholder.Size() {
+		return nil, fmt.Errorf("parsing %s: its file did not take the range reserved for it, base %d", file,
+			placeholder.Base())
+	}
+	loader.fileSet.RemoveFile(placeholder)
+	loader.fileSet.AddExistingFiles(parsed)
+	return syntax, parseError
 }
 
 // check type-checks one package from syntax, whose imports are checked, as go/packages' loadPackage does, so its

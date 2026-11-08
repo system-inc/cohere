@@ -9,14 +9,15 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/nilness"
-	"golang.org/x/tools/go/analysis/passes/unusedwrite"
+	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/analysis/suite/vet"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
 
 // registry is All() built once, for every test in the package to read.
@@ -153,16 +154,45 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 }
 
 // TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
-// after vet's suite, as tools rules running their own analyzers.
+// after vet's suite, as tools rules under the originals' names, each running our port onto staticcheck's
+// intermediate form.
 func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 	test.Parallel()
-	expected := []*analysis.Analyzer{nilness.Analyzer, unusedwrite.Analyzer}
+	expected := []*analysis.Analyzer{nil_ness.Analyzer, unused_write.Analyzer}
 	expectBlock(test, len(vet.Suite), expected, rule.OriginTools)
 	for _, analyzer := range expected {
 		registeredRule, found := registeredRuleNamed(rule.Namespace + analyzer.Name)
 		if found && !registeredRule.TypeAware {
-			test.Errorf("%q reads SSA built from type information, so it is type aware", analyzer.Name)
+			test.Errorf("%q reads a program form built from type information, so it is type aware", analyzer.Name)
 		}
+	}
+}
+
+// TestNoRuleRequiresXToolsSingleAssignmentForm holds the run to one program form: no registered rule, nor
+// anything it requires, needs x/tools' buildssa, which cost 1.2 to 1.7 CPU-s a cold run on cohere for two passes
+// whose ports read the form staticcheck's checks already build (#pn1xvnd).
+func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
+	test.Parallel()
+	seen := map[*analysis.Analyzer]bool{}
+	var visit func(analyzer *analysis.Analyzer, ruleName string)
+	visit = func(analyzer *analysis.Analyzer, ruleName string) {
+		if seen[analyzer] {
+			return
+		}
+		seen[analyzer] = true
+		if analyzer == buildssa.Analyzer {
+			test.Errorf("%s requires x/tools' buildssa, so the run builds a second program form", ruleName)
+		}
+		for _, required := range analyzer.Requires {
+			visit(required, ruleName)
+		}
+	}
+	for _, registeredRule := range registry {
+		visit(registeredRule.Analyzer, registeredRule.Name)
+	}
+	if len(seen) <= len(registry) {
+		test.Errorf("the walk saw %d analyzers over %d rules, so it never reached what they require", len(seen),
+			len(registry))
 	}
 }
 
@@ -304,14 +334,20 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own:
 // marker reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a
 // sum type's variant whose methods only mark it, served finds the types a file serves for the two rules that count
-// them, and positions is the line table rules read a node's position from without the FileSet's lock.
+// them, positions is the line table rules read a node's position from without the FileSet's lock, and staticcheck_ir
+// hands the ported passes the functions of staticcheck's intermediate representation.
 var sharedReaders = map[string]bool{
-	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true,
+	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true, "staticcheck_ir": true,
 }
 
+// portedPasses is the packages under rules/ that hold an upstream pass ported onto staticcheck's intermediate
+// representation. Each runs beside its original until it matches it finding for finding, and then All registers it
+// under the original's name in the original's place (#pn1xvnd), so House never lists it.
+var portedPasses = map[string]bool{"unused_write": true, "nil_ness": true}
+
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
-// testdata and the shared readers, is one house rule named for it, and House lists it. A rule package nobody
-// registered would build, pass its own fixtures and run on nothing.
+// testdata, the shared readers and the ported passes, is one house rule named for it, and House lists it. A rule
+// package nobody registered would build, pass its own fixtures and run on nothing.
 func TestEveryRulePackageIsInHouse(test *testing.T) {
 	test.Parallel()
 	entries, readError := os.ReadDir(".")
@@ -324,7 +360,7 @@ func TestEveryRulePackageIsInHouse(test *testing.T) {
 	}
 	packages := 0
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == "testdata" || sharedReaders[entry.Name()] {
+		if !entry.IsDir() || entry.Name() == "testdata" || sharedReaders[entry.Name()] || portedPasses[entry.Name()] {
 			continue
 		}
 		packages++
