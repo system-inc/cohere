@@ -724,6 +724,7 @@ var portedPasses = []string{
 	"receiver_name",
 	"repeated_if_else_condition",
 	"self_assignment",
+	"single_argument_append",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unobserved_append",
