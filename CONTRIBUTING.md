@@ -162,6 +162,8 @@ refused, and the refusal is listed with its reason. The passes:
   written as words. `-global` reaches across packages. A word with several meanings (`pos`) is listed for a
   person, never given its first.
 - `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
+- `octal_prefix`: each literal the octal-prefix rule flags, `0644` written as `0o644`, through the same reload,
+  every literal of a rewritten file proven to keep its constant value.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
   same wrap, `internal/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
   comment or taking a file past the long-file limit), `type_split` (one type
