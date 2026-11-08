@@ -14,12 +14,12 @@
 // code.Matches walks a package only when code.CouldMatchAny finds one of the three in staticcheck's type index of it,
 // which holds sort only when the package imports it or uses a method or field it declares, so a package reaching
 // sort.IntSlice only through another package's alias is not walked, and staticcheck_code.IndexedObject asks the
-// same before the port walks. The generated-file judgment filters nothing, since the original asks none. The message
-// renders the conversion through staticcheck_report.Render, and the fix, a call of sort.Ints, sort.Float64s or
-// sort.Strings spelled sort whatever the file names the package, is printed by staticcheck's analysis/edit, borrowed
-// in this wave as the original uses it, through staticcheck_report.Fixes. The registry still runs the original, which
-// stays the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they
-// hold.
+// same once a package, before the port judges any assignment of it. The generated-file judgment filters nothing,
+// since the original asks none. The message renders the conversion through staticcheck_report.Render, and the fix, a
+// call of sort.Ints, sort.Float64s or sort.Strings spelled sort whatever the file names the package, is printed by
+// staticcheck's analysis/edit, borrowed in this wave as the original uses it, through staticcheck_report.Fixes. The
+// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
+// packages, and the two differ nowhere they hold.
 package ineffective_sort
 
 import (
@@ -28,26 +28,54 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4029",
-	Doc: "Flags x = sort.IntSlice(x) and its twins, a conversion that sorts nothing: staticcheck's SA4029, ported as " +
+// Listener is what the port hears of each package from the dispatcher: every assignment, in preorder, judged only
+// where the type index would hold one of sort's slice types, which it asks once for the package, on the first
+// assignment, and keeps in the context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.AssignStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		assignment, isAssignment := node.(*ast.AssignStmt)
+		if !isAssignment {
+			// Invariant: the dispatcher hands Node only the assignments it was asked for.
+			panic("ineffective_sort: the dispatcher handed over a node that is not an assignment")
+		}
+		match := rule.State[packageMatch](context)
+		if !match.decided {
+			match.decided, match.couldMatch = true, couldMatch(context)
+		}
+		if !match.couldMatch {
+			return
+		}
+		Check(context, assignment)
+	},
+}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4029",
+	"SA4029",
+	"Flags x = sort.IntSlice(x) and its twins, a conversion that sorts nothing: staticcheck's SA4029, ported as "+
 		"a check on types and syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+	&Listener,
+)
+
+// packageMatch is what the port asks once of a package, in the context's state: whether the type index holds one of
+// sort's slice types, as the original asks before it walks anything.
+type packageMatch struct {
+	// decided is whether couldMatch has been asked of the package yet.
+	decided bool
+	// couldMatch is its answer, once decided.
+	couldMatch bool
 }
 
 // sliceTypes are sort's slice types the pattern names, each with the sorting function the fix calls in its place.
@@ -58,32 +86,6 @@ var sliceTypes = []struct {
 	{"Float64Slice", "Float64s"},
 	{"IntSlice", "Ints"},
 	{"StringSlice", "Strings"},
-}
-
-// run builds the pass's context and judges every assignment of the package, once the type index would hold one of
-// sort's slice types.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	if !couldMatch(context) {
-		return nil, nil
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("ineffective_sort: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.AssignStmt)(nil)}, func(node ast.Node) {
-		assignment, isAssignment := node.(*ast.AssignStmt)
-		if !isAssignment {
-			// Invariant: Preorder hands this function only the assignments it was asked for.
-			panic("ineffective_sort: the inspector handed over a node that is not an assignment")
-		}
-		Check(context, assignment)
-	})
-	return nil, nil
 }
 
 // couldMatch is code.CouldMatchAny of the pattern: whether staticcheck's type index of the package holds any of the
