@@ -39,10 +39,14 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 //
 // `no-cache` is the front door's as much as the engine's: the run neither replays nor records (see
 // beginGoRunCache), and it is forwarded so a cache the engine keeps of its own is off too.
+//
+// `other-builds` is Go's alone: the engine checks every build the project's files name beside the host's, so a file
+// only another build compiles is checked and no gap (#72n9mq0). The run cache admits it, as its own record, since the
+// key holds every argument and the engine's inputs record names every build's load (#e4b08k7).
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "no-cache",
+		"rules", "rules-enabled", "version", "no-cache", "other-builds",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open",

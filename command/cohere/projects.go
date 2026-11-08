@@ -62,13 +62,15 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 //
 // lintConfigFileName is the lint config the command line named, absolute, or empty: every project's run
 // gets it, since a path typed here would resolve against each project's directory there. formats is whether
-// the run formats, which decides whether a root no TypeScript project holds gets its format project.
+// the run formats, which decides whether a root no TypeScript project holds gets its format project. given is
+// the flags the command line set, by name.
 func checkDiscoveredProjects(
 	location projectLocation,
 	locateError error,
 	workingDirectory string,
 	lintConfigFileName string,
 	formats bool,
+	given map[string]bool,
 ) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
 	ignoreEntries, rootIgnoreEntriesError := rootIgnoreEntries(root)
@@ -118,6 +120,9 @@ func checkDiscoveredProjects(
 			projectMarker, swiftProjectMarker, goWorkspaceMarker, goModuleMarker, root, solutions, found.Ignored,
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
+	if refuseError := refuseGoOnlySwitchesWithoutGo(found, given, flagValue); refuseError != nil {
+		return 0, false, refuseError
+	}
 	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
 	discoveredIgnores = append(
 		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
@@ -161,6 +166,53 @@ func childArguments(arguments []string, lintConfigFileName string) []string {
 		kept = append(kept, arguments[index])
 	}
 	return append(kept, "--lint-config", lintConfigFileName)
+}
+
+// goOnlySwitches are the switches only a Go run takes (goFlags): every other engine's child is run without them, so
+// one command line at a root holding several projects checks the Go one's other builds, where Swift's run would
+// refuse the switch and TypeScript's has no other build to check.
+var goOnlySwitches = []string{"other-builds"}
+
+// refuseGoOnlySwitches refuses a run that is no Go project's and was typed one of goOnlySwitches, rather than
+// ignoring it, since a flag accepted and ignored reads as a run that did what was asked. Discovery hands them to a Go
+// project's run alone (withoutGoOnlySwitches) and refuses them at a root with no Go project
+// (refuseGoOnlySwitchesWithoutGo), so here only a TypeScript run discovery leaves alone, such as one naming
+// --directory, meets this; Swift's refuses them as its engine's arguments are built (engineArguments).
+func refuseGoOnlySwitches(given map[string]bool, value func(string) string) error {
+	for _, name := range goOnlySwitches {
+		if given[name] && value(name) == "true" {
+			return fmt.Errorf("--%s checks the other builds of a Go project's files, and this is no Go project, so "+
+				"nothing was checked", name)
+		}
+	}
+	return nil
+}
+
+// refuseGoOnlySwitchesWithoutGo refuses a run at a discovered root that was typed one of goOnlySwitches when no
+// project found is a Go one. runProjects hands those switches to a Go project's run alone, so at a root of only
+// TypeScript and Swift projects they would reach no run, and the run would read as one that did what was asked.
+// A root holding a Go project takes them, and its other projects run without them.
+func refuseGoOnlySwitchesWithoutGo(found discovery, given map[string]bool, value func(string) string) error {
+	for _, project := range found.Projects {
+		if project.Engine == engineGo {
+			return nil
+		}
+	}
+	return refuseGoOnlySwitches(given, value)
+}
+
+// withoutGoOnlySwitches is arguments less each of goOnlySwitches, as `--name` or `--name=value`, one dash or two. Every
+// argument is a flag here (see childArguments), and a boolean flag takes no separate value.
+func withoutGoOnlySwitches(arguments []string) []string {
+	kept := make([]string, 0, len(arguments))
+	for _, argument := range arguments {
+		name, _, _ := strings.Cut(strings.TrimLeft(argument, "-"), "=")
+		if strings.HasPrefix(argument, "-") && slices.Contains(goOnlySwitches, name) {
+			continue
+		}
+		kept = append(kept, argument)
+	}
+	return kept
 }
 
 // projectRun is one project's run, as its child reported it.
@@ -240,10 +292,13 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 			continue
 		}
 		projectArguments := arguments
+		if project.Engine != engineGo {
+			projectArguments = withoutGoOnlySwitches(arguments)
+		}
 		// TypeScript runs alone: the cache it turns off is cohere's table in the directory, which a Swift run
 		// never reads or writes, so a Swift run in the same directory keeps its own cache.
 		if found.Ownership.SharedDirectory[label] && project.Engine == engineTypeScript {
-			projectArguments = append(slices.Clone(arguments), "--no-cache")
+			projectArguments = append(slices.Clone(projectArguments), "--no-cache")
 		}
 		openPath := ""
 		if activeOpen != nil {

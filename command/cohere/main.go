@@ -135,6 +135,11 @@ func run() error {
 	// incremental build info.
 	noCache := flag.Bool("no-cache", false,
 		"read nothing from and write nothing to this project's caches (the cache table and the tsconfig's incremental build info), so every phase computes from source")
+	// Go's alone, forwarded to its engine and to nothing else (goFlags, withoutGoOnlySwitches), and read through given:
+	// a file only another platform, cgo setting or build tag compiles is checked, and otherwise a gap (#72n9mq0).
+	flag.Bool("other-builds", false,
+		"in a Go project, check every build its files name beside this machine's (another GOOS, cgo, a build tag) "+
+			"and merge their findings, so only a file no build compiles is left unchecked")
 	// A binary that implements no rule and a binary whose rule found nothing produce the same empty
 	// finding list, and the differential harness cannot tell them apart from the outside. This is how
 	// it asks.
@@ -303,6 +308,7 @@ func run() error {
 			workingDirectory,
 			namedLintConfiguration,
 			formats,
+			given,
 		)
 		if checkDiscoveredProjectsError != nil {
 			return checkDiscoveredProjectsError
@@ -346,6 +352,9 @@ func run() error {
 			finishRunCache(exitCode)
 		}
 		return nil
+	}
+	if goOnlyError := refuseGoOnlySwitches(given, flagValue); goOnlyError != nil {
+		return goOnlyError
 	}
 
 	if *listRules {
@@ -1986,14 +1995,4 @@ func narrowToClosure(
 
 	scope.DependentCount = len(closure) - len(seeds)
 	return scope, closure
-}
-
-// reportForeignCheckers says, under the COHERE_TEST_FOREIGN_CHECKERS instrument, how many files a walk put on
-// a checker other than their own, so a test comparing the two runs can tell the instrument took effect.
-func reportForeignCheckers(graph *program.Graph, walked program.Result, files int) {
-	if graph.WalkOnForeignCheckers {
-		fmt.Fprintf(streams.Errors, "foreign checkers: %d of %d files walked on a checker other than their own\n",
-			walked.FilesOnForeignCheckers, files)
-		showWarning()
-	}
 }

@@ -913,7 +913,9 @@ func TestALandingOntoAMainThatCannotTakeItRunsItsOwnLand(test *testing.T) {
 // The gate's fifth step refuses a landing unless cohere on the tree reads 0 (#06g3f7x): a finding is refused
 // with the finding printed, a run that passes but names a gap is refused naming it, and a clean run lands.
 // Before, the gate never ran cohere on cohere, and two landings that each read green brought main 8 findings.
-// The stand-in prints what a bare `cohere --no-fix --json` would.
+// The stand-in prints what `cohere --no-fix --other-builds --json` would, and keeps the command line it was given,
+// which must check every build (#72n9mq0): without `--other-builds` a file only another platform builds is a gap the
+// gate would refuse every landing over, never checked.
 func TestTheGateRefusesALandingCohereDoesNotReadZeroOn(test *testing.T) {
 	test.Parallel()
 	clean := `{"kind":"summary","schemaVersion":1,"label":".","verdict":"pass","findings":0,"typeErrors":0,` +
@@ -950,11 +952,8 @@ func TestTheGateRefusesALandingCohereDoesNotReadZeroOn(test *testing.T) {
 				test.Fatal(writeError)
 			}
 			standIn := filepath.Join(test.TempDir(), "cohere")
-			script := fmt.Sprintf(
-				"#!/bin/sh\n[ \"$*\" = '--no-fix --json' ] || exit 9\ngrep . '%s'\nexit %d\n",
-				records,
-				gate.exit,
-			)
+			given := filepath.Join(test.TempDir(), "given")
+			script := fmt.Sprintf("#!/bin/sh\necho \"$*\" > '%s'\ngrep . '%s'\nexit %d\n", given, records, gate.exit)
 			if writeError := os.WriteFile(standIn, []byte(script), 0o755); writeError != nil {
 				test.Fatal(writeError)
 			}
@@ -963,6 +962,10 @@ func TestTheGateRefusesALandingCohereDoesNotReadZeroOn(test *testing.T) {
 			landing.Dir = fixture.worktree("a")
 			landing.Env = append(fixture.environment, gateCohereVariable+"="+standIn)
 			output, outputError := landing.CombinedOutput()
+			const wantGiven = "--no-fix --other-builds --json"
+			if ran := strings.TrimSpace(string(readMaybeMissing(test, given))); ran != wantGiven {
+				test.Errorf("the gate ran cohere %q, want %q, which checks every build:\n%s", ran, wantGiven, output)
+			}
 			for _, want := range gate.want {
 				if !strings.Contains(string(output), want) {
 					test.Errorf("the landing's output lacks %q:\n%s", want, output)

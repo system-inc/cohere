@@ -105,6 +105,95 @@ func TestGoEngineArgumentsForwardNoCache(test *testing.T) {
 	}
 }
 
+// TestOtherBuildsReachTheGoEngineAlone: `--other-builds` is forwarded to the Go engine, which checks every build the
+// project's files name (#72n9mq0). Swift's run refuses it by name, and discovery hands it to no project's run but a Go
+// one's, so at a root holding a Swift package beside a Go module the Swift run is not refused over it.
+func TestOtherBuildsReachTheGoEngineAlone(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	arguments, mode, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root),
+		map[string]bool{"no-fix": true, "other-builds": true}, typedTrue, nil)
+	if argumentsError != nil {
+		test.Fatalf("--other-builds was refused for Go: %v", argumentsError)
+	}
+	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--other-builds"}
+	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
+		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
+			engineModeCheck)
+	}
+
+	_, _, swiftError := engineArguments(swiftLanguage, swiftFlags, goTestLocation(root),
+		map[string]bool{"no-fix": true, "other-builds": true}, typedTrue, nil)
+	if swiftError == nil || !strings.Contains(swiftError.Error(), "--other-builds is not implemented for Swift") {
+		test.Errorf("--other-builds was not refused by name for Swift: %v", swiftError)
+	}
+
+	given := []string{"--no-fix", "--other-builds", "-other-builds=true", "--json", "--lint-config", "/a/b.json"}
+	if kept := withoutGoOnlySwitches(given); !slices.Equal(kept,
+		[]string{"--no-fix", "--json", "--lint-config", "/a/b.json"}) {
+		test.Errorf("another engine's child is handed %q, want every flag but --other-builds", kept)
+	}
+}
+
+// TestOtherBuildsAreRefusedAtARootWithNoGoProject: discovery hands `--other-builds` to a Go project's run alone, so
+// at a root of only TypeScript and Swift projects it would reach no run and the run would read as one that checked
+// what was asked. Such a root refuses it before any project runs, the way a run at a TypeScript project does, while
+// a root holding a Go module takes it, and `--other-builds=false` asks for nothing to refuse.
+func TestOtherBuildsAreRefusedAtARootWithNoGoProject(test *testing.T) {
+	test.Parallel()
+	typeScriptAndSwift := map[string]string{
+		"web/tsconfig.json":   discoveryTsconfig,
+		"web/source/a.ts":     "export const a = 1;\n",
+		"tools/Package.swift": discoveryPackage,
+	}
+	withGo := map[string]string{"service/go.mod": "module example.com/service\n\ngo 1.27\n"}
+	for path, contents := range typeScriptAndSwift {
+		withGo[path] = contents
+	}
+	for name, testCase := range map[string]struct {
+		files   map[string]string
+		value   string
+		refused bool
+	}{
+		"TypeScript and Swift, the switch on":    {files: typeScriptAndSwift, value: "true", refused: true},
+		"TypeScript and Swift, the switch off":   {files: typeScriptAndSwift, value: "false"},
+		"a Go module beside them, the switch on": {files: withGo, value: "true"},
+	} {
+		test.Run(name, func(test *testing.T) {
+			test.Parallel()
+			found, discoverProjectsError := discoverProjects(newRepository(test, testCase.files), nil)
+			if discoverProjectsError != nil {
+				test.Fatal(discoverProjectsError)
+			}
+			refuseError := refuseGoOnlySwitchesWithoutGo(
+				found,
+				map[string]bool{"other-builds": true},
+				func(string) string { return testCase.value },
+			)
+			if refused := refuseError != nil; refused != testCase.refused {
+				test.Errorf("refused is %v (%v), want %v for the projects %+v", refused, refuseError,
+					testCase.refused, found.Projects)
+			}
+		})
+	}
+
+	// The real binary at a root of two TypeScript projects, so the refusal is proven where discovery calls it,
+	// before either project's run starts.
+	binary := buildCohere(test)
+	root := newRepository(test, map[string]string{
+		"web/tsconfig.json":   discoveryTsconfig,
+		"web/source/a.ts":     "export const a = 1;\n",
+		"admin/tsconfig.json": discoveryTsconfig,
+		"admin/source/b.ts":   "export const b = 2;\n",
+	})
+	output, exitCode := runCohere(test, binary, root, "--no-fix", "--other-builds")
+	if exitCode == 0 || !strings.Contains(output, "--other-builds checks the other builds of a Go project's files") ||
+		strings.Contains(output, "(TypeScript) ==") || strings.Contains(output, "✓") {
+		test.Errorf("a root with no Go project exited %d over --other-builds, want it refused before any run:\n%s",
+			exitCode, output)
+	}
+}
+
 // TestGoContainerNamesAWorkspaceOrAModule: a root holding a go.work is a workspace in the run's words, and
 // one holding only a go.mod is a module.
 func TestGoContainerNamesAWorkspaceOrAModule(test *testing.T) {

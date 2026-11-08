@@ -75,6 +75,10 @@
             "usage": "open files with remaining findings in code after the run (composes with --types and --lint)"
         },
         {
+            "name": "other-builds",
+            "usage": "in a Go project, check every build its files name beside this machine's (another GOOS, cgo, a build tag) and merge their findings, so only a file no build compiles is left unchecked"
+        },
+        {
             "name": "phases",
             "usage": "put where the time went first in the footer's parentheses"
         },
