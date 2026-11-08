@@ -26,6 +26,7 @@ import (
 //	a link's target hashed with a newline: TestHashFileIsWhatGitHashObjectHashes
 //	sha256 picked by anything but the name's length: TestCommitHashesAsGitHashesIt
 //	the commit's tree line not checked against the listing: TestCheckCommitRefusesAnotherCommitsListing
+//	ParseIndexListing's stage dropped: TestParseIndexListingReadsAMergeLeftInConflict
 
 // permissionModes are the permissions the fixture's files are written at, each beside the mode git
 // records for it: the owner's executable bit decides, and the group's and others' change nothing.
