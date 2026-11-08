@@ -279,7 +279,7 @@ var ports = map[string]port{
 	"ST1017":           {analyzer: yoda_condition.Analyzer, listener: &yoda_condition.Listener},
 	"ST1018":           {analyzer: invisible_character.Analyzer, listener: &invisible_character.Listener},
 	"ST1019":           {analyzer: duplicate_import.Analyzer, listener: &duplicate_import.Listener},
-	"appends":          {analyzer: appends.Analyzer},
+	"appends":          {analyzer: appends.Analyzer, listener: &appends.Listener},
 	"asmdecl":          {analyzer: asm_decl.Analyzer},
 	"assign":           {analyzer: assign.Analyzer},
 	"atomic":           {analyzer: atomic.Analyzer},
