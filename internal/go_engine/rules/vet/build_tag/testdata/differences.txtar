@@ -1,8 +1,9 @@
 Package differences: the one shape where the port and the original disagree, an excluded Go file that does not
 parse, after which the original checks no excluded file, Go or other, and the port checks every one. A finding only
 the port makes is recorded on its line after the original's testing hack, a spaced `// ERROR` comment, which ends
-what either side reads of the line. It is an archive because one file does not parse, and cohere's gofmt guard reads
-every Go file under testdata.
+what either side reads of the line, with its reason on the line above, a comment that names no constraint, so
+where either side allows a constraint is unchanged. It is an archive because one file does not parse, and cohere's
+gofmt guard reads every Go file under testdata.
 -- src/differences/differences.go --
 // Package differences holds the excluded files around one that does not parse.
 package differences
@@ -27,8 +28,10 @@ func {
 
 package differences
 
+// Only the port checks this excluded file, named after the one that does not parse.
 // +build late // ERROR // port finds: misplaced +build comment
 -- src/differences/excluded.s --
 //go:build never
+// Only the port checks this excluded file, named after the one that does not parse.
 // +build late // ERROR // port finds: misplaced +build comment
 #include "textflag.h"
