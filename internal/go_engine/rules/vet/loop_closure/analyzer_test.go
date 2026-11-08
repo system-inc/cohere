@@ -213,8 +213,10 @@ func runs(values []int, test *T) {
 // no function launches nothing, and a Run's literal with no parameter has no *testing.T to call Parallel on, so
 // nothing in either can outlive its iteration and the port, finding nothing, is right. A panic in the checker takes the
 // whole test binary down, so the original runs on a hand-built pass under a recover, which pins its crash, and the
-// port runs on another over the same file. The harness has no form for a crash, and its differences records pair
-// findings, where here the original has none, so this tier keeps its own passes.
+// port runs on another over the same file. The harness's RequirePortWhereOriginalPanics cannot take either case: it
+// holds the port to the fixture's `finds:` records and fails a fixture that records none, where in errgroup's case the
+// port rightly finds nothing, and testing's case needs a package at the standard library's path testing, which go
+// list, the harness's only loader, refuses as ambiguous. So this tier keeps its own passes.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	cases := []struct {

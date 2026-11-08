@@ -39,7 +39,8 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 
 // Over the differences fixtures the two disagree, and only where each disagreement was adjudicated in the port's
 // favour, as the fixtures record it on the finding's line, with the reason on the line above: a move is a finding
-// both make, the original's over the wrong bytes, and a find a true finding only the port makes. The differences
+// both make, the original's over the wrong bytes, and a find a true finding only the port makes, each edit of its fix
+// a `fixes:` record of the text it writes, so the find at a named constant, with none, offers no edit. The differences
 // package is gofmt-clean and lives in testdata/src. The carriage returns of carriage.go are not, since gofmt drops a
 // raw literal's, so it lives in carriage.txtar and is extracted into a directory of the test's own.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
@@ -48,13 +49,15 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	parity.RequireOnlyAdjudicated(test, timeformat.Analyzer, Analyzer, extractedCarriage(test), "carriage")
 }
 
-// The harness pairs a move by line and message alone, and a find by line and message, so over the same fixtures this
-// holds what the records cannot: each fix applied. Every finding the port alone makes that has an end offers one fix,
-// one edit of its own span, on one line, to goodFormat, replacing source that spells badFormat alone and leaving the
-// literal's value as it was with goodFormat in the mistake's place, so the span is the bytes that spell the mistake
-// and no others. One with no end, a layout that is not one literal, sits at a name and offers no fix. And every
+// The harness pairs a move by line and message alone, and holds a find's fixes only by the line each edit starts on
+// and the text it writes, so over the same fixtures this holds what the records cannot: each fix applied. Every
+// finding the port alone makes that has an end, a move's or a find's, offers one fix, one edit of its own span, on one
+// line, to goodFormat, replacing source that spells badFormat alone and leaving the literal's value as it was with
+// goodFormat in the mistake's place, so the span is the bytes that spell the mistake and no others. One with no end, a
+// layout that is not one literal, sits at a name and offers no fix: its `finds:` record, with no `fixes:` record after
+// it, counts edits, not fixes, so a fix with no edits there would pass the record, and only this catches it. And every
 // finding the original alone makes offers a fix that fails the same check, since a move whose original fix were right
-// would be no difference.
+// would be no difference, and a `moves:` record holds only that the two differ.
 func TestPortsFixesReplaceTheMistakeAlone(test *testing.T) {
 	test.Parallel()
 	checkFixes(test, analysistest.TestData(), "differences")
