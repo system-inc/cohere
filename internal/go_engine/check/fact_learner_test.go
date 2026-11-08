@@ -49,12 +49,12 @@ func TestARunLearnsFactsThroughADispatcherOnlyForItsOwnRules(test *testing.T) {
 	dispatcher := dispatch.NewSyntax()
 	quietListener := &rule.Listener{
 		Nodes: []ast.Node{(*ast.Ident)(nil)},
-		Node:  func(*rule.Context, ast.Node, []ast.Node) {},
+		Node:  func(*rule.Context, ast.Node, []ast.Node) { /* Planted: only its requirements matter. */ },
 	}
 	learningListener := &rule.Listener{
 		Requires: []*analysis.Analyzer{learning},
 		Nodes:    []ast.Node{(*ast.Ident)(nil)},
-		Node:     func(*rule.Context, ast.Node, []ast.Node) {},
+		Node:     func(*rule.Context, ast.Node, []ast.Node) { /* Planted: only its requirements matter. */ },
 	}
 	quiet := dispatcher.RuleAnalyzer("planted/quiet", "planted_quiet", "planted: finds nothing", quietListener)
 	learner := dispatcher.RuleAnalyzer("planted/learner", "planted_learner", "planted: finds nothing",
