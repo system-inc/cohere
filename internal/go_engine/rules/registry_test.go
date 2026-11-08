@@ -908,6 +908,7 @@ var portedPasses = []string{
 	"duration_unit_suffix",
 	"dynamic_printf_format",
 	"early_deferred_close",
+	"empty_select_default",
 	"error_variable_name",
 	"extreme_comparison",
 	"find_all_zero_limit",
