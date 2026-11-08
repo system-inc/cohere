@@ -68,6 +68,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -151,7 +152,9 @@ var duplicatesOfVet = map[string]string{
 // original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
-var ports = map[string]*analysis.Analyzer{}
+var ports = map[string]*analysis.Analyzer{
+	"nilfunc": nil_func.Analyzer,
+}
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
 // otherwise.
