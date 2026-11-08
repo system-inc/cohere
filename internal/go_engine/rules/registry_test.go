@@ -867,6 +867,7 @@ var portedPasses = []string{
 	"invalid_url",
 	"invalid_utf8_cut_set",
 	"invisible_character",
+	"ip_compared_as_bytes",
 	"leaky_time_tick",
 	"math_on_converted_integer",
 	"misplaced_error_result",
