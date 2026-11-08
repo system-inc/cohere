@@ -100,6 +100,8 @@ func checkFileExit(context *rule.Context, _ *ast.File) {
 
 // leaveTestMain is the walk leaving the TestMain it was inside: it is reported if it called Run and never os.Exit,
 // and what the walk has seen starts again.
+//
+// Mutates: state is cleared for the walk past the TestMain, the walk's own state, kept in rule.State for it
 func leaveTestMain(context *rule.Context, state *walk) {
 	if !state.callsExit && state.callsRun {
 		staticcheck_report.Report(context, state.testMain, message)
@@ -111,6 +113,8 @@ func leaveTestMain(context *rule.Context, state *walk) {
 }
 
 // enter is the walk entering node, and whether to walk the node's children.
+//
+// Mutates: state records the TestMain entered and the calls seen, the walk's own state, kept in rule.State for it
 func enter(context *rule.Context, state *walk, node ast.Node) bool {
 	switch node := node.(type) {
 	case *ast.FuncDecl:
