@@ -56,6 +56,9 @@ type Context struct {
 	requires []*analysis.Analyzer
 	// options is the flags of the rule's own analyzer, which the engine sets from the rule's settings.
 	options *flag.FlagSet
+	// state is what the check gathers over the package, made by State on first use as the type the check asks for.
+	//cohere:ignore consistency-no-any each check chooses its own state type, read back through State's type parameter
+	state any
 }
 
 // NewContext is the context a check registered as ruleName reads over the package pass analyzes, its findings handed
@@ -117,4 +120,24 @@ func (context *Context) Option(name string) flag.Value {
 		panic(fmt.Sprintf("rule %s reads option %s, which its analyzer has no flag for", context.ruleName, name))
 	}
 	return option.Value
+}
+
+// State is the check's own state over the package context covers, a new Kind made on the first call and the same one
+// on every call after, so a check gathers across its calls and judges in a later one, FileExit or PackageExit, without
+// a variable of its own. Each rule has its own context on each package, so the state is dropped with the package and
+// two packages walked at once never share one. A context holds one state, of one type.
+//
+// Mutates: context gains its state on the first call, handed back on every call after, which is the point of it
+func State[Kind any](context *Context) *Kind {
+	if context.state == nil {
+		context.state = new(Kind)
+	}
+	state, isKind := context.state.(*Kind)
+	if !isKind {
+		// Invariant: a check asks for its state as one type, so a second type is a mistake in the check, and the
+		// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+		panic(fmt.Sprintf("rule %s reads its state as %T, where it was made as %T", context.ruleName, state,
+			context.state))
+	}
+	return state
 }

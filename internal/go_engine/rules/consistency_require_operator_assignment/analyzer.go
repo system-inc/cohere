@@ -30,23 +30,24 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-require-operator-assignment"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_require_operator_assignment",
-	Doc: "Flags x = x op y, where both sides name the same variable, field, index or pointer target, and offers " +
-		"x op= y, because writing the target twice makes a reader check the two spellings match. x = y op x is " +
-		"flagged without a fix when op is *, &, | or ^, and left alone otherwise.",
-	Run: run,
-}
+// listener hears every assignment of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.AssignStmt)(nil)}, Node: judgeAssignment}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_operator_assignment", "Flags x = x op y, where both "+
+	"sides name the same variable, field, index or pointer target, and offers x op= y, because writing the target "+
+	"twice makes a reader check the two spellings match. x = y op x is flagged without a fix when op is *, &, | or ^, "+
+	"and left alone otherwise.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var longFormAssignmentMessage = policy.MessageOf(Name, "longFormAssignment")
 
@@ -67,21 +68,23 @@ var commutes = map[token.Token]bool{
 	token.AND_NOT: false,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			if assignment, isAssignment := node.(*ast.AssignStmt); isAssignment {
-				judge(pass, file, assignment)
-			}
-			return true
-		})
+// judgeAssignment judges an assignment in the file that heads its ancestors, the file whose comments a fix must not
+// lose.
+func judgeAssignment(context *rule.Context, node ast.Node, stack []ast.Node) {
+	assignment, isAssignment := node.(*ast.AssignStmt)
+	if !isAssignment || len(stack) == 0 {
+		return
 	}
-	return nil, nil
+	file, isFile := stack[0].(*ast.File)
+	if !isFile {
+		return
+	}
+	judge(context, file, assignment)
 }
 
 // judge reports assignment when it is a plain `=` of one target whose right side is a binary operation reading that
 // target where the compound form would.
-func judge(pass *analysis.Pass, file *ast.File, assignment *ast.AssignStmt) {
+func judge(context *rule.Context, file *ast.File, assignment *ast.AssignStmt) {
 	// `:=` declares rather than assigns, and a tuple assignment has no compound form.
 	if assignment.Tok != token.ASSIGN || len(assignment.Lhs) != 1 || len(assignment.Rhs) != 1 {
 		return
@@ -96,10 +99,10 @@ func judge(pass *analysis.Pass, file *ast.File, assignment *ast.AssignStmt) {
 	}
 	target := ast.Unparen(assignment.Lhs[0])
 	switch {
-	case isSameReference(pass, target, operation.X):
-		report(pass, assignment, target, operation, compoundFix(file, assignment, operation))
-	case commutative && isSameReference(pass, target, operation.Y):
-		report(pass, assignment, target, operation, nil)
+	case isSameReference(context, target, operation.X):
+		report(context, assignment, target, operation, compoundFix(file, assignment, operation))
+	case commutative && isSameReference(context, target, operation.Y):
+		report(context, assignment, target, operation, nil)
 	}
 }
 
@@ -111,11 +114,11 @@ func judge(pass *analysis.Pass, file *ast.File, assignment *ast.AssignStmt) {
 // Anything else is not a reference, which is what keeps `values[next()] = values[next()] + 1` and
 // `values[index+1] = values[index+1] + 1` clean: a call may answer differently the second time, and an arithmetic
 // key is left alone rather than proved pure. Parentheses are transparent, as they are to the port.
-func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
+func isSameReference(context *rule.Context, left ast.Expr, right ast.Expr) bool {
 	unwrappedLeft := ast.Unparen(left)
 	unwrappedRight := ast.Unparen(right)
-	leftValue := pass.TypesInfo.Types[unwrappedLeft]
-	rightValue := pass.TypesInfo.Types[unwrappedRight]
+	leftValue := context.TypesInfo.Types[unwrappedLeft]
+	rightValue := context.TypesInfo.Types[unwrappedRight]
 	if leftValue.Value != nil || rightValue.Value != nil {
 		// A key of interface type keeps its dynamic type, so `byKey[int8(1)]` and `byKey[1]` are two entries. The
 		// types are compared before the values for a second reason: constant.Compare reads a string against a number
@@ -132,34 +135,34 @@ func isSameReference(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 		}
 		// Only a variable is a place; a function or a type of the same name is not, and the blank identifier has no
 		// object at all.
-		variable, isVariable := pass.TypesInfo.ObjectOf(leftNode).(*types.Var)
-		return isVariable && pass.TypesInfo.ObjectOf(rightNode) == variable
+		variable, isVariable := context.TypesInfo.ObjectOf(leftNode).(*types.Var)
+		return isVariable && context.TypesInfo.ObjectOf(rightNode) == variable
 	case *ast.SelectorExpr:
 		rightNode, isSelector := unwrappedRight.(*ast.SelectorExpr)
 		if !isSelector {
 			return false
 		}
-		leftSelection, leftIsSelection := pass.TypesInfo.Selections[leftNode]
-		rightSelection, rightIsSelection := pass.TypesInfo.Selections[rightNode]
+		leftSelection, leftIsSelection := context.TypesInfo.Selections[leftNode]
+		rightSelection, rightIsSelection := context.TypesInfo.Selections[rightNode]
 		if !leftIsSelection && !rightIsSelection {
 			// A qualified identifier, another package's variable, has no selection; its name resolves to it.
-			variable, isVariable := pass.TypesInfo.Uses[leftNode.Sel].(*types.Var)
-			return isVariable && pass.TypesInfo.Uses[rightNode.Sel] == variable
+			variable, isVariable := context.TypesInfo.Uses[leftNode.Sel].(*types.Var)
+			return isVariable && context.TypesInfo.Uses[rightNode.Sel] == variable
 		}
 		return leftIsSelection && rightIsSelection &&
 			leftSelection.Kind() == types.FieldVal && rightSelection.Kind() == types.FieldVal &&
 			leftSelection.Obj() == rightSelection.Obj() &&
-			isSameReference(pass, leftNode.X, rightNode.X)
+			isSameReference(context, leftNode.X, rightNode.X)
 	case *ast.IndexExpr:
 		rightNode, isIndex := unwrappedRight.(*ast.IndexExpr)
 		// An instantiation of a generic function is an IndexExpr too, and its function is no variable, so it fails
 		// the comparison of what is indexed.
 		return isIndex &&
-			isSameReference(pass, leftNode.X, rightNode.X) &&
-			isSameReference(pass, leftNode.Index, rightNode.Index)
+			isSameReference(context, leftNode.X, rightNode.X) &&
+			isSameReference(context, leftNode.Index, rightNode.Index)
 	case *ast.StarExpr:
 		rightNode, isStar := unwrappedRight.(*ast.StarExpr)
-		return isStar && isSameReference(pass, leftNode.X, rightNode.X)
+		return isStar && isSameReference(context, leftNode.X, rightNode.X)
 	}
 	return false
 }
@@ -192,13 +195,13 @@ func compoundFix(file *ast.File, assignment *ast.AssignStmt, operation *ast.Bina
 
 // report flags assignment, naming its target as the source spells it, with fixes when there are any.
 func report(
-	pass *analysis.Pass,
+	context *rule.Context,
 	assignment *ast.AssignStmt,
 	target ast.Expr,
 	operation *ast.BinaryExpr,
 	fixes []analysis.SuggestedFix,
 ) {
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      assignment.Pos(),
 		End:      assignment.End(),
 		Category: longFormAssignmentMessage.Id,
