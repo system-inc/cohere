@@ -315,7 +315,7 @@ var ports = map[string]port{
 	"unreachable":      {analyzer: unreachable.Analyzer},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer, listener: &unsafe_ptr.Listener},
 	"unusedresult":     {analyzer: unused_result.Analyzer},
-	"waitgroup":        {analyzer: wait_group.Analyzer},
+	"waitgroup":        {analyzer: wait_group.Analyzer, listener: &wait_group.Listener},
 }
 
 // port is a borrowed check's port as the registry runs it: its analyzer, and the listener that analyzer reads its
