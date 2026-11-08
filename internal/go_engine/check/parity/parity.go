@@ -11,12 +11,12 @@
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
-// RequireOnlyAdjudicated over its differences fixture, and RequireStaticcheckGolden over staticcheck's golden files for
-// a port that offers fixes. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a
-// go.mod loads that folder as a module (see fixtureLoad). Each loads for the machine's own target, and a port whose
-// check judges another calls the same on the target it judges, as `parity.On("GOOS=linux", "GOARCH=386",
-// "CGO_ENABLED=0").RequireIdentical(...)` (see Target). The census command, command/cohere-parity, runs Analyze over a
-// real tree.
+// RequireOnlyAdjudicated over its differences fixture, RequireStaticcheckGolden over staticcheck's golden files for
+// a port that offers fixes, and RequirePortWhereOriginalPanics over a fixture the original panics on. Each takes
+// testdata and patterns, and a pattern naming a folder of testdata that holds a go.mod loads that folder as a module
+// (see fixtureLoad). Each loads for the machine's own target, and a port whose check judges another calls the same on
+// the target it judges, as `parity.On("GOOS=linux", "GOARCH=386", "CGO_ENABLED=0").RequireIdentical(...)` (see
+// Target). The census command, command/cohere-parity, runs Analyze over a real tree.
 package parity
 
 import (
