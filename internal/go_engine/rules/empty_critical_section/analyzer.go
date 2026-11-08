@@ -10,9 +10,9 @@
 // function's name and empty signature alone, so any type's Lock and Unlock count, not only a mutex's, and so do a
 // package's functions called through its name (parity's packageFunctions shows it), and a receiver printed the same
 // twice is judged one receiver even when computing it has effects, as `m.x().Lock()` and `m.x().Unlock()` do
-// (upstream's fn4), which the original accepts as the price of catching the common case. The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// (upstream's fn4), which the original accepts as the price of catching the common case. The registry runs the port in
+// the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over the same packages, and the two differ nowhere they hold.
 package empty_critical_section
 
 import (

@@ -6,12 +6,13 @@
 // whose messages it reports word for word, from the start to the end of the defer statement, where staticcheck's
 // report puts it. The original walks every source function of a package in one run, but keeps nothing from one
 // function to the next, nor from one block to the next: it judges each pair of neighbouring instructions alone. So the
-// port judges one function at a time and finds what the original finds. The original stays the oracle: the parity
-// tests beside this file run both over the same packages, and they differ nowhere. The original names the method in
-// its message by the short name of the first call, looked up again after its match, where the port reads both names
-// from the full name it matched, one of only two, so the words are the same. The one place the port could differ is a
-// defer with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every
-// defer from its statement, so no such defer reaches either.
+// port judges one function at a time and finds what the original finds. The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over the
+// same packages, and they differ nowhere. The original names the method in its message by the short name of the first
+// call, looked up again after its match, where the port reads both names from the full name it matched, one of only
+// two, so the words are the same. The one place the port could differ is a defer with no syntax, where staticcheck's
+// report panics and the port reports nothing; staticcheck builds every defer from its statement, so no such defer
+// reaches either.
 package deferred_lock_after_lock
 
 import (

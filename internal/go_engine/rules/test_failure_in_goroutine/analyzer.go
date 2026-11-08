@@ -8,13 +8,14 @@
 // package in one run, but keeps nothing from one function to the next: for each go statement it reads the body of the
 // function the goroutine starts, one level deep, afresh. That body is another function of the same intermediate
 // representation, read the same from any function that starts it, so the port judges one function at a time and finds
-// what the original finds. The original stays the oracle: the parity tests beside this file run both over the same
-// packages, related entries included, and they differ nowhere. The original reports through staticcheck's report with
-// its Related option; the port sets the one related entry itself until the shared report kit (#wtvf02h) carries it.
-// A call with no syntax does reach both: a goroutine started from a method value runs the wrapper staticcheck builds
-// for it, whose call of the method has none, and both report that finding without its related entry. The one place
-// the port could differ is a go statement with no syntax, where staticcheck's report panics and the port reports
-// nothing; staticcheck builds every go statement from its statement, so no such one reaches either.
+// what the original finds. The registry runs the port in the original's place, under its name, and the original stays
+// only as the oracle: the parity tests beside this file run both over the same packages, related entries included, and
+// they differ nowhere. The original reports through staticcheck's report with its Related option; the port sets the one
+// related entry itself until the shared report kit (#wtvf02h) carries it. A call with no syntax does reach both: a
+// goroutine started from a method value runs the wrapper staticcheck builds for it, whose call of the method has none,
+// and both report that finding without its related entry. The one place the port could differ is a go statement with no
+// syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every go statement from
+// its statement, so no such one reaches either.
 package test_failure_in_goroutine
 
 import (
