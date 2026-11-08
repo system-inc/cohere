@@ -1,0 +1,10 @@
+// Package module_golden is a fixture module holding a call, and its golden file the file with it replaced.
+package module_golden
+
+func shared() {}
+
+func kept() {}
+
+func calls() {
+	shared()
+}
