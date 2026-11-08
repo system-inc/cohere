@@ -1,0 +1,30 @@
+// Package unformatted holds the shapes gofmt would rewrite, which the original still judges: a guard split across
+// lines, an assertion in a case split across lines, and doubled parentheses around the switched variable.
+package unformatted
+
+import "fmt"
+
+func split(x interface{}) {
+	switch x.(
+		type) {
+	case int:
+		fmt.Println(x.(
+			int))
+	}
+}
+
+func splitBeforeTheDot(x interface{}) {
+	switch x.
+		(type) {
+	case string:
+		fmt.Println(x.
+			(string))
+	}
+}
+
+func doubled(x interface{}) {
+	switch ((x)).(type) {
+	case int:
+		fmt.Println(x.(int))
+	}
+}

@@ -1,0 +1,17 @@
+package unformatted
+
+// gofmt removes the parentheses around a slice ranged over, which the pattern language looks through and its binding
+// stores without, so each side's message names the slice bare.
+func parenthesized(source []int, destination []int) []int {
+	for _, value := range (source) {
+		destination = append(destination, value)
+	}
+	for index := range ((source)) {
+		destination = append(destination, source[index])
+	}
+	for index := range (source) {
+		value := (source)[index]
+		destination = append(destination, value)
+	}
+	return destination
+}

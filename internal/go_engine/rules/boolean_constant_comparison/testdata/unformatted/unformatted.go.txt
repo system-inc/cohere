@@ -1,0 +1,14 @@
+// Package unformatted holds shapes gofmt would rewrite, which the house's testdata cannot hold: doubled parentheses
+// around the other side and the constant, and comparisons written without spaces, whose fixes are rendered.
+package unformatted
+
+func unformatted() {
+	var x, y bool
+	var a, b int
+	_ = ((x)) == true // reported, the render printing the parentheses as gofmt does
+	_ = (((y))) != true // reported
+	_ = x == ((true)) // not reported: the constant is parenthesized
+	_ = x==false // reported
+	_ = ((a<b))==false // reported
+	_ = !!(!y)==false // reported
+}

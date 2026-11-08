@@ -1,0 +1,11 @@
+// Package golden_whole holds two calls, and its golden file, with no sections, the file with both replaced.
+package golden_whole
+
+func shared() {}
+
+func kept() {}
+
+func calls() {
+	kept()
+	kept()
+}

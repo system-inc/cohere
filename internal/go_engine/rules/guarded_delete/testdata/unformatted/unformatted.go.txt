@@ -1,0 +1,27 @@
+// Package unformatted holds shapes gofmt would rewrite, which the original still judges: parentheses gofmt folds or
+// drops, a semicolon gofmt drops, an empty statement beside the call, and an else that holds one.
+package unformatted
+
+func guarded(values map[string]int, key string) {
+	if _, ok := ((values[key])); (ok) {
+		delete(values, key)
+	}
+	if _, ok := ((values))[((key))]; ((ok)) {
+		((delete))(((values)), ((key)))
+	}
+	if _, ok := values[key]; ok {
+		((delete(values, key)));
+	}
+	if _, ok := values[key]; ok { delete(values, key) }
+	if _, ok := values[key]; ok {
+		;
+		delete(values, key)
+	}
+	if _, ok := values[key]; ok {
+		delete(values, key);;
+	}
+	if _, ok := values[key]; ok {
+		delete(values, key)
+	} else { ; }
+	if _, ok := values[key]; ok { delete(values, key) } else {}
+}

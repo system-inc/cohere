@@ -1,0 +1,49 @@
+package differences
+
+import clock "time"
+
+type clocks struct {
+	Now func() clock.Time
+}
+
+// The file imports time as clock alone, so the original's time.Until names nothing, and the port names it clock, as
+// the call names time.Now.
+func renamed(t clock.Time, pointer *clock.Time) {
+	// The original writes time.Until(t), and the port clock.Until(t).
+	_ = clock.Until(t) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(pointer), wrong twice, and the port clock.Until(*pointer).
+	_ = clock.Until(*pointer) // port moves: should use time.Until instead of t.Sub(time.Now())
+}
+
+// A local named time holds a time, and the original's time.Until selects from it.
+func shadowed() {
+	time := clock.Now()
+	// The original writes time.Until(time), and the port clock.Until(time).
+	_ = clock.Until(time) // port moves: should use time.Until instead of t.Sub(time.Now())
+}
+
+// A field named Now holding time.Now is a variable, not the function, even where a local named time selects it.
+func field(t clock.Time) {
+	time := clocks{Now: clock.Now}
+	_ = t.Sub(time.Now())
+}
+
+// A receiver across lines, with comments among its parts, is printed by the fix from its own positions.
+func commented(times []clock.Time, index int) {
+	// The original writes time.Until(times[index]), and the port clock.Until(times[index]).
+	_ = clock.Until(times[index])
+	// The original writes time.Until around the function literal, and the port clock.Until.
+	_ = clock.Until(func() clock.Time {
+
+		return times[0]
+	}())
+}
+
+// A receiver of a conversion and of a composite literal.
+func converted(t clock.Time) {
+	type named clock.Time
+	// The original writes time.Until around the conversion, and the port clock.Until.
+	_ = clock.Until(clock.Time(named(t))) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(struct{ clock.Time }{t}), wrong twice, and the port selects the field.
+	_ = clock.Until(struct{ clock.Time }{t}.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+}

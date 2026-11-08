@@ -3,6 +3,8 @@ package load
 import (
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -81,4 +83,38 @@ func TestTheListerReadsTheHeldBytes(test *testing.T) {
 	if listed.byPath["strings"] == nil {
 		test.Error("the lister did not list strings, which only the held bytes import")
 	}
+}
+
+// The lister's prefetch of the standard library reads through held, and the caller writes what held reads once the
+// listing returns, as the pipeline's reread does (#5qhgt92), so the listing ends only after every read the prefetch
+// started has ended. heldModule imports nothing on disk, so every read of the standard library here is the prefetch's.
+// The fixture's own read waits for the prefetch's first, so the prefetch is reading before the listing can end, and
+// held reads a plain map that the test writes once the listing returns: under -race, a read the listing did not wait
+// for is a data race with that write.
+func TestThePrefetchEndsWithTheListing(test *testing.T) {
+	test.Parallel()
+
+	directory := test.TempDir()
+	writeListingFiles(test, directory, heldModule)
+	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
+	if environmentError != nil {
+		test.Fatal(environmentError)
+	}
+	contents := map[string][]byte{}
+	prefetchReading := make(chan struct{})
+	var firstStandardRead sync.Once
+	held := Held(func(file string) ([]byte, bool) {
+		if strings.HasPrefix(file, directory+string(filepath.Separator)) {
+			<-prefetchReading
+		} else {
+			firstStandardRead.Do(func() { close(prefetchReading) })
+		}
+		bytes, isHeld := contents[file]
+		return bytes, isHeld
+	})
+	if _, doubt := listInProcess(directory, environment, []string{"./..."}, held); doubt != "" {
+		test.Fatalf("the lister did not answer: %s", doubt)
+	}
+	// What the pipeline's reread does once the listing returns: it holds the bytes of a file it wrote.
+	contents[filepath.Join(directory, "held.go")] = []byte(heldModule["held.go"])
 }

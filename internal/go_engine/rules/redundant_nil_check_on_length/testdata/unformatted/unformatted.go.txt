@@ -1,0 +1,13 @@
+// Package unformatted holds doubled parentheses, which gofmt folds to one pair, so the house's testdata cannot hold
+// them; the pattern looks through every pair, so both report each check here.
+package unformatted
+
+func doubled(values []int, table map[string]int) {
+	if ((values == nil)) || ((len(values) == 0)) {
+	}
+	if ((values)) == ((nil)) || ((len))(((values))) == ((0)) {
+	}
+	if table != nil && len(((table))) > ((0)) {
+	}
+	_ = ((values != nil && len(values) > 0))
+}

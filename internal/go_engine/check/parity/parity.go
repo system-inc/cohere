@@ -9,9 +9,12 @@
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
 //
-// A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, RequireIdentical
-// over those and the port's parity fixtures, RequireOnlyAdjudicated over its differences fixture. The census command,
-// command/cohere-parity, runs Analyze over a real tree.
+// A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
+// RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
+// RequireOnlyAdjudicated over its differences fixture, and RequireStaticcheckGolden over staticcheck's golden files for
+// a port that offers fixes. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a
+// go.mod loads that folder as a module (see fixtureLoad). The census command, command/cohere-parity, runs Analyze over
+// a real tree.
 package parity
 
 import (
@@ -20,7 +23,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -31,7 +33,6 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // Pair is an original analyzer and its port, under the name the census prints. The ports carry their originals'
@@ -94,15 +95,18 @@ func Analyze(pairs []Pair, roots []*packages.Package) ([]Outcome, error) {
 	}
 	for index := range outcomes {
 		for _, side := range []*Side{&outcomes[index].Original, &outcomes[index].Port} {
-			slices.SortFunc(side.Findings, func(first Finding, second Finding) int {
-				return cmp.Or(cmp.Compare(first.String(), second.String()), cmp.Compare(first.key(), second.key()))
-			})
+			slices.SortFunc(side.Findings, compareFindings)
 			slices.SortFunc(side.Failures, func(first Failure, second Failure) int {
 				return cmp.Or(cmp.Compare(first.Package, second.Package), cmp.Compare(first.Error, second.Error))
 			})
 		}
 	}
 	return outcomes, nil
+}
+
+// compareFindings orders findings by how a finding line prints them, and two that print alike by every field.
+func compareFindings(first Finding, second Finding) int {
+	return cmp.Or(cmp.Compare(first.String(), second.String()), cmp.Compare(first.key(), second.key()))
 }
 
 // loadFailuresShown is how many of a package's load errors LoadFailures names; the first say why, and the rest
@@ -134,10 +138,10 @@ func LoadFailures(loadedPackages []*packages.Package) []Failure {
 	return failures
 }
 
-// Findings loads the fixture packages patterns name from testdata, runs original and port over them in one checker,
-// and returns each one's findings, sorted, each in its file's base name. A load that found nothing, a fixture package
-// that did not load clean, and an analyzer that did not run on a fixture package each fail the test, since silence
-// there would read as agreement.
+// Findings loads the fixture packages patterns name from testdata, runs original and port over them in one checker
+// for each load, and returns each one's findings, sorted, each in its file's base name, after its module's pattern in
+// a fixture module (see fixtureLoad). A load that found nothing, a fixture package that did not load clean, and an
+// analyzer that did not run on a fixture package each fail the test, since silence there would read as agreement.
 func Findings(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -146,51 +150,39 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
-	loaded, loadError := load.Packages(testdata, patterns, fixtureEnvironment(testdata), nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	// The checker passes over a root that does not type-check without a word, so a fixture with one type error would
-	// compare nothing and read green. There must be a root, and every root must load clean.
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
-	}
-	for _, failure := range LoadFailures(loaded.Roots) {
-		test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
-			failure.Package, failure.Error)
-	}
-	// The roots, as analysistest analyzes them: every package the patterns match and every test variant of it.
-	outcomes, analyzeError := Analyze([]Pair{{Original: original, Port: port}}, loaded.Roots)
-	if analyzeError != nil {
-		test.Fatalf("%v", analyzeError)
-	}
-	outcome := outcomes[0]
-	for _, failure := range slices.Concat(outcome.Original.Failures, outcome.Port.Failures) {
-		test.Fatalf("running on %s: %s", failure.Package, failure.Error)
-	}
-	return baseNamed(outcome.Original.Findings), baseNamed(outcome.Port.Findings)
+	return findingsOver(test, original, port, loadFixtures(test, testdata, patterns))
 }
 
-// fixtureEnvironment is the environment a fixture tree loads under, as analysistest loads one: a module when
-// testdata holds a go.mod, and otherwise a tree laid out by import path under src.
-func fixtureEnvironment(testdata string) []string {
-	if _, statError := os.Stat(filepath.Join(testdata, "go.mod")); statError == nil {
-		work := filepath.Join(testdata, "go.work")
-		if _, workError := os.Stat(work); workError != nil {
-			work = "off"
+// findingsOver is Findings over loads already made, so a caller that reads the loaded packages as well, as
+// RequireOnlyAdjudicated reads where its records sit, loads them once.
+func findingsOver(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	loads []loadedFixtures,
+) (originalFindings []Finding, portFindings []Finding) {
+	test.Helper()
+	originalFindings, portFindings = []Finding{}, []Finding{}
+	for _, fixtures := range loads {
+		// The roots, as analysistest analyzes them: every package the patterns match and every test variant of it.
+		outcomes, analyzeError := Analyze([]Pair{{Original: original, Port: port}}, fixtures.roots)
+		if analyzeError != nil {
+			test.Fatalf("%v", analyzeError)
 		}
-		return []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=" + work}
+		outcome := outcomes[0]
+		for _, failure := range slices.Concat(outcome.Original.Failures, outcome.Port.Failures) {
+			test.Fatalf("running on %s: %s", failure.Package, failure.Error)
+		}
+		for _, finding := range outcome.Original.Findings {
+			originalFindings = append(originalFindings, finding.WithFileNames(fixtures.fileName))
+		}
+		for _, finding := range outcome.Port.Findings {
+			portFindings = append(portFindings, finding.WithFileNames(fixtures.fileName))
+		}
 	}
-	return []string{"GOPATH=" + testdata, "GO111MODULE=off", "GOWORK=off"}
-}
-
-// baseNamed is findings with each file they name named by its base name.
-func baseNamed(findings []Finding) []Finding {
-	named := []Finding{}
-	for _, finding := range findings {
-		named = append(named, finding.WithFileNames(filepath.Base))
-	}
-	return named
+	slices.SortFunc(originalFindings, compareFindings)
+	slices.SortFunc(portFindings, compareFindings)
+	return originalFindings, portFindings
 }
 
 // RequireIdentical runs original and port over the fixture packages patterns name, and their findings must be the
@@ -230,22 +222,23 @@ var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?))\s*$`,
 )
 
-// RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture under testdata's
-// src, where the two disagree, and only where each disagreement was adjudicated: every finding the port alone makes
-// is recorded on its line, as found or as the port's side of a renaming; every finding the original alone makes is
-// recorded on its line, as the original's side of a renaming or as dropped, a false positive ruled with the finding
-// in hand; a finding both make in other spans or fixes is recorded as moved, one the original offers a fix on that
-// the port leaves out as withheld, and one whose related entry the port leaves out as omitted, each pairing the two
-// sides' findings and nothing more; and every record is matched by a finding on its own line, never another's. A
-// finding the original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or
-// related entry one side alone offers that no record withholds or omits. Every record must give its reason, on the
-// line above it or in the doc comment of the declaration it is in, and one with none fails, named by file and line.
-// A `// port ` comment it cannot read fails, and so does a fixture that records nothing. The census has no fixture,
-// so no record covers anything there.
+// RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture names, its records
+// read from the folder the load found it in (see recordsFolder), or the fixture module of that name (see
+// fixtureLoad), where the two disagree, and only where each disagreement was
+// adjudicated: every finding the port alone makes is recorded on its line, as found or as the port's side of a
+// renaming; every finding the original alone makes is recorded on its line, as the original's side of a renaming or as
+// dropped, a false positive ruled with the finding in hand; a finding both make in other spans or fixes is recorded as
+// moved, one the original offers a fix on that the port leaves out as withheld, and one whose related entry the port
+// leaves out as omitted, each pairing the two sides' findings and nothing more; and every record is matched by a
+// finding on its own line, never another's. A finding the original makes and the port does not, unrecorded, is a
+// regression and fails, and so does any fix or related entry one side alone offers that no record withholds or omits.
+// Every record must give its reason, on the line above it or in the doc comment of the declaration it is in, and one
+// with none fails, named by file and line. A `// port ` comment it cannot read fails, and so does a fixture that
+// records nothing. The census has no fixture, so no record covers anything there.
 //
-// A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden
-// file or by applying the edit and checking the result. It reads the one package directory fixture names, not the
-// packages nested below it, so a fixture tree with nested packages takes one call for each.
+// A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
+// or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
+// nested below it, so a fixture tree with nested packages takes one call for each.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -254,9 +247,10 @@ func RequireOnlyAdjudicated(
 	fixture string,
 ) {
 	test.Helper()
-	originalFindings, portFindings := Findings(test, original, port, testdata, fixture)
+	loads := loadFixtures(test, testdata, []string{fixture})
+	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
-	recorded := adjudicated(test, filepath.Join(testdata, "src", filepath.FromSlash(fixture)))
+	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
 	if len(recorded.portAlone)+len(recorded.dropped)+len(recorded.moved)+len(recorded.withheld)+
 		len(recorded.omitted) == 0 {
 		test.Fatalf("the differences fixture %s records nothing, so the comparison proves nothing", fixture)
@@ -401,10 +395,11 @@ func pairMoved(
 	return remainingOriginal, remainingPort
 }
 
-// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, and
-// fails each record that gives no reason (see reasonedLines). It reads comments as the parser finds them, so a
-// `// port ` inside a string is no record. It reads that one directory, not those below it.
-func adjudicated(test testing.TB, directory string) records {
+// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, its
+// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines). It
+// reads comments as the parser finds them, so a `// port ` inside a string is no record. It reads that one directory,
+// not those below it.
+func adjudicated(test testing.TB, directory string, fileName func(string) string) records {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
 	if globError != nil {
@@ -423,7 +418,7 @@ func adjudicated(test testing.TB, directory string) records {
 				line := fileSet.Position(comment.Slash).Line
 				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
 					match := adjudicatedPattern.FindStringSubmatch(record)
-					at := Finding{File: filepath.Base(name), Line: line}
+					at := Finding{File: fileName(name), Line: line}
 					if match != nil && !reasoned(line) {
 						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in the "+
 							"doc comment of the declaration it is in", at.File, line)
