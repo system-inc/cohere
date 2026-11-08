@@ -74,6 +74,9 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	}
 }
 
+// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
+const differencesFile = "differences/differences.go"
+
 // adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
 // the message of a finding only the port makes, or `renames:`, the original's message, `=>` and the port's, for a
 // finding both make in words that differ.
@@ -136,9 +139,6 @@ func compareAdjudicated(test *testing.T, side string, actual []finding, expected
 		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
 	}
 }
-
-// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
-const differencesFile = "differences/differences.go"
 
 // finding is one finding as the differential compares it, its file named by its path below testdata/src, so two
 // fixtures of one name in two packages stay apart. Staticcheck's report gives a finding the end of its shift's
