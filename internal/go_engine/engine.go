@@ -19,6 +19,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
@@ -64,8 +65,9 @@ var engineRuleNames = []string{
 var mainHasRun atomic.Bool
 
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
-// prose to standardError, and returns the exit code.
-func Main(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
+// prose to standardError, and returns the exit code. availableMemoryBytes is the memory the front door's policy
+// read as available when this process started, 0 when it could not, which the memory limit is sized from.
+func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Writer, standardError io.Writer) int {
 	// A run sets its rule options on the registry's analyzers, which outlive it, so a second run in this process
 	// would be judged by the first's options with no error. The front door starts one engine process per Go root
 	// and main exits after this call, so a second call is a caller's mistake, refused before anything runs.
@@ -74,13 +76,20 @@ func Main(arguments []string, standardOutput io.Writer, standardError io.Writer)
 			"rule options are still set on the analyzers; start a new engine process for each project"))
 	}
 	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
-	capMemory(os.LookupEnv, debug.SetMemoryLimit)
-	return run(arguments, standardOutput, standardError, rules.All())
+	memory := capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes)
+	return run(arguments, standardOutput, standardError, rules.All(), &memory)
 }
 
 // run is Main with the analyzer rules handed in, so a test can run the engine with a rule planted in place of
-// the registry's, such as one that panics.
-func run(arguments []string, standardOutput io.Writer, standardError io.Writer, registered []rule.Rule) int {
+// the registry's, such as one that panics. memory is what Main decided about the memory limit, nil in a test,
+// which decides nothing.
+func run(
+	arguments []string,
+	standardOutput io.Writer,
+	standardError io.Writer,
+	registered []rule.Rule,
+	memory *contract.Memory,
+) int {
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		return refuse(standardError, parseError)
@@ -104,7 +113,7 @@ func run(arguments []string, standardOutput io.Writer, standardError io.Writer, 
 	if describeError != nil {
 		return refuse(standardError, describeError)
 	}
-	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError)
+	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError, memory)
 	return engine.run()
 }
 
