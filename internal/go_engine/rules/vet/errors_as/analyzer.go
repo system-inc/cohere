@@ -23,20 +23,20 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// name is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same as before the port took the original's place.
-const name = "errorsas"
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "errorsas"
 
-// doc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
-const doc = "report passing non-pointer or non-error values to errors.As\n\n" +
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "report passing non-pointer or non-error values to errors.As\n\n" +
 	"The errorsas analyzer reports calls to errors.As where the type\n" +
 	"of the second argument is not a pointer to a type implementing error.\n" +
 	"For example:\n\n" +
 	"\tvar unwrappedErr net.DNSError\n" +
 	"\terrors.As(err, unwrappedErr) // should use &unwrappedErr, DNSError.Error has a pointer receiver\n"
 
-// url is the original's address.
-const url = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/errorsas"
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/errorsas"
 
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder, the order typeindex's
 // Calls yields them in, of which it judges the calls to errors.As, outside the packages the original leaves alone.
@@ -52,8 +52,8 @@ var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 // newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
 // RuleAnalyzer leaves unset.
 func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
-	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+name, name, doc, &Listener)
-	analyzer.URL = url
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
 	return analyzer
 }
 
