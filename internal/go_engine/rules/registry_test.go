@@ -705,6 +705,7 @@ var portedPasses = []string{
 	"duration_unit_suffix",
 	"error_variable_name",
 	"http_status_literal",
+	"identical_operands",
 	"inconsistent_receiver_name",
 	"invisible_character",
 	"misplaced_error_result",
