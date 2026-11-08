@@ -19,7 +19,35 @@ import (
 // reads the `//@ diag(...)` notes staticcheck's fixtures mark theirs with.
 func RequireUpstreamWants(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
 	test.Helper()
+	requireUpstreamWants(test, analysistest.Run, port, testdata, patterns)
+}
+
+// RequireUpstreamWantsWithFixes is RequireUpstreamWants for an original whose own test is
+// analysistest.RunWithSuggestedFixes: every want is met as there, and the port's fixes must make the original's
+// `.golden` files, copied unchanged beside the fixture files they fix, the forms and conflicts as
+// RunWithSuggestedFixes reads them. It holds only a file some fix edits, so a fix in a file with no golden file fails
+// on the missing file, and a port that offers no fix at all passes here, where RequireIdentical fails it beside an
+// original that offers one.
+//
+// The golden check formats the fixed file and the golden file before it compares them, so it cannot see an edit's
+// stray whitespace. RequireIdentical compares every edit exactly, offsets and text, and holds that, so this adds to
+// it and replaces nothing.
+func RequireUpstreamWantsWithFixes(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
+	test.Helper()
+	requireUpstreamWants(test, analysistest.RunWithSuggestedFixes, port, testdata, patterns)
+}
+
+// requireUpstreamWants runs port over each load of the fixtures patterns name with run, analysistest.Run or one that
+// checks more beside it, from the load's own folder, reporting through errorsOnly.
+func requireUpstreamWants(
+	test testing.TB,
+	run func(analysistest.Testing, string, *analysis.Analyzer, ...string) []*analysistest.Result,
+	port *analysis.Analyzer,
+	testdata string,
+	patterns []string,
+) {
+	test.Helper()
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
-		analysistest.Run(errorsOnly{test}, fixtures.directory, port, fixtures.patterns...)
+		run(errorsOnly{test}, fixtures.directory, port, fixtures.patterns...)
 	}
 }

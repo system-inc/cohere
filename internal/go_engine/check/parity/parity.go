@@ -10,6 +10,7 @@
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
+// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, or
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
 // RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireOnlyAdjudicated over its differences fixture, RequireStaticcheckGolden over staticcheck's golden files for
