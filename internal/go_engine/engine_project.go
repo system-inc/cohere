@@ -68,6 +68,7 @@ func describeProject(request invocation) (*describedProject, error) {
 
 	described := &describedProject{
 		workspace:          workspace,
+		census:             census,
 		manifest:           manifest,
 		inScopeSet:         map[string]bool{},
 		constrainedInScope: map[string]bool{},

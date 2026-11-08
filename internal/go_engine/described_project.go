@@ -11,6 +11,10 @@ import (
 type describedProject struct {
 	workspace project.Workspace
 
+	// census is the workspace's census, which the builds a run under `--other-builds` checks are read from
+	// (project.BuildsFor).
+	census project.Census
+
 	// readableOurs are the census's files that are ours and could be read, before the build constraints narrow
 	// them: what the load accounts for. An unreadable file is left out, since the load
 	// reads each file it accounts for and one it cannot open fails it whole; the file is already a record.

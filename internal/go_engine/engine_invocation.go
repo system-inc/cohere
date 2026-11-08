@@ -13,9 +13,12 @@ import (
 //
 // `no-cache` turns off the per-package findings cache (see lintCache), as the front door's run cache is off for the
 // same run, so a run under it computes every package from source.
+//
+// `other-builds` is hidden: the front door never forwards it. It checks, beside the host's build, every other build
+// the census needs (otherBuilds), off until the merge of their findings is built (#72n9mq0), and off changes nothing.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache",
+	"rules", "rules-enabled", "version", "no-cache", "other-builds",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

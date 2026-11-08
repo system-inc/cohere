@@ -63,6 +63,10 @@ type pipeline struct {
 	// refusedRenames are the renames refused so far, by file, old name and new name, so a rename a round refused and
 	// whose finding still stands is not asked for, and counted, again by the next.
 	refusedRenames map[[3]string]bool
+
+	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
+	// beside the host's to check.
+	buildRuns []buildRun
 }
 
 func newPipeline(
@@ -121,7 +125,14 @@ func (engine *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
-	engine.runLint(loaded, loadError, linted)
+	pass := engine.runLint(loaded, loadError, linted)
+	// Under the hidden `--other-builds`, every other build the census needs checks what can differ from the host's,
+	// after the host's lint, and only when that lint ran: the host's run is what the others are read beside.
+	if engine.request.switches["other-builds"] && pass != nil {
+		if runs := engine.otherBuilds(loaded, pass); len(runs) > 0 {
+			engine.mergeBuildRuns(runs)
+		}
+	}
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load

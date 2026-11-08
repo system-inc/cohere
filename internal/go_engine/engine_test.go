@@ -256,6 +256,9 @@ var endToEndCases = []endToEndCase{
 	{name: "suppression", exitCode: 1},
 	{name: "configured", exitCode: 1},
 	{name: "lint-only", fixture: "clean", extra: []string{"--lint"}, exitCode: 0},
+	// A file only windows builds and one only the cohere_extra tag builds: `--other-builds` checks both beside the
+	// host's build, and writes what a run without it writes, until the merge of their findings is built.
+	{name: "other-builds", extra: []string{"--other-builds"}, exitCode: 0},
 	{name: "lint-only-type-error", fixture: "type-error", extra: []string{"--lint"}, exitCode: 1},
 	{
 		name: "format-only-no-fix", fixture: "unformatted", extra: []string{"--format-only", "--no-fix"},

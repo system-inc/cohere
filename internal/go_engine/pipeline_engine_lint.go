@@ -23,15 +23,16 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // in the files in scope withhold what they cover and report what is wrong with them. A generated file is in
 // scope like any other: the driver itself withholds a house rule's findings there and counts them, and a vet or
 // tools finding there is still a bug in what ships, so it is written. earlier is the pass the rename already ran
-// over this load, written as it is, or nil to run one here.
-func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) {
+// over this load, written as it is, or nil to run one here. It returns the pass it wrote, which the other builds
+// read beside it (otherBuilds), or nil when the rules did not run.
+func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *lintPass) *lintPass {
 	if !engine.request.requests(contract.PhaseLint) {
 		engine.phase(contract.PhaseLint, contract.OutcomeSkipped, 0, detailNotRequested)
-		return
+		return nil
 	}
 	if loadError != nil {
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
-		return
+		return nil
 	}
 	if count := len(loaded.Diagnostics); count > 0 {
 		detail := fmt.Sprintf("types bailed: %d type errors, so lint findings against wrong semantics would be noise",
@@ -41,7 +42,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 				"noise; run with --types to see them", count)
 		}
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, detail)
-		return
+		return nil
 	}
 
 	pass := earlier
@@ -54,7 +55,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		engine.note("the rules could not run: %v", pass.checkError)
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
 			"the rules could not run: "+oneLine(pass.checkError))
-		return
+		return nil
 	}
 	result, outcome := pass.result, pass.outcome
 
@@ -118,6 +119,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	record.ElapsedMilliseconds = int(elapsed.Milliseconds())
 	engine.write(record)
 	engine.phase(contract.PhaseLint, contract.OutcomeRan, elapsed, "")
+	return pass
 }
 
 // lintPass is the lint phase's rules over one load before any record is written: what they found, the findings in
