@@ -20,7 +20,7 @@ import (
 
 // A channel declared in another file.
 func channelElsewhere() {
-	signal.Notify(unbufferedElsewhere, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	signal.Notify(unbufferedElsewhere, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/declarations.go:9: make(chan os.Signal, 1)
 	signal.Notify(bufferedElsewhere, os.Interrupt)
 	signal.Notify(fromCallElsewhere, os.Interrupt)
 }
@@ -28,7 +28,7 @@ func channelElsewhere() {
 // Notify reached through a variable declared in another file.
 func notifyThroughElsewhere() {
 	unbuffered := make(chan os.Signal)        // fix: make(chan os.Signal, 1)
-	notifyElsewhere(unbuffered, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	notifyElsewhere(unbuffered, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/differences.go:30: make(chan os.Signal, 1)
 	buffered := make(chan os.Signal, 1)
 	notifyElsewhere(buffered, os.Interrupt)
 	notifyElsewhere(make(chan os.Signal), os.Interrupt)
@@ -37,14 +37,14 @@ func notifyThroughElsewhere() {
 // Parentheses around Notify, around a variable holding it, around the channel passed and around a declared make.
 func parenthesized() {
 	aroundNotify := make(chan os.Signal)        // fix: make(chan os.Signal, 1)
-	(signal.Notify)(aroundNotify, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	(signal.Notify)(aroundNotify, os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/differences.go:39: make(chan os.Signal, 1)
 	aroundHeld := make(chan os.Signal)          // fix: make(chan os.Signal, 1)
 	listen := (signal.Notify)
-	listen(aroundHeld, os.Interrupt)             // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	listen(aroundHeld, os.Interrupt)             // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/differences.go:41: make(chan os.Signal, 1)
 	aroundChannel := make(chan os.Signal)        // fix: make(chan os.Signal, 1)
-	signal.Notify((aroundChannel), os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	signal.Notify((aroundChannel), os.Interrupt) // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/differences.go:44: make(chan os.Signal, 1)
 	aroundDeclared := (make(chan os.Signal))     // fix: make(chan os.Signal, 1)
-	signal.Notify(aroundDeclared, os.Interrupt)  // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes: make(chan os.Signal, 1)
+	signal.Notify(aroundDeclared, os.Interrupt)  // port finds: misuse of unbuffered os.Signal channel as argument to signal.Notify // port fixes at differences/differences.go:46: make(chan os.Signal, 1)
 	// make parenthesized and declared is the builtin, unbuffered, which both find, with the same fix.
 	aroundMake := (make)(chan os.Signal)
 	signal.Notify(aroundMake, os.Interrupt)

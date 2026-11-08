@@ -120,5 +120,5 @@ func requirePortWhereOriginalPanics(
 	for _, unmatched := range Difference(recorded.portAlone, portAlone) {
 		test.Errorf("the fixture records that the port finds %s, and it does not", unmatched)
 	}
-	requireRecordedFixes(test, recorded, portFindings)
+	requireRecordedFixes(test, recorded, portFindings, editLines(loads))
 }

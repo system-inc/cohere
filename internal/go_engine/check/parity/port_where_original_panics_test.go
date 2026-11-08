@@ -135,9 +135,9 @@ func TestRequirePortWhereOriginalPanicsHoldsTheFixesOfItsFindings(test *testing.
 		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
 			calling(portMessages, writing("fixed()")), analysistest.TestData(), "panicking")
 	}),
-		`the port alone fixes its finding at panicking/panicking.go:13 writing "fixed()", which the fixture does not `+
-			"record",
-		`the port alone fixes its finding at panicking/panicking.go:14 writing "fixed()", which the fixture does not `+
-			"record",
+		`the port alone fixes its finding at panicking/panicking.go:13 writing "fixed()" at `+
+			"panicking/panicking.go:13, which the fixture does not record",
+		`the port alone fixes its finding at panicking/panicking.go:14 writing "fixed()" at `+
+			"panicking/panicking.go:14, which the fixture does not record",
 	)
 }
