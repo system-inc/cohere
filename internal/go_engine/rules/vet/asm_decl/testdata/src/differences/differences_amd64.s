@@ -38,13 +38,16 @@ TEXT ·pointer(SB),0,$0-8 // port finds: [amd64] pointer: wrong argument size 8;
 	MOVQ	l_cap+16(FP), AX // port finds: [amd64] pointer: invalid offset l_cap+16(FP); expected l_cap+24(FP)
 	RET
 
+// plain holds no type parameter, so its frame measures and it is judged in full, beside the unjudged ones.
 TEXT ·plain(SB),0,$0-8 // port finds: [amd64] plain: wrong argument size 8; expected $...-16
 	MOVW	x+0(FP), R1 // port finds: [amd64] plain: invalid MOVW of x+0(FP); int64 is 8-byte value
 	RET // port finds: [amd64] plain: RET without writing to 8-byte ret+8(FP)
 
+// later's last declaration takes an int8, which measures, so it is judged by that declaration's frame.
 TEXT ·later(SB),0,$0-99 // port finds: [amd64] later: wrong argument size 99; expected $...-1
 	MOVW	x+0(FP), R1 // port finds: [amd64] later: invalid MOVW of x+0(FP); int8 is 1-byte value
 	RET
 
+// undeclared has no Go declaration at all, which the pass reports of any assembly function that lacks one.
 TEXT ·undeclared(SB),0,$0-8 // port finds: [amd64] undeclared: function undeclared missing Go declaration
 	RET

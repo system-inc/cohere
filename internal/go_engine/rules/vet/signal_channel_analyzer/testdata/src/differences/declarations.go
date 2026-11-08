@@ -6,7 +6,7 @@ import (
 )
 
 // Declared at package level here and used in differences.go, where the parser resolves none of these names.
-var unbufferedElsewhere = make(chan os.Signal) // port fixes: make(chan os.Signal, 1)
+var unbufferedElsewhere = make(chan os.Signal) // fix: make(chan os.Signal, 1)
 
 var bufferedElsewhere = make(chan os.Signal, 1)
 

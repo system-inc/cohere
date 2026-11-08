@@ -2,12 +2,9 @@ package build_tag
 
 import (
 	"bufio"
-	"cmp"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 
@@ -17,44 +14,44 @@ import (
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
-// x/tools' own fixtures for buildtag, byte for byte in testdata/upstream.txtar, run as x/tools' test runs them, over
-// packages a and b with no flags: every `// want` the original expects, the port reports at the same line with the
-// same message, and analysistest fails on a finding no want expects as much as on a want nothing found, so the port
-// adds nothing there either. Most of the fixtures are files the build excludes, and three are assembly:
-// analysistest reads the wants of a package's other files, and, for an analyzer named buildtag, of its excluded files
-// too, as x/tools' does.
+// x/tools' own fixtures for buildtag, byte for byte in testdata/upstream.txtar, over packages a and b with no flags,
+// hold the port to every want the original expects, and to nothing more. Most of the fixtures are files the build
+// excludes, and three are assembly: analysistest reads the wants of a package's other files, and, for an analyzer
+// named buildtag, of its excluded files too, as x/tools' does.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, extractedFixtures(test), Analyzer, "a", "b")
+	parity.RequireUpstreamWants(test, Analyzer, extractedFixtures(test), "a", "b")
 }
 
 // parityPatterns are the packages both sides run over for parity: x/tools' fixtures and parity's, the second holding
 // every branch of the judgment, the shapes most likely to differ, and clean cases beside them.
 var parityPatterns = []string{"a", "b", "parity"}
 
-// The original and the port run in one checker over the same fixture packages, and their findings must be the same
-// multiset of file, line, column, end and message. Neither offers a fix. Each side's count is logged, since two empty
-// sides would match and prove nothing, and the test fails if the original finds nothing at all.
+// Over the fixture packages, extracted into a tree laid out by import path, the original and the port find the same
+// findings, each the same in every field.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, loadedRoots(test, parityPatterns))
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	expectSame(test, original, port)
+	parity.RequireIdentical(test, buildtag.Analyzer, Analyzer, extractedFixtures(test), parityPatterns...)
 }
 
 // The registry lists buildtag among the passes that read no type information, so a run may hand it a pass with
 // none. The port runs here over the same packages with no types, package or type checker's information at all, and
-// must find what the original finds with them.
+// must find what the original finds with them. The harness's checker always hands a pass its types, so the port runs
+// on passes built by hand, and the original's findings, with types, come from the harness's Findings over the same
+// tree, each compared whole by its Difference.
 func TestPortReadsNoTypeInformation(test *testing.T) {
 	test.Parallel()
-	roots := loadedRoots(test, parityPatterns)
-	original, _ := findingsOf(test, roots)
-	untyped := []finding{}
-	for _, loadedPackage := range roots {
+	directory := extractedFixtures(test)
+	original, _ := parity.Findings(test, buildtag.Analyzer, Analyzer, directory, parityPatterns...)
+	if len(original) == 0 {
+		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
+	}
+	untyped := []parity.Finding{}
+	for _, loadedPackage := range loadedRoots(test, directory, parityPatterns) {
 		pass := &analysis.Pass{
 			Analyzer:     Analyzer,
 			Fset:         loadedPackage.Fset,
@@ -64,16 +61,20 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 			ReadFile:     os.ReadFile,
 			ResultOf:     map[*analysis.Analyzer]any{},
 			Report: func(diagnostic analysis.Diagnostic) {
-				untyped = append(untyped, findingAt(loadedPackage, diagnostic))
+				untyped = append(untyped, findingAt(test, directory, loadedPackage, diagnostic))
 			},
 		}
 		if _, runError := Analyzer.Run(pass); runError != nil {
 			test.Fatalf("running the port over %s with no types: %v", loadedPackage.ID, runError)
 		}
 	}
-	slices.SortFunc(untyped, compareFindings)
 	test.Logf("the original found %d, the port with no types %d", len(original), len(untyped))
-	expectSame(test, original, untyped)
+	for _, missing := range parity.Difference(original, untyped) {
+		test.Errorf("the original found %s, and the port did not", missing)
+	}
+	for _, extra := range parity.Difference(untyped, original) {
+		test.Errorf("the port found %s, and the original did not", extra)
+	}
 }
 
 // recordPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and the
@@ -81,38 +82,48 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 var recordPattern = regexp.MustCompile(`^finds: (.+?)\s*$`)
 
 // Over the differences fixture the two disagree, and only where the disagreement was adjudicated in the port's
-// favour: every finding the port alone makes is recorded on its line, the original makes none the port does not,
-// and every record is matched.
+// favour: every finding the port alone makes is recorded on its line, with its reason on the line above, the original
+// makes none the port does not, and every record is matched. The harness's RequireOnlyAdjudicated cannot read this
+// fixture: it parses every Go file of the fixture's directory, and the shape it holds is a Go file that does not
+// parse, and it reads records only in Go files, where one of the two is in an assembly file. So the records are read
+// line by line here, to the harness's rule for a reason, and the findings are the harness's Findings, compared by its
+// Difference.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	directory := extractedFixtures(test)
-	original, port := findingsOf(test, loadedRootsFrom(test, directory, []string{"differences"}))
+	original, port := parity.Findings(test, buildtag.Analyzer, Analyzer, directory, "differences")
 	test.Logf("the original found %d, the port %d", len(original), len(port))
-	recorded := []finding{}
+	recorded := []parity.Finding{}
 	entries, readError := os.ReadDir(filepath.Join(directory, "src", "differences"))
 	if readError != nil {
 		test.Fatal(readError)
 	}
 	for _, entry := range entries {
-		recorded = append(recorded, recordsIn(test, filepath.Join(directory, "src", "differences", entry.Name()))...)
+		path := filepath.Join(directory, "src", "differences", entry.Name())
+		recorded = append(recorded, recordsIn(test, directory, path)...)
 	}
 	if len(recorded) == 0 {
 		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
 	}
-	for _, unrecorded := range difference(lineOnly(difference(port, original)), recorded) {
-		test.Errorf("the port alone found %s, which the fixture does not record", described(unrecorded))
+	portAlone := lineOnly(parity.Difference(port, original))
+	for _, unrecorded := range parity.Difference(portAlone, recorded) {
+		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)
 	}
-	for _, unmatched := range difference(recorded, lineOnly(difference(port, original))) {
-		test.Errorf("the fixture records that the port alone finds %s, and it does not", described(unmatched))
+	for _, unmatched := range parity.Difference(recorded, portAlone) {
+		test.Errorf("the fixture records that the port alone finds %s, and it does not", unmatched)
 	}
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
+	for _, missing := range parity.Difference(original, port) {
+		test.Errorf("the original found %s, and the port did not, a regression", missing)
 	}
 }
 
-// recordsIn is every finding the fixture file at path records as the port's alone, each at its line.
-func recordsIn(test *testing.T, path string) []finding {
+// recordsIn is every finding the fixture file at path, in the tree extracted at directory, records as the port's
+// alone, each at its line, the file named as the harness names it. Each record must give its reason on the line
+// above, a comment that is no record, as the harness requires of its records; a file here has no declaration whose
+// doc could hold one, and an assembly file has none at all.
+func recordsIn(test *testing.T, directory string, path string) []parity.Finding {
 	test.Helper()
+	name := fixtureFileName(directory, path)
 	file, openError := os.Open(path)
 	if openError != nil {
 		test.Fatal(openError)
@@ -120,16 +131,23 @@ func recordsIn(test *testing.T, path string) []finding {
 	defer func() {
 		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
 	}()
-	recorded := []finding{}
+	recorded := []parity.Finding{}
 	scanner := bufio.NewScanner(file)
+	previous := ""
 	for line := 1; scanner.Scan(); line++ {
-		for _, comment := range strings.Split(scanner.Text(), "// port ")[1:] {
+		text := scanner.Text()
+		for _, comment := range strings.Split(text, "// port ")[1:] {
 			match := recordPattern.FindStringSubmatch(comment)
 			if match == nil {
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", filepath.Base(path), line, comment)
+				test.Fatalf("%s:%d holds a comment the test cannot read: %q", name, line, comment)
 			}
-			recorded = append(recorded, finding{file: filepath.Base(path), line: line, message: match[1]})
+			reasoned := strings.HasPrefix(strings.TrimSpace(previous), "//") && !strings.Contains(previous, "// port ")
+			if !reasoned {
+				test.Errorf("%s:%d holds a record with no reason: write why on the line above it", name, line)
+			}
+			recorded = append(recorded, parity.Finding{File: name, Line: line, Message: match[1]})
 		}
+		previous = text
 	}
 	if scanError := scanner.Err(); scanError != nil {
 		test.Fatal(scanError)
@@ -137,67 +155,54 @@ func recordsIn(test *testing.T, path string) []finding {
 	return recorded
 }
 
-// lineOnly is findings with their columns and ends dropped, for comparing with the differences fixture's records,
-// which name a line.
-func lineOnly(findings []finding) []finding {
-	dropped := []finding{}
+// lineOnly is findings by file, line and message alone, for comparing with the differences fixture's records, which
+// name a line and a message.
+func lineOnly(findings []parity.Finding) []parity.Finding {
+	dropped := []parity.Finding{}
 	for _, found := range findings {
-		found.column = 0
-		found.end = ""
-		dropped = append(dropped, found)
+		dropped = append(dropped, parity.Finding{File: found.File, Line: found.Line, Message: found.Message})
 	}
 	return dropped
 }
 
-// finding is one finding as the differential compares it.
-type finding struct {
-	file    string
-	line    int
-	column  int
-	end     string
-	message string
-}
-
-// described is found as a finding line prints it.
-func described(found finding) string {
-	return fmt.Sprintf("%s:%d:%d-%s: %s", found.file, found.line, found.column, found.end, found.message)
-}
-
-// compareFindings orders findings by the line each prints.
-func compareFindings(first finding, second finding) int {
-	return cmp.Compare(described(first), described(second))
-}
-
-// findingAt is diagnostic, reported in loadedPackage, as the differential compares it. The end is its line and
-// column, and empty when the finding has none, as neither side's findings do: both report a position alone.
-func findingAt(loadedPackage *packages.Package, diagnostic analysis.Diagnostic) finding {
-	position := loadedPackage.Fset.Position(diagnostic.Pos)
-	end := ""
-	if diagnostic.End.IsValid() {
-		endPosition := loadedPackage.Fset.Position(diagnostic.End)
-		end = fmt.Sprintf("%d:%d", endPosition.Line, endPosition.Column)
-	}
-	return finding{
-		file:    filepath.Base(position.Filename),
-		line:    position.Line,
-		column:  position.Column,
-		end:     end,
-		message: diagnostic.Message,
-	}
-}
-
-// expectSame fails unless original and other are the same multiset of findings, and the original found any.
-func expectSame(test *testing.T, original []finding, other []finding) {
+// findingAt is diagnostic, reported in loadedPackage from the tree extracted at directory, as the harness records a
+// finding, its file named as the harness names it. Neither side relates a position or offers a fix, so a diagnostic
+// that does fails here rather than being compared without them.
+func findingAt(
+	test *testing.T,
+	directory string,
+	loadedPackage *packages.Package,
+	diagnostic analysis.Diagnostic,
+) parity.Finding {
 	test.Helper()
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
+	if len(diagnostic.Related) > 0 || len(diagnostic.SuggestedFixes) > 0 {
+		test.Errorf("the port with no types relates a position or offers a fix, which this comparison does not "+
+			"record: %s", diagnostic.Message)
 	}
-	for _, missing := range difference(original, other) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
+	position := loadedPackage.Fset.Position(diagnostic.Pos)
+	found := parity.Finding{
+		File:    fixtureFileName(directory, position.Filename),
+		Line:    position.Line,
+		Column:  position.Column,
+		Message: diagnostic.Message,
 	}
-	for _, extra := range difference(other, original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
+	if diagnostic.End.IsValid() {
+		end := loadedPackage.Fset.Position(diagnostic.End)
+		found.EndLine, found.EndColumn = end.Line, end.Column
 	}
+	return found
+}
+
+// fixtureFileName is file named as the harness's Findings names a file of a fixture tree laid out by import path: its
+// path below the tree's src, in forward slashes, or its path as it is when it lies outside, so a hand tier's findings
+// and records pair with the harness's. The harness keeps that naming in an unexported method of its loads, so it is
+// written out here for the one layout this package's fixtures take.
+func fixtureFileName(directory string, file string) string {
+	below, relativeError := filepath.Rel(filepath.Join(directory, "src"), file)
+	if relativeError != nil || strings.HasPrefix(below, "..") {
+		return filepath.ToSlash(file)
+	}
+	return filepath.ToSlash(below)
 }
 
 // fixtureArchives are the fixture trees, each laid out by import path: x/tools' packages a and b, parity's package,
@@ -246,16 +251,10 @@ func writeFixture(test *testing.T, path string, content []byte) {
 	}
 }
 
-// loadedRoots loads the fixture packages patterns name from a freshly extracted tree.
-func loadedRoots(test *testing.T, patterns []string) []*packages.Package {
-	test.Helper()
-	return loadedRootsFrom(test, extractedFixtures(test), patterns)
-}
-
-// loadedRootsFrom loads the fixture packages patterns name from directory, each with its test variants, as
-// analysistest loads one. Every root must load clean, and there must be one: the checker passes over a root that
-// does not load without a word, so a fixture the go command refuses would compare nothing and read green.
-func loadedRootsFrom(test *testing.T, directory string, patterns []string) []*packages.Package {
+// loadedRoots loads the fixture packages patterns name from directory, each with its test variants, as analysistest
+// loads one and the harness's Findings loads them, for the passes the no types tier builds by hand. Every root must
+// load clean, and there must be one, by the harness's own judgment of a load.
+func loadedRoots(test *testing.T, directory string, patterns []string) []*packages.Package {
 	test.Helper()
 	loaded, loadError := load.Packages(directory, patterns, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
@@ -266,70 +265,9 @@ func loadedRootsFrom(test *testing.T, directory string, patterns []string) []*pa
 	if len(loaded.Roots) == 0 {
 		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
 	}
-	for _, root := range loaded.Roots {
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %v", root.ID,
-				root.Errors)
-		}
+	for _, failure := range parity.LoadFailures(loaded.Roots) {
+		test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
+			failure.Package, failure.Error)
 	}
 	return loaded.Roots
-}
-
-// findingsOf runs x/tools' buildtag and the port over roots in one checker, and returns each one's findings, sorted.
-func findingsOf(test *testing.T, roots []*packages.Package) (original []finding, port []finding) {
-	test.Helper()
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{buildtag.Analyzer, Analyzer}, roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %d packages: %v", len(roots), analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			if len(diagnostic.SuggestedFixes) > 0 {
-				test.Errorf("%s offers a fix, which neither side is known to: %s", action, diagnostic.Message)
-			}
-			found := findingAt(action.Package, diagnostic)
-			switch action.Analyzer {
-			case buildtag.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	slices.SortFunc(original, compareFindings)
-	slices.SortFunc(port, compareFindings)
-	return original, port
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }

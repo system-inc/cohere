@@ -1,146 +1,81 @@
 package atomic
 
 import (
-	"cmp"
-	"fmt"
-	"path/filepath"
-	"slices"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
-// x/tools' own fixtures for atomic, copied unchanged into testdata/src and run as x/tools' test runs them, with no
-// flags: every `// want` the original expects, the port reports at the same line with the same message, and
-// analysistest fails on a finding no want expects as much as on a want nothing found, so the port adds nothing there
-// either.
+// x/tools' own fixtures for atomic, copied unchanged into testdata/src, hold the port to every want the original
+// expects, and to nothing more.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "a", "typeparams")
+	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), "a", "typeparams")
 }
 
 // Parity's wants are what the original makes of it, so each line's comment, reported or clean, says truly what both
-// sides do there, and a shape the differential passes is a shape whose outcome was read, not only matched.
+// sides do there, and a shape the differential passes is a shape whose outcome was read, not only matched. The
+// original stands where RequireUpstreamWants takes a port, since the run holds whichever analyzer it is given to the
+// fixture's wants.
 func TestParityWantsAreTheOriginals(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), atomic.Analyzer, "parity")
+	parity.RequireUpstreamWants(test, atomic.Analyzer, analysistest.TestData(), "parity")
 }
 
-// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
-// holding every branch of the judgment and the shapes most likely to differ, and their findings must be the same
-// multiset of file, line, column and message. Each side's count is logged, since two empty sides would match and
-// prove nothing, and the test fails if the original finds nothing at all.
+// upstreamLoadErrors are the type errors x/tools' fixtures load with, since atomic runs despite errors and its
+// fixtures hold calls that do not type-check: a's AddUint64 with no arguments, which used to crash vet, and in
+// typeparams the Add calls on a type parameter, which its own comment says type-check wrong on purpose, and the
+// generic _S named as a receiver without its type parameter, which upstream leaves unremarked.
+var upstreamLoadErrors = []parity.LoadError{
+	{
+		Position: "a/a.go:43:23",
+		Message:  "not enough arguments in call to atomic.AddUint64 have () want (*uint64, uint64)",
+	},
+	{
+		Position: "typeparams/typeparams.go:19:10",
+		Message:  "cannot use atomic.AddInt64(addr, -delta) (value of type int64) as T value in assignment",
+	},
+	{
+		Position: "typeparams/typeparams.go:19:26",
+		Message:  "cannot use addr (variable of type *T) as *int64 value in argument to atomic.AddInt64",
+	},
+	{
+		Position: "typeparams/typeparams.go:19:32",
+		Message: "cannot use -delta (value of type T constrained by Subtractable) as int64 value in argument to " +
+			"atomic.AddInt64",
+	},
+	{
+		Position: "typeparams/typeparams.go:20:10",
+		Message:  "cannot use atomic.AddUintptr(addr, delta) (value of type uintptr) as T value in assignment",
+	},
+	{
+		Position: "typeparams/typeparams.go:20:28",
+		Message:  "cannot use addr (variable of type *T) as *uintptr value in argument to atomic.AddUintptr",
+	},
+	{
+		Position: "typeparams/typeparams.go:20:34",
+		Message: "cannot use delta (variable of type T constrained by Subtractable) as uintptr value in argument to " +
+			"atomic.AddUintptr",
+	},
+	{
+		Position: "typeparams/typeparams.go:21:18",
+		Message:  "not enough arguments in call to atomic.AddInt64 have () want (*int64, int64)",
+	},
+	{
+		Position: "typeparams/typeparams.go:29:9",
+		Message:  "cannot use generic type _S[T Subtractable] without instantiation",
+	},
+}
+
+// Over x/tools' fixtures and parity's, the second holding every branch of the judgment and the shapes most likely to
+// differ, the original and the port find the same findings, each the same in every field, x/tools' compared despite
+// the type errors upstreamLoadErrors lists and parity's loading clean. The port differs from the original nowhere, so
+// there is no differences fixture.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, "a", "typeparams", "parity")
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
-	}
-	for _, extra := range difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
-	}
-}
-
-// finding is one finding as the differential compares it. The original reports the range of the assignment's left
-// side, so where it ends is compared as well as where it starts.
-type finding struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	message   string
-}
-
-// described is found as a finding line prints it.
-func described(found finding) string {
-	return fmt.Sprintf(
-		"%s:%d:%d-%d:%d: %s", found.file, found.line, found.column, found.endLine, found.endColumn, found.message,
-	)
-}
-
-// findingsOf loads the fixture packages patterns name, runs x/tools' atomic and the port over them in one checker,
-// and returns each one's findings, sorted.
-func findingsOf(test *testing.T, patterns ...string) (original []finding, port []finding) {
-	test.Helper()
-	directory := analysistest.TestData()
-	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, patterns, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{atomic.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			position := action.Package.Fset.Position(diagnostic.Pos)
-			end := action.Package.Fset.Position(diagnostic.End)
-			found := finding{
-				file:      filepath.Base(position.Filename),
-				line:      position.Line,
-				column:    position.Column,
-				endLine:   end.Line,
-				endColumn: end.Column,
-				message:   diagnostic.Message,
-			}
-			switch action.Analyzer {
-			case atomic.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
-	return original, port
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
+	parity.RequireIdenticalDespiteLoadErrors(test, atomic.Analyzer, Analyzer, analysistest.TestData(),
+		upstreamLoadErrors, "a", "typeparams", "parity")
 }

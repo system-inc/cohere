@@ -2,7 +2,6 @@ package printf
 
 import (
 	"fmt"
-	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
@@ -35,42 +35,41 @@ func init() {
 	}
 }
 
-// x/tools' own fixtures for printf, copied unchanged into testdata/src and run as the original's test runs them:
-// every `// want` the original expects, findings and facts, the port reports at the same line with the same text,
-// and analysistest fails on a finding no want expects as much as on a want nothing found.
+// x/tools' own fixtures for printf, copied unchanged into testdata/src, hold the port to every want the original
+// expects, findings and facts, and to nothing more.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, upstreamPackages...)
+	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), upstreamPackages...)
 }
 
 // The original's two version-gated tests, each a module of its own in a txtar archive: a file of go1.24 or later
 // gets the non-constant format finding and its suggested fix, which must give the archive's golden file, and an
 // earlier file gets neither. The original extracts them with x/tools' internal testfiles and skips with its internal
 // testenv on a Go before 1.23 or 1.24; here the public txtar does the extracting, and no skip is needed, since this
-// module's go line is 1.27.
+// module's go line is 1.27. The original runs them with suggested fixes, so they run through the harness's
+// RequireUpstreamWantsWithFixes, which reads the golden files, over the extracted module.
 func TestNonConstantFormatStringGo123(test *testing.T) {
 	test.Parallel()
 	directory := extractArchive(test, "nonconst_go123.txtar")
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, directory, Analyzer, "example.com/nonconst")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, directory, "example.com/nonconst")
 }
 
 func TestNonConstantFormatStringGo124(test *testing.T) {
 	test.Parallel()
 	directory := extractArchive(test, "nonconst_go124.txtar")
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, directory, Analyzer, "example.com/nonconst")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, directory, "example.com/nonconst")
 }
 
-// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
-// holding a violation of every message and every branch, a clean case beside each, and the shapes most likely to
-// differ, and their findings must be the same multiset of file, line, column and message, as must the facts each
-// exports, by object and by the fact's words. Each side's count is logged, since two empty sides would match and
-// prove nothing, and the test fails if the original finds nothing at all.
+// Over x/tools' fixtures and parity's, the second holding a violation of every message and every branch, a clean
+// case beside each, and the shapes most likely to differ, the original and the port find the same findings, each the
+// same in every field, and export the same facts.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
+	patterns := append(slices.Clone(upstreamPackages), "parity", "parity/dependency")
+	parity.RequireIdentical(test, original.Analyzer, Analyzer, directory, patterns...)
 	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	environment := []string{"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off"}
-	compareSides(test, directory, environment, append(slices.Clone(upstreamPackages), "parity", "parity/dependency"))
+	requireSameFacts(test, directory, []string{"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off"}, patterns)
 }
 
 // The two sides agree over the version-gated archives too, each loaded as a module, as analysistest loads it.
@@ -80,54 +79,29 @@ func TestPortMatchesOriginalOverTheArchives(test *testing.T) {
 		test.Run(archive, func(test *testing.T) {
 			test.Parallel()
 			directory := extractArchive(test, archive)
-			environment := []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"}
-			compareSides(test, directory, environment, []string{"example.com/nonconst"})
+			patterns := []string{"example.com/nonconst"}
+			parity.RequireIdentical(test, original.Analyzer, Analyzer, directory, patterns...)
+			requireSameFacts(test, directory, []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"}, patterns)
 		})
 	}
 }
 
-// compareSides fails the test unless the original and the port find and export the same over patterns.
-func compareSides(test *testing.T, directory string, environment []string, patterns []string) {
-	test.Helper()
-	original, port := findingsOf(test, directory, environment, patterns)
-	test.Logf("the original found %d and exported %d facts, the port %d and %d", len(original.findings),
-		len(original.facts), len(port.findings), len(port.facts))
-	if len(original.findings) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original.findings, port.findings) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range difference(port.findings, original.findings) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
-	for _, missing := range difference(original.facts, port.facts) {
-		test.Errorf("the original exported %s, and the port did not", missing)
-	}
-	for _, extra := range difference(port.facts, original.facts) {
-		test.Errorf("the port exported %s, and the original did not", extra)
-	}
-}
-
-// side is what one analyzer found and exported, each as a line naming its file, line and column.
-type side struct {
-	findings []string
-	facts    []string
-}
-
-// findingsOf loads the packages patterns name at directory under environment, runs the original and the port over
-// them in one checker, and returns each one's findings and exported facts, sorted.
-func findingsOf(test *testing.T, directory string, environment []string, patterns []string) (side, side) {
+// requireSameFacts loads the packages patterns name at directory under environment, runs the original and the port
+// over them in one checker, and fails the test unless each exports the same facts, each by its object's position,
+// the object's name and the fact's words. The harness compares findings and not facts, which printf alone among the
+// ports exports, so the facts are compared here on the harness's pieces: its load check, and its Difference over
+// each fact written as a Finding at its object. Each side's count is logged, so a run that exports nothing on both
+// sides reads as that, never as agreement.
+func requireSameFacts(test *testing.T, directory string, environment []string, patterns []string) {
 	test.Helper()
 	loaded, loadError := load.Packages(directory, patterns, environment, nil)
 	if loadError != nil {
 		test.Fatalf("loading %v: %v", patterns, loadError)
 	}
 	// A fixture that does not type-check is skipped by both sides, which would then agree on nothing.
-	for _, root := range loaded.Roots {
-		for _, packageError := range root.Errors {
-			test.Errorf("%s: %v", root.PkgPath, packageError)
-		}
+	for _, failure := range parity.LoadFailures(loaded.Roots) {
+		test.Fatalf("fixture package %s does not load clean, so its facts would go uncounted: %s", failure.Package,
+			failure.Error)
 	}
 	graph, analyzeError := checker.Analyze(
 		[]*analysis.Analyzer{original.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
@@ -135,59 +109,30 @@ func findingsOf(test *testing.T, directory string, environment []string, pattern
 	if analyzeError != nil {
 		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
 	}
-	sides := map[*analysis.Analyzer]*side{original.Analyzer: {}, Analyzer: {}}
+	exported := map[*analysis.Analyzer][]parity.Finding{}
 	for _, action := range graph.Roots {
 		if action.Err != nil {
 			test.Fatalf("running %s: %v", action, action.Err)
 		}
-		found := sides[action.Analyzer]
-		for _, diagnostic := range action.Diagnostics {
-			// The end and every suggested edit are compared too, so a finding placed alike but spanning
-			// otherwise, or fixed otherwise, is a difference.
-			message := diagnostic.Message + " to " + described(action, diagnostic.End, "")
-			for _, fix := range diagnostic.SuggestedFixes {
-				for _, edit := range fix.TextEdits {
-					message += fmt.Sprintf(", fix %q at %s%q", fix.Message, described(action, edit.Pos, ""),
-						edit.NewText)
-				}
-			}
-			found.findings = append(found.findings, described(action, diagnostic.Pos, message))
-		}
 		objectFacts, _ := action.ExportedFacts()
 		for _, objectFact := range objectFacts {
-			found.facts = append(found.facts, described(action, objectFact.Object.Pos(),
-				fmt.Sprintf("%s %v", objectFact.Object.Name(), objectFact.Fact)))
+			position := action.Package.Fset.Position(objectFact.Object.Pos())
+			exported[action.Analyzer] = append(exported[action.Analyzer], parity.Finding{
+				File:    filepath.Base(position.Filename),
+				Line:    position.Line,
+				Column:  position.Column,
+				Message: fmt.Sprintf("%s %v", objectFact.Object.Name(), objectFact.Fact),
+			})
 		}
 	}
-	for _, found := range sides {
-		slices.Sort(found.findings)
-		slices.Sort(found.facts)
+	test.Logf("the original exported %d facts, the port %d", len(exported[original.Analyzer]),
+		len(exported[Analyzer]))
+	for _, missing := range parity.Difference(exported[original.Analyzer], exported[Analyzer]) {
+		test.Errorf("the original exported %s, and the port did not", missing)
 	}
-	return *sides[original.Analyzer], *sides[Analyzer]
-}
-
-// described is message at position in action's package as a finding line prints it, with the file's base name.
-func described(action *checker.Action, position token.Pos, message string) string {
-	resolved := action.Package.Fset.Position(position)
-	return fmt.Sprintf("%s:%d:%d: %s", filepath.Base(resolved.Filename), resolved.Line, resolved.Column, message)
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []string, without []string) []string {
-	remaining := map[string]int{}
-	for _, found := range without {
-		remaining[found]++
+	for _, extra := range parity.Difference(exported[Analyzer], exported[original.Analyzer]) {
+		test.Errorf("the port exported %s, and the original did not", extra)
 	}
-	missing := []string{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
 }
 
 // extractArchive writes the txtar archive of testdata named name into a directory of the test's own, as x/tools'
@@ -207,14 +152,4 @@ func extractArchive(test *testing.T, name string) string {
 		test.Fatal(copyError)
 	}
 	return directory
-}
-
-// errorsOnly hands analysistest a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }

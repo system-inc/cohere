@@ -1,26 +1,22 @@
 package time_format
 
 import (
-	"cmp"
 	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/timeformat"
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
 // x/tools' own fixtures for timeformat, copied unchanged into testdata/src, a.go beside its golden file and the b it
@@ -29,54 +25,46 @@ import (
 // much as on a want nothing found, and the port's fixes, applied, turn a.go into a.go.golden.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, analysistest.TestData(), "a")
 }
 
-// The original and the port run in one checker over the same fixture packages, x/tools' and those written for the
-// port, parity holding every branch of the judgment and the shapes most likely to differ and dotted a dot import, and
-// their findings must be the same multiset of file, start, end, message and fixes, each fix's edits compared as
-// offsets and text, since a golden file is gofmt'd first and would miss an edit off by one byte. Each side's count is
-// logged, since two empty sides would match and prove nothing, and the test fails if the original finds nothing.
+// Over x/tools' fixtures and those written for the port, parity holding every branch of the judgment and the shapes
+// most likely to differ and dotted a dot import, the original and the port find the same findings, each the same in
+// every field, each fix's edits compared as offsets and text, since a golden file is gofmt'd first and would miss an
+// edit off by one byte.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, analysistest.TestData(), "a", "parity", "dotted")
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
-	}
-	for _, extra := range difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
-	}
-}
-
-// recordPattern is one comment in a differences fixture, the text after its `// port ` opening: its kind, the message,
-// `@` and the port's span on that line by column, its start and its end, or its start alone for a finding with no
-// end. `moves:` is a finding both make on that line with that message, the port's over the pinned span and the
-// original's elsewhere. `finds:` is a true finding only the port makes.
-var recordPattern = regexp.MustCompile(`^(moves|finds): (.+?) @ (\d+)(?:-(\d+))?\s*$`)
-
-// record is one comment of a differences fixture, read: its kind, and the port's finding it pins, by file, line,
-// column, end column and message.
-type record struct {
-	kind  string
-	found finding
+	parity.RequireIdentical(test, timeformat.Analyzer, Analyzer, analysistest.TestData(), "a", "parity", "dotted")
 }
 
 // Over the differences fixtures the two disagree, and only where each disagreement was adjudicated in the port's
-// favour, as the fixtures record it on the finding's line, with the reason on the line above. A move is a finding both
-// make, the original's over the wrong bytes: the port's span is the one pinned, its fix, applied, replaces source that
-// spells 2006-02-01 alone and leaves the literal's value as it was with 2006-01-02 in the mistake's place, and the
-// original's fix does not. A finding the port alone makes is pinned the same way, its fix checked the same way, or it
-// has no fix where it has no end. Every finding either side alone makes must be recorded, and every record matched by
-// exactly one. The differences package is gofmt-clean and lives in testdata/src. The carriage returns of carriage.go
-// are not, since gofmt drops a raw literal's, so it lives in carriage.txtar and is extracted into a directory of the
-// test's own.
+// favour, as the fixtures record it on the finding's line, with the reason on the line above: a move is a finding
+// both make, the original's over the wrong bytes, and a find a true finding only the port makes. The differences
+// package is gofmt-clean and lives in testdata/src. The carriage returns of carriage.go are not, since gofmt drops a
+// raw literal's, so it lives in carriage.txtar and is extracted into a directory of the test's own.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	compareDifferences(test, analysistest.TestData(), "differences")
+	parity.RequireOnlyAdjudicated(test, timeformat.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	parity.RequireOnlyAdjudicated(test, timeformat.Analyzer, Analyzer, extractedCarriage(test), "carriage")
+}
+
+// The harness pairs a move by line and message alone, and a find by line and message, so over the same fixtures this
+// holds what the records cannot: each fix applied. Every finding the port alone makes that has an end offers one fix,
+// one edit of its own span, on one line, to goodFormat, replacing source that spells badFormat alone and leaving the
+// literal's value as it was with goodFormat in the mistake's place, so the span is the bytes that spell the mistake
+// and no others. One with no end, a layout that is not one literal, sits at a name and offers no fix. And every
+// finding the original alone makes offers a fix that fails the same check, since a move whose original fix were right
+// would be no difference.
+func TestPortsFixesReplaceTheMistakeAlone(test *testing.T) {
+	test.Parallel()
+	checkFixes(test, analysistest.TestData(), "differences")
+	checkFixes(test, extractedCarriage(test), "carriage")
+}
+
+// extractedCarriage writes carriage.txtar's files, carriage returns and all, into a directory of the test's own laid
+// out as testdata is, and returns it.
+func extractedCarriage(test *testing.T) string {
+	test.Helper()
 	archive, archiveError := txtar.ParseFile(filepath.Join(analysistest.TestData(), "carriage.txtar"))
 	if archiveError != nil {
 		test.Fatal(archiveError)
@@ -91,126 +79,104 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	compareDifferences(test, extracted, "carriage")
+	return extracted
 }
 
-// compareDifferences runs both over the package at pattern in the tree at directory, a package of one file named for
-// it, and fails the test unless every finding either side alone makes is one the file records, as it records it.
-func compareDifferences(test *testing.T, directory string, pattern string) {
+// checkFixes runs both over the package fixture names in testdata, a package of one file named for it, and checks
+// each finding one side alone makes against the source, as TestPortsFixesReplaceTheMistakeAlone says.
+func checkFixes(test *testing.T, testdata string, fixture string) {
 	test.Helper()
-	original, port := findingsOf(test, directory, pattern)
-	test.Logf("over %s, the original found %d, the port %d", pattern, len(original), len(port))
-	path := filepath.Join(directory, "src", pattern, pattern+".go")
-	content, readError := os.ReadFile(path)
+	original, port := parity.Findings(test, timeformat.Analyzer, Analyzer, testdata, fixture)
+	content, readError := os.ReadFile(filepath.Join(testdata, "src", fixture, fixture+".go"))
 	if readError != nil {
 		test.Fatal(readError)
 	}
-	records := recordsOf(test, pattern+".go", content)
-	originalAlone := unclaimedFindings(difference(original, port))
-	portAlone := unclaimedFindings(difference(port, original))
-	moves := 0
-	finds := 0
-	for _, recorded := range records {
-		portFound := portAlone.claim(test, "the port", recorded.found)
-		if recorded.kind == "moves" {
-			moves++
-			originalFound := originalAlone.claim(test, "the original", recorded.found)
-			if originalFound != nil && checkFix(content, *originalFound) == nil {
-				test.Errorf("the original's fix at %s is right, so %s:%d records no difference",
-					described(*originalFound), recorded.found.file, recorded.found.line)
+	lineStarts := []int{0}
+	for offset, character := range content {
+		if character == '\n' {
+			lineStarts = append(lineStarts, offset+1)
+		}
+	}
+	originalAlone := parity.Difference(original, port)
+	for _, found := range originalAlone {
+		if checkFix(content, lineStarts, found) == nil {
+			test.Errorf("the original's fix at %s is right, so its line records no difference", found)
+		}
+	}
+	portAlone := parity.Difference(port, original)
+	if len(portAlone) == 0 {
+		test.Fatalf("over %s, the port alone finds nothing, so no fix is checked", fixture)
+	}
+	withoutEnd := 0
+	for _, found := range portAlone {
+		if found.EndLine == 0 {
+			withoutEnd++
+			if len(found.Fixes) > 0 {
+				test.Errorf("the port found %s, which has no end, and offers a fix", found)
 			}
-		} else {
-			finds++
-		}
-		if portFound == nil {
-			continue
-		}
-		if portFound.column != recorded.found.column || portFound.endColumn != recorded.found.endColumn ||
-			portFound.endLine != 0 && portFound.endLine != portFound.line {
-			test.Errorf("the port found %s, and %s:%d pins its span to columns %d to %d of that line",
-				described(*portFound), recorded.found.file, recorded.found.line, recorded.found.column,
-				recorded.found.endColumn)
-		}
-		if portFound.endColumn == 0 {
-			if portFound.fixes != "[]" {
-				test.Errorf("the port found %s, which has no end, and offers a fix", described(*portFound))
+			if !startsName(content, offsetOf(lineStarts, found.Line, found.Column)) {
+				test.Errorf("the port found %s, which has no end, and sits at no name", found)
 			}
 			continue
 		}
-		if fixError := checkFix(content, *portFound); fixError != nil {
-			test.Errorf("the port's fix at %s is wrong: %v", described(*portFound), fixError)
+		if found.EndLine != found.Line {
+			test.Errorf("the port found %s, which spans more than its line", found)
+		}
+		if fixError := checkFix(content, lineStarts, found); fixError != nil {
+			test.Errorf("the port's fix at %s is wrong: %v", found, fixError)
 		}
 	}
-	test.Logf("over %s, %d moves and %d findings only the port makes are recorded", pattern, moves, finds)
-	for _, unrecorded := range originalAlone {
-		test.Errorf("the original alone found %s, which the fixture does not record", described(unrecorded))
-	}
-	for _, unrecorded := range portAlone {
-		test.Errorf("the port alone found %s, which the fixture does not record", described(unrecorded))
-	}
+	test.Logf(
+		"over %s, %d fixes of the original's are wrong, and %d of the port's are right, %d with no end and no fix",
+		fixture, len(originalAlone), len(portAlone)-withoutEnd, withoutEnd,
+	)
 }
 
-// recordsOf reads every record of the differences fixture named file whose text is content, and fails the test on a
-// comment it cannot read, on a record with no reason on the line above, and on a fixture that records nothing.
-func recordsOf(test *testing.T, file string, content []byte) []record {
-	test.Helper()
-	lines := strings.Split(string(content), "\n")
-	records := []record{}
-	for index, text := range lines {
-		comments := strings.Split(text, "// port ")[1:]
-		if len(comments) > 1 {
-			test.Fatalf("%s:%d holds %d records, and a line holds one", file, index+1, len(comments))
-		}
-		for _, comment := range comments {
-			match := recordPattern.FindStringSubmatch(comment)
-			if match == nil {
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", file, index+1, comment)
-			}
-			// The line above is the reason, a comment of its own that is no record.
-			if index == 0 || !strings.HasPrefix(strings.TrimSpace(lines[index-1]), "//") ||
-				strings.Contains(lines[index-1], "// port ") {
-				test.Fatalf("%s:%d records a difference with no reason on the line above", file, index+1)
-			}
-			column, columnError := strconv.Atoi(match[3])
-			if columnError != nil {
-				test.Fatalf("%s:%d pins a column the test cannot read: %v", file, index+1, columnError)
-			}
-			// A record with no end column pins a finding with no end, whose end column reads as zero.
-			endColumn := 0
-			if match[4] != "" {
-				parsed, endError := strconv.Atoi(match[4])
-				if endError != nil {
-					test.Fatalf("%s:%d pins an end column the test cannot read: %v", file, index+1, endError)
-				}
-				endColumn = parsed
-			}
-			records = append(records, record{kind: match[1], found: finding{
-				file: file, line: index + 1, column: column, endColumn: endColumn, message: match[2],
-			}})
-		}
-	}
-	if len(records) == 0 {
-		test.Fatalf("%s records nothing, so the comparison proves nothing", file)
-	}
-	return records
+// offsetOf is the byte offset of line and column, both counted from 1 as a token.Position counts them, in a file
+// whose lines open at lineStarts.
+func offsetOf(lineStarts []int, line int, column int) int {
+	return lineStarts[line-1] + column - 1
 }
 
-// checkFix applies found's one fix to content and reports what is wrong with it: anything but one edit of found's
-// own span to goodFormat, a span whose source does not spell badFormat alone, or a literal whose text after the edit
-// does not decode to its value before with its first badFormat replaced by goodFormat.
-func checkFix(content []byte, found finding) error {
-	expectedFixes := fmt.Sprintf("[{%q %s[%d:%d]=%q}]", "Replace "+badFormat+" with "+goodFormat, found.file,
-		found.offset, found.endOffset, goodFormat)
-	if found.fixes != expectedFixes {
-		return fmt.Errorf("its fixes are %s, not one edit of its own span, %s", found.fixes, expectedFixes)
+// startsName is whether an identifier opens at offset in content, parsed as a Go file.
+func startsName(content []byte, offset int) bool {
+	files := token.NewFileSet()
+	parsed, parseError := parser.ParseFile(files, "fixture.go", content, parser.SkipObjectResolution)
+	if parseError != nil {
+		return false
 	}
-	before, beforeError := literalAt(content, found.offset)
+	for node := range ast.Preorder(parsed) {
+		if identifier, isIdentifier := node.(*ast.Ident); isIdentifier &&
+			files.Position(identifier.Pos()).Offset == offset {
+			return true
+		}
+	}
+	return false
+}
+
+// checkFix applies found's one fix to content, whose lines open at lineStarts, and reports what is wrong with it:
+// anything but one edit of found's own span to goodFormat, a span whose source does not spell badFormat alone, or a
+// literal whose text after the edit does not decode to its value before with its first badFormat replaced by
+// goodFormat.
+func checkFix(content []byte, lineStarts []int, found parity.Finding) error {
+	offset := offsetOf(lineStarts, found.Line, found.Column)
+	endOffset := offsetOf(lineStarts, found.EndLine, found.EndColumn)
+	expectedFixes := []parity.Fix{{
+		Message: "Replace " + badFormat + " with " + goodFormat,
+		Edits:   []parity.Edit{{File: found.File, Start: offset, End: endOffset, NewText: goodFormat}},
+	}}
+	if !slices.EqualFunc(found.Fixes, expectedFixes, func(fix parity.Fix, expected parity.Fix) bool {
+		return fix.Message == expected.Message && slices.Equal(fix.Edits, expected.Edits)
+	}) {
+		return fmt.Errorf("its fixes are %v, not one edit of its own span, %v", found.Fixes, expectedFixes)
+	}
+	before, beforeError := literalAt(content, offset)
 	if beforeError != nil {
 		return fmt.Errorf("before the fix: %w", beforeError)
 	}
 	// replaced is the source the edit replaces, which must decode, as the literal's own quotes decode it, to the
 	// mistake and nothing more. A raw literal's carriage returns decode to nothing.
-	replaced := string(content[found.offset:found.endOffset])
+	replaced := string(content[offset:endOffset])
 	decoded := strings.ReplaceAll(replaced, "\r", "")
 	if !strings.HasPrefix(before.Value, "`") {
 		unquoted, unquoteError := strconv.Unquote(`"` + replaced + `"`)
@@ -223,8 +189,8 @@ func checkFix(content []byte, found finding) error {
 	if decoded != badFormat {
 		return fmt.Errorf("it replaces %q, which spells %q, not %s alone", replaced, decoded, badFormat)
 	}
-	fixed := slices.Concat(content[:found.offset], []byte(goodFormat), content[found.endOffset:])
-	after, afterError := literalAt(fixed, found.offset)
+	fixed := slices.Concat(content[:offset], []byte(goodFormat), content[endOffset:])
+	after, afterError := literalAt(fixed, offset)
 	if afterError != nil {
 		return fmt.Errorf("after the fix: %w", afterError)
 	}
@@ -262,134 +228,4 @@ func literalAt(content []byte, offset int) (*ast.BasicLit, error) {
 		return nil, fmt.Errorf("no string literal opens at or before offset %d", offset)
 	}
 	return enclosing, nil
-}
-
-// finding is one finding as the differential compares it. offset and endOffset are its span in bytes from the file's
-// start, and fixes is every suggested fix written out, its message and each edit's offsets and text, so a finding stays
-// one comparable value.
-type finding struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	offset    int
-	endOffset int
-	message   string
-	fixes     string
-}
-
-// described is found as a finding line prints it, its end and fixes after.
-func described(found finding) string {
-	return fmt.Sprintf("%s:%d:%d-%d:%d: %s %s", found.file, found.line, found.column, found.endLine, found.endColumn,
-		found.message, found.fixes)
-}
-
-// findingsOf loads the fixture packages patterns name in the tree at directory, runs x/tools' timeformat and the port
-// over them in one checker, and returns each one's findings, sorted.
-func findingsOf(test *testing.T, directory string, patterns ...string) (original []finding, port []finding) {
-	test.Helper()
-	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, patterns, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	// The checker passes over a root that does not type-check without a word, so a fixture with one type error would
-	// compare nothing and read green. Every root must load clean, and there must be one.
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
-	}
-	for _, root := range loaded.Roots {
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %v", root.ID,
-				root.Errors)
-		}
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{timeformat.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			position := action.Package.Fset.Position(diagnostic.Pos)
-			// A finding with no end, as one reported with Reportf, has an end position that is not valid, line and
-			// column zero, which compares as well as any other.
-			end := action.Package.Fset.Position(diagnostic.End)
-			found := finding{
-				file:      filepath.Base(position.Filename),
-				line:      position.Line,
-				column:    position.Column,
-				endLine:   end.Line,
-				endColumn: end.Column,
-				offset:    position.Offset,
-				endOffset: end.Offset,
-				message:   diagnostic.Message,
-				fixes:     fixesOf(action.Package.Fset, diagnostic),
-			}
-			switch action.Analyzer {
-			case timeformat.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
-	return original, port
-}
-
-// fixesOf is every suggested fix of diagnostic written out, in order: its message, then each edit as the file, the
-// byte offsets it replaces and the text it puts there.
-func fixesOf(files *token.FileSet, diagnostic analysis.Diagnostic) string {
-	written := []string{}
-	for _, fix := range diagnostic.SuggestedFixes {
-		edits := []string{}
-		for _, edit := range fix.TextEdits {
-			start := files.Position(edit.Pos)
-			end := files.Position(edit.End)
-			edits = append(edits, fmt.Sprintf("%s[%d:%d]=%q", filepath.Base(start.Filename), start.Offset, end.Offset,
-				edit.NewText))
-		}
-		written = append(written, fmt.Sprintf("{%q %s}", fix.Message, strings.Join(edits, " ")))
-	}
-	return "[" + strings.Join(written, " ") + "]"
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }

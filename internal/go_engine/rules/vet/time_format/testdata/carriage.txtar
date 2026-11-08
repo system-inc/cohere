@@ -9,9 +9,9 @@ import "time"
 // Each carriage return before the mistake lands the original one byte early, and one inside it covers one byte too few.
 func carried(moment time.Time) {
 	// One carriage return before the mistake.
-	_ = moment.Format(`Mon 2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02 @ 26-36
+	_ = moment.Format(`Mon 2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
 	// Two carriage returns before it, so the original lands two bytes early.
-	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02 @ 23-33
+	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
 	// One carriage return inside it.
-	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02 @ 21-32
+	_ = moment.Format(`2006-02-01`) // port moves: 2006-02-01 should be 2006-01-02
 }

@@ -1,25 +1,19 @@
 package unreachable
 
 import (
-	"bufio"
-	"cmp"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
-	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/unreachable"
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker/driverutil"
-	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 )
 
 // x/tools' own fixture for unreachable, a.go and its golden file copied unchanged into testdata/src/a, run as x/tools'
@@ -29,353 +23,180 @@ import (
 // file. The parity fixtures' wants are held to the port the same way, so each says truly what it holds.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "parity", "parity/shadowed")
-	analysistest.Run(errorsOnly{test}, extractedLayouts(test), Analyzer, "layout")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, analysistest.TestData(), "a")
+	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), "parity", "parity/shadowed")
+	parity.RequireUpstreamWants(test, Analyzer, fixtureTree(test), "layout")
 }
+
+// aMissingReturnLines are the 209 lines of x/tools' a.go where a function whose result is an int ends with no return,
+// each its closing brace, at column 1.
+var aMissingReturnLines = []int{
+	18, 22, 28, 35, 41, 49, 58, 66, 76, 85, 100, 108, 115, 123, 130, 139, 149, 158, 167, 177, 186, 196, 207, 222,
+	235, 243, 256, 263, 272, 300, 308, 317, 327, 334, 343, 353, 360, 369, 379, 385, 395, 405, 416, 427, 442, 456,
+	469, 481, 490, 504, 516, 525, 536, 549, 563, 576, 589, 601, 614, 626, 638, 650, 657, 669, 681, 693, 703, 717,
+	730, 745, 758, 770, 783, 795, 807, 819, 826, 838, 850, 862, 872, 886, 899, 914, 921, 926, 932, 937, 944, 951,
+	958, 966, 974, 981, 988, 995, 1003, 1010, 1019, 1029, 1038, 1047, 1057, 1066, 1071, 1075, 1081, 1088, 1094,
+	1102, 1111, 1119, 1129, 1138, 1153, 1161, 1168, 1176, 1183, 1192, 1202, 1211, 1220, 1230, 1239, 1249, 1260,
+	1275, 1288, 1296, 1309, 1316, 1325, 1353, 1361, 1370, 1380, 1387, 1396, 1406, 1413, 1422, 1432, 1438, 1448,
+	1458, 1469, 1480, 1495, 1509, 1522, 1534, 1543, 1557, 1569, 1578, 1589, 1602, 1616, 1629, 1642, 1654, 1667,
+	1679, 1691, 1703, 1710, 1722, 1734, 1746, 1756, 1770, 1783, 1798, 1811, 1823, 1836, 1848, 1860, 1872, 1879,
+	1891, 1903, 1915, 1925, 1939, 1952, 1967, 1974, 1979, 1985, 1990, 1997, 2004, 2011, 2019, 2027, 2034, 2041,
+	2048, 2056, 2063, 2072, 2082, 2091, 2100, 2110, 2119, 2128,
+}
+
+// missingReturnsInA is the load error a.go reports at each of lines, a function's closing brace with no return before
+// it.
+func missingReturnsInA(lines []int) []parity.LoadError {
+	loadErrors := []parity.LoadError{}
+	for _, line := range lines {
+		loadErrors = append(loadErrors, parity.LoadError{
+			Position: fmt.Sprintf("a/a.go:%d:1", line),
+			Message:  "missing return",
+		})
+	}
+	return loadErrors
+}
+
+// illTypedLoadErrors are the 220 errors the fixture packages that do not type-check on purpose load with, each listed:
+// x/tools' a, whose file says it "produces masses of errors from the type checker due to missing returns statements
+// and other things", 218 of them, and truncated, a file of layout.txtar cut off in the middle of a function, which
+// does not parse, 2.
+var illTypedLoadErrors = slices.Concat(missingReturnsInA(aMissingReturnLines), []parity.LoadError{
+	// A label L that no goto names, before an if whose every way through ends but one.
+	{Position: "a/a.go:246:1", Message: "label L declared and not used"},
+	{Position: "a/a.go:1299:1", Message: "label L declared and not used"},
+	// A fallthrough in a type switch's clause, a way through the switch the walk follows as written.
+	{Position: "a/a.go:802:3", Message: "cannot fallthrough in type switch"},
+	{Position: "a/a.go:814:3", Message: "cannot fallthrough in type switch"},
+	{Position: "a/a.go:857:3", Message: "cannot fallthrough in type switch"},
+	{Position: "a/a.go:1855:3", Message: "cannot fallthrough in type switch"},
+	{Position: "a/a.go:1867:3", Message: "cannot fallthrough in type switch"},
+	{Position: "a/a.go:1910:3", Message: "cannot fallthrough in type switch"},
+	// A switch with no tag and a case value that is not a bool, a shape the fixture says once panicked.
+	{Position: "a/a.go:2124:7", Message: "cannot convert 1 (untyped int constant) to type bool"},
+	// truncated's one file ends inside a function, after its dead statement.
+	{Position: "truncated/truncated.go:5:18", Message: "expected ';', found 'EOF'"},
+	{Position: "truncated/truncated.go:5:18", Message: "expected '}', found 'EOF'"},
+})
 
 // The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
 // holding every branch of the walk and the shapes most likely to differ, and the layouts' (testdata/layout.txtar),
-// every way the statement deleted can share its lines. Their findings must be the same multiset of file, line,
-// column, end, message and fix, edit for edit, each edit as its offsets and new text, which a golden file, gofmt'd
-// before it is compared, would not hold to the character. Each side's count is logged, since two empty sides would
-// match and prove nothing, and the test fails if the original finds nothing at all.
+// every way the statement deleted can share its lines, and their findings must be the same multiset, each the same in
+// every field, its fixes edit for edit, each edit as its offsets and new text, which a golden file, gofmt'd before it
+// is compared, would not hold to the character. Two of the packages do not type-check on purpose, and both sides run
+// despite errors, so their load errors are listed exactly.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, fixtureRoots(test))
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	expectSame(test, "the port", original, port)
+	parity.RequireIdenticalDespiteLoadErrors(test, unreachable.Analyzer, Analyzer, fixtureTree(test),
+		illTypedLoadErrors, "a", "parity", "parity/shadowed", "layout", "truncated")
 }
-
-// adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes, `renames:`, the original's message, `=>` and the port's, for a
-// finding both make in words that differ, or `drops:` and the message of a finding only the original makes, which is
-// wrong.
-var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?))\s*$`)
 
 // Over the differences fixture the two disagree, and only where each disagreement was adjudicated in the port's
-// favour: every finding the port alone makes is recorded on its line, as found or as a renaming, every finding the
-// original alone makes is recorded as dropped, with the reason it is wrong on the line above, or is the original's
-// side of a renaming, and every record is matched. A finding the original makes and the port does not, unrecorded,
-// fails, since the port is never worse than the original.
+// favour, as the fixture records it on the finding's line, with the reason on the line above: every finding the
+// original alone makes there is dropped, wrong where the package declares a panic of its own, which returns.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
-	original, port := findingsOf(test, loadedRoots(test, analysistest.TestData(), []string{"differences"}))
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	expectedPort := []finding{}
-	expectedOriginal := []finding{}
-	paths, globError := filepath.Glob(filepath.Join(analysistest.TestData(), "src", "differences", "*.go"))
-	if globError != nil {
-		test.Fatal(globError)
-	}
-	for _, path := range paths {
-		fileExpectedPort, fileExpectedOriginal := adjudicatedIn(test, path)
-		expectedPort = append(expectedPort, fileExpectedPort...)
-		expectedOriginal = append(expectedOriginal, fileExpectedOriginal...)
-	}
-	if len(expectedPort)+len(expectedOriginal) == 0 {
-		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
-	}
-	compareAdjudicated(test, "the port", adjudicatedOnly(difference(port, original)), expectedPort)
-	compareAdjudicated(test, "the original", adjudicatedOnly(difference(original, port)), expectedOriginal)
+	parity.RequireOnlyAdjudicated(test, unreachable.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
 
-// The registry lists unreachable among the passes that read no type information, so a run may hand it a pass with
-// none. The port runs here over every fixture package, the differences' too, with no types, package or type
-// checker's information at all, each analyzer it requires run first over the same syntax, as the checker would run
-// them, and must find what it finds with them, fix for fix, each fix held to what the checker's report holds it to.
-func TestPortReadsNoTypeInformation(test *testing.T) {
-	test.Parallel()
-	roots := append(fixtureRoots(test), loadedRoots(test, analysistest.TestData(), []string{"differences"})...)
-	_, typed := findingsOf(test, roots)
-	untyped := []finding{}
-	for _, loadedPackage := range roots {
-		// The checker's report, which holds every fix to be well formed, and cuts an edit's end just past the file's,
-		// as the deletion in a file cut off makes, back to the file's end.
-		runWithoutTypes(test, loadedPackage, func(diagnostic analysis.Diagnostic) {
-			validateError := driverutil.ValidateFixes(loadedPackage.Fset, Analyzer, diagnostic.SuggestedFixes)
-			if validateError != nil {
-				test.Errorf("the port with no types offers a fix the checker refuses: %v", validateError)
-			}
-			untyped = append(untyped, findingAt(loadedPackage, diagnostic))
-		})
-	}
-	slices.SortFunc(untyped, compareFindings)
-	test.Logf("the port found %d with types, %d with none", len(typed), len(untyped))
-	expectSame(test, "the port with no types", typed, untyped)
-}
-
-// runWithoutTypes runs the port over loadedPackage's syntax alone, handing report what it reports: first every
-// analyzer it requires, the syntax dispatcher and what the dispatcher requires, each once and over the same syntax,
-// then the port's own analyzer, which reports what the dispatcher's walk found. A pass holds no types, package or
-// type checker's information, so an analyzer that read any would find nothing there or fail.
-func runWithoutTypes(test *testing.T, loadedPackage *packages.Package, report func(diagnostic analysis.Diagnostic)) {
-	test.Helper()
+// runWithoutTypes runs the port over checked's syntax alone: first every analyzer it requires, the syntax dispatcher
+// and what the dispatcher requires, each once and over the same syntax, each handed the results of what it requires,
+// then the port's own analyzer, which reports what the dispatcher's walk found through checked's report, the
+// checker's, which holds every fix to be well formed, and cuts an edit's end just past the file's, as the deletion in
+// a file cut off makes, back to the file's end. A pass here holds no types, package or type checker's information,
+// so an analyzer that read any would find nothing there or fail.
+func runWithoutTypes(checked *analysis.Pass) (any, error) {
+	// results is each analyzer's result once it has run, as a pass's ResultOf holds them.
 	results := map[*analysis.Analyzer]any{}
-	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic))
-	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) {
+	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) error
+	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) error {
 		resultOf := map[*analysis.Analyzer]any{}
 		for _, required := range running.Requires {
 			if _, isRun := results[required]; !isRun {
-				run(required, func(analysis.Diagnostic) {
+				runError := run(required, func(analysis.Diagnostic) {
 					// A requirement's findings are not the port's, and none of these makes any.
 				})
+				if runError != nil {
+					return fmt.Errorf("running %s with no types: %w", required.Name, runError)
+				}
 			}
 			resultOf[required] = results[required]
 		}
-		pass := &analysis.Pass{
+		result, runError := running.Run(&analysis.Pass{
 			Analyzer: running,
-			Fset:     loadedPackage.Fset,
-			Files:    loadedPackage.Syntax,
+			Fset:     checked.Fset,
+			Files:    checked.Files,
 			ResultOf: resultOf,
 			Report:   report,
-		}
-		result, runError := running.Run(pass)
-		if runError != nil {
-			test.Fatalf("running %s over %s with no types: %v", running.Name, loadedPackage.ID, runError)
-		}
+		})
 		results[running] = result
+		return runError
 	}
-	run(Analyzer, report)
-}
-
-// finding is one finding as the differential compares it, its suggested fixes included.
-type finding struct {
-	file    string
-	line    int
-	column  int
-	end     string
-	message string
-	fixes   string
-}
-
-// described is found as a finding line prints it, followed by its end and its fixes.
-func described(found finding) string {
-	return fmt.Sprintf(
-		"%s:%d:%d (to %s): %s%s", found.file, found.line, found.column, found.end, found.message, found.fixes,
-	)
-}
-
-// compareFindings orders findings by the line each prints.
-func compareFindings(first finding, second finding) int {
-	return cmp.Compare(described(first), described(second))
-}
-
-// findingAt is diagnostic, reported in loadedPackage, as the differential compares it.
-func findingAt(loadedPackage *packages.Package, diagnostic analysis.Diagnostic) finding {
-	position := loadedPackage.Fset.Position(diagnostic.Pos)
-	end := loadedPackage.Fset.Position(diagnostic.End)
-	return finding{
-		file:    filepath.Base(position.Filename),
-		line:    position.Line,
-		column:  position.Column,
-		end:     fmt.Sprintf("%d:%d", end.Line, end.Column),
-		message: diagnostic.Message,
-		fixes:   describedFixes(loadedPackage, diagnostic),
+	if runError := run(Analyzer, checked.Report); runError != nil {
+		return nil, runError
 	}
+	return results[Analyzer], nil
 }
 
-// describedFixes is every suggested fix of diagnostic, in order, as its message and each edit's file, offsets and new
-// text, in the order the fix lists them, so two findings match only where they offer the same edits to the character.
-// A fix with no edits is its message alone.
-func describedFixes(loadedPackage *packages.Package, diagnostic analysis.Diagnostic) string {
-	var fixes strings.Builder
-	for _, fix := range diagnostic.SuggestedFixes {
-		fmt.Fprintf(&fixes, " [fix %q:", fix.Message)
-		for _, edit := range fix.TextEdits {
-			start := loadedPackage.Fset.Position(edit.Pos)
-			end := loadedPackage.Fset.Position(edit.End)
-			fmt.Fprintf(
-				&fixes, " %s@%d-%d %q", filepath.Base(start.Filename), start.Offset, end.Offset, edit.NewText,
-			)
+// typeless is the port run with no type information (see runWithoutTypes). It runs despite errors as the port does,
+// and requires nothing, so the checker hands it every package and runs nothing for it.
+var typeless = &analysis.Analyzer{
+	Name:             Analyzer.Name,
+	Doc:              "typeless runs the port with no type information.",
+	RunDespiteErrors: true,
+	Run:              runWithoutTypes,
+}
+
+// The registry lists unreachable among the passes that read no type information, so a run may hand it a pass with
+// none. The port runs here over every fixture package, the differences' too, once with types and once as typeless,
+// in one checker, and must find with none what it finds with them, each finding the same in every field, fix for
+// fix. The harness names the side with types the original.
+func TestPortReadsNoTypeInformation(test *testing.T) {
+	test.Parallel()
+	parity.RequireIdenticalDespiteLoadErrors(test, Analyzer, typeless, fixtureTree(test), illTypedLoadErrors,
+		"a", "parity", "parity/shadowed", "differences", "layout", "truncated")
+}
+
+// fixtureTree is a `GOPATH` of the test's own, so every fixture package loads in one call: testdata/src copied file for
+// file, and testdata/layout.txtar extracted beside it, since cohere's gofmt guard reads every Go file under testdata
+// and truncated does not parse.
+func fixtureTree(test *testing.T) string {
+	test.Helper()
+	tree := test.TempDir()
+	write := func(name string, data []byte) {
+		path := filepath.Join(tree, filepath.FromSlash(name))
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
 		}
-		fixes.WriteString("]")
-	}
-	return fixes.String()
-}
-
-// expectSame fails unless original and other, side's findings, are the same multiset, and the original found any.
-func expectSame(test *testing.T, side string, original []finding, other []finding) {
-	test.Helper()
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original, other) {
-		test.Errorf("the original found %s, and %s did not", described(missing), side)
-	}
-	for _, extra := range difference(other, original) {
-		test.Errorf("%s found %s, and the original did not", side, described(extra))
-	}
-}
-
-// illFormed is the fixture packages that do not type-check, by design: x/tools' a, whose functions mostly lack the
-// return their results ask for, and truncated, which does not even parse. Every other fixture must load clean, or its
-// findings would be the checker's guesses at broken code.
-var illFormed = map[string]bool{"a": true, "truncated": true}
-
-// fixtureRoots loads every fixture package the original and the port agree on: x/tools' and parity's from
-// testdata/src, and the layouts' from testdata/layout.txtar, extracted.
-func fixtureRoots(test *testing.T) []*packages.Package {
-	test.Helper()
-	roots := loadedRoots(test, analysistest.TestData(), []string{"a", "parity", "parity/shadowed"})
-	return append(roots, loadedRoots(test, extractedLayouts(test), []string{"layout", "truncated"})...)
-}
-
-// loadedRoots loads the fixture packages patterns name from directory, a tree laid out by import path, as
-// analysistest loads one, and fails unless each but the ill-formed loads clean.
-func loadedRoots(test *testing.T, directory string, patterns []string) []*packages.Package {
-	test.Helper()
-	loaded, loadError := load.Packages(directory, patterns, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
-	}
-	for _, root := range loaded.Roots {
-		if len(root.Errors) > 0 && !illFormed[root.PkgPath] {
-			test.Fatalf("fixture package %s does not load clean: %v", root.ID, root.Errors)
+		if writeError := os.WriteFile(path, data, 0o644); writeError != nil {
+			test.Fatal(writeError)
 		}
 	}
-	return loaded.Roots
-}
-
-// extractedLayouts extracts testdata/layout.txtar into a temporary tree, a `GOPATH`, and returns its root.
-func extractedLayouts(test *testing.T) string {
-	test.Helper()
+	walkError := filepath.WalkDir(filepath.Join(analysistest.TestData(), "src"),
+		func(path string, entry fs.DirEntry, entryError error) error {
+			if entryError != nil || entry.IsDir() {
+				return entryError
+			}
+			data, readError := os.ReadFile(path)
+			if readError != nil {
+				return readError
+			}
+			below, relativeError := filepath.Rel(analysistest.TestData(), path)
+			if relativeError != nil {
+				return relativeError
+			}
+			write(filepath.ToSlash(below), data)
+			return nil
+		})
+	if walkError != nil {
+		test.Fatalf("copying testdata/src: %v", walkError)
+	}
 	archive, parseError := txtar.ParseFile(filepath.Join(analysistest.TestData(), "layout.txtar"))
 	if parseError != nil {
 		test.Fatalf("reading layout.txtar: %v", parseError)
 	}
-	tree := test.TempDir()
 	for _, file := range archive.Files {
-		path := filepath.Join(tree, filepath.FromSlash(file.Name))
-		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
-			test.Fatal(makeError)
-		}
-		if writeError := os.WriteFile(path, file.Data, 0o644); writeError != nil {
-			test.Fatal(writeError)
-		}
+		write(file.Name, file.Data)
 	}
 	return tree
-}
-
-// findingsOf runs x/tools' unreachable and the port over roots in one checker, and returns each one's findings,
-// sorted.
-func findingsOf(test *testing.T, roots []*packages.Package) (original []finding, port []finding) {
-	test.Helper()
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{unreachable.Analyzer, Analyzer}, roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %d packages: %v", len(roots), analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			found := findingAt(action.Package, diagnostic)
-			switch action.Analyzer {
-			case unreachable.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	slices.SortFunc(original, compareFindings)
-	slices.SortFunc(port, compareFindings)
-	return original, port
-}
-
-// adjudicatedIn reads the records of the differences fixture at path: the findings the port alone makes, and those
-// the original alone makes, each as its file, line and message. A drop with no comment on the line above, its reason,
-// fails.
-func adjudicatedIn(test *testing.T, path string) (expectedPort []finding, expectedOriginal []finding) {
-	test.Helper()
-	file, openError := os.Open(path)
-	if openError != nil {
-		test.Fatal(openError)
-	}
-	defer func() {
-		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
-	}()
-	name := filepath.Base(path)
-	previousLine := ""
-	scanner := bufio.NewScanner(file)
-	for line := 1; scanner.Scan(); line++ {
-		for _, comment := range strings.Split(scanner.Text(), "// port ")[1:] {
-			match := adjudicatedPattern.FindStringSubmatch(comment)
-			switch {
-			case match == nil:
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", name, line, comment)
-			case match[1] != "":
-				expectedPort = append(expectedPort, finding{file: name, line: line, message: match[1]})
-			case match[4] != "":
-				if !strings.HasPrefix(strings.TrimSpace(previousLine), "//") {
-					test.Fatalf("%s:%d drops a finding with no reason on the line above", name, line)
-				}
-				expectedOriginal = append(expectedOriginal, finding{file: name, line: line, message: match[4]})
-			default:
-				expectedOriginal = append(expectedOriginal, finding{file: name, line: line, message: match[2]})
-				expectedPort = append(expectedPort, finding{file: name, line: line, message: match[3]})
-			}
-		}
-		previousLine = scanner.Text()
-	}
-	if scanError := scanner.Err(); scanError != nil {
-		test.Fatal(scanError)
-	}
-	return expectedPort, expectedOriginal
-}
-
-// compareAdjudicated fails the test unless the findings side alone makes are exactly those the fixture records.
-func compareAdjudicated(test *testing.T, side string, actual []finding, expected []finding) {
-	test.Helper()
-	for _, unrecorded := range difference(actual, expected) {
-		test.Errorf("%s alone found %s, which the fixture does not record", side, described(unrecorded))
-	}
-	for _, unmatched := range difference(expected, actual) {
-		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
-	}
-}
-
-// adjudicatedOnly is findings as the differences fixture's records name them, by file, line and message alone.
-func adjudicatedOnly(findings []finding) []finding {
-	named := []finding{}
-	for _, found := range findings {
-		named = append(named, finding{file: found.file, line: found.line, message: found.message})
-	}
-	return named
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
