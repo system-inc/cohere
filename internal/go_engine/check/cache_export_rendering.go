@@ -65,38 +65,48 @@ func exportRendering(checked *types.Package) []string {
 	if checked == nil {
 		return []string{"no types"}
 	}
-	qualifier := func(other *types.Package) string { return other.Path() }
-	written := func(written types.Type) string {
-		return types.TypeString(written, qualifier) + unexportedOrigins(written)
-	}
 	lines := []string{"package " + checked.Path() + " " + checked.Name() + " " + checked.GoVersion()}
 	for _, name := range checked.Scope().Names() {
-		switch object := checked.Scope().Lookup(name).(type) {
-		case *types.Const:
-			lines = append(lines, "const "+name+" "+written(object.Type())+" = "+object.Val().ExactString())
-		case *types.Var:
-			lines = append(lines, "var "+name+" "+written(object.Type()))
-		case *types.Func:
-			lines = append(lines, "func "+name+" "+written(object.Type()))
-		case *types.TypeName:
-			lines = append(lines, renderedTypeName(object, written)...)
-		default:
-			lines = append(lines, "object "+name+" "+written(object.Type()))
-		}
+		lines = append(lines, renderedObject(checked.Scope().Lookup(name))...)
 	}
 	return lines
 }
 
+// writtenType is a type as the rendering writes it: by types.TypeString, every named type in it qualified by its
+// package's path, then its unexportedOrigins.
+func writtenType(written types.Type) string {
+	return types.TypeString(written, func(other *types.Package) string { return other.Path() }) +
+		unexportedOrigins(written)
+}
+
+// renderedObject is the lines of one package-level object as exportRendering writes them, which ReadBuild also
+// digests object by object.
+func renderedObject(object types.Object) []string {
+	switch declared := object.(type) {
+	case *types.Const:
+		return []string{"const " + declared.Name() + " " + writtenType(declared.Type()) + " = " +
+			declared.Val().ExactString()}
+	case *types.Var:
+		return []string{"var " + declared.Name() + " " + writtenType(declared.Type())}
+	case *types.Func:
+		return []string{"func " + declared.Name() + " " + writtenType(declared.Type())}
+	case *types.TypeName:
+		return renderedTypeName(declared)
+	default:
+		return []string{"object " + object.Name() + " " + writtenType(object.Type())}
+	}
+}
+
 // renderedTypeName is the lines of a type name: an alias, a defined type with its methods, or any other type name by
-// its type.
-func renderedTypeName(object *types.TypeName, written func(types.Type) string) []string {
+// its type. A defined type's first line is the one that writes its underlying type.
+func renderedTypeName(object *types.TypeName) []string {
 	switch declared := object.Type().(type) {
 	case *types.Alias:
-		return []string{"alias " + object.Name() + renderedTypeParameters(declared.TypeParams(), written) + " = " +
-			written(declared.Rhs()) + " is " + written(types.Unalias(declared))}
+		return []string{"alias " + object.Name() + renderedTypeParameters(declared.TypeParams()) + " = " +
+			writtenType(declared.Rhs()) + " is " + writtenType(types.Unalias(declared))}
 	case *types.Named:
-		lines := []string{"type " + object.Name() + renderedTypeParameters(declared.TypeParams(), written) + " " +
-			written(declared.Underlying())}
+		lines := []string{"type " + object.Name() + renderedTypeParameters(declared.TypeParams()) + " " +
+			writtenType(declared.Underlying())}
 		methods := slices.Collect(declared.Methods())
 		inOrder := make([]string, 0, len(methods))
 		for _, method := range methods {
@@ -106,32 +116,38 @@ func renderedTypeName(object *types.TypeName, written func(types.Type) string) [
 			return strings.Compare(left.Name(), right.Name())
 		})
 		for _, method := range methods {
-			signature, _ := method.Type().(*types.Signature)
-			receiver := "value"
-			receiverType := "none"
-			if signature != nil && signature.Recv() != nil {
-				receiverType = written(signature.Recv().Type())
-				if _, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
-					receiver = "pointer"
-				}
-			}
-			lines = append(lines, "method "+object.Name()+"."+method.Name()+" "+receiver+" "+receiverType+" "+
-				written(method.Type()))
+			lines = append(lines, renderedMethod(object, method))
 		}
 		return append(lines, "methods of "+object.Name()+" in order "+strings.Join(inOrder, " "))
 	default:
-		return []string{"type name " + object.Name() + " " + written(object.Type())}
+		return []string{"type name " + object.Name() + " " + writtenType(object.Type())}
 	}
 }
 
+// renderedMethod is the line of one method declared on owner: its name, a pointer or value receiver, its receiver
+// type and its full signature.
+func renderedMethod(owner *types.TypeName, method *types.Func) string {
+	signature, _ := method.Type().(*types.Signature)
+	receiver := "value"
+	receiverType := "none"
+	if signature != nil && signature.Recv() != nil {
+		receiverType = writtenType(signature.Recv().Type())
+		if _, isPointer := signature.Recv().Type().(*types.Pointer); isPointer {
+			receiver = "pointer"
+		}
+	}
+	return "method " + owner.Name() + "." + method.Name() + " " + receiver + " " + receiverType + " " +
+		writtenType(method.Type())
+}
+
 // renderedTypeParameters is a list of type parameters, each by name and constraint, or nothing for none.
-func renderedTypeParameters(parameters *types.TypeParamList, written func(types.Type) string) string {
+func renderedTypeParameters(parameters *types.TypeParamList) string {
 	if parameters.Len() == 0 {
 		return ""
 	}
 	rendered := make([]string, 0, parameters.Len())
 	for parameter := range parameters.TypeParams() {
-		rendered = append(rendered, parameter.Obj().Name()+" "+written(parameter.Constraint()))
+		rendered = append(rendered, parameter.Obj().Name()+" "+writtenType(parameter.Constraint()))
 	}
 	return "[" + strings.Join(rendered, ", ") + "]"
 }
