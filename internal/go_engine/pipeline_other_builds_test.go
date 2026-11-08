@@ -30,7 +30,13 @@ const (
 // run must exit wantExit.
 func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
 	test.Helper()
-	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-cache"}, extra...)
+	return runOverWith(test, root, wantExit, append([]string{"--no-cache"}, extra...)...)
+}
+
+// runOverWith is runOver with the findings cache as extra leaves it, on and in root's own store by default.
+func runOverWith(test *testing.T, root string, wantExit int, extra ...string) (*pipeline, string) {
+	test.Helper()
+	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		test.Fatal(parseError)
@@ -148,6 +154,50 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 	if foundIn(host) || foundIn(tagged) {
 		test.Errorf("a build that never compiles %s found %s in it", windowsFile, elseReturn)
 	}
+}
+
+// With the findings cache on, each extra build keeps its own entries, keyed on its own target, cgo and flags: a first
+// run over the fixture hits nothing another build wrote and writes an entry for every package of every build, and a
+// second over the same tree restores every package of every build from them, writing nothing, as the host's build
+// does. Its verdict is the first run's.
+func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	cold, coldStream := runOverWith(test, root, exitFindings, "--other-builds")
+	warm, warmStream := runOverWith(test, root, exitFindings, "--other-builds")
+	if len(cold.buildRuns) != 3 || len(warm.buildRuns) != 3 {
+		test.Fatalf("the runs handed the merge %d and %d runs, want 3 each", len(cold.buildRuns), len(warm.buildRuns))
+	}
+	for index, warmRun := range warm.buildRuns {
+		coldCounts, warmCounts := cold.buildRuns[index].result.Cache, warmRun.result.Cache
+		// The first run's builds run one after another into one store, so a build whose keys met another's would hit
+		// what that build wrote.
+		if !coldCounts.On || coldCounts.Hit != 0 || coldCounts.Missed == 0 || coldCounts.Written != coldCounts.Missed {
+			test.Errorf("%s's first run hit %d and wrote %d of %d misses (on %t), want none hit and every one written",
+				warmRun.build, coldCounts.Hit, coldCounts.Written, coldCounts.Missed, coldCounts.On)
+		}
+		if warmCounts.Hit != coldCounts.Hit+coldCounts.Missed || warmCounts.Missed != 0 || warmCounts.Written != 0 {
+			test.Errorf("%s's second run hit %d, missed %d and wrote %d, want every one of %d hit and none written",
+				warmRun.build, warmCounts.Hit, warmCounts.Missed, warmCounts.Written,
+				coldCounts.Hit+coldCounts.Missed)
+		}
+	}
+	if withoutCache(coldStream) != withoutCache(warmStream) {
+		test.Errorf("the warm run's stream differs from the cold run's:\ncold\n%s\nwarm\n%s", coldStream, warmStream)
+	}
+}
+
+// withoutCache is a normalized stream with its lint record's cache counts left out, the one field a warm run writes
+// otherwise than a cold one.
+func withoutCache(stream string) string {
+	lines := strings.Split(stream, "\n")
+	for index, line := range lines {
+		if start := strings.Index(line, `"cache":{`); start >= 0 {
+			end := strings.Index(line[start:], "}")
+			lines[index] = line[:start] + line[start+end+1:]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // A module whose every file the host builds needs no other build, so `--other-builds` hands the merge nothing, and the
