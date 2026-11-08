@@ -40,7 +40,8 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 }
 
 // upstreamWithholding is a fix the port withholds in x/tools' own fixtures, by the file and line of the finding that
-// offers it and the fix's message, which those files, copied byte for byte, cannot carry as a record.
+// offers it and the fix's message, which those files, copied byte for byte, cannot carry as a record. The file is
+// named by its path below testdata's src, as the harness names it.
 type upstreamWithholding struct {
 	file    string
 	line    int
@@ -51,7 +52,7 @@ type upstreamWithholding struct {
 var upstreamWithholdings = []upstreamWithholding{
 	// `AllString(p)`: fmt.Sprint(p) is a string, where the conversion it would replace is an AllString, a type
 	// parameter whose one term is string.
-	{file: "typeparams.go", line: 34, message: "Format the number as a decimal"},
+	{file: "typeparams/typeparams.go", line: 34, message: "Format the number as a decimal"},
 }
 
 // Over x/tools' typeparams, which can hold no record, the two make the same findings, each the same in every field,
