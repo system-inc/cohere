@@ -111,9 +111,14 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			Listener: &Listener{
 				Instructions: []ir.Instruction{(*ir.Store)(nil), (*ir.Call)(nil)},
 				Instruction:  plantedInstruction,
-				Nodes:        []ast.Node{(*ast.CallExpr)(nil)},
-				Node:         plantedNode,
+				PackageExit:  plantedPackageExit,
 			},
+		},
+		{
+			Name:     "cohere-go/consistency-no-label",
+			Origin:   OriginHouse,
+			Analyzer: plantedAnalyzer,
+			Listener: &Listener{Nodes: []ast.Node{(*ast.LabeledStmt)(nil)}, Node: plantedNode},
 		},
 		{
 			Name:         "cohere-go/U1000",
@@ -207,6 +212,16 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			name:   "a listener that declares nothing",
 			rule:   listening(Listener{Requires: []*analysis.Analyzer{plantedAnalyzer}}),
 			saying: "declares no callback",
+		},
+		{
+			name:   "a listener that declares both walks",
+			rule:   listening(Listener{Function: plantedFunction, FileEnter: plantedFile}),
+			saying: "declares both the intermediate representation's walk and the syntax walk",
+		},
+		{
+			name:   "a listener with PackageExit alone",
+			rule:   listening(Listener{PackageExit: plantedPackageExit}),
+			saying: "declares PackageExit alone",
 		},
 		{
 			name:   "instruction kinds with no callback",

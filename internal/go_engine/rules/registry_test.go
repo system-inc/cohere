@@ -12,11 +12,13 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/analysis/suite/vet"
+	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
@@ -25,28 +27,14 @@ import (
 var registry = All()
 
 // registryProblems is every reason a list of rules could not be the registry: a rule that does not
-// validate, a listener that listens to syntax, which no dispatcher walks yet, a listener with PackageExit alone, which
-// no walk gathers for, or a name two rules share, which would make a finding's rule ambiguous and its config key
-// configure two rules at once.
+// validate, its listener included, or a name two rules share, which would make a finding's rule ambiguous and its
+// config key configure two rules at once.
 func registryProblems(registered []rule.Rule) []string {
 	problems := []string{}
 	seen := map[string]bool{}
 	for _, registeredRule := range registered {
 		if validateError := registeredRule.Validate(); validateError != nil {
 			problems = append(problems, validateError.Error())
-		}
-		listener := registeredRule.Listener
-		switch {
-		case listener == nil:
-			// A rule whose analyzer walks the package itself.
-		case len(listener.Nodes) > 0 || listener.Node != nil || listener.FileEnter != nil || listener.FileExit != nil:
-			problems = append(problems, fmt.Sprintf("rule %q has a listener that listens to syntax, with Nodes, "+
-				"Node, FileEnter or FileExit, and no syntax dispatcher exists yet to call them, so it would hear "+
-				"nothing there", registeredRule.Name))
-		case listener.PackageExit != nil && listener.Function == nil && listener.Instruction == nil &&
-			listener.FunctionExit == nil:
-			problems = append(problems, fmt.Sprintf("rule %q has a listener with PackageExit alone, and no "+
-				"dispatcher walks the package for it, so it would judge what nothing gathered", registeredRule.Name))
 		}
 		if seen[registeredRule.Name] {
 			problems = append(problems, fmt.Sprintf("rule %q is registered twice", registeredRule.Name))
@@ -87,6 +75,8 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 		{Name: "cohere-go/printf", Origin: rule.OriginVet, UpstreamName: "printf", Analyzer: planted},
 		{Name: "cohere-go/U1000", Origin: rule.OriginStaticcheck, UpstreamName: "U1000", Analyzer: planted,
 			Listener: &rule.Listener{FileEnter: plantedFileEnter, PackageExit: plantedPackageExit}},
+		{Name: "cohere-go/SA4006", Origin: rule.OriginStaticcheck, UpstreamName: "SA4006", Analyzer: planted,
+			Listener: &rule.Listener{FileEnter: plantedFileEnter, FunctionExit: plantedFunctionExit}},
 		{Name: "cohere-go/nilness", Origin: rule.OriginTools, UpstreamName: "nilness", Analyzer: planted,
 			Listener: &rule.Listener{Requires: []*analysis.Analyzer{planted}}},
 		{Name: "cohere-go/unusedwrite", Origin: rule.OriginTools, UpstreamName: "unusedwrite", Analyzer: planted,
@@ -95,7 +85,7 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 	plantedProblems := registryProblems(plantedRegistry)
 	expected := []string{
 		"a house rule has no upstream", `rule "cohere-go/printf" is registered twice`,
-		"no syntax dispatcher exists yet", "declares no callback", "PackageExit alone",
+		"declares both", "declares no callback", "PackageExit alone",
 	}
 	if len(plantedProblems) != len(expected) {
 		test.Fatalf(
@@ -110,12 +100,17 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 	}
 }
 
-// plantedFileEnter is a syntax callback for a planted listener, which the registry refuses before it is ever called.
+// plantedFileEnter is a syntax callback for a planted listener, which the registry only validates.
 func plantedFileEnter(*rule.Context, *ast.File) {
 	// Never called: the registry reads only whether a callback is set.
 }
 
-// plantedPackageExit is a planted listener's PackageExit, which the registry refuses before it is ever called.
+// plantedFunctionExit is an IR callback for a planted listener, which the registry only validates.
+func plantedFunctionExit(*rule.Context, *ir.Function) {
+	// Never called: the registry reads only whether a callback is set.
+}
+
+// plantedPackageExit is a planted listener's PackageExit, which the registry only validates.
 func plantedPackageExit(*rule.Context) {
 	// Never called: the registry reads only whether a callback is set.
 }
@@ -214,35 +209,41 @@ func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 }
 
 // TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener holds every rule with a listener, over two calls to
-// All as the engine, the docs and the tests make them, to one dispatcher: its analyzer requires irDispatcher's, which
-// holds its listener, and both calls hand out the same analyzer, the one the settings set options on.
+// All as the engine, the docs and the tests make them, to the one shared dispatcher of its walk: its analyzer requires
+// that dispatcher's, which holds its listener, every rule of a walk requires the same one, and both calls hand out
+// the same analyzer, the one the settings set options on.
 func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testing.T) {
 	test.Parallel()
 	first, second := All(), All()
 	analyzerOf := map[string]*analysis.Analyzer{}
-	dispatchedRules := 0
+	dispatcherOf := map[bool]*analysis.Analyzer{}
 	for _, registered := range slices.Concat(first, second) {
 		if registered.Listener == nil {
 			continue
 		}
-		dispatchedRules++
-		if !slices.Contains(registered.Analyzer.Requires, irDispatcher.Analyzer) {
-			test.Errorf("%s does not require irDispatcher's analyzer, so another dispatcher would walk for it",
-				registered.Name)
+		shared, holds := dispatch.Shared(registered.Listener)
+		if !holds {
+			test.Errorf("the shared dispatcher of %s's walk does not hold its listener, so its analyzer would read "+
+				"no outcome", registered.Name)
 		}
-		if !irDispatcher.Holds(registered.Listener) {
-			test.Errorf("irDispatcher does not hold %s's listener, so its analyzer would read no outcome",
-				registered.Name)
+		if !slices.Contains(registered.Analyzer.Requires, shared) {
+			test.Errorf("%s does not require the shared dispatcher of its walk, so another dispatcher would walk for "+
+				"it", registered.Name)
 		}
+		syntax := registered.Listener.IsSyntax()
+		if earlier, seen := dispatcherOf[syntax]; seen && earlier != shared {
+			test.Errorf("%s's walk is shared by two dispatchers", registered.Name)
+		}
+		dispatcherOf[syntax] = shared
 		if earlier, seen := analyzerOf[registered.Name]; seen && earlier != registered.Analyzer {
 			test.Errorf("two calls to All hand out two analyzers for %s, so options set on one miss the other",
 				registered.Name)
 		}
 		analyzerOf[registered.Name] = registered.Analyzer
 	}
-	if dispatchedRules < 4 {
-		test.Errorf("two calls to All hold %d dispatched rules, where nilness and unusedwrite twice are 4",
-			dispatchedRules)
+	if len(dispatcherOf) != 2 {
+		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
+			"and the syntax's were expected", len(dispatcherOf))
 	}
 }
 
@@ -414,8 +415,7 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // sum type's variant whose methods only mark it, served finds the types a file serves for the two rules that count
 // them, positions is the line table rules read a node's position from without the FileSet's lock, staticcheck_ir
 // reads the functions of staticcheck's intermediate representation, and dispatch walks a package once for every rule
-// with a listener and builds each such rule's analyzer, holding no rule itself: the registry names which rules it
-// calls.
+// with a listener and builds each such rule's analyzer, holding no rule itself.
 var sharedReaders = map[string]bool{
 	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true, "staticcheck_ir": true,
 	"dispatch": true,

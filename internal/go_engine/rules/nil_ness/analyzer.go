@@ -28,6 +28,7 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // Name is the original's, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it read
@@ -40,6 +41,9 @@ const Doc = "Flags a nil dereference, a panic with nil, and a comparison with ni
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
 var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.
+var Analyzer = dispatch.RuleAnalyzer(rule.Namespace+Name, Name, Doc, &Listener)
 
 // Check judges one function, visiting its reachable blocks in dominance order with the nilness facts that dominate
 // each.

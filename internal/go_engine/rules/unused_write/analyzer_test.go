@@ -17,19 +17,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
-
-// portAnalyzer is the port as the registry runs it, a rule analyzer reporting what a dispatcher's walk found, on a
-// dispatcher of its own that holds the port alone.
-var portAnalyzer = dispatch.RuleAnalyzer(Name, Doc, &Listener, dispatch.NewIr())
 
 // x/tools' own fixtures for unusedwrite, copied unchanged into testdata/src: every `// want` the original expects,
 // the port reports at the same line with the same message, and analysistest fails on a finding no want expects as
 // much as on a want nothing found, so the port adds nothing there either.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), portAnalyzer, "a", "importsunsafe")
+	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "a", "importsunsafe")
 }
 
 // The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
@@ -148,7 +143,7 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 		}
 	}
 	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{unusedwrite.Analyzer, portAnalyzer}, loaded.Roots, &checker.Options{},
+		[]*analysis.Analyzer{unusedwrite.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
 	)
 	if analyzeError != nil {
 		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
@@ -168,7 +163,7 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 			switch action.Analyzer {
 			case unusedwrite.Analyzer:
 				original = append(original, found)
-			case portAnalyzer:
+			case Analyzer:
 				port = append(port, found)
 			}
 		}

@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"fmt"
+	"go/ast"
 	"go/types"
 	"maps"
 	"path/filepath"
@@ -39,7 +40,8 @@ func namingCheck(context *rule.Context, function *ir.Function) {
 // on a finding no want expected.
 func TestRuleAnalyzerReportsTheListenersFindings(test *testing.T) {
 	test.Parallel()
-	analyzer := RuleAnalyzer("naming", "reports every source function", &rule.Listener{Function: namingCheck}, NewIr())
+	analyzer := NewIr().RuleAnalyzer(rule.Namespace+"naming", "naming", "reports every source function",
+		&rule.Listener{Function: namingCheck})
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), analyzer, "dispatched")
 }
 
@@ -51,28 +53,30 @@ func TestTheWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T) {
 	test.Parallel()
 	heard := []string{}
 	dispatcher := NewIr()
-	listening := RuleAnalyzer("listening", "records each call", &rule.Listener{
-		Function: func(_ *rule.Context, function *ir.Function) {
-			heard = append(heard, "function "+function.Name())
-		},
-		Instructions: []ir.Instruction{(*ir.Call)(nil), (*ir.Return)(nil)},
-		Instruction: func(_ *rule.Context, instruction ir.Instruction) {
-			heard = append(heard, fmt.Sprintf("instruction %T in %s", instruction, instruction.Parent().Name()))
-		},
-		FunctionExit: func(_ *rule.Context, function *ir.Function) {
-			heard = append(heard, "exit "+function.Name())
-		},
-		PackageExit: func(*rule.Context) {
-			heard = append(heard, "package")
-		},
-	}, dispatcher)
-	alongside := RuleAnalyzer("alongside", "records each function", &rule.Listener{
-		Function: func(_ *rule.Context, function *ir.Function) {
-			heard = append(heard, "alongside function "+function.Name())
-		},
-	}, dispatcher)
+	listening := dispatcher.RuleAnalyzer(rule.Namespace+"listening", "listening",
+		"records each call", &rule.Listener{
+			Function: func(_ *rule.Context, function *ir.Function) {
+				heard = append(heard, "function "+function.Name())
+			},
+			Instructions: []ir.Instruction{(*ir.Call)(nil), (*ir.Return)(nil)},
+			Instruction: func(_ *rule.Context, instruction ir.Instruction) {
+				heard = append(heard, fmt.Sprintf("instruction %T in %s", instruction, instruction.Parent().Name()))
+			},
+			FunctionExit: func(_ *rule.Context, function *ir.Function) {
+				heard = append(heard, "exit "+function.Name())
+			},
+			PackageExit: func(*rule.Context) {
+				heard = append(heard, "package")
+			},
+		})
+	alongside := dispatcher.RuleAnalyzer(rule.Namespace+"alongside", "alongside",
+		"records each function", &rule.Listener{
+			Function: func(_ *rule.Context, function *ir.Function) {
+				heard = append(heard, "alongside function "+function.Name())
+			},
+		})
 	probe, functions := functionProbe()
-	graph := analyzeFixture(test, listening, alongside, probe)
+	graph := analyzeFixture(test, "dispatched", listening, alongside, probe)
 	for _, action := range graph.Roots {
 		if action.Err != nil {
 			test.Fatalf("running %s: %v", action, action.Err)
@@ -114,39 +118,41 @@ func TestAPanickingListenerCrashesItsOwnRuleAlone(test *testing.T) {
 	dispatcher := NewIr()
 	crashingCalls := 0
 	crashingExited := false
-	crashing := RuleAnalyzer("crashing", "reports, then panics on the second function", &rule.Listener{
-		Function: func(context *rule.Context, function *ir.Function) {
-			crashingCalls++
-			context.Report(analysis.Diagnostic{Pos: context.Files[0].Name.Pos(), Message: "before the panic"})
-			if crashingCalls == 2 {
-				panic("planted panic")
-			}
-		},
-		PackageExit: func(*rule.Context) {
-			crashingExited = true
-		},
-	}, dispatcher)
-	steady := RuleAnalyzer("steady", "reports every function", &rule.Listener{
-		Function: func(context *rule.Context, function *ir.Function) {
-			context.Report(analysis.Diagnostic{Pos: context.Files[0].Name.Pos(), Message: function.Name()})
-		},
-	}, dispatcher)
+	crashing := dispatcher.RuleAnalyzer(rule.Namespace+"crashing", "crashing",
+		"reports, then panics on the second function", &rule.Listener{
+			Function: func(context *rule.Context, function *ir.Function) {
+				crashingCalls++
+				context.Report(analysis.Diagnostic{Pos: context.Files[0].Name.Pos(), Message: "before the panic"})
+				if crashingCalls == 2 {
+					panic("planted panic")
+				}
+			},
+			PackageExit: func(*rule.Context) {
+				crashingExited = true
+			},
+		})
+	steady := dispatcher.RuleAnalyzer(rule.Namespace+"steady", "steady",
+		"reports every function", &rule.Listener{
+			Function: func(context *rule.Context, function *ir.Function) {
+				context.Report(analysis.Diagnostic{Pos: context.Files[0].Name.Pos(), Message: function.Name()})
+			},
+		})
 	probe, functions := functionProbe()
 	var outcomes Result
 	resultProbe := &analysis.Analyzer{
 		Name:     "result_probe",
 		Doc:      "reads the dispatcher's result",
-		Requires: []*analysis.Analyzer{dispatcher.Analyzer},
+		Requires: []*analysis.Analyzer{dispatcher.Analyzer()},
 		Run: func(pass *analysis.Pass) (any, error) {
-			result, isResult := pass.ResultOf[dispatcher.Analyzer].(Result)
+			result, isResult := pass.ResultOf[dispatcher.Analyzer()].(Result)
 			if !isResult {
-				return nil, fmt.Errorf("the dispatcher's result is %T", pass.ResultOf[dispatcher.Analyzer])
+				return nil, fmt.Errorf("the dispatcher's result is %T", pass.ResultOf[dispatcher.Analyzer()])
 			}
 			outcomes = result
 			return nil, nil
 		},
 	}
-	graph := analyzeFixture(test, crashing, steady, probe, resultProbe)
+	graph := analyzeFixture(test, "dispatched", crashing, steady, probe, resultProbe)
 	if outcome := outcomes[rule.Namespace+"crashing"]; outcome.Crash == nil || len(outcome.Diagnostics) != 0 {
 		test.Errorf("the dispatcher's outcome for the panicking rule holds the crash %v and %d findings, where the "+
 			"crash alone was expected", outcome.Crash, len(outcome.Diagnostics))
@@ -200,31 +206,33 @@ func TestAPanickingListenerCrashesItsOwnRuleAlone(test *testing.T) {
 func TestAListenerReadsWhatItRequiresAndItsOwnOptions(test *testing.T) {
 	test.Parallel()
 	dispatcher := NewIr()
-	reading := RuleAnalyzer("reading", "reports what it reads", &rule.Listener{
-		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		PackageExit: func(context *rule.Context) {
-			_, isInspector := context.ResultOf(inspect.Analyzer).(*inspector.Inspector)
-			context.Report(analysis.Diagnostic{
-				Pos: context.Files[0].Name.Pos(),
-				Message: fmt.Sprintf("inspector %t, greeting %s, int of %d bytes", isInspector,
-					context.Option("greeting"), context.TypesSizes.Sizeof(types.Typ[types.Int])),
-			})
-		},
-	}, dispatcher)
+	reading := dispatcher.RuleAnalyzer(rule.Namespace+"reading", "reading",
+		"reports what it reads", &rule.Listener{
+			Requires: []*analysis.Analyzer{inspect.Analyzer},
+			PackageExit: func(context *rule.Context) {
+				_, isInspector := context.ResultOf(inspect.Analyzer).(*inspector.Inspector)
+				context.Report(analysis.Diagnostic{
+					Pos: context.Files[0].Name.Pos(),
+					Message: fmt.Sprintf("inspector %t, greeting %s, int of %d bytes", isInspector,
+						context.Option("greeting"), context.TypesSizes.Sizeof(types.Typ[types.Int])),
+				})
+			},
+		})
 	reading.Flags.String("greeting", "", "what the rule under test says")
 	if setError := reading.Flags.Set("greeting", "hello"); setError != nil {
 		test.Fatal(setError)
 	}
-	trespassing := RuleAnalyzer("trespassing", "reads what it does not require", &rule.Listener{
-		PackageExit: func(context *rule.Context) {
-			context.ResultOf(inspect.Analyzer)
-		},
-	}, dispatcher)
-	if !slices.Contains(dispatcher.Analyzer.Requires, inspect.Analyzer) {
+	trespassing := dispatcher.RuleAnalyzer(rule.Namespace+"trespassing", "trespassing",
+		"reads what it does not require", &rule.Listener{
+			PackageExit: func(context *rule.Context) {
+				context.ResultOf(inspect.Analyzer)
+			},
+		})
+	if !slices.Contains(dispatcher.Analyzer().Requires, inspect.Analyzer) {
 		test.Errorf("the dispatcher requires %v, which leaves out what a listener requires",
-			dispatcher.Analyzer.Requires)
+			dispatcher.Analyzer().Requires)
 	}
-	graph := analyzeFixture(test, reading, trespassing)
+	graph := analyzeFixture(test, "dispatched", reading, trespassing)
 	for _, action := range graph.Roots {
 		switch action.Analyzer {
 		case reading:
@@ -248,15 +256,14 @@ func TestAListenerReadsWhatItRequiresAndItsOwnOptions(test *testing.T) {
 func TestIsGeneratedReadsStaticchecksJudgment(test *testing.T) {
 	test.Parallel()
 	judged := map[string]bool{}
-	judging := RuleAnalyzer("judging", "records each file's judgment", &rule.Listener{
-		PackageExit: func(context *rule.Context) {
-			for _, file := range context.Files {
-				filename := context.Fset.Position(file.Pos()).Filename
+	judging := NewSyntax().RuleAnalyzer(rule.Namespace+"judging", "judging", "records each file's judgment",
+		&rule.Listener{
+			FileEnter: func(context *rule.Context, file *ast.File) {
+				filename := context.Fset.PositionFor(file.Pos(), false).Filename
 				judged[filepath.Base(filename)] = context.IsGenerated(filename)
-			}
-		},
-	}, NewIr())
-	for _, action := range analyzeFixture(test, judging).Roots {
+			},
+		})
+	for _, action := range analyzeFixture(test, "dispatched", judging).Roots {
 		if action.Err != nil {
 			test.Fatalf("running %s: %v", action, action.Err)
 		}
@@ -284,12 +291,12 @@ func functionProbe() (*analysis.Analyzer, *[]*ir.Function) {
 	return probe, functions
 }
 
-// analyzeFixture runs analyzers over the dispatched fixture in one checker.
-func analyzeFixture(test *testing.T, analyzers ...*analysis.Analyzer) *checker.Graph {
+// analyzeFixture runs analyzers over the fixture package named fixture in one checker.
+func analyzeFixture(test *testing.T, fixture string, analyzers ...*analysis.Analyzer) *checker.Graph {
 	test.Helper()
 	directory := analysistest.TestData()
 	// The fixture is a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, []string{"dispatched"}, []string{
+	loaded, loadError := load.Packages(directory, []string{fixture}, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
 	if loadError != nil {

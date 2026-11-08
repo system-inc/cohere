@@ -13,42 +13,38 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-label"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_label",
-	Doc: "Flags every labeled statement at its label, the target of a labeled break or continue and of a goto " +
-		"alike, because a jump to a label lands where a reader is not looking.",
-	Run: run,
-}
+// listener hears every labeled statement of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.LabeledStmt)(nil)}, Node: judgeLabeled}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_label", "Flags every labeled statement at its label, "+
+	"the target of a labeled break or continue and of a goto alike, because a jump to a label lands where a reader "+
+	"is not looking.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. A label is syntax, so the rule reads no types.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var labelMessage = policy.MessageOf(Name, "label")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// Every labeled statement is a jump target whatever it labels, a loop, a select, a block or an empty
-		// statement at the end of a function, and the walk reaches those inside function literals too.
-		ast.Inspect(file, func(node ast.Node) bool {
-			labeled, isLabeled := node.(*ast.LabeledStmt)
-			if !isLabeled {
-				return true
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      labeled.Label.Pos(),
-				End:      labeled.Label.End(),
-				Category: labelMessage.Id,
-				Message:  labelMessage.Render(map[string]string{"label": labeled.Label.Name}),
-			})
-			return true
-		})
+// judgeLabeled reports a labeled statement at its label. Every labeled statement is a jump target whatever it labels,
+// a loop, a select, a block or an empty statement at the end of a function, and the walk reaches those inside
+// function literals too.
+func judgeLabeled(context *rule.Context, node ast.Node, _ []ast.Node) {
+	labeled, isLabeled := node.(*ast.LabeledStmt)
+	if !isLabeled {
+		return
 	}
-	return nil, nil
+	context.Report(analysis.Diagnostic{
+		Pos:      labeled.Label.Pos(),
+		End:      labeled.Label.End(),
+		Category: labelMessage.Id,
+		Message:  labelMessage.Render(map[string]string{"label": labeled.Label.Name}),
+	})
 }
