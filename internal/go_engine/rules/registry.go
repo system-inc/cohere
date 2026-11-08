@@ -55,6 +55,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_one_type_per_file"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_operator_assignment"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_separated_folder_words"
+	"github.com/system-inc/cohere/internal/go_engine/rules/constant_group_type"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_caller_data_mutation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_identical_branches"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_no_process_exit_after_output"
@@ -66,6 +67,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_wrapped_error"
 	"github.com/system-inc/cohere/internal/go_engine/rules/cyclic_finalizer"
+	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
@@ -81,6 +83,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/errors_new_of_sprintf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/extreme_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/failed_type_assertion_read"
 	"github.com/system-inc/cohere/internal/go_engine/rules/find_all_zero_limit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/guarded_delete"
 	"github.com/system-inc/cohere/internal/go_engine/rules/guarded_map_access"
@@ -114,6 +117,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/leaky_time_tick"
 	"github.com/system-inc/cohere/internal/go_engine/rules/loop_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/manual_trim"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marshaled_struct_without_exported_fields"
 	"github.com/system-inc/cohere/internal/go_engine/rules/math_on_converted_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misaligned_atomic_field"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
@@ -128,9 +132,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_map_assignment"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_canonical_header_key"
+	"github.com/system-inc/cohere/internal/go_engine/rules/non_octal_file_mode"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_pointer_unmarshal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
+	"github.com/system-inc/cohere/internal/go_engine/rules/oversized_shift"
 	"github.com/system-inc/cohere/internal/go_engine/rules/print_of_sprintf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/range_over_string_directly"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
@@ -143,6 +149,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_slice_length"
 	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_sprintf_of_string"
 	"github.com/system-inc/cohere/internal/go_engine/rules/regular_expression_raw_string"
+	"github.com/system-inc/cohere/internal/go_engine/rules/removed_user_directory"
 	"github.com/system-inc/cohere/internal/go_engine/rules/repeated_if_else_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/replace_zero_count"
 	"github.com/system-inc/cohere/internal/go_engine/rules/reversed_errors_is_arguments"
@@ -157,6 +164,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/sliding_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/sort_helper_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/sort_slice_on_non_slice"
+	"github.com/system-inc/cohere/internal/go_engine/rules/spaced_compiler_directive"
 	"github.com/system-inc/cohere/internal/go_engine/rules/spinning_empty_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/struct_conversion_by_field_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/swapped_seek_arguments"
@@ -171,6 +179,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/type_switch_bound_value"
 	"github.com/system-inc/cohere/internal/go_engine/rules/typed_nil_interface_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unbuffered_signal_channel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/uncalled_deferred_function"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unchanging_loop_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unconditional_loop_exit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unencodable_binary_value"
@@ -415,16 +424,28 @@ var ports = map[string]port{
 		analyzer: impossible_target_comparison.Analyzer,
 		listener: &impossible_target_comparison.Listener,
 	},
-	"SA5000":           {analyzer: nil_map_assignment.Analyzer, listener: &nil_map_assignment.Listener},
-	"SA5001":           {analyzer: early_deferred_close.Analyzer, listener: &early_deferred_close.Listener},
-	"SA5002":           {analyzer: spinning_empty_loop.Analyzer, listener: &spinning_empty_loop.Listener},
-	"SA5003":           {analyzer: defer_in_infinite_loop.Analyzer, listener: &defer_in_infinite_loop.Listener},
-	"SA5004":           {analyzer: empty_select_default.Analyzer, listener: &empty_select_default.Listener},
-	"SA5005":           {analyzer: cyclic_finalizer.Analyzer, listener: &cyclic_finalizer.Listener},
-	"SA5007":           {analyzer: infinite_recursion.Analyzer, listener: &infinite_recursion.Listener},
-	"SA5008":           {analyzer: invalid_struct_tag.Analyzer, listener: &invalid_struct_tag.Listener},
-	"SA5010":           {analyzer: impossible_type_assertion.Analyzer, listener: &impossible_type_assertion.Listener},
-	"SA5012":           {analyzer: odd_slice_argument.Analyzer},
+	"SA5000": {analyzer: nil_map_assignment.Analyzer, listener: &nil_map_assignment.Listener},
+	"SA5001": {analyzer: early_deferred_close.Analyzer, listener: &early_deferred_close.Listener},
+	"SA5002": {analyzer: spinning_empty_loop.Analyzer, listener: &spinning_empty_loop.Listener},
+	"SA5003": {analyzer: defer_in_infinite_loop.Analyzer, listener: &defer_in_infinite_loop.Listener},
+	"SA5004": {analyzer: empty_select_default.Analyzer, listener: &empty_select_default.Listener},
+	"SA5005": {analyzer: cyclic_finalizer.Analyzer, listener: &cyclic_finalizer.Listener},
+	"SA5007": {analyzer: infinite_recursion.Analyzer, listener: &infinite_recursion.Listener},
+	"SA5008": {analyzer: invalid_struct_tag.Analyzer, listener: &invalid_struct_tag.Listener},
+	"SA5010": {analyzer: impossible_type_assertion.Analyzer, listener: &impossible_type_assertion.Listener},
+	"SA5012": {analyzer: odd_slice_argument.Analyzer},
+	"SA9001": {analyzer: defer_in_channel_range_loop.Analyzer, listener: &defer_in_channel_range_loop.Listener},
+	"SA9002": {analyzer: non_octal_file_mode.Analyzer, listener: &non_octal_file_mode.Listener},
+	"SA9004": {analyzer: constant_group_type.Analyzer, listener: &constant_group_type.Listener},
+	"SA9005": {
+		analyzer: marshaled_struct_without_exported_fields.Analyzer,
+		listener: &marshaled_struct_without_exported_fields.Listener,
+	},
+	"SA9006":           {analyzer: oversized_shift.Analyzer, listener: &oversized_shift.Listener},
+	"SA9007":           {analyzer: removed_user_directory.Analyzer, listener: &removed_user_directory.Listener},
+	"SA9008":           {analyzer: failed_type_assertion_read.Analyzer, listener: &failed_type_assertion_read.Listener},
+	"SA9009":           {analyzer: spaced_compiler_directive.Analyzer, listener: &spaced_compiler_directive.Listener},
+	"SA9010":           {analyzer: uncalled_deferred_function.Analyzer, listener: &uncalled_deferred_function.Listener},
 	"ST1001":           {analyzer: dot_import.Analyzer, listener: &dot_import.Listener},
 	"ST1006":           {analyzer: receiver_name.Analyzer, listener: &receiver_name.Listener},
 	"ST1008":           {analyzer: misplaced_error_result.Analyzer, listener: &misplaced_error_result.Listener},
