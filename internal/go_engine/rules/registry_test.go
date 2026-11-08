@@ -192,6 +192,41 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 	expectBlock(test, 0, expected, rule.OriginVet)
 }
 
+// portedVet is vet's passes cohere runs as its own ports, written out here rather than read from the registry's own
+// table, so a port's line dropped from or added to that table by mistake fails the test below.
+var portedVet = []string{
+	"appends", "asmdecl", "assign", "atomic", "bools", "buildtag", "cgocall", "composites", "copylocks", "defers",
+	"directive", "errorsas", "framepointer", "hostport", "httpresponse", "ifaceassert", "loopclosure", "lostcancel",
+	"nilfunc", "printf", "scannererr", "shift", "sigchanyzer", "slog", "sqlrowserr", "stdmethods", "stdversion",
+	"stringintconv", "structtag", "testinggoroutine", "tests", "timeformat", "unmarshal", "unreachable", "unsafeptr",
+	"unusedresult", "waitgroup",
+}
+
+// TestExactlyThePortedVetPassesRunTheirPorts holds every vet pass portedVet names to a registered rule running a port,
+// not vet's original, and every other vet pass to the original itself, so the registry's table can neither lose a port
+// nor gain one unannounced. Each name in portedVet is a pass vet runs, so the list cannot name a port that pins nothing.
+func TestExactlyThePortedVetPassesRunTheirPorts(test *testing.T) {
+	test.Parallel()
+	vetPasses := map[string]bool{}
+	for _, pass := range vet.Suite {
+		vetPasses[pass.Name] = true
+		registeredRule, registered := registeredRuleNamed(rule.Namespace + pass.Name)
+		switch {
+		case !registered:
+			test.Errorf("vet's %q is not registered", pass.Name)
+		case slices.Contains(portedVet, pass.Name) && registeredRule.Analyzer == pass:
+			test.Errorf("vet's %q runs the original, expected its port", pass.Name)
+		case !slices.Contains(portedVet, pass.Name) && registeredRule.Analyzer != pass:
+			test.Errorf("vet's %q runs a port that portedVet does not name", pass.Name)
+		}
+	}
+	for _, name := range portedVet {
+		if !vetPasses[name] {
+			test.Errorf("portedVet names %q, which vet does not run", name)
+		}
+	}
+}
+
 // borrowedChecks is every borrowed check a port may stand in for, by its name: vet's passes, staticcheck's SA, S and
 // ST checks, each the original.
 func borrowedChecks() map[string]*analysis.Analyzer {
