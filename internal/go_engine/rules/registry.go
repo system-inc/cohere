@@ -74,6 +74,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/defers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 )
 
@@ -165,6 +166,7 @@ var ports = map[string]*analysis.Analyzer{
 	"defers":     defers.Analyzer,
 	"errorsas":   errors_as.Analyzer,
 	"nilfunc":    nil_func.Analyzer,
+	"printf":     printf.Analyzer,
 	"sqlrowserr": sql_rows_err.Analyzer,
 }
 
