@@ -3,6 +3,7 @@ package directive
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -62,7 +63,7 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 			ReadFile:     os.ReadFile,
 			ResultOf:     map[*analysis.Analyzer]any{},
 			Report: func(diagnostic analysis.Diagnostic) {
-				untyped = append(untyped, untypedFinding(test, loadedPackage, diagnostic))
+				untyped = append(untyped, untypedFinding(test, directory, loadedPackage, diagnostic))
 			},
 		}
 		if _, runError := Analyzer.Run(pass); runError != nil {
@@ -81,19 +82,31 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 	}
 }
 
-// untypedFinding is diagnostic, reported in loadedPackage by the port with no types, as the harness sees a finding,
-// in its file's base name as Findings names the original's. The harness's own conversion is not exported, so this
-// one holds the fields the port's findings have, where each starts and ends and its message, and fails the test on a
-// related entry or a fix, which the port never offers and this conversion would otherwise drop.
-func untypedFinding(test *testing.T, loadedPackage *packages.Package, diagnostic analysis.Diagnostic) parity.Finding {
+// untypedFinding is diagnostic, reported in loadedPackage by the port with no types, as the harness sees a finding.
+// Its file is named as Findings names the original's, by its path below the fixtures' root, which for this tree laid
+// out by import path is directory's src, as `parity/command/main.go`, and a file outside it keeps its path. The
+// harness's own conversion is not exported, so this one holds the fields the port's findings have, where each starts
+// and ends and its message, and fails the test on a related entry or a fix, which the port never offers and this
+// conversion would otherwise drop.
+func untypedFinding(
+	test *testing.T,
+	directory string,
+	loadedPackage *packages.Package,
+	diagnostic analysis.Diagnostic,
+) parity.Finding {
 	test.Helper()
 	if len(diagnostic.Related) > 0 || len(diagnostic.SuggestedFixes) > 0 {
 		test.Errorf("the port with no types reported %q with related entries or fixes, which untypedFinding does "+
 			"not compare", diagnostic.Message)
 	}
 	start := loadedPackage.Fset.Position(diagnostic.Pos)
+	file := filepath.ToSlash(start.Filename)
+	if below, relativeError := filepath.Rel(filepath.Join(directory, "src"), start.Filename); relativeError == nil &&
+		!strings.HasPrefix(below, "..") {
+		file = filepath.ToSlash(below)
+	}
 	found := parity.Finding{
-		File:    filepath.Base(start.Filename),
+		File:    file,
 		Line:    start.Line,
 		Column:  start.Column,
 		Message: diagnostic.Message,
