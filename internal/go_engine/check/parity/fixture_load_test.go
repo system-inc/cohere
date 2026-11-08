@@ -112,3 +112,16 @@ func TestRequireOnlyAdjudicatedReadsRecordsWhereTheLoadFoundThem(test *testing.T
 			"the original's words, renamed, and it does",
 	)
 }
+
+// A differences fixture is one package's, so a pattern whose packages sit in two folders fails before any record is
+// read, naming both folders: twins/... matches twins/first and twins/second. Read from either alone, the other's
+// records would go unread.
+func TestRequireOnlyAdjudicatedFailsAFixtureInTwoFolders(test *testing.T) {
+	test.Parallel()
+	source := filepath.Join(analysistest.TestData(), "src", "twins")
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "twins/...")
+	}), "the packages of [twins/...] sit in 2 folders, ["+filepath.Join(source, "first")+" "+
+		filepath.Join(source, "second")+"], where a differences fixture is one package's, so its records could not be "+
+		"read")
+}
