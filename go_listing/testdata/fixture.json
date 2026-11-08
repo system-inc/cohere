@@ -1,0 +1,972 @@
+{
+	"Dir": "/fixture",
+	"ImportPath": "example.com/fixture",
+	"Name": "fixture",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/cg",
+	"GoFiles": [
+		"lib.go"
+	],
+	"IgnoredGoFiles": [
+		"never_test.go",
+		"other.go"
+	],
+	"IgnoredOtherFiles": [
+		"asm_plan9.s"
+	],
+	"EmbedPatterns": [
+		"message.txt"
+	],
+	"EmbedFiles": [
+		"message.txt"
+	],
+	"Imports": [
+		"embed",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep"
+	],
+	"Deps": [
+		"cmp",
+		"embed",
+		"errors",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep",
+		"internal/abi",
+		"internal/asan",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/goarch",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math/bits",
+		"path",
+		"runtime",
+		"runtime/cgo",
+		"slices",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"time",
+		"unicode/utf8",
+		"unsafe"
+	],
+	"TestGoFiles": [
+		"lib_test.go"
+	],
+	"TestImports": [
+		"testing"
+	],
+	"XTestGoFiles": [
+		"x_test.go"
+	],
+	"XTestImports": [
+		"embed",
+		"example.com/fixture",
+		"testing"
+	],
+	"XTestEmbedPatterns": [
+		"expected.txt"
+	],
+	"XTestEmbedFiles": [
+		"expected.txt"
+	]
+}
+{
+	"Dir": "/fixture/broken",
+	"ImportPath": "example.com/fixture/broken",
+	"Name": "broken",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Incomplete": true,
+	"Stale": true,
+	"StaleReason": "build ID mismatch",
+	"GoFiles": [
+		"broken.go"
+	],
+	"InvalidGoFiles": [
+		"broken.go"
+	],
+	"Error": {
+		"ImportStack": [
+			"example.com/fixture/broken"
+		],
+		"Pos": "broken/broken.go:3:8",
+		"Err": "string literal not terminated"
+	}
+}
+{
+	"Dir": "/fixture/cg",
+	"ImportPath": "example.com/fixture/cg",
+	"Name": "cg",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Stale": true,
+	"StaleReason": "build ID mismatch",
+	"CgoFiles": [
+		"cg.go"
+	],
+	"CFiles": [
+		"cg.c"
+	],
+	"HFiles": [
+		"cg.h"
+	],
+	"CgoCFLAGS": [
+		"-I/fixture/cg/../include",
+		"-I",
+		"/fixture/cg/include2"
+	],
+	"Imports": [
+		"C"
+	],
+	"Deps": [
+		"errors",
+		"internal/abi",
+		"internal/asan",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/goarch",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"math/bits",
+		"runtime",
+		"runtime/cgo",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"unsafe"
+	]
+}
+{
+	"Dir": "/fixture/dep",
+	"ImportPath": "example.com/fixture/dep",
+	"Name": "dep",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Stale": true,
+	"StaleReason": "build ID mismatch",
+	"GoFiles": [
+		"dep.go"
+	],
+	"TestGoFiles": [
+		"dep_test.go"
+	],
+	"TestImports": [
+		"testing"
+	]
+}
+{
+	"Dir": "/fixture/user",
+	"ImportPath": "example.com/fixture/user",
+	"Name": "user",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Incomplete": true,
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/broken",
+	"GoFiles": [
+		"user.go"
+	],
+	"Imports": [
+		"example.com/fixture/broken"
+	],
+	"Deps": [
+		"example.com/fixture/broken"
+	],
+	"DepsErrors": [
+		{
+			"ImportStack": [
+				"example.com/fixture/broken"
+			],
+			"Pos": "broken/broken.go:3:8",
+			"Err": "string literal not terminated"
+		}
+	]
+}
+{
+	"Dir": "/goroot/src/unsafe",
+	"ImportPath": "unsafe",
+	"Name": "unsafe",
+	"Doc": "Package unsafe contains operations that step around the type safety of Go programs.",
+	"Root": "/goroot",
+	"Match": [
+		"unsafe"
+	],
+	"Goroot": true,
+	"Standard": true,
+	"GoFiles": [
+		"unsafe.go"
+	]
+}
+{
+	"Dir": "/fixture",
+	"ImportPath": "example.com/fixture.test",
+	"Name": "main",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"DefaultGODEBUG": "containermaxprocs=0,cryptocustomrand=1,decoratemappings=0,gotestjsonbuildtext=1,httpcookiemaxnum=0,httplaxcontentlength=1,httpmuxgo121=1,httpservecontentkeepheaders=1,multipathtcp=0,randseednop=0,rsa1024min=0,tlsmlkem=0,tlssecpmlkem=0,tlssha1=1,tracebacklabels=0,updatemaxprocs=0,urlmaxqueryparams=0,urlstrictcolons=0,winreadlinkvolume=0,winsymlink=0,x509negativeserial=1,x509rsacrt=0,x509sha256skid=0,x509sslcertoverrideplatform=0,x509usepolicies=0",
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/cg",
+	"GoFiles": [
+		"/gocache/a8/a8a16cca7f4d86baa576e1f061fb000c0cc758eed07969399f8e7d18508d6010-d"
+	],
+	"Imports": [
+		"example.com/fixture [example.com/fixture.test]",
+		"example.com/fixture_test [example.com/fixture.test]",
+		"os",
+		"reflect",
+		"testing",
+		"testing/internal/testdeps"
+	],
+	"ImportMap": {
+		"example.com/fixture": "example.com/fixture [example.com/fixture.test]",
+		"example.com/fixture_test": "example.com/fixture_test [example.com/fixture.test]"
+	},
+	"Deps": [
+		"bufio",
+		"bytes",
+		"cmp",
+		"compress/flate",
+		"compress/gzip",
+		"context",
+		"crypto",
+		"crypto/cipher",
+		"crypto/fips140",
+		"crypto/internal/boring",
+		"crypto/internal/boring/sig",
+		"crypto/internal/constanttime",
+		"crypto/internal/entropy/v1.0.0",
+		"crypto/internal/fips140",
+		"crypto/internal/fips140/aes",
+		"crypto/internal/fips140/aes/gcm",
+		"crypto/internal/fips140/alias",
+		"crypto/internal/fips140/check",
+		"crypto/internal/fips140/drbg",
+		"crypto/internal/fips140/hmac",
+		"crypto/internal/fips140/sha256",
+		"crypto/internal/fips140/sha3",
+		"crypto/internal/fips140/sha512",
+		"crypto/internal/fips140/subtle",
+		"crypto/internal/fips140deps/byteorder",
+		"crypto/internal/fips140deps/cpu",
+		"crypto/internal/fips140deps/godebug",
+		"crypto/internal/fips140deps/time",
+		"crypto/internal/fips140only",
+		"crypto/internal/impl",
+		"crypto/internal/sysrand",
+		"crypto/sha256",
+		"crypto/subtle",
+		"embed",
+		"encoding",
+		"encoding/base32",
+		"encoding/base64",
+		"encoding/binary",
+		"encoding/hex",
+		"encoding/json",
+		"encoding/json/internal",
+		"encoding/json/internal/jsonflags",
+		"encoding/json/internal/jsonopts",
+		"encoding/json/internal/jsonwire",
+		"encoding/json/jsontext",
+		"encoding/json/v2",
+		"errors",
+		"example.com/fixture [example.com/fixture.test]",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep",
+		"example.com/fixture_test [example.com/fixture.test]",
+		"flag",
+		"fmt",
+		"go/ast",
+		"go/build/constraint",
+		"go/parser",
+		"go/scanner",
+		"go/token",
+		"hash",
+		"hash/crc32",
+		"internal/abi",
+		"internal/asan",
+		"internal/bisect",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/filepathlite",
+		"internal/fmtsort",
+		"internal/fuzz",
+		"internal/goarch",
+		"internal/godebug",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/poll",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/syscall/execenv",
+		"internal/syscall/unix",
+		"internal/sysinfo",
+		"internal/testlog",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math",
+		"math/bits",
+		"math/rand",
+		"os",
+		"os/exec",
+		"os/signal",
+		"path",
+		"path/filepath",
+		"reflect",
+		"regexp",
+		"regexp/syntax",
+		"runtime",
+		"runtime/cgo",
+		"runtime/debug",
+		"runtime/pprof",
+		"runtime/trace",
+		"slices",
+		"sort",
+		"strconv",
+		"strings",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"testing",
+		"testing/internal/testdeps",
+		"text/tabwriter",
+		"time",
+		"unicode",
+		"unicode/utf16",
+		"unicode/utf8",
+		"unsafe"
+	]
+}
+{
+	"Dir": "/fixture",
+	"ImportPath": "example.com/fixture [example.com/fixture.test]",
+	"Name": "fixture",
+	"Root": "/fixture",
+	"ForTest": "example.com/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/cg",
+	"GoFiles": [
+		"lib.go",
+		"lib_test.go"
+	],
+	"IgnoredGoFiles": [
+		"never_test.go",
+		"other.go"
+	],
+	"IgnoredOtherFiles": [
+		"asm_plan9.s"
+	],
+	"EmbedPatterns": [
+		"message.txt"
+	],
+	"EmbedFiles": [
+		"message.txt"
+	],
+	"Imports": [
+		"testing",
+		"embed",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep"
+	],
+	"Deps": [
+		"bytes",
+		"cmp",
+		"context",
+		"embed",
+		"encoding",
+		"errors",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep",
+		"flag",
+		"fmt",
+		"internal/abi",
+		"internal/asan",
+		"internal/bisect",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/filepathlite",
+		"internal/fmtsort",
+		"internal/goarch",
+		"internal/godebug",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/poll",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/syscall/execenv",
+		"internal/syscall/unix",
+		"internal/sysinfo",
+		"internal/testlog",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math",
+		"math/bits",
+		"math/rand",
+		"os",
+		"path",
+		"path/filepath",
+		"reflect",
+		"runtime",
+		"runtime/cgo",
+		"runtime/debug",
+		"runtime/trace",
+		"slices",
+		"strconv",
+		"strings",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"testing",
+		"time",
+		"unicode",
+		"unicode/utf8",
+		"unsafe"
+	],
+	"TestGoFiles": [
+		"lib_test.go"
+	],
+	"TestImports": [
+		"testing"
+	],
+	"XTestGoFiles": [
+		"x_test.go"
+	],
+	"XTestImports": [
+		"embed",
+		"example.com/fixture",
+		"testing"
+	],
+	"XTestEmbedPatterns": [
+		"expected.txt"
+	],
+	"XTestEmbedFiles": [
+		"expected.txt"
+	]
+}
+{
+	"Dir": "/fixture",
+	"ImportPath": "example.com/fixture_test [example.com/fixture.test]",
+	"Name": "fixture_test",
+	"Root": "/fixture",
+	"ForTest": "example.com/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/cg",
+	"GoFiles": [
+		"x_test.go"
+	],
+	"EmbedFiles": [
+		"expected.txt"
+	],
+	"Imports": [
+		"embed",
+		"example.com/fixture [example.com/fixture.test]",
+		"testing"
+	],
+	"ImportMap": {
+		"example.com/fixture": "example.com/fixture [example.com/fixture.test]"
+	},
+	"Deps": [
+		"bytes",
+		"cmp",
+		"context",
+		"embed",
+		"encoding",
+		"errors",
+		"example.com/fixture [example.com/fixture.test]",
+		"example.com/fixture/cg",
+		"example.com/fixture/dep",
+		"flag",
+		"fmt",
+		"internal/abi",
+		"internal/asan",
+		"internal/bisect",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/filepathlite",
+		"internal/fmtsort",
+		"internal/goarch",
+		"internal/godebug",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/poll",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/syscall/execenv",
+		"internal/syscall/unix",
+		"internal/sysinfo",
+		"internal/testlog",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math",
+		"math/bits",
+		"math/rand",
+		"os",
+		"path",
+		"path/filepath",
+		"reflect",
+		"runtime",
+		"runtime/cgo",
+		"runtime/debug",
+		"runtime/trace",
+		"slices",
+		"strconv",
+		"strings",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"testing",
+		"time",
+		"unicode",
+		"unicode/utf8",
+		"unsafe"
+	]
+}
+{
+	"Dir": "/fixture/dep",
+	"ImportPath": "example.com/fixture/dep.test",
+	"Name": "main",
+	"Root": "/fixture",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"DefaultGODEBUG": "containermaxprocs=0,cryptocustomrand=1,decoratemappings=0,gotestjsonbuildtext=1,httpcookiemaxnum=0,httplaxcontentlength=1,httpmuxgo121=1,httpservecontentkeepheaders=1,multipathtcp=0,randseednop=0,rsa1024min=0,tlsmlkem=0,tlssecpmlkem=0,tlssha1=1,tracebacklabels=0,updatemaxprocs=0,urlmaxqueryparams=0,urlstrictcolons=0,winreadlinkvolume=0,winsymlink=0,x509negativeserial=1,x509rsacrt=0,x509sha256skid=0,x509sslcertoverrideplatform=0,x509usepolicies=0",
+	"Stale": true,
+	"StaleReason": "stale dependency: example.com/fixture/dep",
+	"GoFiles": [
+		"/gocache/d9/d9d7bbe4dc323b2018f17c5a7bfebbda4c2b4ba04a28a4c328dc042ff7990adb-d"
+	],
+	"Imports": [
+		"example.com/fixture/dep [example.com/fixture/dep.test]",
+		"os",
+		"reflect",
+		"testing",
+		"testing/internal/testdeps"
+	],
+	"ImportMap": {
+		"example.com/fixture/dep": "example.com/fixture/dep [example.com/fixture/dep.test]"
+	},
+	"Deps": [
+		"bufio",
+		"bytes",
+		"cmp",
+		"compress/flate",
+		"compress/gzip",
+		"context",
+		"crypto",
+		"crypto/cipher",
+		"crypto/fips140",
+		"crypto/internal/boring",
+		"crypto/internal/boring/sig",
+		"crypto/internal/constanttime",
+		"crypto/internal/entropy/v1.0.0",
+		"crypto/internal/fips140",
+		"crypto/internal/fips140/aes",
+		"crypto/internal/fips140/aes/gcm",
+		"crypto/internal/fips140/alias",
+		"crypto/internal/fips140/check",
+		"crypto/internal/fips140/drbg",
+		"crypto/internal/fips140/hmac",
+		"crypto/internal/fips140/sha256",
+		"crypto/internal/fips140/sha3",
+		"crypto/internal/fips140/sha512",
+		"crypto/internal/fips140/subtle",
+		"crypto/internal/fips140deps/byteorder",
+		"crypto/internal/fips140deps/cpu",
+		"crypto/internal/fips140deps/godebug",
+		"crypto/internal/fips140deps/time",
+		"crypto/internal/fips140only",
+		"crypto/internal/impl",
+		"crypto/internal/sysrand",
+		"crypto/sha256",
+		"crypto/subtle",
+		"encoding",
+		"encoding/base32",
+		"encoding/base64",
+		"encoding/binary",
+		"encoding/hex",
+		"encoding/json",
+		"encoding/json/internal",
+		"encoding/json/internal/jsonflags",
+		"encoding/json/internal/jsonopts",
+		"encoding/json/internal/jsonwire",
+		"encoding/json/jsontext",
+		"encoding/json/v2",
+		"errors",
+		"example.com/fixture/dep [example.com/fixture/dep.test]",
+		"flag",
+		"fmt",
+		"go/ast",
+		"go/build/constraint",
+		"go/parser",
+		"go/scanner",
+		"go/token",
+		"hash",
+		"hash/crc32",
+		"internal/abi",
+		"internal/asan",
+		"internal/bisect",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/filepathlite",
+		"internal/fmtsort",
+		"internal/fuzz",
+		"internal/goarch",
+		"internal/godebug",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/poll",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/syscall/execenv",
+		"internal/syscall/unix",
+		"internal/sysinfo",
+		"internal/testlog",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math",
+		"math/bits",
+		"math/rand",
+		"os",
+		"os/exec",
+		"os/signal",
+		"path",
+		"path/filepath",
+		"reflect",
+		"regexp",
+		"regexp/syntax",
+		"runtime",
+		"runtime/debug",
+		"runtime/pprof",
+		"runtime/trace",
+		"slices",
+		"sort",
+		"strconv",
+		"strings",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"testing",
+		"testing/internal/testdeps",
+		"text/tabwriter",
+		"time",
+		"unicode",
+		"unicode/utf16",
+		"unicode/utf8",
+		"unsafe"
+	]
+}
+{
+	"Dir": "/fixture/dep",
+	"ImportPath": "example.com/fixture/dep [example.com/fixture/dep.test]",
+	"Name": "dep",
+	"Root": "/fixture",
+	"ForTest": "example.com/fixture/dep",
+	"Module": {
+		"Path": "example.com/fixture",
+		"Main": true,
+		"Dir": "/fixture",
+		"GoMod": "/fixture/go.mod",
+		"GoVersion": "1.21"
+	},
+	"Match": [
+		"./..."
+	],
+	"Stale": true,
+	"StaleReason": "build ID mismatch",
+	"GoFiles": [
+		"dep.go",
+		"dep_test.go"
+	],
+	"Imports": [
+		"testing"
+	],
+	"Deps": [
+		"bytes",
+		"cmp",
+		"context",
+		"encoding",
+		"errors",
+		"flag",
+		"fmt",
+		"internal/abi",
+		"internal/asan",
+		"internal/bisect",
+		"internal/bytealg",
+		"internal/byteorder",
+		"internal/chacha8rand",
+		"internal/coverage/rtcov",
+		"internal/cpu",
+		"internal/filepathlite",
+		"internal/fmtsort",
+		"internal/goarch",
+		"internal/godebug",
+		"internal/godebugs",
+		"internal/goexperiment",
+		"internal/goos",
+		"internal/msan",
+		"internal/oserror",
+		"internal/poll",
+		"internal/profilerecord",
+		"internal/race",
+		"internal/reflectlite",
+		"internal/runtime/atomic",
+		"internal/runtime/exithook",
+		"internal/runtime/gc",
+		"internal/runtime/gc/scan",
+		"internal/runtime/maps",
+		"internal/runtime/math",
+		"internal/runtime/pprof/label",
+		"internal/runtime/sys",
+		"internal/strconv",
+		"internal/stringslite",
+		"internal/sync",
+		"internal/synctest",
+		"internal/syscall/execenv",
+		"internal/syscall/unix",
+		"internal/sysinfo",
+		"internal/testlog",
+		"internal/trace/tracev2",
+		"internal/unsafeheader",
+		"io",
+		"io/fs",
+		"iter",
+		"math",
+		"math/bits",
+		"math/rand",
+		"os",
+		"path",
+		"path/filepath",
+		"reflect",
+		"runtime",
+		"runtime/debug",
+		"runtime/trace",
+		"slices",
+		"strconv",
+		"strings",
+		"sync",
+		"sync/atomic",
+		"syscall",
+		"testing",
+		"time",
+		"unicode",
+		"unicode/utf8",
+		"unsafe"
+	],
+	"TestGoFiles": [
+		"dep_test.go"
+	],
+	"TestImports": [
+		"testing"
+	]
+}
