@@ -1,7 +1,6 @@
 package printf
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,9 +11,7 @@ import (
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
 // upstreamPackages are the fixture packages x/tools' own test runs the original over, copied unchanged into
@@ -68,70 +65,20 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	directory := analysistest.TestData()
 	patterns := append(slices.Clone(upstreamPackages), "parity", "parity/dependency")
 	parity.RequireIdentical(test, original.Analyzer, Analyzer, directory, patterns...)
-	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	requireSameFacts(test, directory, []string{"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off"}, patterns)
+	parity.RequireIdenticalFacts(test, original.Analyzer, Analyzer, directory, patterns...)
 }
 
-// The two sides agree over the version-gated archives too, each loaded as a module, as analysistest loads it.
+// The two sides agree over the version-gated archives too, each loaded as a module, as analysistest loads it. Their
+// facts are not compared: each archive's functions are all named _, so neither side exports a fact there, and
+// RequireIdenticalFacts fails a comparison of two empty sides as proving nothing.
 func TestPortMatchesOriginalOverTheArchives(test *testing.T) {
 	test.Parallel()
 	for _, archive := range []string{"nonconst_go123.txtar", "nonconst_go124.txtar"} {
 		test.Run(archive, func(test *testing.T) {
 			test.Parallel()
 			directory := extractArchive(test, archive)
-			patterns := []string{"example.com/nonconst"}
-			parity.RequireIdentical(test, original.Analyzer, Analyzer, directory, patterns...)
-			requireSameFacts(test, directory, []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"}, patterns)
+			parity.RequireIdentical(test, original.Analyzer, Analyzer, directory, "example.com/nonconst")
 		})
-	}
-}
-
-// requireSameFacts loads the packages patterns name at directory under environment, runs the original and the port
-// over them in one checker, and fails the test unless each exports the same facts, each by its object's position,
-// the object's name and the fact's words. The harness compares findings and not facts, which printf alone among the
-// ports exports, so the facts are compared here on the harness's pieces: its load check, and its Difference over
-// each fact written as a Finding at its object. Each side's count is logged, so a run that exports nothing on both
-// sides reads as that, never as agreement.
-func requireSameFacts(test *testing.T, directory string, environment []string, patterns []string) {
-	test.Helper()
-	loaded, loadError := load.Packages(directory, patterns, environment, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	// A fixture that does not type-check is skipped by both sides, which would then agree on nothing.
-	for _, failure := range parity.LoadFailures(loaded.Roots) {
-		test.Fatalf("fixture package %s does not load clean, so its facts would go uncounted: %s", failure.Package,
-			failure.Error)
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{original.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
-	}
-	exported := map[*analysis.Analyzer][]parity.Finding{}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		objectFacts, _ := action.ExportedFacts()
-		for _, objectFact := range objectFacts {
-			position := action.Package.Fset.Position(objectFact.Object.Pos())
-			exported[action.Analyzer] = append(exported[action.Analyzer], parity.Finding{
-				File:    filepath.Base(position.Filename),
-				Line:    position.Line,
-				Column:  position.Column,
-				Message: fmt.Sprintf("%s %v", objectFact.Object.Name(), objectFact.Fact),
-			})
-		}
-	}
-	test.Logf("the original exported %d facts, the port %d", len(exported[original.Analyzer]),
-		len(exported[Analyzer]))
-	for _, missing := range parity.Difference(exported[original.Analyzer], exported[Analyzer]) {
-		test.Errorf("the original exported %s, and the port did not", missing)
-	}
-	for _, extra := range parity.Difference(exported[Analyzer], exported[original.Analyzer]) {
-		test.Errorf("the port exported %s, and the original did not", extra)
 	}
 }
 
