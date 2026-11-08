@@ -24,11 +24,17 @@ type noteParser struct {
 	// fileSet places the notes, and base is where in it the comment's notes start.
 	fileSet *token.FileSet
 	base    token.Pos
+	// readsFacts is whether fact notes are read beside diag notes, or refused as any other note is.
+	readsFacts bool
+	// wants and facts are the notes read so far.
+	wants []Want
+	facts []FactWant
 }
 
-// newNoteParser is a parser of body, the notes of a comment, which start at base in fileSet.
-func newNoteParser(fileSet *token.FileSet, base token.Pos, body string) *noteParser {
-	parser := &noteParser{fileSet: fileSet, base: base}
+// newNoteParser is a parser of body, the notes of a comment, which start at base in fileSet, reading fact notes
+// beside diag notes when readsFacts is set.
+func newNoteParser(fileSet *token.FileSet, base token.Pos, body string, readsFacts bool) *noteParser {
+	parser := &noteParser{fileSet: fileSet, base: base, readsFacts: readsFacts}
 	parser.scanner.Init(strings.NewReader(body))
 	parser.scanner.Mode = scanner.GoTokens
 	parser.scanner.Whitespace ^= 1 << '\n'
@@ -38,9 +44,9 @@ func newNoteParser(fileSet *token.FileSet, base token.Pos, body string) *notePar
 	return parser
 }
 
-// wants is the wants of the comment's notes, or the error naming where the first note it cannot read is.
-func (parser *noteParser) wants() ([]Want, error) {
-	wants := []Want{}
+// notes is the wants and the facts of the comment's notes, or the error naming where the first note it cannot read
+// is.
+func (parser *noteParser) notes() ([]Want, []FactWant, error) {
 	// Once the parse fails every token reads as the end, so each way out of the loop is a break.
 	for {
 		parser.skipNewlines()
@@ -51,11 +57,9 @@ func (parser *noteParser) wants() ([]Want, error) {
 			parser.fail("unexpected %s, where a note's name was expected", parser.tokenName())
 			break
 		}
-		want, isWant := parser.note()
-		if !isWant {
+		if !parser.note() {
 			break
 		}
-		wants = append(wants, want)
 		if parser.token() == scanner.EOF {
 			break
 		}
@@ -66,59 +70,108 @@ func (parser *noteParser) wants() ([]Want, error) {
 		parser.consume()
 	}
 	if parser.failure != nil {
-		return nil, parser.failure
+		return nil, nil, parser.failure
 	}
-	return wants, nil
+	return parser.wants, parser.facts, nil
 }
 
-// note reads one note, a diag note of one argument, a string or re and a string, as a Want.
-func (parser *noteParser) note() (Want, bool) {
+// note reads one note, a diag note of one argument, a string or re and a string, as a Want, or when facts are read,
+// a fact note of two, an object's name and a string or re and a string, as a FactWant. It is false once the parse
+// has failed.
+func (parser *noteParser) note() bool {
 	position := parser.fileSet.Position(parser.position())
 	name := parser.consume()
-	if name != "diag" {
+	switch {
+	case name == "diag":
+	case name == "fact" && parser.readsFacts:
+	case parser.readsFacts:
+		parser.fail("a %s note, where this reader reads diag and fact notes alone", name)
+		return false
+	default:
 		parser.fail("a %s note, where this reader reads diag notes alone", name)
-		return Want{}, false
+		return false
 	}
 	if parser.token() != '(' {
-		parser.fail("a diag note without its argument, where diag(...) was expected")
-		return Want{}, false
+		if name == "fact" {
+			parser.fail("a fact note without its arguments, where fact(...) was expected")
+		} else {
+			parser.fail("a diag note without its argument, where diag(...) was expected")
+		}
+		return false
 	}
 	parser.consume()
 	parser.skipNewlines()
-	want := Want{File: position.Filename, Line: position.Line}
-	isPattern := parser.token() == scanner.Ident && parser.scanner.TokenText() == "re"
-	if isPattern {
-		parser.consume()
-	}
-	if parser.token() != scanner.String && parser.token() != scanner.RawString {
-		parser.fail("unexpected %s in a diag note, where a string or re and a string was expected", parser.tokenName())
-		return Want{}, false
-	}
-	text, unquoteError := strconv.Unquote(parser.consume())
-	if unquoteError != nil {
-		parser.fail("unquoting a diag note's argument: %v", unquoteError)
-		return Want{}, false
-	}
-	if isPattern {
-		pattern, compileError := regexp.Compile(text)
-		if compileError != nil {
-			parser.fail("invalid regular expression %s: %v", text, compileError)
-			return Want{}, false
+	object := ""
+	if name == "fact" {
+		if parser.token() != scanner.Ident {
+			parser.fail("unexpected %s in a fact note, where the name of the object it is about was expected",
+				parser.tokenName())
+			return false
 		}
-		want.Pattern = pattern
-	} else {
-		want.Text = text
+		object = parser.consume()
+		if parser.token() != ',' {
+			parser.fail("unexpected %s in a fact note, where a comma after the object's name was expected",
+				parser.tokenName())
+			return false
+		}
+		parser.consume()
+		parser.skipNewlines()
+	}
+	text, pattern, isText := parser.textArgument(name)
+	if !isText {
+		return false
 	}
 	if parser.token() == ',' {
 		parser.consume()
 		parser.skipNewlines()
 	}
 	if parser.token() != ')' {
-		parser.fail("unexpected %s in a diag note, where its one argument closes with )", parser.tokenName())
-		return Want{}, false
+		if name == "fact" {
+			parser.fail("unexpected %s in a fact note, where its two arguments close with )", parser.tokenName())
+		} else {
+			parser.fail("unexpected %s in a diag note, where its one argument closes with )", parser.tokenName())
+		}
+		return false
 	}
 	parser.consume()
-	return want, true
+	if name == "fact" {
+		parser.facts = append(parser.facts, FactWant{
+			File: position.Filename, Line: position.Line, Object: object, Text: text, Pattern: pattern,
+		})
+		return true
+	}
+	parser.wants = append(parser.wants, Want{
+		File: position.Filename, Line: position.Line, Text: text, Pattern: pattern,
+	})
+	return true
+}
+
+// textArgument reads what a note named name expects the message or the fact to say: a string, whose text it
+// returns, or re and a string, whose compiled pattern it returns. It is false once the parse has failed.
+func (parser *noteParser) textArgument(name string) (string, *regexp.Regexp, bool) {
+	isPattern := parser.token() == scanner.Ident && parser.scanner.TokenText() == "re"
+	if isPattern {
+		parser.consume()
+	}
+	if parser.token() != scanner.String && parser.token() != scanner.RawString {
+		parser.fail("unexpected %s in a %s note, where a string or re and a string was expected", parser.tokenName(),
+			name)
+		return "", nil, false
+	}
+	text, unquoteError := strconv.Unquote(parser.consume())
+	if unquoteError != nil {
+		parser.fail("unquoting a %s note's argument: %v", name, unquoteError)
+		return "", nil, false
+	}
+	if !isPattern {
+		return text, nil, true
+	}
+	pattern, compileError := regexp.Compile(text)
+	if compileError != nil {
+		parser.fail("invalid regular expression %s: %v", text, compileError)
+		return "", nil, false
+	}
+	return "", pattern, true
 }
 
 // token is the current token, scanning one if none is current, and the end once the parse has failed.

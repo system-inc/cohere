@@ -7,8 +7,11 @@
 // The notes are read as go/expect v0.1.1 (golang.org/x/tools/go/expect@v0.1.1-deprecated extract.go, the version
 // staticcheck v0.8.1 pins) reads them, which comments hold notes and how notes are separated, and matched as
 // staticcheck v0.8.1's analysis/lint/testutil/check.go matches them: a string is a substring of the message, a
-// re"..." a regular expression it matches. The one difference is that this reader knows diag notes alone, each of one
-// argument, and refuses any other note, a fact note among them, rather than leaving it unchecked.
+// re"..." a regular expression it matches. Read knows diag notes alone, each of one argument, and refuses any other
+// note, a fact note among them, rather than leaving it unchecked, so a port whose original exports no facts never
+// passes over one. ReadWithFacts reads fact notes too, `//@ fact(name, "text")` on the line of the object a fact is
+// about, and hands them back beside the wants, for a port whose original exports facts to match through
+// CompareFacts as staticcheck's testutil matches them.
 package staticcheck_wants
 
 import (
@@ -24,12 +27,26 @@ import (
 // paths and of the notes in each. A note this reader cannot read, or one that is not a diag note, is an error naming
 // where it is, never a want dropped.
 func Read(directory string) ([]Want, error) {
+	wants, _, readError := read(directory, false)
+	return wants, readError
+}
+
+// ReadWithFacts is every finding and every fact the Go files under directory expect, read from their diag and fact
+// notes as Read reads them, the wants in the order Read gives and the facts in the same order. A note that is
+// neither, or one this reader cannot read, is an error naming where it is.
+func ReadWithFacts(directory string) ([]Want, []FactWant, error) {
+	return read(directory, true)
+}
+
+// read is the wants and, when readsFacts is set, the facts of the notes of the Go files under directory.
+func read(directory string, readsFacts bool) ([]Want, []FactWant, error) {
 	root, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
-		return nil, absoluteError
+		return nil, nil, absoluteError
 	}
 	fileSet := token.NewFileSet()
 	wants := []Want{}
+	facts := []FactWant{}
 	walkError := filepath.WalkDir(root, func(path string, entry fs.DirEntry, entryError error) error {
 		if entryError != nil {
 			return entryError
@@ -47,19 +64,21 @@ func Read(directory string) ([]Want, error) {
 				if !isNote {
 					continue
 				}
-				noteWants, noteError := newNoteParser(fileSet, comment.Pos()+token.Pos(offset), body).wants()
+				noteWants, noteFacts, noteError := newNoteParser(fileSet, comment.Pos()+token.Pos(offset), body,
+					readsFacts).notes()
 				if noteError != nil {
 					return noteError
 				}
 				wants = append(wants, noteWants...)
+				facts = append(facts, noteFacts...)
 			}
 		}
 		return nil
 	})
 	if walkError != nil {
-		return nil, walkError
+		return nil, nil, walkError
 	}
-	return wants, nil
+	return wants, facts, nil
 }
 
 // noteBody is the notes text holds, the text of one comment, and the offset in text they start at, or false when
