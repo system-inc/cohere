@@ -16,6 +16,8 @@ import (
 
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // inProcessLister lists a workspace's packages the way `go list -e -deps -json` lists them, by reading what go list
@@ -98,10 +100,10 @@ var (
 )
 
 // listInProcess is list without go list: the same listing, in the same order, with the same fields, read in this
-// process (see inProcessLister). It returns why it could not answer when it could not, and then the listing is nil
-// and go list answers instead.
-func listInProcess(workspace string, environment []string, patterns []string) (*listing, string) {
-	lister, doubt := newInProcessLister(workspace, environment)
+// process (see inProcessLister), each file held holds read from its held bytes. It returns why it could not answer
+// when it could not, and then the listing is nil and go list answers instead.
+func listInProcess(workspace string, environment []string, patterns []string, held Held) (*listing, string) {
+	lister, doubt := newInProcessLister(workspace, environment, held)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -174,12 +176,14 @@ func listInProcess(workspace string, environment []string, patterns []string) (*
 }
 
 // newInProcessLister reads the build list, the build context and the go environment, and says why it cannot list
-// at all when something in them is beyond what it carries.
-func newInProcessLister(workspace string, environment []string) (*inProcessLister, string) {
+// at all when something in them is beyond what it carries. Its build context opens a file held holds from its held
+// bytes, and any other on disk, so go/build reads no file the run already holds again.
+func newInProcessLister(workspace string, environment []string, held Held) (*inProcessLister, string) {
 	read, doubt := readGoState(workspace, environment)
 	if doubt != "" {
 		return nil, doubt
 	}
+	read.context.OpenFile = held.openFile()
 	lister := &inProcessLister{
 		workspace:     workspace,
 		environment:   environment,
@@ -225,6 +229,12 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 		group.Go(func() {
 			if pattern == "./..." {
 				matches[index], doubts[index] = lister.matchLocal()
+			} else if strings.HasPrefix(pattern, ".") || filepath.IsAbs(pattern) {
+				// A directory pattern below or outside the workspace, `./sub/...` or an absolute path, is matched by
+				// directory, which only matchLocal does and only for the workspace itself. Read as a module import
+				// path it would name no module, match nothing and answer an empty listing, which go list never does.
+				doubts[index] = fmt.Sprintf("the pattern %s names a directory, which the lister matches only as ./...",
+					pattern)
 			} else if prefix, wildcard := strings.CutSuffix(
 				pattern,
 				"/...",
@@ -241,6 +251,11 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 	for index := range patterns {
 		if doubts[index] != "" {
 			return nil, doubts[index]
+		}
+		if len(matches[index]) == 0 {
+			// go list warns that such a pattern matched no packages and lists the others, so an empty match is
+			// go list's to answer, never an empty listing that would check nothing and say nothing.
+			return nil, fmt.Sprintf("the pattern %s matched no packages", patterns[index])
 		}
 		for _, each := range matches[index] {
 			if !seen[each] {
@@ -259,7 +274,7 @@ func (lister *inProcessLister) matchLocal() ([]string, string) {
 	if owner == nil {
 		return nil, fmt.Sprintf("%s is in no main module", lister.workspace)
 	}
-	directories, doubt := walkPackageDirectories(lister.workspace, func(string) bool { return true })
+	directories, doubt := listed_directories.PackageDirectories(lister.workspace, func(string) bool { return true })
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -281,7 +296,7 @@ func (lister *inProcessLister) matchModules(prefix string) ([]string, string) {
 			return nil, fmt.Sprintf("the pattern %s/... could name packages of %s, which is not a main module",
 				prefix, each.Path)
 		}
-		directories, doubt := walkPackageDirectories(each.Dir, func(directory string) bool {
+		directories, doubt := listed_directories.PackageDirectories(each.Dir, func(directory string) bool {
 			return canMatch(importPathIn(each.Dir, each.Path, directory))
 		})
 		if doubt != "" {
@@ -337,42 +352,6 @@ func (lister *inProcessLister) packagesIn(
 		paths = append(paths, importPath)
 	}
 	return paths, ""
-}
-
-// walkPackageDirectories is every directory below root, root among them, that go's walk of a pattern looks in, in its
-// order: it leaves out a directory whose name starts with a dot or an underscore, testdata, one that holds a module
-// of its own, and one wanted declines, and never follows a symbolic link. A directory named vendor is looked in, as a
-// wildcard matches one, but nothing below it is, as no wildcard matches a vendored package (cmd/go's pkgpattern).
-func walkPackageDirectories(root string, wanted func(string) bool) ([]string, string) {
-	var directories []string
-	walkError := filepath.WalkDir(root, func(directory string, entry fs.DirEntry, pathError error) error {
-		if pathError != nil {
-			return pathError
-		}
-		if !entry.IsDir() {
-			return nil
-		}
-		if directory != root {
-			name := entry.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" ||
-				!wanted(directory) {
-				return filepath.SkipDir
-			}
-			if goModAt(directory) {
-				return filepath.SkipDir
-			}
-			if name == "vendor" {
-				directories = append(directories, directory)
-				return filepath.SkipDir
-			}
-		}
-		directories = append(directories, directory)
-		return nil
-	})
-	if walkError != nil {
-		return nil, fmt.Sprintf("walking %s: %v", root, walkError)
-	}
-	return directories, ""
 }
 
 // prefetchStandardLibrary starts reading every directory of the standard library at once, but the commands' and
@@ -646,7 +625,7 @@ func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 // no main module's.
 func (lister *inProcessLister) moduleRootOf(directory string) *packages.Module {
 	for each := directory; ; each = filepath.Dir(each) {
-		if goModAt(each) {
+		if listed_directories.GoModAt(each) {
 			for _, main := range lister.mainModules {
 				if main.Dir == each {
 					return main
@@ -853,7 +832,7 @@ func internalAllowed(importer string, importerStandard bool, imported string) bo
 // module, so directory is not moduleDirectory's.
 func nestedModule(moduleDirectory string, directory string) bool {
 	for each := directory; len(each) > len(moduleDirectory); each = filepath.Dir(each) {
-		if goModAt(each) {
+		if listed_directories.GoModAt(each) {
 			return true
 		}
 	}
@@ -889,12 +868,6 @@ func nonEmpty(list []string) []string {
 		return nil
 	}
 	return list
-}
-
-// goModAt reports whether directory holds a go.mod, by go's test of one: anything there but a directory.
-func goModAt(directory string) bool {
-	info, statError := os.Stat(filepath.Join(directory, "go.mod"))
-	return statError == nil && !info.IsDir()
 }
 
 // foldCollision is a doubt when two listed import paths differ only in case, which go list reports. Every import path

@@ -156,6 +156,9 @@ type engineTypesRecord struct {
 	// with the toolchain's SDK index seed, its key and whether the run's store was seeded from it, absent when no
 	// seed applied. A Go engine sends none.
 	SdkIndexSeed *sdkIndexSeedUse `json:"sdkIndexSeed"`
+	// Memory is the Go engine's, additive within contract 3: the memory limit its process ran under and where it
+	// came from, printed in the account `--verbose` prints. A Swift engine sends none.
+	Memory *engineMemory `json:"memory"`
 }
 
 type engineLintRecord struct {
@@ -440,7 +443,9 @@ func (run *engineRun) acceptProject(record *engineProjectRecord) error {
 	// which a replay did not spend (see invocationTag).
 	printInvocation(accountOutput(run.out), "%s\n", line)
 	streams.Show(run.out)
-	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
+	// Checked is what a phase examined, so it starts at none: the types and lint records set it as they come. A run
+	// whose files no phase reached reads none checked beside the gap that names them (#1hva1ya).
+	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, 0
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
 	run.report.graph = elapsed
@@ -790,6 +795,13 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+	// The compiler examined every file it left a record for, at most the files in scope, since it checks the whole
+	// container whatever the scope. A file with no record it did not examine (#1hva1ya).
+	examined := max(record.Files-len(record.FilesWithoutRecord), 0)
+	if run.project != nil {
+		examined = min(examined, run.project.FilesInScope)
+	}
+	activeSummary.FilesChecked = max(activeSummary.FilesChecked, examined)
 
 	// Said, so a cold run that took the toolchain's SDK index units never reads like one that indexed them: in the
 	// account `--verbose` prints and in `--json`'s summary, never in the default line, as #f6pqraj ruled.
@@ -801,6 +813,11 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 				"  types: no toolchain seed %s held the SDK's index units, so they were indexed afresh\n", seed.Key)
 		}
 		activeSummary.Swift = &swiftSummary{SdkIndexSeed: seed}
+	}
+
+	// The invocation's, as the types line is: the limit this run's engine held its heap under, and why.
+	if record.Memory != nil {
+		printInvocation(accountOutput(run.out), "  memory: %s\n", record.Memory.line())
 	}
 
 	// Said, so a run that withheld what no cgo tool could settle never reads like one with nothing to withhold:
@@ -1178,11 +1195,9 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
-	// The files nothing checked are named whichever phases ran (#4txsasr). A build that failed before compiling, an
-	// Xcode root's resolve that failed among them, is a type error that keeps lint from being reached, and the footer
-	// said only that, "1 type error (13 checked) • lint did not run", over files the compiler never saw: measured on
-	// ahraos-presence's CapturePhone/PhoneCapture before its unstarted check let lint run.
-	if namedGaps {
+	// The files nothing checked are named on the line whatever else fell short: a phase that did not run is a gap of
+	// its own, and with it alone the line read as if every file had reached the phases that did (#1hva1ya).
+	if !*record.Complete && namedGaps {
 		activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
 	}
 	if !*record.Complete && run.report.checkedEveryRequestedPhase() {

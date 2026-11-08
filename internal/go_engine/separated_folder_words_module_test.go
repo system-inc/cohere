@@ -49,7 +49,7 @@ func separatedFolderWordsRun(test *testing.T, directory string) ([]contract.Find
 	arguments := []string{"--contract", fmt.Sprint(contract.Version), "--root", directory, "--lint"}
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	exitCode := run(arguments, &standardOutput, &standardError, registered)
+	exitCode := run(arguments, &standardOutput, &standardError, registered, nil)
 	if exitCode != 0 && exitCode != 1 {
 		test.Fatalf("the engine exited %d, so the run measured nothing; stderr:\n%s", exitCode, standardError.String())
 	}

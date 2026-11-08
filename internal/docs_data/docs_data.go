@@ -67,6 +67,10 @@ type Inputs struct {
 	// engine is Go and compiled into the same binary as this package.
 	GoRules []goenginerule.Rule
 
+	// GoFixingRules are the names of the Go rules whose findings a run without --no-fix fixes, as the engine
+	// reports them (go_engine.FixingRules), each of which must name a rule GoRules holds.
+	GoFixingRules []string
+
 	// SettingsSchemas is what internal/settings_schema renders, keyed by its path relative to the module
 	// root. The *.schema.json files are copied beside the rest, so the site reads one directory.
 	SettingsSchemas map[string][]byte

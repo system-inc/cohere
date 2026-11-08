@@ -34,6 +34,9 @@ type pipeline struct {
 	writer        *contract.Writer
 	standardError io.Writer
 
+	// memory is what Main decided about the process's memory limit, written on the types record, nil in a test.
+	memory *contract.Memory
+
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
 	// ends as a broken stream.
 	writeError error
@@ -45,8 +48,8 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
-	// session is the findings cache the load and the lint phase share, nil under `--no-cache` or when the cache
-	// sat the run out.
+	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, and under
+	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads.
 	session *check.CacheSession
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -69,6 +72,7 @@ func newPipeline(
 	registered []rule.Rule,
 	standardOutput io.Writer,
 	standardError io.Writer,
+	memory *contract.Memory,
 ) *pipeline {
 	return &pipeline{
 		request:       request,
@@ -77,6 +81,7 @@ func newPipeline(
 		registered:    registered,
 		writer:        contract.NewWriter(standardOutput),
 		standardError: standardError,
+		memory:        memory,
 	}
 }
 
@@ -199,6 +204,13 @@ type heldFix struct {
 
 	// known is gofmt's verdicts, which the wrap reads and adds to before the run keeps them.
 	known *format.KnownFiles
+
+	// formatKnown and wrapKnown count the files gofmt and the wrap answered from known rather than formatting or
+	// wrapping, each left as it was when the run last saw the same bytes. They are the engine's own account of what a
+	// verdict spared, held beside the record rather than in it, since the fix record is the contract every engine
+	// writes and none reports such a count yet (#3hygsbr).
+	formatKnown int
+	wrapKnown   int
 }
 
 // runFix is the fix and format phase's gofmt: over every readable file in scope, written unless `--no-fix`, and
@@ -233,7 +245,9 @@ func (engine *pipeline) runFix(wraps bool) {
 		Write:          !engine.request.switches["no-fix"],
 		SingleThreaded: engine.request.switches["single-threaded"],
 		Known:          held.known,
+		Held:           engine.held,
 	})
+	held.formatKnown = result.Known
 	// Neither a file gofmt could not format nor a generated one is the wrap's to change.
 	skipped := map[string]bool{}
 	for _, generated := range result.Generated {
@@ -314,9 +328,10 @@ func (engine *pipeline) wrapsLongLines() bool {
 // knownFilesLabel names gofmt's verdicts among what the findings cache keeps.
 const knownFilesLabel = "gofmt verdicts"
 
-// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache.
+// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache or its store, so
+// a run under `--no-cache` neither reads nor keeps them.
 func (engine *pipeline) knownFiles() *format.KnownFiles {
-	if engine.session == nil {
+	if engine.session == nil || !engine.session.HasStore() {
 		return nil
 	}
 	encoded, _ := engine.session.Kept(engine.session.KeyFor(knownFilesLabel))
@@ -353,6 +368,19 @@ func (engine *pipeline) reread(file string) {
 	engine.described.contents[file] = contents
 }
 
+// held is the bytes the run holds for file, as load.Held asks: described.contents, every readable file in scope as it
+// is on disk, since describeProject read it and each write after was reread (reread). Every reader that would open a
+// file again reads it here instead: gofmt's check, the load, and a rule through sourceReader. The one time the map
+// runs ahead of the disk is inside the rename, whose askedOver sets a file to the rewrite before writeRenamed writes
+// and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first.
+// described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
+// the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
+// lock.
+func (engine *pipeline) held(file string) ([]byte, bool) {
+	contents, isHeld := engine.described.contents[file]
+	return contents, isHeld
+}
+
 // sourceReader is what a rule's pass.ReadFile reads through over a load that parsed overlay's bytes in place of the
 // disk's: a file's bytes in overlay, else the bytes the run holds for it, else the disk, so a rule reads the bytes the
 // load parsed without reading a file it holds again. The run holds each readable file in scope as every load after the
@@ -365,7 +393,7 @@ func (engine *pipeline) sourceReader(overlay map[string][]byte) func(file string
 		if contents, overlaid := overlay[file]; overlaid {
 			return contents, nil
 		}
-		if contents, held := engine.described.contents[file]; held {
+		if contents, isHeld := engine.held(file); isHeld {
 			return contents, nil
 		}
 		return os.ReadFile(file)
@@ -425,6 +453,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			Packages:     loaded.CgoTranslatedPackages,
 			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
 		},
+		Memory: engine.memory,
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }

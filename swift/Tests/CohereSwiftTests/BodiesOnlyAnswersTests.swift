@@ -52,9 +52,14 @@ struct BodiesOnlyAnswersTests {
     static func answer(under key: String) throws -> (findings: [FindingRecord], replayed: Bool) {
         var earlier = BodiesOnlyAnswers()
         let base = try Self.key()
-        _ = earlier.answer(path: "/Subject/Use.swift", key: base, replaying: BodiesOnlyAnswers()) { [finding("kept")] }
+        _ = earlier.answer(path: "/Subject/Use.swift", key: base, replaying: BodiesOnlyAnswers()) {
+            ([finding("kept")], nil)
+        }
         var next = BodiesOnlyAnswers()
-        return next.answer(path: "/Subject/Use.swift", key: key, replaying: earlier) { [finding("asked")] }
+        let answered = next.answer(path: "/Subject/Use.swift", key: key, replaying: earlier) {
+            ([finding("asked")], nil)
+        }
+        return (answered.answer.findings, answered.replayed)
     }
 
     @Test func theSameInputsReplayTheKeptAnswer() throws {
@@ -145,13 +150,16 @@ struct BodiesOnlyAnswersTests {
                 ),
             )
             var answers = BodiesOnlyAnswers()
-            let answer = try answers.answer(path: use.path, key: key, replaying: earlier) {
-                TypesPhase.findings(
-                    in: try Sourcekitd.shared().diagnostics(file: use.path, arguments: arguments, text: useText),
-                    of: use.path,
+            let answered = try answers.answer(path: use.path, key: key, replaying: earlier) {
+                (
+                    TypesPhase.findings(
+                        in: try Sourcekitd.shared().diagnostics(file: use.path, arguments: arguments, text: useText),
+                        of: use.path,
+                    ),
+                    nil,
                 )
             }
-            return (answers, answer.findings, answer.replayed)
+            return (answers, answered.answer.findings, answered.replayed)
         }
 
         let first = try check(makeText: "func make() -> Int {\n    2\n}\n", replaying: BodiesOnlyAnswers())

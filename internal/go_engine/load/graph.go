@@ -174,7 +174,10 @@ func addFileFromError(loaded *packages.Package, listedPackage *listedPackage, wo
 }
 
 // resolvedImports is each of imported, the import paths go list resolved, by the path as written: an identity
-// import is its own key, and ImportMap names the rest. "C" is no package.
+// import is its own key, and ImportMap names the rest. A standard package's test imports go list prints resolved
+// too, a vendored one as `vendor/X`, while its ImportMap names only the package's own imports, so a vendored import
+// ImportMap does not name was written X. Only the standard library, which is in no module, resolves an import to
+// `vendor/X`. "C" is no package.
 func resolvedImports(listedPackage *listedPackage, imported []string) map[string]string {
 	resolved := map[string]string{}
 	for _, path := range imported {
@@ -186,6 +189,15 @@ func resolvedImports(listedPackage *listedPackage, imported []string) map[string
 		if _, found := resolved[path]; found && written != path {
 			delete(resolved, path)
 			resolved[written] = path
+		}
+	}
+	if listedPackage.Module == nil {
+		for _, path := range imported {
+			// Still its own key, so ImportMap did not name it.
+			if written, vendored := strings.CutPrefix(path, "vendor/"); vendored && resolved[path] == path {
+				delete(resolved, path)
+				resolved[written] = path
+			}
 		}
 	}
 	return resolved

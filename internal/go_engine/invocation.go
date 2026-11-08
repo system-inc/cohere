@@ -21,6 +21,10 @@ type invocation struct {
 
 	// paths narrow the scope, each absolute, as given.
 	paths []string
+
+	// standardLibrary is the standard library's entries the run may read from the binary (see lintCache), never
+	// read from the command line.
+	standardLibrary builtInStandardLibrary
 }
 
 // check refuses what each flag allows alone but the command line does not allow as a whole.

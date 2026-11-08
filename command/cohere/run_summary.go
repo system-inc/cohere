@@ -60,10 +60,11 @@ type runSummary struct {
 	Changed     []changedFile
 	WouldChange int
 
-	// FilesInScope is every file the run was to account for. FilesChecked is the ones it examined fresh,
-	// and FilesCached the ones the cache answered for, so the two add up to FilesInScope; countsAgree
-	// holds them to it. The split is the point: a warm run that checked three files and took the rest
-	// from the cache must not read like one that checked them all again.
+	// FilesInScope is every file the run was to account for. FilesChecked is the ones a phase examined fresh,
+	// and FilesCached the ones the cache answered for, so the two are at most FilesInScope, and short of it only
+	// by files no phase reached, which a gap names (#1hva1ya); countsAgree holds them to it. The split is the
+	// point: a warm run that checked three files and took the rest from the cache must not read like one that
+	// checked them all again, and a run that checked none must not read like one that checked them all.
 	FilesInScope int
 	FilesChecked int
 	FilesCached  int
@@ -142,12 +143,12 @@ func (summary runSummary) cohered() int {
 	return len(summary.Changed)
 }
 
-// countsAgree checks that checked and cached add up to every file in scope, so neither count can drift
-// from the other unnoticed. The other invariant, that the cohered count is the number of 🪄 and 💅 lines,
+// countsAgree checks that checked and cached are at most every file in scope, so neither count can drift
+// past it unnoticed. The other invariant, that the cohered count is the number of 🪄 and 💅 lines,
 // holds by construction, since both come from Changed, and a test pins it.
 func (summary runSummary) countsAgree() error {
-	if summary.FilesChecked+summary.FilesCached != summary.FilesInScope {
-		return fmt.Errorf("%d checked and %d cached do not add up to the %d files in scope",
+	if summary.FilesChecked+summary.FilesCached > summary.FilesInScope {
+		return fmt.Errorf("%d checked and %d cached are more than the %d files in scope",
 			summary.FilesChecked, summary.FilesCached, summary.FilesInScope)
 	}
 	return nil

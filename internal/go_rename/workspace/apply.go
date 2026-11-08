@@ -46,6 +46,57 @@ func ApplyVerifiedRetargeted(
 	output *bufio.Writer,
 	errorOutput *bufio.Writer,
 ) int {
+	return applyVerified(
+		loaded,
+		root,
+		skips,
+		edits,
+		editsByFile,
+		retargets,
+		insertions,
+		nil,
+		passName,
+		output,
+		errorOutput,
+	)
+}
+
+// Verify is a pass's own proof of its rewrite, beyond what identifiers resolve to: given the reload with the rewrite
+// in memory, it prints what it compared to output and returns how many mismatches it found, each enough to write
+// nothing.
+type Verify func(reloaded *Workspace, output *bufio.Writer) int
+
+// ApplyVerifiedChecked is ApplyVerified for a pass whose edits change what no identifier records, as a literal's
+// spelling: verify runs over the same reload once the identifiers compare, and a mismatch it finds writes nothing,
+// as an identifier's would.
+func ApplyVerifiedChecked(
+	loaded *Workspace,
+	root string,
+	skips []string,
+	edits []rename.Edit,
+	editsByFile map[string][]rename.Edit,
+	verify Verify,
+	passName string,
+	output *bufio.Writer,
+	errorOutput *bufio.Writer,
+) int {
+	return applyVerified(loaded, root, skips, edits, editsByFile, nil, nil, verify, passName, output, errorOutput)
+}
+
+// applyVerified is ApplyVerifiedRetargeted with verify, when set, run over the reload as ApplyVerifiedChecked runs it.
+func applyVerified(
+	loaded *Workspace,
+	root string,
+	skips []string,
+	edits []rename.Edit,
+	editsByFile map[string][]rename.Edit,
+	retargets map[rename.EditKey]int,
+	insertions []rename.Insertion,
+	verify Verify,
+	passName string,
+	output *bufio.Writer,
+	errorOutput *bufio.Writer,
+) int {
 	newNameAt := map[rename.EditKey]string{}
 	for _, edit := range edits {
 		newNameAt[rename.EditKey{Filename: edit.Filename, Offset: edit.Offset}] = edit.NewText
@@ -174,6 +225,9 @@ func ApplyVerifiedRetargeted(
 		len(reloaded.Roots),
 		mismatches,
 	)
+	if verify != nil {
+		mismatches += verify(reloaded, output)
+	}
 	if mismatches > 0 {
 		fmt.Fprintf(errorOutput, "%s: %d mismatches, so nothing was written\n", passName, mismatches)
 		return 1

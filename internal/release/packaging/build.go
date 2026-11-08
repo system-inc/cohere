@@ -165,11 +165,43 @@ func Build(options Options) (Result, error) {
 		return Result{}, readGoToolchainError
 	}
 
+	commit, readReleaseCommitError := readReleaseCommit(options.ModuleDirectory)
+	if readReleaseCommitError != nil {
+		return Result{}, readReleaseCommitError
+	}
+	stamp, standardLibraryReleaseStampError := standardLibraryReleaseStamp(options.Version, commit, goToolchain)
+	if standardLibraryReleaseStampError != nil {
+		return Result{}, standardLibraryReleaseStampError
+	}
+	// One set of flags for the host binary that generates the tables and for every target, so the stamp a table is
+	// written under is the stamp every binary reads it with.
+	linkerFlags := releaseLinkerFlags(options.Version, pin, goToolchain, stamp)
+
+	// Outside the module and the output: the tables are inputs to the build, never part of the source tree or of
+	// what ships beside the packages.
+	tableScratch, createTemporaryDirectoryError := os.MkdirTemp("", "cohere-release-standard-library-")
+	if createTemporaryDirectoryError != nil {
+		return Result{}, fmt.Errorf("creating a scratch for the standard library's tables: %w",
+			createTemporaryDirectoryError)
+	}
+	// Ignored: the directory is this build's own, and a failure to remove it changes nothing that was staged.
+	defer func() { _ = os.RemoveAll(tableScratch) }()
+
+	overlays, generateStandardLibraryTablesError := generateStandardLibraryTables(
+		options,
+		targets,
+		linkerFlags,
+		tableScratch,
+	)
+	if generateStandardLibraryTablesError != nil {
+		return Result{}, generateStandardLibraryTablesError
+	}
+
 	result := Result{}
 
 	packageDirectoryNames := []string{}
 	for _, target := range targets {
-		staged, buildPlatformPackageError := buildPlatformPackage(options, target, pin, goToolchain)
+		staged, buildPlatformPackageError := buildPlatformPackage(options, target, linkerFlags, overlays[target])
 		if buildPlatformPackageError != nil {
 			return Result{}, fmt.Errorf("building %s: %w", target, buildPlatformPackageError)
 		}
@@ -252,8 +284,14 @@ func requireAncestor(moduleDirectory string, minimum string, reason string) erro
 	)
 }
 
-// buildPlatformPackage cross-compiles one target and writes its package around the binary.
-func buildPlatformPackage(options Options, target Target, pin compilerPin, goToolchain string) (StagedPackage, error) {
+// buildPlatformPackage cross-compiles one target and writes its package around the binary. overlayPath is the
+// target's standard library overlay, empty for a target that carries no table.
+func buildPlatformPackage(
+	options Options,
+	target Target,
+	linkerFlags string,
+	overlayPath string,
+) (StagedPackage, error) {
 	directory := filepath.Join(options.OutputDirectory, target.DirectoryName())
 	binaryPath := filepath.Join(directory, "bin", target.BinaryFileName())
 
@@ -261,7 +299,13 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		return StagedPackage{}, fmt.Errorf("creating the package directory: %w", createDirectoryError)
 	}
 
-	if compileError := compile(options, target, binaryPath, pin, goToolchain); compileError != nil {
+	if compileError := compile(
+		options.ModuleDirectory,
+		target,
+		linkerFlags,
+		binaryPath,
+		overlayPath,
+	); compileError != nil {
 		return StagedPackage{}, compileError
 	}
 
@@ -497,21 +541,30 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 	return nil
 }
 
-// compile cross-compiles one target, stamping the provenance in.
-func compile(options Options, target Target, binaryPath string, pin compilerPin, goToolchain string) error {
+// releaseLinkerFlags are the `-ldflags` of every binary a release builds, stamping the provenance and the standard
+// library's release stamp in. The host binary that generates the tables is built with these too, so a stamp cannot
+// differ between the binary that wrote a table and the binaries that read it.
+func releaseLinkerFlags(version string, pin compilerPin, goToolchain string, standardLibraryStamp string) string {
 	const packagePath = "github.com/system-inc/cohere/internal/release/packaging"
 
 	// Strip the symbol table and `DWARF`. Measured on a comparable binary: marginally faster to link
 	// and 29% smaller, with nothing traded away that a released binary needs.
 	stamps := append([]string{}, StripFlags...)
 	stamps = append(stamps,
-		"-X", packagePath+".version="+options.Version,
+		"-X", packagePath+".version="+version,
 		"-X", packagePath+".compilerCommit="+pin.Commit,
 		"-X", packagePath+".compilerUpstream="+pin.Upstream,
 		"-X", packagePath+".goToolchain="+goToolchain,
+		// Quoted, since the stamp holds spaces and go splits `-ldflags` on them outside quotes.
+		// standardLibraryReleaseStamp refuses a stamp with a quote of its own.
+		"-X", "'"+standardLibraryTablePackagePath+".ReleaseStamp="+standardLibraryStamp+"'",
 	)
+	return strings.Join(stamps, " ")
+}
 
-	command := GoBuildCommand(options.ModuleDirectory, target, strings.Join(stamps, " "), binaryPath)
+// compile builds one target with linkerFlags into binaryPath, through overlayPath when it is not empty.
+func compile(moduleDirectory string, target Target, linkerFlags string, binaryPath string, overlayPath string) error {
+	command := GoBuildCommand(moduleDirectory, target, linkerFlags, binaryPath, overlayPath)
 	command.Stderr = os.Stderr
 
 	if runError := command.Run(); runError != nil {
@@ -520,14 +573,24 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 	return nil
 }
 
-// GoBuildCommand is the `go build` that produces cohere for one target.
+// GoBuildCommand is the `go build` that produces cohere for one target, through the `-overlay` file at overlayPath
+// when it is not empty.
 //
 // It is the single definition of how a target is compiled, shared by the release and by
 // TestEveryReleaseTargetCompiles (internal/release/cross_compile), so a flag or an environment variable added here for
 // the release is one the test compiles with too. A test with its own copy would keep passing on the copy after
 // the release had changed.
-func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
+func GoBuildCommand(
+	moduleDirectory string,
+	target Target,
+	linkerFlags string,
+	binaryPath string,
+	overlayPath string,
+) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
+	if overlayPath != "" {
+		arguments = append(arguments, "-overlay="+overlayPath)
+	}
 	arguments = append(arguments, "-ldflags="+linkerFlags, "-o", binaryPath, "./command/cohere")
 
 	command := exec.Command("go", arguments...)
@@ -541,6 +604,13 @@ func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, b
 		// else's CI.
 		"CGO_ENABLED=0",
 	)
+	// The go command names its working directory by `PWD` when that is the directory it runs in, and otherwise by
+	// the path with every symbolic link resolved. An overlay is matched by path as a string, and
+	// standardLibraryOverlay spells its key from filepath.Abs, so this hands go that same spelling. Without it a
+	// module reached through a link, as macOS's /tmp and /var are, would build with the overlay matching nothing.
+	if absoluteModuleDirectory, absolutePathError := filepath.Abs(moduleDirectory); absolutePathError == nil {
+		command.Env = append(command.Env, "PWD="+absoluteModuleDirectory)
+	}
 	return command
 }
 

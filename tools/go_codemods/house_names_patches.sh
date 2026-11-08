@@ -3,7 +3,7 @@
 # box that runs the passes where the repository's own rules keep its Go off a person's machine, as adamic's do.
 #
 # Usage, from the root of a cohere worktree:
-#   tools/go_codemods/house_names_patches.sh <root>
+#   tools/go_codemods/house_names_patches.sh <root> [--only <n>]
 #
 # <root> is a scratch checkout of the other repository, with a go.work, that this script may commit in: after each
 # pass its changes are committed there, under a placeholder author, so the next pass's change is its own, and the
@@ -12,7 +12,8 @@
 # pass over a large tree writes tens of megabytes of patch, and gzip keeps it a fraction of that, small enough for a
 # job relay that lets bytes go when a job writes faster than it reads. Each pass's lines that say whether it is sound (its
 # accepted and rejected counts, "zero package errors", "0 mismatches") print as it runs. A pass that changes nothing
-# says so. A pass that fails stops the run, and every pass before it stays printed.
+# says so. A pass that fails stops the run, and every pass before it stays printed. --only runs the nth pass alone, as
+# house_names.sh's --only does, for a branch that already holds the passes before it.
 #
 # Only the root's own files are committed: every submodule of the root is skipped by every pass and left out of what
 # is staged. It is bash, written for bash 3.2 and up, like house_names.sh.
@@ -21,8 +22,8 @@ if [[ ! -f go.work || ! -f tools/go_codemods/house_names.sh ]]; then
 	echo "house_names_patches: run this from the root of a cohere worktree" >&2
 	exit 2
 fi
-if (( $# != 1 )); then
-	echo "usage: house_names_patches.sh <root>" >&2
+if (( $# != 1 && $# != 3 )) || { (( $# == 3 )) && [[ $2 != --only ]]; }; then
+	echo "usage: house_names_patches.sh <root> [--only <n>]" >&2
 	exit 2
 fi
 root=$(cd "$1" 2>/dev/null && pwd -P) || { echo "house_names_patches: no directory at $1" >&2; exit 2; }
@@ -36,6 +37,16 @@ if [[ ! $count =~ ^[0-9]+$ ]]; then
 	echo "house_names_patches: could not read the number of passes from house_names.sh" >&2
 	exit 2
 fi
+first=1
+last=$count
+if (( $# == 3 )); then
+	if [[ ! $3 =~ ^[0-9]+$ ]] || (( $3 < 1 || $3 > count )); then
+		echo "house_names_patches: --only takes a pass number from 1 to $count, not $3" >&2
+		exit 2
+	fi
+	first=$3
+	last=$3
+fi
 
 # Pathspecs leaving out each submodule, so a pass's commit holds the root's own files only.
 excludes=()
@@ -45,7 +56,7 @@ if [[ -f $root/.gitmodules ]]; then
 	done < <(git -C "$root" config --file .gitmodules --get-regexp '\.path$' | awk '{print $2}')
 fi
 
-for (( number = 1; number <= count; number++ )); do
+for (( number = first; number <= last; number++ )); do
 	echo "=== PASS $number"
 	bash tools/go_codemods/house_names.sh --root "$root" --only "$number"
 	exitCode=$?

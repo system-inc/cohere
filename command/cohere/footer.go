@@ -18,12 +18,19 @@ import (
 //	✗ ☠️ 0.8s • 1 type error • 2 findings (480 rules • 3 checked • 3,923 cached)
 //
 // The words are the brand's. Cohered is altered: the files cohere rewrote, fixed or formatted, the same
-// files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files
-// examined fresh this run, and cached the ones the cache answered for; together they are every file in
-// scope. Types-only is the files an ignore naming the type check matched, which only that check reads, and a
-// file a plain ignore matched is in no count (#cxeq6jw):
+// files the 🪄 and 💅 lines above the footer list, said only when there were any. Checked is the files a
+// phase examined fresh this run, and cached the ones the cache answered for; together they are every file in
+// scope but the ones no phase reached, which a marker after them names. A run whose files no phase examined
+// reads no checked count at all, never the files it was to check (#1hva1ya). Types-only is the files an ignore
+// naming the type check matched, which only that check reads, and a file a plain ignore matched is in no count
+// (#cxeq6jw):
 //
 //	✓ 💎 2.4s (480 rules • 3,900 checked • 26 types-only)
+//
+// A Go run whose standard library came from the entries a release binary carries says how many packages did, since
+// no file count holds them:
+//
+//	✓ 💎 1.9s (480 rules • 3,926 checked) • standard library: 258 from the binary
 //
 // A count is exact, its thousands grouped, and a count of zero is left out. In order: the verdict
 // and time, what was found, what was cohered, the parentheses, and anything the run did not check.
@@ -119,6 +126,11 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 		line += " " + style.dim("("+strings.Join(inside, " • ")+")")
 	}
 
+	// The standard library's packages a Go run restored from the binary rather than analyzed, which no file count
+	// holds, so a cold run that reused them reads as such.
+	if summary.PackageCache != nil && summary.PackageCache.FromBinary > 0 {
+		line += " • " + summary.PackageCache.segment()
+	}
 	// Said apart from the time, which leaves them out, so a build is never read as checking (#ket0hrp).
 	for _, segment := range engineBuildSegments(summary.EngineBuilds) {
 		line += " • " + segment

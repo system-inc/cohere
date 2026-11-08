@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 )
 
@@ -33,11 +34,24 @@ type cachedRun struct {
 // says nothing on stderr and writes a lint record.
 func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	test.Helper()
+	return runEngineWith(test, root, embeddedStandardLibrary, rules.All(), extra...)
+}
+
+// runEngineWith is runCachedEngine with builtIn as the binary's standard-library entries and registered as the
+// rules.
+func runEngineWith(
+	test *testing.T,
+	root string,
+	builtIn builtInStandardLibrary,
+	registered []rule.Rule,
+	extra ...string,
+) cachedRun {
+	test.Helper()
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := run(arguments, &standardOutput, &standardError, rules.All()); exitCode != exitClean &&
-		exitCode != exitFindings {
+	if exitCode := runWithStandardLibrary(arguments, &standardOutput, &standardError, registered, nil,
+		builtIn); exitCode != exitClean && exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
 	if standardError.Len() > 0 {
@@ -196,6 +210,16 @@ func TestAStaticcheckConfAboveAPackageIsInItsKey(test *testing.T) {
 	}
 }
 
+// goEnvironmentIn is what readGoEnvironment reads in root under environment, failing the test when go env fails.
+func goEnvironmentIn(test *testing.T, root string, environment []string) map[string]string {
+	test.Helper()
+	values, valuesError := readGoEnvironment(root, environment)
+	if valuesError != nil {
+		test.Fatalf("reading the build context under %q: %v", environment, valuesError)
+	}
+	return values
+}
+
 // The build context names the process's own `GOOS`, `GOARCH` and `BURNTSUSHI_TOML_110`, set or unset, apart from what
 // go env reports, since asmdecl and framepointer read the target from the process and staticcheck's TOML parser reads
 // the last: a run under another value keys every package apart.
@@ -208,10 +232,7 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	}
 	test.Setenv("GOARCH", "arm64")
 	test.Setenv("BURNTSUSHI_TOML_110", "1")
-	set, setError := cacheBuild(root, nil)
-	if setError != nil {
-		test.Fatalf("reading the build context: %v", setError)
-	}
+	set := cacheBuild(goEnvironmentIn(test, root, nil))
 	for _, expected := range []string{"process GOARCH=arm64", "process BURNTSUSHI_TOML_110=1"} {
 		if !slices.Contains(set, expected) {
 			test.Errorf("want %q in %q", expected, set)
@@ -220,10 +241,7 @@ func TestTheBuildContextNamesTheProcessVariablesAnAnalyzerReads(test *testing.T)
 	if unsetError := os.Unsetenv("BURNTSUSHI_TOML_110"); unsetError != nil {
 		test.Fatalf("unsetting BURNTSUSHI_TOML_110: %v", unsetError)
 	}
-	unset, unsetBuildError := cacheBuild(root, nil)
-	if unsetBuildError != nil {
-		test.Fatalf("reading the build context: %v", unsetBuildError)
-	}
+	unset := cacheBuild(goEnvironmentIn(test, root, nil))
 	if !slices.Contains(unset, "process BURNTSUSHI_TOML_110 unset") {
 		test.Errorf("want BURNTSUSHI_TOML_110 named unset in %q", unset)
 	}
@@ -241,11 +259,7 @@ func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
 	}
 	contextUnder := func(goFlags string) []string {
 		test.Helper()
-		build, buildError := cacheBuild(root, []string{"GOFLAGS=" + goFlags})
-		if buildError != nil {
-			test.Fatalf("reading the build context under %q: %v", goFlags, buildError)
-		}
-		return build
+		return cacheBuild(goEnvironmentIn(test, root, []string{"GOFLAGS=" + goFlags}))
 	}
 	threeThreads := contextUnder("-trimpath -p=3 -tags=probe -buildvcs=false -v")
 	if !slices.Contains(threeThreads, "GOFLAGS=-trimpath -tags=probe -buildvcs=false") {
@@ -263,6 +277,58 @@ func TestAFlagNoVerdictReadsStaysOutOfTheBuildContext(test *testing.T) {
 	otherTags := contextUnder("-trimpath -p=3 -tags=other")
 	if slices.Equal(threeThreads, otherTags) {
 		test.Errorf("want -tags to key apart, got %q for both", threeThreads)
+	}
+}
+
+// The standard library's build context is the target, cgo, the toolchain and its experiments, and the go flags but
+// those no verdict reads and those that change nothing of the standard library: -trimpath and the module flags drop
+// out, while -n, -buildvcs, -tags, -race and every other flag stay and key apart. It names none of the process's own
+// variables, and go env's `GOROOT`, which the standard library's keys name each file below, is read beside it and is
+// in neither context.
+//
+// Not parallel: it sets the process's own `GOARCH`, which every test in the process reads.
+func TestTheStandardLibraryBuildContextNarrowsOnlyWhatTheStandardLibraryCannotSee(test *testing.T) {
+	root, absoluteError := filepath.Abs(filepath.Join("testdata", "vet-finding"))
+	if absoluteError != nil {
+		test.Fatalf("resolving the fixture: %v", absoluteError)
+	}
+	test.Setenv("GOARCH", "arm64")
+	contextUnder := func(goFlags string) []string {
+		test.Helper()
+		return standardLibraryBuild(goEnvironmentIn(test, root, []string{"GOFLAGS=" + goFlags,
+			"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOEXPERIMENT="}))
+	}
+	keptFlags := "-n -buildvcs=false -tags=probe -race -gcflags=all=-N"
+	narrowed := contextUnder("-trimpath -mod=mod -modfile=other.mod -modcacherw -p=3 -v " + keptFlags)
+	values := goEnvironmentIn(test, root, nil)
+	want := []string{"GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=1", "GOFLAGS=" + keptFlags,
+		"GOVERSION=" + values["GOVERSION"], "GOEXPERIMENT="}
+	if !slices.Equal(narrowed, want) {
+		test.Errorf("want\n%q\ngot\n%q", want, narrowed)
+	}
+	if bare := contextUnder(keptFlags); !slices.Equal(narrowed, bare) {
+		test.Errorf("want -trimpath, the module flags, -p and -v left out, got %q and %q", narrowed, bare)
+	}
+	for _, kept := range strings.Fields(keptFlags) {
+		without := strings.Join(slices.DeleteFunc(strings.Fields(keptFlags), func(field string) bool {
+			return field == kept
+		}), " ")
+		if slices.Equal(narrowed, contextUnder(without)) {
+			test.Errorf("want %s to key apart, got %q for both", kept, narrowed)
+		}
+	}
+	if values["GOROOT"] == "" || !filepath.IsAbs(values["GOROOT"]) {
+		test.Errorf("want go env's GOROOT read, absolute, got %q", values["GOROOT"])
+	}
+	for _, entry := range narrowed {
+		if strings.HasPrefix(entry, "process ") {
+			test.Errorf("want no process variable in the standard library's build context, got %q", entry)
+		}
+	}
+	for _, entry := range slices.Concat(narrowed, cacheBuild(values)) {
+		if strings.HasPrefix(entry, "GOROOT=") {
+			test.Errorf("want GOROOT in neither build context, got %q", entry)
+		}
 	}
 }
 
@@ -314,7 +380,7 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-		rules.All())
+		rules.All(), nil)
 	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
 		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
 			standardOutput.String(), standardError.String())
@@ -343,7 +409,7 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput, &standardError,
-		rules.All())
+		rules.All(), nil)
 	var record contract.FixRecord
 	for line := range strings.Lines(standardOutput.String()) {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {

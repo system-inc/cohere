@@ -1,0 +1,79 @@
+x/tools' own fixtures for directive, golang.org/x/tools@v0.50.0 go/analysis/passes/directive/testdata/src/a,
+each file byte for byte as upstream holds it, extracted at test time into a temporary GOPATH. They are an archive,
+not files under src, because cohere's gofmt guard reads every Go file under testdata, and badspace.go is not
+gofmt-clean as upstream wrote it.
+-- src/a/badspace.go --
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:build ignore
+
+// want +1 `invalid space '\\u00a0' in //go:debug directive`
+//go:debug 00a0
+
+package main
+
+-- src/a/issue66046.go --
+// Copyright 2024 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:build ignore
+
+//go:debug panicnil=1
+package main
+-- src/a/misplaced.go --
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:build ignore
+
+package main
+
+// want +1 `//go:debug directive only valid before package declaration`
+//go:debug panicnil=1
+-- src/a/misplaced.s --
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `//go:debug directive only valid in Go source files`
+//go:debug panicnil=1
+
+/*
+can skip over comments
+//go:debug doesn't matter here
+*/
+
+// want +1 `//go:debug directive only valid in Go source files`
+//go:debug panicnil=1
+
+package a
+
+// no error here because we can't parse this far
+//go:debug panicnil=1
+-- src/a/misplaced_test.go --
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:debug panicnil=1
+
+package p_test
+
+// want +1 `//go:debug directive only valid before package declaration`
+//go:debug panicnil=1
+-- src/a/p.go --
+// Copyright 2023 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// want +1 `//go:debug directive only valid in package main or test`
+//go:debug panicnil=1
+
+package p
+
+// want +1 `//go:debug directive only valid in package main or test`
+//go:debug panicnil=1

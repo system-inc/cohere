@@ -7,6 +7,8 @@ import (
 	"go/build"
 	"go/parser"
 	"go/token"
+	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -25,25 +27,27 @@ type Excluded struct {
 // ExcludedByConstraints is each of files, absolute paths, that the build constraints leave out when go runs
 // in directory with the current environment plus environment, sorted, with the target they were read for. It
 // reads each file's name and build lines as go does, so it names a file in a directory whose every file is
-// left out, which go list matches as no package at all and so never reports.
-func ExcludedByConstraints(directory string, environment []string, files []string) ([]Excluded, error) {
-	workspace, absoluteError := filepath.Abs(directory)
-	if absoluteError != nil {
-		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
+// left out, which go list matches as no package at all and so never reports. A file held holds is read from its
+// held bytes, and any other from disk. It returns go env's answer too, for the load to take in place of asking again
+// (see GoEnvironment), or nil when there were no files and go env was not asked.
+func ExcludedByConstraints(
+	directory string,
+	environment []string,
+	files []string,
+	held Held,
+) ([]Excluded, *GoEnvironment, error) {
+	if _, absoluteError := filepath.Abs(directory); absoluteError != nil {
+		return nil, nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
 	if len(files) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
+	goEnvironment, environmentError := readGoEnvironment(directory, environment, held)
 	if environmentError != nil {
-		return nil, environmentError
+		return nil, nil, environmentError
 	}
-	buildContext, _, contextError := constraintContext(workspace, fullEnvironment)
-	if contextError != nil {
-		return nil, contextError
-	}
-	excluded, _, matchError := matchConstraints(buildContext, files)
-	return excluded, matchError
+	excluded, _, matchError := matchConstraints(goEnvironment.buildContext, files)
+	return excluded, goEnvironment, matchError
 }
 
 // excludedAndUnseen is what the load left out of the workspace. The root packages' ignored files inside
@@ -127,7 +131,8 @@ func matchConstraints(buildContext *build.Context, files []string) ([]Excluded, 
 
 // exclusionReason is why the context leaves file out, or empty when it builds it. MatchFile reads the file's
 // name and build lines and keeps a file that imports "C" though cgo is off; only go/build's Import drops that
-// one, so it is read here too, its imports alone.
+// one, so it is read here too, its imports alone. Both read the file through the context's OpenFile, the run's held
+// bytes when it holds the file.
 func exclusionReason(buildContext *build.Context, file string) (string, error) {
 	directory, name := filepath.Split(file)
 	matched, matchError := buildContext.MatchFile(directory, name)
@@ -140,9 +145,14 @@ func exclusionReason(buildContext *build.Context, file string) (string, error) {
 	if buildContext.CgoEnabled || filepath.Ext(name) != ".go" {
 		return "", nil
 	}
+	contents, readError := readThrough(buildContext, file)
+	if readError != nil {
+		// A file that cannot be read has no imports to judge, as a parse that could not open it had none.
+		return "", nil
+	}
 	// Ignored: a header that does not parse still yields the imports read before the error, and the load
 	// reports the error itself, so only what was read decides.
-	header, _ := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
+	header, _ := parser.ParseFile(token.NewFileSet(), file, contents, parser.ImportsOnly)
 	if header == nil {
 		return "", nil
 	}
@@ -155,6 +165,24 @@ func exclusionReason(buildContext *build.Context, file string) (string, error) {
 	return "", nil
 }
 
+// readThrough is file's bytes as buildContext opens it: through its OpenFile when that is set, and from disk otherwise,
+// as go/build opens a file.
+func readThrough(buildContext *build.Context, file string) ([]byte, error) {
+	if buildContext.OpenFile == nil {
+		return os.ReadFile(file)
+	}
+	opened, openError := buildContext.OpenFile(file)
+	if openError != nil {
+		return nil, openError
+	}
+	contents, readError := io.ReadAll(opened)
+	closeError := opened.Close()
+	if readError != nil {
+		return nil, readError
+	}
+	return contents, closeError
+}
+
 // reasonFor is why a file the context's constraints leave out was left out.
 func reasonFor(buildContext *build.Context) string {
 	return "excluded by build constraints on " + buildContext.GOOS + "/" + buildContext.GOARCH
@@ -164,8 +192,13 @@ func reasonFor(buildContext *build.Context) string {
 // env reports it: the target, whether cgo is on, and the `-tags` of `GOFLAGS`, each of which a value given to
 // the load or a go.env setting can change from the host's. The same go env call reports where the toolchain and
 // its settings live, which go.mod and go.work go found, and where go writes its build cache, which the inputs record
-// needs (see inputs.go), so learning them costs no second command.
-func constraintContext(workspace string, environment []string) (*build.Context, reportedEnvironment, error) {
+// needs (see inputs.go), so learning them costs no second command. The context opens a file held holds from its
+// held bytes, and any other on disk.
+func constraintContext(
+	workspace string,
+	environment []string,
+	held Held,
+) (*build.Context, reportedEnvironment, error) {
 	command := exec.Command("go", "env", "-json", "GOOS", "GOARCH", "CGO_ENABLED", "GOFLAGS", "GOROOT", "GOENV",
 		"GOMOD", "GOWORK", "GOCACHE")
 	command.Dir = workspace
@@ -201,6 +234,7 @@ func constraintContext(workspace string, environment []string) (*build.Context, 
 	buildContext.GOARCH = values.Goarch
 	buildContext.CgoEnabled = values.CgoEnabled == "1"
 	buildContext.BuildTags = tagsOf(values.Goflags)
+	buildContext.OpenFile = held.openFile()
 	reported := reportedEnvironment{
 		goRoot:          values.Goroot,
 		environmentFile: values.Goenv,

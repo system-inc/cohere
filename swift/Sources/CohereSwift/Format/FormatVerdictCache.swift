@@ -3,10 +3,9 @@ import Foundation
 import SwiftFormat
 
 /*
- What the formatter said last time about each file under `--no-fix`, kept in the engine's scratch so a warm run
- does not format every file again to learn that nothing moved. Formatting is most of a warm `--no-fix` run's
- fix phase: 1,548 samples of it on ahraos-presence, every file every run, for a verdict that changes only when
- the file does.
+ What the formatter said last time about each file, kept in the engine's scratch so a warm run does not format
+ every file again to learn that nothing moved. Formatting is most of a warm run's fix phase: 1,548 samples of it
+ on ahraos-presence under `--no-fix`, every file every run, for a verdict that changes only when the file does.
 
  A verdict is the formatter's answer to one text under one house format, so the entry holds a fingerprint of
  each thing that answer reads, and replays only when every one still holds:
@@ -17,14 +16,15 @@ import SwiftFormat
    lay out the same text under the same settings differently.
 
  Only the verdict is kept, formatted or not and the first line that would move, which is all a `--no-fix` run
- reports. A plain run's rewrite is never cached: it needs the formatted text itself, and it writes what it
- formats. A file the formatter failed on is not kept either, so it is asked again next time and says why.
+ reports. A plain run reads it too, for a file that is formatted: formatting those bytes hands them back as they
+ are, so there is nothing to write and nothing to ask. A file that would move is formatted, since the run needs
+ the formatted text itself. A file the formatter failed on is not kept, so it is asked again next time and says why.
 
- The store is one file, replaced whole after each run that checked formatting. A file this run did not check
- keeps its verdict while it is still on disk, so a run over a few paths does not cost the next whole run its
- answers, and a deleted file's verdict goes. A different configuration or formatter makes every stored verdict
- none, and the next store starts over. A store that does not decode reads as empty: the run formats cold,
- slower and still right.
+ The store is one file, replaced whole after a run that learned something, and left as it is by one that did not,
+ so an unchanged run writes nothing. A file this run did not check keeps its verdict while it is still on disk,
+ so a run over a few paths does not cost the next whole run its answers, and a deleted file's verdict goes. A
+ different configuration or formatter makes every stored verdict none, and the next store starts over. A store
+ that does not decode reads as empty: the run formats cold, slower and still right.
  */
 struct FormatVerdictCache: Sendable {
     /* One file's verdict, with the fingerprint of the bytes it was given for. */
@@ -67,12 +67,13 @@ struct FormatVerdictCache: Sendable {
         return kept
     }
 
-    /* This run's verdicts, by path, over the stored ones whose file is still on disk. */
+    /* This run's verdicts, by path, over the stored ones whose file is still on disk. Not written when that is what the store holds. */
     func store(_ verdicts: [String: Verdict]) {
         var kept = verdicts
         for (path, verdict) in stored where kept[path] == nil && FileManager.default.fileExists(atPath: path) {
             kept[path] = verdict
         }
+        guard kept != stored else { return }
         do {
             try FileManager.default.createDirectory(
                 at: file.deletingLastPathComponent(),

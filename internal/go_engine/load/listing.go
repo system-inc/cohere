@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // listedPackage is what `go list -deps -json -e` says of one package, the fields the load reads. Module decodes
@@ -88,9 +90,10 @@ type listing struct {
 }
 
 // list lists the patterns in workspace under environment, the whole environment, as `go list -deps -json -e` lists
-// them: read in this process when the lister can answer exactly, and by go list itself when it has any doubt.
-func list(workspace string, environment []string, patterns []string) (*listing, error) {
-	listed, doubt := listInProcess(workspace, environment, patterns)
+// them: read in this process when the lister can answer exactly, each file held holds read from its held bytes, and by
+// go list itself, which reads the disk, when it has any doubt.
+func list(workspace string, environment []string, patterns []string, held Held) (*listing, error) {
+	listed, doubt := listInProcess(workspace, environment, patterns, held)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil
@@ -195,6 +198,21 @@ func runList(workspace string, environment []string, patterns []string) ([]*list
 		}
 		listed = append(listed, listedPackage)
 	}
+	// What go list read in its process, read again in this one, so a test that loads fixtures has its result keyed
+	// on them (#cmpsz8p).
+	reads := make([]listed_directories.Package, 0, len(listed))
+	for _, listedPackage := range listed {
+		each := listed_directories.Package{
+			ImportPath: listedPackage.ImportPath,
+			Directory:  listedPackage.Directory,
+			Root:       !listedPackage.DepOnly,
+		}
+		if listedPackage.Module != nil && listedPackage.Module.Main {
+			each.MainModule, each.MainGoMod = true, listedPackage.Module.GoMod
+		}
+		reads = append(reads, each)
+	}
+	listed_directories.Open(workspace, patterns, reads)
 	return listed, nil
 }
 

@@ -18,9 +18,9 @@ import Foundation
    writes into the derived data it is given, and nothing into `~/Library/Developer/Xcode/DerivedData`, while
    `-alltargets` with no scheme made a folder there, which is why each target's scheme is named. Like a build, it
    makes an empty `.swiftpm/xcode` in each local package and empty `xcshareddata/swiftpm` folders in the bundle it
-   is given; the first are removed again (`removeFoldersMadeInLocalPackages`), and the bundle is the generated one
-   in the scratch, or under `--no-fix` a committed one is reached through the scratch workspace, which left it
-   byte-identical.
+   is given; the first are left there as a build's are and any other empty folder it made in a package's `.swiftpm`
+   is removed (`removeFoldersMadeInLocalPackages`, #8f8vy1n), and the bundle is the generated one in the scratch, or
+   under `--no-fix` a committed one is reached through the scratch workspace, which left it byte-identical.
  - It costs 4.9s on the probe and 8.4s on CapturePhone the first time, which resolves, then 1.4s and 2.1 to 2.3s a
    configuration. CapturePhone's two configurations are 4.5s on every warm run, most of a run that reuses its
    build, so the answer is kept against the same kind of fingerprint the build's reuse uses (`BuildInputSnapshot`)
