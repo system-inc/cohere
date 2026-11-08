@@ -1,0 +1,20 @@
+// Package unformatted holds shapes gofmt would rewrite, which the pattern looks through: doubled parentheses around
+// the callee, the format and the argument, and a stray semicolon.
+package unformatted
+
+import "fmt"
+
+type Number int
+
+func (Number) String() string { return "" }
+
+type Text string
+
+func unformatted(text string, number Number, other Text, raw []byte) {
+	_ = ((fmt.Sprintf))(("%s"), ((text)))
+	_ = fmt.Sprintf((("%s")), ((number)))
+	_ = fmt.Sprintf("%s", ((other)));
+	_ = fmt.Sprintf("%s", ((raw)))
+	_ = fmt.Sprintf("%s", ((*&number)))
+	_ = ((fmt.Sprintf("%s", ((text + text)))))[0]
+}
