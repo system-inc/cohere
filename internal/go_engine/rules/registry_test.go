@@ -906,6 +906,7 @@ var portedPasses = []string{
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unnecessary_blank_identifier",
+	"unnecessary_sprint",
 	"unobserved_append",
 	"unreachable_type_case",
 	"unread_assigned_value",
