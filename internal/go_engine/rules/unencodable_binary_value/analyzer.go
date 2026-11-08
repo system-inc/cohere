@@ -22,8 +22,9 @@ import (
 
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
@@ -32,13 +33,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"encoding/binary.Write": checkData,
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1003",
 	"SA1003",
 	"Flags a value given to encoding/binary.Write of a type the package cannot encode: staticcheck's SA1003, "+
 		"ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkData marks the call's data with its type when binary.Write cannot encode a value of that type.

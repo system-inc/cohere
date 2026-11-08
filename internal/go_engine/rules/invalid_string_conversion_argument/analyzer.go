@@ -17,8 +17,9 @@ import (
 
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to a strconv function that takes a bit size, a number base or a float
@@ -66,13 +67,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	},
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1030",
 	"SA1030",
 	"Flags a constant bit size, number base or float format given to a strconv function that the function does not "+
 		"accept: staticcheck's SA1030, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // constantInteger is argument's value when it is a constant integer, and false otherwise. An argument computed while

@@ -12,8 +12,9 @@ package reversed_errors_is_arguments
 import (
 	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to errors.Is.
@@ -21,13 +22,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"errors.Is": checkOrder,
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1032",
 	"SA1032",
 	"Flags errors.Is given a global error of another package first and the error it judges second: "+
 		"staticcheck's SA1032, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkOrder marks the call when its first argument, the error judged, is a global another package declares, the

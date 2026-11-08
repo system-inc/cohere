@@ -23,8 +23,9 @@ import (
 	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/ir/irutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to one of sync/atomic's functions on a 64-bit word.
@@ -41,13 +42,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"sync/atomic.SwapUint64":           checkAlignment,
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1027",
 	"SA1027",
 	"Flags the address of a struct field that is not 64-bit aligned given to one of sync/atomic's 64-bit "+
 		"functions on a 32-bit platform: staticcheck's SA1027, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkAlignment marks the call when its first argument, the address of the word, is the address of a struct field

@@ -21,8 +21,9 @@ import (
 
 	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to net/http.ListenAndServe or ListenAndServeTLS.
@@ -31,13 +32,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"net/http.ListenAndServeTLS": checkAddress(0),
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1020",
 	"SA1020",
 	"Flags a constant address given to net/http.ListenAndServe whose port is neither a port number nor a service "+
 		"name: staticcheck's SA1020, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkAddress is the rule that marks the argument at index, the address the call listens on, when it is a constant

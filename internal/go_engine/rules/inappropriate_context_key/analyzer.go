@@ -13,8 +13,9 @@ import (
 	"fmt"
 	"go/types"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to context.WithValue.
@@ -22,13 +23,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"context.WithValue": checkKey,
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1029",
 	"SA1029",
 	"Flags a key given to context.WithValue that is of a built in type, an empty anonymous struct, or a type that "+
 		"cannot be compared: staticcheck's SA1029, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkKey marks the call's key, its second argument, as the kit hands it, the value before its conversion to the

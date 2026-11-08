@@ -34,53 +34,41 @@ import (
 	"go/types"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA1013",
-	Doc: "Flags an io.Seeker's Seek given one of io's whence constants first, where the offset belongs: " +
-		"staticcheck's SA1013, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("swapped_seek_arguments: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1013",
+	"SA1013",
+	"Flags an io.Seeker's Seek given one of io's whence constants first, where the offset belongs: "+
+		"staticcheck's SA1013, ported as a check on syntax.",
+	&Listener,
+)
 
 // whenceConstants are io's three whence constants, by the names the pattern's Symbol gives a package-level constant.
 var whenceConstants = []string{"io.SeekStart", "io.SeekCurrent", "io.SeekEnd"}
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("swapped_seek_arguments: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("swapped_seek_arguments: the inspector handed over a node that is not a call")
-		}
-		Check(context, call)
-	})
-	return nil, nil
-}
 
 // Check judges one call: an io.Seeker's Seek given a whence constant first is reported, with the fix that swaps its
 // two arguments.

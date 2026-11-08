@@ -23,49 +23,37 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA1004",
-	Doc: "Flags time.Sleep given an integer literal from 1 to 120, nanoseconds most likely meant as seconds: " +
-		"staticcheck's SA1004, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("nanosecond_sleep: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("nanosecond_sleep: the inspector handed over a node that is not a call")
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("nanosecond_sleep: the dispatcher handed over a node that is not a call")
 		}
 		Check(context, call)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1004",
+	"SA1004",
+	"Flags time.Sleep given an integer literal from 1 to 120, nanoseconds most likely meant as seconds: "+
+		"staticcheck's SA1004, ported.",
+	&Listener,
+)
 
 // Check judges one call: a call of time.Sleep whose one argument is an integer literal of a value from 1 to 120,
 // negative values included, sleeps nanoseconds where seconds were most likely meant, and the fixes multiply the

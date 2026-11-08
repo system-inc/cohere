@@ -27,27 +27,37 @@ import (
 	"go/types"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA1006",
-	Doc: "Flags a printf-style call whose format is not a literal and that has nothing to format, where print-style " +
-		"is meant: staticcheck's SA1006, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("dynamic_printf_format: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1006",
+	"SA1006",
+	"Flags a printf-style call whose format is not a literal and that has nothing to format, where print-style "+
+		"is meant: staticcheck's SA1006, ported as a check on syntax.",
+	&Listener,
+)
 
 // formatFirstFunctions are the functions whose format is their first argument, by their full names, the original's
 // first pattern's.
@@ -74,28 +84,6 @@ const fprintf = "fmt.Fprintf"
 
 // errorf is the one function whose print-style form is in another package, errors.New.
 const errorf = "fmt.Errorf"
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("dynamic_printf_format: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("dynamic_printf_format: the inspector handed over a node that is not a call")
-		}
-		Check(context, call)
-	})
-	return nil, nil
-}
 
 // Check judges one call: a call of a printf-style function given a format that is an identifier or a call and nothing
 // else to format is reported, with the fix that calls the print-style function instead.

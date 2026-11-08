@@ -23,8 +23,9 @@ import (
 	"honnef.co/go/tools/go/ir/irutil"
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // Check judges every call in a function to an encoder that writes a source's encoding into a destination.
@@ -47,13 +48,18 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	),
 })
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1031",
 	"SA1031",
 	"Flags an encoder of encoding/ascii85, base32, base64 or hex given a destination and a source that overlap: "+
 		"staticcheck's SA1031, ported onto staticcheck's intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // checkBuffers is the rule for an encoder whose destination and source are the arguments at destinationIndex and

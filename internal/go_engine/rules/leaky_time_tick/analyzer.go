@@ -21,18 +21,23 @@ import (
 	"honnef.co/go/tools/go/ir/irutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1015",
 	"SA1015",
 	"Flags time.Tick in a function that returns, outside tests and commands, where its ticker leaks before Go "+
 		"1.23: staticcheck's SA1015, ported onto its intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // message is the original's, word for word.
