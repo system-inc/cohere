@@ -17,8 +17,8 @@
 // go or defer statement's call is the statement, so a go or defer passing an odd slice to a marked parameter panics
 // the original's run. The port reads the statement's call and reports the argument there, which
 // TestPortReportsWhereTheOriginalPanics holds, running the original behind a recover and requiring that it panic. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere else.
+// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
+// tests beside this file run both over the same packages, and the two differ nowhere else.
 package odd_slice_argument
 
 import (
