@@ -6,12 +6,13 @@
 // returning from it ends the process.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/lostcancel/lostcancel.go, whose
-// logic it keeps and whose messages it reports word for word, at the same positions. It requires what the original
-// requires, inspect and x/tools' public ctrlflow, and searches the control-flow graph ctrlflow builds for each
-// function, the graph that already knows which calls never return, in this package and, through ctrlflow's facts, in
-// its dependencies, so the port walks the same paths the original walks. The registry runs the port in the
-// original's place, and the original stays the oracle: the parity tests beside this file run both over the same
-// packages.
+// logic it keeps and whose messages it reports word for word, at the same positions. It sits on the engine's syntax
+// dispatcher, hearing each function declaration and literal on the walk the dispatcher makes once for every syntax
+// rule, where the original walks the package with an inspector of its own. Its listener requires the original's
+// other requirement, x/tools' public ctrlflow, and searches the control-flow graph ctrlflow builds for each function,
+// the graph that already knows which calls never return, in this package and, through ctrlflow's facts, in its
+// dependencies, so the port walks the same paths the original walks. The registry runs the port in the original's
+// place, and the original stays the oracle: the parity tests beside this file run both over the same packages.
 //
 // The two differ in one place, adjudicated in testdata/src/differences and held by
 // TestPortDiffersFromOriginalOnlyWhereItIsRight: where a call's qualifier is no package name, the original falls
@@ -23,9 +24,9 @@
 // ranges over a map, so its findings come out in a stable order; the findings themselves are the same. The
 // original's debug printing of each graph is left out.
 //
-// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it requires ctrlflow, which does not run
-// despite errors, and TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors holds every listener's requirements
-// to running despite errors. It moves onto the dispatcher once that test holds only the walk's own requirements.
+// ctrlflow does not run despite errors, and the rule's own analyzer requires it as the listener does, so on a package
+// with errors the checker fails the rule there naming ctrlflow, as it did when the port walked by itself, while the
+// dispatcher runs every other syntax listener.
 package lost_cancel
 
 import (
@@ -36,64 +37,97 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/ctrlflow"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/cfg"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "lostcancel",
-	Doc: "check cancel func returned by context.WithCancel is called\n\n" +
-		"The cancellation function returned by context.WithCancel, WithTimeout,\n" +
-		"WithDeadline and variants such as WithCancelCause must be called,\n" +
-		"or the new context will remain live until its parent context is cancelled.\n" +
-		"(The background context is never cancelled.)",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/lostcancel",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, ctrlflow.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "lostcancel"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check cancel func returned by context.WithCancel is called\n\n" +
+	"The cancellation function returned by context.WithCancel, WithTimeout,\n" +
+	"WithDeadline and variants such as WithCancelCause must be called,\n" +
+	"or the new context will remain live until its parent context is cancelled.\n" +
+	"(The background context is never cancelled.)"
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/lostcancel"
+
+// Listener is what the port hears of each package from the dispatcher: every function declaration and literal, in
+// preorder, as the original's Preorder visits them, a literal after the function that holds it, each judged on its
+// own. It requires ctrlflow, whose graphs it searches. It judges only a package that imports context, which it asks
+// once for the package, on the first function, and keeps in the context's state.
+var Listener = rule.Listener{
+	Requires: []*analysis.Analyzer{ctrlflow.Analyzer},
+	Nodes:    []ast.Node{(*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)},
+	Node:     checkFunction,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
 }
 
 // contextPackage is the import path of the package whose functions return a cancel function.
 const contextPackage = "context"
 
-func run(pass *analysis.Pass) (any, error) {
+// packageGate is whether the package imports context, asked once, on its first function.
+type packageGate struct {
+	// decided is whether the package has been asked about yet.
+	decided bool
+	// importsContext is whether the package imports context itself, without which nothing is judged.
+	importsContext bool
+}
+
+// checkFunction judges node, a function declaration or literal, in a package that imports context, against the
+// control-flow graph ctrlflow built for it.
+func checkFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch node.(type) {
+	case *ast.FuncLit, *ast.FuncDecl:
+	default:
+		return
+	}
 	// A package that imports no context calls none of its functions, so none of its functions is walked.
-	if !imports(pass.Pkg, contextPackage) {
-		return nil, nil
+	gate := rule.State[packageGate](context)
+	if !gate.decided {
+		gate.decided, gate.importsContext = true, imports(context.Package, contextPackage)
 	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("lost_cancel: inspect's result is missing")
+	if !gate.importsContext {
+		return
 	}
-	graphs, isGraphs := pass.ResultOf[ctrlflow.Analyzer].(*ctrlflow.CFGs)
+	graphs, isGraphs := context.ResultOf(ctrlflow.Analyzer).(*ctrlflow.CFGs)
 	if !isGraphs {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
+		// Invariant: the dispatcher hands every check the results of what its listener requires, of the types they
+		// declare.
 		panic("lost_cancel: ctrlflow's result is missing")
 	}
-	// PreorderSeq visits each function declaration and literal in the order the original's Preorder does, a literal
-	// after the function that holds it, and each is judged on its own.
-	for function := range inspected.PreorderSeq((*ast.FuncLit)(nil), (*ast.FuncDecl)(nil)) {
-		judgeFunction(pass, graphs, function)
-	}
-	return nil, nil
+	judgeFunction(context, graphs, node)
 }
 
 // judgeFunction judges one function declaration or literal: each cancel function its own body discards is reported,
 // and each cancel variable it defines that some path to a return never uses is reported at its definition and at
 // that return. x/tools' lostcancel.runFunc.
-func judgeFunction(pass *analysis.Pass, graphs *ctrlflow.CFGs, function ast.Node) {
+func judgeFunction(context *rule.Context, graphs *ctrlflow.CFGs, function ast.Node) {
 	// scope is the function's own scope, opened at its type, which holds its parameters, its results and its body.
 	var scope *types.Scope
 	switch declared := function.(type) {
 	case *ast.FuncLit:
-		scope = pass.TypesInfo.Scopes[declared.Type]
+		scope = context.TypesInfo.Scopes[declared.Type]
 	case *ast.FuncDecl:
-		scope = pass.TypesInfo.Scopes[declared.Type]
+		scope = context.TypesInfo.Scopes[declared.Type]
 	}
-	variables, definitions := cancelVariables(pass, scope, function)
+	variables, definitions := cancelVariables(context, scope, function)
 	if len(variables) == 0 {
 		// Nothing to search for, so the graph is never read.
 		return
@@ -106,18 +140,18 @@ func judgeFunction(pass *analysis.Pass, graphs *ctrlflow.CFGs, function ast.Node
 		// The original reads the declaration's type through Defs without a check, and would panic where Defs held no
 		// object for its name. A type-checked declaration always has one, so the port, which judges nothing then,
 		// never differs from it.
-		declaredFunction, isFunction := pass.TypesInfo.Defs[declared.Name].(*types.Func)
+		declaredFunction, isFunction := context.TypesInfo.Defs[declared.Name].(*types.Func)
 		if !isFunction {
 			return
 		}
 		signature = declaredFunction.Signature()
-		if signature.Recv() == nil && declared.Name.Name == "main" && pass.Pkg.Name() == "main" {
+		if signature.Recv() == nil && declared.Name.Name == "main" && context.Package.Name() == "main" {
 			// Returning from main.main terminates the process, so there's no need to cancel contexts.
 			return
 		}
 		graph = graphs.FuncDecl(declared)
 	case *ast.FuncLit:
-		literalSignature, isSignature := pass.TypesInfo.Types[declared.Type].Type.(*types.Signature)
+		literalSignature, isSignature := context.TypesInfo.Types[declared.Type].Type.(*types.Signature)
 		if !isSignature {
 			// Missing type information, which the original also leaves unjudged.
 			return
@@ -128,20 +162,20 @@ func judgeFunction(pass *analysis.Pass, graphs *ctrlflow.CFGs, function ast.Node
 
 	for _, variable := range variables {
 		definition := definitions[variable]
-		returned := lostCancelPath(pass.TypesInfo, graph, variable, definition, signature)
+		returned := lostCancelPath(context.TypesInfo, graph, variable, definition, signature)
 		if returned == nil {
 			continue
 		}
-		line := pass.Fset.Position(definition.Pos()).Line
-		pass.ReportRangef(definition,
+		line := context.Fset.Position(definition.Pos()).Line
+		context.ReportRangef(definition,
 			"the %s function is not used on all paths (possible context leak)", variable.Name())
 		// golang/go#64547: the return cfg makes explicit at a function's closing brace is synthetic, and its end, six
 		// bytes on for the word return, may overflow the file, so such a return is reported as the point it starts at.
 		end := returned.End()
-		if pass.Fset.File(returned.Pos()) != pass.Fset.File(end) {
+		if context.Fset.File(returned.Pos()) != context.Fset.File(end) {
 			end = returned.Pos()
 		}
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos: returned.Pos(),
 			End: end,
 			Message: fmt.Sprintf(
@@ -159,7 +193,7 @@ func judgeFunction(pass *analysis.Pass, graphs *ctrlflow.CFGs, function ast.Node
 // from. scope is function's own scope, and a cancel variable declared outside it is left alone, assumed to be used
 // elsewhere. The first half of x/tools' lostcancel.runFunc.
 func cancelVariables(
-	pass *analysis.Pass,
+	context *rule.Context,
 	scope *types.Scope,
 	function ast.Node,
 ) (variables []*types.Var, definitions map[*types.Var]ast.Node) {
@@ -174,7 +208,7 @@ func cancelVariables(
 	}
 	ast.PreorderStack(function, nil, func(node ast.Node, stack []ast.Node) bool {
 		if _, isLiteral := node.(*ast.FuncLit); isLiteral && len(stack) > 0 {
-			// A nested function literal is judged on its own, when run's walk reaches it.
+			// A nested function literal is judged on its own, when the dispatcher's walk reaches it.
 			return false
 		}
 		// The selector called, beneath its call and the statement that holds the call:
@@ -186,7 +220,7 @@ func cancelVariables(
 		// The original asks only that the selector's parent be a call, not that the selector be what it calls, so a
 		// selector passed as an argument, `ctx, cancel := apply(context.WithCancel)`, is judged too, as here. The
 		// selector is never function itself, and its parent call never a function's root, so stack holds both.
-		selector := contextWithCancel(pass.TypesInfo, node)
+		selector := contextWithCancel(context.TypesInfo, node)
 		if selector == nil || !isCall(stack[len(stack)-1]) {
 			return true
 		}
@@ -210,18 +244,18 @@ func cancelVariables(
 			return true
 		}
 		if identifier.Name == "_" {
-			pass.ReportRangef(identifier,
+			context.ReportRangef(identifier,
 				"the cancel function returned by context.%s should be called, not discarded, to avoid a context leak",
 				selector.Sel.Name)
 			return true
 		}
 		// Uses holds a variable assigned with `=`, and Defs one defined with `:=` or `var`. A variable assigned
 		// whose declaration lies outside function is left alone, without falling back to Defs, as in the original.
-		if used, isVariable := pass.TypesInfo.Uses[identifier].(*types.Var); isVariable {
+		if used, isVariable := context.TypesInfo.Uses[identifier].(*types.Var); isVariable {
 			if scope.Contains(used.Pos()) {
 				record(used, statement)
 			}
-		} else if defined, isVariable := pass.TypesInfo.Defs[identifier].(*types.Var); isVariable {
+		} else if defined, isVariable := context.TypesInfo.Defs[identifier].(*types.Var); isVariable {
 			record(defined, statement)
 		}
 		return true

@@ -505,7 +505,7 @@ var ports = map[string]port{
 	"httpresponse":     {analyzer: http_response.Analyzer, listener: &http_response.Listener},
 	"ifaceassert":      {analyzer: iface_assert.Analyzer, listener: &iface_assert.Listener},
 	"loopclosure":      {analyzer: loop_closure.Analyzer, listener: &loop_closure.Listener},
-	"lostcancel":       {analyzer: lost_cancel.Analyzer},
+	"lostcancel":       {analyzer: lost_cancel.Analyzer, listener: &lost_cancel.Listener},
 	"nilfunc":          {analyzer: nil_func.Analyzer, listener: &nil_func.Listener},
 	"printf":           {analyzer: printf.Analyzer},
 	"scannererr":       {analyzer: scanner_error.Analyzer, listener: &scanner_error.Listener},
