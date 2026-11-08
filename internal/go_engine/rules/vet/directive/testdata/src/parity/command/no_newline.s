@@ -1,0 +1,1 @@
+//go:debug panicnil=1
