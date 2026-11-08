@@ -20,8 +20,6 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/facts/purity"
 	"honnef.co/go/tools/analysis/report"
 	"honnef.co/go/tools/go/ir"
@@ -32,15 +30,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher. The check judges syntax, every assignment of
-// the package in the order the inspector walks them, once the walk is over, at PackageExit. It listens to the walk
-// over the intermediate representation, not the syntax's, because it reads staticcheck's purity facts, which are
-// built from that representation and so only on a package without errors, as the original runs: the syntax walk runs
-// on every package, and so must everything a syntax listener requires.
+// Listener is what the port hears of each package from the dispatcher: every function of the intermediate
+// representation, whose syntax it walks when the function is a top-level one, so each assignment is judged once. It
+// listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which are built from the
+// representation and so only on a package without errors, as the original runs: the syntax walk runs on every
+// package, and so must everything a syntax listener requires.
 var Listener = rule.Listener{
-	Requires:    []*analysis.Analyzer{inspect.Analyzer, purity.Analyzer},
-	Function:    hearFunction,
-	PackageExit: judgeAssignments,
+	Requires: []*analysis.Analyzer{purity.Analyzer},
+	Function: judgeFunction,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
@@ -53,37 +50,31 @@ var Analyzer = dispatch.RuleAnalyzer(
 	&Listener,
 )
 
-// hearFunction is the listener's Function, which a listener of the walk over the intermediate representation
-// declares to hear it, and which keeps nothing of the function.
-func hearFunction(*rule.Context, *ir.Function) {
-	// Nothing to keep: the check judges the package's syntax once the walk is over, in judgeAssignments.
-}
-
-// judgeAssignments builds the purity judgment and judges every assignment of the package.
-func judgeAssignments(context *rule.Context) {
+// judgeFunction judges every assignment in the syntax of function, nested function literals included, when function is
+// where that syntax starts: a declared function, the blank-named among them, which the representation builds too, or
+// a function literal of the package's initializer, whose parent, the initializer itself, has no syntax. Every other
+// function is a literal inside one of those and is judged in its walk. An assignment is written only inside a
+// function's body, so these walks reach every assignment the original's walk over the files reaches, each once.
+func judgeFunction(context *rule.Context, function *ir.Function) {
+	syntax := function.Syntax()
+	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
+		return
+	}
 	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
 	if !isPurity {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.
 		panic("self_assignment: the purity pass's result is missing")
 	}
-	isPure := func(function *types.Func) bool {
-		_, isHeld := pure[function]
+	isPure := func(callee *types.Func) bool {
+		_, isHeld := pure[callee]
 		return isHeld
 	}
-	inspected, isInspector := context.ResultOf(inspect.Analyzer).(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the listener requires the inspect pass, and the dispatcher hands over its result, of the type it
-		// declares.
-		panic("self_assignment: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.AssignStmt)(nil)}, func(node ast.Node) {
-		assignment, isAssignment := node.(*ast.AssignStmt)
-		if !isAssignment {
-			// Invariant: Preorder hands this function only the assignments it was asked for.
-			panic("self_assignment: the inspector handed over a node that is not an assignment")
+	ast.Inspect(syntax, func(node ast.Node) bool {
+		if assignment, isAssignment := node.(*ast.AssignStmt); isAssignment {
+			Check(context, assignment, isPure)
 		}
-		Check(context, assignment, isPure)
+		return true
 	})
 }
 
