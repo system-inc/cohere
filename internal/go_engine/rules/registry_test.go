@@ -363,13 +363,11 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 	}
 }
 
-// TestNoRuleRequiresXToolsSingleAssignmentForm holds the run to one program form: no registered rule, nor
-// anything it requires, needs x/tools' buildssa, which cost 1.2 to 1.7 CPU-s a cold run on cohere for two passes
-// whose ports read the form staticcheck's checks already build (#pn1xvnd).
-// The syntax dispatcher runs despite errors, so on a package with errors each syntax rule is skipped for the errors,
-// as it was when it walked on its own, never failed for a prerequisite. That holds only while everything it requires,
-// its own requirements and every listener's, transitively, runs despite errors too; a listener requiring an analyzer
-// that does not would fail the dispatcher, and every syntax rule with it, on every package with errors.
+// TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors holds the dispatcher's prerequisites to running despite
+// errors. The syntax dispatcher runs despite errors, so on a package with errors each syntax rule is skipped for the
+// errors, as it was when it walked on its own, never failed for a prerequisite. That holds only while everything it
+// requires, its own requirements and every listener's, transitively, runs despite errors too; a listener requiring an
+// analyzer that does not would fail the dispatcher, and every syntax rule with it, on every package with errors.
 func TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors(test *testing.T) {
 	test.Parallel()
 	visited := map[*analysis.Analyzer]bool{}
@@ -408,6 +406,9 @@ func TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors(test *testing.T)
 	}
 }
 
+// TestNoRuleRequiresXToolsSingleAssignmentForm holds the run to one program form: no registered rule, nor
+// anything it requires, needs x/tools' buildssa, which cost 1.2 to 1.7 CPU-s a cold run on cohere for two passes
+// whose ports read the form staticcheck's checks already build (#pn1xvnd).
 func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
 	test.Parallel()
 	seen := map[*analysis.Analyzer]bool{}
