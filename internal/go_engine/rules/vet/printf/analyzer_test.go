@@ -35,21 +35,6 @@ func init() {
 	}
 }
 
-// The port is documented as the original is, byte for byte, which the registry's test holds too once the port is
-// switched on.
-func TestPortIsDocumentedAsTheOriginal(test *testing.T) {
-	test.Parallel()
-	if Analyzer.Name != original.Analyzer.Name || Analyzer.Doc != original.Analyzer.Doc ||
-		Analyzer.URL != original.Analyzer.URL {
-		test.Errorf("the port is %q, %q, %q, the original %q, %q, %q", Analyzer.Name, Analyzer.Doc, Analyzer.URL,
-			original.Analyzer.Name, original.Analyzer.Doc, original.Analyzer.URL)
-	}
-	if Analyzer.Flags.Lookup("funcs").Value.String() != original.Analyzer.Flags.Lookup("funcs").Value.String() {
-		test.Errorf("the port's -funcs is %q, the original's %q", Analyzer.Flags.Lookup("funcs").Value,
-			original.Analyzer.Flags.Lookup("funcs").Value)
-	}
-}
-
 // x/tools' own fixtures for printf, copied unchanged into testdata/src and run as the original's test runs them:
 // every `// want` the original expects, findings and facts, the port reports at the same line with the same text,
 // and analysistest fails on a finding no want expects as much as on a want nothing found.
