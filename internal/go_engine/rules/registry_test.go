@@ -1028,6 +1028,7 @@ var portedPasses = []string{
 	"cyclic_finalizer",
 	"defer_in_channel_range_loop",
 	"defer_in_infinite_loop",
+	"deferred_lock_after_lock",
 	"deprecated_use",
 	"discarded_pure_call",
 	"dot_import",
