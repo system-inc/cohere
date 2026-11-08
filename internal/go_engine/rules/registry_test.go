@@ -1131,6 +1131,7 @@ var portedPasses = []string{
 	"spinning_empty_loop",
 	"struct_conversion_by_field_copy",
 	"swapped_seek_arguments",
+	"test_failure_in_goroutine",
 	"time_since",
 	"time_until",
 	"timer_reset_result_used",
