@@ -3,16 +3,16 @@ package functions
 
 type counter struct{ count int }
 
-func first() int { // want `first in functions, line 6`
+func first() int {
 	return 1
 }
 
-func (value *counter) increment() { // want `increment in functions, line 10`
+func (value *counter) increment() {
 	value.count++
 }
 
-func second() func() int { // want `second in functions, line 14`
-	return func() int { // want `second\$1 in functions, line 15`
+func second() func() int {
+	return func() int {
 		return first()
 	}
 }

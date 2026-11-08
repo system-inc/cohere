@@ -1,10 +1,12 @@
 package rule
 
 import (
+	"go/ast"
 	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"honnef.co/go/tools/go/ir"
 )
 
 // plantedAnalyzer is an analyzer that finds nothing, for rules that need one to be valid.
@@ -28,6 +30,39 @@ var optionedAnalyzer = func() *analysis.Analyzer {
 	analyzer.Flags.String("readsFile", "", "the file a rule under test would read")
 	return analyzer
 }()
+
+// The planted callbacks exist so a listener under test declares something, and are never called.
+func plantedFunction(*Context, *ir.Function) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedInstruction(*Context, ir.Instruction) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedNode(*Context, ast.Node, []ast.Node) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedFile(*Context, *ast.File) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedPackageExit(*Context) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+// listening is a well-formed rule but for listener, which is what a refusal of it names.
+func listening(listener Listener) Rule {
+	held := listener
+	return Rule{
+		Name:         "cohere-go/nilness",
+		Origin:       OriginTools,
+		UpstreamName: "nilness",
+		Analyzer:     plantedAnalyzer,
+		Listener:     &held,
+	}
+}
 
 // TestValidateAcceptsAWellFormedRule is the control for the refusals below: a house rule and each kind of
 // ported rule, written the way the registry will hold them.
@@ -60,6 +95,32 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			Origin:       OriginHouse,
 			Analyzer:     optionedAnalyzer,
 			ConfiguredBy: []string{"readsFile"},
+		},
+		{
+			Name:         "cohere-go/nilness",
+			Origin:       OriginTools,
+			UpstreamName: "nilness",
+			Analyzer:     plantedAnalyzer,
+			Listener:     &Listener{Function: plantedFunction},
+		},
+		{
+			Name:         "cohere-go/unusedwrite",
+			Origin:       OriginTools,
+			UpstreamName: "unusedwrite",
+			Analyzer:     plantedAnalyzer,
+			Listener: &Listener{
+				Instructions: []ir.Instruction{(*ir.Store)(nil), (*ir.Call)(nil)},
+				Instruction:  plantedInstruction,
+				Nodes:        []ast.Node{(*ast.CallExpr)(nil)},
+				Node:         plantedNode,
+			},
+		},
+		{
+			Name:         "cohere-go/U1000",
+			Origin:       OriginStaticcheck,
+			UpstreamName: "U1000",
+			Analyzer:     plantedAnalyzer,
+			Listener:     &Listener{FileEnter: plantedFile, PackageExit: plantedPackageExit},
 		},
 	}
 	for _, testCase := range cases {
@@ -141,6 +202,44 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			name:   "a tools rule with no upstream name",
 			rule:   Rule{Name: "cohere-go/nilness", Origin: OriginTools, Analyzer: plantedAnalyzer},
 			saying: "names no upstream rule",
+		},
+		{
+			name:   "a listener that declares nothing",
+			rule:   listening(Listener{Requires: []*analysis.Analyzer{plantedAnalyzer}}),
+			saying: "declares no callback",
+		},
+		{
+			name:   "instruction kinds with no callback",
+			rule:   listening(Listener{Function: plantedFunction, Instructions: []ir.Instruction{(*ir.Call)(nil)}}),
+			saying: "has no Instruction to call for them",
+		},
+		{
+			name:   "an instruction callback with no kinds",
+			rule:   listening(Listener{Instruction: plantedInstruction}),
+			saying: "sets Instruction and lists no instruction kinds",
+		},
+		{
+			name:   "node kinds with no callback",
+			rule:   listening(Listener{FileEnter: plantedFile, Nodes: []ast.Node{(*ast.CallExpr)(nil)}}),
+			saying: "has no Node to call for them",
+		},
+		{
+			name:   "a node callback with no kinds",
+			rule:   listening(Listener{Node: plantedNode}),
+			saying: "sets Node and lists no node kinds",
+		},
+		{
+			name:   "a bare nil kind",
+			rule:   listening(Listener{Instruction: plantedInstruction, Instructions: []ir.Instruction{nil}}),
+			saying: "lists a bare nil in Instructions",
+		},
+		{
+			name: "a kind listed twice",
+			rule: listening(Listener{
+				Instruction:  plantedInstruction,
+				Instructions: []ir.Instruction{(*ir.Call)(nil), (*ir.Call)(nil)},
+			}),
+			saying: "twice in Instructions",
 		},
 		{
 			name: "an option its analyzer has no flag for",
