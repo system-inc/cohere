@@ -1,0 +1,16 @@
+// Package spelled names another package fmt, so the original's fix calls strings.Errorf, which does not exist, and
+// the port's the name the call of Sprintf is made by.
+package spelled
+
+import (
+	"errors"
+	formatted "fmt"
+	fmt "strings"
+)
+
+func spelled(count int) {
+	// errors.New of a string the code holds is no finding, and keeps errors imported once every fix is applied.
+	_ = errors.New(fmt.ToUpper("text"))
+	// The original writes fmt.Errorf, which is strings', and the port formatted.Errorf.
+	_ = formatted.Errorf("%d", count)
+}

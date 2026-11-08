@@ -1,0 +1,22 @@
+// Package dotted imports fmt into its own scope alone, so the original's fix, which spells fmt, names nothing, and
+// the port's spells Errorf alone where Errorf is fmt's.
+package dotted
+
+import (
+	"errors"
+	. "fmt"
+)
+
+func dotted() {
+	// The original writes fmt.Errorf("%d", 1), and the port Errorf("%d", 1).
+	_ = Errorf("%d", 1) // port moves: should use fmt.Errorf(...) instead of errors.New(fmt.Sprintf(...))
+	// The original writes fmt.Errorf, and the port Errorf, through the parentheses.
+	_ = Errorf("%d", 1) // port moves: should use fmt.Errorf(...) instead of errors.New(fmt.Sprintf(...))
+}
+
+func shadowed(count int) {
+	Errorf := "a local"
+	_ = Errorf
+	// Here Errorf names the local, and fmt nothing, so no name the port could write calls fmt.Errorf.
+	_ = errors.New(Sprintf("%d", count)) // port withholds: Use fmt.Errorf
+}

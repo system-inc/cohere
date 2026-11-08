@@ -1,0 +1,56 @@
+// Package unformatted holds the shapes gofmt rewrites, a parenthesized if condition, which it strips, and doubled
+// parentheses, which it folds, for the original and the port to agree on as the parser hands them over.
+package unformatted
+
+func parenthesized(value bool) bool {
+	if (value) {
+		return false
+	}
+	return true
+}
+
+func parenthesizedComparison(a, b int) bool {
+	if ((a > b)) {
+		return false
+	}
+	return true
+}
+
+func parenthesizedLength(text string) bool {
+	if (len(text) > 0) {
+		return false
+	}
+	return true
+}
+
+func parenthesizedAnd(a, b bool) bool {
+	if ((a && b)) {
+		return true
+	}
+	return false
+}
+
+func parenthesizedNot(value bool) bool {
+	if (!value) {
+		return false
+	}
+	return true
+}
+
+func parenthesizedSelector(each struct{ ready bool }) bool {
+	if (each.ready) {
+		return false
+	}
+	return true
+}
+
+func doubledResults(value bool) bool {
+	if value {
+		return ((false))
+	}
+	return ((true))
+}
+
+func oneLine(value bool) bool {
+	if value { return true }; return false
+}

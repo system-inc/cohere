@@ -14,6 +14,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
 	"github.com/system-inc/cohere/internal/go_engine/rules/argument_overwritten_before_use"
+	"github.com/system-inc/cohere/internal/go_engine/rules/assertion_to_own_type"
+	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_constant_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_return_of_condition"
+	"github.com/system-inc/cohere/internal/go_engine/rules/buffer_string_conversion"
+	"github.com/system-inc/cohere/internal/go_engine/rules/bytes_compare_equality"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_kill_by_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_require_escape_hatch_reason"
@@ -71,16 +76,21 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dynamic_printf_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/early_deferred_close"
+	"github.com/system-inc/cohere/internal/go_engine/rules/elaborate_sleep"
 	"github.com/system-inc/cohere/internal/go_engine/rules/empty_select_default"
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/errors_new_of_sprintf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/extreme_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/find_all_zero_limit"
+	"github.com/system-inc/cohere/internal/go_engine/rules/guarded_delete"
+	"github.com/system-inc/cohere/internal/go_engine/rules/guarded_map_access"
 	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/identical_operands"
 	"github.com/system-inc/cohere/internal/go_engine/rules/impossible_target_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/impossible_type_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inappropriate_context_key"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/index_compared_as_contains"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_bitwise_operation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_break"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_copy"
@@ -88,6 +98,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_random_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_sort"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_url_query_modification"
+	"github.com/system-inc/cohere/internal/go_engine/rules/infinite_loop_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/infinite_recursion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/integer_division_to_zero"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_listen_address"
@@ -101,6 +112,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ip_compared_as_bytes"
 	"github.com/system-inc/cohere/internal/go_engine/rules/leaky_time_tick"
+	"github.com/system-inc/cohere/internal/go_engine/rules/loop_copy"
+	"github.com/system-inc/cohere/internal/go_engine/rules/manual_trim"
 	"github.com/system-inc/cohere/internal/go_engine/rules/math_on_converted_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misaligned_atomic_field"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
@@ -118,29 +131,51 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_pointer_unmarshal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
+	"github.com/system-inc/cohere/internal/go_engine/rules/print_of_sprintf"
+	"github.com/system-inc/cohere/internal/go_engine/rules/range_over_string_directly"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_assertion_nil_check"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_canonical_header_key"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_control_flow"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_make_arguments"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_nil_check_around_loop"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_nil_check_on_length"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_slice_length"
+	"github.com/system-inc/cohere/internal/go_engine/rules/redundant_sprintf_of_string"
+	"github.com/system-inc/cohere/internal/go_engine/rules/regular_expression_raw_string"
 	"github.com/system-inc/cohere/internal/go_engine/rules/repeated_if_else_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/replace_zero_count"
 	"github.com/system-inc/cohere/internal/go_engine/rules/reversed_errors_is_arguments"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/go_engine/rules/self_assignment"
+	"github.com/system-inc/cohere/internal/go_engine/rules/separate_declaration_and_assignment"
 	"github.com/system-inc/cohere/internal/go_engine/rules/shell_command_as_program"
+	"github.com/system-inc/cohere/internal/go_engine/rules/single_append_concatenation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/single_argument_append"
+	"github.com/system-inc/cohere/internal/go_engine/rules/single_case_select"
+	"github.com/system-inc/cohere/internal/go_engine/rules/sliding_copy"
+	"github.com/system-inc/cohere/internal/go_engine/rules/sort_helper_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/sort_slice_on_non_slice"
 	"github.com/system-inc/cohere/internal/go_engine/rules/spinning_empty_loop"
+	"github.com/system-inc/cohere/internal/go_engine/rules/struct_conversion_by_field_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/swapped_seek_arguments"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_machine_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_timing_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_uncached_run"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/time_since"
+	"github.com/system-inc/cohere/internal/go_engine/rules/time_until"
 	"github.com/system-inc/cohere/internal/go_engine/rules/timer_reset_result_used"
+	"github.com/system-inc/cohere/internal/go_engine/rules/type_switch_bound_value"
 	"github.com/system-inc/cohere/internal/go_engine/rules/typed_nil_interface_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unbuffered_signal_channel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unchanging_loop_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unconditional_loop_exit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unencodable_binary_value"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_blank_identifier"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_sprint"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unobserved_append"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unreachable_type_case"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unread_assigned_value"
@@ -272,6 +307,44 @@ var duplicatesOfVet = map[string]string{
 // A port that listens on a dispatcher carries its listener beside its analyzer, so its rule registers with it, and is
 // validated and held to its dispatcher as every dispatched rule is.
 var ports = map[string]port{
+	"S1000": {analyzer: single_case_select.Analyzer, listener: &single_case_select.Listener},
+	"S1001": {analyzer: loop_copy.Analyzer, listener: &loop_copy.Listener},
+	"S1002": {analyzer: boolean_constant_comparison.Analyzer, listener: &boolean_constant_comparison.Listener},
+	"S1003": {analyzer: index_compared_as_contains.Analyzer, listener: &index_compared_as_contains.Listener},
+	"S1004": {analyzer: bytes_compare_equality.Analyzer, listener: &bytes_compare_equality.Listener},
+	"S1005": {analyzer: unnecessary_blank_identifier.Analyzer, listener: &unnecessary_blank_identifier.Listener},
+	"S1006": {analyzer: infinite_loop_condition.Analyzer, listener: &infinite_loop_condition.Listener},
+	"S1007": {analyzer: regular_expression_raw_string.Analyzer, listener: &regular_expression_raw_string.Listener},
+	"S1008": {analyzer: boolean_return_of_condition.Analyzer, listener: &boolean_return_of_condition.Listener},
+	"S1009": {analyzer: redundant_nil_check_on_length.Analyzer, listener: &redundant_nil_check_on_length.Listener},
+	"S1010": {analyzer: redundant_slice_length.Analyzer, listener: &redundant_slice_length.Listener},
+	"S1011": {analyzer: single_append_concatenation.Analyzer, listener: &single_append_concatenation.Listener},
+	"S1012": {analyzer: time_since.Analyzer, listener: &time_since.Listener},
+	"S1016": {analyzer: struct_conversion_by_field_copy.Analyzer, listener: &struct_conversion_by_field_copy.Listener},
+	"S1017": {analyzer: manual_trim.Analyzer, listener: &manual_trim.Listener},
+	"S1018": {analyzer: sliding_copy.Analyzer, listener: &sliding_copy.Listener},
+	"S1019": {analyzer: redundant_make_arguments.Analyzer, listener: &redundant_make_arguments.Listener},
+	"S1020": {analyzer: redundant_assertion_nil_check.Analyzer, listener: &redundant_assertion_nil_check.Listener},
+	"S1021": {
+		analyzer: separate_declaration_and_assignment.Analyzer,
+		listener: &separate_declaration_and_assignment.Listener,
+	},
+	"S1023":  {analyzer: redundant_control_flow.Analyzer, listener: &redundant_control_flow.Listener},
+	"S1024":  {analyzer: time_until.Analyzer, listener: &time_until.Listener},
+	"S1025":  {analyzer: redundant_sprintf_of_string.Analyzer, listener: &redundant_sprintf_of_string.Listener},
+	"S1028":  {analyzer: errors_new_of_sprintf.Analyzer, listener: &errors_new_of_sprintf.Listener},
+	"S1029":  {analyzer: range_over_string_directly.Analyzer, listener: &range_over_string_directly.Listener},
+	"S1030":  {analyzer: buffer_string_conversion.Analyzer, listener: &buffer_string_conversion.Listener},
+	"S1031":  {analyzer: redundant_nil_check_around_loop.Analyzer, listener: &redundant_nil_check_around_loop.Listener},
+	"S1032":  {analyzer: sort_helper_call.Analyzer, listener: &sort_helper_call.Listener},
+	"S1033":  {analyzer: guarded_delete.Analyzer, listener: &guarded_delete.Listener},
+	"S1034":  {analyzer: type_switch_bound_value.Analyzer, listener: &type_switch_bound_value.Listener},
+	"S1035":  {analyzer: redundant_canonical_header_key.Analyzer, listener: &redundant_canonical_header_key.Listener},
+	"S1036":  {analyzer: guarded_map_access.Analyzer, listener: &guarded_map_access.Listener},
+	"S1037":  {analyzer: elaborate_sleep.Analyzer, listener: &elaborate_sleep.Listener},
+	"S1038":  {analyzer: print_of_sprintf.Analyzer, listener: &print_of_sprintf.Listener},
+	"S1039":  {analyzer: unnecessary_sprint.Analyzer, listener: &unnecessary_sprint.Listener},
+	"S1040":  {analyzer: assertion_to_own_type.Analyzer, listener: &assertion_to_own_type.Listener},
 	"SA1000": {analyzer: invalid_regular_expression.Analyzer, listener: &invalid_regular_expression.Listener},
 	"SA1001": {analyzer: invalid_template.Analyzer, listener: &invalid_template.Listener},
 	"SA1002": {analyzer: invalid_time_layout.Analyzer, listener: &invalid_time_layout.Listener},

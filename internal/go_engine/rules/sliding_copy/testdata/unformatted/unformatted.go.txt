@@ -1,0 +1,23 @@
+// Package unformatted holds the shapes gofmt would rewrite, which the original still judges: parentheses around the
+// loop's condition and doubled ones, a body of one line, and an empty statement after the store.
+package unformatted
+
+func loops(values []int, n int, offset int) {
+	for i := 0; (i < n); i++ {
+		values[i] = values[offset+i]
+	}
+	for i := ((0)); ((i)) < ((n)); ((i))++ {
+		((values))[((i))] = ((values))[((offset))+((i))]
+	}
+	for i := 0; i < n; i++ { values[i] = values[offset+i] }
+	for i := 0; i < n; i++ { { values[i] = values[offset+i] } }
+	for i := 0; i < n; i++ {
+		values[i] = values[offset+i];
+	}
+	for i := 0; i < n; i++ {
+		values[i] = values[offset+i];;
+	}
+	for i := 0; i < n; i++ {
+		{ values[i] = values[offset+i]; };
+	}
+}

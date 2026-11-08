@@ -1,0 +1,36 @@
+// Package unformatted holds what gofmt would rewrite: parentheses around the condition and the ranged value, which the
+// pattern looks through, and empty statements, which the parser keeps and the query counts.
+package unformatted
+
+func parenthesized(values []int) {
+	if (values != nil) {
+		for range values {
+		}
+	}
+	if values != nil {
+		for range (values) {
+		}
+	}
+	if ((values) != nil) {
+		for range ((values)) {
+		}
+	}
+}
+
+func emptyStatements(values []int) {
+	// An empty statement before the range makes the body two statements.
+	if values != nil {
+		; for range values {
+		}
+	}
+	// A semicolon after the range ends its statement and adds none.
+	if values != nil {
+		for range values {
+		};
+	}
+	// An else holding an empty statement is no empty else.
+	if values != nil {
+		for range values {
+		}
+	} else { ; }
+}
