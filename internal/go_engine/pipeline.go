@@ -204,6 +204,13 @@ type heldFix struct {
 
 	// known is gofmt's verdicts, which the wrap reads and adds to before the run keeps them.
 	known *format.KnownFiles
+
+	// formatKnown and wrapKnown count the files gofmt and the wrap answered from known rather than formatting or
+	// wrapping, each left as it was when the run last saw the same bytes. They are the engine's own account of what a
+	// verdict spared, held beside the record rather than in it, since the fix record is the contract every engine
+	// writes and none reports such a count yet (#3hygsbr).
+	formatKnown int
+	wrapKnown   int
 }
 
 // runFix is the fix and format phase's gofmt: over every readable file in scope, written unless `--no-fix`, and
@@ -240,6 +247,7 @@ func (engine *pipeline) runFix(wraps bool) {
 		Known:          held.known,
 		Held:           engine.held,
 	})
+	held.formatKnown = result.Known
 	// Neither a file gofmt could not format nor a generated one is the wrap's to change.
 	skipped := map[string]bool{}
 	for _, generated := range result.Generated {
