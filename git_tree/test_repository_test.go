@@ -43,6 +43,29 @@ func newTestRepository(test *testing.T, format git_tree.ObjectFormat) *testRepos
 // error when it fails.
 func (repository *testRepository) git(arguments ...string) []byte {
 	repository.test.Helper()
+	output, standardError, outputError := repository.run(arguments...)
+	if outputError != nil {
+		repository.test.Fatalf("git %q in %s: %v\n%s", arguments, repository.directory, outputError, standardError)
+	}
+	return output
+}
+
+// gitFails runs git in the repository for a command meant to fail, as a merge left in conflict does,
+// failing the test when it succeeds.
+func (repository *testRepository) gitFails(arguments ...string) {
+	repository.test.Helper()
+	if output, _, outputError := repository.run(arguments...); outputError == nil {
+		repository.test.Fatalf(
+			"git %q in %s succeeded, and was meant to fail:\n%s",
+			arguments,
+			repository.directory,
+			output,
+		)
+	}
+}
+
+// run runs git in the repository, returning its standard output, its standard error and how it ended.
+func (repository *testRepository) run(arguments ...string) ([]byte, string, error) {
 	command := exec.Command("git", append(append([]string{}, testGitConfiguration...), arguments...)...)
 	command.Dir = repository.directory
 	for _, variable := range os.Environ() {
@@ -58,16 +81,7 @@ func (repository *testRepository) git(arguments ...string) []byte {
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
 	output, outputError := command.Output()
-	if outputError != nil {
-		repository.test.Fatalf(
-			"git %q in %s: %v\n%s",
-			arguments,
-			repository.directory,
-			outputError,
-			standardError.String(),
-		)
-	}
-	return output
+	return output, standardError.String(), outputError
 }
 
 // line is git's output with its one trailing newline trimmed.
