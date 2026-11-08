@@ -878,6 +878,7 @@ var portedPasses = []string{
 	"typed_nil_interface_comparison",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
+	"unnecessary_blank_identifier",
 	"unobserved_append",
 	"unreachable_type_case",
 	"unread_assigned_value",
