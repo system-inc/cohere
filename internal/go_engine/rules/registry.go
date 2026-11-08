@@ -192,63 +192,72 @@ var duplicatesOfVet = map[string]string{
 // original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
-var ports = map[string]*analysis.Analyzer{
-	"ST1001":           dot_import.Analyzer,
-	"ST1006":           receiver_name.Analyzer,
-	"ST1008":           misplaced_error_result.Analyzer,
-	"ST1011":           duration_unit_suffix.Analyzer,
-	"ST1012":           error_variable_name.Analyzer,
-	"ST1013":           http_status_literal.Analyzer,
-	"ST1016":           inconsistent_receiver_name.Analyzer,
-	"ST1017":           yoda_condition.Analyzer,
-	"ST1018":           invisible_character.Analyzer,
-	"ST1019":           duplicate_import.Analyzer,
-	"appends":          appends.Analyzer,
-	"assign":           assign.Analyzer,
-	"atomic":           atomic.Analyzer,
-	"bools":            bools.Analyzer,
-	"cgocall":          cgo_call.Analyzer,
-	"composites":       composite.Analyzer,
-	"copylocks":        copy_lock.Analyzer,
-	"defers":           defers.Analyzer,
-	"directive":        directive.Analyzer,
-	"errorsas":         errors_as.Analyzer,
-	"framepointer":     frame_pointer.Analyzer,
-	"hostport":         host_port.Analyzer,
-	"httpresponse":     http_response.Analyzer,
-	"ifaceassert":      iface_assert.Analyzer,
-	"loopclosure":      loop_closure.Analyzer,
-	"lostcancel":       lost_cancel.Analyzer,
-	"nilfunc":          nil_func.Analyzer,
-	"printf":           printf.Analyzer,
-	"scannererr":       scanner_error.Analyzer,
-	"shift":            shift.Analyzer,
-	"slog":             slog.Analyzer,
-	"sqlrowserr":       sql_rows_err.Analyzer,
-	"stdmethods":       std_methods.Analyzer,
-	"stringintconv":    string_int_conv.Analyzer,
-	"structtag":        struct_tag.Analyzer,
-	"testinggoroutine": testing_goroutine.Analyzer,
-	"tests":            tests.Analyzer,
-	"unmarshal":        unmarshal.Analyzer,
-	"unsafeptr":        unsafe_ptr.Analyzer,
-	"unusedresult":     unused_result.Analyzer,
-	"waitgroup":        wait_group.Analyzer,
+// A port that listens on a dispatcher carries its listener beside its analyzer, so its rule registers with it, and is
+// validated and held to its dispatcher as every dispatched rule is.
+var ports = map[string]port{
+	"ST1001":           {analyzer: dot_import.Analyzer, listener: &dot_import.Listener},
+	"ST1006":           {analyzer: receiver_name.Analyzer, listener: &receiver_name.Listener},
+	"ST1008":           {analyzer: misplaced_error_result.Analyzer, listener: &misplaced_error_result.Listener},
+	"ST1011":           {analyzer: duration_unit_suffix.Analyzer, listener: &duration_unit_suffix.Listener},
+	"ST1012":           {analyzer: error_variable_name.Analyzer, listener: &error_variable_name.Listener},
+	"ST1013":           {analyzer: http_status_literal.Analyzer, listener: &http_status_literal.Listener},
+	"ST1016":           {analyzer: inconsistent_receiver_name.Analyzer, listener: &inconsistent_receiver_name.Listener},
+	"ST1017":           {analyzer: yoda_condition.Analyzer, listener: &yoda_condition.Listener},
+	"ST1018":           {analyzer: invisible_character.Analyzer, listener: &invisible_character.Listener},
+	"ST1019":           {analyzer: duplicate_import.Analyzer, listener: &duplicate_import.Listener},
+	"appends":          {analyzer: appends.Analyzer},
+	"assign":           {analyzer: assign.Analyzer},
+	"atomic":           {analyzer: atomic.Analyzer},
+	"bools":            {analyzer: bools.Analyzer},
+	"cgocall":          {analyzer: cgo_call.Analyzer},
+	"composites":       {analyzer: composite.Analyzer},
+	"copylocks":        {analyzer: copy_lock.Analyzer},
+	"defers":           {analyzer: defers.Analyzer},
+	"directive":        {analyzer: directive.Analyzer},
+	"errorsas":         {analyzer: errors_as.Analyzer},
+	"framepointer":     {analyzer: frame_pointer.Analyzer},
+	"hostport":         {analyzer: host_port.Analyzer},
+	"httpresponse":     {analyzer: http_response.Analyzer},
+	"ifaceassert":      {analyzer: iface_assert.Analyzer},
+	"loopclosure":      {analyzer: loop_closure.Analyzer},
+	"lostcancel":       {analyzer: lost_cancel.Analyzer},
+	"nilfunc":          {analyzer: nil_func.Analyzer},
+	"printf":           {analyzer: printf.Analyzer},
+	"scannererr":       {analyzer: scanner_error.Analyzer},
+	"shift":            {analyzer: shift.Analyzer},
+	"slog":             {analyzer: slog.Analyzer},
+	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
+	"stdmethods":       {analyzer: std_methods.Analyzer},
+	"stringintconv":    {analyzer: string_int_conv.Analyzer},
+	"structtag":        {analyzer: struct_tag.Analyzer},
+	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
+	"tests":            {analyzer: tests.Analyzer},
+	"unmarshal":        {analyzer: unmarshal.Analyzer},
+	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer},
+	"unusedresult":     {analyzer: unused_result.Analyzer},
+	"waitgroup":        {analyzer: wait_group.Analyzer},
 }
 
-// portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
-// otherwise.
-func portOrOriginal(original *analysis.Analyzer, table map[string]*analysis.Analyzer) *analysis.Analyzer {
-	if port, ported := table[original.Name]; ported {
-		return port
+// port is a borrowed check's port as the registry runs it: its analyzer, and the listener that analyzer reads its
+// findings from, nil for a port that walks the package itself.
+type port struct {
+	analyzer *analysis.Analyzer
+	listener *rule.Listener
+}
+
+// portOrOriginal is what All runs for one borrowed check: its port when table holds one, and the original, which
+// listens on no dispatcher, otherwise.
+func portOrOriginal(original *analysis.Analyzer, table map[string]port) port {
+	if ported, held := table[original.Name]; held {
+		return ported
 	}
-	return original
+	return port{analyzer: original}
 }
 
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
-		registered = append(registered, portedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
+		registered = append(registered, borrowedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
 	}
 	registered = append(registered, dispatchedRule(nil_ness.Analyzer, &nil_ness.Listener, rule.OriginTools))
 	registered = append(registered, dispatchedRule(unused_write.Analyzer, &unused_write.Listener, rule.OriginTools))
@@ -256,11 +265,12 @@ func All() []rule.Rule {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
+		registered = append(registered, borrowedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
 	}
 	for _, wrapped := range stylecheck.Analyzers {
 		if stylecheckRuledOn[wrapped.Analyzer.Name] {
-			registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
+			chosen := portOrOriginal(wrapped.Analyzer, ports)
+			registered = append(registered, borrowedRule(chosen, rule.OriginStaticcheck))
 		}
 	}
 	registered = append(registered, rule.Rule{
@@ -338,8 +348,14 @@ func House() []rule.Rule {
 // dispatchedRule is the rule that runs an upstream pass's port, whose analyzer reports what a dispatcher's walk found
 // for listener, under the name it has upstream.
 func dispatchedRule(analyzer *analysis.Analyzer, listener *rule.Listener, origin rule.Origin) rule.Rule {
-	registered := portedRule(analyzer, origin)
-	registered.Listener = listener
+	return borrowedRule(port{analyzer: analyzer, listener: listener}, origin)
+}
+
+// borrowedRule is the rule that runs chosen, a borrowed check's port or its original, under the name it has upstream,
+// with the port's listener when it listens on a dispatcher.
+func borrowedRule(chosen port, origin rule.Origin) rule.Rule {
+	registered := portedRule(chosen.analyzer, origin)
+	registered.Listener = chosen.listener
 	return registered
 }
 

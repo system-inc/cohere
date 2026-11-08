@@ -192,7 +192,7 @@ func staticcheckAnalyzers() []*analysis.Analyzer {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
+		analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports).analyzer)
 	}
 	return analyzers
 }
@@ -203,7 +203,7 @@ func stylecheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range stylecheck.Analyzers {
 		if slices.Contains(ruledStylecheck, wrapped.Analyzer.Name) {
-			analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
+			analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports).analyzer)
 		}
 	}
 	return analyzers
@@ -216,7 +216,7 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 	test.Parallel()
 	expected := []*analysis.Analyzer{}
 	for _, pass := range vet.Suite {
-		expected = append(expected, portOrOriginal(pass, ports))
+		expected = append(expected, portOrOriginal(pass, ports).analyzer)
 	}
 	expectBlock(test, 0, expected, rule.OriginVet)
 }
@@ -245,20 +245,21 @@ func TestEveryPortStandsInForABorrowedCheck(test *testing.T) {
 	for _, pass := range vet.Suite {
 		vetPasses[pass.Name] = true
 	}
-	for name, port := range ports {
+	for name, ported := range ports {
 		original, borrowed := originals[name]
 		switch {
 		case !borrowed:
 			test.Errorf("ports holds a port for %q, which neither vet nor staticcheck names", name)
-		case port == original:
+		case ported.analyzer == original:
 			test.Errorf("ports maps %q to the original's own analyzer, so nothing is ported", name)
-		case port.Name != name:
-			test.Errorf("the port for %q is named %q, so its rule would be renamed", name, port.Name)
-		case vetPasses[name] && (port.Doc != original.Doc || port.URL != original.URL):
+		case ported.analyzer.Name != name:
+			test.Errorf("the port for %q is named %q, so its rule would be renamed", name,
+				ported.analyzer.Name)
+		case vetPasses[name] && (ported.analyzer.Doc != original.Doc || ported.analyzer.URL != original.URL):
 			test.Errorf("the port for vet's %q is documented differently from the original", name)
-		case !maps.Equal(flagDefaults(port), flagDefaults(original)):
+		case !maps.Equal(flagDefaults(ported.analyzer), flagDefaults(original)):
 			test.Errorf("the port for %q takes flags %v, and the original %v, so a setting would read differently",
-				name, flagDefaults(port), flagDefaults(original))
+				name, flagDefaults(ported.analyzer), flagDefaults(original))
 		}
 	}
 }
@@ -300,25 +301,26 @@ func TestFlagDefaultsTellFlagSetsApart(test *testing.T) {
 // leave every check borrowed.
 func TestAPortRunsInItsOriginalsPlace(test *testing.T) {
 	test.Parallel()
-	planted := map[string]*analysis.Analyzer{}
+	planted := map[string]port{}
 	for _, name := range []string{"bools", "SA4006"} {
-		planted[name] = &analysis.Analyzer{
+		planted[name] = port{analyzer: &analysis.Analyzer{
 			Name: name,
 			Doc:  "planted finds nothing; it stands in for a port of " + name,
 			Run: func(pass *analysis.Pass) (any, error) {
 				return nil, nil
 			},
-		}
+		}}
 	}
 	replaced := 0
 	for name, original := range borrowedChecks() {
-		running := portOrOriginal(original, planted)
+		running := portOrOriginal(original, planted).analyzer
+		plantedPort, isPlanted := planted[name]
 		switch {
-		case planted[name] != nil && running != planted[name]:
+		case isPlanted && running != plantedPort.analyzer:
 			test.Errorf("%s runs its original, expected the planted port", name)
-		case planted[name] == nil && running != original:
+		case !isPlanted && running != original:
 			test.Errorf("%s runs a planted port, expected its original", name)
-		case running == planted[name]:
+		case isPlanted:
 			replaced++
 		}
 	}
@@ -389,6 +391,28 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 	if len(dispatcherOf) != 2 {
 		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
 			"and the syntax's were expected", len(dispatcherOf))
+	}
+}
+
+// TestEveryRuleRequiringADispatcherCarriesItsListener holds every registered rule whose analyzer reads a dispatcher's
+// outcome to carrying its listener, a port from the ports table as much as a house rule, so rule.Validate checks the
+// listener and the test above holds the rule to the dispatcher that walks for it. A rule that required a dispatcher
+// with no listener would run, reading its outcome from a dispatcher no check ties it to, so a port whose listener
+// was left out of the table would pass every other test.
+func TestEveryRuleRequiringADispatcherCarriesItsListener(test *testing.T) {
+	test.Parallel()
+	dispatched := 0
+	for _, registered := range All() {
+		if !slices.ContainsFunc(registered.Analyzer.Requires, dispatch.IsDispatcher) {
+			continue
+		}
+		dispatched++
+		if registered.Listener == nil {
+			test.Errorf("%s's analyzer requires a dispatcher, and the rule carries no listener", registered.Name)
+		}
+	}
+	if dispatched == 0 {
+		test.Fatal("no registered rule requires a dispatcher, so nothing here was checked")
 	}
 }
 
