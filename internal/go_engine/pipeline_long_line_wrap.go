@@ -74,6 +74,7 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 		Known:          engine.fix.known,
 		Wrap:           engine.longLineWrap(),
 	})
+	engine.fix.wrapKnown = result.Known
 	engine.addWrapped(result.Changed)
 	for _, changed := range result.Changed {
 		engine.reread(changed.File)
