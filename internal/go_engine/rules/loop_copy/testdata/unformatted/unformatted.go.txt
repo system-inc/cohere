@@ -1,0 +1,32 @@
+// Package unformatted holds the shapes gofmt would rewrite, which the original still judges: parentheses around a
+// ranged source and doubled ones, and an empty statement after the store.
+package unformatted
+
+func loops() {
+	var source, destination []int
+	var first, second [4]int
+	for index, value := range (source) {
+		destination[index] = value
+	}
+	for index, value := range ((source)) {
+		((destination))[((index))] = ((value))
+	}
+	for index := range (source) {
+		destination[index] = ((source))[index]
+	}
+	for index := range ((first)) {
+		((second))[index] = (first)[index]
+	}
+	for index := 0; ((index)) < ((len))(((source))); ((index))++ {
+		destination[index] = ((source))[index]
+	}
+	for index, value := range source {
+		destination[index] = value;
+	}
+	for index, value := range source {
+		destination[index] = value;;
+	}
+	for index, value := range source {
+		{ destination[index] = value; }
+	}
+}
