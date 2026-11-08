@@ -871,6 +871,7 @@ var portedPasses = []string{
 	"leaky_time_tick",
 	"math_on_converted_integer",
 	"misplaced_error_result",
+	"modified_writer_buffer",
 	"modulo_by_one",
 	"nan_comparison",
 	"nanosecond_sleep",
