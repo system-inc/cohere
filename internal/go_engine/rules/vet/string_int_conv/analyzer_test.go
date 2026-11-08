@@ -12,12 +12,12 @@ import (
 
 // x/tools' own fixtures for stringintconv, copied unchanged into testdata/src with their golden files, hold the port
 // to every want the original expects, and to nothing more: a and typeparams for their wants, and fix with its
-// suggested fixes too, every fix the port offers there, applied, turning each file into its golden one. The harness
-// runs wants alone, so the fixes run stays here, as x/tools' test runs it.
+// suggested fixes too, every fix the port offers there, applied, turning each file into its golden one, as x/tools'
+// test runs it.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
 	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), "a", "typeparams")
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "fix")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, analysistest.TestData(), "fix")
 }
 
 // Over x/tools' fixtures and parity's, the second holding every branch of the judgment and of both fixes, the import
@@ -93,15 +93,4 @@ func TestPortWithholdsOnlyTheRecordedFixInUpstreamTypeparams(test *testing.T) {
 	if withheld == 0 {
 		test.Fatal("the port withholds nothing in typeparams, so the tier proves nothing")
 	}
-}
-
-// errorsOnly hands analysistest a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list. The harness keeps one of its own unexported, for RequireUpstreamWants,
-// and has no form for the fixes run, which needs this one.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
