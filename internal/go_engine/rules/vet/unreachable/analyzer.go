@@ -16,6 +16,9 @@
 // it reported as dead. The port also reads every file's package-level declarations, still syntax alone, and takes
 // none of those calls for the builtin's (testdata/src/differences).
 //
+// It sits on the engine's syntax dispatcher, hearing each function declaration and literal on the walk the dispatcher
+// makes once for every syntax rule, with the cursor of each, the one the original's walk handed it.
+//
 // The registry runs the port in the original's place, and the original stays the oracle: the parity tests beside
 // this file run both over the same packages.
 package unreachable
@@ -24,59 +27,86 @@ import (
 	"go/ast"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. It runs despite errors as
-// the original does, since a file that does not type-check still has a syntax tree to walk.
-var Analyzer = &analysis.Analyzer{
-	Name: "unreachable",
-	Doc: "check for unreachable code\n\n" +
-		"The unreachable analyzer finds statements that execution can never reach\n" +
-		"because they are preceded by a return statement, a call to panic, an\n" +
-		"infinite loop, or similar constructs.",
-	URL:              "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unreachable",
-	Requires:         []*analysis.Analyzer{inspect.Analyzer},
-	RunDespiteErrors: true,
-	Run:              run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "unreachable"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for unreachable code\n\n" +
+	"The unreachable analyzer finds statements that execution can never reach\n" +
+	"because they are preceded by a return statement, a call to panic, an\n" +
+	"infinite loop, or similar constructs."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unreachable"
+
+// Listener is what the port hears of each package from the dispatcher: each function declaration and literal in
+// preorder, as the original's Preorder visits them, with its cursor, so its fix can find a dead statement's place in
+// the tree within the function alone. Whether the package declares its own `panic`, which the original's loop asked
+// once before walking, is asked on the first function and kept in the context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	Node:  checkFunction,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unreachable: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset. It runs despite errors as the original does, since a file that does not type-check still
+// has a syntax tree to walk.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	analyzer.RunDespiteErrors = true
+	return analyzer
+}
+
+// packageState is whether the package declares its own `panic` at package level, asked once, on its first function.
+type packageState struct {
+	// decided is whether the package has been asked about yet.
+	decided bool
+	// panicDeclared is whether any of the package's files declares `panic` at package level.
+	panicDeclared bool
+}
+
+// checkFunction walks the body of the function declaration or literal node, reporting each statement in it that
+// execution can never reach.
+func checkFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	var body *ast.BlockStmt
+	switch declared := node.(type) {
+	case *ast.FuncDecl:
+		body = declared.Body
+	case *ast.FuncLit:
+		body = declared.Body
+	default:
+		return
 	}
-	panicDeclared := declaresPanicAtPackageLevel(pass.Files)
-	// Each function declaration and literal in preorder, as the original's Preorder visits them, as a cursor, so its
-	// fix can find a dead statement's place in the tree within the function alone.
-	for function := range inspected.Root().Preorder((*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)) {
-		var body *ast.BlockStmt
-		switch declared := function.Node().(type) {
-		case *ast.FuncDecl:
-			body = declared.Body
-		case *ast.FuncLit:
-			body = declared.Body
-		}
-		// A function declared without a body, implemented elsewhere, has nothing to reach.
-		if body == nil {
-			continue
-		}
-		state := &deadState{
-			pass:          pass,
-			function:      function,
-			panicDeclared: panicDeclared,
-			hasBreak:      map[ast.Stmt]bool{},
-			hasGoto:       map[string]bool{},
-			labels:        map[string]ast.Stmt{},
-		}
-		state.findLabels(body)
-		state.reachable = true
-		state.findDead(body)
+	// A function declared without a body, implemented elsewhere, has nothing to reach.
+	if body == nil {
+		return
 	}
-	return nil, nil
+	declared := rule.State[packageState](context)
+	if !declared.decided {
+		declared.decided, declared.panicDeclared = true, declaresPanicAtPackageLevel(context.Files)
+	}
+	state := &deadState{
+		context:       context,
+		function:      context.Cursor(),
+		panicDeclared: declared.panicDeclared,
+		hasBreak:      map[ast.Stmt]bool{},
+		hasGoto:       map[string]bool{},
+		labels:        map[string]ast.Stmt{},
+	}
+	state.findLabels(body)
+	state.reachable = true
+	state.findDead(body)
 }
 
 // declaresPanicAtPackageLevel is whether any of files declares `panic` at package level, as a function, variable,

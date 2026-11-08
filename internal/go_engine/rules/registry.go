@@ -468,7 +468,7 @@ var ports = map[string]port{
 	"tests":            {analyzer: tests.Analyzer, listener: &tests.Listener},
 	"timeformat":       {analyzer: time_format.Analyzer, listener: &time_format.Listener},
 	"unmarshal":        {analyzer: unmarshal.Analyzer, listener: &unmarshal.Listener},
-	"unreachable":      {analyzer: unreachable.Analyzer},
+	"unreachable":      {analyzer: unreachable.Analyzer, listener: &unreachable.Listener},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer, listener: &unsafe_ptr.Listener},
 	"unusedresult":     {analyzer: unused_result.Analyzer, listener: &unused_result.Listener},
 	"waitgroup":        {analyzer: wait_group.Analyzer, listener: &wait_group.Listener},
