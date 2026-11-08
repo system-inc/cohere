@@ -1,7 +1,9 @@
 package rules
 
 import (
+	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"reflect"
 	"slices"
@@ -122,35 +124,146 @@ var ruledStylecheck = []string{
 }
 
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
-// they follow the x/tools passes in.
+// they follow the x/tools passes in, each as the registry runs it: its port when ports holds one.
 func staticcheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		analyzers = append(analyzers, wrapped.Analyzer)
+		analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
 	}
 	return analyzers
 }
 
 // stylecheckAnalyzers is the ruled ST checks, in stylecheck's order, which is the order they follow the SA
-// and S checks in.
+// and S checks in, each as the registry runs it: its port when ports holds one.
 func stylecheckAnalyzers() []*analysis.Analyzer {
 	analyzers := []*analysis.Analyzer{}
 	for _, wrapped := range stylecheck.Analyzers {
 		if slices.Contains(ruledStylecheck, wrapped.Analyzer.Name) {
-			analyzers = append(analyzers, wrapped.Analyzer)
+			analyzers = append(analyzers, portOrOriginal(wrapped.Analyzer, ports))
 		}
 	}
 	return analyzers
 }
 
 // TestVetsSuiteOpensTheRegistryInItsOwnOrder holds the promise that `cohere` is never weaker than
-// `go vet`: every pass vet runs is a rule, under vet's name, in vet's order, running vet's own analyzer.
+// `go vet`: every pass vet runs is a rule, under vet's name, in vet's order, running vet's own analyzer or, for a
+// pass we have ported, the port that matched it finding for finding.
 func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 	test.Parallel()
-	expectBlock(test, 0, vet.Suite, rule.OriginVet)
+	expected := []*analysis.Analyzer{}
+	for _, pass := range vet.Suite {
+		expected = append(expected, portOrOriginal(pass, ports))
+	}
+	expectBlock(test, 0, expected, rule.OriginVet)
+}
+
+// borrowedChecks is every borrowed check a port may stand in for, by its name: vet's passes, staticcheck's SA, S and
+// ST checks, each the original.
+func borrowedChecks() map[string]*analysis.Analyzer {
+	originals := map[string]*analysis.Analyzer{}
+	for _, pass := range vet.Suite {
+		originals[pass.Name] = pass
+	}
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers, stylecheck.Analyzers) {
+		originals[wrapped.Analyzer.Name] = wrapped.Analyzer
+	}
+	return originals
+}
+
+// TestEveryPortStandsInForABorrowedCheck holds each port in ports to the check it replaces: keyed by a name vet or
+// staticcheck gives a check, named that same name, so the rule and its ignores keep it, and never the original itself,
+// which would port nothing. A port of a vet pass is also documented in the original's words and at its address, so
+// `go vet`'s documentation describes the rule exactly as before.
+func TestEveryPortStandsInForABorrowedCheck(test *testing.T) {
+	test.Parallel()
+	originals := borrowedChecks()
+	vetPasses := map[string]bool{}
+	for _, pass := range vet.Suite {
+		vetPasses[pass.Name] = true
+	}
+	for name, port := range ports {
+		original, borrowed := originals[name]
+		switch {
+		case !borrowed:
+			test.Errorf("ports holds a port for %q, which neither vet nor staticcheck names", name)
+		case port == original:
+			test.Errorf("ports maps %q to the original's own analyzer, so nothing is ported", name)
+		case port.Name != name:
+			test.Errorf("the port for %q is named %q, so its rule would be renamed", name, port.Name)
+		case vetPasses[name] && (port.Doc != original.Doc || port.URL != original.URL):
+			test.Errorf("the port for vet's %q is documented differently from the original", name)
+		case !maps.Equal(flagDefaults(port), flagDefaults(original)):
+			test.Errorf("the port for %q takes flags %v, and the original %v, so a setting would read differently",
+				name, flagDefaults(port), flagDefaults(original))
+		}
+	}
+}
+
+// flagDefaults is each flag analyzer takes, by name, with its default, so a port that drops, adds or defaults a flag
+// differently from its original, printf's -funcs for one, reads as different.
+func flagDefaults(analyzer *analysis.Analyzer) map[string]string {
+	defaults := map[string]string{}
+	analyzer.Flags.VisitAll(func(defined *flag.Flag) {
+		defaults[defined.Name] = defined.DefValue
+	})
+	return defaults
+}
+
+// TestFlagDefaultsTellFlagSetsApart holds flagDefaults to telling analyzers apart by their flags: a flag one takes and
+// the other lacks, and the same flag with another default, each differ, and the same flag with the same default does
+// not, so the port check above cannot pass by reading every analyzer's flags as the same.
+func TestFlagDefaultsTellFlagSetsApart(test *testing.T) {
+	test.Parallel()
+	withFlag := func(defaultValue string) *analysis.Analyzer {
+		planted := &analysis.Analyzer{Name: "planted"}
+		planted.Flags.String("funcs", defaultValue, "planted takes a flag")
+		return planted
+	}
+	without := &analysis.Analyzer{Name: "planted"}
+	if maps.Equal(flagDefaults(withFlag("")), flagDefaults(without)) {
+		test.Error("an analyzer with a flag reads the same as one without it")
+	}
+	if maps.Equal(flagDefaults(withFlag("Warn")), flagDefaults(withFlag(""))) {
+		test.Error("the same flag with another default reads the same")
+	}
+	if !maps.Equal(flagDefaults(withFlag("Warn")), flagDefaults(withFlag("Warn"))) {
+		test.Error("the same flag with the same default reads as different")
+	}
+}
+
+// TestAPortRunsInItsOriginalsPlace plants a port for bools and one for SA4006 and holds portOrOriginal to them: each
+// planted port in its original's place, and every other check the original, so the table cannot fall silent and
+// leave every check borrowed.
+func TestAPortRunsInItsOriginalsPlace(test *testing.T) {
+	test.Parallel()
+	planted := map[string]*analysis.Analyzer{}
+	for _, name := range []string{"bools", "SA4006"} {
+		planted[name] = &analysis.Analyzer{
+			Name: name,
+			Doc:  "planted finds nothing; it stands in for a port of " + name,
+			Run: func(pass *analysis.Pass) (any, error) {
+				return nil, nil
+			},
+		}
+	}
+	replaced := 0
+	for name, original := range borrowedChecks() {
+		running := portOrOriginal(original, planted)
+		switch {
+		case planted[name] != nil && running != planted[name]:
+			test.Errorf("%s runs its original, expected the planted port", name)
+		case planted[name] == nil && running != original:
+			test.Errorf("%s runs a planted port, expected its original", name)
+		case running == planted[name]:
+			replaced++
+		}
+	}
+	if replaced != len(planted) {
+		test.Errorf("the planted ports ran in %d places, expected %d", replaced, len(planted))
+	}
 }
 
 // TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
@@ -353,13 +466,15 @@ var sharedReaders = []string{
 	"staticcheck_wants",
 }
 
-// portedPasses is the packages under rules/ that hold an upstream pass ported onto staticcheck's intermediate
-// representation. Each runs beside its original until it matches it finding for finding, and then All registers it
-// under the original's name in the original's place (#pn1xvnd), so House never lists it. One entry a line, so each
-// port's branch adds its own line and the ports land one after another without touching each other's lines.
+// portedPasses is the packages under rules/ that hold an upstream pass ported as ours: two onto staticcheck's
+// intermediate representation, and vet, which holds vet's passes, one package each (#z2x1c7g). Each runs beside its
+// original until it matches it finding for finding, and then All registers it under the original's name in the
+// original's place (#pn1xvnd), so House never lists it. One entry a line, so each port's branch adds its own line
+// and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
 	"nil_ness",
 	"unused_write",
+	"vet",
 }
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
