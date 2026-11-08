@@ -1,20 +1,14 @@
 package sliding_copy
 
 import (
-	"bytes"
-	"cmp"
-	"go/format"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
-	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1018"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstreams are staticcheck's own fixtures for S1018, each copied unchanged, golden file and all, from
@@ -22,13 +16,7 @@ import (
 // since the two fixtures share one folder name. The go1.N folder sets the language version of staticcheck's run,
 // which S1018 never reads, gating nothing, so the fixtures load from a tree laid out by import path as the house's
 // fixtures do, where the generic one type-checks under the newest language.
-var upstreams = []struct {
-	pattern string
-	file    string
-}{
-	{pattern: "go1.0/CheckLoopSlide", file: "LintLoopSlide.go"},
-	{pattern: "go1.18/CheckLoopSlide", file: "generics.go"},
-}
+var upstreams = []string{"go1.0/CheckLoopSlide", "go1.18/CheckLoopSlide"}
 
 // fixtures is every fixture package the tree holds where the original and the port agree, staticcheck's and parity's.
 var fixtures = []string{"go1.0/CheckLoopSlide", "go1.18/CheckLoopSlide", "parity"}
@@ -41,95 +29,15 @@ var differencesFixtures = []string{"differences", "differences/shadowed", "diffe
 // matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	for _, upstream := range upstreams {
-		fixture := filepath.Join(analysistest.TestData(), "src", upstream.pattern)
-		wants, readError := staticcheck_wants.Read(fixture)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		if len(wants) == 0 {
-			test.Fatalf("the upstream fixture %s holds no notes, so the comparison proves nothing", upstream.pattern)
-		}
-		original, port := parity.Findings(test, s1018.Analyzer, Analyzer, analysistest.TestData(), upstream.pattern)
-		found := []staticcheck_wants.Finding{}
-		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its path below testdata's src.
-			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
-				Message: each.Message,
-			})
-		}
-		test.Logf("in %s the fixture expects %d, the original found %d, the port %d", upstream.pattern, len(wants),
-			len(original), len(found))
-		unexpected, untaken := staticcheck_wants.Compare(wants, found)
-		for _, extra := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-				extra.Message)
-		}
-		for _, missing := range untaken {
-			test.Errorf("the port reported nothing matching %s", missing)
-		}
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), upstreams...)
 }
 
 // The port's fixes, applied to each upstream fixture, make its golden file, as staticcheck's testutil requires of the
-// original's: the golden file is read as a txtar archive, whose comment is the whole fixed file when it holds no
-// sections, and the fixed file is gofmt'd before it is compared, which is what drops the blank line the replaced
-// loop leaves. Each finding suggests one fix, and neither golden file holds sections.
+// original's. The fixed file is gofmt'd before it is compared, which is what drops the blank line the replaced loop
+// leaves. Each finding suggests one fix, and neither golden file holds sections.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
-	for _, upstream := range upstreams {
-		_, port := parity.Findings(test, s1018.Analyzer, Analyzer, analysistest.TestData(), upstream.pattern)
-		path := filepath.Join(analysistest.TestData(), "src", upstream.pattern, upstream.file)
-		source, readError := os.ReadFile(path)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		golden, goldenError := os.ReadFile(path + ".golden")
-		if goldenError != nil {
-			test.Fatal(goldenError)
-		}
-		archive := txtar.Parse(golden)
-		if len(archive.Files) > 0 {
-			test.Fatalf("%s's golden file holds %d sections, one a fix's message, which this test does not read",
-				upstream.file, len(archive.Files))
-		}
-		edits := []parity.Edit{}
-		reported := 0
-		for _, finding := range port {
-			// Every fix of S1018 replaces the loop its finding is at, so a finding's file is its edits'.
-			if finding.File != upstream.pattern+"/"+upstream.file {
-				continue
-			}
-			reported++
-			for _, fix := range finding.Fixes {
-				edits = append(edits, fix.Edits...)
-			}
-		}
-		test.Logf("in %s the port found %d, with %d edits", upstream.file, reported, len(edits))
-		if len(edits) == 0 {
-			test.Fatalf("the port made no edit to %s, so the comparison proves nothing", upstream.file)
-		}
-		// Applied from the last to the first, each edit's offsets still name the bytes they were read against.
-		slices.SortFunc(edits, func(first parity.Edit, second parity.Edit) int {
-			return cmp.Compare(second.Start, first.Start)
-		})
-		fixed := slices.Clone(source)
-		for index, edit := range edits {
-			if index > 0 && edit.End > edits[index-1].Start {
-				test.Fatalf("the port's edits to %s overlap at offset %d", upstream.file, edit.Start)
-			}
-			fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
-		}
-		formatted, formatError := format.Source(fixed)
-		if formatError != nil {
-			test.Fatalf("the port's fixes make source gofmt cannot format: %v\n%s", formatError, fixed)
-		}
-		if !bytes.Equal(formatted, archive.Comment) {
-			test.Errorf("the port's fixes to %s make\n%s\nand the golden file is\n%s", upstream.file, formatted,
-				archive.Comment)
-		}
-	}
+	parity.RequireStaticcheckGolden(test, Analyzer, analysistest.TestData(), upstreams...)
 }
 
 // The original and the port run in one checker over staticcheck's fixtures and parity's, the second holding every
@@ -166,7 +74,8 @@ func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 }
 
 // unformattedTree writes the unformatted fixture out as Go into a tree laid out by import path in a directory of the
-// test's own, and returns the tree.
+// test's own, and returns the tree. It stays the port's own, since no harness call writes a fixture kept as text out
+// as Go; the comparison over the tree is the harness's.
 func unformattedTree(test *testing.T) string {
 	test.Helper()
 	source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "unformatted", "unformatted.go.txt"))
