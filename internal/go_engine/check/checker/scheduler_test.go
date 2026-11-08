@@ -125,8 +125,8 @@ var quietAnalyzer = &analysis.Analyzer{
 	},
 }
 
-// With one slot, independent packages start largest first. Their IDs, and so the order the graph holds them in, run
-// smallest to largest, so neither queue order nor smallest first passes.
+// With one slot, independent packages, each its own whole path to the end, start largest first. Their IDs, and so the
+// order the graph holds them in, run smallest to largest, so neither queue order nor smallest first passes.
 func TestTheLargestReadyGroupStartsFirst(test *testing.T) {
 	test.Parallel()
 
@@ -142,6 +142,37 @@ func TestTheLargestReadyGroupStartsFirst(test *testing.T) {
 	}
 	if want := []string{"delta", "charlie", "bravo", "alpha"}; !slices.Equal(observer.started, want) {
 		test.Errorf("want the groups started largest first, %v, got %v", want, observer.started)
+	}
+}
+
+// With one slot, a small package that a chain waits on starts before a larger package nothing waits on. Lower is 10
+// bytes, but middle and top wait on it in turn, 600 bytes each, so its path is about 1210 against solo's 1000; then
+// middle's 1200 still beats solo, and top's 600 does not. Granting by cost alone would start solo first, and queue
+// order would put solo before top.
+func TestTheReadyGroupOnTheLongestPathStartsFirst(test *testing.T) {
+	test.Parallel()
+
+	roots := writeModule(test, "slots", map[string]string{
+		"lower/lower.go": packageOf("lower", 10),
+		"middle/middle.go": "package middle\n\nimport \"example.com/slots/lower\"\n\n// " + strings.Repeat("x", 600) +
+			"\n\nfunc Middle() { lower.Lower() }\n",
+		"top/top.go": "package top\n\nimport \"example.com/slots/middle\"\n\n// " + strings.Repeat("x", 600) +
+			"\n\nfunc Top() { middle.Middle() }\n",
+		"solo/solo.go": packageOf("solo", 1000),
+	}, "./...")
+	inheriting := &analysis.Analyzer{
+		Name:      "inheriting",
+		Doc:       "inheriting reports nothing and inherits facts, so a package waits on its imports",
+		FactTypes: []analysis.Fact{new(declaredFact)},
+		Run:       func(*analysis.Pass) (any, error) { return nil, nil },
+	}
+	observer := &groupObserver{finished: map[string]bool{}}
+	if _, analyzeError := Analyze([]*analysis.Analyzer{inheriting}, roots,
+		&Options{slots: 1, observeGroup: observer.observe}); analyzeError != nil {
+		test.Fatalf("analyzing: %v", analyzeError)
+	}
+	if want := []string{"lower", "middle", "solo", "top"}; !slices.Equal(observer.started, want) {
+		test.Errorf("want the groups started longest path first, %v, got %v", want, observer.started)
 	}
 }
 
