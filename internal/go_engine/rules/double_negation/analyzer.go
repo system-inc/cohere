@@ -21,47 +21,35 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name:     "SA4013",
-	Doc:      "Flags a boolean negated twice, !!b, which is b: staticcheck's SA4013, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every unary expression of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("double_negation: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.UnaryExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every unary expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.UnaryExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		expression, isUnary := node.(*ast.UnaryExpr)
 		if !isUnary {
-			// Invariant: Preorder hands this function only the unary expressions it was asked for.
-			panic("double_negation: the inspector handed over a node that is not a unary expression")
+			// Invariant: the dispatcher hands Node only the unary expressions it was asked for.
+			panic("double_negation: the dispatcher handed over a node that is not a unary expression")
 		}
 		Check(context, expression)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4013",
+	"SA4013",
+	"Flags a boolean negated twice, !!b, which is b: staticcheck's SA4013, ported as a check on syntax.",
+	&Listener,
+)
 
 // Check judges one unary expression: a negation of a negation, !!b or !(!b), is b, and the fixes turn it into the
 // single negation or remove both. In !!!b both the outer and the inner pair are judged, each a finding of its own.

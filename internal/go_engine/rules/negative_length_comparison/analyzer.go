@@ -20,51 +20,38 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4024",
-	Doc: "Flags len or cap compared below zero, which they never return: staticcheck's SA4024, ported as a check on " +
-		"syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		expression, isBinary := node.(*ast.BinaryExpr)
+		if !isBinary {
+			// Invariant: the dispatcher hands Node only the binary expressions it was asked for.
+			panic("negative_length_comparison: the dispatcher handed over a node that is not a binary expression")
+		}
+		Check(context, expression)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4024",
+	"SA4024",
+	"Flags len or cap compared below zero, which they never return: staticcheck's SA4024, ported as a check on "+
+		"syntax.",
+	&Listener,
+)
 
 // builtinNames are the builtins the pattern's Or names, in its order.
 var builtinNames = []string{"len", "cap"}
-
-// run builds the pass's context and judges every binary expression of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("negative_length_comparison: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BinaryExpr)(nil)}, func(node ast.Node) {
-		expression, isBinary := node.(*ast.BinaryExpr)
-		if !isBinary {
-			// Invariant: Preorder hands this function only the binary expressions it was asked for.
-			panic("negative_length_comparison: the inspector handed over a node that is not a binary expression")
-		}
-		Check(context, expression)
-	})
-	return nil, nil
-}
 
 // Check judges one binary expression: 0 > len(x), 0 > cap(x), len(x) < 0 and cap(x) < 0 are always false, since
 // neither builtin returns a negative value. Only those two orders are judged, as the original judges them, so

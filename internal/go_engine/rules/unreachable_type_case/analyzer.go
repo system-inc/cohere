@@ -17,47 +17,34 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4020",
-	Doc: "Flags a case clause of a type switch that an earlier clause always matches first: staticcheck's SA4020, " +
-		"ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every type switch of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unreachable_type_case: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.TypeSwitchStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every type switch, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.TypeSwitchStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		typeSwitch, isTypeSwitch := node.(*ast.TypeSwitchStmt)
 		if !isTypeSwitch {
-			// Invariant: Preorder hands this function only the type switches it was asked for.
-			panic("unreachable_type_case: the inspector handed over a node that is not a type switch")
+			// Invariant: the dispatcher hands Node only the type switches it was asked for.
+			panic("unreachable_type_case: the dispatcher handed over a node that is not a type switch")
 		}
 		Check(context, typeSwitch)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4020",
+	"SA4020",
+	"Flags a case clause of a type switch that an earlier clause always matches first: staticcheck's SA4020, "+
+		"ported as a check on syntax.",
+	&Listener,
+)
 
 // typedClause is a case clause of a type switch and the types its case list names, in order, a `nil` left out.
 type typedClause struct {

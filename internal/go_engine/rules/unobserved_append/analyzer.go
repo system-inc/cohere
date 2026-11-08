@@ -20,16 +20,21 @@ import (
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4010",
 	"SA4010",
 	"Flags a call to append whose result is never observed anywhere: staticcheck's SA4010, ported onto its "+
 		"intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // message is the original's, word for word.

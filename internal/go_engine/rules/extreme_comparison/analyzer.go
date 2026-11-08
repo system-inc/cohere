@@ -22,27 +22,37 @@ import (
 	"go/types"
 	"math"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4003",
-	Doc: "Flags a comparison with the least or greatest value of an integer type, which never changes: " +
-		"staticcheck's SA4003, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		binary, isBinary := node.(*ast.BinaryExpr)
+		if !isBinary {
+			// Invariant: the dispatcher hands Node only the binary expressions it was asked for.
+			panic("extreme_comparison: the dispatcher handed over a node that is not a binary expression")
+		}
+		Check(context, binary)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4003",
+	"SA4003",
+	"Flags a comparison with the least or greatest value of an integer type, which never changes: "+
+		"staticcheck's SA4003, ported as a check on syntax.",
+	&Listener,
+)
 
 // limits are the least and greatest values of one integer type, as the math package names them and as literals. A
 // name is empty, and a literal nil, where the type has no such limit the check reads, as an unsigned type has no
@@ -80,28 +90,6 @@ var limitsOf = map[types.BasicKind]limits{
 
 // zero is the literal an unsigned value is never less than.
 var zero = constant.MakeInt64(0)
-
-// run builds the pass's context and judges every binary expression of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("extreme_comparison: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BinaryExpr)(nil)}, func(node ast.Node) {
-		binary, isBinary := node.(*ast.BinaryExpr)
-		if !isBinary {
-			// Invariant: Preorder hands this function only the binary expressions it was asked for.
-			panic("extreme_comparison: the inspector handed over a node that is not a binary expression")
-		}
-		Check(context, binary)
-	})
-	return nil, nil
-}
 
 // Check judges one binary expression: an unsigned value compared with a literal zero, and an integer whose type set
 // has one core type compared with that type's least or greatest value, by the math package's name or as a literal.

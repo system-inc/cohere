@@ -21,54 +21,42 @@ import (
 	"go/ast"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4027",
-	Doc: "Flags a modification of the copy (*net/url.URL).Query returns: staticcheck's SA4027, ported as a check " +
-		"on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("ineffective_url_query_modification: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4027",
+	"SA4027",
+	"Flags a modification of the copy (*net/url.URL).Query returns: staticcheck's SA4027, ported as a check "+
+		"on syntax.",
+	&Listener,
+)
 
 // message is the original's, word for word.
 const message = "(*net/url.URL).Query returns a copy, modifying it doesn't change the URL"
 
 // modifyingMethods are the methods of url.Values the original names, each of which changes only the copy.
 var modifyingMethods = []string{"Add", "Del", "Set"}
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("ineffective_url_query_modification: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("ineffective_url_query_modification: the inspector handed over a node that is not a call")
-		}
-		Check(context, call)
-	})
-	return nil, nil
-}
 
 // Check judges one call: Add, Del or Set called on the result of calling Query with no arguments on a pointer to a
 // net/url.URL, each named through any parentheses.

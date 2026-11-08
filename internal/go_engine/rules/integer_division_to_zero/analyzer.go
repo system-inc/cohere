@@ -22,48 +22,37 @@ import (
 	"go/token"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4025",
-	Doc: "Flags a division of two integer literals that truncates to zero, such as 2 / 3: staticcheck's SA4025, " +
-		"ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every binary expression of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("integer_division_to_zero: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BinaryExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		expression, isBinary := node.(*ast.BinaryExpr)
 		if !isBinary {
-			// Invariant: Preorder hands this function only the binary expressions it was asked for.
-			panic("integer_division_to_zero: the inspector handed over a node that is not a binary expression")
+			// Invariant: the dispatcher hands Node only the binary expressions it was asked for.
+			panic("integer_division_to_zero: the dispatcher handed over a node that is not a binary expression")
 		}
 		Check(context, expression)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4025",
+	"SA4025",
+	"Flags a division of two integer literals that truncates to zero, such as 2 / 3: staticcheck's SA4025, "+
+		"ported as a check on syntax.",
+	&Listener,
+)
 
 // Check judges one binary expression: a division whose operands are both written as integer literals, such as 2 / 3,
 // -1 / 2 or (1) / 0x2, is a constant division of integers, which truncates, and one whose result is zero almost
