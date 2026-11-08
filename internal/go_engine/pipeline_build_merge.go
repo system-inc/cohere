@@ -33,6 +33,10 @@ type mergedBuilds struct {
 	directiveFindings []suppression.DirectiveFinding
 	crashes           []check.Crash
 	typeErrors        []load.Diagnostic
+	// added and dropped count, by build in the order merged, the findings that stand which the build kept and the
+	// first build, the host's, did not, and the findings the build kept that the merge left out.
+	added   []int
+	dropped []int
 }
 
 // findingIdentity is what makes two builds' findings one finding: its file, position, rule and message. Anything
@@ -74,7 +78,11 @@ func mergeBuilds(builds []buildOutcome, mergeIfAll map[string]bool) mergedBuilds
 		}
 	}
 
-	merged := mergedBuilds{withheldByRule: map[string]int{}}
+	merged := mergedBuilds{
+		withheldByRule: map[string]int{}, added: make([]int, len(builds)), dropped: make([]int, len(builds)),
+	}
+	// keptIn is, by build, every finding the build kept, which says whom a finding that stands or falls is counted to.
+	keptIn := make([]map[findingIdentity]bool, len(builds))
 	keptBy := map[findingIdentity]int{}
 	var kept []check.Finding
 	withheld := map[findingIdentity]bool{}
@@ -83,9 +91,10 @@ func mergeBuilds(builds []buildOutcome, mergeIfAll map[string]bool) mergedBuilds
 	written := map[suppression.DirectiveFinding]bool{}
 	crashed := map[check.Crash]bool{}
 	typeErrors := map[load.Diagnostic]bool{}
-	for _, build := range builds {
+	for buildIndex, build := range builds {
 		// A build reports a finding once however its packages repeat it, so one build's say is counted once.
 		keptHere := map[findingIdentity]bool{}
+		keptIn[buildIndex] = keptHere
 		for _, found := range build.kept {
 			identity := identityOf(found)
 			if keptHere[identity] {
@@ -134,8 +143,22 @@ func mergeBuilds(builds []buildOutcome, mergeIfAll map[string]bool) mergedBuilds
 	// A file no build has a say on is one a finding's position names but no build compiled, a `//line` directive's
 	// target such as a .y file or a template, where no build disagrees, so what any build says there stands.
 	for _, found := range kept {
-		if !mergeIfAll[found.Rule] || sayers[found.File] == 0 || keptBy[identityOf(found)] == sayers[found.File] {
+		identity := identityOf(found)
+		stands := !mergeIfAll[found.Rule] || sayers[found.File] == 0 || keptBy[identity] == sayers[found.File]
+		if stands {
 			merged.kept = append(merged.kept, found)
+		}
+		for buildIndex := range builds {
+			if !keptIn[buildIndex][identity] {
+				continue
+			}
+			if !stands {
+				merged.dropped[buildIndex]++
+				continue
+			}
+			if buildIndex > 0 && !keptIn[0][identity] {
+				merged.added[buildIndex]++
+			}
 		}
 	}
 	for _, directiveFinding := range unused {

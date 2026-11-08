@@ -83,6 +83,26 @@ func TestWhatNoBuildHasASayOnStandsAsAnyBuildSaysIt(test *testing.T) {
 	}
 }
 
+// Each build is counted the findings it brought: added, those that stand which it kept and the host's did not, each
+// counted to every build beyond the host's that kept it; and dropped, those it kept that the merge left out.
+func TestEachBuildIsCountedWhatItAddedAndWhatWasDropped(test *testing.T) {
+	test.Parallel()
+	shared := mergeTestFinding(mergeAnyRule, "shared.go")
+	windowsOnly := mergeTestFinding(mergeAnyRule, "only_unix_windows.go")
+	unusedOnWindows := mergeTestFinding(mergeAllRule, "shared.go")
+	merged := mergeBuilds([]buildOutcome{
+		{said: saying("shared.go"), kept: []check.Finding{shared}},
+		{
+			said: saying("shared.go", "only_unix_windows.go"),
+			kept: []check.Finding{shared, windowsOnly, unusedOnWindows},
+		},
+		{said: saying("only_unix_windows.go"), kept: []check.Finding{windowsOnly}},
+	}, mergeTestStrategies)
+	if !slices.Equal(merged.added, []int{0, 1, 1}) || !slices.Equal(merged.dropped, []int{0, 1, 0}) {
+		test.Errorf("added %v and dropped %v, where [0 1 1] and [0 1 0] were expected", merged.added, merged.dropped)
+	}
+}
+
 // A mergeIfAny finding stands when any build with a say kept it, and one finding two builds kept is written once,
 // the host's copy.
 func TestAMergeIfAnyFindingStandsOnceWhereAnyBuildKeepsIt(test *testing.T) {
