@@ -1,0 +1,63 @@
+package differences
+
+import (
+	"time"
+
+	"example.com/differences/embedder"
+)
+
+type embedding struct{ time.Time }
+
+type pointing struct{ *time.Time }
+
+type inner struct{ time.Time }
+
+type deeper struct{ inner }
+
+// The method is promoted from inner's time.Time, and the field named Time nearer the receiver takes the name.
+type covered struct {
+	inner
+	Time int
+}
+
+// The method is promoted from inner's time.Time, and the field named Time nearer the receiver is another time.Time,
+// which is not embedded, so its methods are not promoted, and selecting it compiles and reads the wrong time.
+type twoTimes struct {
+	inner
+	Time time.Time
+}
+
+// The original hands time.Until the receiver as written, which is no time.Time through a pointer or an embedded
+// field, and the port hands it the time.Time the method is called on.
+func receivers(
+	pointer *time.Time,
+	embedded embedding,
+	embeddedPointer *embedding,
+	pointed pointing,
+	deep deeper,
+	cover covered,
+	two twoTimes,
+	promoted embedder.Promoted,
+	hidden embedder.Hidden,
+) {
+	// The original writes time.Until(pointer), and the port time.Until(*pointer).
+	_ = time.Until(*pointer) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until((pointer)), and the port time.Until(*(pointer)).
+	_ = time.Until(*(pointer)) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(embedded), and the port time.Until(embedded.Time).
+	_ = time.Until(embedded.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(embeddedPointer), and the port time.Until(embeddedPointer.Time).
+	_ = time.Until(embeddedPointer.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(pointed), and the port time.Until(*pointed.Time).
+	_ = time.Until(*pointed.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(deep), and the port time.Until(deep.Time), the name alone reaching two deep.
+	_ = time.Until(deep.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(cover), and the port time.Until(cover.inner.Time), since cover.Time is an int.
+	_ = time.Until(cover.inner.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(promoted), and the port time.Until(promoted.Time), through an unexported field.
+	_ = time.Until(promoted.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// The original writes time.Until(two), and the port time.Until(two.inner.Time), since two.Time is another time.
+	_ = time.Until(two.inner.Time) // port moves: should use time.Until instead of t.Sub(time.Now())
+	// hidden.Time is an int, and the time.Time is behind another package's unexported field, which nothing here names.
+	_ = hidden.Sub(time.Now()) // port withholds: Replace with call to time.Until
+}
