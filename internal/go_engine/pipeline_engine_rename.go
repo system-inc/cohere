@@ -795,5 +795,6 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	for file, contents := range overlay {
 		engine.described.contents[file] = contents
 	}
-	return engine.askedRenames(engine.suppress(names, engine.inScope(result.Findings)).kept)
+	suppressed := engine.suppress(names, engine.inScope(result.Findings), engine.described.readable())
+	return engine.askedRenames(suppressed.kept)
 }
