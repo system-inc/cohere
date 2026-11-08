@@ -722,6 +722,7 @@ var portedPasses = []string{
 	"invisible_character",
 	"math_on_converted_integer",
 	"misplaced_error_result",
+	"modulo_by_one",
 	"nan_comparison",
 	"negative_length_comparison",
 	"negative_zero_float",
