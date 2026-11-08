@@ -846,6 +846,7 @@ var portedPasses = []string{
 	"dynamic_printf_format",
 	"error_variable_name",
 	"extreme_comparison",
+	"find_all_zero_limit",
 	"http_status_literal",
 	"identical_operands",
 	"impossible_target_comparison",
