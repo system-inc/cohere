@@ -33,7 +33,7 @@ func requireStaticcheckWants(
 	test.Helper()
 	wanted := 0
 	reported := 0
-	for _, fixtures := range loadFixtures(test, target, testdata, patterns) {
+	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {
 		for _, action := range portActions(test, port, fixtures.roots) {
 			wants := []staticcheck_wants.Want{}
 			for _, file := range action.Package.GoFiles {

@@ -19,11 +19,12 @@ func TestRequireStaticcheckWantsFailsEitherWay(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckWants(recording, original, analysistest.TestData(), "staticcheck_notes")
 	}),
-		`staticcheck_notes.go:15: the port reported "call to renamed in the original's words" in staticcheck_notes, `+
-			"which no note on the line expects",
-		`staticcheck_notes.go:14: diag(re"call to gai.ed"): the port reported nothing in staticcheck_notes matching it`,
-		`staticcheck_notes.go:15: diag("in the port's words"): the port reported nothing in staticcheck_notes `+
-			"matching it",
+		`staticcheck_notes/staticcheck_notes.go:15: the port reported "call to renamed in the original's words" in `+
+			"staticcheck_notes, which no note on the line expects",
+		`staticcheck_notes/staticcheck_notes.go:14: diag(re"call to gai.ed"): the port reported nothing in `+
+			"staticcheck_notes matching it",
+		`staticcheck_notes/staticcheck_notes.go:15: diag("in the port's words"): the port reported nothing in `+
+			"staticcheck_notes matching it",
 	)
 }
 

@@ -33,7 +33,7 @@ func (target Target) Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
-	return findingsOver(test, original, port, loadFixtures(test, target, testdata, patterns))
+	return findingsOver(test, original, port, loadFixtures(test, target, testdata, patterns, nil))
 }
 
 // RequireIdentical is the package's RequireIdentical with the fixtures loaded for target.
@@ -45,7 +45,7 @@ func (target Target) RequireIdentical(
 	patterns ...string,
 ) {
 	test.Helper()
-	requireIdentical(test, target, original, port, testdata, patterns...)
+	requireIdentical(test, target, original, port, testdata, nil, patterns...)
 }
 
 // RequireOnlyAdjudicated is the package's RequireOnlyAdjudicated with the fixtures loaded for target.

@@ -3,8 +3,10 @@ package parity
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -79,13 +81,22 @@ func (fixtures fixtureLoad) described() string {
 	return fmt.Sprint(fixtures.patterns)
 }
 
-// fileName is a file of the load as findings and records name it: its base name, after the pattern that named its
-// module when the load is one, since every version's module of staticcheck's fixtures holds a file of the same name.
-func (fixtures fixtureLoad) fileName(path string) string {
-	if fixtures.module == "" {
-		return filepath.Base(path)
+// fileName is a file of the load as findings, records and failures name it: its path below the fixtures' root, so
+// two files of one name in different folders never pair, as every version's folder of staticcheck's fixtures holds
+// one. The root is testdata's src in the tree, as `go1.0/CheckIneffectiveRandInt/CheckIneffectiveRandInt.go`, and
+// testdata itself when it is a module; in a module a pattern named, it is the module's folder, the path after that
+// pattern, as `module_one/inner/inner.go`. A file outside the root, as a related entry can name in the standard
+// library, keeps its path.
+func (fixtures fixtureLoad) fileName(file string) string {
+	root := fixtures.directory
+	if fixtures.module == "" && !isModule(fixtures.directory) {
+		root = filepath.Join(fixtures.directory, "src")
 	}
-	return filepath.ToSlash(filepath.Join(fixtures.module, filepath.Base(path)))
+	below, relativeError := filepath.Rel(root, file)
+	if relativeError != nil || strings.HasPrefix(below, "..") {
+		return filepath.ToSlash(file)
+	}
+	return path.Join(fixtures.module, filepath.ToSlash(below))
 }
 
 // loadedFixtures is one load's root packages, beside the load.
@@ -121,11 +132,20 @@ func recordsFolder(test testing.TB, fixtures loadedFixtures) string {
 }
 
 // loadFixtures loads the fixture packages patterns name from testdata for target, a load for the tree and one for
-// each module. A load that found nothing and a fixture package that did not load clean each fail the test, since
-// silence there would read as agreement.
-func loadFixtures(test testing.TB, target Target, testdata string, patterns []string) []loadedFixtures {
+// each module. A load that found nothing fails the test, since silence there would read as agreement, and so do the
+// fixture packages' load errors unless they are exactly expected (see requireLoadErrors). With nothing expected, as
+// every caller but RequireIdenticalDespiteLoadErrors expects, a fixture package that did not load clean fails on its
+// own.
+func loadFixtures(
+	test testing.TB,
+	target Target,
+	testdata string,
+	patterns []string,
+	expected []LoadError,
+) []loadedFixtures {
 	test.Helper()
 	loads := []loadedFixtures{}
+	loadErrors := []LoadError{}
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
 		loaded, loadError := load.Packages(fixtures.directory, fixtures.patterns, target.environmentOf(test, fixtures),
 			nil)
@@ -133,15 +153,20 @@ func loadFixtures(test testing.TB, target Target, testdata string, patterns []st
 			test.Fatalf("loading %s: %v", fixtures.described(), loadError)
 		}
 		// The checker passes over a root that does not type-check without a word, so a fixture with one type error
-		// would compare nothing and read green. There must be a root, and every root must load clean.
+		// would compare nothing and read green. There must be a root, and every root must load clean or with exactly
+		// the errors expected.
 		if len(loaded.Roots) == 0 {
 			test.Fatalf("loading %s found no package, so the comparison would prove nothing", fixtures.described())
 		}
-		for _, failure := range LoadFailures(loaded.Roots) {
-			test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
-				failure.Package, failure.Error)
+		if len(expected) == 0 {
+			for _, failure := range LoadFailures(loaded.Roots) {
+				test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
+					failure.Package, failure.Error)
+			}
 		}
+		loadErrors = append(loadErrors, loadErrorsOf(loaded.Roots, fixtures.fileName)...)
 		loads = append(loads, loadedFixtures{fixtureLoad: fixtures, roots: loaded.Roots})
 	}
+	requireLoadErrors(test, loadErrors, expected)
 	return loads
 }
