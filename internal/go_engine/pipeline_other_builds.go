@@ -6,6 +6,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -43,6 +44,9 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
 	}}
+	if engine.session != nil {
+		runs[0].files = engine.session.Files()
+	}
 
 	for _, extra := range extras {
 		extraRun, extraError := engine.extraBuildRun(extra, ours)
@@ -82,12 +86,22 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 // environment, so they never meet the host's. Its type errors are its load's for every package. A load with any
 // analyzes nothing, as the host's lint runs over no load with one, since findings against wrong semantics would be
 // noise, and so has a say on no file.
+//
+// The build's keys read the digests of the files the host's session hashed (CacheSession.Files) rather than hash them
+// again, since nearly every file is the host's too. That holds because nothing writes a file between the host's load
+// and this one: gofmt, the long-line wrap and the rename all write before the load the lint reads (pipeline.run), the
+// wrap's write is followed by a second load whose Restore keys every file again, and a run whose rename wrote reads no
+// findings cache here at all.
 func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
 	var session *check.CacheSession
 	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
 	if !engine.renamed {
-		session = engine.cacheSession(environment)
+		var hostFiles cache.FileDigests
+		if engine.session != nil {
+			hostFiles = engine.session.Files()
+		}
+		session = engine.cacheSession(environment, hostFiles)
 	}
 	caching := load.Caching{Held: engine.held}
 	if session != nil {
@@ -109,6 +123,9 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		result:     &check.Result{FindingsByRule: map[string]int{}},
 		typeErrors: loaded.Diagnostics,
 		inputs:     loaded.Inputs,
+	}
+	if session != nil {
+		run.files = session.Files()
 	}
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil

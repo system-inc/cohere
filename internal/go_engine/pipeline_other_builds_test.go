@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -192,6 +194,111 @@ func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	}
 	if withoutCache(coldStream) != withoutCache(warmStream) {
 		test.Errorf("the warm run's stream differs from the cold run's:\ncold\n%s\nwarm\n%s", coldStream, warmStream)
+	}
+}
+
+// Under `--other-builds` each extra build's keys read the digests of the files the host's keys hashed, so a run hashes
+// every file of the host's build once, and of each extra build only the files its load holds that the host's does
+// not. The fixture gains a package importing os, so windows reaches standard-library packages the host's build never
+// does, and has files of its own to hash.
+//
+// Not parallel: it reads cache.FilesHashed, which every test in the process that keys a package moves.
+func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	reach := filepath.Join(root, "internal", "reach")
+	if makeError := os.MkdirAll(reach, 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	reachFile := "// Package reach reaches os, whose files differ by platform.\npackage reach\n\nimport \"os\"\n\n" +
+		"// Name is the program's name.\nfunc Name() string { return os.Args[0] }\n"
+	if writeError := os.WriteFile(filepath.Join(reach, "reach.go"), []byte(reachFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	before := cache.FilesHashed()
+	engine, _ := runOverWith(test, root, exitFindings, "--other-builds")
+	hashed := cache.FilesHashed() - before
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	}
+	hostFiles := map[string]bool{}
+	ownFiles := 0
+	for file := range engine.buildRuns[0].files.Paths() {
+		hostFiles[file] = true
+	}
+	want := int64(len(hostFiles))
+	for _, extra := range engine.buildRuns[1:] {
+		shared, own := 0, 0
+		for file := range extra.files.Paths() {
+			if hostFiles[file] {
+				shared++
+				continue
+			}
+			own++
+		}
+		if shared == 0 {
+			test.Fatalf("%s keyed no file the host's did, so there was nothing to read rather than hash", extra.build)
+		}
+		ownFiles += own
+		want += int64(own)
+	}
+	if ownFiles == 0 {
+		test.Fatal("no extra build keyed a file the host's did not, so nothing tells hashing those from not")
+	}
+	if hashed != want {
+		test.Errorf("want the host's %d files and each extra build's own hashed, %d in all, got %d hashed",
+			len(hostFiles), want, hashed)
+	}
+}
+
+// describeFile is a file of the other-builds fixture's label package, which every build compiles, with a line past
+// the limit that the long-line wrap breaks after a comma.
+const describeFile = "package label\n\nimport \"fmt\"\n\n" +
+	"// Describe says where a delivery goes and when, as one sentence a reader can follow.\n" +
+	"func Describe(sender string, recipient string, street string, city string, weekday string) string {\n" +
+	"\treturn fmt.Sprintf(\"%s sends a parcel to %s, who lives at %s in %s, and it arrives on %s\", " +
+	"sender, recipient, street, city, weekday)\n}\n"
+
+// When the long-line wrap writes a file in a run under `--other-builds`, the load the lint reads is a second one, whose
+// Restore keys every file again, and each extra build reads the digests of that Restore, of the bytes on disk after
+// the wrap, never the first's, of the bytes it replaced: an extra build keyed on the replaced bytes would save entries
+// under keys of a file no longer on disk. The digests are what this holds every build to. Once the wrapped file is put
+// back as it was, a cached `--no-fix` run also finds what a `--no-cache` one does, though the merge's verdict alone
+// does not tell the stale digests apart: the host's finding on the file stands whatever its extra builds restore.
+func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	file := filepath.Join(root, "internal", "label", "describe.go")
+	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	engine, stream := runOverWith(test, root, exitFindings, "--other-builds")
+	if !strings.Contains(stream, `"fixedBy":{"cohere-go/consistency-no-long-line":1}`) {
+		test.Fatalf("want the wrap to break the long line of %s, got\n%s", file, stream)
+	}
+	wrapped, readError := os.ReadFile(file)
+	if readError != nil || string(wrapped) == describeFile {
+		test.Fatalf("the run left %s as it was (%v)", file, readError)
+	}
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	}
+	onDisk := sha256.Sum256(wrapped)
+	for _, run := range engine.buildRuns {
+		digest, held := run.files.Digest(file)
+		if !held || digest != onDisk {
+			test.Errorf("%s keyed %s at %x (held %t), want the wrapped bytes on disk, %x", run.build, file, digest,
+				held, onDisk)
+		}
+	}
+
+	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, cached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix")
+	_, uncached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix", "--no-cache")
+	if withoutCache(cached) != withoutCache(uncached) {
+		test.Errorf("over the bytes the wrap replaced, the cached run's stream differs from a --no-cache run's:\n"+
+			"cached\n%s\nwithout the cache\n%s", cached, uncached)
 	}
 }
 

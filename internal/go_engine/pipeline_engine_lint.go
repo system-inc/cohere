@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -220,9 +221,11 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 }
 
 // cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
-// so the load restores what it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no
-// standard-library entries, or when what every key shares cannot be read, which the run says on stderr.
-func (engine *pipeline) cacheSession(environment []string) *check.CacheSession {
+// so the load restores what it holds, whose keys read files' digests rather than hashing those files again, and nil
+// when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries, or when what every key
+// shares cannot be read, which the run says on stderr. files must be of the files as they are on disk when the load
+// runs (see extraBuildRun).
+func (engine *pipeline) cacheSession(environment []string, files cache.FileDigests) *check.CacheSession {
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {
@@ -231,6 +234,7 @@ func (engine *pipeline) cacheSession(environment []string) *check.CacheSession {
 	if caching == nil {
 		return nil
 	}
+	caching.Files = files
 	return check.NewCacheSession(caching, enabled)
 }
 

@@ -1,14 +1,8 @@
 package cache
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"io"
-	"os"
-	"runtime"
 	"slices"
-	"sync"
-	"sync/atomic"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -37,27 +31,16 @@ type Keyed struct {
 	// key joins with what its dependencies' analyses came out as rather than with what went into them.
 	Own map[*packages.Package]Key
 
-	// Files are the digests of every file Keys hashed, which StandardLibraryKeys reads rather than hashing the
-	// standard library's files again in the same run.
+	// Files are the digests of every file Keys keyed, those it was given included, which StandardLibraryKeys reads
+	// rather than hashing the standard library's files again in the same run, and an extra build's Keys under
+	// `--other-builds` reads rather than hashing again the files the host's build shares with it.
 	Files FileDigests
-}
-
-// FileDigests is the sha256 of each file a run has hashed, by path. The zero value holds none.
-type FileDigests struct {
-	byPath map[string]fileDigest
-}
-
-// filesHashed counts the files this process has hashed for a key, which FilesHashed reads.
-var filesHashed atomic.Int64
-
-// FilesHashed is how many files this process has hashed for a key so far, so a test can tell a run that hashes each
-// file once from one that hashes some twice.
-func FilesHashed() int64 {
-	return filesHashed.Load()
 }
 
 // Keys computes every package's key, for the packages given and everything they import, reading each file once.
 // extraInputs, when non-nil, returns more inputs for one package (a rule's reads outside the pass), each hashed in.
+// known are digests the run already holds, read rather than hashed again, and the caller vouches that nothing wrote
+// any of those files since: the zero value holds none.
 //
 // A key is a sha256 over two parts, each length-prefixed: the package's own digest, then the keys of the packages it
 // imports, sorted by import path. The own digest is a sha256 over, in this order and each part length-prefixed: the
@@ -70,12 +53,13 @@ func Keys(
 	given []*packages.Package,
 	shared Context,
 	extraInputs func(*packages.Package) ([]string, error),
+	known FileDigests,
 ) (*Keyed, error) {
 	reachable, reachableError := reachableFrom(given)
 	if reachableError != nil {
 		return nil, reachableError
 	}
-	digests, digestsError := fileDigests(reachable, FileDigests{})
+	digests, digestsError := fileDigests(reachable, known)
 	if digestsError != nil {
 		return nil, digestsError
 	}
@@ -172,78 +156,4 @@ func reachableFrom(given []*packages.Package) ([]*packages.Package, error) {
 		}
 	}
 	return reachable, nil
-}
-
-// fileDigests is the digest of every file of the packages that are not keyed by path alone: known's when it holds
-// the file, else hashed, each once, across the cores, since reading and hashing the files is nearly all of Keys'
-// work. A file that cannot be read is an error, since a key without its bytes would say nothing about it.
-func fileDigests(reachable []*packages.Package, known FileDigests) (map[string]fileDigest, error) {
-	seen := map[string]bool{}
-	var files []string
-	byPath := map[string]fileDigest{}
-	for _, reached := range reachable {
-		if pathOnly(reached) {
-			continue
-		}
-		for _, list := range fileLists(reached) {
-			for _, file := range list {
-				if seen[file] {
-					continue
-				}
-				seen[file] = true
-				if digest, hashed := known.byPath[file]; hashed {
-					byPath[file] = digest
-					continue
-				}
-				files = append(files, file)
-			}
-		}
-	}
-	// Sorted so that of several unreadable files the same one is reported every time.
-	slices.Sort(files)
-
-	digests := make([]fileDigest, len(files))
-	readErrors := make([]error, len(files))
-	indexes := make(chan int)
-	var workers sync.WaitGroup
-	for range min(runtime.GOMAXPROCS(0), max(len(files), 1)) {
-		workers.Go(func() {
-			for index := range indexes {
-				digests[index], readErrors[index] = digestOf(files[index])
-			}
-		})
-	}
-	for index := range files {
-		indexes <- index
-	}
-	close(indexes)
-	workers.Wait()
-
-	for index, file := range files {
-		if readErrors[index] != nil {
-			return nil, readErrors[index]
-		}
-		byPath[file] = digests[index]
-	}
-	return byPath, nil
-}
-
-// digestOf is the sha256 of one file's bytes, streamed rather than read whole.
-func digestOf(file string) (fileDigest, error) {
-	opened, openError := os.Open(file)
-	if openError != nil {
-		return fileDigest{}, fmt.Errorf("hashing %s: %w", file, openError)
-	}
-	defer func() {
-		// Ignored: the file was only read, and every byte of it hashed or the copy failed.
-		_ = opened.Close()
-	}()
-	filesHashed.Add(1)
-	digester := sha256.New()
-	if _, copyError := io.Copy(digester, opened); copyError != nil {
-		return fileDigest{}, fmt.Errorf("hashing %s: %w", file, copyError)
-	}
-	var digest fileDigest
-	copy(digest[:], digester.Sum(nil))
-	return digest, nil
 }
