@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/system-inc/cohere/git_tree"
 )
 
 // A landing is one merge commit onto main, `Land #<task>: <what landed>`, whose first parent is main and whose
@@ -98,23 +100,19 @@ func subjectVocabulary(worktree string, commit string) (map[string]bool, error) 
 	if gitOutputError != nil {
 		return nil, fmt.Errorf("reading the tree to name its areas: %w", gitOutputError)
 	}
+	entries, parseError := git_tree.ParseTreeListing([]byte(listing))
+	if parseError != nil {
+		return nil, fmt.Errorf("reading the tree to name its areas: %w", parseError)
+	}
 	vocabulary := map[string]bool{}
-	for _, entry := range strings.Split(listing, "\x00") {
-		description, entryPath, found := strings.Cut(entry, "\t")
-		if !found {
-			continue
-		}
-		fields := strings.Fields(description)
-		if len(fields) < 2 {
-			continue
-		}
-		switch fields[1] {
-		case "tree", "commit":
-			vocabulary[entryPath] = true
-			vocabulary[path.Base(entryPath)] = true
-		case "blob":
-			if !strings.Contains(entryPath, "/") {
-				vocabulary[strings.ToLower(strings.TrimSuffix(entryPath, path.Ext(entryPath)))] = true
+	for _, entry := range entries {
+		switch entry.Mode {
+		case git_tree.ModeTree, git_tree.ModeGitlink:
+			vocabulary[entry.Path] = true
+			vocabulary[path.Base(entry.Path)] = true
+		default:
+			if !strings.Contains(entry.Path, "/") {
+				vocabulary[strings.ToLower(strings.TrimSuffix(entry.Path, path.Ext(entry.Path)))] = true
 			}
 		}
 	}

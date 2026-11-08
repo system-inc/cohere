@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/system-inc/cohere/git_tree"
 	"golang.org/x/mod/modfile"
 )
 
@@ -81,16 +82,13 @@ func readTreeListing(worktree string, revision string) (*treeListing, error) {
 	if listError != nil {
 		return nil, listError
 	}
+	entries, parseError := git_tree.ParseTreeListing([]byte(listing))
+	if parseError != nil {
+		return nil, parseError
+	}
 	objects := map[string]string{"": commit}
-	for _, entry := range strings.Split(listing, "\x00") {
-		description, entryPath, found := strings.Cut(entry, "\t")
-		if !found {
-			continue
-		}
-		fields := strings.Fields(description)
-		if len(fields) == 3 {
-			objects[entryPath] = fields[2]
-		}
+	for _, entry := range entries {
+		objects[entry.Path] = entry.Object
 	}
 	return &treeListing{commit: commit, objects: objects}, nil
 }
