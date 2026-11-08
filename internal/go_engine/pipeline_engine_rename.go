@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
@@ -773,12 +774,18 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	on := engine.renamingRulesOn()
 	naming := make([]rule.Rule, 0, len(on))
 	names := make([]string, 0, len(on))
+	run := make([]*analysis.Analyzer, 0, len(on))
 	for _, name := range slices.Sorted(maps.Keys(on)) {
-		// A rule that learns facts, itself or through anything it requires, as through its dispatcher, which requires
-		// what every listener on it does, is analyzed on every dependency, which lets go of their syntax and types. A
-		// package with tests is a root of current beside its test variant, and a dependency of every package that
-		// imports it, so the next round, which plans over current's roots, would read a root with no types.
-		if learner := check.FactLearner(on[name].Analyzer); learner != nil {
+		run = append(run, on[name].Analyzer)
+	}
+	for _, name := range slices.Sorted(maps.Keys(on)) {
+		// A rule that learns facts, itself or through anything it requires in this run of the naming rules alone, as
+		// through its dispatcher where a naming rule's listener requires a fact analyzer, is analyzed on every
+		// dependency, which lets go of their syntax and types. A package with tests is a root of current beside its
+		// test variant, and a dependency of every package that imports it, so the next round, which plans over
+		// current's roots, would read a root with no types. A listener registered on the dispatcher for a rule this run
+		// leaves out teaches nothing here, since the run never runs what it requires.
+		if learner := check.FactLearner(on[name].Analyzer, run); learner != nil {
 			engine.note("%s learns facts through %s, so its renames are not asked for again after a round", name,
 				learner.Name)
 			return nil

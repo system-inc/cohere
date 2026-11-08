@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -316,5 +318,201 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 				subtest.Errorf("the run found %q, where exactly %q was expected", messages, expected)
 			}
 		})
+	}
+}
+
+// plantedRuns is an analyzer that learns facts, so the checker runs it on every package below one it runs on, and
+// counts its runs by package path, standing in for staticcheck's purity, which only the listeners of SA4017 and its
+// kin require.
+type plantedRuns struct {
+	mutex    sync.Mutex
+	runs     map[string]int
+	analyzer *analysis.Analyzer
+}
+
+// newPlantedRuns is a counting analyzer named name, whose result names the package it ran on.
+func newPlantedRuns(name string) *plantedRuns {
+	planted := &plantedRuns{runs: map[string]int{}}
+	planted.analyzer = &analysis.Analyzer{
+		Name:       name,
+		Doc:        name + " counts its runs on each package",
+		FactTypes:  []analysis.Fact{new(plantedFact)},
+		ResultType: reflect.TypeFor[string](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			planted.mutex.Lock()
+			defer planted.mutex.Unlock()
+			planted.runs[pass.Pkg.Path()]++
+			return name + " on " + pass.Pkg.Path(), nil
+		},
+	}
+	return planted
+}
+
+// An analyzer that only the listener of a rule the run leaves out requires never runs, on either dispatcher, on any
+// package, though that listener registered on the very dispatcher the run's enabled rule requires and the dispatcher
+// requires what each of its listeners does: the run's rule beside it still reports every function. The same analyzer,
+// required also by an enabled rule's listener, runs once on every package, and that listener reads its result there,
+// as a dispatcher handed only some of what its listeners require would not let it.
+func TestAnAnalyzerOnlyALeftOutListenerRequiresNeverRuns(test *testing.T) {
+	test.Parallel()
+
+	// reportDeclared reports every function as declaring its name, for a listener of either walk.
+	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
+		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
+	}
+	// reportRead reports the result of planted the listener was handed at the package clause of the package's first
+	// file, which the run keeps once per package however often it is called there, and panics, which the dispatcher
+	// makes the rule's crash, when it was handed none.
+	reportRead := func(context *rule.Context, planted *analysis.Analyzer) {
+		result, isResult := context.ResultOf(planted).(string)
+		if !isResult || result == "" {
+			panic(fmt.Sprintf("the listener was handed %v for %s", context.ResultOf(planted), planted.Name))
+		}
+		context.Report(analysis.Diagnostic{Pos: context.Files[0].Package, Message: "read " + result})
+	}
+	walks := []struct {
+		name string
+		// register registers on a fresh dispatcher of the walk the case is for a listener that requires planted
+		// whose rule the run leaves out, a listener that requires nothing and reports every function, and one that
+		// requires planted and reports reading its result, and returns the last two's rules.
+		register func(planted *analysis.Analyzer) (declaring rule.Rule, reading rule.Rule)
+	}{
+		{"syntax", func(planted *analysis.Analyzer) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewSyntax()
+			dispatcher.RuleAnalyzer(rule.Namespace+"test-planted-left-out", "planted_left_out_syntax",
+				"requires the planted analyzer", &rule.Listener{
+					Requires: []*analysis.Analyzer{planted},
+					Nodes:    []ast.Node{(*ast.FuncDecl)(nil)},
+					Node:     func(context *rule.Context, _ ast.Node, _ []ast.Node) { reportRead(context, planted) },
+				})
+			declaring := &rule.Listener{
+				Nodes: []ast.Node{(*ast.FuncDecl)(nil)},
+				Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+					if declaration, isDeclaration := node.(*ast.FuncDecl); isDeclaration {
+						reportDeclared(context, declaration.Name.Pos(), declaration.Name.Name)
+					}
+				},
+			}
+			reading := &rule.Listener{
+				Requires:  []*analysis.Analyzer{planted},
+				FileEnter: func(context *rule.Context, _ *ast.File) { reportRead(context, planted) },
+			}
+			declaringName, readingName := rule.Namespace+"test-planted-declaring", rule.Namespace+"test-planted-reading"
+			return rule.Rule{Name: declaringName, Origin: rule.OriginHouse, Listener: declaring,
+					Analyzer: dispatcher.RuleAnalyzer(declaringName, "planted_declaring_syntax",
+						"reports every declaration", declaring)},
+				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
+					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_syntax",
+						"reports reading the planted analyzer", reading)}
+		}},
+		{"intermediate representation", func(planted *analysis.Analyzer) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewIr()
+			dispatcher.RuleAnalyzer(rule.Namespace+"test-planted-left-out", "planted_left_out_ir",
+				"requires the planted analyzer", &rule.Listener{
+					Requires: []*analysis.Analyzer{planted},
+					Function: func(context *rule.Context, _ *ir.Function) { reportRead(context, planted) },
+				})
+			declaring := &rule.Listener{
+				Function: func(context *rule.Context, function *ir.Function) {
+					// The package initializer is synthetic and declared by no one.
+					if function.Synthetic == "" {
+						reportDeclared(context, function.Pos(), function.Name())
+					}
+				},
+			}
+			reading := &rule.Listener{
+				Requires: []*analysis.Analyzer{planted},
+				Function: func(context *rule.Context, _ *ir.Function) { reportRead(context, planted) },
+			}
+			declaringName, readingName := rule.Namespace+"test-planted-declaring", rule.Namespace+"test-planted-reading"
+			return rule.Rule{Name: declaringName, Origin: rule.OriginHouse, Listener: declaring,
+					Analyzer: dispatcher.RuleAnalyzer(declaringName, "planted_declaring_ir",
+						"reports every source function", declaring)},
+				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
+					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_ir",
+						"reports reading the planted analyzer", reading)}
+		}},
+	}
+	const base = "example.com/fixture/base"
+	const user = "example.com/fixture/user"
+	for _, walk := range walks {
+		for _, readerEnabled := range []bool{false, true} {
+			test.Run(fmt.Sprintf("%s, the reader enabled %t", walk.name, readerEnabled), func(subtest *testing.T) {
+				subtest.Parallel()
+				planted := newPlantedRuns("planted_" + strings.ReplaceAll(walk.name, " ", "_"))
+				declaring, reading := walk.register(planted.analyzer)
+				enabled := []rule.Rule{declaring}
+				expectedRuns := map[string]int{}
+				expected := []string{declaring.Name + ": declares Marked", declaring.Name + ": declares Target",
+					declaring.Name + ": declares Use"}
+				if readerEnabled {
+					enabled = append(enabled, reading)
+					expectedRuns = map[string]int{base: 1, user: 1}
+					expected = append(expected, reading.Name+": read "+planted.analyzer.Name+" on "+base,
+						reading.Name+": read "+planted.analyzer.Name+" on "+user)
+				}
+				result := runRules(subtest, Options{}, enabled...)
+				planted.mutex.Lock()
+				defer planted.mutex.Unlock()
+				if !maps.Equal(planted.runs, expectedRuns) {
+					subtest.Errorf("the planted analyzer ran %v, where %v was expected", planted.runs, expectedRuns)
+				}
+				messages := []string{}
+				for _, finding := range result.Findings {
+					messages = append(messages, finding.Rule+": "+finding.Message)
+				}
+				slices.Sort(messages)
+				slices.Sort(expected)
+				if !slices.Equal(messages, expected) || len(result.Crashes) != 0 {
+					subtest.Errorf("the run found %q and crashed %+v, where exactly %q and no crash were expected",
+						messages, result.Crashes, expected)
+				}
+			})
+		}
+	}
+}
+
+// The cache asks an entry for the facts of exactly the fact analyzers the run's graph runs: not one only a left-out
+// rule's listener requires, which no run of these rules ever runs, so an entry that holds none of its facts covers
+// what the run asks, and the same analyzer once an enabled rule's listener requires it too.
+func TestTheCacheAsksNoFactsOfAnAnalyzerOnlyALeftOutListenerRequires(test *testing.T) {
+	test.Parallel()
+
+	planted := newPlantedRuns("planted_cache")
+	dispatcher := dispatch.NewSyntax()
+	// heard is every listener's FileEnter: newCacheAnalyzers reads only the analyzers, and no rule here ever runs.
+	heard := func(*rule.Context, *ast.File) {
+		panic("a listener of the cache's test ran, where only its analyzers are read")
+	}
+	listener := func() *rule.Listener {
+		return &rule.Listener{Requires: []*analysis.Analyzer{planted.analyzer}, FileEnter: heard}
+	}
+	dispatcher.RuleAnalyzer(rule.Namespace+"test-cache-left-out", "cache_left_out", "requires the planted analyzer",
+		listener())
+	plain := &rule.Listener{FileEnter: heard}
+	plainAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"test-cache-plain", "cache_plain", "requires nothing",
+		plain)
+	readingAnalyzer := dispatcher.RuleAnalyzer(rule.Namespace+"test-cache-reading", "cache_reading",
+		"requires the planted analyzer", listener())
+	for _, configuration := range []struct {
+		name      string
+		analyzers []*analysis.Analyzer
+		asked     bool
+	}{
+		{"the reader left out", []*analysis.Analyzer{plainAnalyzer}, false},
+		{"the reader enabled", []*analysis.Analyzer{plainAnalyzer, readingAnalyzer}, true},
+	} {
+		ruleOf := map[*analysis.Analyzer]rule.Rule{}
+		for _, analyzer := range configuration.analyzers {
+			ruleOf[analyzer] = rule.Rule{Name: rule.Namespace + "test-" + analyzer.Name, Analyzer: analyzer}
+		}
+		known, knownError := newCacheAnalyzers(ruleOf, configuration.analyzers)
+		if knownError != nil {
+			test.Fatalf("%s: reading the analyzers: %v", configuration.name, knownError)
+		}
+		if asked := slices.Contains(known.facts, planted.analyzer); asked != configuration.asked {
+			test.Errorf("%s: the cache asks for the planted analyzer's facts %t, where %t was expected",
+				configuration.name, asked, configuration.asked)
+		}
 	}
 }
