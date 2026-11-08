@@ -1063,6 +1063,7 @@ var portedPasses = []string{
 	"non_pointer_unmarshal",
 	"odd_slice_argument",
 	"overlapping_encode_buffers",
+	"oversized_shift",
 	"print_of_sprintf",
 	"range_over_string_directly",
 	"receiver_name",
