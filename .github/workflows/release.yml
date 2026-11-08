@@ -297,6 +297,15 @@ jobs:
                       exit 1
                   fi
 
+            - name: Prove each Mac binary's standard library table is what Go computes
+              # Each binary recomputes every variant of the table it embeds for its own target and fails on any
+              # difference, or on a table with no variant for it (CONTRIBUTING.md, "Releasing"). It fetches each
+              # Go version the table holds, so it needs the go setup-go put on PATH and the network. darwin-x64
+              # runs under Rosetta here, so it computes as darwin/amd64; swift-on-intel runs it natively too.
+              run: |
+                  ./dist/cohere-darwin-arm64/bin/cohere go-engine verify-std-facts
+                  arch -x86_64 ./dist/cohere-darwin-x64/bin/cohere go-engine verify-std-facts
+
             - name: Prove each Mac package checks Swift with no checkout on the machine
               # This workspace is the tree the engines were built in, so it is the checkout a released
               # engine must never read. The x64 package runs under Rosetta here and can only lint, since
@@ -438,6 +447,15 @@ jobs:
                   cp .github/scripts/check-swift-packages.sh "$script"
                   bash "$script" "$GITHUB_WORKSPACE" darwin-x64:--no-fix
 
+            # The go the table check runs to fetch each version it holds, the one the clean-machine legs use.
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: 1.27.3
+                  cache: false
+
+            - name: Prove the x64 binary's standard library table is what Go computes, natively
+              run: ./dist/cohere-darwin-x64/bin/cohere go-engine verify-std-facts
+
     # The Windows x64 package, run on Windows: installed with npm, then checked, fixed and formatted
     # through npm's shim, the Node launcher and cohere.exe. Then the tests written for what differs on
     # Windows: the rename retry, the ignore walk, and the run cache's file identity (#0kfa508). The
@@ -473,6 +491,10 @@ jobs:
               run: |
                   tar -xf cohere-dist.tar
                   bash .github/scripts/check-platform-package.sh win32-x64
+
+            - name: Prove the Windows binary's standard library table is what Go computes
+              # win32-arm64 ships no table, by ruling, since nothing here could run this for it.
+              run: ./dist/cohere-win32-x64/bin/cohere.exe go-engine verify-std-facts
 
             - name: Run the tests written for what differs on Windows
               run: |
@@ -530,6 +552,17 @@ jobs:
                   fi
 
                   bash .github/scripts/check-platform-package.sh "${{ matrix.platform }}"
+
+            # After the proof that the install needs no Go, since the table check does: it recomputes each version
+            # the table holds, which go fetches. 1.27.3, the newest the table holds, where the release job reads go.mod's
+            # 1.27 and gets the newest patch; the check forces each version it computes, so this go only fetches them.
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: 1.27.3
+                  cache: false
+
+            - name: Prove this platform's standard library table is what Go computes
+              run: ./dist/cohere-${{ matrix.platform }}/bin/cohere go-engine verify-std-facts
 
     publish:
         # After every proof, so a package one of them refused is never on the registry.

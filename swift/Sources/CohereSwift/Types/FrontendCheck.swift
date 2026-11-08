@@ -1,4 +1,5 @@
 import Foundation
+import SwiftParser
 import Synchronization
 
 /*
@@ -123,6 +124,8 @@ struct FrontendCheck {
         var jobs: Int
         /* Each module's record directory, by module name, in the shape `CompilerRecords.read(targetDirectories:)` takes. */
         var targetDirectories: [(String, URL)]
+        /* What the check did with the SDK index seed, nil when it had none to use: a store not empty, or jobs of more than one key. */
+        var sdkIndexSeed: SDKIndexSeed.Use? = nil
     }
 
     /* `swiftc` from the toolchain the check uses, which plans the jobs. */
@@ -138,6 +141,8 @@ struct FrontendCheck {
     /* The most primaries the driver puts in one batch, the size the probe measured with. */
     var batchSize = 25
     var mode = Mode.check
+    /* The SDK's index units to seed an empty store with (`SDKIndexSeed`), nil for none. */
+    var sdkIndexSeed: SDKIndexSeed?
 
     /*
      What a job is run for. `check` is the module's diagnostics and its full index. `indexDeclarations` is a
@@ -160,7 +165,20 @@ struct FrontendCheck {
         for result in planned {
             jobs += try result.get()
         }
-        return try run(jobs)
+        /* An empty store is seeded with the SDK's units before any job writes to it, so no job indexes the SDK again. */
+        var used: SDKIndexSeed.Use?
+        if mode == .check, let sdkIndexSeed,
+            !FileManager.default.fileExists(atPath: indexStorePath.appendingPathComponent("v5").path),
+            let key = sdkIndexSeed.key(of: jobs.map(frontendArguments(of:)), imports: Self.imports(of: modules))
+        {
+            used = sdkIndexSeed.seed(store: indexStorePath, key: key)
+            if let failure = used?.failure {
+                throw Failure(module: modules.first?.name ?? "", detail: failure)
+            }
+        }
+        var outcome = try run(jobs)
+        outcome.sdkIndexSeed = used
+        return outcome
     }
 
     /*
@@ -221,6 +239,16 @@ struct FrontendCheck {
             )
         }
         return jobs
+    }
+
+    /* Every module the modules' files import, in any branch of any `#if`: what an SDK index seed's key holds (`SDKIndexSeed.Key`). */
+    static func imports(of modules: [Module]) -> [String] {
+        var imports = Set<String>()
+        for file in modules.flatMap(\.sources) {
+            guard let text = try? String(contentsOf: URL(fileURLWithPath: file), encoding: .utf8) else { continue }
+            imports.formUnion(TypesPhase.importedModules(of: Parser.parse(source: text)))
+        }
+        return imports.sorted()
     }
 
     /*
@@ -416,12 +444,15 @@ struct FrontendCheck {
         "-index-unit-output-path", "-driver-batch-count", "-o",
     ]
 
-    /* The server's arguments with prepare's flags and every output and planning flag removed. */
-    static func cleaned(_ arguments: [String]) -> [String] {
+    /*
+     The server's arguments with every output and planning flag removed, and prepare's flags too unless they are kept,
+     as the check's own emit of an interface keeps them (`InterfaceEmit`).
+     */
+    static func cleaned(_ arguments: [String], keepingPrepareFlags: Bool = false) -> [String] {
         var cleaned: [String] = []
         var remaining = arguments[...]
         while let argument = remaining.popFirst() {
-            if argument == "-Xfrontend", let next = remaining.first, prepareFlags.contains(next) {
+            if !keepingPrepareFlags, argument == "-Xfrontend", let next = remaining.first, prepareFlags.contains(next) {
                 remaining = remaining.dropFirst()
                 continue
             }

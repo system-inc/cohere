@@ -398,4 +398,64 @@ struct XcodeTypesPhaseTests {
             #expect(XcodeTypesPhase.localPackages(stateIn: folder.appendingPathComponent("absent")).isEmpty)
         }
     }
+
+    /*
+     After a build, the empty folders xcodebuild made in a linked package are judged one by one (#8f8vy1n): its
+     `.swiftpm/xcode` and `.swiftpm/configuration` stay, and so does `.swiftpm`, which holds them; any other empty
+     folder it made there is removed, innermost first; and a folder older than the build is not this build's.
+     */
+    @Test func leavesOnlyTheFoldersXcodebuildMakesInALinkedPackage() throws {
+        try Self.withFolder { folder in
+            let olderPackage = folder.appendingPathComponent("Older", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: olderPackage.appendingPathComponent(".swiftpm/stale", isDirectory: true),
+                withIntermediateDirectories: true,
+            )
+            /* Creation times are fine-grained, and the build must start after the older folder was made. */
+            Thread.sleep(forTimeInterval: 0.01)
+            let buildStart = Date()
+            let package = folder.appendingPathComponent("Lib", isDirectory: true)
+            for made in [".swiftpm/xcode", ".swiftpm/configuration", ".swiftpm/other/inner"] {
+                try FileManager.default.createDirectory(
+                    at: package.appendingPathComponent(made, isDirectory: true),
+                    withIntermediateDirectories: true,
+                )
+            }
+
+            XcodeTypesPhase.removeFoldersMade(in: [package, olderPackage], since: buildStart)
+
+            func exists(_ path: String, in root: URL = package) -> Bool {
+                IgnoreRules.isDirectory(root.appendingPathComponent(path))
+            }
+            #expect(
+                exists(".swiftpm/xcode") && exists(".swiftpm/configuration"),
+                "a folder a check leaves was removed",
+            )
+            #expect(!exists(".swiftpm/other"), "an empty folder of another name the build made was left")
+            #expect(exists(".swiftpm/stale", in: olderPackage), "a folder older than the build was removed")
+            #expect(XcodeTypesPhase.packagesHoldingFoldersLeft(in: [package, package]).map(\.path) == [package.path])
+        }
+    }
+
+    /* A file in a folder xcodebuild makes is never the check's to delete, nor the folder holding it, whoever wrote it. */
+    @Test func neverDeletesAFileInAPackagesSwiftpmFolder() throws {
+        try Self.withFolder { folder in
+            let buildStart = Date()
+            let package = folder.appendingPathComponent("Lib", isDirectory: true)
+            let planted = package.appendingPathComponent(".swiftpm/xcode/xcshareddata/Lib.xcscheme")
+            let other = package.appendingPathComponent(".swiftpm/other/Kept.txt")
+            for file in [planted, other] {
+                try FileManager.default.createDirectory(
+                    at: file.deletingLastPathComponent(),
+                    withIntermediateDirectories: true,
+                )
+                try "<Scheme/>\n".write(to: file, atomically: true, encoding: .utf8)
+            }
+
+            XcodeTypesPhase.removeFoldersMade(in: [package], since: buildStart)
+
+            #expect(try String(contentsOf: planted, encoding: .utf8) == "<Scheme/>\n")
+            #expect(try String(contentsOf: other, encoding: .utf8) == "<Scheme/>\n")
+        }
+    }
 }

@@ -81,6 +81,8 @@
 #
 # usage: quiet_machine.sh [options]
 #   --project DIR        the project to copy (default ~/Projects/ahra)
+#   --commit REF         the project's commit to copy, so an older tree is measured on today's machine; its
+#                        node_modules are still the checkout's as they stand (default the checkout's own)
 #   --modes LIST         the modes to measure, comma-separated: cold, warm, edit, idle, first (default cold)
 #   --runs N             at most N rounds, so at most N runs of each mode (default 5)
 #   --band PERCENT       stop once every measured mode's quiet runs, at least 3 of them, are within this
@@ -92,6 +94,12 @@
 #   --edit PATH          the file the edit run changes, relative to the project
 #                        (default modules/tasks/TasksSearchQuery.ts)
 #   --cohere PATH        the cohere launcher, or an engine binary, to run (default: `cohere` on PATH)
+#   --generate COMMAND   the project's own generator, run in the copy once, with no network, before its
+#                        tree is hashed, so the copy holds what a checkout's generators wrote, as ahra's route
+#                        types: `NEXT_TELEMETRY_DISABLED=1 node_modules/.bin/next typegen` (see run_generator)
+#   --link PATH          an input git ignores and no generator can make, relative to the project, linked from
+#                        the checkout into the copy and named in the header with its content's hash, as
+#                        presence's Local/Models files; repeat it for each (see link_inputs)
 #   --work DIR           where the copies live (default $TMPDIR/cohere-quiet-machine)
 #   --record             also write the run to bench/results as a record to commit
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
@@ -114,6 +122,9 @@ settle=60
 idle_seconds=60
 edit=modules/tasks/TasksSearchQuery.ts
 cohere=cohere
+generate=
+links=()
+commit=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 
@@ -128,6 +139,9 @@ while (( $# > 0 )); do
     --idle-seconds) idle_seconds=$2; shift 2 ;;
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
+    --generate) generate=$2; shift 2 ;;
+    --commit) commit=$2; shift 2 ;;
+    --link) links+=($2); shift 2 ;;
     --work) work=$2; shift 2 ;;
     --record) record=true; shift ;;
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;
@@ -214,6 +228,10 @@ measure() {
   local log=$logs/$mode-$round.log
   run_cohere $log "$@"
   local after=$(load) idle_after=$(idle_over 1)
+  # One build per round: a run that ran any Swift engine but the pinned one measured another (#ywx8zgd).
+  local other_swift=$(swift_engine_named_otherwise $log)
+  [[ -z $other_swift ]] ||
+    fail "the $mode run of round $round ran the Swift engine $other_swift, not the pinned one; see $log"
   local quiet=loaded
   at_floor $idle_before && at_floor $idle_after && quiet=quiet
   # The run's engine seconds, findings and cache use, from its --json summary. A log the reader cannot

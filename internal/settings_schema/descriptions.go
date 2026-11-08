@@ -92,8 +92,9 @@ var ignoreEntryDescriptions = map[string]string{
 	"reason":  "Why these paths are never checked, in a sentence. Required in our tiers and in cohere's sets.",
 	"kind": "What the paths are: input, data a program reads as it was given; generated, written by a tool; " +
 		"thirdParty, somebody else's code.",
-	"check": "A check that still reads the ignored paths: types, the type check. Accepted and carried, and not yet " +
-		"acted on.",
+	"check": "A check that still reads the ignored paths: types, the type check, whose errors in them are still " +
+		"reported while they are never linted or formatted. Without it an ignored path is never checked at all, " +
+		"and where both kinds of entry match a path, the one naming types keeps it.",
 }
 
 var overrideDescriptions = map[string]string{

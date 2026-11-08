@@ -100,6 +100,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 	record.Cache = contract.LintCache{
 		On:           result.Cache.On,
 		Hit:          result.Cache.Hit,
+		FromBinary:   result.Cache.FromBinary,
 		Missed:       result.Cache.Missed,
 		Written:      result.Cache.Written,
 		Unstorable:   result.Cache.Unstorable,
@@ -146,6 +147,7 @@ func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
 		// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
 		// and what follows reads the files' contents the project description holds, and the types.
 		ReleaseAnalyzed: true,
+		ReadFile:        engine.sourceReader(nil),
 	})
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
@@ -187,7 +189,8 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 }
 
 // cacheSession is the findings cache for the run's enabled rules, made before the load so the load restores what
-// it holds, and nil under `--no-cache` or when what every key shares cannot be read, which the run says on stderr.
+// it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries,
+// or when what every key shares cannot be read, which the run says on stderr.
 func (engine *pipeline) cacheSession() *check.CacheSession {
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, enabled)

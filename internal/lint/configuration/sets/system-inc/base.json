@@ -18,7 +18,6 @@
         "adamic/invariant-mutable": "cohere:adamic turns it on, and our code has 721 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#phhrgfw). Outsiders get it on.",
         "adamic/no-ambient-declarations": "cohere:adamic turns it on, and our code has 1,153 findings in api-phi-health at cohere 1eaf2345, nearly all ORM entity fields declared with declare and filled by the ORM at runtime, the territory of adamic/no-definite-assignment, so it is off here (#7ck9vvd). Outsiders get it on.",
         "adamic/no-definite-assignment": "cohere:adamic turns it on, and our code has 34 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#vk7621w). Outsiders get it on.",
-        "adamic/no-indexed-access-write": "cohere:adamic turns it on, and our code has 1 finding in api-phi-health at cohere 1f5ea4a3 (workers/shopify/services/ffe/ShopifyMappingServiceUtilities.ts:36:17), so it is off here until its fix wave reads 0 in every consumer (#8nvccrd). cohere:system-inc/structure has it on, its consumers at 0. Outsiders get it on.",
         "adamic/no-optional-widening": "cohere:adamic turns it on, and our code has 401 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#aaajpke). Outsiders get it on.",
         "adamic/no-type-predicate": "cohere:adamic turns it on, and our code has 155 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#05k4swm). Outsiders get it on.",
         "adamic/no-unchecked-cast": "cohere:adamic turns it on, and our code has 1,340 findings in api-phi-health at cohere 5f65dd9d, so it is off here until its fix wave reads 0 in every consumer (#v2r1xst). runtimeChecksEmitted is false because our code runs on tsc, which emits no check behind a cast, so the wave also covers the union downcasts Adamic would check: 71 sites across our four consumers, 28 of them real bugs (#mdccedj). Outsiders get it on.",
@@ -45,7 +44,6 @@
         "adamic/invariant-mutable": "off",
         "adamic/no-ambient-declarations": "off",
         "adamic/no-definite-assignment": "off",
-        "adamic/no-indexed-access-write": "off",
         "adamic/no-optional-widening": "off",
         "adamic/no-type-predicate": "off",
         "adamic/no-unchecked-cast": [

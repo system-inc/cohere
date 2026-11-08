@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
@@ -14,6 +15,10 @@ type describedProject struct {
 	// them: what the load accounts for. An unreadable file is left out, since the load
 	// reads each file it accounts for and one it cannot open fails it whole; the file is already a record.
 	readableOurs []string
+
+	// goEnvironment is go env's answer the census read the build constraints by, which every load of the run takes
+	// in place of asking again, nil when the census judged no file (#f53yra8).
+	goEnvironment *load.GoEnvironment
 
 	// manifest is the root's go.work, or its go.mod for a module root: where a diagnostic that names no file
 	// is placed, since the front door refuses a finding with no position.

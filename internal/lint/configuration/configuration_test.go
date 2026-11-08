@@ -241,6 +241,53 @@ func TestIgnoredFileRunsNoRulesAndSaysWhy(test *testing.T) {
 	}
 }
 
+// TestAnIgnoreNamingTheTypeCheckKeepsItAndAPlainOneDoesNot holds Kirk's ruling (#cxeq6jw): a plain ignore is
+// never checked at all, an entry with `"check": "types"` keeps the type check for its paths, and where both match
+// a path the explicit one wins, in either order, and is the one named as excluding it.
+func TestAnIgnoreNamingTheTypeCheckKeepsItAndAPlainOneDoesNot(test *testing.T) {
+	test.Parallel()
+	for _, entries := range [][]IgnoreEntry{
+		{{Pattern: "legacy/**"}, {Pattern: "legacy/models/**", Check: IgnoreCheckTypes}},
+		{{Pattern: "legacy/models/**", Check: IgnoreCheckTypes}, {Pattern: "legacy/**"}},
+	} {
+		configuration := &Configuration{
+			Rules:          map[string]RuleSetting{"a-rule": {Severity: SeverityError}},
+			IgnorePatterns: IgnorePatternsFrom(entries),
+			IgnoreEntries:  entries,
+		}
+
+		plain := configuration.Resolve("legacy/Old.ts")
+		if !plain.Ignored || plain.TypesOnly {
+			test.Errorf("%v: a file only the plain entry matches resolved %+v, want never checked",
+				IgnorePatternsFrom(entries), plain)
+		}
+
+		both := configuration.Resolve("legacy/models/Model.ts")
+		if !both.Ignored || !both.TypesOnly {
+			test.Errorf("%v: a file both entries match resolved %+v, want ignored and type-checked",
+				IgnorePatternsFrom(entries), both)
+		}
+		if both.IgnoredBy != "legacy/models/**" {
+			test.Errorf("%v: a file both entries match names %q as excluding it, want the entry keeping types",
+				IgnorePatternsFrom(entries), both.IgnoredBy)
+		}
+		if both.Enabled("a-rule") {
+			test.Errorf("%v: a rule ran on a file an entry keeping types matched", IgnorePatternsFrom(entries))
+		}
+
+		if authored := configuration.Resolve("source/Authored.ts"); authored.Ignored || authored.TypesOnly {
+			test.Errorf("%v: a file no entry matches resolved %+v, want checked as any other file is",
+				IgnorePatternsFrom(entries), authored)
+		}
+	}
+
+	// A configuration built from patterns alone has no entry to keep types.
+	patternsAlone := &Configuration{IgnorePatterns: []string{"legacy/**"}}
+	if resolved := patternsAlone.Resolve("legacy/Old.ts"); !resolved.Ignored || resolved.TypesOnly {
+		test.Errorf("a pattern with no entry resolved %+v, want ignored and never checked", resolved)
+	}
+}
+
 // TestAnUnconfiguredRuleDoesNotRun keeps adding a rule to the registry from silently enabling it
 // across the whole tree.
 func TestAnUnconfiguredRuleDoesNotRun(test *testing.T) {

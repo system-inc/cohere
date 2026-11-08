@@ -64,7 +64,7 @@
             }
         },
         "ignoreEntry": {
-            "description": "One entry of the root settings' ignorePatterns, as this run's discovery counted it.",
+            "description": "One entry of the root settings' ignorePatterns, or one of cohere's defaults, as this run's discovery counted it.",
             "type": "object",
             "additionalProperties": false,
             "required": ["pattern", "file", "matched"],
@@ -84,7 +84,11 @@
                 },
                 "file": {
                     "type": "string",
-                    "description": "The settings file that wrote the entry, as an absolute path, or the set's name, such as cohere:next."
+                    "description": "The settings file that wrote the entry, as an absolute path, or the set's name, such as cohere:next, or cohere for one of its defaults."
+                },
+                "default": {
+                    "type": "boolean",
+                    "description": "One of cohere's defaults, written by no settings file: testdata, which the Go engine and the format walk never enter, and Vendor, which the format walk and the Swift engine never enter. Each holds only there, so a file a tsconfig includes under either is still type-checked and linted, and neither is ever a finding. Absent for an entry a settings file or set wrote."
                 },
                 "matched": {
                     "type": "integer",
@@ -160,7 +164,7 @@
                 "ignorePatterns": {
                     "type": "array",
                     "items": { "$ref": "#/$defs/ignoreEntry" },
-                    "description": "The root settings' ignorePatterns, when the run discovered its project and the root has any. findings counts each dead one, an entry a settings file wrote that matched nothing and whose kind is not generated."
+                    "description": "The root settings' ignorePatterns, then cohere's defaults, when the run discovered its project. findings counts each dead one, an entry a settings file wrote that matched nothing and whose kind is not generated."
                 },
                 "verdict": { "enum": ["pass", "fail"] },
                 "seconds": { "type": "number", "description": "The run's wall clock." },
@@ -228,11 +232,15 @@
                     "properties": {
                         "on": {
                             "type": "boolean",
-                            "description": "False under `--no-cache`, and then every count is zero."
+                            "description": "False under `--no-cache`, and then every count is zero but standardLibraryFromBinary and factsSkipped."
                         },
                         "hit": {
                             "type": "integer",
                             "description": "Packages restored from an entry, with nothing run on them."
+                        },
+                        "standardLibraryFromBinary": {
+                            "type": "integer",
+                            "description": "Go standard-library packages restored from the entries a release binary carries, with nothing run on them, apart from hit. `--no-cache` reads them too. Absent when zero."
                         },
                         "missed": { "type": "integer", "description": "Packages analyzed from source." },
                         "written": { "type": "integer", "description": "Missed packages that got an entry." },
@@ -272,6 +280,10 @@
                 },
                 "checked": { "type": "integer", "description": "The files examined fresh this run." },
                 "cached": { "type": "integer", "description": "The files the cache answered for." },
+                "typesOnly": {
+                    "type": "integer",
+                    "description": "The files an ignorePatterns entry naming \"check\": \"types\" matched, beside filesInScope and not in it: type-checked, their type errors reported, and never linted or formatted. Absent when there were none. A file only plain entries match is in no count, since it is never checked at all."
+                },
                 "nodes": {
                     "type": "integer",
                     "description": "The syntax nodes walked this run, in the checked files."
@@ -397,6 +409,23 @@
                         "withheldDependencyCgoDeclarations": {
                             "type": "integer",
                             "description": "Declarations of dependencies with cgo files that every rule of a Go run was given without their bodies or initial values, because no cgo tool ran. They fail nothing. Absent when there are none, as on macOS."
+                        }
+                    }
+                },
+                "swift": {
+                    "type": "object",
+                    "description": "What only a Swift run says of itself. Absent for every other run, and for a Swift run with nothing here to say.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "sdkIndexSeed": {
+                            "type": "object",
+                            "description": "What the check of the standalone scripts did with the toolchain's SDK index seed (#f6pqraj): its key, the name of its folder under ~/Library/Caches/cohere/sdk-index, and whether the run's empty index store was seeded from it rather than indexing the SDK afresh. Absent when the check's store was not empty or no seed applied.",
+                            "additionalProperties": false,
+                            "required": ["key", "hit"],
+                            "properties": {
+                                "key": { "type": "string" },
+                                "hit": { "type": "boolean" }
+                            }
                         }
                     }
                 },

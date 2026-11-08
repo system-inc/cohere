@@ -76,6 +76,12 @@ type Loaded struct {
 	// (see cachedList).
 	ListingKept bool
 
+	// ListedInProcess is set when the listing was read in this process rather than by go list, and GoListReason, when
+	// go list read it, says what the in-process lister could not answer exactly (see listInProcess). A kept listing
+	// is neither: nothing was listed.
+	ListedInProcess bool
+	GoListReason    string
+
 	// FilesParsed counts the files the load parsed, and PackagesFromExportData the packages whose types it read
 	// from the findings cache's export data rather than checking them.
 	FilesParsed            int
@@ -133,6 +139,16 @@ func PackagesWithOverlay(
 type Caching struct {
 	Restorer Restorer
 	Listings ListingStore
+
+	// GoEnvironment is go env's answer the run already has, from its census, which the load reads in place of asking
+	// again when it is for the load's workspace and environment (see GoEnvironment).
+	GoEnvironment *GoEnvironment
+
+	// Held is the bytes the run already holds of the workspace's files, read in place of opening each again by every
+	// reader of the load: the in-process lister and the kept listing's fingerprint, which read each file's header, the
+	// parse, and the build constraints of the files no package holds. go list, when the in-process lister doubts, and
+	// the cgo tool still read the disk, which the held bytes are. Nil reads every file from disk.
+	Held Held
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -163,15 +179,20 @@ func loadWorkspace(
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
-	fullEnvironment, environmentError := sourceEnvironment(workspace, environment)
-	if environmentError != nil {
-		return nil, environmentError
+	goEnvironment := caching.GoEnvironment
+	if !goEnvironment.answers(workspace, environment) {
+		var environmentError error
+		if goEnvironment, environmentError = readGoEnvironment(
+			workspace,
+			environment,
+			caching.Held,
+		); environmentError != nil {
+			return nil, environmentError
+		}
 	}
-	buildContext, reported, contextError := constraintContext(workspace, fullEnvironment)
-	if contextError != nil {
-		return nil, contextError
-	}
-	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings)
+	fullEnvironment, reported := goEnvironment.fullEnvironment, goEnvironment.reported
+	buildContext := goEnvironment.contextFor(caching.Held)
+	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings, caching.Held)
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
@@ -196,7 +217,7 @@ func loadWorkspace(
 		}
 		translationElapsed = time.Since(translationStarted)
 	}
-	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching.Restorer, overlay, compiled)
+	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching, overlay, compiled)
 	if loadError != nil {
 		return nil, loadError
 	}
@@ -211,6 +232,8 @@ func loadWorkspace(
 		}
 	}
 	loaded.ListingKept = listingKept
+	loaded.ListedInProcess = listed.inProcess
+	loaded.GoListReason = listed.goListReason
 	loaded.Roots = roots
 	loaded.PackagesInWorkspace = len(loaded.Packages)
 	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
@@ -237,16 +260,17 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 	return false
 }
 
-// fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, and
-// each package compiled holds the cgo tool's translation of from its outputs, and returns its roots and what the load
-// knows of them before the diagnostics and the counts. The declarations of dependencies that reach their cgo files
-// lose what reaches it only once every package is type-checked. The Restorer is told which loader ran, since a
-// translated package has other files than one checked with package "C" faked.
+// fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, each
+// other file caching holds from its held bytes, and each package compiled holds the cgo tool's translation of from its
+// outputs, and returns its roots and what the load knows of them before the diagnostics and the counts. The
+// declarations of dependencies that reach their cgo files lose what reaches it only once every package is
+// type-checked. caching's Restorer is told which loader ran, since a translated package has other files than one
+// checked with package "C" faked.
 func fromSource(
 	workspace string,
 	listed *listing,
 	buildContext *build.Context,
-	restorer Restorer,
+	caching Caching,
 	overlay map[string][]byte,
 	compiled map[string]*compiledPackage,
 ) ([]*packages.Package, *Loaded, error) {
@@ -257,15 +281,15 @@ func fromSource(
 	}
 	built := newGraph(listed, workspace, compiled)
 	withheld := newWithheldErrors()
-	typeChecker := newLoader(built, sizes, withheld, overlay)
+	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held)
 	reachable := typeChecker.connect()
 	analyzedPackages := analyzedOfGraph(built)
-	if restorer != nil {
+	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
 			loaderName = LoaderCgoTranslated
 		}
-		typeChecker.restored = restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
+		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
 	}
 	typeChecker.load(reachable)
 
@@ -335,7 +359,34 @@ func filesTypeChecked(workspace string, analyzedPackages []*packages.Package) in
 // lists: a command with a default.pgo profile would otherwise have go list print a second variant of every package
 // the command builds. -trimpath stays as given, since no cgo tool runs and go list prints nothing differently for it.
 func sourceEnvironment(workspace string, environment []string) ([]string, error) {
-	return withGoFlags(workspace, environment, func(flags []string) []string { return append(flags, "-pgo=off") })
+	fullEnvironment, _, _, contextError := sourceContext(workspace, environment, nil)
+	return fullEnvironment, contextError
+}
+
+// sourceContext is sourceEnvironment with the build target and the go environment the inputs record names, as
+// constraintContext reads them under it, from one go command where two ran one after the other (#3epjyj2). go env
+// is asked once under the environment as given, and the whole environment follows from its `GOFLAGS`: the same
+// flags, -pgo=off last. Asked again under that, go env would print the same target and paths, since -pgo=off moves
+// none of them, and that `GOFLAGS` exactly, so it is not asked.
+func sourceContext(
+	workspace string,
+	environment []string,
+	held Held,
+) ([]string, *build.Context, reportedEnvironment, error) {
+	given := append(os.Environ(), environment...)
+	buildContext, reported, contextError := constraintContext(workspace, given, held)
+	if contextError != nil {
+		return nil, nil, reportedEnvironment{}, contextError
+	}
+	reported.goFlags = append(reported.goFlags, "-pgo=off")
+	fullEnvironment := []string{}
+	for _, variable := range given {
+		if !strings.HasPrefix(variable, "GOFLAGS=") {
+			fullEnvironment = append(fullEnvironment, variable)
+		}
+	}
+	fullEnvironment = append(fullEnvironment, "GOFLAGS="+strings.Join(reported.goFlags, " "))
+	return fullEnvironment, buildContext, reported, nil
 }
 
 // translatedEnvironment is the whole environment go list -compiled runs with in workspace when it translates the

@@ -410,6 +410,31 @@ func TestKnownFilesAnswerTheSameBytesAndOnlyThem(test *testing.T) {
 	}
 }
 
+// A check reads a file from the bytes the run holds of it, so it reports what those bytes need. A write reads the disk
+// whatever the run holds, so a rewrite never starts from bytes older than the file it replaces: here the held bytes
+// are already formatted, and the write still formats the unformatted file on disk.
+func TestOnlyACheckReadsTheHeldBytes(test *testing.T) {
+	test.Parallel()
+
+	checked := writeFile(test, formattedSource)
+	heldUnformatted := func(string) ([]byte, bool) { return []byte(unformattedSource), true }
+	checkResult := Run([]string{checked}, Options{Held: heldUnformatted})
+	wantChecked := []ChangedFile{{File: checked, Formatted: true, FirstDifferingLine: 5}}
+	if !reflect.DeepEqual(checkResult.Changed, wantChecked) {
+		test.Fatalf("a check of held unformatted bytes got %+v, want %+v", checkResult, wantChecked)
+	}
+	requireContents(test, checked, formattedSource)
+
+	written := writeFile(test, unformattedSource)
+	heldFormatted := func(string) ([]byte, bool) { return []byte(reformattedSource), true }
+	writeResult := Run([]string{written}, Options{Write: true, Held: heldFormatted})
+	wantWritten := []ChangedFile{{File: written, Formatted: true, Written: true, FirstDifferingLine: 5}}
+	if !reflect.DeepEqual(writeResult.Changed, wantWritten) {
+		test.Fatalf("a write over held formatted bytes got %+v, want %+v", writeResult, wantWritten)
+	}
+	requireContents(test, written, reformattedSource)
+}
+
 // callSource is formatted, and callWrapped is the same program with its call broken one argument per line, gofmt's
 // own layout of it, which a wrap may write in its place.
 const (

@@ -26,6 +26,13 @@ replace (
 	// React's mutation and aliasing model, the effect vocabulary and the mutable ranges inferred from
 	// it, shared with Adamic the same way (#kr2yp54).
 	github.com/system-inc/cohere/mutation_aliasing => ./mutation_aliasing
+
+	// staticcheck v0.8.1 as released, but for upstream's fa9ae6d1a5 in unused/: U1000 shares one object path
+	// encoder per package, where the release walks the package afresh for every object it records. That walk was
+	// most of U1000's CPU at cohere's root, 4.3 to 4.5 core-seconds, and with the fix it is 0.5 to 0.7, findings
+	// the same (#j3bfnyt). The copy and this line are deleted at the first staticcheck release that carries the
+	// commit (third_party/honnef.co/go/tools/README.cohere.md).
+	honnef.co/go/tools => ./third_party/honnef.co/go/tools
 )
 
 require (

@@ -399,14 +399,19 @@ At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that 
 through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
 `build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
 `xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
-run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Packages resolve into the scratch,
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Beside the build, the one write a
+check leaves in the developer's tree is the empty `.swiftpm/xcode` and `.swiftpm/configuration` xcodebuild makes in
+each local package the project links, which no flag stops (#8f8vy1n): removed after each build, they moved the
+package directory's times, which the inputs record names, so every build cost each project naming that package its
+next replay. Left there, they move it once. Any other empty folder a build made in a package's `.swiftpm` is
+removed, a folder holding a file stays, and no file is ever deleted. Packages resolve into the scratch,
 under `--no-fix` too (#s8p20fe): a generated bundle is in the scratch already, and under `--no-fix` a committed
 bundle is built through a workspace in the scratch that names it, so its pins land there and the bundle is left as
 it was found. A resolution the repository commits (a committed bundle's own, or one kept in the bundle beside a
 spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
 that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
 are judged by the same rules as a package's, and `build` reads
-`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, or that the last build's records were reused
+`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, then, when a package it links holds those folders, `; it leaves the empty .swiftpm/xcode and .swiftpm/configuration xcodebuild makes in each local package the project links, in <n> packages here, the one write into the tree a check allows`, or that the last build's records were reused
 because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.
@@ -437,6 +442,13 @@ through another, and the owned C-family files when one of them or a header chang
 are the last check's, and `build` counts them, as `, 3 modules no edit could change read from the last check's records`.
 A scoped module that imports no other scoped module needs nothing prepare emits again, so it is checked while prepare
 runs, counted as `, 1 module of them alongside prepare, since they import no edited module`.
+When the edits are all to Swift files, prepare covers only the edited modules' own dependencies, and the check emits
+each interface a scoped module imports itself: one `-emit-module` job with the testable variant's arguments and bodies
+skipped, as prepare's, into `<scratch>/check/interfaces/<Target>`, which every module checked after searches first.
+Prepare emitted an owned module twice, its testable variant and its product's, and the check reads only the first.
+`build` says so after prepare's time, as `, only the edited modules' own, and the check emitted the interface of Core
+itself in 6.1s`. The scratch lists those interfaces, whose prepared copies are older than their sources, until a check
+that prepares everything, after a C-family edit or any other, empties the list.
 An edit to anything else, a manifest or a resource, checks everything.
 
 A local package that holds test files of ours is checked in a session of its own, under `<scratch>/local/<package>`,
@@ -469,6 +481,22 @@ as `swift <name>` runs it, and that a script needing other files to compile belo
 script needing companion files fails exactly so. `build` ends by counting the scripts checked alone with `-emit-sib`,
 by platform, and names each script kept unchecked because this Xcode lacks its SDK, which is in `filesWithoutRecord`.
 
+The scripts' check indexes the SDK modules they import (`-index-system-modules`), which `--unused` and the typed rules
+read. Into an empty store, every `--no-cache` run and every first run, it seeds them first from the toolchain's SDK
+index seed (#f6pqraj): a store of the SDK's units alone, never a project's, under
+`~/Library/Caches/cohere/sdk-index/<key>`, outside every project, cloned in whole. The key is everything the units
+depend on, each part compared: the seed's format, the contract, `swift --version`'s whole output, the SDK's path and
+build version, the target, the index flags, the job's whole argument list without its own file and outputs, and the
+modules the scripts import, since Clang writes an SDK header's record differently in another import context. A
+unit the seed cannot vouch for (its bytes, the bytes of a record it names, or the module file it was indexed from
+not as recorded) is taken out with every unit that imports it, and indexed afresh; a seed that cannot be read, or none, is a miss, and
+the check indexes everything, then makes the key's seed from what it wrote, in a folder of its own renamed into
+place, never changed after. A hit touches its key's folder, and a publish removes every key's folder untouched for
+fourteen days that no reader holds. The types record says so, additive within contract 3, as
+`"sdkIndexSeed": {"key": "<the key's SHA-256>", "hit": true}`, absent when the store was not empty or no seed
+applied; the front door names it under `--verbose` and in `--json`'s summary as `swift.sdkIndexSeed`, never in
+the default line. `COHERE_SDK_INDEX_SEED_ROOT` points the seeds elsewhere, for a bench or a proof.
+
 The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
 not read them yet loses only what they count. The Go engine type-checks every package from source and runs no
 cgo tool, so a dependency's package `"C"` is faked, and every C name is of an invalid type.
@@ -491,6 +519,15 @@ carries one more additive field, `cgoTranslation`, that counts the exception on 
 the project's and its dependencies' with cgo files alike, and how long that took. On a load that
 translates nothing, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never
 left out, so a front door can always say whether a run built anything.
+
+The Go engine's types record also carries `memory`, additive within contract 3: the memory limit its process
+held its heap under and where it came from, as
+`{"limitBytes":8589934592,"capBytes":8589934592,"source":"Cap","availableBytes":44023414784}`. The limit is the
+smaller of the engine's cap and half the memory available when the run started. `source` is `Cap` or
+`Available`, whichever was smaller; `Environment` when the user's `GOGC` or `GOMEMLIMIT` decided, with
+`environment` naming them and `limitBytes` the limit they left, `0` for none; or `Unreadable` when available
+memory could not be read, and the cap was set as a bound alone. The front door prints it in the account
+`--verbose` prints. It is left out of a run the engine was not started for as a process of its own.
 
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
@@ -622,7 +659,8 @@ The Go engine's lint record carries one more field, additive within contract 3 a
 are, so a front door that does not read it yet loses only what it counts:
 `"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.
 It is what the engine's per-package findings cache did, by package. Every package the load reached,
-each analyzed package and test variant and each dependency, was either `hit` or `missed`. A hit is
+each analyzed package and test variant and each dependency, was either `hit` or `missed`, or
+restored from the binary (see `standardLibraryFromBinary` below). A hit is
 restored from its entry, and no analyzer runs on it. A package's key holds its dependencies' keys, so
 an edit misses every package above the one edited, though most come out of an analysis as before.
 So the packages whose own inputs moved are analyzed first, and each package above them is then
@@ -646,6 +684,16 @@ own cache. The cache changes no finding and no other field of any record: a run 
 under `--no-cache` write the same stream but for this field and the elapsed times. Under `--no-cache`
 the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
 its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
+
+A release binary also carries the Go standard library's entries, computed when the release was
+built and keyed on everything they read: the release, the Go version, the target, cgo, the go flags,
+the analyzers that learn facts with their options, and each file's bytes by its path below `GOROOT`.
+A standard-library package whose key matches is restored from the binary, in a cached run and under
+`--no-cache` alike, since those entries are part of cohere and nothing of the project's tree; any
+mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, which are neither
+`hit` nor `missed`, and is written only when it is not 0, so a build that carries none, as every
+build but a release does, writes the field as it always has. Under `--no-cache` it, and
+`factsSkipped` of what it restored, are the only counts that can be other than 0.
 
 ### `phase`
 

@@ -44,9 +44,9 @@ rules are set under a `go` key in `CohereSettings.json`, and a finding is suppre
 Run it anywhere in a repository. It starts from the project you're in, the nearest `tsconfig.json`,
 `Package.swift`, `go.work` or `go.mod` at or above you, or from the repository's root when there's none,
 and checks that project and every project below it: each TypeScript program, each Swift package and each
-Go workspace or module, each with its own engine and its own settings, all at once. A repository holding more than one gets one report, a section
-per project, a line per project and one summary, and the exit code is the worst of theirs, so it's green
-only when every project is. A run that finds no project fails, and so does one whose every project was
+Go workspace or module, each with its own engine and its own settings, all at once. A repository holding more than one gets one report, its findings
+with their paths, ending on one footer line for all of them (see [Output](#output)), and the exit code is
+the worst of theirs, so it's green only when every project is. A run that finds no project fails, and so does one whose every project was
 skipped, such as a Swift package alone under `--format-only`: it checked nothing.
 
 A TypeScript project at the root formats every JSON, Markdown, YAML and CSS file the repository holds, as
@@ -256,6 +256,19 @@ A run prints three things, in order:
 ```
 
 The last line is a run with `--adamic-readiness`.
+
+A root holding several projects ends on the same one line, their counts summed: the run's time, every
+project's rules (each language's are its own), and their files checked, cached and cohered. A gap any project
+has is on the line with that project's name, so a green line never hides a project that checked nothing:
+
+```
+✓ 💎 0.1s (485 rules • 4 checked • 4,900 cached)
+✗ ☠️ 20s • 87 type errors • 4 findings (228 rules • 1,520 checked) • ⚠ 👑 lint did not run (CapturePhone)
+```
+
+`--verbose` and `--phases` print each project's own footer, labeled with its path, and then a line counting
+the projects, since phase times don't add up across projects that run side by side. `--json` is one summary
+per project.
 
 The words mean exactly this:
 

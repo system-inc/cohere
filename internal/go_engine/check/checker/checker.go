@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are four.
+// The changes are six.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -74,6 +74,35 @@
 // importer then inherits them as it would have inherited them from a run.
 // ExportedFacts is what such an entry is written from: the facts an
 // action exported that its importers read.
+//
+// The fifth is Options.ReadFile, the option upstream keeps unexported
+// under its "TODO(adonovan): expose ReadFile", exported. The engine
+// holds every file in scope as its load parsed it, and gives each pass
+// those bytes, so a rule that reads the source, as the long-line rule
+// reads every file, reads none from disk again. CheckedReadFile still
+// guards which files a pass may read. Measured on cohere's own root,
+// the engine alone, cold, two runs each at a load average of 13 to 17,
+// the long-line rule's CPU went from 0.56 to 0.65s, 0.53 to 0.59s of it
+// in os.ReadFile, to 0.19 to 0.20s, none of it reading a file.
+//
+// The sixth is ready actions, inside the packages the second change
+// admits (schedule). There a goroutine started for every action on a
+// package, and execAll another for each of its prerequisites, finished
+// ones on imported packages included: a trace of a cold run on cohere's
+// root found up to 2,312 goroutines runnable while 12 to 93 actions ran,
+// and the critical chain's actions queued behind the rest. Here an action
+// is queued once its horizontal prerequisites have finished, `GOMAXPROCS`
+// workers run the queue, the package on the longest weighted path to the
+// end of the graph first, and execOnce runs its prerequisites inline,
+// where each has already finished. Measured on cohere's own root, the
+// engine alone, cold, six interleaved runs each, the same records in
+// every run, at a load average of 4.9 to 15.7, medians:
+//
+//	before: 3.91s wall, 31.0s user, 3.31s sys, lint 2.59s
+//	after:  3.66s wall, 28.8s user, 3.30s sys, lint 2.40s
+//
+// Peak RSS, 8.4 to 8.5 GB, and involuntary context switches, 82,000 to
+// 123,000, did not move.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -155,7 +184,12 @@ type Options struct {
 	// TODO(adonovan): expose ReadFile so that an Overlay specified
 	// in the [packages.Config] can be communicated via
 	// Pass.ReadFile to each Analyzer.
-	readFile driverutil.ReadFileFunc
+	// cohere: exposed, as the TODO above asks. ReadFile, when set, is
+	// what every Pass.ReadFile reads through, behind CheckedReadFile's
+	// guard on which files a pass may read, so a driver that holds the
+	// bytes its load parsed can serve them rather than have each reader
+	// read the file from disk again. Unset, it is os.ReadFile.
+	ReadFile driverutil.ReadFileFunc
 
 	// cohere: Restored reports whether a package's analysis is restored
 	// rather than run. Every action on such a package skips its pass and
@@ -171,12 +205,13 @@ type Options struct {
 	// are (see releaseSyntax). Unset, a given package keeps them.
 	Finished func(*packages.Package)
 
-	// cohere: slots and observeGroup are the scheduler's test hooks (see
-	// schedule). slots, above 0, is how many packages run at once in place
-	// of the default; observeGroup is called as a package's group starts,
-	// with true, and once its last action has finished, with false, before
-	// its slot is given back.
+	// cohere: slots, workers and observeGroup are the scheduler's test
+	// hooks (see schedule). slots, above 0, is how many packages run at once
+	// in place of the default; workers, above 0, is how many actions; and
+	// observeGroup is called as a package's group starts, with true, and once
+	// its last action has finished, with false, before its slot is given back.
 	slots        int
+	workers      int
 	observeGroup func(pkg *packages.Package, running bool)
 }
 
@@ -393,9 +428,10 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	})
 
 	// Execute the graph in parallel.
-	// cohere: a package's actions at a time, in a bounded number of
-	// packages at once, largest first (see schedule), where upstream's
-	// execAll(roots) starts every action at once.
+	// cohere: a bounded number of packages at once, largest first, and
+	// within them only ready actions, on a bounded pool of workers, longest
+	// path first (see schedule), where upstream's execAll(roots) starts
+	// every action at once.
 	schedule(groups, opts)
 
 	// Ensure that only root Results are visible to caller.
@@ -428,28 +464,22 @@ type packageFactKey struct {
 	typ reflect.Type
 }
 
-func execAll(actions []*Action) {
-	var wg sync.WaitGroup
-	for _, act := range actions {
-		wg.Add(1)
-		work := func(act *Action) {
-			act.exec()
-			wg.Done()
-		}
-		if act.opts.Sequential {
-			work(act)
-		} else {
-			go work(act)
-		}
-	}
-	wg.Wait()
-}
+// cohere: execAll, which started a goroutine for each action it was
+// given, is gone: Analyze schedules the roots, and execOnce runs its
+// prerequisites inline.
 
 func (act *Action) exec() { act.once.Do(act.execOnce) }
 
 func (act *Action) execOnce() {
 	// Analyze dependencies.
-	execAll(act.Deps)
+	// cohere: inline, on this goroutine, where upstream's execAll starts one
+	// for each. The scheduler starts an action only once every prerequisite
+	// has finished, so each exec here returns at once from its once.Do; one
+	// still unfinished, which only a caller outside the scheduler could
+	// produce, runs here, or is waited on if another goroutine is running it.
+	for _, dep := range act.Deps {
+		dep.exec()
+	}
 
 	// cohere: however this action ends, a failed prerequisite or an
 	// error from Run included, it has read all it will of its inputs, and
@@ -547,8 +577,9 @@ func (act *Action) execOnce() {
 		AllPackageFacts:   act.AllPackageFacts,
 	}
 	readFile := os.ReadFile
-	if act.opts.readFile != nil {
-		readFile = act.opts.readFile
+	// cohere: Options.ReadFile, the field upstream's TODO asks to expose.
+	if act.opts.ReadFile != nil {
+		readFile = act.opts.ReadFile
 	}
 	pass.ReadFile = driverutil.CheckedReadFile(pass, readFile)
 	act.pass = pass
