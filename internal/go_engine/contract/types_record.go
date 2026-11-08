@@ -31,6 +31,39 @@ type TypesRecord struct {
 	// exception is never invisible: how many packages the cgo tool translated, and how long that took. On a load that
 	// translates nothing it is written as 0 and 0, never left out.
 	CgoTranslation CgoTranslation `json:"cgoTranslation"`
+
+	// Memory is additive within contract 3 too: the memory limit the engine's process ran under and where it came
+	// from, so `--verbose` can say why a run collected when it did. Left out when the engine was not started as a
+	// process of its own, as in a test running it in process, since nothing was decided then.
+	Memory *Memory `json:"memory,omitempty"`
+}
+
+// MemorySource is where the engine's memory limit came from.
+type MemorySource string
+
+const (
+	// MemorySourceEnvironment is a `GOGC` or `GOMEMLIMIT` the user set, which decides the collector, so the engine
+	// sets nothing.
+	MemorySourceEnvironment MemorySource = "Environment"
+	// MemorySourceCap is the engine's cap, lower than half the memory available.
+	MemorySourceCap MemorySource = "Cap"
+	// MemorySourceAvailable is half the memory available when the run started, lower than the cap.
+	MemorySourceAvailable MemorySource = "Available"
+	// MemorySourceUnreadable is the cap, set as a bound alone, since available memory could not be read and the
+	// collector runs at Go's default.
+	MemorySourceUnreadable MemorySource = "Unreadable"
+)
+
+// Memory is the memory limit a run's process held its heap under. LimitBytes is 0 when no limit applied, which only
+// the environment can decide.
+type Memory struct {
+	LimitBytes int64        `json:"limitBytes"`
+	CapBytes   int64        `json:"capBytes"`
+	Source     MemorySource `json:"source"`
+	// AvailableBytes is the memory available when the run started, 0 when it could not be read or did not matter.
+	AvailableBytes uint64 `json:"availableBytes"`
+	// Environment names the variables that set the collector, as `GOGC=100`, when Source is Environment.
+	Environment string `json:"environment,omitempty"`
 }
 
 // CgoTranslation is how many packages a run's cgo tool translated, and the milliseconds the go list that ran it
