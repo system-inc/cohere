@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/token"
 	"go/types"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -41,6 +42,65 @@ func TestContextReportStampsTheRegisteredRuleName(test *testing.T) {
 	context.Report(analysis.Diagnostic{Message: "planted"})
 	if len(stamped) != 1 || stamped[0] != Namespace+"planted" {
 		test.Errorf("Report stamped %q, where %q was registered", stamped, Namespace+"planted")
+	}
+}
+
+// plantedRange is a range whose End is past its Pos, so a report that drops either shows.
+type plantedRange struct{}
+
+func (plantedRange) Pos() token.Pos { return 7 }
+
+func (plantedRange) End() token.Pos { return 19 }
+
+// Reportf and ReportRangef report, called as a check ported from a pass calls them, every field of the diagnostic
+// analysis.Pass's method of the same name reports for the same call, so moving a check off its pass changes none of
+// its findings.
+func TestContextReportsFormattedFindingsAsAPassDoes(test *testing.T) {
+	test.Parallel()
+	calls := []struct {
+		name    string
+		context func(context *Context)
+		pass    func(pass *analysis.Pass)
+	}{
+		{
+			name:    "Reportf with arguments",
+			context: func(context *Context) { context.Reportf(7, "%s reads %d of %q", "planted", 3, "files") },
+			pass:    func(pass *analysis.Pass) { pass.Reportf(7, "%s reads %d of %q", "planted", 3, "files") },
+		},
+		{
+			name:    "Reportf without arguments",
+			context: func(context *Context) { context.Reportf(7, "planted reads nothing") },
+			pass:    func(pass *analysis.Pass) { pass.Reportf(7, "planted reads nothing") },
+		},
+		{
+			name: "ReportRangef with arguments",
+			context: func(context *Context) {
+				context.ReportRangef(plantedRange{}, "%s reads %d of %q", "planted", 3, "files")
+			},
+			pass: func(pass *analysis.Pass) {
+				pass.ReportRangef(plantedRange{}, "%s reads %d of %q", "planted", 3, "files")
+			},
+		},
+	}
+	for _, call := range calls {
+		test.Run(call.name, func(test *testing.T) {
+			test.Parallel()
+			passReported := []analysis.Diagnostic{}
+			pass := plantedPass()
+			pass.Report = func(diagnostic analysis.Diagnostic) {
+				passReported = append(passReported, diagnostic)
+			}
+			call.pass(pass)
+			contextReported := []analysis.Diagnostic{}
+			context := NewContext(Namespace+"planted", plantedPass(), nil, &flag.FlagSet{}, generatedNone,
+				func(_ string, diagnostic analysis.Diagnostic) {
+					contextReported = append(contextReported, diagnostic)
+				})
+			call.context(context)
+			if len(passReported) != 1 || !reflect.DeepEqual(contextReported, passReported) {
+				test.Errorf("the context reported %#v, where the pass reported %#v", contextReported, passReported)
+			}
+		})
 	}
 }
 
