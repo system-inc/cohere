@@ -161,7 +161,9 @@ func run(pass *analysis.Pass) (any, error) {
 func queryMethodIndex(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
 	method, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
 	// typeindex indexes the packages a package refers to, never the package itself, so typeindex.Index.Selection
-	// finds no method of database/sql while database/sql itself is analyzed, and the original is silent there.
+	// finds no method of database/sql while database/sql itself is analyzed, and the original is silent there. No
+	// fixture can reach this skip, since a fixture package cannot stand in for the standard library's database/sql,
+	// so the whole-tree tier over the standard library holds it.
 	if !isFunction || method.Pkg() == nil || method.Pkg().Path() != sqlPath || method.Pkg() == pass.Pkg {
 		return 0, false
 	}
