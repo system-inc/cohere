@@ -10,8 +10,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/system-inc/cohere/internal/build_inputs"
 )
 
 // A rebuild after a trim recomputes only entries the trim removed, and only the ones it needs: every entry
@@ -53,7 +51,7 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 	build := func() {
 		test.Helper()
 		command := exec.Command("go", "build", "-o", test.TempDir()+string(filepath.Separator), "./...")
-		command.Dir = build_inputs.OutsideModule(test, module)
+		command.Dir = outsideModule(test, module)
 		command.Env = append(os.Environ(), "GOCACHE="+cache, "GOFLAGS=", "GOWORK=off")
 		if output, outputError := command.CombinedOutput(); outputError != nil {
 			test.Fatalf("go build: %v: %s", outputError, output)
@@ -95,7 +93,7 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		}
 		size += information.Size()
 	}
-	trimmed, trimError := Trim(cache, Limit{Cap: size / 2, Target: size / 2, Spare: 10 * time.Minute}, time.Now())
+	trimmed, trimError := Trim(cache, Limit{Cap: size / 2, Target: size / 2, Spare: MinimumSpare}, time.Now())
 	if trimError != nil {
 		test.Fatal(trimError)
 	}

@@ -1,4 +1,4 @@
-package go_cache
+package guard
 
 import (
 	"fmt"
@@ -12,19 +12,23 @@ import (
 	"testing"
 )
 
-// goCacheImport is this package's import path, which a caller of Trim imports.
-const goCacheImport = "github.com/system-inc/cohere/internal/release/go_cache"
+// goCacheImport is the go_cache module's import path, which a caller of its deletes imports.
+const goCacheImport = "github.com/system-inc/cohere/go_cache"
 
-// trimCaller is the one directory whose code may call Trim on a live cache: cohere-dev's, which holds every
+// goCacheDeletes are go_cache's functions that remove from a cache.
+var goCacheDeletes = map[string]bool{"Trim": true, "RemoveOldest": true, "Remove": true}
+
+// trimCaller is the one directory whose code may delete from a live cache: cohere-dev's, which holds every
 // token of the machine's pool while it trims.
 const trimCaller = "command/cohere-dev"
 
 // One trim, one path, under the pool's lock (#cpxc2d7). The launcher also trimmed the default cache, holding
 // nothing, and on 2026-10-06 a trim holding the wrong pool deleted 83 GB from under running gates
-// (#d0x1fhp). So no code outside cohere-dev calls Trim. Tests are exempt: they trim caches of their own.
+// (#d0x1fhp). So no code of cohere's outside cohere-dev calls go_cache's deletes. Tests are exempt: they trim
+// caches of their own. The go_cache module itself never imports its own path, so its own calls are not read.
 func TestOnlyCohereDevTrims(test *testing.T) {
 	test.Parallel()
-	root, absolutePathError := filepath.Abs(filepath.Join("..", "..", ".."))
+	root, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
 	if absolutePathError != nil {
 		test.Fatal(absolutePathError)
 	}
@@ -77,7 +81,7 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 			return parseError
 		}
 		ast.Inspect(parsed, func(node ast.Node) bool {
-			if selector, ok := node.(*ast.SelectorExpr); ok && selector.Sel.Name == "Trim" {
+			if selector, ok := node.(*ast.SelectorExpr); ok && goCacheDeletes[selector.Sel.Name] {
 				if identifier, ok := selector.X.(*ast.Ident); ok && identifier.Name == name {
 					callers = append(callers, files.Position(selector.Pos()).String())
 				}
@@ -91,7 +95,7 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 	}
 	for _, caller := range callers {
 		test.Errorf(
-			"%s calls go_cache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
+			"%s deletes through go_cache outside %s: only cohere-dev's trim may delete from a live Go cache, "+
 				"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds",
 			caller,
 			trimCaller,
