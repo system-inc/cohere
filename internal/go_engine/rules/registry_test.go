@@ -23,6 +23,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
 	"github.com/system-inc/cohere/internal/go_engine/rules/argument_overwritten_before_use"
 	"github.com/system-inc/cohere/internal/go_engine/rules/assertion_to_own_type"
+	"github.com/system-inc/cohere/internal/go_engine/rules/assigned_benchmark_iterations"
 	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_constant_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_return_of_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/buffer_string_conversion"
@@ -150,6 +151,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unchanging_loop_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unconditional_loop_exit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unencodable_binary_value"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unexiting_test_main"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_blank_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_sprint"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unobserved_append"
@@ -386,6 +388,8 @@ var portedStaticcheck = []struct {
 	{"SA2001", empty_critical_section.Analyzer},
 	{"SA2002", test_failure_in_goroutine.Analyzer},
 	{"SA2003", deferred_lock_after_lock.Analyzer},
+	{"SA3000", unexiting_test_main.Analyzer},
+	{"SA3001", assigned_benchmark_iterations.Analyzer},
 	{"SA4000", identical_operands.Analyzer},
 	{"SA4001", ineffective_copy.Analyzer},
 	{"SA4003", extreme_comparison.Analyzer},

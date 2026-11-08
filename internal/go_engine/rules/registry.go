@@ -15,6 +15,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
 	"github.com/system-inc/cohere/internal/go_engine/rules/argument_overwritten_before_use"
 	"github.com/system-inc/cohere/internal/go_engine/rules/assertion_to_own_type"
+	"github.com/system-inc/cohere/internal/go_engine/rules/assigned_benchmark_iterations"
 	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_constant_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/boolean_return_of_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/buffer_string_conversion"
@@ -192,6 +193,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unchanging_loop_condition"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unconditional_loop_exit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unencodable_binary_value"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unexiting_test_main"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_blank_identifier"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unnecessary_sprint"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unobserved_append"
@@ -401,6 +403,8 @@ var ports = map[string]port{
 	"SA2001": {analyzer: empty_critical_section.Analyzer, listener: &empty_critical_section.Listener},
 	"SA2002": {analyzer: test_failure_in_goroutine.Analyzer, listener: &test_failure_in_goroutine.Listener},
 	"SA2003": {analyzer: deferred_lock_after_lock.Analyzer, listener: &deferred_lock_after_lock.Listener},
+	"SA3000": {analyzer: unexiting_test_main.Analyzer, listener: &unexiting_test_main.Listener},
+	"SA3001": {analyzer: assigned_benchmark_iterations.Analyzer, listener: &assigned_benchmark_iterations.Listener},
 	"SA4000": {analyzer: identical_operands.Analyzer, listener: &identical_operands.Listener},
 	"SA4001": {analyzer: ineffective_copy.Analyzer, listener: &ineffective_copy.Listener},
 	"SA4003": {analyzer: extreme_comparison.Analyzer, listener: &extreme_comparison.Listener},
