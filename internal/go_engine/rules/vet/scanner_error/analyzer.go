@@ -10,6 +10,11 @@
 // the index hands them over in: each call whose typeutil.Callee is NewScanner, and each identifier whose use is the
 // variable. The registry runs the port in the original's place, and the original stays the oracle: the parity tests
 // beside this file run both over the same packages. The two agree everywhere, so there is no differences fixture.
+//
+// The port sits on the engine's syntax dispatcher, hearing each call on the walk the dispatcher makes once for every
+// syntax rule, with the call's cursor, which it reads where the call sits in its parent. Once the walk has covered the
+// package, it walks the identifiers for the scanners' uses on the dispatcher's own inspector, only in a package that
+// holds a scanner to judge, as before.
 package scanner_error
 
 import (
@@ -20,14 +25,20 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/edge"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// doc is the original's documentation byte for byte, so the rule's documentation reads the same.
-const doc = `scannererr: report failure to check bufio.Scanner.Err
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming
+// it read the same as before the port took the original's place.
+const passName = "scannererr"
+
+// passDoc is the original's documentation byte for byte, so the rule's documentation reads the same.
+const passDoc = `scannererr: report failure to check bufio.Scanner.Err
 
 This analyzer reports uses of bufio.Scanner in which the result of
 NewScanner is assigned to a local variable that is then used in a loop
@@ -63,14 +74,27 @@ suppress the diagnostic thus:
 
 `
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name:     "scannererr",
-	Doc:      doc,
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/scannererr",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/scannererr"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, with its cursor, as
+// the original's index hands the calls over, and, once the walk is over, the package, whose scanners it judges.
+var Listener = rule.Listener{
+	Nodes:       []ast.Node{(*ast.CallExpr)(nil)},
+	Node:        gatherCandidate,
+	PackageExit: judgeCandidates,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
 }
 
 // candidate is one call of bufio.NewScanner whose result is assigned to a variable, the scanner, waiting to be judged
@@ -80,62 +104,70 @@ type candidate struct {
 	scanner *types.Var
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("scanner_error: inspect's result is missing")
+// packageState is what the port gathers over one package's walk: the candidates, in the order their calls were
+// heard, and the inspector the dispatcher walks with, whose identifiers judgeCandidates walks for the scanners' uses.
+type packageState struct {
+	candidates []candidate
+	inspected  *inspector.Inspector
+}
+
+// gatherCandidate keeps node as a candidate when it is a call of bufio.NewScanner, over a reader that can fail, whose
+// result is assigned to a variable. The calls are heard in the order the original's index hands them over in, the
+// order of their functions' identifiers: a call comes before every call inside it, and its function before its
+// arguments. The judgment reads where each call sits in its parent, so it reads the call's cursor, as the original's
+// does.
+func gatherCandidate(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	candidates := []candidate{}
-	// The walk is by cursor rather than by inspector.All, since the judgment reads where each call sits in its
-	// parent, as the original's cursor does. Preorder visits the calls in the order the index hands them over in, the
-	// order of their functions' identifiers: a call comes before every call inside it, and its function before its
-	// arguments.
-	for cursor := range inspected.Root().Preorder((*ast.CallExpr)(nil)) {
-		call, isCall := cursor.Node().(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder filtered by *ast.CallExpr visits nothing else.
-			panic("scanner_error: a call's cursor holds no call")
-		}
-		if !isNewScanner(pass, typeutil.Callee(pass.TypesInfo, call)) {
-			continue
-		}
-		// A reader in memory never fails to read, so a scanner over one is disregarded. Scanning can still fail on a
-		// token or line longer than the scanner's buffer, which is much rarer than an I/O error. NewScanner takes one
-		// argument, and a pass runs only over a package that type-checks, so Args holds it.
-		reader := pass.TypesInfo.TypeOf(call.Args[0])
-		if isPointerToNamed(reader, "bytes", "Buffer", "Reader") || isPointerToNamed(reader, "strings", "Reader") {
-			continue
-		}
-		assigned := assignedIdentifier(cursor)
-		if assigned == nil {
-			continue
-		}
-		scanner, isVariable := pass.TypesInfo.ObjectOf(assigned).(*types.Var)
-		if !isVariable {
-			continue
-		}
-		candidates = append(candidates, candidate{call: call, scanner: scanner})
+	if !isNewScanner(context, typeutil.Callee(context.TypesInfo, call)) {
+		return
 	}
-	if len(candidates) == 0 {
-		return nil, nil
+	// A reader in memory never fails to read, so a scanner over one is disregarded. Scanning can still fail on a
+	// token or line longer than the scanner's buffer, which is much rarer than an I/O error. NewScanner takes one
+	// argument, and a pass runs only over a package that type-checks, so Args holds it.
+	reader := context.TypesInfo.TypeOf(call.Args[0])
+	if isPointerToNamed(reader, "bytes", "Buffer", "Reader") || isPointerToNamed(reader, "strings", "Reader") {
+		return
 	}
-	uses := usesOf(pass.TypesInfo, inspected, candidates)
-	for _, judged := range candidates {
+	cursor := context.Cursor()
+	assigned := assignedIdentifier(cursor)
+	if assigned == nil {
+		return
+	}
+	scanner, isVariable := context.TypesInfo.ObjectOf(assigned).(*types.Var)
+	if !isVariable {
+		return
+	}
+	state := rule.State[packageState](context)
+	state.candidates = append(state.candidates, candidate{call: call, scanner: scanner})
+	// Every cursor of the walk is the same inspector's, the one the dispatcher walks the package with.
+	state.inspected = cursor.Inspector()
+}
+
+// judgeCandidates reports each candidate whose scanner is used in a Scan loop with no check of its Err, once the walk
+// has covered the package, and walks nothing in a package with no candidate.
+func judgeCandidates(context *rule.Context) {
+	state := rule.State[packageState](context)
+	if len(state.candidates) == 0 {
+		return
+	}
+	uses := usesOf(context.TypesInfo, state.inspected, state.candidates)
+	for _, judged := range state.candidates {
 		scanPosition := scanInLoop(judged.scanner, uses[judged.scanner])
 		if !scanPosition.IsValid() {
 			continue
 		}
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos: judged.call.Pos(),
 			End: judged.call.End(),
 			Message: fmt.Sprintf(
 				"bufio.Scanner %q is used in Scan loop at line %d without final check of %s.Err()",
-				judged.scanner.Name(), pass.Fset.Position(scanPosition).Line, judged.scanner.Name(),
+				judged.scanner.Name(), context.Fset.Position(scanPosition).Line, judged.scanner.Name(),
 			),
 		})
 	}
-	return nil, nil
 }
 
 // isNewScanner reports whether callee is bufio's package-level NewScanner, the object the original's index looks up
@@ -144,10 +176,10 @@ func run(pass *analysis.Pass) (any, error) {
 // The index holds the packages the pass refers to, never the pass's own, so a call inside bufio itself is never
 // judged. No file of bufio calls NewScanner, so no input reaches that case; it is kept so the port judges what the
 // original judges.
-func isNewScanner(pass *analysis.Pass, callee types.Object) bool {
+func isNewScanner(context *rule.Context, callee types.Object) bool {
 	return callee != nil &&
 		isPackageLevel(callee) &&
-		callee.Pkg() != pass.Pkg &&
+		callee.Pkg() != context.Package &&
 		callee.Pkg().Path() == "bufio" &&
 		callee.Name() == "NewScanner"
 }

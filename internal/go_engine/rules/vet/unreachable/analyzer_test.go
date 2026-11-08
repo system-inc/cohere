@@ -12,9 +12,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/analysis/passes/unreachable"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/txtar"
 
@@ -84,36 +82,61 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 
 // The registry lists unreachable among the passes that read no type information, so a run may hand it a pass with
 // none. The port runs here over every fixture package, the differences' too, with no types, package or type
-// checker's information at all, and inspect's result built from the syntax alone, and must find what it finds with
-// them, fix for fix, each fix held to what the checker's report holds it to.
+// checker's information at all, each analyzer it requires run first over the same syntax, as the checker would run
+// them, and must find what it finds with them, fix for fix, each fix held to what the checker's report holds it to.
 func TestPortReadsNoTypeInformation(test *testing.T) {
 	test.Parallel()
 	roots := append(fixtureRoots(test), loadedRoots(test, analysistest.TestData(), []string{"differences"})...)
 	_, typed := findingsOf(test, roots)
 	untyped := []finding{}
 	for _, loadedPackage := range roots {
-		pass := &analysis.Pass{
-			Analyzer: Analyzer,
-			Fset:     loadedPackage.Fset,
-			Files:    loadedPackage.Syntax,
-			ResultOf: map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New(loadedPackage.Syntax)},
-			// The checker's report, which holds every fix to be well formed, and cuts an edit's end just past the
-			// file's, as the deletion in a file cut off makes, back to the file's end.
-			Report: func(diagnostic analysis.Diagnostic) {
-				validateError := driverutil.ValidateFixes(loadedPackage.Fset, Analyzer, diagnostic.SuggestedFixes)
-				if validateError != nil {
-					test.Errorf("the port with no types offers a fix the checker refuses: %v", validateError)
-				}
-				untyped = append(untyped, findingAt(loadedPackage, diagnostic))
-			},
-		}
-		if _, runError := Analyzer.Run(pass); runError != nil {
-			test.Fatalf("running the port over %s with no types: %v", loadedPackage.ID, runError)
-		}
+		// The checker's report, which holds every fix to be well formed, and cuts an edit's end just past the file's,
+		// as the deletion in a file cut off makes, back to the file's end.
+		runWithoutTypes(test, loadedPackage, func(diagnostic analysis.Diagnostic) {
+			validateError := driverutil.ValidateFixes(loadedPackage.Fset, Analyzer, diagnostic.SuggestedFixes)
+			if validateError != nil {
+				test.Errorf("the port with no types offers a fix the checker refuses: %v", validateError)
+			}
+			untyped = append(untyped, findingAt(loadedPackage, diagnostic))
+		})
 	}
 	slices.SortFunc(untyped, compareFindings)
 	test.Logf("the port found %d with types, %d with none", len(typed), len(untyped))
 	expectSame(test, "the port with no types", typed, untyped)
+}
+
+// runWithoutTypes runs the port over loadedPackage's syntax alone, handing report what it reports: first every
+// analyzer it requires, the syntax dispatcher and what the dispatcher requires, each once and over the same syntax,
+// then the port's own analyzer, which reports what the dispatcher's walk found. A pass holds no types, package or
+// type checker's information, so an analyzer that read any would find nothing there or fail.
+func runWithoutTypes(test *testing.T, loadedPackage *packages.Package, report func(diagnostic analysis.Diagnostic)) {
+	test.Helper()
+	results := map[*analysis.Analyzer]any{}
+	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic))
+	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) {
+		resultOf := map[*analysis.Analyzer]any{}
+		for _, required := range running.Requires {
+			if _, isRun := results[required]; !isRun {
+				run(required, func(analysis.Diagnostic) {
+					// A requirement's findings are not the port's, and none of these makes any.
+				})
+			}
+			resultOf[required] = results[required]
+		}
+		pass := &analysis.Pass{
+			Analyzer: running,
+			Fset:     loadedPackage.Fset,
+			Files:    loadedPackage.Syntax,
+			ResultOf: resultOf,
+			Report:   report,
+		}
+		result, runError := running.Run(pass)
+		if runError != nil {
+			test.Fatalf("running %s over %s with no types: %v", running.Name, loadedPackage.ID, runError)
+		}
+		results[running] = result
+	}
+	run(Analyzer, report)
 }
 
 // finding is one finding as the differential compares it, its suggested fixes included.
