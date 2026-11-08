@@ -12,6 +12,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/standard_library_table"
@@ -126,7 +127,7 @@ func cacheBuild(values map[string]string) []string {
 	build := make([]string, 0, len(buildNames)+len(processEnvironment))
 	for _, name := range buildNames {
 		if name == "GOFLAGS" {
-			build = append(build, name+"="+verdictFlags(values[name]))
+			build = append(build, name+"="+load.VerdictFlags(values[name]))
 			continue
 		}
 		build = append(build, name+"="+values[name])
@@ -142,14 +143,14 @@ func cacheBuild(values map[string]string) []string {
 	return build
 }
 
-// flagsNoStandardLibraryReads are the go flags that, beyond flagsNoVerdictReads, change nothing of a standard-library
-// package's entry, which standardLibraryBuild leaves out of the standard library's key. The standard library is in no
-// module, so -mod, -modfile and -modcacherw, which say how go resolves and keeps the main module's dependencies,
-// resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. -trimpath rewrites the
-// paths go compiles into what it builds, never the paths go list names, and the source loader reads the standard
-// library's files by the paths go list names, with it or without it; the key names each file below `GOROOT` besides.
-// Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose which files a package holds, and
-// -n and -buildvcs can decide whether a load succeeds at all.
+// flagsNoStandardLibraryReads are the go flags that, beyond those load.VerdictFlags leaves out, change nothing of a
+// standard-library package's entry, which standardLibraryBuild leaves out of the standard library's key. The standard
+// library is in no module, so -mod, -modfile and -modcacherw, which say how go resolves and keeps the main module's
+// dependencies, resolve none of it: go finds every standard-library package below `GOROOT` whatever they say. -trimpath
+// rewrites the paths go compiles into what it builds, never the paths go list names, and the source loader reads the
+// standard library's files by the paths go list names, with it or without it; the key names each file below `GOROOT`
+// besides. Every other flag stays, as in the engine's key (#s5h4q2t): -tags and -race choose which files a package
+// holds, and -n and -buildvcs can decide whether a load succeeds at all.
 var flagsNoStandardLibraryReads = []string{"trimpath", "mod", "modfile", "modcacherw"}
 
 // standardLibraryBuild is the build context every standard-library key shares, in cacheBuild's order: of values,
@@ -165,7 +166,7 @@ func standardLibraryBuild(values map[string]string) []string {
 			continue
 		}
 		kept := []string{}
-		for _, field := range strings.Fields(verdictFlags(values[name])) {
+		for _, field := range strings.Fields(load.VerdictFlags(values[name])) {
 			flagName, _, _ := strings.Cut(strings.TrimLeft(field, "-"), "=")
 			if !slices.Contains(flagsNoStandardLibraryReads, flagName) {
 				kept = append(kept, field)
@@ -174,30 +175,6 @@ func standardLibraryBuild(values map[string]string) []string {
 		build = append(build, name+"="+strings.Join(kept, " "))
 	}
 	return build
-}
-
-// flagsNoVerdictReads are the go flags a run's verdict cannot depend on, which verdictFlags leaves out of the key:
-// -p bounds how many packages go builds at once, and -v, -x and -work only change what go prints or keeps of its
-// work, while every go command runs as it would without them. The list errs narrow on purpose: a flag left in the key
-// costs a miss when it changes, a flag left out wrongly replays a verdict another build would not give, so a flag
-// joins it only when neither the load's success nor anything a rule reads can see it. That keeps -n in the key, which
-// makes go print its commands without running them, so a load that needs cgo's output gets none, and -buildvcs,
-// whose true can refuse a main package in a tree whose version control go cannot read. cohere-dev's pool sets -p to
-// each token's share, so with it in the key a run under another share missed every package.
-var flagsNoVerdictReads = []string{"p", "v", "x", "work"}
-
-// verdictFlags is goFlags, `GOFLAGS` as go env reports it, without the flags in flagsNoVerdictReads, every other
-// flag kept as written and in its order. go reads `GOFLAGS` as fields split on white space, each `-name` or
-// `-name=value`, one dash or two.
-func verdictFlags(goFlags string) string {
-	kept := []string{}
-	for _, field := range strings.Fields(goFlags) {
-		name, _, _ := strings.Cut(strings.TrimLeft(field, "-"), "=")
-		if !slices.Contains(flagsNoVerdictReads, name) {
-			kept = append(kept, field)
-		}
-	}
-	return strings.Join(kept, " ")
 }
 
 // cacheRuleSet is each enabled rule as its name, then its analyzer's options as they were resolved from the

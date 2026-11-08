@@ -151,6 +151,17 @@ var listingEdits = []listingEdit{
 		"project/go.work": "go 1.24\n\nuse (\n\t.\n\t../outside\n)\n",
 	}},
 	{name: "another target", environment: []string{"GOOS=linux", "GOARCH=amd64"}},
+	// Flags that change only what go prints, or how many packages it builds at once, keep the answer, as cohere-dev's
+	// pool sets -p to each token's share; a flag that changes what it lists, a build tag, does not. Each keeps the
+	// process's other flags, -buildvcs among them, so it changes only what it names.
+	{
+		name: "another pool share", kept: true,
+		environment: []string{"GOFLAGS=" + VerdictFlags(os.Getenv("GOFLAGS")) + " -p=7 -v -x"},
+	},
+	{
+		name:        "another build tag",
+		environment: []string{"GOFLAGS=" + VerdictFlags(os.Getenv("GOFLAGS")) + " -tags=probe"},
+	},
 }
 
 // go list's answer is kept until something it reads moves. An edit below a file's imports keeps it; each kind of
