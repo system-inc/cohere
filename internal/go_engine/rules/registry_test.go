@@ -1039,6 +1039,7 @@ var portedPasses = []string{
 	"dynamic_printf_format",
 	"early_deferred_close",
 	"elaborate_sleep",
+	"empty_critical_section",
 	"empty_select_default",
 	"error_variable_name",
 	"errors_new_of_sprintf",
