@@ -295,7 +295,7 @@ var ports = map[string]port{
 	"hostport":         {analyzer: host_port.Analyzer, listener: &host_port.Listener},
 	"httpresponse":     {analyzer: http_response.Analyzer, listener: &http_response.Listener},
 	"ifaceassert":      {analyzer: iface_assert.Analyzer, listener: &iface_assert.Listener},
-	"loopclosure":      {analyzer: loop_closure.Analyzer},
+	"loopclosure":      {analyzer: loop_closure.Analyzer, listener: &loop_closure.Listener},
 	"lostcancel":       {analyzer: lost_cancel.Analyzer},
 	"nilfunc":          {analyzer: nil_func.Analyzer, listener: &nil_func.Listener},
 	"printf":           {analyzer: printf.Analyzer},
