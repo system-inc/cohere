@@ -1,22 +1,18 @@
 package time_until
 
 import (
-	"bytes"
 	"cmp"
-	"go/format"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1024"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstream is staticcheck's own fixture for S1024, which it keeps twice, under simple/s1024/testdata/go1.7 and
@@ -32,9 +28,6 @@ const upstream = "CheckTimeUntil"
 // versions are the modules the fixtures load from, each named for the version its go.mod says, staticcheck's two.
 var versions = []string{"go1.7", "go1.8"}
 
-// upstreamFile is the upstream fixture's one file, beside its golden file under go1.8.
-const upstreamFile = "LimeTimeUntil.go"
-
 // fixtures is every fixture package of the go1.8 module where the original and the port agree, fixes and all:
 // staticcheck's, parity's, and parity's that imports time into its own scope beside its own name.
 var fixtures = []string{"./" + upstream, "./parity", "./parity/dotted"}
@@ -42,10 +35,10 @@ var fixtures = []string{"./" + upstream, "./parity", "./parity/dotted"}
 // differencesFixtures is the differences fixture's packages, where the two make the same findings and the original's
 // fixes fail to compile: its own, which imports time as clock alone in one file and hands Sub receivers that are no
 // time.Time in the other, and one that imports time into its own scope alone. Its embedder package, which it imports,
-// holds no call. The harness reads a fixture's records under the src of the directory it loads from, by the path it
-// loads, and the gate needs go1.8, so the fixture is a module of its own, `module differences` at `go 1.8`, under
+// holds no call. The gate needs go1.8, so the fixture is a module of its own, `module differences` at `go 1.8`, under
 // go1.8's src, and go1.8's go.work uses both modules, which the harness loads through since it sits beside go1.8's
-// go.mod. So the pattern differences names the package at go1.8/src/differences, its records' directory.
+// go.mod. So the pattern differences names the package at go1.8/src/differences, and the harness reads its records
+// from the folder the load finds it in.
 var differencesFixtures = []string{"differences", "differences/dotted"}
 
 // modulePatterns is, for each fixture module's version, the patterns that name every package it loads: the module's
@@ -93,82 +86,33 @@ func TestFixtureModulesCarryTheirVersions(test *testing.T) {
 	}
 }
 
-// Every `//@ diag(...)` note the upstream fixture holds, under each version, the port reports on the same line with
-// a message the note matches, and the port reports nothing no note expects. The go1.7 fixture holds no note, so there
-// the original must report nothing too, as staticcheck's own test requires of it, and the call it holds is the one
-// the go1.8 fixture's note expects, so the gate is what parts them.
+// Every `//@ diag(...)` note the go1.8 upstream fixture holds, the port reports on the same line with a message the
+// note matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	wanted := 0
-	for _, version := range versions {
-		fixture := filepath.Join(module(version), upstream)
-		wants, readError := staticcheck_wants.Read(fixture)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		wanted += len(wants)
-		original, port := parity.Findings(test, s1024.Analyzer, Analyzer, module(version), "./"+upstream)
-		found := []staticcheck_wants.Finding{}
-		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its path below its module's folder.
-			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
-				Message: each.Message,
-			})
-		}
-		test.Logf("under %s the fixture expects %d, the original found %d, the port %d", version, len(wants),
-			len(original), len(found))
-		if len(wants) == 0 && len(original) != 0 {
-			test.Errorf("under %s the fixture expects nothing, and the original found %v, so the version did not "+
-				"reach it as staticcheck's testutil hands it over", version, original)
-		}
-		unexpected, untaken := staticcheck_wants.Compare(wants, found)
-		for _, extra := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-				extra.Message)
-		}
-		for _, missing := range untaken {
-			test.Errorf("the port reported nothing matching %s", missing)
-		}
-	}
-	if wanted == 0 {
-		test.Fatal("the upstream fixtures hold no notes, so the comparison proves nothing")
+	parity.RequireStaticcheckWants(test, Analyzer, module("go1.8"), "./"+upstream)
+}
+
+// The go1.7 upstream fixture holds no note, so there the original must report nothing, as staticcheck's own test
+// requires of it, and the port nothing either; the call it holds is the one the go1.8 fixture's note expects, so the
+// gate is what parts them. RequireStaticcheckWants fails fixtures that hold no note and RequireIdentical fails where
+// the original finds nothing, since each would prove nothing there, so the silence is held here over the harness's
+// Findings.
+func TestPortMatchesUpstreamSilenceUnderGo17(test *testing.T) {
+	test.Parallel()
+	original, port := parity.Findings(test, s1024.Analyzer, Analyzer, module("go1.7"), "./"+upstream)
+	test.Logf("under go1.7 the original found %d, the port %d", len(original), len(port))
+	for _, found := range slices.Concat(original, port) {
+		test.Errorf("under go1.7 the fixture expects nothing, and %s was found, so the version did not reach it as "+
+			"staticcheck's testutil hands it over, or the port's gate parts from the original's", found)
 	}
 }
 
 // The port's fixes, applied to the go1.8 upstream fixture, make its golden file, as staticcheck's testutil requires
-// of the original's: the golden file is read as a txtar archive, whose comment is the whole fixed file when it holds
-// no sections, and the fixed file is gofmt'd before it is compared. The go1.7 fixture has no golden file, and no fix.
+// of the original's. The golden file holds no sections. The go1.7 fixture has no golden file, and no fix.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
-	_, port := parity.Findings(test, s1024.Analyzer, Analyzer, module("go1.8"), "./"+upstream)
-	path := filepath.Join(module("go1.8"), upstream, upstreamFile)
-	source, readError := os.ReadFile(path)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	golden, goldenError := os.ReadFile(path + ".golden")
-	if goldenError != nil {
-		test.Fatal(goldenError)
-	}
-	archive := txtar.Parse(golden)
-	if len(archive.Files) > 0 {
-		test.Fatalf("the golden file holds %d sections, one a fix's message, which this test does not read",
-			len(archive.Files))
-	}
-	edits := editsIn(port, upstream+"/"+upstreamFile)
-	test.Logf("the port found %d, with %d edits", len(port), len(edits))
-	if len(edits) == 0 {
-		test.Fatal("the port made no edit to the upstream fixture, so the comparison proves nothing")
-	}
-	fixed := applied(test, upstreamFile, source, edits)
-	formatted, formatError := format.Source(fixed)
-	if formatError != nil {
-		test.Fatalf("the port's fixes make source gofmt cannot format: %v\n%s", formatError, fixed)
-	}
-	if !bytes.Equal(formatted, archive.Comment) {
-		test.Errorf("the port's fixes make\n%s\nand the golden file is\n%s", formatted, archive.Comment)
-	}
+	parity.RequireStaticcheckGolden(test, Analyzer, module("go1.8"), "./"+upstream)
 }
 
 // The original and the port run in one checker over staticcheck's go1.8 fixture and parity's, which holds every shape
@@ -213,9 +157,9 @@ func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 
 // Over the differences fixture, each finding the port makes is one the original makes at the same range, and each fix
 // it offers edits the bytes the original's does, so a move rewrites a fix's text and nothing else. A `moves:` record
-// pairs any two findings on its line with its message, so this is where the moved fix is held to the original's
-// bytes, and TestPortMovedFixesMakeGoldens holds it by its text; a fix the port withholds is held to its record by
-// TestPortDiffersFromOriginalOnlyWhereRecorded.
+// pairs any two findings on its line with its message, and no harness call holds a moved fix to the original's bytes,
+// so this is where it is held there, and TestPortMovedFixesMakeGoldens holds it by its text; a fix the port withholds
+// is held to its record by TestPortDiffersFromOriginalOnlyWhereRecorded.
 func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 	test.Parallel()
 	original, port := parity.Findings(test, s1024.Analyzer, Analyzer, module("go1.8"), differencesFixtures...)
@@ -243,62 +187,14 @@ func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 	}
 }
 
-// The port's fixes, applied to each differences file where a fix of the port's is not the original's, make the
-// file's golden file beside it, as gofmt prints it, so a move's edits are held by their text: the name the code gives
-// time, the pointer dereferenced and the embedded field selected, by its name alone or by the path, which a wrong
-// field that still compiles would fail here and nowhere else. Every golden file belongs to a file a move is in, and
-// every file a move is in has one.
+// The port's fixes, applied to each file of the differences fixture, make the golden file beside it, as gofmt prints
+// it, so a move's edits are held by their text: the name the code gives time, the pointer dereferenced and the
+// embedded field selected, by its name alone or by the path, which a wrong field that still compiles would fail here
+// and nowhere else. Each golden file holds no sections, so it reads as staticcheck's do, and a file a fix edits with
+// no golden file fails.
 func TestPortMovedFixesMakeGoldens(test *testing.T) {
 	test.Parallel()
-	original, port := parity.Findings(test, s1024.Analyzer, Analyzer, module("go1.8"), differencesFixtures...)
-	moved := []string{}
-	for _, finding := range parity.Difference(port, original) {
-		// A finding of the port's that differs and offers a fix is a move; one that offers none withholds it.
-		if len(finding.Fixes) > 0 && !slices.Contains(moved, finding.File) {
-			moved = append(moved, finding.File)
-		}
-	}
-	if len(moved) == 0 {
-		test.Fatal("the port moves no fix of the differences fixture, so the comparison proves nothing")
-	}
-	compared := 0
-	for _, file := range differencesFiles(test) {
-		// The findings name a file by its path below its module's folder.
-		below, relativeError := filepath.Rel(module("go1.8"), file)
-		if relativeError != nil {
-			test.Fatal(relativeError)
-		}
-		golden, goldenError := os.ReadFile(file + ".golden")
-		isMoved := slices.Contains(moved, filepath.ToSlash(below))
-		if os.IsNotExist(goldenError) && !isMoved {
-			continue
-		}
-		if goldenError != nil {
-			test.Fatal(goldenError)
-		}
-		if !isMoved {
-			test.Errorf("%s.golden is the golden file of a file no move is in", filepath.Base(file))
-			continue
-		}
-		source, readError := os.ReadFile(file)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		edits := editsIn(port, filepath.ToSlash(below))
-		test.Logf("%s: the port made %d edits", filepath.Base(file), len(edits))
-		formatted, formatError := format.Source(applied(test, filepath.Base(file), source, edits))
-		if formatError != nil {
-			test.Fatalf("the port's fixes to %s make source gofmt cannot format: %v", filepath.Base(file), formatError)
-		}
-		if !bytes.Equal(formatted, golden) {
-			test.Errorf("the port's fixes to %s make\n%s\nand its golden file is\n%s", filepath.Base(file), formatted,
-				golden)
-		}
-		compared++
-	}
-	if compared != len(moved) {
-		test.Errorf("%d files hold a move, and %d were compared with a golden file", len(moved), compared)
-	}
+	parity.RequireStaticcheckGolden(test, Analyzer, module("go1.8"), differencesFixtures...)
 }
 
 // Applied to the differences fixture, the port's fixes make packages that type-check, and the original's make ones
@@ -346,8 +242,8 @@ func withoutEditText(findings []parity.Finding) []parity.Finding {
 	return textless
 }
 
-// differencesFiles is every .go file of the differences fixture's packages, by absolute path. The findings name a
-// file by its base name, so two files that share one fail the test.
+// differencesFiles is every .go file of the differences fixture's packages, by absolute path. TestPortMovedFixesCompile
+// finds a file's type errors by its base name, so two files that share one fail the test.
 func differencesFiles(test *testing.T) []string {
 	test.Helper()
 	files := []string{}
@@ -431,7 +327,8 @@ func editsIn(findings []parity.Finding, file string) []parity.Edit {
 }
 
 // applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
-// were read against. Two edits that overlap fail the test.
+// were read against. Two edits that overlap fail the test. The harness applies fixes only to hold them to a golden
+// file, and here they are held by whether they type-check, so fixedErrors applies them itself.
 func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
 	test.Helper()
 	ordered := slices.Clone(edits)
