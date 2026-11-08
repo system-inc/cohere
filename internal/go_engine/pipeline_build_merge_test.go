@@ -42,8 +42,8 @@ func unusedDirective(file string, rule string) suppression.DirectiveFinding {
 }
 
 // A mergeIfAll finding one build kept and another with a say on its file did not is gone, so code is unused only if
-// it is unused in every build; the same finding where the other build has no say, having left the package out of its
-// closure, stands as the one build with a say has it.
+// it is unused in every build; the same finding where the other build has no say, since it does not compile the file,
+// stands as the one build with a say has it.
 func TestAMergeIfAllFindingStandsOnlyWhereEveryBuildWithASayKeepsIt(test *testing.T) {
 	test.Parallel()
 	found := mergeTestFinding(mergeAllRule, "shared.go")

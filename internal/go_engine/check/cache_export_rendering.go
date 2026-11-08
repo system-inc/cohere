@@ -79,8 +79,7 @@ func writtenType(written types.Type) string {
 		unexportedOrigins(written)
 }
 
-// renderedObject is the lines of one package-level object as exportRendering writes them, which ReadBuild also
-// digests object by object.
+// renderedObject is the lines of one package-level object as exportRendering writes them.
 func renderedObject(object types.Object) []string {
 	switch declared := object.(type) {
 	case *types.Const:

@@ -49,15 +49,9 @@ type BuildRecord struct {
 	Target string `json:"target"`
 	Host   bool   `json:"host"`
 	// CompiledFiles counts the files of ours the build compiles, and AnalyzedPackages the packages it analyzed: every
-	// root for the host's build, and for another the packages that could find what the host's did not.
+	// package its load holds, and none for a build whose load found a type error.
 	CompiledFiles    int `json:"compiledFiles"`
 	AnalyzedPackages int `json:"analyzedPackages"`
-	// Seeds, References and Importers count another build's analyzed packages by why it analyzed them: its files
-	// differ from the host's, it names something that differs, or it imports a package whose own surface differs. A
-	// package held for more than one reason counts under each, and all three are 0 for the host's.
-	Seeds      int `json:"seeds"`
-	References int `json:"references"`
-	Importers  int `json:"importers"`
 	// FindingsAdded counts the findings that stand which this build kept and the host's did not, and FindingsDropped
 	// the findings this build kept that the merge left out, since their rule keeps only what every build with a say
 	// on the file reports.

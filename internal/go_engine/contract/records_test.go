@@ -327,7 +327,7 @@ func populatedRecords() []Record {
 			WithheldAsCopied:      map[string]int{"cohere-go/y": 3},
 			Builds: []BuildRecord{
 				{Target: "darwin/arm64 cgo", Host: true, CompiledFiles: 2, AnalyzedPackages: 1},
-				{Target: "windows/arm64", CompiledFiles: 2, AnalyzedPackages: 1, Seeds: 1, FindingsAdded: 1},
+				{Target: "windows/arm64", CompiledFiles: 2, AnalyzedPackages: 1, FindingsAdded: 1},
 			},
 		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
@@ -543,16 +543,13 @@ func TestLintRecordWritesBuildsOnlyForMoreThanOne(test *testing.T) {
 	}
 	several := encode(LintRecord{Builds: []BuildRecord{
 		{Target: "darwin/arm64 cgo", Host: true, CompiledFiles: 3, AnalyzedPackages: 2},
-		{
-			Target: "windows/arm64", CompiledFiles: 3, AnalyzedPackages: 1, Seeds: 1, FindingsAdded: 2,
-			FindingsDropped: 1,
-		},
+		{Target: "windows/arm64", CompiledFiles: 3, AnalyzedPackages: 1, FindingsAdded: 2, FindingsDropped: 1},
 	}})
 	for _, field := range []string{
-		`"builds":[{"target":"darwin/arm64 cgo","host":true,"compiledFiles":3,"analyzedPackages":2,"seeds":0,` +
-			`"references":0,"importers":0,"findingsAdded":0,"findingsDropped":0},`,
-		`{"target":"windows/arm64","host":false,"compiledFiles":3,"analyzedPackages":1,"seeds":1,"references":0,` +
-			`"importers":0,"findingsAdded":2,"findingsDropped":1}]`,
+		`"builds":[{"target":"darwin/arm64 cgo","host":true,"compiledFiles":3,"analyzedPackages":2,` +
+			`"findingsAdded":0,"findingsDropped":0},`,
+		`{"target":"windows/arm64","host":false,"compiledFiles":3,"analyzedPackages":1,"findingsAdded":2,` +
+			`"findingsDropped":1}]`,
 	} {
 		if !strings.Contains(several, field) {
 			test.Errorf("a run of two builds wrote %s, want %s in it", several, field)

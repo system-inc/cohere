@@ -9,20 +9,17 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/platform"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
 // otherBuilds is the run under every build beside the host's that the census needs (#72n9mq0), each extra build
-// checking only what can differ from the host's: a run per build, the host's first, from loaded and pass, the host's
+// checking the whole workspace as it builds there: a run per build, the host's first, from loaded and pass, the host's
 // load and the lint pass it wrote. It is nil when no extra build is needed, so such a run checks nothing more, and
 // when the builds could not be read, which it notes, and the run is incomplete.
 //
-// The host's run is its lint pass as it is. Each extra build loads the workspace under its own environment, and
-// check.ReadBuild reads it and a second load of the host's from source, since the host's lint let its packages' syntax
-// go and a load the findings cache restored has none; platform.Closure compares the two, and the run's enabled rules
-// run over the closure's members, with no findings cache, whose keys are the host's build's alone. A file no build
-// the toolchain targets compiles (project.Unbuilt) stays the gap the types phase names.
+// The host's run is its lint pass as it is. Each extra build loads the workspace under its own environment and runs
+// the enabled rules over every package, through its own findings cache (extraBuildRun). A file no build the
+// toolchain targets compiles (project.Unbuilt) stays the gap the types phase names.
 func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []buildRun {
 	host, extras, buildsError := engine.buildsBeside()
 	if buildsError != nil {
@@ -44,15 +41,11 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 		said:       compiledFiles(loaded.Packages, ours),
 		result:     pass.result,
 		typeErrors: loaded.Diagnostics,
+		inputs:     loaded.Inputs,
 	}}
 
-	hostLoad, hostLoadError := engine.hostBuildLoad(host)
-	if hostLoadError != nil {
-		engine.otherBuildsFailed(hostLoadError)
-		return nil
-	}
 	for _, extra := range extras {
-		extraRun, extraError := engine.extraBuildRun(hostLoad, extra, ours)
+		extraRun, extraError := engine.extraBuildRun(extra, ours)
 		if extraError != nil {
 			engine.otherBuildsFailed(extraError)
 			return nil
@@ -83,46 +76,28 @@ func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
 	return host, builds[1:], nil
 }
 
-// hostBuildLoad is the host's build loaded again and read (check.ReadBuild), for the closure to compare each extra
-// build with: from source, under the environment and go env answer the host's lint load had, so its packages are
-// the ones that lint ran over, each with its syntax and types.
-func (engine *pipeline) hostBuildLoad(host project.Build) (platform.BuildLoad, error) {
-	loaded, loadError := load.PackagesCached(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-		engine.described.workspace.Environment(), engine.described.readableOurs,
-		load.Caching{Held: engine.held, GoEnvironment: engine.described.goEnvironment})
-	if loadError != nil {
-		return platform.BuildLoad{}, fmt.Errorf("loading the host's build %s again from source: %w", host, loadError)
-	}
-	return engine.readBuildLoad(host, loaded)
-}
-
-// readBuildLoad is loaded, a load under target, as the closure reads it: its packages and check.ReadBuild's digests
-// of them, read with the run's enabled rules.
-func (engine *pipeline) readBuildLoad(target project.Build, loaded *load.Loaded) (platform.BuildLoad, error) {
-	enabled, _ := engine.enabledRules()
-	objects, ours, readError := check.ReadBuild(loaded, enabled)
-	if readError != nil {
-		return platform.BuildLoad{}, fmt.Errorf("reading the build %s: %w", target, readError)
-	}
-	return platform.BuildLoad{
-		Build:          target,
-		Packages:       loaded.Packages,
-		ObjectDigests:  objects,
-		PackageDigests: ours,
-	}, nil
-}
-
 // extraBuildRun is one extra build's run: the workspace loaded under its environment, as the rename's platformLoad
-// loads a platform, and the run's enabled rules over the closure of what it can find that the host's run cannot.
-// Its type errors are its load's for every package, analyzed or not. A load with any analyzes nothing, as the host's
-// lint runs over no load with one, since findings against wrong semantics would be noise, and so has a say on no
-// file.
-func (engine *pipeline) extraBuildRun(
-	hostLoad platform.BuildLoad, extra project.Build, ours map[string]bool,
-) (buildRun, error) {
+// loads a platform, and the run's enabled rules over every package it loaded, as the host's lint runs, through a
+// findings cache of the build's own, whose keys hold the build's target, cgo and flags as go env reads them under its
+// environment, so they never meet the host's. Its type errors are its load's for every package. A load with any
+// analyzes nothing, as the host's lint runs over no load with one, since findings against wrong semantics would be
+// noise, and so has a say on no file.
+func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool) (buildRun, error) {
 	environment := append(slices.Clone(engine.described.workspace.Environment()), extra.Environment()...)
+	var session *check.CacheSession
+	// As the host's lint does, a run that renamed reads no findings cache, whose keys are of the bytes it replaced.
+	if !engine.renamed {
+		session = engine.cacheSession(environment)
+	}
+	caching := load.Caching{Held: engine.held}
+	if session != nil {
+		caching.Restorer = session
+		if session.HasStore() {
+			caching.Listings = session
+		}
+	}
 	loaded, loadError := load.PackagesCached(engine.described.workspace.Root, engine.described.workspace.Patterns(),
-		environment, engine.described.readableOurs, load.Caching{Held: engine.held})
+		environment, engine.described.readableOurs, caching)
 	if loadError != nil {
 		return buildRun{}, fmt.Errorf("loading the build %s: %w", extra, loadError)
 	}
@@ -133,39 +108,29 @@ func (engine *pipeline) extraBuildRun(
 		said:       map[string]bool{},
 		result:     &check.Result{FindingsByRule: map[string]int{}},
 		typeErrors: loaded.Diagnostics,
+		inputs:     loaded.Inputs,
 	}
 	if len(loaded.Diagnostics) > 0 {
 		return run, nil
 	}
-	extraLoad, readError := engine.readBuildLoad(extra, loaded)
-	if readError != nil {
-		return buildRun{}, readError
-	}
-	members, closureError := platform.Closure(hostLoad, extraLoad)
-	if closureError != nil {
-		return buildRun{}, fmt.Errorf("the closure of the build %s: %w", extra, closureError)
-	}
-	run.closure = members
-	for _, member := range members {
-		run.analyzed[member.Id] = true
-	}
-	var closure []*packages.Package
 	for _, each := range loaded.Packages {
-		if run.analyzed[each.ID] {
-			closure = append(closure, each)
-		}
+		run.analyzed[each.ID] = true
 	}
-	run.said = compiledFiles(closure, ours)
+	run.said = compiledFiles(loaded.Packages, ours)
 	enabled, _ := engine.enabledRules()
-	result, checkError := check.Run(closure, enabled, check.Options{
+	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
 		SingleThreaded: engine.request.switches["single-threaded"],
+		Cache:          session,
 		Withheld:       loaded.Withheld,
-		// Nothing reads the closure's syntax after its rules: what the run hands the merge was read above.
+		// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 		ReleaseAnalyzed: true,
 		ReadFile:        engine.sourceReader(nil),
 	})
 	if checkError != nil {
-		return buildRun{}, fmt.Errorf("running the rules over the build %s's closure: %w", extra, checkError)
+		return buildRun{}, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)
+	}
+	for _, problem := range result.Cache.Problems {
+		engine.note("the findings cache of the build %s: %s", extra, problem)
 	}
 	run.result = result
 	return run, nil
@@ -220,21 +185,6 @@ func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVer
 			AnalyzedPackages: len(run.analyzed),
 			FindingsAdded:    verdict.merged.added[index],
 			FindingsDropped:  verdict.merged.dropped[index],
-		}
-		for _, member := range run.closure {
-			counted := map[platform.ReasonKind]bool{}
-			for _, reason := range member.Reasons {
-				counted[reason.Kind] = true
-			}
-			if counted[platform.ReasonKindSeed] {
-				record.Seeds++
-			}
-			if counted[platform.ReasonKindReference] {
-				record.References++
-			}
-			if counted[platform.ReasonKindImporter] {
-				record.Importers++
-			}
 		}
 		verdict.records = append(verdict.records, record)
 	}

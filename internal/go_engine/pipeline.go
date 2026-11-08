@@ -103,7 +103,7 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession()
+		engine.session = engine.cacheSession(engine.described.workspace.Environment())
 	}
 	engine.runFix(wraps)
 	var loaded *load.Loaded

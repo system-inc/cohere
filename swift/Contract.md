@@ -709,25 +709,23 @@ within contract 3, the host's first:
 ```
 {
     "builds": [
-        { "target": "darwin/arm64 cgo", "host": true, "compiledFiles": 412, "analyzedPackages": 349, "seeds": 0,
-          "references": 0, "importers": 0, "findingsAdded": 0, "findingsDropped": 0 },
-        { "target": "windows/arm64", "host": false, "compiledFiles": 398, "analyzedPackages": 51, "seeds": 10,
-          "references": 39, "importers": 4, "findingsAdded": 6, "findingsDropped": 1 }
+        { "target": "darwin/arm64 cgo", "host": true, "compiledFiles": 412, "analyzedPackages": 349,
+          "findingsAdded": 0, "findingsDropped": 0 },
+        { "target": "windows/arm64", "host": false, "compiledFiles": 398, "analyzedPackages": 351,
+          "findingsAdded": 6, "findingsDropped": 1 }
     ]
 }
 ```
 
-`target` names the build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after `tags`. Another build
-analyzes only the packages that could find what the host's did not, counted by why: `seeds`, whose files differ from
-the host's, `references`, which name something that differs, and `importers`, which import a package whose own
-surface differs; a package held for more than one reason counts under each. Every other package's findings are the
-host's. The findings, the withheld counts and the crashes above are the merge of every build's: a finding stands if
-any build that compiled its file and analyzed its package reports it, but for a rule whose findings stand only where
-every such build reports them (U1000, and each staticcheck check whose documentation says so), and a
-`//cohere:ignore` is unused only if it is unused in every such build. `findingsAdded` counts the findings that stand
-which this build reported and the host's did not, and `findingsDropped` those it reported that the merge left out.
-A run of one build writes no `builds`, so its record reads as it always has. A file no build compiles stays a named
-gap, in the summary's `gaps.unchecked`.
+`target` names the build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after `tags`. Every build
+analyzes every package its load holds, through a findings cache of its own keyed on its target, cgo and flags, and
+`analyzedPackages` counts them; a build whose load found a type error analyzes none. The findings, the withheld
+counts and the crashes above are the merge of every build's: a finding stands if any build that compiled its file
+and analyzed its package reports it, but for a rule whose findings stand only where every such build reports them
+(U1000, and each staticcheck check whose documentation says so), and a `//cohere:ignore` is unused only if it is
+unused in every such build. `findingsAdded` counts the findings that stand which this build reported and the host's
+did not, and `findingsDropped` those it reported that the merge left out. A run of one build writes no `builds`, so
+its record reads as it always has. A file no build compiles stays a named gap, in the summary's `gaps.unchecked`.
 
 ### `phase`
 

@@ -219,12 +219,12 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 	return enabled, turnedOff
 }
 
-// cacheSession is the findings cache for the run's enabled rules, made before the load so the load restores what
-// it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries,
-// or when what every key shares cannot be read, which the run says on stderr.
-func (engine *pipeline) cacheSession() *check.CacheSession {
+// cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
+// so the load restores what it holds, and nil when lintCache gives none, as under `--no-cache` in a binary with no
+// standard-library entries, or when what every key shares cannot be read, which the run says on stderr.
+func (engine *pipeline) cacheSession(environment []string) *check.CacheSession {
 	enabled, _ := engine.enabledRules()
-	caching, cachingError := lintCache(engine.request, engine.described.workspace, enabled)
+	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {
 		engine.note("the findings cache sat this run out: %v", cachingError)
 	}

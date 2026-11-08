@@ -39,8 +39,12 @@ var embeddedStandardLibrary = builtInStandardLibrary{
 // the standard library as it always has. Under `--no-cache` it reads and writes no store: it is nil, or, when the
 // binary carries a table, a Caching with that table alone, since the standard library's entries are part of cohere
 // itself and nothing of the project's tree. It is nil with an error when what every key shares cannot be read, which
-// the run says on stderr and runs without it.
-func lintCache(request invocation, workspace project.Workspace, enabled []rule.Rule) (*check.Caching, error) {
+// the run says on stderr and runs without it. environment is what the load the cache serves runs under, the
+// workspace's own for the host's build and with an extra build's target after it for that build, so go env reads the
+// build context every key shares for the build the load is of.
+func lintCache(
+	request invocation, workspace project.Workspace, environment []string, enabled []rule.Rule,
+) (*check.Caching, error) {
 	builtIn := request.standardLibrary
 	holdsTable := builtIn.table != nil && !builtIn.table.Empty()
 	readsBuiltIn := builtIn.stamp != "" && (holdsTable || builtIn.collected != nil)
@@ -48,7 +52,7 @@ func lintCache(request invocation, workspace project.Workspace, enabled []rule.R
 	if noCache && (!readsBuiltIn || !holdsTable) {
 		return nil, nil
 	}
-	values, valuesError := readGoEnvironment(workspace.Root, workspace.Environment())
+	values, valuesError := readGoEnvironment(workspace.Root, environment)
 	if valuesError != nil {
 		return nil, valuesError
 	}

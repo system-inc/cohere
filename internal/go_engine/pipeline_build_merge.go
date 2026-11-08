@@ -110,8 +110,8 @@ func identityOf(found check.Finding) findingIdentity {
 }
 
 // mergeBuilds merges every build's outcome, the host's first (#72n9mq0). A build has a say on a file only where it
-// compiled the file and analyzed its package, so a file whose package an extra build left out of its closure takes
-// the host's findings as they are.
+// compiled the file and analyzed its package, so a file an extra build does not compile takes the host's findings as
+// they are.
 //
 //   - A finding stands if any build with a say on its file kept it, but for a rule mergeIfAll names, which keeps it
 //     only if every build with a say kept it: code is unused only if it is unused in every build. A file no build has

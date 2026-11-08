@@ -56,9 +56,10 @@ func runOver(test *testing.T, root string, wantExit int, extra ...string) (*pipe
 }
 
 // Under `--other-builds` a module with a file only windows builds and one only the cohere_extra tag builds is
-// checked under three builds, the host's first, and mergeBuildRuns is handed a run for each: windows's closure holds
-// the package with its windows file, and the tagged build's the package with its tagged file, each having a say on
-// that file. Without the switch nothing is handed over and the run is clean, as it was.
+// checked under three builds, the host's first, and mergeBuildRuns is handed a run for each: every extra build
+// analyzes every package its load holds, as the host's does, and has a say on every file it compiles, and every run
+// carries the inputs its load read. Only windows's run finds the else after a return planted in its windows file.
+// Without the switch nothing is handed over and the run is clean, as it was.
 func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 	test.Parallel()
 	off, _ := runOver(test, copyFixture(test, filepath.Join("testdata", "other-builds")), exitClean)
@@ -99,27 +100,42 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 			on.buildRuns[1].build, on.buildRuns[2].build)
 	}
 	windows, tagged := on.buildRuns[windowsAt], on.buildRuns[taggedAt]
-	if !windows.analyzed[separatorPackage] || !windows.said[windowsFile] {
-		test.Errorf("windows's closure %s leaves out %s, or it has no say on its windows file",
-			sortedKeys(windows.analyzed), separatorPackage)
-	}
-	if windows.analyzed[labelPackage] || windows.said[taggedFile] {
-		test.Errorf("windows's closure %s holds %s, which compiles there as the host's does",
-			sortedKeys(windows.analyzed), labelPackage)
-	}
-	if !tagged.analyzed[labelPackage] || !tagged.said[taggedFile] || tagged.analyzed[separatorPackage] {
-		test.Errorf("%s's closure is %s, want %s and not %s", tagged.build, sortedKeys(tagged.analyzed),
-			labelPackage, separatorPackage)
-	}
+	// Every build of the fixture loads the same three packages, so an extra build that analyzed every package its load
+	// holds analyzed what the host's did.
 	for _, extra := range on.buildRuns[1:] {
 		if extra.result == nil || len(extra.typeErrors) > 0 {
 			test.Errorf("%s ran no rules (%t) or found type errors: %v", extra.build, extra.result == nil,
 				extra.typeErrors)
 		}
+		if !maps.Equal(extra.analyzed, host.analyzed) || !extra.analyzed[separatorPackage] ||
+			!extra.analyzed[labelPackage] {
+			test.Errorf("%s analyzed %s, want every package its load holds, %s", extra.build,
+				sortedKeys(extra.analyzed), sortedKeys(host.analyzed))
+		}
+		for file := range extra.compiled {
+			if !extra.said[file] {
+				test.Errorf("%s compiles %s and has no say on it", extra.build, file)
+			}
+		}
+	}
+	if !windows.said[windowsFile] || windows.said[taggedFile] {
+		test.Errorf("windows says on %s, want %s and not %s", sortedKeys(windows.said), windowsFile, taggedFile)
+	}
+	if !tagged.said[taggedFile] || tagged.said[windowsFile] {
+		test.Errorf("%s says on %s, want %s and not %s", tagged.build, sortedKeys(tagged.said), taggedFile,
+			windowsFile)
+	}
+	for _, run := range on.buildRuns {
+		if len(run.inputs.Files) == 0 || len(run.inputs.Directories) == 0 {
+			test.Errorf("%s's run carries no inputs: %+v", run.build, run.inputs)
+		}
+	}
+	if !slices.Contains(windows.inputs.Files, windowsFile) {
+		test.Errorf("windows's inputs %v leave out %s, which it compiles", windows.inputs.Files, windowsFile)
 	}
 
-	// The windows file's else after a return is found by windows's run, which ran the rules over its closure, and by
-	// no other, since no other build compiles that file.
+	// The windows file's else after a return is found by windows's run and by no other, since no other build
+	// compiles that file.
 	elseReturn := consistency_no_else_return.Name
 	foundIn := func(run buildRun) bool {
 		return slices.ContainsFunc(run.result.Findings, func(finding check.Finding) bool {
@@ -187,9 +203,10 @@ func TestOtherBuildsWriteTheMergedVerdict(test *testing.T) {
 		wantAdded := 0
 		if engine.buildRuns[index].build.OperatingSystem == "windows" {
 			wantAdded = 1
-			if build.Seeds == 0 || build.AnalyzedPackages == 0 {
-				test.Errorf("windows's build %+v names no seed or analyzed nothing", build)
-			}
+		}
+		if build.AnalyzedPackages != len(engine.buildRuns[0].analyzed) {
+			test.Errorf("the build %s analyzed %d packages, want every one of the %d its load holds",
+				engine.buildRuns[index].build, build.AnalyzedPackages, len(engine.buildRuns[0].analyzed))
 		}
 		if build.FindingsAdded != wantAdded || build.FindingsDropped != 0 {
 			test.Errorf("the build %s added %d and dropped %d, want %d and 0", engine.buildRuns[index].build,
