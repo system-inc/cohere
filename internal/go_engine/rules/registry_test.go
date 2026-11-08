@@ -1044,6 +1044,7 @@ var portedPasses = []string{
 	"leaky_time_tick",
 	"loop_copy",
 	"manual_trim",
+	"marshaled_struct_without_exported_fields",
 	"math_on_converted_integer",
 	"misaligned_atomic_field",
 	"misplaced_error_result",
