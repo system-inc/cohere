@@ -9,10 +9,11 @@
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
 //
-// A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, RequireIdentical
-// over those and the port's parity fixtures, RequireOnlyAdjudicated over its differences fixture. Each takes testdata
-// and patterns, and a pattern naming a folder of testdata that holds a go.mod loads that folder as a module (see
-// fixtureLoad). The census command, command/cohere-parity, runs Analyze over a real tree.
+// A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
+// RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
+// RequireOnlyAdjudicated over its differences fixture. Each takes testdata and patterns, and a pattern naming a folder
+// of testdata that holds a go.mod loads that folder as a module (see fixtureLoad). The census command,
+// command/cohere-parity, runs Analyze over a real tree.
 package parity
 
 import (

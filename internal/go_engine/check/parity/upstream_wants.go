@@ -15,8 +15,8 @@ import (
 //
 // It reads x/tools' wants, the `// want` comments analysistest reads. An original whose fixtures mark their findings
 // another way gets a function of its own beside this one, in a file of its own, named for the source it reads and
-// taking the same arguments, so a port's test reads the same whichever original it ports. staticcheck's fixtures mark
-// theirs with `//@ diag(...)` notes, and RequireStaticcheckWants, reading them, is to sit here once its reader lands.
+// taking the same arguments, so a port's test reads the same whichever original it ports, as RequireStaticcheckWants
+// reads the `//@ diag(...)` notes staticcheck's fixtures mark theirs with.
 func RequireUpstreamWants(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
 	test.Helper()
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
