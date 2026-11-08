@@ -321,8 +321,8 @@ func isMethodExpression(information *types.Info, call *ast.CallExpr) bool {
 // formatted is node printed as gofmt prints it, as a message quotes an argument. x/tools' astutil.Format.
 func formatted(files *token.FileSet, node ast.Node) string {
 	var builder strings.Builder
-	// Ignored, as the original ignores it: a strings.Builder never fails a write, and an expression the checker typed
-	// always prints.
+	// Ignored: a strings.Builder never fails a write, and an expression the checker typed always prints; the original
+	// drops the error too.
 	_ = printer.Fprint(&builder, files, node)
 	return builder.String()
 }
