@@ -712,6 +712,7 @@ var portedPasses = []string{
 	"extreme_comparison",
 	"http_status_literal",
 	"identical_operands",
+	"impossible_target_comparison",
 	"inconsistent_receiver_name",
 	"ineffective_bitwise_operation",
 	"ineffective_break",
