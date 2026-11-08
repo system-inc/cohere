@@ -314,7 +314,7 @@ var ports = map[string]port{
 	"unmarshal":        {analyzer: unmarshal.Analyzer, listener: &unmarshal.Listener},
 	"unreachable":      {analyzer: unreachable.Analyzer},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer, listener: &unsafe_ptr.Listener},
-	"unusedresult":     {analyzer: unused_result.Analyzer},
+	"unusedresult":     {analyzer: unused_result.Analyzer, listener: &unused_result.Listener},
 	"waitgroup":        {analyzer: wait_group.Analyzer, listener: &wait_group.Listener},
 }
 

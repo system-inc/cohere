@@ -13,6 +13,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // upstreamFunctions is the funcs list x/tools' test sets before it runs its fixtures, which adds the generic
@@ -22,10 +23,11 @@ const upstreamFunctions = "typeparams/userdefs.MustUse,errors.New,fmt.Errorf,fmt
 // x/tools' own fixtures for unusedresult, copied unchanged into testdata/src and run as x/tools' test runs them, with
 // its funcs list: every `// want` the original expects, the port reports at the same line with the same message, and
 // analysistest fails on a finding no want expects as much as on a want nothing found, so the port adds nothing there
-// either. The flag is set on a copy of the analyzer, so the registry's keeps its default.
+// either. The flag is set on a copy of the analyzer, so the registry's keeps its default, and the copy sits on a
+// syntax dispatcher of its own, since a dispatcher names each rule once.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	configured := newAnalyzer()
+	configured := newAnalyzer(dispatch.NewSyntax())
 	if setError := configured.Flags.Set(functionsOption, upstreamFunctions); setError != nil {
 		test.Fatal(setError)
 	}
@@ -82,7 +84,8 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 		}
 	}()
 	for _, configured := range configurations {
-		port := newAnalyzer()
+		// A copy on a dispatcher of its own for each configuration, for the reason the wants test gives.
+		port := newAnalyzer(dispatch.NewSyntax())
 		for _, option := range []string{functionsOption, stringMethodsOption} {
 			value, set := configured.flags[option]
 			if !set {
