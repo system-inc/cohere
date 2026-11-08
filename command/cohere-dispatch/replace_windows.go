@@ -24,10 +24,10 @@ func replaceProcess(binaryPath string, arguments []string) error {
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	signal.Ignore(os.Interrupt)
-	err := command.Run()
+	runError := command.Run()
 	var exitError *exec.ExitError
-	if err != nil && !errors.As(err, &exitError) {
-		return fmt.Errorf("running %s: %w", binaryPath, err)
+	if runError != nil && !errors.As(runError, &exitError) {
+		return fmt.Errorf("running %s: %w", binaryPath, runError)
 	}
 	os.Exit(streams.Finish(command.ProcessState.ExitCode()))
 	return nil

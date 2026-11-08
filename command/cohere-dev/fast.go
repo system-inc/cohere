@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/listed_directories"
 	"github.com/system-inc/cohere/internal/streams"
 )
 
@@ -210,6 +211,9 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 		relative := strings.TrimPrefix(fields[0], fields[1])
 		packages["."+relative] = true
 	}
+	// What go list walked, read again in this process, so a test that lists the module has its result keyed on a
+	// package added or removed (#cmpsz8p).
+	listed_directories.Open(root, []string{"./..."}, nil)
 	return packages, nil
 }
 

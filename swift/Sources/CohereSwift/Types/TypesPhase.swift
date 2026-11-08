@@ -40,6 +40,11 @@ struct TypesPhase {
          findings, so lint never asks sourcekitd to check that file again (`SymbolProvider.answered`).
          */
         var symbols: [String: FileSymbols] = [:]
+        /*
+         Why the check never started, when it did not (`notChecked`): its finding is the run's gap, no type error in
+         any file, so lint still runs behind it and the typed rules say this is why they could not judge a file.
+         */
+        var notStarted: String? = nil
     }
 
     let package: PackageModel
@@ -94,7 +99,62 @@ struct TypesPhase {
         }
     }
 
+    /*
+     The phase begun: the snapshot of what a check reads, taken before anything is checked, what changed since the last
+     check that succeeded, and, when every edit since then stayed inside function bodies, their in-process check
+     running on a queue of its own (`checkBodiesOnly`). The pipeline begins the phase as soon as no later step can
+     change a file it reads, so that check runs beside the fix phase, the scripts' check and lint's reads of the index,
+     and `run(after:)` waits for it where the types records are written.
+     */
+    struct Start: Sendable {
+        var date: Date
+        var snapshot: BuildInputSnapshot?
+        var changes: BuildInputSnapshot.Changes?
+        /* The in-process check, nil when no edit is one it takes. A nil answer from it means a whole check after all. */
+        var bodiesOnly: BackgroundWork<Result?>?
+    }
+
+    /* The phase begun (`Start`), its in-process check started when the edits are ones it takes. */
+    func start() -> Start {
+        let date = Date()
+        /* A package `run(after:)` hands to `PlatformPackageTypesPhase` begins there, so nothing is taken here. */
+        if platform == nil, PlatformPackageTypesPhase.leavesOutHost(package) {
+            return Start(date: date)
+        }
+        let snapshot =
+            toolchain.hasPrefix("unknown")
+            ? nil
+            : BuildInputSnapshot.take(
+                roots: Self.inputRoots(of: package),
+                resolved: package.root.appendingPathComponent("Package.resolved"),
+                toolchain: toolchain,
+                arguments: checks.flatMap(arguments(for:)),
+            )
+        /* What changed since the last check that succeeded, whose snapshot the in-process check is measured from. */
+        let stored = BuildInputSnapshot.stored(scratchPath: scratchPath)
+        let changes = snapshot.flatMap { snapshot in stored.flatMap { snapshot.changes(since: $0) } }
+        guard let stored, let changes, !changes.edited.isEmpty,
+            let plan = bodiesOnlyPlan(changes: changes, stored: stored)
+        else {
+            return Start(date: date, snapshot: snapshot, changes: changes)
+        }
+        let phase = self
+        return Start(
+            date: date,
+            snapshot: snapshot,
+            changes: changes,
+            bodiesOnly: BackgroundWork(label: "cohere-swift.types.bodies-only") {
+                phase.checkBodiesOnly(plan, start: date)
+            },
+        )
+    }
+
     func run() throws -> Result {
+        try run(after: start())
+    }
+
+    /* The phase from a `start()`, which the caller may have made earlier so its in-process check ran beside other work. */
+    func run(after begun: Start) throws -> Result {
         /* A package whose platforms leave out macOS is never judged against the host's SDK, which it does not target. */
         if platform == nil, PlatformPackageTypesPhase.leavesOutHost(package) {
             return try PlatformPackageTypesPhase(
@@ -107,31 +167,16 @@ struct TypesPhase {
             )
             .run()
         }
-        let start = Date()
-        let snapshot =
-            toolchain.hasPrefix("unknown")
-            ? nil
-            : BuildInputSnapshot.take(
-                roots: Self.inputRoots(of: package),
-                resolved: package.root.appendingPathComponent("Package.resolved"),
-                toolchain: toolchain,
-                arguments: checks.flatMap(arguments(for:)),
-            )
-
+        if let checked = try begun.bodiesOnly?.value() {
+            return checked
+        }
         /*
          Nothing a check reads changed since the last check that succeeded, so its records are this check's
          records. Read them, and keep them only if every file of ours has one newer than its source: anything
          less (a scratch someone cleaned, a record gone) means checking after all. A file whose bytes are again
          the ones that check saw is unchanged too, an edit and its revert, judged by the time the check saw.
          */
-        let stored = BuildInputSnapshot.stored(scratchPath: scratchPath)
-        let changes = snapshot.flatMap { snapshot in stored.flatMap { snapshot.changes(since: $0) } }
-        if let stored, let changes, !changes.edited.isEmpty,
-            let checked = checkBodiesOnly(changes: changes, stored: stored, start: start)
-        {
-            return checked
-        }
-        if let changes, changes.edited.isEmpty {
+        if let changes = begun.changes, changes.edited.isEmpty {
             do {
                 let directories = try checks.flatMap { try recordDirectories(under: $0.scratchPath) }
                 if !directories.isEmpty {
@@ -141,7 +186,7 @@ struct TypesPhase {
                         : " (\(changes.restored.count == 1 ? "1 file is" : "\(changes.restored.count) files are") \(Self.restoredWords))"
                     let reused = try read(
                         targetDirectories: directories,
-                        start: start,
+                        start: begun.date,
                         build:
                             "\(Self.reusedWords)\(restoredWords), so its compiler records were read without checking",
                         restored: changes.restored,
@@ -160,13 +205,21 @@ struct TypesPhase {
          Each file's interface and bytes as this check sees them, so the next run can tell whether an edit stayed
          inside bodies, and whether an edit was undone.
          */
-        let fingerprints = snapshot == nil ? Fingerprints() : fingerprints()
+        let fingerprints = begun.snapshot == nil ? Fingerprints() : fingerprints()
         let lastRecorded = BuildInputSnapshot.stored(scratchPath: scratchPath, kind: .lastRecorded)
-        let scopeChanges = snapshot.flatMap { snapshot in
+        let scopeChanges = begun.snapshot.flatMap { snapshot in
             lastRecorded.flatMap { snapshot.changes(since: $0, allowingFileSetChanges: true) }
         }
-        let checked = try check(scope: scopeChanges.flatMap(scope(of:)))
-        if var snapshot, checked.succeeded {
+        let checked: CheckRun
+        do {
+            checked = try check(scope: scopeChanges.flatMap(scope(of:)))
+        }
+        catch let notStarted as CheckNotStarted {
+            BuildInputSnapshot.forget(scratchPath: scratchPath)
+            BuildInputSnapshot.forget(scratchPath: scratchPath, kind: .lastRecorded)
+            return notChecked(because: notStarted, start: begun.date)
+        }
+        if var snapshot = begun.snapshot, checked.succeeded {
             snapshot.interfaces = fingerprints.interfaces
             snapshot.contents = fingerprints.contents
             snapshot.store(scratchPath: scratchPath)
@@ -186,14 +239,14 @@ struct TypesPhase {
             targetDirectories: checked.targetDirectories,
             failures: checked.failures,
             extraFindings: checked.findings,
-            start: start,
+            start: begun.date,
             build: build,
         )
         /*
          A check that left every file a record, its errors included, is the base the next check's scope is measured
          from. One a compiler crashed in, or that failed outside every file, is not: the next check looks at everything.
          */
-        if var snapshot, result.record.filesWithoutRecord.isEmpty,
+        if var snapshot = begun.snapshot, result.record.filesWithoutRecord.isEmpty,
             !result.findings.contains(where: { ["compilerCrashed", "buildFailed"].contains($0.messageId) })
         {
             snapshot.interfaces = fingerprints.interfaces
@@ -308,8 +361,9 @@ struct TypesPhase {
 
     /*
      The checks themselves: each package's build server session, then its owned modules not yet checked by an
-     earlier session, then its owned C-family files. A server that fails is thrown as the named gap it is. With a
-     scope, only its targets are checked again and every other one's records from the last check are read.
+     earlier session, then its owned C-family files. A server that fails is thrown as the named gap it is
+     (`CheckNotStarted`), which `run` reports. With a scope, only its targets are checked again and every other one's
+     records from the last check are read.
      */
     private func check(scope given: Scope?) throws -> CheckRun {
         var run = CheckRun()
@@ -473,7 +527,7 @@ struct TypesPhase {
                 )
             }
             catch {
-                throw TypesFailure(
+                throw CheckNotStarted(
                     description:
                         "the check of \(session.root.path) failed before compiling anything, so the compiler never ran: \(error)\(unresolvableWords(error.description))"
                 )
@@ -1139,6 +1193,20 @@ struct TypesPhase {
     /* The words the types record uses for a run that checked its edited files in process, so a reader can tell it from a whole check. */
     static let checkedInProcessWords = "changed inside function bodies only, so sourcekitd checked them in this process"
 
+    /* What the in-process check of a body-only edit asks with, settled before it starts (`bodiesOnlyPlan`). */
+    struct BodiesOnlyPlan: Sendable {
+        var changes: BuildInputSnapshot.Changes
+        var stored: BuildInputSnapshot
+        /* Each edited file by resolved path, in path order, with the compile command the last check kept for its module. */
+        var edited: [(path: String, command: CompileCommands.Command)]
+        /* Each edited file's interface as it stands, by resolved path, which its siblings' keys hold. */
+        var interfaces: [String: String]
+        /* Every owned target's record directory, read for the files the check does not answer for. */
+        var directories: [(String, URL)]
+        /* Held until the check ends: the compile arguments search the check's emitted interfaces, which a run checking alongside may be emitting. */
+        var interfacesLock: InterfaceEmit.Ledger.Lock?
+    }
+
     /*
      The edited files checked in sourcekitd, and every other file read from the last check's records, when the
      edits cannot have changed what the compiler says about any other file. Nil whenever that is not certain,
@@ -1149,19 +1217,16 @@ struct TypesPhase {
      Each file is asked about only when it changed since the last run asked (`BodiesOnlyAnswers`), and a file
      whose bytes are again the build's is not asked at all (`BuildInputSnapshot.changes(since:)`). The one check
      answers for the file's names too, which lint reads, so lint never checks it a second time.
+
+     Settled here, before the check starts, is everything that can say no without asking sourcekitd, so the caller
+     knows whether the check runs at all; `checkBodiesOnly` asks.
      */
-    private func checkBodiesOnly(
-        changes: BuildInputSnapshot.Changes,
-        stored: BuildInputSnapshot,
-        start: Date,
-    ) -> Result? {
+    private func bodiesOnlyPlan(changes: BuildInputSnapshot.Changes, stored: BuildInputSnapshot) -> BodiesOnlyPlan? {
         let owned = Dictionary(
             files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
             uniquingKeysWith: { first, _ in first },
         )
-        /* The compile arguments search the check's emitted interfaces, which a run checking alongside may be emitting. */
         let interfacesLock = InterfaceEmit.Ledger.Lock(scratchPath: scratchPath)
-        defer { withExtendedLifetime(interfacesLock) {} }
         var edited: [(path: String, file: FileSet.OwnedFile)] = []
         var interfaces: [String: String] = [:]
         for path in changes.edited {
@@ -1191,6 +1256,45 @@ struct TypesPhase {
             for check in checks.dropFirst() where FileManager.default.fileExists(atPath: check.scratchPath.path) {
                 tables.append(try CompileCommands.read(layout: .check(scratchPath: check.scratchPath)))
             }
+            var commands: [(path: String, command: CompileCommands.Command)] = []
+            for (path, file) in edited.sorted(by: { $0.path < $1.path }) {
+                guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else { return nil }
+                commands.append((path, command))
+            }
+            let directories = try checks.flatMap { try recordDirectories(under: $0.scratchPath) }
+            guard !directories.isEmpty else { return nil }
+            return BodiesOnlyPlan(
+                changes: changes,
+                stored: stored,
+                edited: commands,
+                interfaces: interfaces,
+                directories: directories,
+                interfacesLock: interfacesLock,
+            )
+        }
+        catch {
+            /* Anything this path could not do, a whole check does. */
+            return nil
+        }
+    }
+
+    /*
+     The check a plan settled on: each edited file asked of sourcekitd, while every other file's records are read on a
+     queue of their own, since that read needs only which files the check answers for. Nil when sourcekitd could not
+     answer or a record is missing, which means checking after all.
+     */
+    private func checkBodiesOnly(_ plan: BodiesOnlyPlan, start: Date) -> Result? {
+        defer { withExtendedLifetime(plan.interfacesLock) {} }
+        let phase = self
+        let records = BackgroundWork(label: "cohere-swift.types.bodies-only-records") {
+            try CompilerRecords(files: phase.files, runner: phase.runner).read(
+                targetDirectories: plan.directories,
+                answering: Set(plan.edited.map(\.path)),
+                restored: plan.changes.restored,
+            )
+        }
+        defer { records.wait() }
+        do {
             let earlier = BodiesOnlyAnswers.stored(scratchPath: scratchPath)
             var kept = BodiesOnlyAnswers()
             var replayed = 0
@@ -1212,19 +1316,18 @@ struct TypesPhase {
                     /* Nothing was written there, or it is left in the temporary directory, which the system clears. */
                 }
             }
-            for (path, file) in edited.sorted(by: { $0.path < $1.path }) {
-                guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else { return nil }
+            for (path, command) in plan.edited {
                 /* Read once: these bytes are both what the key holds and the text sourcekitd checks. */
                 let contents = try Data(contentsOf: URL(fileURLWithPath: path))
                 guard let text = String(data: contents, encoding: .utf8) else { return nil }
                 let key = try BodiesOnlyAnswers.key(
                     contents: contents,
                     arguments: command.arguments,
-                    build: stored.fingerprint,
+                    build: plan.stored.fingerprint,
                     siblingInterfaces: BodiesOnlyAnswers.siblingInterfaces(
                         of: path,
-                        current: interfaces,
-                        built: stored.interfaces,
+                        current: plan.interfaces,
+                        built: plan.stored.interfaces,
                     ),
                 )
                 let answer = try kept.answer(path: path, key: key, replaying: earlier) {
@@ -1246,17 +1349,15 @@ struct TypesPhase {
                 }
                 replayed += answer.replayed ? 1 : 0
             }
-            let directories = try checks.flatMap { try recordDirectories(under: $0.scratchPath) }
-            guard !directories.isEmpty else { return nil }
+            var reading = try records.value()
+            reading.findings.append(contentsOf: answered.values.joined())
             let replayedWords =
                 replayed == 0 ? "" : ", \(replayed) of them answered by an earlier run's check of the same text"
-            var result = try read(
-                targetDirectories: directories,
+            var result = result(
+                of: reading,
                 start: start,
                 build:
-                    "\(edited.count == 1 ? "1 file" : "\(edited.count) files") \(Self.checkedInProcessWords)\(replayedWords), and the rest were read from the last successful check's compiler records",
-                answeredInProcess: answered,
-                restored: changes.restored,
+                    "\(plan.edited.count == 1 ? "1 file" : "\(plan.edited.count) files") \(Self.checkedInProcessWords)\(replayedWords), and the rest were read from the last successful check's compiler records",
             )
             guard result.record.filesWithoutRecord.isEmpty else { return nil }
             kept.store(scratchPath: scratchPath)
@@ -1342,14 +1443,28 @@ struct TypesPhase {
         extraFindings: [FindingRecord] = [],
         start: Date,
         build: String,
-        answeredInProcess: [String: [FindingRecord]] = [:],
         restored: [String: Date] = [:],
     ) throws -> Result {
-        let reading = try CompilerRecords(files: files, runner: runner).read(
-            targetDirectories: targetDirectories,
-            answeredInProcess: answeredInProcess,
-            restored: restored,
+        result(
+            of: try CompilerRecords(files: files, runner: runner).read(
+                targetDirectories: targetDirectories,
+                restored: restored,
+            ),
+            failures: failures,
+            extraFindings: extraFindings,
+            start: start,
+            build: build,
         )
+    }
+
+    /* A reading of the records, with a failure no file carries said beside its findings, as the phase's result. */
+    func result(
+        of reading: CompilerRecords.Reading,
+        failures: [String] = [],
+        extraFindings: [FindingRecord] = [],
+        start: Date,
+        build: String,
+    ) -> Result {
         var findings = reading.findings + extraFindings
         let withoutRecord = reading.filesWithoutRecord
 
@@ -1401,6 +1516,44 @@ struct TypesPhase {
     /* The check could not run, or its records could not be read at all. */
     struct TypesFailure: Error, CustomStringConvertible {
         var description: String
+    }
+
+    /*
+     A build server that failed before the compiler ran, a package `--no-fix` cannot resolve among them: the named gap
+     the header promises, which `run` reports as the run's finding (`notChecked`) rather than ending the run.
+     */
+    struct CheckNotStarted: Error, CustomStringConvertible {
+        var description: String
+    }
+
+    /*
+     The result of a check that never started (#4txsasr): a finding at the package's Package.swift in the failure's
+     own words, and every file of ours without a record, so the run is incomplete and names what went unchecked and
+     why, and lint still runs over every file (`Result.notStarted`). Thrown out of the run, it ended the engine with
+     nothing checked, and the front door could say only that the engine did not run: measured 2026-11-07 on a copy of
+     ahraos-presence at 190bfa8c, where CapturePhone/PhoneCapture names a remote package and keeps no Package.resolved,
+     so `--no-fix` cannot resolve it, and its 13 files went unnamed while the same package with its pins checks all
+     13.
+     */
+    func notChecked(because failure: CheckNotStarted, start: Date) -> Result {
+        let finding = FindingRecord(
+            source: .compiler,
+            file: package.root.appendingPathComponent("Package.swift").path,
+            line: 1,
+            column: 1,
+            severity: .error,
+            rule: "",
+            messageId: "buildFailed",
+            message: failure.description,
+        )
+        let record = TypesRecord(
+            diagnostics: 1,
+            files: files.count,
+            elapsedMilliseconds: Pipeline.milliseconds(since: start),
+            filesWithoutRecord: files.map(\.url.path).sorted(),
+            build: "not checked: \(failure.description)",
+        )
+        return Result(findings: [finding], record: record, hasErrors: true, notStarted: failure.description)
     }
 
     /* The record directory a check into this scratch left for each target we own files in, `<Target>.build`, with that target's name. */

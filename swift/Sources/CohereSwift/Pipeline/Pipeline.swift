@@ -48,6 +48,35 @@ public struct Pipeline {
             : nil
     }
 
+    /*
+     Whether the run computes side by side what does not depend on each other: the types phase's in-process check
+     beside the fix phase and lint's reads, and the scripts' check beside the package's. Records are written in one
+     order either way. Off only where a test compares a run's records with the serial run's.
+     */
+    var overlapsPhases = true
+
+    /*
+     The types phase begun (`beginTypes` in `run`): the package's phase with its start, nil at a scripts-only or an
+     Xcode root, and the scripts' check running beside it, nil when there are none or the run is serial.
+     */
+    struct TypesBegun {
+        var package: (phase: TypesPhase, start: TypesPhase.Start)?
+        var scripts: BackgroundWork<ScriptTypesPhase.Result>?
+
+        /* Whether the package's in-process check answered, so nothing a whole check writes was written after it began. */
+        var answeredInProcess: Bool {
+            (try? package?.start.bodiesOnly?.value()) != nil
+        }
+    }
+
+    /* What lint's typed rules read names through (`typedLintContext` in `run`). */
+    struct TypedLintContext {
+        /* The enabled typed rules that apply to each file, by path. */
+        var typedRules: [String: [String]]
+        var typedCandidates: [ParsedFile]
+        var symbolProvider: SymbolProvider
+    }
+
     /* A run that could not happen at all. Exit 2, no summary: the front door says nothing was checked. */
     public struct RunFailure: Error, CustomStringConvertible {
         public var description: String
@@ -259,7 +288,7 @@ public struct Pipeline {
          package a build first linked is named, and the front door refuses the record when anything named moved
          after the run began.
          */
-        func finish(complete: Bool) throws -> Int32 {
+        func inputsRecord() -> InputsRecord {
             var linkedPackageRoots: [URL] = []
             var pins: [URL] = []
             if let xcodeProject {
@@ -275,21 +304,24 @@ public struct Pipeline {
                 linkedPackageRoots = phase.inputRoots
                 pins = RunInputs.pinsRead(by: phase)
             }
-            try writer.write(
-                RunInputs.record(
-                    package: package,
-                    fileSet: fileSet,
-                    linkedPackageRoots: linkedPackageRoots,
-                    pins: pins,
-                    boundary: repositoryRoot(of: root),
-                    settingsFile: options.lintConfiguration
-                        ?? configurationRoot.appendingPathComponent(
-                            "CohereSettings.json"
-                        ),
-                    toolchainExecutable: (try? SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
-                        .map(RunInputs.toolchainExecutable(libraryPath:)),
-                )
+            return RunInputs.record(
+                package: package,
+                fileSet: fileSet,
+                linkedPackageRoots: linkedPackageRoots,
+                pins: pins,
+                boundary: repositoryRoot(of: root),
+                settingsFile: options.lintConfiguration
+                    ?? configurationRoot.appendingPathComponent(
+                        "CohereSettings.json"
+                    ),
+                toolchainExecutable: (try? SerializedDiagnosticsReader.toolchainLibraryPath(runner: runner))
+                    .map(RunInputs.toolchainExecutable(libraryPath:)),
             )
+        }
+        /* The inputs record taken while the types phase's in-process check ran, kept only when that check answered. */
+        var preparedInputs: InputsRecord?
+        func finish(complete: Bool) throws -> Int32 {
+            try writer.write(preparedInputs ?? inputsRecord())
             return try writer.finish(complete: complete)
         }
 
@@ -337,6 +369,93 @@ public struct Pipeline {
             }
         /* Each file's key for those verdicts, by path, for the text it has now; a file the fix phase rewrites is keyed again. */
         var lintKeys = lintCache == nil ? [:] : LintVerdictCache.fileKeys(of: parsed.files)
+
+        /*
+         The types phase begun (`TypesPhase.start()`): the package's snapshot taken and its in-process check of a body-only
+         edit started, and each standalone script of ours checked alone beside it, as `swift <file>` runs it
+         (`ScriptTypesPhase`), unless the run is serial. The package is checked whole, whatever the scope: a change in one
+         file changes what the rest of its module means.
+         */
+        func beginTypes() -> TypesBegun {
+            var begun = TypesBegun()
+            /* A scripts-only root has no target, and an Xcode root is checked by its own phase. */
+            if package.projectKind != .scripts, xcodeProject == nil {
+                var typesPhase = TypesPhase(
+                    package: package,
+                    files: fileSet.targetFiles,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                typesPhase.parsed = Dictionary(
+                    parsed.files.map { ($0.url.path, $0.tree) },
+                    uniquingKeysWith: { first, _ in first },
+                )
+                begun.package = (typesPhase, typesPhase.start())
+            }
+            if overlapsPhases, let scripts = scriptTypesPhase() {
+                begun.scripts = BackgroundWork(label: "cohere-swift.types.scripts") { try scripts.run() }
+            }
+            return begun
+        }
+        /* The standalone scripts' check, nil when the root holds none. */
+        func scriptTypesPhase() -> ScriptTypesPhase? {
+            guard !fileSet.scripts.isEmpty else { return nil }
+            return ScriptTypesPhase(
+                scripts: fileSet.scripts,
+                scratchPath: runScratch(for: root),
+                workingDirectory: root,
+                runner: runner,
+            )
+        }
+
+        /*
+         The types phase begun, run to its end: the package's check, then the scripts', their findings and files added to
+         the package's, so one types record covers every file of ours. The scripts' check, when it ran beside, is waited
+         for whatever the package's did, so nothing it does outlives the phase.
+         */
+        func build(_ begun: TypesBegun) throws -> TypesPhase.Result {
+            defer { begun.scripts?.wait() }
+            let targets: TypesPhase.Result
+            if let checking = begun.package {
+                targets = try checking.phase.run(after: checking.start)
+            }
+            else if let xcodeProject {
+                targets = try XcodeTypesPhase(
+                    package: package,
+                    project: xcodeProject,
+                    files: fileSet.targetFiles,
+                    scratchPath: runScratch(for: root),
+                    resolutionAllowed: !options.noFix,
+                    toolchain: toolchain,
+                    runner: runner,
+                )
+                .run()
+            }
+            else {
+                /* No target, so no package or Xcode check: a scripts-only root's files are its scripts alone. */
+                targets = ScriptTypesPhase.noTargets
+            }
+            let checked: ScriptTypesPhase.Result
+            if let running = begun.scripts {
+                checked = try running.value()
+            }
+            else if let scripts = scriptTypesPhase() {
+                checked = try scripts.run()
+            }
+            else {
+                return targets
+            }
+            return ScriptTypesPhase.adding(checked, count: fileSet.scripts.count, to: targets)
+        }
+
+        /*
+         Begun now when the fix phase writes nothing, so the in-process check runs beside it; otherwise after the fix
+         phase wrote, since the check reads the edited files' text as it will stand. Never in a run that does not reach it.
+         */
+        let typesBegunEarly =
+            overlapsPhases && options.runTypes && !options.mutate && filesThatDoNotParse == 0 ? beginTypes() : nil
 
         if !options.runFix {
             try writer.write(PhaseRecord(name: .fix, outcome: .skipped, detail: "not requested"))
@@ -582,59 +701,50 @@ public struct Pipeline {
         }
 
         /*
-         The whole package, whatever the scope: a change in one file changes what the rest of its module means. Then each
-         standalone script of ours, alone, as `swift <file>` runs it (`ScriptTypesPhase`), its findings and files added
-         to the package's, so one types record covers every file of ours.
+         What lint's typed rules read names through: which enabled typed rules apply to each file, the files any applies
+         to, and where their names are looked up. The names the types phase's in-process check gave are added once it
+         answered, so this can be settled while it runs.
          */
-        func build() throws -> TypesPhase.Result {
-            let targets: TypesPhase.Result
-            if package.projectKind == .scripts {
-                /* No target, so no package or Xcode check: a scripts-only root's files are its scripts alone. */
-                targets = ScriptTypesPhase.noTargets
+        func typedLintContext() -> TypedLintContext {
+            var typedRules: [String: [String]] = [:]
+            for file in parsed.files {
+                typedRules[file.url.path] = typedRulesApplying(to: file)
             }
-            else if let xcodeProject {
-                targets = try XcodeTypesPhase(
-                    package: package,
-                    project: xcodeProject,
-                    files: fileSet.targetFiles,
-                    scratchPath: runScratch(for: root),
-                    resolutionAllowed: !options.noFix,
-                    toolchain: toolchain,
-                    runner: runner,
-                )
-                .run()
-            }
-            else {
-                var typesPhase = TypesPhase(
-                    package: package,
-                    files: fileSet.targetFiles,
-                    scratchPath: runScratch(for: root),
-                    resolutionAllowed: !options.noFix,
-                    toolchain: toolchain,
-                    runner: runner,
-                )
-                typesPhase.parsed = Dictionary(
-                    parsed.files.map { ($0.url.path, $0.tree) },
-                    uniquingKeysWith: { first, _ in first },
-                )
-                targets = try typesPhase.run()
-            }
-            let scripts = fileSet.scripts
-            guard !scripts.isEmpty else { return targets }
-            let checked = try ScriptTypesPhase(
-                scripts: scripts,
-                scratchPath: runScratch(for: root),
-                workingDirectory: root,
+            var symbolProvider = SymbolProvider(
+                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
-            .run()
-            return ScriptTypesPhase.adding(checked, count: scripts.count, to: targets)
+            symbolProvider.ownedModules = Self.ownedModules(of: package)
+                .union(Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts))
+                .union(fileSet.scripts.map(\.targetName))
+            return TypedLintContext(
+                typedRules: typedRules,
+                typedCandidates: parsed.files.filter { !(typedRules[$0.url.path] ?? []).isEmpty },
+                symbolProvider: symbolProvider,
+            )
+        }
+        /* The typed key of a file under a record: its own key, the record, and the modules the package owns. */
+        func typedKey(_ path: String, _ record: IndexStore.FreshRecord.Identity, ownedModules: Set<String>) -> String? {
+            lintKeys[path].map {
+                LintVerdictCache.typedKey(fileKey: $0, record: record, ownedModules: ownedModules)
+            }
+        }
+        /* What the index says of the typed candidates, each file whose typed verdict is kept under the record a read would answer from left unread. */
+        func indexed(_ context: TypedLintContext) -> SymbolProvider.Indexed? {
+            context.symbolProvider.indexed(for: context.typedCandidates) { file, record in
+                guard let lintCache,
+                    let key = typedKey(file.url.path, record, ownedModules: context.symbolProvider.ownedModules)
+                else { return false }
+                return lintCache.typedVerdict(path: file.url.path, key: key) != nil
+            }
         }
 
         var typeErrors = 0
         var lintBuildFailure: String?
         /* The names the types phase's in-process check recorded, handed to lint so it never checks those files again. */
         var answeredSymbols: [String: FileSymbols] = [:]
+        /* Lint's typed context and its reads of the index, taken while the in-process check ran and kept only if it answered. */
+        var prefetched: (context: TypedLintContext, indexed: SymbolProvider.Indexed?)?
         if !options.runTypes {
             /*
              A typed rule reads what names resolve to from the build's index and compile commands, so a `--lint` run
@@ -647,7 +757,7 @@ public struct Pipeline {
             if options.runLint && typedRulesApply {
                 do {
                     /* A build that failed after compiling something is said by a `buildFailed` finding rather than thrown. */
-                    let types = try build()
+                    let types = try build(beginTypes())
                     lintBuildFailure = types.findings.first { $0.messageId == "buildFailed" }?.message
                     answeredSymbols = types.symbols
                 }
@@ -660,7 +770,26 @@ public struct Pipeline {
             try writer.write(PhaseRecord(name: .types, outcome: .skipped, detail: "not requested"))
         }
         else {
-            let types = try build()
+            let begun = typesBegunEarly ?? beginTypes()
+            /*
+             While the in-process check runs, the reads that need nothing it answers: what the inputs record names, and,
+             once the scripts' check stopped writing into its index, lint's reads of the index. Each is kept only when
+             that check answered: a whole check after it writes the stores these reads describe, and may resolve
+             packages into the tree.
+             */
+            if overlapsPhases, begun.package?.start.bodiesOnly != nil {
+                preparedInputs = inputsRecord()
+                if options.runLint {
+                    begun.scripts?.wait()
+                    let context = typedLintContext()
+                    prefetched = (context, indexed(context))
+                }
+            }
+            let types = try build(begun)
+            if !begun.answeredInProcess {
+                preparedInputs = nil
+                prefetched = nil
+            }
             answeredSymbols = types.symbols
             for finding in types.findings {
                 try writer.write(finding)
@@ -673,6 +802,15 @@ public struct Pipeline {
                 complete = false
             }
             typeErrors = types.findings.filter { $0.severity == .error }.count
+            /*
+             A check that never started found no type error in any file, so lint is not kept from judging them
+             (#4txsasr): the rules that need no build judge every file, and each file the typed rules cannot judge
+             says the failed check is why, as under `--lint`.
+             */
+            if let notStarted = types.notStarted {
+                typeErrors -= 1
+                lintBuildFailure = notStarted
+            }
         }
 
         if typeErrors > 0 && options.runLint {
@@ -699,34 +837,19 @@ public struct Pipeline {
             let lintStart = Date()
             var linter = Linter(configuration: configuration, fileRules: fileRules)
             linter.typedRules = RuleRegistry.typedRules
-            var typedRules: [String: [String]] = [:]
-            for file in parsed.files {
-                typedRules[file.url.path] = typedRulesApplying(to: file)
-            }
-            let typedCandidates = parsed.files.filter { !(typedRules[$0.url.path] ?? []).isEmpty }
-            var symbolProvider = SymbolProvider(
-                layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
-                runner: runner,
-            )
+            let context = prefetched?.context ?? typedLintContext()
+            var symbolProvider = context.symbolProvider
             symbolProvider.answered = answeredSymbols
-            symbolProvider.ownedModules = Self.ownedModules(of: package)
-                .union(Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts))
-                .union(fileSet.scripts.map(\.targetName))
-            let ownedModules = symbolProvider.ownedModules
             let keys = lintKeys
-            /* The typed key of a file under a record: its own key, the record, and the modules the package owns. */
-            func typedKey(_ path: String, _ record: IndexStore.FreshRecord.Identity) -> String? {
-                keys[path].map {
-                    LintVerdictCache.typedKey(fileKey: $0, record: record, ownedModules: ownedModules)
-                }
-            }
-            linter.symbols = symbolProvider.symbols(for: typedCandidates) { file, record in
-                guard let lintCache, let key = typedKey(file.url.path, record) else { return false }
-                return lintCache.typedVerdict(path: file.url.path, key: key) != nil
-            }
+            linter.symbols = symbolProvider.symbols(
+                for: context.typedCandidates,
+                from: prefetched.map(\.indexed) ?? indexed(context),
+            )
             var typedReplayed: [String: [String: [FindingRecord]]] = [:]
             for (path, record) in linter.symbols.replayed {
-                if let key = typedKey(path, record), let kept = lintCache?.typedVerdict(path: path, key: key) {
+                if let key = typedKey(path, record, ownedModules: context.symbolProvider.ownedModules),
+                    let kept = lintCache?.typedVerdict(path: path, key: key)
+                {
                     typedReplayed[path] = kept
                 }
             }
@@ -758,7 +881,7 @@ public struct Pipeline {
                 files: parsed.files,
                 reusable: reusableFindings.merging(replayedFileRules) { walked, _ in walked },
                 typedReplayed: typedReplayed,
-                typedRules: typedRules,
+                typedRules: context.typedRules,
             )
             for finding in lint.findings {
                 try writer.write(finding)
@@ -766,7 +889,7 @@ public struct Pipeline {
             /* A file is replayed when the store answered for every rule that judged it: its file rules, and its typed rules if any apply. */
             let filesReplayed = parsed.files.filter { file in
                 replayedFileRules[file.url.path] != nil
-                    && ((typedRules[file.url.path] ?? []).isEmpty || typedReplayed[file.url.path] != nil)
+                    && ((context.typedRules[file.url.path] ?? []).isEmpty || typedReplayed[file.url.path] != nil)
             }
             if let lintCache {
                 /* A typed verdict is kept under the record it was read from or replayed under; one sourcekitd gave has none. */
@@ -775,7 +898,7 @@ public struct Pipeline {
                     linter.symbols.replayed,
                     uniquingKeysWith: { read, _ in read },
                 ) {
-                    typedKeys[path] = typedKey(path, record)
+                    typedKeys[path] = typedKey(path, record, ownedModules: context.symbolProvider.ownedModules)
                 }
                 lintCache.store(
                     lintCache.entries(
@@ -793,7 +916,7 @@ public struct Pipeline {
              still saves the walk, and says it ran.
              */
             let reusedEverything =
-                nothingRewritten && typedCandidates.isEmpty && !parsed.files.isEmpty
+                nothingRewritten && context.typedCandidates.isEmpty && !parsed.files.isEmpty
                 && parsed.files.allSatisfy { reusableFindings[$0.url.path] != nil }
             var record = lint.record
             record.elapsedMilliseconds = Self.milliseconds(since: lintStart)

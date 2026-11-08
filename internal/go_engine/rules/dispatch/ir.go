@@ -18,10 +18,10 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
-// Ir calls the listeners registered on it over one walk of each package's functions in staticcheck's intermediate
-// representation: for each function every listener's Function, then each instruction, in block order, to every
-// listener whose Instructions list its kind, then every FunctionExit; and once the functions are walked, every
-// PackageExit. Listeners are called in the order they were registered.
+// Ir calls the listeners registered on it that a package's pass starts (see start) over one walk of the package's
+// functions in staticcheck's intermediate representation: for each function every listener's Function, then each
+// instruction, in block order, to every listener whose Instructions list its kind, then every FunctionExit; and once
+// the functions are walked, every PackageExit. Listeners are called in the order they were registered.
 type Ir struct {
 	*listeners
 }
@@ -63,34 +63,35 @@ func (dispatcher *Ir) RuleAnalyzer(
 	return dispatcher.ruleAnalyzer(ruleName, analyzerName, doc, listener, kinds)
 }
 
-// run walks the package's functions once, calling every registered listener, each with its own context and its own
-// recover, and returns each rule's outcome.
+// run walks the package's functions once, calling every started listener, each with its own context and its own
+// recover, and returns each started rule's outcome.
 func (dispatcher *Ir) run(pass *analysis.Pass) (any, error) {
+	// Started first, which refuses a pass whose intermediate representation failed, so that failure is named as one.
+	started, startError := dispatcher.start(pass)
+	if startError != nil {
+		return nil, startError
+	}
 	functions, readError := staticcheck_ir.Functions(pass)
 	if readError != nil {
 		return nil, readError
 	}
-	runs, startError := dispatcher.start(pass)
-	if startError != nil {
-		return nil, startError
-	}
 	for _, function := range functions {
-		for _, run := range runs {
+		for _, run := range started.runs {
 			run.function(function)
 		}
-		// With no listener hearing an instruction, the blocks are not walked at all.
-		if len(dispatcher.byKind) > 0 {
+		// With no started listener hearing an instruction, the blocks are not walked at all.
+		if len(started.byKind) > 0 {
 			for _, block := range function.Blocks {
 				for _, instruction := range block.Instrs {
-					for _, index := range dispatcher.byKind[reflect.TypeOf(instruction)] {
-						runs[index].instruction(instruction)
+					for _, run := range started.byKind[reflect.TypeOf(instruction)] {
+						run.instruction(instruction)
 					}
 				}
 			}
 		}
-		for _, run := range runs {
+		for _, run := range started.runs {
 			run.functionExit(function)
 		}
 	}
-	return finish(runs), nil
+	return finish(started), nil
 }

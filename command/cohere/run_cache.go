@@ -561,7 +561,9 @@ func replayedSummary(recorded runSummary, elapsed time.Duration) runSummary {
 	replayed.Cache = cacheUse{Replayed: true, FilesReplayed: recorded.FilesInScope}
 	// The engine's cache was not consulted by a replay, which started no engine, so what it did is the recorded run's.
 	replayed.PackageCache = nil
-	replayed.FilesChecked, replayed.FilesCached = 0, recorded.FilesInScope
+	// Cached is what the recorded run accounted for, checked or cached: a file it never examined, the cache cannot
+	// answer for either, and the recorded gap still names it (#1hva1ya).
+	replayed.FilesChecked, replayed.FilesCached = 0, recorded.FilesChecked+recorded.FilesCached
 	replayed.Changed = nil
 	replayed.Nodes = 0
 	return replayed

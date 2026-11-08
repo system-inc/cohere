@@ -1,9 +1,6 @@
 package main
 
-import (
-	"path/filepath"
-	"time"
-)
+import "time"
 
 // The table's lock, which keeps back-to-back runs in order once a run can answer its caller before it has
 // written the cache table (sendVerdict).
@@ -27,8 +24,3 @@ import (
 // and the worst outcome is a miss, never a stale hit, so a writer stuck for any reason costs a run at most
 // this much.
 const tableWriterWait = 2 * time.Second
-
-// tableLockPath is the lock in a cache table's directory.
-func tableLockPath(directory string) string {
-	return filepath.Join(directory, "table.lock")
-}

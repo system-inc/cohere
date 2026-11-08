@@ -1,0 +1,158 @@
+The parity fixtures for directive, packages parity and parity/command, extracted at test time into a temporary
+GOPATH. They are an archive, not files under src, because they must stay as written: Go files whose //go: lines
+gofmt would move or set apart, an excluded Go file that does not parse, and assembly whose lines end in a carriage
+return and a newline, which .gitattributes beside this archive keeps from being normalized. An archive ends every
+file with a newline, so the one fixture without a final newline, parity/command/no_newline.s, is written by the test.
+-- src/parity/parity.go --
+// Package parity holds every branch of the directive pass in a package that is neither main nor a test, beside the
+// clean cases, so the original and the port are compared over each. Its comments say what each side should find.
+//
+// A //go:debug in the header of a package that is not main, outside a test file: only valid in package main or test.
+//go:debug panicnil=1
+
+// Two in one comment group, each reported.
+//go:debug panicnil=1
+//go:debug http2client=0
+
+// An unknown verb is left alone, and so is //go:build after the header, both clean.
+//go:unknownverb anything
+
+/*
+//go:debug inside a block comment is not a // comment line, clean.
+*/
+
+// A verb ending in a no-break space: invalid space, and the //go:debug judged as well.
+//go:debug panicnil=1
+
+// A verb ending in a tab or a plain space is clean, and any other space is reported whatever the verb.
+//go:debug	panicnil=1
+//go:noinlinex
+//go:linknamex
+//go:embedx
+//go:nosplit x
+
+// The testing hack's `// ERROR` cut: the judgment of the verb is unchanged.
+//go:debug panicnil=1 // ERROR "here"
+//go:debug // ERROR "here"
+
+// Not a directive at all: a space after the slashes, a capital verb, and no colon.
+// go:debug panicnil=1
+//Go:debug panicnil=1
+//go debug panicnil=1
+package parity /* a block adjoining the clause */ //go:debug panicnil=1
+
+// A //go:build verb is not judged, but its space is, here past the header, where it constrains nothing.
+//go:build ignore
+
+// After the clause, in a package that is not main: still only valid in package main or test, the first branch that
+// holds wins.
+//go:debug panicnil=1
+
+func Function() {
+	//go:debug panicnil=1
+	_ = 0 //go:debug panicnil=1
+}
+-- src/parity/parity_test.go --
+// A test file of the package: its header is valid.
+//go:debug panicnil=1
+
+/* a block comment ends nothing in a Go file */
+
+//go:debug panicnil=1
+package parity
+
+// After the clause: only valid before package declaration.
+//go:debug panicnil=1
+
+/*
+//go:debug in a block comment is clean.
+*/
+-- src/parity/external_test.go --
+//go:debug panicnil=1
+package parity_test
+
+//go:debug panicnil=1 // only valid before package declaration
+-- src/parity/line_directive.go --
+// A //line directive renames the file in positions, and the file's own name still decides whether it is a test: this
+// file is not one, though it says it is.
+//line renamed_test.go:1
+//go:debug panicnil=1
+package parity
+-- src/parity/ignored_main.go --
+//go:build ignore
+
+// An excluded file of package main: its header is valid.
+//go:debug panicnil=1
+package main
+
+// Past the clause: only valid before package declaration.
+//go:debug panicnil=1
+-- src/parity/ignored_other_test.go --
+//go:build ignore
+
+// An excluded test file of another package: valid in its header, misplaced after.
+//go:debug panicnil=1
+package other
+
+//go:debug panicnil=1
+-- src/parity/ignored_broken.go --
+//go:build ignore
+
+// An excluded file that is not valid Go is skipped whole, so neither side reports these.
+//go:debug panicnil=1
+package broken
+
+func {
+//go:debug panicnil=1
+-- src/parity/assembly.s --
+// A file that is not Go: every //go:debug is only valid in Go source files.
+//go:debug panicnil=1
+//go:debug	panicnil=1
+//go:debug panicnil=1
+//go:unknownverbx
+
+/* one line */ /* and another */
+
+/* a block comment
+//go:debug inside it is skipped
+   and closed */ /* opened and
+closed */
+
+  // An indented comment line is no comment line here, and it ends the reading, so what follows is clean.
+//go:debug panicnil=1
+-- src/parity/carriage_return.s --
+// Lines that end in a carriage return and a newline.
+//go:debug panicnil=1
+//go:debug
+//go:noescape
+
+TEXT ·f(SB),0,$0
+//go:debug panicnil=1
+-- src/parity/block_ends.s --
+/* a block comment */ // and a line comment after it ends the reading
+//go:debug panicnil=1
+-- src/parity/unclosed.s --
+/* a block comment never closed
+//go:debug panicnil=1
+-- src/parity/ignored.s --
+//go:build ignore
+
+// An excluded file that is not Go is read too.
+//go:debug panicnil=1
+-- src/parity/empty.s --
+-- src/parity/command/main.go --
+// Package main's header is where //go:debug belongs.
+//go:debug panicnil=1
+//go:debug http2client=0
+
+//go:debug http2server=0
+package main //go:debug panicnil=1 adjoins the clause, past the header: only valid before package declaration
+
+//go:debug panicnil=1
+
+func main() {}
+-- src/parity/command/main_test.go --
+//go:debug panicnil=1
+package main
+
+//go:debug panicnil=1

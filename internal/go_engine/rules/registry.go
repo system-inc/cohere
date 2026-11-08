@@ -10,7 +10,6 @@ import (
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
-	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
@@ -67,7 +66,39 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_uncached_run"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/assign"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/bools"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/cgo_call"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/composite"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/copy_lock"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/defers"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/directive"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/frame_pointer"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/host_port"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/http_response"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/iface_assert"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/loop_closure"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/lost_cancel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/shift"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -129,9 +160,9 @@ var stylecheckRuledOn = map[string]bool{
 // with nil whose answer is already known, and a write to a struct or array nothing reads again. Each runs as
 // our port onto staticcheck's intermediate form, under the original's name, so the run builds one program form
 // where x/tools' would build a second for these two alone (#pn1xvnd). Then
-// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 through an
-// analyzer that reports what it finds. staticcheck's QF checks are quick fixes an editor offers, not
-// findings.
+// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 as our port,
+// which reports what it finds where the original returns its verdict for staticcheck's runner to report
+// (#7hdcn3w). staticcheck's QF checks are quick fixes an editor offers, not findings.
 //
 // An SA or S check staticcheck leaves off by default (its documentation's NonDefault) is left off here
 // too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch. And a check
@@ -145,10 +176,59 @@ var duplicatesOfVet = map[string]string{
 	"SA5009": "printf",
 }
 
+// ports is each borrowed check we have ported as ours (#pn1xvnd), keyed by the original's name: a vet pass's name
+// (#z2x1c7g) or a staticcheck check's code (#d8s4rsy), which never collide. A port enters this table only in its own
+// landing, once it matches its original finding for finding, and All then runs it in the original's place: under the
+// original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
+// naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
+// and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
+var ports = map[string]*analysis.Analyzer{
+	"appends":          appends.Analyzer,
+	"assign":           assign.Analyzer,
+	"atomic":           atomic.Analyzer,
+	"bools":            bools.Analyzer,
+	"cgocall":          cgo_call.Analyzer,
+	"composites":       composite.Analyzer,
+	"copylocks":        copy_lock.Analyzer,
+	"defers":           defers.Analyzer,
+	"directive":        directive.Analyzer,
+	"errorsas":         errors_as.Analyzer,
+	"framepointer":     frame_pointer.Analyzer,
+	"hostport":         host_port.Analyzer,
+	"httpresponse":     http_response.Analyzer,
+	"ifaceassert":      iface_assert.Analyzer,
+	"loopclosure":      loop_closure.Analyzer,
+	"lostcancel":       lost_cancel.Analyzer,
+	"nilfunc":          nil_func.Analyzer,
+	"printf":           printf.Analyzer,
+	"scannererr":       scanner_error.Analyzer,
+	"shift":            shift.Analyzer,
+	"slog":             slog.Analyzer,
+	"sqlrowserr":       sql_rows_err.Analyzer,
+	"stdmethods":       std_methods.Analyzer,
+	"stringintconv":    string_int_conv.Analyzer,
+	"structtag":        struct_tag.Analyzer,
+	"testinggoroutine": testing_goroutine.Analyzer,
+	"tests":            tests.Analyzer,
+	"unmarshal":        unmarshal.Analyzer,
+	"unsafeptr":        unsafe_ptr.Analyzer,
+	"unusedresult":     unused_result.Analyzer,
+	"waitgroup":        wait_group.Analyzer,
+}
+
+// portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
+// otherwise.
+func portOrOriginal(original *analysis.Analyzer, table map[string]*analysis.Analyzer) *analysis.Analyzer {
+	if port, ported := table[original.Name]; ported {
+		return port
+	}
+	return original
+}
+
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
-		registered = append(registered, portedRule(analyzer, rule.OriginVet))
+		registered = append(registered, portedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
 	}
 	registered = append(registered, dispatchedRule(nil_ness.Analyzer, &nil_ness.Listener, rule.OriginTools))
 	registered = append(registered, dispatchedRule(unused_write.Analyzer, &unused_write.Listener, rule.OriginTools))
@@ -156,19 +236,19 @@ func All() []rule.Rule {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+		registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
 	}
 	for _, wrapped := range stylecheck.Analyzers {
 		if stylecheckRuledOn[wrapped.Analyzer.Name] {
-			registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+			registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
 		}
 	}
 	registered = append(registered, rule.Rule{
-		Name:         rule.Namespace + unused.Analyzer.Analyzer.Name,
+		Name:         rule.Namespace + unused_code.Analyzer.Name,
 		Origin:       rule.OriginStaticcheck,
-		UpstreamName: unused.Analyzer.Analyzer.Name,
+		UpstreamName: unused_code.Analyzer.Name,
 		TypeAware:    true,
-		Analyzer:     unusedReport,
+		Analyzer:     unused_code.Analyzer,
 	})
 	// The house rules come last, each from its own package, which holds its name, origin and analyzer
 	// together so the registry restates none of them.

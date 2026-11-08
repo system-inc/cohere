@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_require_octal_prefix"
@@ -216,21 +217,18 @@ func plan(loaded *workspace.Workspace) (planned, error) {
 	return result, nil
 }
 
-// findings runs the rule over goPackage's files and returns what it reports. The rule reads only the files and
-// reports, so the pass needs nothing else of an analysis driver.
+// findings runs the rule over goPackage through x/tools' checker and returns what it reports. The rule's analyzer
+// reads its findings from the syntax dispatcher it requires, so only a driver that runs its requirements first, never
+// a pass built by hand, can run it.
 func findings(goPackage *packages.Package) ([]analysis.Diagnostic, error) {
-	var diagnostics []analysis.Diagnostic
-	pass := &analysis.Pass{
-		Analyzer:  consistency_require_octal_prefix.Analyzer,
-		Fset:      goPackage.Fset,
-		Files:     goPackage.Syntax,
-		Pkg:       goPackage.Types,
-		TypesInfo: goPackage.TypesInfo,
-		ResultOf:  map[*analysis.Analyzer]any{},
-		Report:    func(diagnostic analysis.Diagnostic) { diagnostics = append(diagnostics, diagnostic) },
+	graph, analyzeError := checker.Analyze(
+		[]*analysis.Analyzer{consistency_require_octal_prefix.Analyzer}, []*packages.Package{goPackage}, nil)
+	if analyzeError != nil {
+		return nil, analyzeError
 	}
-	_, runError := consistency_require_octal_prefix.Analyzer.Run(pass)
-	return diagnostics, runError
+	// One analyzer over one package is one root.
+	root := graph.Roots[0]
+	return root.Diagnostics, root.Err
 }
 
 // onlyFix is the text of diagnostic's fix when it is one edit spanning literal exactly, as the rule offers it.

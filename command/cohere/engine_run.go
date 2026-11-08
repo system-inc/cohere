@@ -443,7 +443,9 @@ func (run *engineRun) acceptProject(record *engineProjectRecord) error {
 	// which a replay did not spend (see invocationTag).
 	printInvocation(accountOutput(run.out), "%s\n", line)
 	streams.Show(run.out)
-	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
+	// Checked is what a phase examined, so it starts at none: the types and lint records set it as they come. A run
+	// whose files no phase reached reads none checked beside the gap that names them (#1hva1ya).
+	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, 0
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
 	run.report.graph = elapsed
@@ -793,6 +795,13 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+	// The compiler examined every file it left a record for, at most the files in scope, since it checks the whole
+	// container whatever the scope. A file with no record it did not examine (#1hva1ya).
+	examined := max(record.Files-len(record.FilesWithoutRecord), 0)
+	if run.project != nil {
+		examined = min(examined, run.project.FilesInScope)
+	}
+	activeSummary.FilesChecked = max(activeSummary.FilesChecked, examined)
 
 	// Said, so a cold run that took the toolchain's SDK index units never reads like one that indexed them: in the
 	// account `--verbose` prints and in `--json`'s summary, never in the default line, as #f6pqraj ruled.
@@ -1186,10 +1195,14 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 	if gapInRecords && *record.Complete {
 		return fmt.Errorf("the summary calls the run complete, and its own records show what it did not check")
 	}
+	// The files nothing checked are named on the line whatever else fell short: a phase that did not run is a gap of
+	// its own, and with it alone the line read as if every file had reached the phases that did (#1hva1ya).
+	if !*record.Complete && namedGaps {
+		activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
+	}
 	if !*record.Complete && run.report.checkedEveryRequestedPhase() {
 		if namedGaps {
 			run.report.incompleteBeyondPhases = "the notes above name the files nothing checked"
-			activeSummary.Gaps.Unread = engineUncheckedFiles(run.filesWithoutRecord, len(run.unreadable))
 		} else {
 			run.report.incompleteBeyondPhases = run.language.theEngine() +
 				" reported that it fell short without a record saying where"
