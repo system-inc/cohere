@@ -9,7 +9,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstream is staticcheck's own fixture for S1017, copied unchanged from simple/s1017/testdata/go1.0/CheckTrim into
@@ -27,32 +26,7 @@ var fixtures = []string{upstream, "parity", "packagelength"}
 // matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	fixture := filepath.Join(analysistest.TestData(), "src", upstream)
-	wants, readError := staticcheck_wants.Read(fixture)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	if len(wants) == 0 {
-		test.Fatal("the upstream fixture holds no notes, so the comparison proves nothing")
-	}
-	_, port := parity.Findings(test, s1017.Analyzer, Analyzer, analysistest.TestData(), upstream)
-	found := []staticcheck_wants.Finding{}
-	for _, each := range port {
-		// The wants name a file by its full path, and the findings by its path below testdata's src.
-		found = append(found, staticcheck_wants.Finding{
-			File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
-			Message: each.Message,
-		})
-	}
-	test.Logf("the fixture expects %d, the port found %d", len(wants), len(found))
-	unexpected, untaken := staticcheck_wants.Compare(wants, found)
-	for _, extra := range unexpected {
-		test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-			extra.Message)
-	}
-	for _, missing := range untaken {
-		test.Errorf("the port reported nothing matching %s", missing)
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), upstream)
 }
 
 // Over staticcheck's fixture and parity's, the original and the port find the same multiset, each finding the same to
@@ -66,7 +40,7 @@ func TestPortMatchesOriginal(test *testing.T) {
 // gofmt strips the parentheses around an if statement's condition, which the original takes as written, so a
 // parenthesized guard is held to the original's judgment here. The guard holds every .go file of the tree to gofmt,
 // so the fixture is kept as testdata/unformatted/unformatted.go.txt and written out as Go into a tree of the test's
-// own.
+// own, since no harness call writes a fixture out.
 func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 	test.Parallel()
 	source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "unformatted", "unformatted.go.txt"))
@@ -98,7 +72,9 @@ func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 // The one place the original crashes and the port declines: astutil.Equal panics on a node kind it does not know, a
 // function type in an index, and on a field's tag absent on one side only, and a panic in a check is a crash under
 // its rule's name. The original can't run over the panicking fixture, so the port runs alone, through analysistest,
-// which fails on any finding there, as the fixture holds no want, and on the panic.
+// which fails on any finding there, as the fixture holds no want, and on the panic. RequirePortWhereOriginalPanics
+// can't hold it, since the port finds nothing there for a `// port finds:` record to name, and that call refuses a
+// fixture that records nothing.
 func TestPortDeclinesWhereTheOriginalPanics(test *testing.T) {
 	test.Parallel()
 	parity.RequireUpstreamWants(test, Analyzer, analysistest.TestData(), "panicking")
