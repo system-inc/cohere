@@ -282,7 +282,7 @@ var ports = map[string]port{
 	"appends":          {analyzer: appends.Analyzer, listener: &appends.Listener},
 	"asmdecl":          {analyzer: asm_decl.Analyzer},
 	"assign":           {analyzer: assign.Analyzer},
-	"atomic":           {analyzer: atomic.Analyzer},
+	"atomic":           {analyzer: atomic.Analyzer, listener: &atomic.Listener},
 	"bools":            {analyzer: bools.Analyzer},
 	"buildtag":         {analyzer: build_tag.Analyzer},
 	"cgocall":          {analyzer: cgo_call.Analyzer},
