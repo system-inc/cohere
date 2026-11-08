@@ -110,6 +110,10 @@ func recordRunSummary(summary runSummary) {
 // `--adamic-readiness` measures what the run without it does not, so it is its own record too, and a run
 // with it never replays one without it, nor one without it a run with it (#9tgm3dq).
 //
+// `--other-builds` checks a Go project's other builds too, which a run without it does not, so it is its own record
+// as well. Its verdict is replayed only while every build's inputs are unchanged, since the Go engine's inputs record
+// names what every build's load read (#e4b08k7), and the land gate runs with it (#72n9mq0).
+//
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
 // arguments happen to be admitted next.
@@ -155,7 +159,8 @@ func runCacheAdmits(arguments []string) bool {
 	seen := map[string]bool{}
 	for _, argument := range arguments {
 		switch argument {
-		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness":
+		case "--no-fix", "--format", "--no-format", "--verbose", "--json", "--phases", "--adamic-readiness",
+			"--other-builds":
 		default:
 			return false
 		}

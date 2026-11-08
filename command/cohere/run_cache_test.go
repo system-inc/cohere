@@ -188,8 +188,8 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 	}
 }
 
-// Exactly two invocations may use the run cache: a bare run and `--no-fix` alone. Any other argument
-// widens what the output could depend on, and one admitted by accident would be cached on a key that
+// The run cache serves a bare run and `--no-fix`, with the flags runCacheAdmits names beside them. Any other
+// argument widens what the output could depend on, and one admitted by accident would be cached on a key that
 // covers it but by a cache never shown to be correct for it.
 // Not parallel: it sets os.Args and the package-level cacheOff, which runCacheEligible reads
 func TestRunCacheEligibility(test *testing.T) {
@@ -205,6 +205,8 @@ func TestRunCacheEligibility(test *testing.T) {
 		{[]string{"--fix"}, false},
 		{[]string{"--lint"}, false},
 		{[]string{"--no-fix", "--lint"}, false},
+		// The land gate's run, its own record since the key holds every argument (#72n9mq0).
+		{[]string{"--no-fix", "--other-builds", "--json"}, true},
 		{[]string{"source/a.ts"}, false},
 	} {
 		os.Args = append([]string{"cohere"}, testCase.arguments...)
