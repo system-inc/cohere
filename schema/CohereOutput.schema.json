@@ -408,6 +408,23 @@
                         }
                     }
                 },
+                "swift": {
+                    "type": "object",
+                    "description": "What only a Swift run says of itself. Absent for every other run, and for a Swift run with nothing here to say.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "sdkIndexSeed": {
+                            "type": "object",
+                            "description": "What the check of the standalone scripts did with the toolchain's SDK index seed (#f6pqraj): its key, the name of its folder under ~/Library/Caches/cohere/sdk-index, and whether the run's empty index store was seeded from it rather than indexing the SDK afresh. Absent when the check's store was not empty or no seed applied.",
+                            "additionalProperties": false,
+                            "required": ["key", "hit"],
+                            "properties": {
+                                "key": { "type": "string" },
+                                "hit": { "type": "boolean" }
+                            }
+                        }
+                    }
+                },
                 "adamic": {
                     "description": "Adamic readiness: the files whose types are true, with no type error and no cohere:adamic finding before suppression, whatever the project's rules enable. Present only under --adamic-readiness, and then always: a run that asked and could not measure it says so.",
                     "type": "object",

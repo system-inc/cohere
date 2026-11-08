@@ -104,6 +104,9 @@ type summaryJson struct {
 	// Gaps is every way the run fell short of checking everything. A reader deciding whether a green run
 	// can be trusted reads this, not the verdict alone.
 	Gaps runGaps `json:"gaps"`
+	// Swift is what only a Swift run says of itself: the SDK index seed its scripts' check used, as
+	// `swift.sdkIndexSeed`. Absent for every other run.
+	Swift *swiftSummary `json:"swift,omitempty"`
 	// Adamic is the run's readiness, present only under --adamic-readiness (#9tgm3dq). A run that asked and
 	// did not lint says not measured, and why, so a reader who asked never takes its absence for a pass.
 	Adamic *readinessSummary `json:"adamic,omitempty"`
@@ -173,6 +176,7 @@ func summaryAsJson(summary runSummary) summaryJson {
 		TypesOnly:         summary.FilesTypesOnly,
 		Nodes:             summary.Nodes,
 		Gaps:              summary.Gaps,
+		Swift:             summary.Swift,
 		Adamic:            adamic,
 		IgnorePatterns:    summary.IgnorePatterns,
 	}
