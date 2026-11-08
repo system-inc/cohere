@@ -26,7 +26,7 @@ var lintSuppressionRules = []string{suppression.RuleNoUnusedIgnore, suppression.
 // tools finding there is still a bug in what ships, so it is written. earlier is the pass the rename already ran
 // over this load, written as it is, or nil to run one here.
 //
-// Under the hidden `--other-builds`, every other build the census needs checks what can differ from the host's,
+// Under `--other-builds`, every other build the census needs checks what can differ from the host's,
 // read beside the host's pass before anything is written, and the phase writes the merge of every build's findings
 // (#72n9mq0): the findings, the withheld counts and the crashes are every build's, merged; another build's type
 // errors are written as the compiler's findings, since the host's lint ran only on a host load without any; and the

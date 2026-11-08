@@ -24,6 +24,14 @@ type describedProject struct {
 	// in place of asking again, nil when the census judged no file (#f53yra8).
 	goEnvironment *load.GoEnvironment
 
+	// builds are what a run under `--other-builds` checks, the host's first, read from the census before the first
+	// record (readBuilds), so the project record names a file only another build compiles as checked by it, and the
+	// lint phase checks these and reads them no second time (otherBuilds). Nil without the switch, and when the census
+	// judged no file. buildsError is why they could not be read, which the lint phase notes, leaving the run
+	// incomplete, and leaves every file the host's build constraints exclude a gap.
+	builds      []project.Build
+	buildsError error
+
 	// manifest is the root's go.work, or its go.mod for a module root: where a diagnostic that names no file
 	// is placed, since the front door refuses a finding with no position.
 	manifest string

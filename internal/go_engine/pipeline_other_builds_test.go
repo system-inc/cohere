@@ -16,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_else_return"
 )
@@ -163,6 +164,75 @@ func TestOtherBuildsHandTheMergeARunPerBuild(test *testing.T) {
 	}
 	if foundIn(host) || foundIn(tagged) {
 		test.Errorf("a build that never compiles %s found %s in it", windowsFile, elseReturn)
+	}
+}
+
+// The project record is written before any build runs, so under `--other-builds` describeProject reads the builds
+// and names each file the host's build constraints leave out and an extra build compiles as checked by that build, in
+// the build's own words, which the front door counts as checked (#72n9mq0): the windows file by windows's build, the
+// tagged file by the cohere_extra one, each the build the lint phase ran. A file no build compiles, one whose
+// constraint names `ignore`, keeps the constraint's reason and stays a gap, and adds no build. Without the switch
+// every one of the three keeps the constraint's reason.
+func TestOtherBuildsNameTheBuildThatChecksAConstrainedFile(test *testing.T) {
+	test.Parallel()
+	const constraintPrefix = "excluded by build constraints on "
+	windowsFile := filepath.Join("internal", "separator", "separator_windows.go")
+	taggedFile := filepath.Join("internal", "label", "prefix_extra.go")
+	ignoredFile := filepath.Join("internal", "label", "generate.go")
+	// copyWithIgnored is a copy of the fixture with a file whose constraint names `ignore`, which no build sets.
+	copyWithIgnored := func() string {
+		root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+		ignored := []byte("//go:build ignore\n\npackage label\n")
+		if writeError := os.WriteFile(filepath.Join(root, ignoredFile), ignored, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+		return root
+	}
+	// reasons is the project record's reason for each file it left out, by its path below root.
+	reasons := func(engine *pipeline, root string) map[string]string {
+		byFile := map[string]string{}
+		for _, excluded := range engine.described.record.Excluded {
+			relative, relativeError := filepath.Rel(root, excluded.File)
+			if relativeError != nil {
+				test.Fatal(relativeError)
+			}
+			byFile[relative] = excluded.Reason
+		}
+		return byFile
+	}
+
+	offRoot := copyWithIgnored()
+	off, _ := runOver(test, offRoot, exitClean)
+	offReasons := reasons(off, offRoot)
+	for _, file := range []string{windowsFile, taggedFile, ignoredFile} {
+		if !strings.HasPrefix(offReasons[file], constraintPrefix) {
+			test.Errorf("without the switch %s is left out for %q, want the constraint's reason", file,
+				offReasons[file])
+		}
+	}
+
+	onRoot := copyWithIgnored()
+	on, _ := runOver(test, onRoot, exitFindings, "--other-builds")
+	if len(on.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3: the file no build compiles adds none", len(on.buildRuns))
+	}
+	onReasons := reasons(on, onRoot)
+	for file, isItsBuild := range map[string]func(build project.Build) bool{
+		windowsFile: func(build project.Build) bool { return build.OperatingSystem == "windows" },
+		taggedFile:  func(build project.Build) bool { return slices.Contains(build.Tags, "cohere_extra") },
+	} {
+		at := slices.IndexFunc(on.buildRuns[1:], func(run buildRun) bool { return isItsBuild(run.build) })
+		if at < 0 {
+			test.Fatalf("no extra build compiles %s", file)
+		}
+		want := project.CheckedByBuild(on.buildRuns[1+at].build)
+		if onReasons[file] != want {
+			test.Errorf("under the switch %s is left out for %q, want %q", file, onReasons[file], want)
+		}
+	}
+	if !strings.HasPrefix(onReasons[ignoredFile], constraintPrefix) {
+		test.Errorf("under the switch %s, which no build compiles, is left out for %q, want the constraint's reason",
+			ignoredFile, onReasons[ignoredFile])
 	}
 }
 

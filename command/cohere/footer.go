@@ -59,7 +59,7 @@ import (
 // rule crashed on, a rule that skipped every file it was offered, a phase that could not run, formatting
 // not checked, a run narrowed to some of the files, a project with nothing to check, a generated file the
 // program asks for that does not exist yet, Swift files inside a package's directory that no target compiles
-// and no other project's run checks, and what a
+// and no other project's run checks, Go files only another platform builds, and what a
 // Go run withheld of its dependencies because no cgo tool ran. The old phase line existed so that a run which
 // checked nothing could not print like one that checked everything, and a one-line summary that dropped those
 // cases would undo it in the line people actually read. So a gap is never left to `--verbose`.
@@ -263,15 +263,32 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+
 			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
-	if len(gaps.UncheckedSwift) > 0 {
-		markers = append(markers, "⚠ "+
-			counted(len(gaps.UncheckedSwift), "Swift file not checked", "Swift files not checked"))
-	}
+	markers = append(markers, uncheckedEngineFileMarkers(gaps.Unchecked)...)
 	if marker := withheldCgoMarker(gaps.WithheldInDependencyCgo, gaps.WithheldDependencyCgoDeclarations); marker != "" {
 		markers = append(markers, marker)
 	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
+	}
+	return markers
+}
+
+// uncheckedEngineFileMarkers counts a run's unchecked files in its language's noun, one marker per language in the
+// order the files first name it, "⚠ 3 Swift files not checked" or "⚠ 1 Go file not checked". A run is one engine's,
+// so there is one marker; the noun is each file's own, so no file is ever counted in another language's words.
+func uncheckedEngineFileMarkers(files []uncheckedEngineFile) []string {
+	var languages []string
+	countByLanguage := map[string]int{}
+	for _, file := range files {
+		if countByLanguage[file.Language] == 0 {
+			languages = append(languages, file.Language)
+		}
+		countByLanguage[file.Language]++
+	}
+	markers := make([]string, 0, len(languages))
+	for _, language := range languages {
+		markers = append(markers, "⚠ "+counted(countByLanguage[language], language+" file not checked",
+			language+" files not checked"))
 	}
 	return markers
 }

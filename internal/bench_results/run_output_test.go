@@ -104,20 +104,25 @@ func TestRunOutputRefusesEachGapThatChecksLess(test *testing.T) {
 		line    string
 		refused bool
 	}{
-		"an error":                    {line: summary(`,"error":"no engine"`, ""), refused: true},
-		"phases not run":              {line: summary("", `,"phasesNotRun":["lint"]`), refused: true},
-		"a crashed file":              {line: summary("", `,"crashedFiles":1`), refused: true},
-		"a rule crash":                {line: summary("", `,"ruleCrashes":1`), refused: true},
-		"nothing to check":            {line: summary("", `,"nothingToCheck":true`), refused: true},
-		"unread files":                {line: summary("", `,"unread":"2 files"`), refused: true},
-		"a narrowed program":          {line: summary("", `,"programFiles":9`), refused: true},
-		"formatting not checked":      {line: summary("", `,"formattingNotChecked":true`), refused: true},
-		"a missing generated file":    {line: summary("", `,"missingGenerated":["gen.d.ts"]`), refused: true},
-		"fixes held":                  {line: summary("", `,"fixesHeld":true`), refused: true},
-		"rules with nothing to do":    {line: summary("", `,"rulesSkippingEverything":4`)},
-		"a modified build":            {line: summary("", `,"modifiedBuild":true`)},
-		"nested files unchecked":      {line: summary("", `,"nestedUnchecked":2`)},
-		"Swift no target compiles":    {line: summary("", `,"uncheckedSwift":[{"file":"a.swift","reason":"none"}]`)},
+		"an error":                 {line: summary(`,"error":"no engine"`, ""), refused: true},
+		"phases not run":           {line: summary("", `,"phasesNotRun":["lint"]`), refused: true},
+		"a crashed file":           {line: summary("", `,"crashedFiles":1`), refused: true},
+		"a rule crash":             {line: summary("", `,"ruleCrashes":1`), refused: true},
+		"nothing to check":         {line: summary("", `,"nothingToCheck":true`), refused: true},
+		"unread files":             {line: summary("", `,"unread":"2 files"`), refused: true},
+		"a narrowed program":       {line: summary("", `,"programFiles":9`), refused: true},
+		"formatting not checked":   {line: summary("", `,"formattingNotChecked":true`), refused: true},
+		"a missing generated file": {line: summary("", `,"missingGenerated":["gen.d.ts"]`), refused: true},
+		"fixes held":               {line: summary("", `,"fixesHeld":true`), refused: true},
+		"rules with nothing to do": {line: summary("", `,"rulesSkippingEverything":4`)},
+		"a modified build":         {line: summary("", `,"modifiedBuild":true`)},
+		"nested files unchecked":   {line: summary("", `,"nestedUnchecked":2`)},
+		"Swift no target compiles": {
+			line: summary("", `,"unchecked":[{"file":"a.swift","reason":"none","language":"Swift"}]`),
+		},
+		"Go only another platform builds": {
+			line: summary("", `,"unchecked":[{"file":"a_windows.go","reason":"none","language":"Go"}]`),
+		},
 		"a dependency's cgo withheld": {line: summary("", `,"withheldDependencyCgoDeclarations":3`)},
 	} {
 		test.Run(name, func(test *testing.T) {

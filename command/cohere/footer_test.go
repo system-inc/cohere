@@ -377,6 +377,29 @@ var uncheckedConditions = []struct {
 		marker: "⚠ 1 file the compiler left no record for",
 	},
 	{
+		name: "Swift files no target compiles",
+		plant: func(summary *runSummary) {
+			summary.Gaps.Unchecked = []uncheckedEngineFile{
+				{File: "/package/Stray/A.swift", Reason: "no target of this package compiles it", Language: "Swift"},
+				{File: "/package/Stray/B.swift", Reason: "no target of this package compiles it", Language: "Swift"},
+			}
+		},
+		marker: "⚠ 2 Swift files not checked",
+	},
+	{
+		name: "a Go file only another platform builds",
+		plant: func(summary *runSummary) {
+			summary.Gaps.Unchecked = []uncheckedEngineFile{
+				{
+					File:     "/module/open_windows.go",
+					Reason:   "excluded by build constraints on darwin/arm64",
+					Language: "Go",
+				},
+			}
+		},
+		marker: "⚠ 1 Go file not checked",
+	},
+	{
 		name: "a Go run withheld type errors and declarations for cgo",
 		plant: func(summary *runSummary) {
 			summary.Gaps.WithheldInDependencyCgo = []withheldCgoFile{

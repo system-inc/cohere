@@ -1034,6 +1034,9 @@ const excludedNamedLimit = 5
 // expects checked, is the run's gap: listed for the footer and `--json`, and named here file by file however
 // many share a reason, since the limit is for one fact said a hundred times and each file of a gap is one to
 // act on. A language that names no such reasons keeps no gap (see engineLanguage.ExpectedExclusionReasons).
+//
+// A file another build checked was checked, so its line leads with the reason that says by which build, in place
+// of "not checked": `checked by the freebsd/arm64 build: …/memory_other.go`, under Go's `--other-builds` (#72n9mq0).
 func (run *engineRun) writeExcluded() {
 	if run.excludedPrinted || run.project == nil {
 		return
@@ -1048,7 +1051,7 @@ func (run *engineRun) writeExcluded() {
 		}
 		filesByReason[reason] = append(filesByReason[reason], file)
 	}
-	var gap []uncheckedSwiftFile
+	var gap []uncheckedEngineFile
 	gapReasons := map[string]bool{}
 	for _, excluded := range run.project.Excluded {
 		// Resolved, since the engine standardizes its paths as Foundation spells them, `/tmp` where this
@@ -1057,12 +1060,13 @@ func (run *engineRun) writeExcluded() {
 			continue
 		}
 		add(excluded.File, excluded.Reason)
-		if run.language.ExpectedExclusionReasons != nil && !run.language.ExpectedExclusionReasons[excluded.Reason] {
-			gap = append(gap, uncheckedSwiftFile{File: excluded.File, Reason: excluded.Reason})
+		if run.language.ExpectedExclusionReasons != nil && !run.language.expectsExcluded(excluded.Reason) {
+			gap = append(gap,
+				uncheckedEngineFile{File: excluded.File, Reason: excluded.Reason, Language: run.language.Name})
 			gapReasons[excluded.Reason] = true
 		}
 	}
-	activeSummary.Gaps.UncheckedSwift = gap
+	activeSummary.Gaps.Unchecked = gap
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
 	for _, unreadable := range run.unreadable {
@@ -1071,6 +1075,16 @@ func (run *engineRun) writeExcluded() {
 	sort.Strings(reasons)
 	for _, reason := range reasons {
 		files := filesByReason[reason]
+		if run.language.checkedElsewhere(reason) {
+			if len(files) > excludedNamedLimit {
+				fmt.Fprintf(accountOutput(run.out), "  %s: %d files\n", reason, len(files))
+				continue
+			}
+			for _, file := range files {
+				fmt.Fprintf(accountOutput(run.out), "  %s: %s\n", reason, file)
+			}
+			continue
+		}
 		if len(files) > excludedNamedLimit && !gapReasons[reason] {
 			fmt.Fprintf(accountOutput(run.out), "  not checked: %d files (%s)\n", len(files), reason)
 			continue

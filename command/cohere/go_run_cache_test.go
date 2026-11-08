@@ -494,7 +494,7 @@ const goCleanAccount = "module described in 96ms: 4 Go files in the module, 3 of
 	goCleanLintLine +
 	"coverage: 5 rules = 5 ran and found nothing\n" +
 	"  0 files crashed \u00b7 details: cohere --coverage\n" +
-	"  not checked: /project/internal/schema/schema_generated.go (marked // Code generated)\n" +
+	"  not checked: /project/internal/schema/schema_generated.go (ignored by git)\n" +
 	"phases: fix ran in 18ms \u00b7 types ran in 240ms \u00b7 " +
 	"lint reused the fix phase's walk (nothing was rewritten) \u00b7 unused skipped (not requested)\n" +
 	"  total 0s: module 96ms plus phases, overlapping by 354ms\n" +

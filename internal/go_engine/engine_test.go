@@ -810,6 +810,7 @@ var (
 	cachePackagesPattern   = regexp.MustCompile(`"(missed|written|unstorable|factsDropped|factsSkipped|waves)":\d+`)
 	panicFramesPattern     = regexp.MustCompile(`, at [^"]*"`)
 	buildTargetPattern     = regexp.MustCompile(`"target":"[^"]*"`)
+	checkedByBuildPattern  = regexp.MustCompile(`"reason":"checked by the [^"]* build"`)
 	hostTarget             = " on " + runtime.GOOS + "/" + runtime.GOARCH
 	normalizedProvenance   = contract.ProvenanceRecord{
 		Contract: contract.Version, Engine: engineName, Version: "test", Commit: "test", Toolchain: "test",
@@ -820,7 +821,8 @@ var (
 // provenance fixed, the inputs held to the copy's own paths (the toolchain's, the module cache's and the temporary
 // directory's move with the machine), the standard library's package count (which moves with the toolchain) N, a
 // panic's frames (which move with this file) left out, the host's target `host`, and each build's target in the lint
-// record `target`, since every build is made on the host's `GOOS` or `GOARCH` and its cgo.
+// record `target`, as in the reason the project record gives a file another build checks, since every build is made
+// on the host's `GOOS` or `GOARCH` and its cgo.
 func normalize(stream string, root string) string {
 	lines := strings.SplitAfter(stream, "\n")
 	for index, line := range lines {
@@ -842,6 +844,7 @@ func normalize(stream string, root string) string {
 	normalized = cgoMillisecondsPattern.ReplaceAllString(normalized, "${1}0")
 	normalized = panicFramesPattern.ReplaceAllString(normalized, `, at <frames>"`)
 	normalized = buildTargetPattern.ReplaceAllString(normalized, `"target":"target"`)
+	normalized = checkedByBuildPattern.ReplaceAllString(normalized, `"reason":"checked by the target build"`)
 	return strings.ReplaceAll(normalized, hostTarget, " on host")
 }
 
