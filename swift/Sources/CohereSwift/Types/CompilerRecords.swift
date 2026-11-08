@@ -31,10 +31,14 @@ struct CompilerRecords {
      A restored file, one whose bytes are again the ones the build compiled though its time moved
      (`BuildInputSnapshot.changes(since:)`), is judged by the time the build saw it at, so the build's records
      still describe it, and a record older than that build is still stale.
+
+     A file in `answering`, by resolved path, is one a check in this process answers for: its records describe text
+     that has changed since, so neither their diagnostics nor their coverage count, and the caller adds that check's
+     own findings. Only the paths are needed, so the records can be read while that check still runs.
      */
     func read(
         targetDirectories: [(String, URL)],
-        answeredInProcess: [String: [FindingRecord]] = [:],
+        answering: Set<String> = [],
         restored: [String: Date] = [:],
     ) throws -> Reading {
         let reader = try SerializedDiagnosticsReader(
@@ -93,7 +97,7 @@ struct CompilerRecords {
                     guard let severity = diagnostic.severity else { continue }
                     let file = URL(fileURLWithPath: diagnostic.file).resolvingSymlinksInPath().path
                     /* A file sourcekitd just checked is answered by that check; its record describes text that has changed since. */
-                    guard ours[file] != nil, answeredInProcess[file] == nil else { continue }
+                    guard ours[file] != nil, !answering.contains(file) else { continue }
                     guard modified >= modifiedNow(file) else { continue }
                     let identity = "\(file):\(diagnostic.line):\(diagnostic.column):\(diagnostic.message)"
                     guard seen.insert(identity).inserted else { continue }
@@ -113,11 +117,9 @@ struct CompilerRecords {
             }
         }
 
-        findings.append(contentsOf: answeredInProcess.values.joined())
-
         /* Coverage: each file's own record, by stem, newer than the source as it stands, or a check in this process. */
         var withoutRecord: [String] = []
-        for file in files where answeredInProcess[file.url.resolvingSymlinksInPath().path] == nil {
+        for file in files where !answering.contains(file.url.resolvingSymlinksInPath().path) {
             let key = "\(file.targetName)/\(file.url.deletingPathExtension().lastPathComponent)"
             let sourceModified =
                 try restored[file.url.resolvingSymlinksInPath().path]
