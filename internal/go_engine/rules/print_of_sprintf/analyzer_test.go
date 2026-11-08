@@ -2,7 +2,6 @@ package print_of_sprintf
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -13,7 +12,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // staticcheck's own fixture for S1038, copied unchanged from simple/s1038/testdata/go1.0/CheckPrintSprintf into
@@ -23,36 +21,7 @@ import (
 // the house's fixtures do.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	fixture, absoluteError := filepath.Abs(filepath.Join(analysistest.TestData(), "src", "CheckPrintSprintf"))
-	if absoluteError != nil {
-		test.Fatal(absoluteError)
-	}
-	wants, readError := staticcheck_wants.Read(fixture)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	if len(wants) == 0 {
-		test.Fatal("the upstream fixture holds no notes, so the comparison proves nothing")
-	}
-	_, port := parity.Findings(test, s1038.Analyzer, Analyzer, analysistest.TestData(), "CheckPrintSprintf")
-	found := []staticcheck_wants.Finding{}
-	for _, each := range port {
-		// The wants name a file by its full path, and the findings by its path below testdata's src, the folder
-		// fixture sits in.
-		found = append(found, staticcheck_wants.Finding{
-			File: filepath.Join(filepath.Dir(fixture), filepath.FromSlash(each.File)), Line: each.Line,
-			Message: each.Message,
-		})
-	}
-	test.Logf("the fixture expects %d, the port found %d", len(wants), len(found))
-	unexpected, untaken := staticcheck_wants.Compare(wants, found)
-	for _, extra := range unexpected {
-		test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-			extra.Message)
-	}
-	for _, missing := range untaken {
-		test.Errorf("the port reported nothing matching %s", missing)
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "CheckPrintSprintf")
 }
 
 // The original and the port run in one checker over staticcheck's fixture and the house's two, parity holding every
