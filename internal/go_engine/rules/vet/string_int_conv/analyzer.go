@@ -2,21 +2,26 @@
 // byte nor a rune, which yields the UTF-8 encoding of the code point x, a string of one rune, where the writer most
 // likely meant x's decimal digits. A conversion to a type parameter, or of a value of one, is judged over the type
 // sets: it is reported when some type in the target's set is a string and some type in the source's set is such an
-// integer. A finding offers to format the number with fmt.Sprint, importing fmt where the file needs it, when neither
-// side is a type parameter and the source's type has no methods, and to convert the value to a rune first, when every
-// type in the source's set converts to one.
+// integer. A finding offers to format the number with fmt.Sprint, importing fmt where the file needs it, when each
+// side's set holds one type, the source's type has no methods, and the fix keeps the conversion's type, and to
+// convert the value to a rune first, when every type in the source's set converts to one.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/stringintconv/string.go, with the
 // helpers it calls from x/tools' internal packages (typeparams.StructuralTerms, typesinternal.TypeNameFor and
 // refactor.AddImport) translated beside it, and it reports the original's messages word for word, at the same
-// position, with the same suggested fixes, edit for edit. The registry runs the port in the original's place, and the
-// original stays the oracle: the parity tests beside this file run both over the same packages and compare findings
-// and fixes. The two agree everywhere, so there is no differences fixture.
+// position. Its suggested fixes are the original's, edit for edit, but in two places, where the port withholds the
+// original's "Format the number as a decimal" because applying it would be wrong. One is a conversion to a type
+// parameter whose one term is string, `AllString(x)`, which the fix would replace with `fmt.Sprint(x)`, a string, not
+// an AllString. The other is a value of a type parameter whose constraint gives it a String method, which fmt.Sprint
+// would print in place of the number; the original reads only the methods of the constraint's one term. The registry
+// runs the port in the original's place, and the original stays the oracle: the parity tests beside this file run
+// both over the same packages and compare findings and fixes, and the differences fixture pins each fix withheld.
 package string_int_conv
 
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
@@ -144,13 +149,29 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 
 	// Fix 1: format the number with fmt.Sprint, which works for any integer type where strconv.Itoa, FormatInt and
 	// FormatUint each take one, importing fmt as the file needs. A target that is not exactly string keeps its
-	// conversion around the formatted number. The fix is not offered where a type parameter is involved, whose many
-	// combinations differ subtly in the finding and the fix they want, nor for a source type with methods, since a
-	// String, GoString or Format method may change what fmt.Sprint prints.
-	if len(targetTypes) == 1 && len(sourceTypes) == 1 && types.NewMethodSet(sourceInteger).Len() == 0 {
+	// conversion around the formatted number. The original offers it only where each side's set holds one type, and
+	// the source's type has no methods, since a String, GoString or Format method may change what fmt.Sprint prints.
+	// The port withholds it in two more places, where it would be wrong: where `fmt.Sprint(x)` would replace a
+	// conversion whose type is not string, and where the value's type, a type parameter whose constraint has a
+	// String method, prints itself. A term of the constraint with a String method is passed over already: it is the
+	// one term, sourceInteger, whose methods the original's check reads. Every other suggestion is the original's.
+	if len(targetTypes) == 1 && len(sourceTypes) == 1 && types.NewMethodSet(sourceInteger).Len() == 0 &&
+		!types.Implements(sourceType, stringerInterface) {
 		prefix, importEdits := addImport(pass.TypesInfo, file, "fmt", "fmt", "Sprint", argument.Pos())
-		if types.Identical(targetString, types.Typ[types.String]) {
-			// `string(x)` becomes `fmt.Sprint(x)`.
+		switch {
+		case !types.Identical(targetString, types.Typ[types.String]):
+			// `mystring(x)` becomes `mystring(fmt.Sprint(x))`, which keeps the conversion and so its type.
+			diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
+				Message: "Format the number as a decimal",
+				TextEdits: append(importEdits,
+					analysis.TextEdit{Pos: call.Lparen + 1, End: call.Lparen + 1, NewText: []byte(prefix + "Sprint(")},
+					analysis.TextEdit{Pos: call.Rparen, End: call.Rparen, NewText: []byte(")")},
+				),
+			})
+		case types.Identical(pass.TypesInfo.TypeOf(call), types.Typ[types.String]):
+			// `string(x)` becomes `fmt.Sprint(x)`, a string as the conversion was. A conversion to a type parameter
+			// whose one term is string, `AllString(x)`, is not one, so the original's fix there would change the
+			// result's type, and the port does not offer it.
 			diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
 				Message: "Format the number as a decimal",
 				TextEdits: append(importEdits, analysis.TextEdit{
@@ -158,15 +179,6 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 					End:     call.Fun.End(),
 					NewText: []byte(prefix + "Sprint"),
 				}),
-			})
-		} else {
-			// `mystring(x)` becomes `mystring(fmt.Sprint(x))`.
-			diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
-				Message: "Format the number as a decimal",
-				TextEdits: append(importEdits,
-					analysis.TextEdit{Pos: call.Lparen + 1, End: call.Lparen + 1, NewText: []byte(prefix + "Sprint(")},
-					analysis.TextEdit{Pos: call.Rparen, End: call.Rparen, NewText: []byte(")")},
-				),
 			})
 		}
 	}
@@ -183,6 +195,15 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	}
 	pass.Report(diagnostic)
 }
+
+// stringerInterface is `interface{ String() string }`, fmt.Stringer's method set, built here so the port imports
+// nothing to name it: a value whose type implements it, a type parameter's through its constraint included, is
+// printed by fmt.Sprint with that method, not as a number.
+var stringerInterface = types.NewInterfaceType([]*types.Func{
+	types.NewFunc(token.NoPos, nil, "String", types.NewSignatureType(
+		nil, nil, nil, nil, types.NewTuple(types.NewVar(token.NoPos, nil, "", types.Typ[types.String])), false,
+	)),
+}, nil).Complete()
 
 // convertibleToRune is whether every one of candidates converts to a rune.
 func convertibleToRune(candidates []types.Type) bool {

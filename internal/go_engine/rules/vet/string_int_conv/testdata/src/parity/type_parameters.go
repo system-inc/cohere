@@ -57,16 +57,15 @@ func typeParameters[
 	sourceStrings SourceStrings, intersection Intersection, folded Folded, inner Inner, twice Twice,
 	methodical Methodical, comparableValue Comparable,
 ) {
+	// A conversion to AllString, a type parameter whose one term is string, of a value whose type has one term, and
+	// a value of Methodical, whose constraint has a String method, are in differences: the port withholds a fix there.
 	const untyped = 0
-	_ = AllString(number)
 	_ = AllString(letter)
 	_ = AllString(octet)
-	_ = AllString(count)
-	_ = AllString(width)
-	_ = AllString(untyped)
 	_ = NamedString(number)
 	_ = AliasString(number)
 	_ = MaybeString(number)
+	_ = MaybeString(untyped)
 	_ = MaybeString(count)
 	_ = MaybeString(maybe)
 	_ = string(maybe)
@@ -85,7 +84,6 @@ func typeParameters[
 	_ = AllString(folded)
 	_ = string(inner)
 	_ = string(twice)
-	_ = string(methodical)
 	_ = string(comparableValue)
 	_ = SourceInt(number)
 	_ = Folded(number)
@@ -102,7 +100,7 @@ func (box Box[Element, Index]) convert(number int) Element {
 	_ = string(box.index)
 	_ = Element(box.index)
 	_ = string(box.element)
-	return Element(number)
+	return Element(box.index) + Element(rune(number))
 }
 
 func instantiated(box Box[Text, Count]) {
