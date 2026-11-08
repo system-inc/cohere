@@ -30,7 +30,7 @@ const fileBasicInfoClass = 0
 // Windows allows and one an antivirus filter has no content to scan for.
 const fileReadAttributes = 0x80
 
-// unixEpochInFiletime is 1970-01-01 as a FILETIME.
+// unixEpochInFiletime is 1970-01-01 as a `FILETIME`.
 const unixEpochInFiletime = 116444736000000000
 
 var getFileInformationByHandleEx = syscall.NewLazyDLL("kernel32.dll").NewProc("GetFileInformationByHandleEx")
@@ -44,20 +44,26 @@ var getFileInformationByHandleEx = syscall.NewLazyDLL("kernel32.dll").NewProc("G
 // in another process's way. Either answers zero when Windows does not give it, and an input whose open
 // failed is then signed by its size and modification time alone, as on a platform with neither.
 func changeTimeAndInode(path string, information os.FileInfo) (changedNanoseconds int64, inode uint64) {
-	name, err := syscall.UTF16PtrFromString(path)
-	if err != nil {
+	name, encodeError := syscall.UTF16PtrFromString(path)
+	if encodeError != nil {
 		return 0, 0
 	}
-	handle, err := syscall.CreateFile(name, fileReadAttributes,
+	handle, createFileError := syscall.CreateFile(name, fileReadAttributes,
 		syscall.FILE_SHARE_READ|syscall.FILE_SHARE_WRITE|syscall.FILE_SHARE_DELETE, nil,
 		// Backup semantics is what lets CreateFile open a directory, which the run cache records too.
 		syscall.OPEN_EXISTING, syscall.FILE_FLAG_BACKUP_SEMANTICS, 0)
-	if err != nil {
+	if createFileError != nil {
 		return 0, 0
 	}
+	// Ignored: the handle was opened for attributes only and nothing is written through it, so closing it can
+	// lose nothing.
 	defer syscall.CloseHandle(handle)
 
 	var basic fileBasicInfo
+	// Ignored: Call's error only says why succeeded is zero, and a failed read leaves the change time zero, which
+	// is the answer then.
+	// Unsafe: the conversion sits in Call's own argument list, the form that keeps basic alive and in place until
+	// the call returns, and Windows writes no more than the size passed beside it.
 	if succeeded, _, _ := getFileInformationByHandleEx.Call(uintptr(handle), fileBasicInfoClass,
 		uintptr(unsafe.Pointer(&basic)), unsafe.Sizeof(basic)); succeeded != 0 {
 		changedNanoseconds = (basic.changeTime - unixEpochInFiletime) * 100

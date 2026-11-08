@@ -36,6 +36,17 @@ func mixedRepository(test *testing.T, swiftDirectory string) string {
 	return root
 }
 
+// outsideAnyRepository removes a fixture's `.git`, so a test can hold discovery to what it does inside one: the
+// Swift no project claims is a scripts-only root's either way, since the engine walks by the tree's own ignore files
+// outside a repository (#13nbb1s).
+func outsideAnyRepository(test *testing.T, root string) string {
+	test.Helper()
+	if removeError := os.Remove(filepath.Join(root, ".git")); removeError != nil {
+		test.Fatal(removeError)
+	}
+	return root
+}
+
 // A mixed repository is checked whole from its root: each project in its own section under its own
 // engine, one line per project, and one summary. The run is green only when both are, a Swift finding
 // turns it red, and its exit code is the one the failing project's own run gives.

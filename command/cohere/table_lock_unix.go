@@ -5,9 +5,15 @@ package main
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"syscall"
 	"time"
 )
+
+// tableLockPath is the lock in a cache table's directory.
+func tableLockPath(directory string) string {
+	return filepath.Join(directory, "table.lock")
+}
 
 // holdTableLock takes the table's lock exclusively, waiting for any other writer, and returns its release.
 // It returns a release that does nothing when the lock cannot be taken, since writing without it is what

@@ -5,7 +5,7 @@ import (
 	"unsafe"
 )
 
-// memoryStatus is Windows' MEMORYSTATUSEX, laid out field for field.
+// memoryStatus is Windows' `MEMORYSTATUSEX`, laid out field for field.
 type memoryStatus struct {
 	length                   uint32
 	memoryLoad               uint32
@@ -24,8 +24,10 @@ var globalMemoryStatus = syscall.NewLazyDLL("kernel32.dll").NewProc("GlobalMemor
 // cache as reclaimable.
 func availableMemory() (uint64, error) {
 	status := memoryStatus{length: uint32(unsafe.Sizeof(memoryStatus{}))}
-	if succeeded, _, err := globalMemoryStatus.Call(uintptr(unsafe.Pointer(&status))); succeeded == 0 {
-		return 0, err
+	// Unsafe: the conversion sits in Call's own argument list, the form that keeps status alive and in place until
+	// the call returns, and Windows writes no more than the length status gives, which is its own size.
+	if succeeded, _, callError := globalMemoryStatus.Call(uintptr(unsafe.Pointer(&status))); succeeded == 0 {
+		return 0, callError
 	}
 	return status.availablePhysical, nil
 }
