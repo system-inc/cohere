@@ -3,8 +3,10 @@ package parity
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -79,13 +81,22 @@ func (fixtures fixtureLoad) described() string {
 	return fmt.Sprint(fixtures.patterns)
 }
 
-// fileName is a file of the load as findings and records name it: its base name, after the pattern that named its
-// module when the load is one, since every version's module of staticcheck's fixtures holds a file of the same name.
-func (fixtures fixtureLoad) fileName(path string) string {
-	if fixtures.module == "" {
-		return filepath.Base(path)
+// fileName is a file of the load as findings, records and failures name it: its path below the fixtures' root, so
+// two files of one name in different folders never pair, as every version's folder of staticcheck's fixtures holds
+// one. The root is testdata's src in the tree, as `go1.0/CheckIneffectiveRandInt/CheckIneffectiveRandInt.go`, and
+// testdata itself when it is a module; in a module a pattern named, it is the module's folder, the path after that
+// pattern, as `module_one/inner/inner.go`. A file outside the root, as a related entry can name in the standard
+// library, keeps its path.
+func (fixtures fixtureLoad) fileName(file string) string {
+	root := fixtures.directory
+	if fixtures.module == "" && !isModule(fixtures.directory) {
+		root = filepath.Join(fixtures.directory, "src")
 	}
-	return filepath.ToSlash(filepath.Join(fixtures.module, filepath.Base(path)))
+	below, relativeError := filepath.Rel(root, file)
+	if relativeError != nil || strings.HasPrefix(below, "..") {
+		return filepath.ToSlash(file)
+	}
+	return path.Join(fixtures.module, filepath.ToSlash(below))
 }
 
 // loadedFixtures is one load's root packages, beside the load.

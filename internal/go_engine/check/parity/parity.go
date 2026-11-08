@@ -144,10 +144,10 @@ func LoadFailures(loadedPackages []*packages.Package) []Failure {
 }
 
 // Findings loads the fixture packages patterns name from testdata, runs original and port over them in one checker
-// for each load, and returns each one's findings, sorted, each in its file's base name, after its module's pattern in
-// a fixture module (see fixtureLoad). A load that found nothing, a fixture package that did not load clean, and an
-// analyzer that did not run on a fixture package each fail the test, since silence there would read as agreement. It
-// loads for the machine's own target, and Target.Findings for another.
+// for each load, and returns each one's findings, sorted, each file named by its path below the fixtures' root, after
+// its module's pattern in a fixture module (see fixtureLoad.fileName). A load that found nothing, a fixture package
+// that did not load clean, and an analyzer that did not run on a fixture package each fail the test, since silence
+// there would read as agreement. It loads for the machine's own target, and Target.Findings for another.
 func Findings(
 	test testing.TB,
 	original *analysis.Analyzer,

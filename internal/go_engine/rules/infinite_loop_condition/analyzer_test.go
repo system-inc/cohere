@@ -34,9 +34,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	_, port := parity.Findings(test, s1006.Analyzer, Analyzer, analysistest.TestData(), upstream)
 	found := []staticcheck_wants.Finding{}
 	for _, each := range port {
-		// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+		// The wants name a file by its full path, and the findings by its path below testdata's src.
 		found = append(found, staticcheck_wants.Finding{
-			File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+			File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
+			Message: each.Message,
 		})
 	}
 	test.Logf("the fixture expects %d, the port found %d", len(wants), len(found))

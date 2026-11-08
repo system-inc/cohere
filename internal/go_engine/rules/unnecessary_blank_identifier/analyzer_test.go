@@ -73,9 +73,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		original, port := parity.Findings(test, s1005.Analyzer, Analyzer, module(version), "./"+upstream)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below its module's folder.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("under %s the fixture expects %d, the original found %d, the port %d", version, len(wants),
@@ -119,7 +120,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("%s's golden file holds %d sections, one a fix's message, which this test does not read",
 				golden.file, len(archive.Files))
 		}
-		edits := editsIn(port, golden.file)
+		edits := editsIn(port, upstream+"/"+golden.file)
 		test.Logf("under %s in %s the port made %d edits", golden.version, golden.file, len(edits))
 		if len(edits) == 0 {
 			test.Fatalf("the port made no edit to %s, so the comparison proves nothing", golden.file)
@@ -245,7 +246,7 @@ func requireBothFixes(test *testing.T, original []parity.Finding) {
 	}
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below its module's folder.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

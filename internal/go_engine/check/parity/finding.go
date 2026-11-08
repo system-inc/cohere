@@ -13,9 +13,9 @@ import (
 // and the fixes it suggests. The engine writes every one of them into the finding's record, so a port that differs in
 // any of them differs in what the engine prints, and two findings are the same only when all of them are.
 //
-// File, and every file a related entry or an edit names, is the base name in the fixtures, whose findings are
-// compared with the comments of one package, and the path in Analyze's outcomes, where two packages can each hold a
-// file of the same name.
+// File, and every file a related entry or an edit names, is named in the fixtures by its path below their root, as
+// fixtureLoad.fileName names it, and is the path in Analyze's outcomes, since two packages can each hold a file of
+// the same name.
 type Finding struct {
 	File   string
 	Line   int

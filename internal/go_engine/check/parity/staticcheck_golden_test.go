@@ -40,7 +40,7 @@ func TestRequireStaticcheckGoldenFailsAnEditWhoseTextDiffers(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckGolden(recording, calling(sharedMessages, replacing("replace with kept", "other()")),
 			analysistest.TestData(), "golden_whole")
-	}), "where golden_whole.go.golden holds")
+	}), "where golden_whole/golden_whole.go.golden holds")
 }
 
 // A golden file no fix reaches is held all the same, so a port that offers none where the golden file holds one
@@ -59,10 +59,10 @@ func TestRequireStaticcheckGoldenFailsASectionEitherWay(test *testing.T) {
 		RequireStaticcheckGolden(recording, calling(sharedMessages, replacing("replace with kept", "kept()"),
 			replacing("replace with third", "kept()")), analysistest.TestData(), "golden_sections")
 	}),
-		`golden_sections.go.golden holds no section for the fix "replace with third" the port suggests in `+
-			"golden_sections",
-		`golden_sections.go.golden holds a section for the fix "replace with other", which the port never suggests `+
-			"in golden_sections",
+		`golden_sections/golden_sections.go.golden holds no section for the fix "replace with third" the port `+
+			"suggests in golden_sections",
+		`golden_sections/golden_sections.go.golden holds a section for the fix "replace with other", which the port `+
+			"never suggests in golden_sections",
 	)
 }
 
@@ -70,7 +70,8 @@ func TestRequireStaticcheckGoldenRefusesSectionsBesideAComment(test *testing.T) 
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckGolden(recording, keeping, analysistest.TestData(), "golden_commented")
-	}), "golden_commented.go.golden holds sections and a comment beside them, which staticcheck's testutil refuses")
+	}), "golden_commented/golden_commented.go.golden holds sections and a comment beside them, which "+
+		"staticcheck's testutil refuses")
 }
 
 // A fix in a file with no golden file fails, and fixtures with no golden file prove nothing.
@@ -79,7 +80,7 @@ func TestRequireStaticcheckGoldenFailsAFixWithNoGoldenFile(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckGolden(recording, keeping, analysistest.TestData(), "same")
 	}),
-		"same.go: the port's fixes in same edit it, and it has no golden file",
+		"same/same.go: the port's fixes in same edit it, and it has no golden file",
 		"the fixtures hold no golden file, so the comparison proves nothing",
 	)
 }

@@ -60,9 +60,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		original, port := parity.Findings(test, s1002.Analyzer, Analyzer, analysistest.TestData(), upstream.pattern)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range distinct(port) {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below testdata's src.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("in %s the fixture expects %d, the original found %d, the port %d", upstream.pattern, len(wants),
@@ -101,7 +102,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("%s's golden file holds %d sections, one a fix's message, which this test does not read",
 				upstream.file, len(archive.Files))
 		}
-		edits := editsIn(distinct(port), upstream.file)
+		edits := editsIn(distinct(port), upstream.pattern+"/"+upstream.file)
 		test.Logf("in %s the port found %d, with %d edits", upstream.file, len(distinct(port)), len(edits))
 		if len(edits) == 0 {
 			test.Fatalf("the port made no edit to %s, so the comparison proves nothing", upstream.file)
@@ -229,7 +230,12 @@ func fixedErrors(test *testing.T, findings []parity.Finding) []string {
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		overlay[name] = applied(test, filepath.Base(name), source, editsIn(findings, filepath.Base(name)))
+		// The findings name a file by its path below testdata's src.
+		below, relativeError := filepath.Rel(filepath.Join(directory, "src"), name)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		overlay[name] = applied(test, filepath.Base(name), source, editsIn(findings, filepath.ToSlash(below)))
 	}
 	// The fixtures are a tree laid out by import path, loaded as the harness loads one.
 	loaded, loadError := load.PackagesWithOverlay(directory, []string{differences}, []string{
@@ -292,7 +298,7 @@ func editTexts(finding parity.Finding) []string {
 	return texts
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below testdata's src.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

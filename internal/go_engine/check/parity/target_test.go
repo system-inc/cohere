@@ -19,13 +19,13 @@ var (
 func TestFindingsLoadsForTheTargetNamed(test *testing.T) {
 	test.Parallel()
 	originalFindings, portFindings := on386.Findings(test, original, port, analysistest.TestData(), "targeted")
-	wanted := []Finding{{File: "narrow.go", Line: 6, Column: 2, Message: "call to shared"}}
+	wanted := []Finding{{File: "targeted/narrow.go", Line: 6, Column: 2, Message: "call to shared"}}
 	if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
 		test.Errorf("for 386 the original found %v and the port %v, want %v from each", originalFindings,
 			portFindings, wanted)
 	}
 	originalFindings, portFindings = onAmd64.Findings(test, original, port, analysistest.TestData(), "targeted")
-	wantedOriginal := []Finding{{File: "wide.go", Line: 6, Column: 2, Message: "call to lost"}}
+	wantedOriginal := []Finding{{File: "targeted/wide.go", Line: 6, Column: 2, Message: "call to lost"}}
 	if !reflect.DeepEqual(originalFindings, wantedOriginal) || len(portFindings) != 0 {
 		test.Errorf("for amd64 the original found %v and the port %v, want %v and nothing", originalFindings,
 			portFindings, wantedOriginal)
@@ -41,7 +41,7 @@ func TestRequireIdenticalLoadsForTheTargetNamed(test *testing.T) {
 	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireIdentical(recording, original, port, analysistest.TestData(), "targeted")
-	}), "the original found wide.go:6:2: call to lost, and the port did not")
+	}), "the original found targeted/wide.go:6:2: call to lost, and the port did not")
 }
 
 // The note is on narrow.go, so the machine's own target builds no noted file.
@@ -63,7 +63,8 @@ func TestRequireOnlyAdjudicatedLoadsForTheTargetNamed(test *testing.T) {
 	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "targeted_adjudicated")
-	}), "the fixture records that the port alone finds narrow.go:7:0: call to gained, and it does not")
+	}), "the fixture records that the port alone finds targeted_adjudicated/narrow.go:7:0: call to gained, and it "+
+		"does not")
 }
 
 // The golden file is narrow.go's, so the machine's own target holds none.
@@ -90,7 +91,7 @@ func TestRequirePortWhereOriginalPanicsLoadsForTheTargetNamed(test *testing.T) {
 			"targeted_panicking")
 	}),
 		"the original no longer panics on 1 of the 1 packages of targeted_panicking",
-		"the fixture records that the port finds narrow.go:8:0: call to gained, and it does not",
+		"the fixture records that the port finds targeted_panicking/narrow.go:8:0: call to gained, and it does not",
 	)
 }
 

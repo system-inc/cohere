@@ -13,15 +13,15 @@ import (
 // two again.
 var despiteListed = []LoadError{
 	{
-		Position: "despite.go:12:17",
+		Position: "despite/despite.go:12:17",
 		Message:  `cannot use "many" (untyped string constant) as int value in variable declaration`,
 	},
 	{
-		Position: "despite.go:14:17",
+		Position: "despite/despite.go:14:17",
 		Message:  `cannot use "many" (untyped string constant) as int value in variable declaration`,
 	},
 	{
-		Position: "despite_test.go:3:19",
+		Position: "despite/despite_test.go:3:19",
 		Message:  "cannot use 1 (untyped int constant) as bool value in variable declaration",
 	},
 }
@@ -49,8 +49,8 @@ func TestRequireIdenticalDespiteLoadErrorsFailsAnUnlistedError(test *testing.T) 
 		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, analysistest.TestData(),
 			despiteListed[:2], "despite")
 	}),
-		"the fixture packages load with despite_test.go:3:19: cannot use 1 (untyped int constant) as bool value in "+
-			"variable declaration, which is not listed",
+		"the fixture packages load with despite/despite_test.go:3:19: cannot use 1 (untyped int constant) as bool "+
+			"value in variable declaration, which is not listed",
 		"the fixture packages do not fail as listed",
 	)
 }
@@ -59,14 +59,14 @@ func TestRequireIdenticalDespiteLoadErrorsFailsAnUnlistedError(test *testing.T) 
 // is a multiset.
 func TestRequireIdenticalDespiteLoadErrorsFailsAListedErrorThatDoesNotLoad(test *testing.T) {
 	test.Parallel()
-	absent := LoadError{Position: "despite.go:8:2", Message: "undefined: shared"}
+	absent := LoadError{Position: "despite/despite.go:8:2", Message: "undefined: shared"}
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, analysistest.TestData(),
 			slices.Concat(despiteListed, []LoadError{absent, despiteListed[0]}), "despite")
 	}),
-		"the list holds despite.go:8:2: undefined: shared, and the fixture packages do not load with it",
-		`the list holds despite.go:12:17: cannot use "many" (untyped string constant) as int value in variable `+
-			"declaration, and the fixture packages do not load with it",
+		"the list holds despite/despite.go:8:2: undefined: shared, and the fixture packages do not load with it",
+		`the list holds despite/despite.go:12:17: cannot use "many" (untyped string constant) as int value in `+
+			"variable declaration, and the fixture packages do not load with it",
 		"the fixture packages do not fail as listed",
 	)
 }
@@ -101,10 +101,10 @@ func TestRequireIdenticalDespiteLoadErrorsComparesTheFindings(test *testing.T) {
 		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, despiteErrors(calling(nil)),
 			analysistest.TestData(), despiteListed, "despite")
 	}),
-		"the original found despite.go:8:2: call to shared, and the port did not",
-		"the original found despite.go:8:2: call to shared, and the port did not",
-		"the original found despite.go:9:2: call to shared, and the port did not",
-		"the original found despite.go:9:2: call to shared, and the port did not",
+		"the original found despite/despite.go:8:2: call to shared, and the port did not",
+		"the original found despite/despite.go:8:2: call to shared, and the port did not",
+		"the original found despite/despite.go:9:2: call to shared, and the port did not",
+		"the original found despite/despite.go:9:2: call to shared, and the port did not",
 	)
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireIdenticalDespiteLoadErrors(recording, despiteErrors(calling(nil)), portDespiteErrors,
@@ -132,12 +132,12 @@ func TestRequireIdenticalDespiteLoadErrorsFailsAnAnalyzerThatDidNotRun(test *tes
 // the end of a file that ends inside a function.
 var (
 	despiteAgainListed = LoadError{
-		Position: "despite_again.go:11:17",
+		Position: "despite_again/despite_again.go:11:17",
 		Message:  "cannot use 1 (untyped int constant) as bool value in variable declaration",
 	}
 	truncatedListed = []LoadError{
-		{Position: "truncated.go:7:11", Message: "expected ';', found 'EOF'"},
-		{Position: "truncated.go:7:11", Message: "expected '}', found 'EOF'"},
+		{Position: "truncated/truncated.go:7:11", Message: "expected ';', found 'EOF'"},
+		{Position: "truncated/truncated.go:7:11", Message: "expected '}', found 'EOF'"},
 	}
 )
 

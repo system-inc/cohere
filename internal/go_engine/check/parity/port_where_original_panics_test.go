@@ -60,7 +60,7 @@ func TestRequirePortWhereOriginalPanicsFailsAMissingFinding(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), calling(sharedMessages),
 			analysistest.TestData(), "panicking")
-	}), "the fixture records that the port finds panicking.go:14:0: call to gained, and it does not")
+	}), "the fixture records that the port finds panicking/panicking.go:14:0: call to gained, and it does not")
 }
 
 // A port that finds what no record holds fails on that finding.
@@ -70,7 +70,7 @@ func TestRequirePortWhereOriginalPanicsFailsAnExtraFinding(test *testing.T) {
 		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), calling(map[string]string{
 			"panics": "call to panics", "shared": "call to shared", "gained": "call to gained",
 		}), analysistest.TestData(), "panicking")
-	}), "the port found panicking.go:12:0: call to panics, which the fixture does not record")
+	}), "the port found panicking/panicking.go:12:0: call to panics, which the fixture does not record")
 }
 
 // An original that runs over the fixture no longer panics there, and the fixture belongs to a comparison.
@@ -114,7 +114,7 @@ func TestRequirePortWhereOriginalPanicsFailsARecordWithNoReason(test *testing.T)
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
 			"panicking_unreasoned")
-	}), "panicking_unreasoned.go:10 holds a record with no reason")
+	}), "panicking_unreasoned/panicking_unreasoned.go:10 holds a record with no reason")
 }
 
 // A record of any kind but `finds:` is refused, since the original makes no finding there for it to cover.
@@ -123,6 +123,6 @@ func TestRequirePortWhereOriginalPanicsRefusesARecordOtherThanFinds(test *testin
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequirePortWhereOriginalPanics(recording, panicking(originalMessages), port, analysistest.TestData(),
 			"panicking_renamed")
-	}), "panicking_renamed.go:11 records `renames:`, and where the original panics it finds nothing for the record to "+
-		"cover")
+	}), "panicking_renamed/panicking_renamed.go:11 records `renames:`, and where the original panics it finds "+
+		"nothing for the record to cover")
 }

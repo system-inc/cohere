@@ -111,9 +111,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		original, port := parity.Findings(test, s1025.Analyzer, Analyzer, module(version), "./"+upstream)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below its module's folder.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("under %s the fixture expects %d, the original found %d, the port %d", version, len(wants),
@@ -159,7 +160,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("the %s golden file holds %d sections, one a fix's message, which this test does not read",
 				version, len(archive.Files))
 		}
-		edits := editsIn(port, upstreamFile)
+		edits := editsIn(port, upstream+"/"+upstreamFile)
 		edited += len(edits)
 		test.Logf("under %s the port found %d, with %d edits", version, len(port), len(edits))
 		fixed := applied(test, upstreamFile, source, edits)
@@ -273,7 +274,8 @@ func TestPortMovedFixesCompile(test *testing.T) {
 			return portFinding.File == originalFinding.File && portFinding.Line == originalFinding.Line &&
 				portFinding.Message == originalFinding.Message
 		})
-		if !isShared || originalFinding.File == regroupedFile {
+		// The findings name a file by its path below testdata's src.
+		if !isShared || originalFinding.File == "differences/"+regroupedFile {
 			continue
 		}
 		parted++
@@ -311,12 +313,13 @@ func TestPortMovedFixesKeepTheirMeaning(test *testing.T) {
 		{name: "original", found: original, expected: "return first + second[1:]"},
 	} {
 		inFile := slices.DeleteFunc(slices.Clone(side.found), func(finding parity.Finding) bool {
-			return finding.File != regroupedFile
+			// The findings name a file by its path below testdata's src.
+			return finding.File != "differences/"+regroupedFile
 		})
 		if len(inFile) != 1 {
 			test.Fatalf("the %s finds %d in %s, where it holds the move alone", side.name, len(inFile), regroupedFile)
 		}
-		edits := editsIn(inFile, regroupedFile)
+		edits := editsIn(inFile, "differences/"+regroupedFile)
 		if len(edits) != 1 {
 			test.Fatalf("the %s makes %d edits to %s, where the move is one", side.name, len(edits), regroupedFile)
 		}
@@ -390,7 +393,12 @@ func fixedErrors(test *testing.T, files []string, findings []parity.Finding) []s
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		overlay[file] = applied(test, filepath.Base(file), source, editsIn(findings, filepath.Base(file)))
+		// The findings name a file by its path below testdata's src.
+		below, relativeError := filepath.Rel(filepath.Join(directory, "src"), file)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		overlay[file] = applied(test, filepath.Base(file), source, editsIn(findings, filepath.ToSlash(below)))
 	}
 	// The fixtures are a tree laid out by import path, loaded as the harness loads one.
 	loaded, loadError := load.PackagesWithOverlay(directory, differencesFixtures, []string{
@@ -411,7 +419,7 @@ func fixedErrors(test *testing.T, files []string, findings []parity.Finding) []s
 	return errors
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below its module's folder.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {
