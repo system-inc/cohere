@@ -57,8 +57,9 @@ var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => 
 // Over the differences fixture the two disagree, and only where each disagreement was adjudicated in the port's
 // favour: every finding the port alone makes is recorded on its line, as found or as a renaming, every finding the
 // original alone makes is recorded as dropped or as the original's side of a renaming, and every record is matched.
-// A finding the original makes and the port does not, unrecorded, fails, since the port drops only what was ruled
-// false.
+// A record stands for exactly one finding on its own line with exactly its message, so two findings on one line need
+// two records. A finding the original makes and the port does not, unrecorded, fails, since the port drops only what
+// was ruled false, and so does a recorded drop the port does not make.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	original, port := findingsOf(test, "differences")
@@ -82,7 +83,8 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 }
 
 // adjudicatedIn reads the records of one file of the differences fixture: the findings each says the port alone
-// makes, and those it says the original alone makes.
+// makes, and those it says the original alone makes. A line holding records must follow a comment line that is not
+// one, the reason for them, so no adjudication goes unexplained.
 func adjudicatedIn(test *testing.T, path string) (port []finding, original []finding) {
 	test.Helper()
 	name := filepath.Base(path)
@@ -94,8 +96,16 @@ func adjudicatedIn(test *testing.T, path string) (port []finding, original []fin
 		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
 	}()
 	scanner := bufio.NewScanner(file)
+	// previous is the line before the one being read, which must give the reason for any record on it.
+	previous := ""
 	for line := 1; scanner.Scan(); line++ {
-		for _, comment := range strings.Split(scanner.Text(), "// port ")[1:] {
+		comments := strings.Split(scanner.Text(), "// port ")[1:]
+		reason := strings.TrimSpace(previous)
+		if len(comments) > 0 && (!strings.HasPrefix(reason, "//") || strings.Contains(reason, "// port ")) {
+			test.Fatalf("%s:%d holds a record with no reason on the line above it", name, line)
+		}
+		previous = scanner.Text()
+		for _, comment := range comments {
 			match := adjudicatedPattern.FindStringSubmatch(comment)
 			switch {
 			case match == nil:
