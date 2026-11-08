@@ -8,6 +8,9 @@ import "net/http"
 // Client is net/http's client, reached from a package that does not import net/http.
 var Client = &http.Client{}
 
+// Last is a response a package that dot-imports this one assigns.
+var Last *http.Response
+
 // Get returns a response and an error as net/http's Get does.
 func Get(url string) (*http.Response, error) {
 	return http.Get(url)

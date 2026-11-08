@@ -6,11 +6,17 @@
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/httpresponse/httpresponse.go,
 // whose logic it keeps and whose messages it reports word for word, at the same position. The original walks with
 // the inspector's stack to find the statement list a call sits in; the port climbs from the call with the inspector's
-// public cursor instead, visiting the same calls in the same order and reading the same statements. Like the
-// original, it holds the deferred call's root to the response's name by the parser's resolution of the two, not the
-// type checker's, so it finds every match the original finds, two unresolved names among them. The registry runs the
-// port in the original's place, and the original stays the oracle: the parity tests beside this file run both over
-// the same packages. The two agree everywhere, so there is no differences fixture.
+// public cursor instead, visiting the same calls in the same order and reading the same statements. The registry runs
+// the port in the original's place, and the original stays the oracle: the parity tests beside this file run both
+// over the same packages.
+//
+// The two differ in one judgment only, each case in testdata/src/differences and held by
+// TestPortDiffersFromOriginalOnlyWhereItIsRight. The original holds the deferred call's root to the response's name
+// by the parser's resolution of the two, under which every name the parser leaves unresolved is nil and so the same
+// as every other: `_` assigned with `=`, a package-level variable declared in another file, an imported package's
+// name, a dot import's and a predeclared function's. It reports `defer log.Println()` after `_, err = http.Get(url)`
+// as a use of `_`, a finding that is false. The port compares the objects the type checker gives the two names, so
+// it drops those findings and keeps every one where the two are the same variable, resolved by the parser or not.
 package http_response
 
 import (
@@ -94,11 +100,15 @@ func run(pass *analysis.Pass) (any, error) {
 		if receiver == nil {
 			continue
 		}
-		// The two names are the same variable by the parser's resolution, as the original judges them, and not by
-		// the type checker's: two names the parser left unresolved, such as a package-level variable declared in
-		// another file and an imported package's name, both hold nil and count as the same, so judging by
-		// TypesInfo's objects would miss what the original finds.
-		if response.Obj == receiver.Obj {
+		// The two names are judged by the objects the type checker gives them, where the original compares the
+		// parser's: two names the parser left unresolved, such as `_` assigned with `=`, a package-level variable
+		// declared in another file, an imported package's name or a predeclared function, both hold nil there and
+		// count as one, so `defer log.Println()` after `_, err = http.Get(url)` was reported as a use of `_`. A name
+		// with no object, `_` assigned with `=`, is never the same as another. Two names without objects would match
+		// without the nil check, but a deferred call's root always denotes something in a package that type-checks,
+		// so no fixture can make that check fire; it is kept so a pair of unknowns is never taken for one variable.
+		responseObject := pass.TypesInfo.ObjectOf(response)
+		if responseObject != nil && responseObject == pass.TypesInfo.ObjectOf(receiver) {
 			pass.ReportRangef(receiver, "using %s before checking for errors", response.Name)
 		}
 	}

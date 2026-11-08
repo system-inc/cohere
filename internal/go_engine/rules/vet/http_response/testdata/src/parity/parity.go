@@ -252,22 +252,19 @@ func otherRoots(url string) {
 	}
 }
 
-// Names compared by the parser's resolution: the blank identifier assigned with `=` is unresolved, and so is an
-// imported package's name, and the two count as one. The blank identifier declared with `:=` is resolved, to an
-// object of its own.
+// The blank identifier declared with `:=` is an object of its own, the same as no other name. Assigned with `=`, it
+// has no object, and differences.go holds that case, which the original reports.
 func blankTargets(url string) {
-	var err error
-	_, err = http.Get(url)
-	defer log.Println("deferred") // reported
 	_, declared := http.Get(url)
 	defer log.Println("deferred")
-	if err != nil || declared != nil {
-		log.Fatal(err)
+	if declared != nil {
+		log.Fatal(declared)
 	}
 }
 
-// A package-level variable declared in this file is resolved, and one declared in another file is not, so with an
-// unresolved name in the defer it counts as one, and so does a predeclared function's name.
+// A package-level variable is the same variable in the defer, whether declared in this file, which the parser
+// resolves, or in another, which it leaves unresolved, and is reported either way. Beside an imported package's name
+// it is not; differences.go holds the unresolved cases the original reports.
 var sameFile *http.Response
 
 func packageLevel(url string) {
@@ -277,11 +274,22 @@ func packageLevel(url string) {
 	sameFile, err = http.Get(url)
 	defer sameFile.Body.Close() // reported
 	otherFile, err = http.Get(url)
-	defer os.Exit(1) // reported
-	otherFile, err = http.Get(url)
 	defer otherFile.Body.Close() // reported
-	otherFile, err = http.Get(url)
-	defer panic(err) // reported
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// A type switch's variable is an object of each clause, the same throughout a block within the clause.
+func typeSwitch(url string, value any) {
+	var err error
+	switch held := value.(type) {
+	case *holder:
+		{
+			held.response, err = http.Get(url)
+			defer held.response.Body.Close() // reported
+		}
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
