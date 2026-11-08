@@ -90,6 +90,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -196,6 +197,7 @@ var ports = map[string]*analysis.Analyzer{
 	"slog":         slog.Analyzer,
 	"sqlrowserr":   sql_rows_err.Analyzer,
 	"stdmethods":   std_methods.Analyzer,
+	"structtag":    struct_tag.Analyzer,
 }
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
