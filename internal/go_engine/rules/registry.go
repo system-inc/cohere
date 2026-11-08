@@ -288,7 +288,7 @@ var ports = map[string]port{
 	"cgocall":          {analyzer: cgo_call.Analyzer},
 	"composites":       {analyzer: composite.Analyzer},
 	"copylocks":        {analyzer: copy_lock.Analyzer},
-	"defers":           {analyzer: defers.Analyzer},
+	"defers":           {analyzer: defers.Analyzer, listener: &defers.Listener},
 	"directive":        {analyzer: directive.Analyzer},
 	"errorsas":         {analyzer: errors_as.Analyzer},
 	"framepointer":     {analyzer: frame_pointer.Analyzer},
