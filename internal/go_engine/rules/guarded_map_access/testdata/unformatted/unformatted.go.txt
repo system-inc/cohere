@@ -1,0 +1,25 @@
+package unformatted
+
+// gofmt strips the parentheses around an if's condition, which the pattern looks through, so both report these.
+func guards(m map[string]int, k string) {
+	if _, ok := m[k]; (ok) {
+		m[k]++
+	} else {
+		m[k] = 1
+	}
+	if _, ok := m[k]; ((ok)) {
+		m[k] += 2
+	} else {
+		m[k] = 2
+	}
+	if _, ok := m[k]; (!ok) {
+		m[k]++
+	} else {
+		m[k] = 1
+	}
+	if _, ok := ((m[k])); (ok) {
+		((m[k]))++
+	} else {
+		m[k] = ((1))
+	}
+}

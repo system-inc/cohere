@@ -851,6 +851,7 @@ var portedPasses = []string{
 	"errors_new_of_sprintf",
 	"extreme_comparison",
 	"guarded_delete",
+	"guarded_map_access",
 	"http_status_literal",
 	"identical_operands",
 	"impossible_target_comparison",
