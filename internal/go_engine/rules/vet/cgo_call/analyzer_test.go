@@ -40,11 +40,9 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 		"parity", "runtimecgo")
 }
 
-// illTypedLoadErrors are the errors the parity fixtures that hold type errors on purpose load with, each one the
-// fixture is written for. illtyped's are the type checker refusing each address its Untyped takes, of a map's element
-// as the cgo tool rewrites the map, of a call's result, and of a name never declared. faked's one is the cgo tool
-// failing on the header it includes, which does not exist, named at no position since go list reports it for the
-// package; its words are the C compiler's, clang's here.
+// illTypedLoadErrors are the errors the illtyped fixture loads with, each one it is written for: the type checker
+// refusing each address its Untyped takes, of a map's element as the cgo tool rewrites the map, of a call's result,
+// and of a name never declared.
 var illTypedLoadErrors = []parity.LoadError{
 	{
 		Position: "illtyped/illtyped.go:15:25",
@@ -74,21 +72,42 @@ var illTypedLoadErrors = []parity.LoadError{
 		Message: `invalid operation: cannot take address of (*_cgoIndex1)["key"] (map index expression of type ` +
 			`[]int)`,
 	},
-	{
-		Position: "",
-		Message: `# faked src/faked/faked.go:6:11: fatal error: 'missing.h' file not found 6 | #include ` +
-			`"missing.h" | ^~~~~~~~~~~ 1 error generated.`,
-	},
 }
 
-// Over the parity fixtures that hold type errors on purpose, the original and the port find the same findings, each
-// the same in every field: illtyped, one whose type errors leave an address untyped beside a typed value, and faked,
-// one the cgo tool fails on, so the load type-checks it from its files as written with package "C" faked.
-func TestPortMatchesOriginalOverIllTypedFixtures(test *testing.T) {
+// Over illtyped, a parity fixture whose type errors leave an address untyped beside a typed value, the original and
+// the port find the same findings, each the same in every field.
+func TestPortMatchesOriginalOverIllTypedFixture(test *testing.T) {
 	test.Parallel()
 	cgo_testing.RequireTranslation(test)
 	parity.RequireIdenticalDespiteLoadErrors(test, cgocall.Analyzer, Analyzer, analysistest.TestData(),
-		illTypedLoadErrors, "illtyped", "faked")
+		illTypedLoadErrors, "illtyped")
+}
+
+// Over faked, a parity fixture the cgo tool fails on, so the load type-checks it from its files as written with
+// package "C" faked, the original and the port find the same findings, each the same in every field, and the original
+// runs on it without failing.
+//
+// RequireIdenticalDespiteLoadErrors would list faked's one load error exactly, and that error is the C compiler's own
+// text, failing on the header the fixture includes, which does not exist: clang and gcc word it differently, so a
+// list that pins either would fail on a box with the other. So this tier keeps its own load, which holds the fixture
+// to failing to load without reading the words, and compares through the harness's Analyze and Difference.
+func TestPortMatchesOriginalOverFakedFixture(test *testing.T) {
+	test.Parallel()
+	cgo_testing.RequireTranslation(test)
+	outcome := illTypedOutcome(test, "faked")
+	test.Logf("the original found %d, the port %d", len(outcome.Original.Findings), len(outcome.Port.Findings))
+	for _, failure := range outcome.Original.Failures {
+		test.Errorf("the original failed on %s: %s", failure.Package, failure.Error)
+	}
+	if len(outcome.Original.Findings) == 0 {
+		test.Fatal("the original found nothing in the fixture, so the comparison proves nothing")
+	}
+	for _, missing := range parity.Difference(outcome.Original.Findings, outcome.Port.Findings) {
+		test.Errorf("the original found %s, and the port did not", missing)
+	}
+	for _, extra := range parity.Difference(outcome.Port.Findings, outcome.Original.Findings) {
+		test.Errorf("the port found %s, and the original did not", extra)
+	}
 }
 
 // adjudicatedPattern is one comment in the differences fixture, the message after its `// port finds: ` opening, of
@@ -170,9 +189,10 @@ var recoveringOriginal = func() *analysis.Analyzer {
 	return &recovering
 }()
 
-// illTypedOutcome loads the fixture packages patterns name, each of which must hold type errors, so it proves the
-// path it was written for, and runs the recovering original and the port over them in one checker, through the
-// harness's Analyze, each side's findings in their files' base names. The port failing on one fails the test.
+// illTypedOutcome loads the fixture packages patterns name, each of which must load with errors, a type error or the
+// cgo tool's failure, so it proves the path it was written for, and runs the recovering original and the port over
+// them in one checker, through the harness's Analyze, each side's findings in their files' base names. The port
+// failing on one fails the test.
 func illTypedOutcome(test *testing.T, patterns ...string) parity.Outcome {
 	test.Helper()
 	directory := analysistest.TestData()
@@ -186,8 +206,8 @@ func illTypedOutcome(test *testing.T, patterns ...string) parity.Outcome {
 	if len(loaded.Roots) != len(patterns) {
 		test.Fatalf("loading %v found %d packages, expected one a pattern", patterns, len(loaded.Roots))
 	}
-	// Both run despite type errors, so a fixture that does not type-check is still compared, and each of these must
-	// not, since one that loads clean would not prove the path it was written for.
+	// Both run despite errors, so a fixture that does not load clean is still compared, and each of these must not,
+	// since one that loads clean would not prove the path it was written for.
 	failed := parity.LoadFailures(loaded.Roots)
 	for _, root := range loaded.Roots {
 		if !slices.ContainsFunc(failed, func(failure parity.Failure) bool { return failure.Package == root.ID }) {
