@@ -9,9 +9,17 @@
 // go/analysis/passes/testinggoroutine/testinggoroutine.go and util.go, whose logic it keeps and whose messages it
 // reports word for word, at the same position. The registry runs the port in the original's place, and the original
 // stays the oracle: the parity tests beside this file run both over the same packages, with the subtest flag on and
-// off. The two agree everywhere, so there is no differences fixture. The one change is that the original's unchecked
-// assertion on a parameter's type, which panics on a parameter typed `*a.b.T`, is checked here; such a parameter
-// does not type-check, and the checker runs neither on a package that does not.
+// off, and agree there.
+//
+// They differ in one place, where the port is right (#x1m1wtm), and the differences fixture records each finding it
+// changes. A go statement's call arguments, and a t.Run's name, are evaluated by the goroutine executing the
+// statement, not the one it starts, so the port judges them as part of the region enclosing the statement: a
+// forbidden call there is the test's own when that is the test itself, and goes unreported, and is reported against
+// the enclosing goroutine when the statement is in a region of its own. The original judges them with the region the
+// statement starts. A function literal an argument hands over, rather than calls in place, stays with the started
+// region, as in the original, since the started goroutine is what is likely to call it. The other change is that the
+// original's unchecked assertion on a parameter's type, which panics on a parameter typed `*a.b.T`, is checked here;
+// such a parameter does not type-check, and the checker runs neither on a package that does not.
 package testing_goroutine
 
 import (
@@ -112,30 +120,7 @@ func run(pass *analysis.Pass) (any, error) {
 	// Each forbidden call within a region, which includes the region being a `go t.Fatal()` itself, is judged once for
 	// each call that starts the region.
 	for _, region := range regions {
-		ast.Inspect(region, func(node ast.Node) bool {
-			if node == region {
-				// The region itself is always descended into.
-				return true
-			}
-			if startedAt[node] != nil {
-				// A region within this one is judged on its own.
-				return false
-			}
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall {
-				return true
-			}
-			receiver, selection, method := forbiddenMethod(pass.TypesInfo, call)
-			if receiver == nil {
-				return true
-			}
-			for _, started := range startedAt[region] {
-				if !withinScope(started.scope, receiver) {
-					report(pass, started, call, receiver, formatMethod(selection, method))
-				}
-			}
-			return true
-		})
+		judge(pass, region, startedAt)
 	}
 	return nil, nil
 }

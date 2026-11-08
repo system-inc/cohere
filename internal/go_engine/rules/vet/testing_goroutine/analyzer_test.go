@@ -3,8 +3,11 @@ package testing_goroutine
 import (
 	"cmp"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -76,6 +79,87 @@ func compareWithOriginal(test *testing.T) {
 	for _, extra := range difference(port, original) {
 		test.Errorf("the port found %s, and the original did not", described(extra))
 	}
+}
+
+// adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
+// the message of a finding only the port makes, `renames:`, the original's message, `=>` and the port's, for a finding
+// both make at one place in words that differ, or `drops:` and the message of a finding only the original makes,
+// which is wrong.
+var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?))\s*$`)
+
+// Over the differences fixture the two disagree, and only where each disagreement was adjudicated in the port's
+// favour: every finding the port alone makes is recorded on its line, as found or as a renaming, every finding the
+// original alone makes is recorded on its line, as dropped or as the original's side of a renaming, every record is
+// matched, and every record has its reason in a comment on the line above. A finding the original makes and the port
+// does not, unrecorded, fails, since the port is never worse than the original.
+func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
+	test.Parallel()
+	original, port := findingsOf(test, "differences")
+	test.Logf("the original found %d, the port %d", len(original), len(port))
+	expectedPort := []finding{}
+	expectedOriginal := []finding{}
+	path := filepath.Join(analysistest.TestData(), "src", "differences", "differences.go")
+	content, readError := os.ReadFile(path)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	lines := strings.Split(string(content), "\n")
+	for index, text := range lines {
+		line := index + 1
+		comments := strings.Split(text, "// port ")[1:]
+		if len(comments) > 0 && (index == 0 || !strings.HasPrefix(strings.TrimSpace(lines[index-1]), "//")) {
+			test.Errorf("differences.go:%d records a difference with no reason on the line above", line)
+		}
+		for _, comment := range comments {
+			match := adjudicatedPattern.FindStringSubmatch(comment)
+			switch {
+			case match == nil:
+				test.Fatalf("differences.go:%d holds a comment the test cannot read: %q", line, comment)
+			case match[1] != "":
+				expectedPort = append(expectedPort, finding{file: "differences.go", line: line, message: match[1]})
+			case match[4] != "":
+				expectedOriginal = append(
+					expectedOriginal, finding{file: "differences.go", line: line, message: match[4]},
+				)
+			default:
+				expectedOriginal = append(
+					expectedOriginal, finding{file: "differences.go", line: line, message: match[2]},
+				)
+				expectedPort = append(expectedPort, finding{file: "differences.go", line: line, message: match[3]})
+			}
+		}
+	}
+	if len(expectedPort)+len(expectedOriginal) == 0 {
+		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
+	}
+	test.Logf("the fixture records %d findings only the port makes and %d only the original makes",
+		len(expectedPort), len(expectedOriginal))
+	compareAdjudicated(test, "the port", withoutPlaces(difference(port, original)), expectedPort)
+	compareAdjudicated(test, "the original", withoutPlaces(difference(original, port)), expectedOriginal)
+}
+
+// compareAdjudicated fails the test unless the findings side alone makes are exactly those the fixture records.
+func compareAdjudicated(test *testing.T, side string, actual []finding, expected []finding) {
+	test.Helper()
+	for _, unrecorded := range difference(actual, expected) {
+		test.Errorf("%s alone found %s, which the fixture does not record", side, described(unrecorded))
+	}
+	for _, unmatched := range difference(expected, actual) {
+		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
+	}
+}
+
+// withoutPlaces is findings with their columns and ends dropped, for comparing with the differences fixture's
+// comments, which name a line.
+func withoutPlaces(findings []finding) []finding {
+	dropped := []finding{}
+	for _, found := range findings {
+		found.column = 0
+		found.endLine = 0
+		found.endColumn = 0
+		dropped = append(dropped, found)
+	}
+	return dropped
 }
 
 // finding is one finding as the differential compares it. testinggoroutine offers no fixes, so there are no edits to

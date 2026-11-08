@@ -193,13 +193,18 @@ func TestNestedGoroutines(t *testing.T) {
 	}()
 }
 
-// A forbidden call evaluated in the test's own goroutine, as a go statement's argument, is still within the go
-// statement the original judges whole, so both report it.
+// A go statement's argument is evaluated by the goroutine executing the statement. Within a started literal, that
+// goroutine is the literal's, and a go statement whose callee is a literal reports at the forbidden call, so the
+// original, which judges the argument with the inner go statement, and the port, which judges it with the outer
+// literal, report the same. The differences fixture holds the shapes where the two part.
 func TestArgumentsOfAGoStatement(t *testing.T) {
-	go fmt.Println(func() int {
-		t.FailNow() // reported at the go statement, though this runs in the test's goroutine
-		return 0
-	}())
+	go func() {
+		go func(int) {}(func() int {
+			t.FailNow() // reported: (*testing.T).FailNow from a non-test goroutine
+			return 0
+		}())
+		go fmt.Println(t.Name()) // clean: no forbidden call in the argument
+	}()
 }
 
 // A subtest's literal, a variable first assigned one, and a named function, judged against the test declared outside.
@@ -219,10 +224,6 @@ func TestSubtests(t *testing.T) {
 	t.Run("paren", (func(sub *testing.T) {
 		t.Fatal("parenthesized") // reported
 	}))
-	t.Run(func() string {
-		t.Fatal("name") // reported, though it runs in the test's goroutine: the call is the region
-		return "name"
-	}(), named)
 	go t.Run("started", func(sub *testing.T) {
 		t.Fatal("started") // reported: on t defined outside of the subtest, and not from a non-test goroutine
 	})
