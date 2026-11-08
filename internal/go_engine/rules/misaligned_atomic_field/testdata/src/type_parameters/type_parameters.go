@@ -33,6 +33,10 @@ type counters struct {
 	second int64
 }
 
+// generic gives sync/atomic the address of a field after one a type parameter sizes, in each of the ways, where the
+// original panics and the port judges nothing, and the misaligned field of a struct no type parameter sizes, which
+// only the port can find, since the original never runs here, and finds rightly, the field being misaligned on a
+// 32-bit platform.
 func generic[Value any](
 	first *direct[Value],
 	second *inArray[Value],

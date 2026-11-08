@@ -15,12 +15,25 @@ import (
 // it reports nothing no note expects, so the port adds nothing there either. Each package is held to the notes of its
 // own files, as staticcheck's testutil holds it, so a file a package and its test variant share is held in each. A
 // fixture module (see fixtureLoad) loads under its own go.mod, as testutil runs each version's folder, and fixtures
-// that hold no note at all fail, since the comparison would prove nothing.
+// that hold no note at all fail, since the comparison would prove nothing. It loads for the machine's own target, and
+// Target.RequireStaticcheckWants for another.
 func RequireStaticcheckWants(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
+	test.Helper()
+	requireStaticcheckWants(test, Target{}, port, testdata, patterns...)
+}
+
+// requireStaticcheckWants is RequireStaticcheckWants with the fixtures loaded for target.
+func requireStaticcheckWants(
+	test testing.TB,
+	target Target,
+	port *analysis.Analyzer,
+	testdata string,
+	patterns ...string,
+) {
 	test.Helper()
 	wanted := 0
 	reported := 0
-	for _, fixtures := range loadFixtures(test, testdata, patterns) {
+	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {
 		for _, action := range portActions(test, port, fixtures.roots) {
 			wants := []staticcheck_wants.Want{}
 			for _, file := range action.Package.GoFiles {

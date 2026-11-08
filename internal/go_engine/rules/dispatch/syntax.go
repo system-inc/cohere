@@ -14,8 +14,8 @@ import (
 
 // Syntax calls the listeners registered on it that a package's pass starts (see start) over one inspector walk of the
 // package's files: on entering a file, every FileEnter; each node, in preorder, to every listener whose Nodes list
-// its kind, with its ancestors; on leaving the file, every FileExit; and once every file is walked, every
-// PackageExit. Listeners are called in the order they were registered.
+// its kind, with its ancestors and, through its context, its cursor; on leaving the file, every FileExit; and once
+// every file is walked, every PackageExit. Listeners are called in the order they were registered.
 type Syntax struct {
 	*listeners
 }
@@ -70,34 +70,35 @@ func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 		return nil, fmt.Errorf("reading %s's result: it is %T, where an inspector was expected", inspect.Analyzer.Name,
 			pass.ResultOf[inspect.Analyzer])
 	}
-	// The inspector walks for every kind a started listener lists, and the file, which FileEnter and FileExit hear,
-	// and skips a subtree holding none of them, so a kind that only an unstarted listener lists is never visited. It
-	// reads the kinds as a set, so a kind two listeners list is listed twice here at no cost.
-	walked := []ast.Node{(*ast.File)(nil)}
+	// The inspector walks each file for every kind a started listener lists, and skips a subtree holding none of them,
+	// so a kind that only an unstarted listener lists is never visited. It reads the kinds as a set, so a kind two
+	// listeners list is listed twice here at no cost.
+	kinds := []ast.Node{}
 	for _, run := range started.runs {
-		walked = append(walked, run.registered.listener.Nodes...)
+		kinds = append(kinds, run.registered.listener.Nodes...)
 	}
-	walker.WithStack(walked, func(node ast.Node, entering bool, stack []ast.Node) bool {
-		file, isFile := node.(*ast.File)
-		if !entering {
-			if isFile {
-				for _, run := range started.runs {
-					run.fileExit(file)
-				}
-			}
-			return true
+	walk := &syntaxWalk{started: started}
+	visit := walk.visit
+	// The root's children are the package's files, in the order the pass holds them.
+	for fileCursor := range walker.Root().Children() {
+		file, isFile := fileCursor.Node().(*ast.File)
+		if !isFile {
+			return nil, fmt.Errorf("walking %s: the inspector's root holds a %T, where only files were expected",
+				pass.Pkg.Path(), fileCursor.Node())
 		}
-		if isFile {
-			for _, run := range started.runs {
-				run.fileEnter(file)
-			}
+		for _, run := range started.runs {
+			run.fileEnter(file)
 		}
-		// The inspector's stack ends with the node itself, which a listener is handed on its own.
-		ancestors := stack[:len(stack)-1]
-		for _, run := range started.byKind[reflect.TypeOf(node)] {
-			run.node(node, ancestors)
+		// An empty list is every kind to the inspector, so listeners that list none, hearing only FileEnter and
+		// FileExit, are no reason to walk the file's nodes.
+		if len(kinds) > 0 {
+			walk.spine = walk.spine[:0]
+			walk.ancestors = walk.ancestors[:0]
+			fileCursor.Inspect(kinds, visit)
 		}
-		return true
-	})
+		for _, run := range started.runs {
+			run.fileExit(file)
+		}
+	}
 	return finish(started), nil
 }

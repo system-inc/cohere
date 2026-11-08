@@ -111,9 +111,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		_, port := parity.Findings(test, s1016.Analyzer, Analyzer, module(version), "./"+upstream)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+			// The wants name a file by its full path, and the findings by its path below its module's folder.
 			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
+				Message: each.Message,
 			})
 		}
 		test.Logf("under %s the fixture expects %d, the port found %d", version, len(wants), len(found))
@@ -149,7 +150,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("under %s the golden file holds %d sections, one a fix's message, which this test does not "+
 				"read", version, len(archive.Files))
 		}
-		edits := editsIn(port, upstreamFiles[version])
+		edits := editsIn(port, upstream+"/"+upstreamFiles[version])
 		test.Logf("under %s the port found %d, with %d edits", version, len(port), len(edits))
 		if len(edits) == 0 {
 			test.Fatalf("under %s the port made no edit to the upstream fixture, so the comparison proves nothing",
@@ -192,7 +193,7 @@ func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 	parity.RequireOnlyAdjudicated(test, s1016.Analyzer, Analyzer, analysistest.TestData(), differencesFixture)
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below its module's folder.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

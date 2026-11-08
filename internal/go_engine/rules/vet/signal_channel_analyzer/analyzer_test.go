@@ -50,16 +50,18 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	testdata := analysistest.TestData()
 	parity.RequireOnlyAdjudicated(test, sigchanyzer.Analyzer, Analyzer, testdata, differencesFixture)
 	original, port := parity.Findings(test, sigchanyzer.Analyzer, Analyzer, testdata, differencesFixture)
-	directory := filepath.Join(testdata, "src", differencesFixture)
+	// root is the fixtures' root, testdata's src, below which the harness names every file it reports, as
+	// `differences/declarations.go`.
+	root := filepath.Join(testdata, "src")
 	editsAlone := []parity.Finding{}
 	for _, found := range parity.Difference(port, original) {
 		for _, fix := range found.Fixes {
 			for _, edit := range fix.Edits {
-				editsAlone = append(editsAlone, editAt(test, directory, edit))
+				editsAlone = append(editsAlone, editAt(test, root, edit))
 			}
 		}
 	}
-	recorded := fixRecords(test, directory)
+	recorded := fixRecords(test, root, filepath.Join(root, differencesFixture))
 	if len(recorded) == 0 {
 		test.Fatalf("the differences fixture records no fix of the port's, so the comparison proves nothing")
 	}
@@ -72,11 +74,11 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 }
 
 // editAt is edit as a fix record names it, a finding with the edit's file, the line its start is on and the text it
-// puts there as the message, so the harness's Difference compares edits with records. edit's file is a base name in
-// directory.
-func editAt(test *testing.T, directory string, edit parity.Edit) parity.Finding {
+// puts there as the message, so the harness's Difference compares edits with records. edit's file is its path below
+// root, as the harness names it.
+func editAt(test *testing.T, root string, edit parity.Edit) parity.Finding {
 	test.Helper()
-	content, readError := os.ReadFile(filepath.Join(directory, edit.File))
+	content, readError := os.ReadFile(filepath.Join(root, filepath.FromSlash(edit.File)))
 	if readError != nil {
 		test.Fatalf("reading the file a fix edits: %v", readError)
 	}
@@ -87,9 +89,10 @@ func editAt(test *testing.T, directory string, edit parity.Edit) parity.Finding 
 	return parity.Finding{File: edit.File, Line: line, Message: edit.NewText}
 }
 
-// fixRecords is every fix record of the .go files in directory, each a finding with the comment's file and line and
-// the recorded text as its message. It reads comments as the parser finds them, as the harness reads its records.
-func fixRecords(test *testing.T, directory string) []parity.Finding {
+// fixRecords is every fix record of the .go files in directory, each a finding with the comment's file, named by its
+// path below root as the harness names it, its line, and the recorded text as its message. It reads comments as the
+// parser finds them, as the harness reads its records.
+func fixRecords(test *testing.T, root string, directory string) []parity.Finding {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
 	if globError != nil {
@@ -102,6 +105,10 @@ func fixRecords(test *testing.T, directory string) []parity.Finding {
 		if parseError != nil {
 			test.Fatalf("parsing the differences fixture: %v", parseError)
 		}
+		below, relativeError := filepath.Rel(root, name)
+		if relativeError != nil {
+			test.Fatalf("naming %s below the fixtures' root %s: %v", name, root, relativeError)
+		}
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				text, isRecord := strings.CutPrefix(comment.Text, fixRecord)
@@ -109,7 +116,7 @@ func fixRecords(test *testing.T, directory string) []parity.Finding {
 					continue
 				}
 				line := fileSet.Position(comment.Slash).Line
-				recorded = append(recorded, parity.Finding{File: filepath.Base(name), Line: line, Message: text})
+				recorded = append(recorded, parity.Finding{File: filepath.ToSlash(below), Line: line, Message: text})
 			}
 		}
 	}

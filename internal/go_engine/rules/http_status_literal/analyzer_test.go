@@ -72,17 +72,13 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 			if len(wants) == 0 {
 				test.Fatal("the fixture holds no notes, so the comparison proves nothing")
 			}
-			// The findings name a file by its base name, so each want is matched by its file's base name, which is
-			// one file's alone while no two files of the folder share one.
-			wantedFiles := map[string]string{}
+			// The findings name a file by its path below the folder, so each want is named the same way.
 			for index := range wants {
-				base := filepath.Base(wants[index].File)
-				if other, seen := wantedFiles[base]; seen && other != wants[index].File {
-					test.Fatalf("%s and %s share a base name, so a finding in one could take a want of the other",
-						other, wants[index].File)
+				below, relativeError := filepath.Rel(folder, wants[index].File)
+				if relativeError != nil {
+					test.Fatal(relativeError)
 				}
-				wantedFiles[base] = wants[index].File
-				wants[index].File = base
+				wants[index].File = filepath.ToSlash(below)
 			}
 			_, portFindings := parity.Findings(test, st1013.Analyzer, Analyzer, folder, "./...")
 			found := []staticcheck_wants.Finding{}

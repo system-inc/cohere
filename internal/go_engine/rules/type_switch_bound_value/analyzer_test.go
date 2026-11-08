@@ -51,9 +51,10 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	_, port := parity.Findings(test, s1034.Analyzer, Analyzer, analysistest.TestData(), upstream)
 	found := []staticcheck_wants.Finding{}
 	for _, each := range port {
-		// The wants name a file by its full path, and the findings by its base name, in the fixture's one folder.
+		// The wants name a file by its full path, and the findings by its path below testdata's src.
 		found = append(found, staticcheck_wants.Finding{
-			File: filepath.Join(fixture, each.File), Line: each.Line, Message: each.Message,
+			File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
+			Message: each.Message,
 		})
 	}
 	test.Logf("the fixture expects %d, the port found %d", len(wants), len(found))
@@ -87,7 +88,7 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 		test.Fatalf("the golden file holds %d sections, one a fix's message, which this test does not read",
 			len(archive.Files))
 	}
-	edits := editsIn(port, upstreamFile)
+	edits := editsIn(port, upstream+"/"+upstreamFile)
 	test.Logf("the port found %d, with %d edits", len(port), len(edits))
 	if len(edits) == 0 {
 		test.Fatal("the port made no edit to the upstream fixture, so the comparison proves nothing")
@@ -164,7 +165,10 @@ func TestPortMovedFindingsRelateWhatTheirFixReplaces(test *testing.T) {
 			moved.port.EndColumn != moved.original.EndColumn {
 			test.Errorf("the port found %s, at another range than the original's %s", moved.port, moved.original)
 		}
-		source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "src", differences, moved.port.File))
+		// The findings name a file by its path below testdata's src.
+		source, readError := os.ReadFile(
+			filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(moved.port.File)),
+		)
 		if readError != nil {
 			test.Fatal(readError)
 		}
@@ -202,8 +206,10 @@ func TestPortMovedFixesMakeGoldens(test *testing.T) {
 	original, port := parity.Findings(test, s1034.Analyzer, Analyzer, analysistest.TestData(), differences)
 	moved := []string{}
 	for _, each := range movesOf(original, port) {
-		if !slices.Contains(moved, each.port.File) {
-			moved = append(moved, each.port.File)
+		// The findings name a file by its path below testdata's src, and moved names it within the fixture's folder.
+		file := strings.TrimPrefix(each.port.File, differences+"/")
+		if !slices.Contains(moved, file) {
+			moved = append(moved, file)
 		}
 	}
 	if len(moved) == 0 {
@@ -229,7 +235,7 @@ func TestPortMovedFixesMakeGoldens(test *testing.T) {
 		if goldenError != nil {
 			test.Fatal(goldenError)
 		}
-		edits := editsIn(port, file)
+		edits := editsIn(port, differences+"/"+file)
 		test.Logf("%s: the port made %d edits", file, len(edits))
 		formatted, formatError := format.Source(applied(test, file, source, edits))
 		if formatError != nil {
@@ -370,7 +376,12 @@ func fixedErrors(test *testing.T, findings []parity.Finding) []string {
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		overlay[name] = applied(test, filepath.Base(name), source, editsIn(findings, filepath.Base(name)))
+		// The findings name a file by its path below testdata's src.
+		below, relativeError := filepath.Rel(filepath.Join(directory, "src"), name)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
+		overlay[name] = applied(test, filepath.Base(name), source, editsIn(findings, filepath.ToSlash(below)))
 	}
 	// The fixtures are a tree laid out by import path, loaded as the harness loads one.
 	loaded, loadError := load.PackagesWithOverlay(directory, []string{differences}, []string{
@@ -391,7 +402,7 @@ func fixedErrors(test *testing.T, findings []parity.Finding) []string {
 	return errors
 }
 
-// editsIn is every edit of every fix of findings in the file named file, by its base name.
+// editsIn is every edit of every fix of findings in the file named file, by its path below testdata's src.
 func editsIn(findings []parity.Finding, file string) []parity.Edit {
 	edits := []parity.Edit{}
 	for _, finding := range findings {

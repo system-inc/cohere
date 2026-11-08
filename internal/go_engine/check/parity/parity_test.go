@@ -3,6 +3,7 @@ package parity
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"reflect"
 	"runtime"
@@ -154,17 +155,17 @@ func requireFailures(test *testing.T, failures []string, wanted ...string) {
 	}
 }
 
-func TestFindingsAreEachSidesInBaseNames(test *testing.T) {
+func TestFindingsAreEachSidesInTheirPaths(test *testing.T) {
 	test.Parallel()
 	originalFindings, portFindings := Findings(test, original, port, analysistest.TestData(), "adjudicated")
 	wantedOriginal := []Finding{
-		{File: "adjudicated.go", Line: 11, Column: 2, Message: "call to shared"},
-		{File: "adjudicated.go", Line: 13, Column: 2, Message: "call to renamed in the original's words"},
+		{File: "adjudicated/adjudicated.go", Line: 11, Column: 2, Message: "call to shared"},
+		{File: "adjudicated/adjudicated.go", Line: 13, Column: 2, Message: "call to renamed in the original's words"},
 	}
 	wantedPort := []Finding{
-		{File: "adjudicated.go", Line: 11, Column: 2, Message: "call to shared"},
-		{File: "adjudicated.go", Line: 12, Column: 2, Message: "call to gained"},
-		{File: "adjudicated.go", Line: 13, Column: 2, Message: "call to renamed in the port's words"},
+		{File: "adjudicated/adjudicated.go", Line: 11, Column: 2, Message: "call to shared"},
+		{File: "adjudicated/adjudicated.go", Line: 12, Column: 2, Message: "call to gained"},
+		{File: "adjudicated/adjudicated.go", Line: 13, Column: 2, Message: "call to renamed in the port's words"},
 	}
 	if !reflect.DeepEqual(originalFindings, wantedOriginal) {
 		test.Errorf("the original's findings are %v, want %v", originalFindings, wantedOriginal)
@@ -177,8 +178,8 @@ func TestFindingsAreEachSidesInBaseNames(test *testing.T) {
 // Repeats count: a finding one side makes twice and the other once is a difference.
 func TestDifferenceCountsRepeats(test *testing.T) {
 	test.Parallel()
-	twice := Finding{File: "same.go", Line: 1, Column: 1, Message: "call to shared"}
-	other := Finding{File: "same.go", Line: 2, Column: 1, Message: "call to shared"}
+	twice := Finding{File: "same/same.go", Line: 1, Column: 1, Message: "call to shared"}
+	other := Finding{File: "same/same.go", Line: 2, Column: 1, Message: "call to shared"}
 	if difference := Difference([]Finding{twice, twice, other}, []Finding{twice}); !reflect.DeepEqual(
 		difference, []Finding{twice, other},
 	) {
@@ -220,9 +221,10 @@ func TestRequireIdenticalNamesEveryFindingOnOneSide(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireIdentical(recording, original, port, analysistest.TestData(), "adjudicated")
 	}),
-		"the original found adjudicated.go:13:2: call to renamed in the original's words, and the port did not",
-		"the port found adjudicated.go:12:2: call to gained, and the original did not",
-		"the port found adjudicated.go:13:2: call to renamed in the port's words, and the original did not",
+		"the original found adjudicated/adjudicated.go:13:2: call to renamed in the original's words, and the port "+
+			"did not",
+		"the port found adjudicated/adjudicated.go:12:2: call to gained, and the original did not",
+		"the port found adjudicated/adjudicated.go:13:2: call to renamed in the port's words, and the original did not",
 	)
 }
 
@@ -238,7 +240,7 @@ func TestRequireOnlyAdjudicatedFailsARegression(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "regression")
-	}), "the original found regression.go:11:0: call to lost, and the port did not, a regression")
+	}), "the original found regression/regression.go:11:0: call to lost, and the port did not, a regression")
 }
 
 func TestRequireOnlyAdjudicatedFailsARecordThatDidNotHappen(test *testing.T) {
@@ -246,10 +248,11 @@ func TestRequireOnlyAdjudicatedFailsARecordThatDidNotHappen(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unmatched")
 	}),
-		"the fixture records that the port alone finds unmatched.go:10:0: call to shared, and it does not",
-		"the fixture records that the port alone finds unmatched.go:11:0: call to shared in other words, and it "+
-			"does not",
-		"the fixture records that the original alone finds unmatched.go:11:0: call to shared, renamed, and it does",
+		"the fixture records that the port alone finds unmatched/unmatched.go:10:0: call to shared, and it does not",
+		"the fixture records that the port alone finds unmatched/unmatched.go:11:0: call to shared in other words, "+
+			"and it does not",
+		"the fixture records that the original alone finds unmatched/unmatched.go:11:0: call to shared, renamed, "+
+			"and it does",
 	)
 }
 
@@ -257,14 +260,14 @@ func TestRequireOnlyAdjudicatedFailsAnUnrecordedDifference(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unrecorded")
-	}), "the port alone found unrecorded.go:9:0: call to gained, which the fixture does not record")
+	}), "the port alone found unrecorded/unrecorded.go:9:0: call to gained, which the fixture does not record")
 }
 
 func TestRequireOnlyAdjudicatedFailsAnUnreadableRecord(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unreadable")
-	}), `unreadable.go:7 holds a comment the harness cannot read: "found: call to gained"`)
+	}), `unreadable/unreadable.go:7 holds a comment the harness cannot read: "found: call to gained"`)
 }
 
 func TestRequireOnlyAdjudicatedFailsAFixtureThatRecordsNothing(test *testing.T) {
@@ -311,8 +314,8 @@ func TestRequireOnlyAdjudicatedFailsADropThatDidNotHappen(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_unmatched")
-	}), "the fixture records that the port drops drop_unmatched.go:8:0: call to shared, and the original alone does "+
-		"not find it")
+	}), "the fixture records that the port drops drop_unmatched/drop_unmatched.go:8:0: call to shared, and the "+
+		"original alone does not find it")
 }
 
 // A drop covers a finding on its own line and no other: one on the line above leaves the finding a regression, and
@@ -322,9 +325,9 @@ func TestRequireOnlyAdjudicatedFailsADropOnAnotherLine(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_misplaced")
 	}),
-		"the original found drop_misplaced.go:10:0: call to lost, and the port did not, a regression",
-		"the fixture records that the port drops drop_misplaced.go:9:0: call to lost, and the original alone does "+
-			"not find it",
+		"the original found drop_misplaced/drop_misplaced.go:10:0: call to lost, and the port did not, a regression",
+		"the fixture records that the port drops drop_misplaced/drop_misplaced.go:9:0: call to lost, and the original "+
+			"alone does not find it",
 	)
 }
 
@@ -345,7 +348,7 @@ func TestRequireOnlyAdjudicatedFailsAMoveThatDidNotHappen(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages, endingShort(0)),
 			calling(sharedMessages, endingShort(0)), analysistest.TestData(), "moved")
-	}), "the fixture records that the port moves moved.go:9:0: call to shared, and the two do not both find it")
+	}), "the fixture records that the port moves moved/moved.go:9:0: call to shared, and the two do not both find it")
 }
 
 // The original's fix the port leaves out, recorded as withheld, pairs the two findings.
@@ -363,7 +366,8 @@ func TestRequireOnlyAdjudicatedFailsAWithholdThatDidNotHappen(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages, fixingShort(0)),
 			calling(sharedMessages, fixingShort(0)), analysistest.TestData(), "withheld")
-	}), `the fixture records that the port withholds the fix "delete the call" at withheld.go:9, and no finding`)
+	}), `the fixture records that the port withholds the fix "delete the call" at withheld/withheld.go:9, and no `+
+		"finding")
 }
 
 // A withheld record covers only the original's fix: a fix the port alone offers is unrecorded on its side and leaves
@@ -374,9 +378,10 @@ func TestRequireOnlyAdjudicatedWithholdsOnlyTheOriginalsFix(test *testing.T) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(sharedMessages, fixingShort(0)),
 			analysistest.TestData(), "withheld")
 	}),
-		`the fixture records that the port withholds the fix "delete the call" at withheld.go:9, and no finding`,
-		"the port alone found withheld.go:9:0: call to shared, which the fixture does not record",
-		"the original found withheld.go:9:0: call to shared, and the port did not, a regression",
+		`the fixture records that the port withholds the fix "delete the call" at withheld/withheld.go:9, and no `+
+			"finding",
+		"the port alone found withheld/withheld.go:9:0: call to shared, which the fixture does not record",
+		"the original found withheld/withheld.go:9:0: call to shared, and the port did not, a regression",
 	)
 }
 
@@ -395,7 +400,8 @@ func TestRequireOnlyAdjudicatedFailsAnOmitThatDidNotHappen(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages, relatingShort(0)),
 			calling(sharedMessages, relatingShort(0)), analysistest.TestData(), "omitted")
-	}), `the fixture records that the port omits the related entry "the function called" at omitted.go:9, and no`)
+	}), `the fixture records that the port omits the related entry "the function called" at omitted/omitted.go:9, `+
+		"and no")
 }
 
 // An omitted record covers only the original's related entry: one the port alone adds is unrecorded on its side and
@@ -406,9 +412,10 @@ func TestRequireOnlyAdjudicatedOmitsOnlyTheOriginalsRelatedEntry(test *testing.T
 		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(sharedMessages, relatingShort(0)),
 			analysistest.TestData(), "omitted")
 	}),
-		`the fixture records that the port omits the related entry "the function called" at omitted.go:9, and no`,
-		"the port alone found omitted.go:9:0: call to shared, which the fixture does not record",
-		"the original found omitted.go:9:0: call to shared, and the port did not, a regression",
+		`the fixture records that the port omits the related entry "the function called" at omitted/omitted.go:9, `+
+			"and no",
+		"the port alone found omitted/omitted.go:9:0: call to shared, which the fixture does not record",
+		"the original found omitted/omitted.go:9:0: call to shared, and the port did not, a regression",
 	)
 }
 
@@ -417,8 +424,8 @@ func TestRequireOnlyAdjudicatedFailsARecordWithNoReason(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unreasoned")
-	}), "unreasoned.go:8 holds a record with no reason: write why on the line above it, or in the doc comment of the "+
-		"declaration it is in")
+	}), "unreasoned/unreasoned.go:8 holds a record with no reason: write why on the line above it, or in the doc "+
+		"comment of the declaration it is in")
 }
 
 // A record on the line above is no reason for the one below it: the first record's reason is above it, and the
@@ -427,11 +434,64 @@ func TestRequireOnlyAdjudicatedTakesNoRecordAsAReason(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "record_above")
-	}), "record_above.go:10 holds a record with no reason")
+	}), "record_above/record_above.go:10 holds a record with no reason")
 }
 
-// A reason on the line above passes, as in dropped, and so does one in the doc comment of the enclosing function
-// alone, as in adjudicated and wave 1's fixtures.
+// A directive explains nothing, so one on the line above a record is no reason for it: each record here, with a
+// `//go:` or a `//cohere:` directive above it and no doc comment on its function, fails.
+func TestRequireOnlyAdjudicatedTakesNoDirectiveAsAReason(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "reason_directive")
+	}),
+		"reason_directive/reason_directive.go:9 holds a record with no reason",
+		"reason_directive/reason_directive.go:11 holds a record with no reason",
+	)
+}
+
+// Each kind of directive is no reason, a `//line ` one as much as a `//go:` or a `//cohere:` one, and a comment that
+// explains is. The `//line ` directive names the line it is on, so it moves no position.
+func TestReasonedLinesSkipsDirectives(test *testing.T) {
+	test.Parallel()
+	source := strings.Join([]string{
+		"package directives",
+		"",
+		"func calls() {",
+		"\t// A comment that explains.",
+		"\t_ = 0 // port finds: explained",
+		"\t//go:generate echo",
+		"\t_ = 0 // port finds: after go",
+		"\t//cohere:ignore",
+		"\t_ = 0 // port finds: after cohere",
+		"\t//line directives.go:11",
+		"\t_ = 0 // port finds: after line",
+		"}",
+	}, "\n")
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "directives.go", source, parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	reasons := reasonedLines(fileSet, file)
+	for line, wanted := range map[int]bool{5: true, 7: false, 9: false, 11: false} {
+		if reasons.above(line) != wanted {
+			test.Errorf("the record on line %d is reasoned from above: %t, want %t", line, !wanted, wanted)
+		}
+	}
+}
+
+// A drop's reason is its own, on the line directly above it, never the doc comment of the function it is in: of two
+// drops in a documented function, the one with a reason above passes and the one with none fails, named by file and
+// line, while a find the doc rules passes.
+func TestRequireOnlyAdjudicatedTakesADropsReasonOnlyFromAbove(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_documented")
+	}), "drop_documented/drop_documented.go:16 holds a drop with no reason: write why on the line directly above it")
+}
+
+// A reason on the line above passes, as in dropped, and for any record but a drop so does one in the doc comment of
+// the enclosing function alone, as in adjudicated.
 func TestRequireOnlyAdjudicatedTakesEitherReason(test *testing.T) {
 	test.Parallel()
 	for _, fixture := range []string{"dropped", "adjudicated"} {
@@ -452,16 +512,16 @@ func TestRequireIdenticalComparesEveryPartOfAFinding(test *testing.T) {
 		original string
 		port     string
 	}{
-		{"the end", endingShort, "same.go:7:2-7:10: call to shared", "same.go:7:2-7:9: call to shared"},
+		{"the end", endingShort, "same/same.go:7:2-7:10: call to shared", "same/same.go:7:2-7:9: call to shared"},
 		{
 			"a related entry", relatingShort,
-			"same.go:7:2: call to shared [related same.go:7:2-7:8: the function called]",
-			"same.go:7:2: call to shared [related same.go:7:2-7:7: the function called]",
+			"same/same.go:7:2: call to shared [related same/same.go:7:2-7:8: the function called]",
+			"same/same.go:7:2: call to shared [related same/same.go:7:2-7:7: the function called]",
 		},
 		{
 			"a fix", fixingShort,
-			`same.go:7:2: call to shared [fix "delete the call": same.go[`,
-			`same.go:7:2: call to shared [fix "delete the call": same.go[`,
+			`same/same.go:7:2: call to shared [fix "delete the call": same/same.go[`,
+			`same/same.go:7:2: call to shared [fix "delete the call": same/same.go[`,
 		},
 	} {
 		test.Run(planted.name, func(test *testing.T) {
@@ -491,10 +551,10 @@ func TestFindingsRecordAFixByOffsets(test *testing.T) {
 		calling(sharedMessages, fixingShort(1)), analysistest.TestData(), "same")
 	originalEdit := originalFindings[0].Fixes[0].Edits[0]
 	portEdit := portFindings[0].Fixes[0].Edits[0]
-	if originalEdit.File != "same.go" || originalEdit.End-originalEdit.Start != len("shared()") ||
+	if originalEdit.File != "same/same.go" || originalEdit.End-originalEdit.Start != len("shared()") ||
 		portEdit.Start != originalEdit.Start || portEdit.End != originalEdit.End-1 {
-		test.Errorf("the edits are %+v and %+v, want same.go's call deleted whole by the original and short of its "+
-			"last byte by the port", originalEdit, portEdit)
+		test.Errorf("the edits are %+v and %+v, want same/same.go's call deleted whole by the original and short of "+
+			"its last byte by the port", originalEdit, portEdit)
 	}
 }
 
