@@ -68,6 +68,37 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/assign"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/bools"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/cgo_call"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/composite"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/copy_lock"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/defers"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/directive"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/frame_pointer"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/host_port"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/http_response"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/iface_assert"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/loop_closure"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/lost_cancel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/shift"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
@@ -151,7 +182,39 @@ var duplicatesOfVet = map[string]string{
 // original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
-var ports = map[string]*analysis.Analyzer{}
+var ports = map[string]*analysis.Analyzer{
+	"appends":          appends.Analyzer,
+	"assign":           assign.Analyzer,
+	"atomic":           atomic.Analyzer,
+	"bools":            bools.Analyzer,
+	"cgocall":          cgo_call.Analyzer,
+	"composites":       composite.Analyzer,
+	"copylocks":        copy_lock.Analyzer,
+	"defers":           defers.Analyzer,
+	"directive":        directive.Analyzer,
+	"errorsas":         errors_as.Analyzer,
+	"framepointer":     frame_pointer.Analyzer,
+	"hostport":         host_port.Analyzer,
+	"httpresponse":     http_response.Analyzer,
+	"ifaceassert":      iface_assert.Analyzer,
+	"loopclosure":      loop_closure.Analyzer,
+	"lostcancel":       lost_cancel.Analyzer,
+	"nilfunc":          nil_func.Analyzer,
+	"printf":           printf.Analyzer,
+	"scannererr":       scanner_error.Analyzer,
+	"shift":            shift.Analyzer,
+	"slog":             slog.Analyzer,
+	"sqlrowserr":       sql_rows_err.Analyzer,
+	"stdmethods":       std_methods.Analyzer,
+	"stringintconv":    string_int_conv.Analyzer,
+	"structtag":        struct_tag.Analyzer,
+	"testinggoroutine": testing_goroutine.Analyzer,
+	"tests":            tests.Analyzer,
+	"unmarshal":        unmarshal.Analyzer,
+	"unsafeptr":        unsafe_ptr.Analyzer,
+	"unusedresult":     unused_result.Analyzer,
+	"waitgroup":        wait_group.Analyzer,
+}
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
 // otherwise.

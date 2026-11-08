@@ -1,0 +1,155 @@
+package host_port
+
+import (
+	"cmp"
+	"fmt"
+	"go/token"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/hostport"
+
+	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
+	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/load"
+)
+
+// x/tools' own fixture for hostport, a.go and its golden a.go.golden, copied unchanged into testdata/src and run as
+// x/tools' test runs it, with suggested fixes and no flags: every `// want` the original expects, the port reports at
+// the same line with the same message, analysistest fails on a finding no want expects as much as on a want nothing
+// found, so the port adds nothing there either, and every fix the port offers, applied together, turns a.go into the
+// golden.
+func TestPortMatchesUpstreamWants(test *testing.T) {
+	test.Parallel()
+	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
+}
+
+// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
+// holding every branch of the judgment and the shapes most likely to differ, and their findings must be the same
+// multiset of file, line, column, message and suggested fixes, each fix its message and every edit's span and text.
+// Each side's count is logged, since two empty sides would match and prove nothing, and the test fails if the
+// original finds nothing at all.
+func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
+	test.Parallel()
+	original, port := findingsOf(test, "a", "parity", "parity/dotted", "parity/indirect")
+	test.Logf("the original found %d, the port %d", len(original), len(port))
+	if len(original) == 0 {
+		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
+	}
+	for _, missing := range difference(original, port) {
+		test.Errorf("the original found %s, and the port did not", described(missing))
+	}
+	for _, extra := range difference(port, original) {
+		test.Errorf("the port found %s, and the original did not", described(extra))
+	}
+}
+
+// finding is one finding as the differential compares it, its fixes written out by fixesOf.
+type finding struct {
+	file    string
+	line    int
+	column  int
+	message string
+	fixes   string
+}
+
+// described is found as a finding line prints it, followed by its fixes.
+func described(found finding) string {
+	return fmt.Sprintf("%s:%d:%d: %s%s", found.file, found.line, found.column, found.message, found.fixes)
+}
+
+// fixesOf writes out the suggested fixes of diagnostic, in order, each its message and every edit as its file, its
+// span in byte offsets and the text it puts there, so two findings compare equal only when they offer the same edits.
+func fixesOf(fileSet *token.FileSet, diagnostic analysis.Diagnostic) string {
+	written := strings.Builder{}
+	for _, fix := range diagnostic.SuggestedFixes {
+		fmt.Fprintf(&written, "\n\tfix %q:", fix.Message)
+		for _, edit := range fix.TextEdits {
+			start := fileSet.Position(edit.Pos)
+			end := fileSet.Position(edit.End)
+			fmt.Fprintf(
+				&written, " %s[%d:%d]=%q", filepath.Base(start.Filename), start.Offset, end.Offset, edit.NewText,
+			)
+		}
+	}
+	return written.String()
+}
+
+// findingsOf loads the fixture packages patterns name, runs x/tools' hostport and the port over them in one checker,
+// and returns each one's findings, sorted.
+func findingsOf(test *testing.T, patterns ...string) (original []finding, port []finding) {
+	test.Helper()
+	directory := analysistest.TestData()
+	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
+	loaded, loadError := load.Packages(directory, patterns, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil {
+		test.Fatalf("loading %v: %v", patterns, loadError)
+	}
+	graph, analyzeError := checker.Analyze(
+		[]*analysis.Analyzer{hostport.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
+	)
+	if analyzeError != nil {
+		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil {
+			// The package's own errors say why, when the failure is a fixture that does not type-check.
+			test.Fatalf("running %s: %v %v", action, action.Err, action.Package.Errors)
+		}
+		for _, diagnostic := range action.Diagnostics {
+			position := action.Package.Fset.Position(diagnostic.Pos)
+			found := finding{
+				file:    filepath.Base(position.Filename),
+				line:    position.Line,
+				column:  position.Column,
+				message: diagnostic.Message,
+				fixes:   fixesOf(action.Package.Fset, diagnostic),
+			}
+			switch action.Analyzer {
+			case hostport.Analyzer:
+				original = append(original, found)
+			case Analyzer:
+				port = append(port, found)
+			}
+		}
+	}
+	compare := func(first finding, second finding) int {
+		return cmp.Compare(described(first), described(second))
+	}
+	slices.SortFunc(original, compare)
+	slices.SortFunc(port, compare)
+	return original, port
+}
+
+// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
+// the other is a difference.
+func difference(from []finding, without []finding) []finding {
+	remaining := map[finding]int{}
+	for _, found := range without {
+		remaining[found]++
+	}
+	missing := []finding{}
+	for _, found := range from {
+		if remaining[found] > 0 {
+			remaining[found]--
+			continue
+		}
+		missing = append(missing, found)
+	}
+	return missing
+}
+
+// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
+// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
+// Loading the fixtures needs only go list.
+type errorsOnly struct{ test *testing.T }
+
+func (reporter errorsOnly) Errorf(format string, arguments ...any) {
+	reporter.test.Helper()
+	reporter.test.Errorf(format, arguments...)
+}
