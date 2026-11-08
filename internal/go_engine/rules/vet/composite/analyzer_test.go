@@ -14,6 +14,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // x/tools' own fixtures for composites, copied unchanged into testdata/src and run as x/tools' test runs them, with
@@ -49,7 +50,8 @@ func TestPortMatchesOriginalWithTheAllowListOff(test *testing.T) {
 			test.Errorf("turning the original's allow list back on: %v", setError)
 		}
 	})
-	port := newAnalyzer()
+	// A dispatcher of its own, since a dispatcher names each rule once and the shared one holds the registry's port.
+	port := newAnalyzer(dispatch.NewSyntax())
 	if setError := port.Flags.Set("whitelist", "false"); setError != nil {
 		test.Fatalf("turning the port's allow list off: %v", setError)
 	}

@@ -5,7 +5,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // lockerType is sync.Locker's method set, `interface{ Lock(); Unlock() }`, built here rather than looked up, since
@@ -24,7 +24,7 @@ func newLockerType() *types.Interface {
 // lockPathOfValue is the path to a lock in the value value denotes, nil when it holds none or makes a new value
 // rather than copying one: a composite literal, or a call, which may return a zero value, or a pointer to one
 // through `*`. Parentheses are looked through. x/tools' lockPathRhs.
-func lockPathOfValue(pass *analysis.Pass, value ast.Expr) typePath {
+func lockPathOfValue(context *rule.Context, value ast.Expr) typePath {
 	unparenthesized := ast.Unparen(value)
 	switch made := unparenthesized.(type) {
 	case *ast.CompositeLit, *ast.CallExpr:
@@ -35,7 +35,7 @@ func lockPathOfValue(pass *analysis.Pass, value ast.Expr) typePath {
 		}
 	}
 	// A type or a package name is no value, and Types holds nothing for an expression the checker could not type.
-	if typeAndValue, isTyped := pass.TypesInfo.Types[unparenthesized]; isTyped && typeAndValue.IsValue() {
+	if typeAndValue, isTyped := context.TypesInfo.Types[unparenthesized]; isTyped && typeAndValue.IsValue() {
 		return lockPath(typeAndValue.Type)
 	}
 	return nil

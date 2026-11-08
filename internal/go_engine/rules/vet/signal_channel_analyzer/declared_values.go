@@ -3,8 +3,6 @@ package signal_channel_analyzer
 import (
 	"go/ast"
 	"go/types"
-
-	"golang.org/x/tools/go/ast/inspector"
 )
 
 // declaredValues maps each variable declared with a value of its own, by `:=` or by `var`, to that value, across the
@@ -13,41 +11,42 @@ import (
 // `channel, received := <-channels`, gives its names no value. The parser resolves a `:=` that reuses a variable to
 // the variable's first declaration, and the type checker defines nothing there, so the two agree. Neither a range
 // clause nor a type switch's header is a declaration with a value here; findDecl reaches them as a range or a type
-// assertion, which is never the call either judgment looks for.
+// assertion, which is never the call either judgment looks for. Each variable is keyed by the one identifier that
+// defines it, so the map is the same whatever order its declarations are recorded in.
 type declaredValues map[types.Object]ast.Expr
 
-// declaredValuesOf reads every `:=` and every `var` specification in the package inspected walks.
-func declaredValuesOf(inspected *inspector.Inspector, information *types.Info) declaredValues {
-	declarations := declaredValues{}
-	record := func(name ast.Expr, value ast.Expr) {
-		identifier, isIdentifier := name.(*ast.Ident)
-		if !isIdentifier {
-			return
-		}
-		// Defs holds no object for a name a `:=` reuses rather than declares, which keeps its first declaration.
-		if object := information.Defs[identifier]; object != nil {
-			declarations[object] = value
-		}
+// recordAssignment records each name a `:=` declares with its value.
+func (declarations declaredValues) recordAssignment(information *types.Info, assignment *ast.AssignStmt) {
+	// findDecl gives nothing for a declaration whose sides differ in length. An `=` declares nothing, so Defs holds
+	// none of its names and record passes them over.
+	if len(assignment.Lhs) != len(assignment.Rhs) {
+		return
 	}
-	for assignment := range inspector.All[*ast.AssignStmt](inspected) {
-		// findDecl gives nothing for a declaration whose sides differ in length. An `=` declares nothing, so Defs holds
-		// none of its names and record passes them over.
-		if len(assignment.Lhs) != len(assignment.Rhs) {
-			continue
-		}
-		for index, name := range assignment.Lhs {
-			record(name, assignment.Rhs[index])
-		}
+	for index, name := range assignment.Lhs {
+		declarations.record(information, name, assignment.Rhs[index])
 	}
-	for specification := range inspector.All[*ast.ValueSpec](inspected) {
-		if len(specification.Names) != len(specification.Values) {
-			continue
-		}
-		for index, name := range specification.Names {
-			record(name, specification.Values[index])
-		}
+}
+
+// recordSpecification records each name a `var` specification declares with its value.
+func (declarations declaredValues) recordSpecification(information *types.Info, specification *ast.ValueSpec) {
+	if len(specification.Names) != len(specification.Values) {
+		return
 	}
-	return declarations
+	for index, name := range specification.Names {
+		declarations.record(information, name, specification.Values[index])
+	}
+}
+
+// record maps the variable name defines to value, when name is an identifier that defines one.
+func (declarations declaredValues) record(information *types.Info, name ast.Expr, value ast.Expr) {
+	identifier, isIdentifier := name.(*ast.Ident)
+	if !isIdentifier {
+		return
+	}
+	// Defs holds no object for a name a `:=` reuses rather than declares, which keeps its first declaration.
+	if object := information.Defs[identifier]; object != nil {
+		declarations[object] = value
+	}
 }
 
 // valueOf is the value the variable identifier uses was declared with, or nil when it names no variable declared with

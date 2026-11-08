@@ -19,6 +19,10 @@
 // laying it out, where the port judges nothing of that function and goes on with the rest. The registry runs the port
 // in the original's place, and the original stays the oracle: the parity tests beside this file run both over the
 // same packages on every architecture the pass judges, and the differences fixture pins the original's crash.
+//
+// It is not on the engine's syntax dispatcher, and stays a plain analyzer: what it judges is the package's assembly,
+// which it reads from the pass's OtherFiles, and rule.Context carries no OtherFiles. Nor does it make an inspector walk
+// for the dispatcher's to replace: of the Go syntax it reads only each file's top-level declarations.
 package asm_decl
 
 import (

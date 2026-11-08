@@ -95,6 +95,19 @@ func (context *Context) Report(diagnostic analysis.Diagnostic) {
 	context.sink(context.ruleName, diagnostic)
 }
 
+// Reportf reports a finding at position whose message is format filled with arguments, the diagnostic
+// analysis.Pass's Reportf builds, so a check ported from a pass keeps its calls as they were and reports what the
+// pass reported.
+func (context *Context) Reportf(position token.Pos, format string, arguments ...any) {
+	context.Report(analysis.Diagnostic{Pos: position, Message: fmt.Sprintf(format, arguments...)})
+}
+
+// ReportRangef reports a finding over node, from its Pos to its End, whose message is format filled with arguments,
+// the diagnostic analysis.Pass's ReportRangef builds, for Reportf's reason. An ast.Node is a range.
+func (context *Context) ReportRangef(node analysis.Range, format string, arguments ...any) {
+	context.Report(analysis.Diagnostic{Pos: node.Pos(), End: node.End(), Message: fmt.Sprintf(format, arguments...)})
+}
+
 // ResultOf is the result of analyzer over the package, which the rule's listener must require. Asked for one it does
 // not require, ResultOf panics rather than returning an error, since the read is a mistake in the check, not
 // something a package can cause, and the dispatcher turns the panic into that rule's crash on the package, naming
