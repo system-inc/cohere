@@ -430,8 +430,18 @@ func TestRequireOnlyAdjudicatedTakesNoRecordAsAReason(test *testing.T) {
 	}), "record_above.go:10 holds a record with no reason")
 }
 
-// A reason on the line above passes, as in dropped, and so does one in the doc comment of the enclosing function
-// alone, as in adjudicated and wave 1's fixtures.
+// A drop's reason is its own, on the line directly above it, never the doc comment of the function it is in: of two
+// drops in a documented function, the one with a reason above passes and the one with none fails, named by file and
+// line, while a find the doc rules passes.
+func TestRequireOnlyAdjudicatedTakesADropsReasonOnlyFromAbove(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_documented")
+	}), "drop_documented.go:16 holds a drop with no reason: write why on the line directly above it")
+}
+
+// A reason on the line above passes, as in dropped, and for any record but a drop so does one in the doc comment of
+// the enclosing function alone, as in adjudicated.
 func TestRequireOnlyAdjudicatedTakesEitherReason(test *testing.T) {
 	test.Parallel()
 	for _, fixture := range []string{"dropped", "adjudicated"} {
