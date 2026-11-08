@@ -871,6 +871,7 @@ var portedPasses = []string{
 	"ip_compared_as_bytes",
 	"leaky_time_tick",
 	"math_on_converted_integer",
+	"misaligned_atomic_field",
 	"misplaced_error_result",
 	"modified_writer_buffer",
 	"modulo_by_one",
