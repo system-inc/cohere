@@ -10,8 +10,9 @@
 // deletes the case with staticcheck's analysis/edit, borrowed in this wave as the original uses it, through
 // staticcheck_report.Fixes; like the original's, it leaves behind an empty line, and any comment in the case. The
 // pattern names no symbol, so the original walks every package, and so does the port. It reports with no option, so a
-// generated file is judged like any other. The registry still runs the original, which stays the oracle: the parity
-// tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// generated file is judged like any other. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
+// differ nowhere they hold.
 package empty_select_default
 
 import (

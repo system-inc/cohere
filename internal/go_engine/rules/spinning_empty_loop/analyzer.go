@@ -5,9 +5,9 @@
 // whose messages it reports word for word, at the same ranges: the condition's finding spans the whole loop, and the
 // spin's spans its header, as staticcheck's report.ShortRange cuts it. It asks staticcheck_code.MayHaveSideEffects
 // where the original asks code.MayHaveSideEffects, and reports through staticcheck_report.Report where the original
-// reports through report.Report, each the port of the one the original calls, proven against it beside it. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// reports through report.Report, each the port of the one the original calls, proven against it beside it. The registry
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package spinning_empty_loop
 
 import (

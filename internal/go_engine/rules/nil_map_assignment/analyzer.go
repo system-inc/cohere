@@ -6,10 +6,11 @@
 // puts it. The original walks every source function of a package in one run, but keeps nothing from one function to
 // the next: each map update is judged alone, by the one value its map flattens to. So the port judges one function at
 // a time and finds what the original finds, and reads the map through the same irutil.Flatten, so a phi whose edges
-// are the same nil constant is that constant to both, and a phi of two values is nothing to either. The original stays
-// the oracle: the parity tests beside this file run both over the same packages, and they differ nowhere. The one
-// place the port could differ is an update with no syntax, where staticcheck's report panics and the port reports
-// nothing; staticcheck builds every map update from an assignment or a literal, so no such update reaches either.
+// are the same nil constant is that constant to both, and a phi of two values is nothing to either. The registry runs
+// the port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside
+// this file run both over the same packages, and they differ nowhere. The one place the port could differ is an update
+// with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every map update
+// from an assignment or a literal, so no such update reaches either.
 package nil_map_assignment
 
 import (

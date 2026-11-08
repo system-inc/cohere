@@ -7,8 +7,9 @@
 // the report.Report the original calls, proven against it beside it. It keeps the original's approximation as well: a
 // loop with no condition counts as never ending unless its body holds a return or a break, any break, though one in a
 // switch, a select or a loop of its own leaves only that statement, and a goto or a call that never returns does not
-// count. The original keeps no state from one loop to the next. The registry still runs the original, which stays the
-// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// count. The original keeps no state from one loop to the next. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and the two differ nowhere they hold.
 package defer_in_infinite_loop
 
 import (

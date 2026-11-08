@@ -8,9 +8,9 @@
 // report.Render, and reports through staticcheck_report.Report where the original reports through report.Report, each
 // the port of the one the original calls, proven against it beside it. Like the original, it takes a last result
 // whose type prints as `error` for the error, and it judges the closed value by the name its selector starts from, so
-// `t.rc.Close()` after `t, err := f()` counts (upstream's fn2 shows both). The registry still runs the original, which
-// stays the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere
-// they hold.
+// `t.rc.Close()` after `t, err := f()` counts (upstream's fn2 shows both). The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over the
+// same packages, and the two differ nowhere they hold.
 package early_deferred_close
 
 import (

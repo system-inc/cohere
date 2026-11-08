@@ -19,9 +19,9 @@
 // field at the position of the syntax's field list, which is not the field's index when a line declares several
 // names, `A, B int`: every later line's `xml` value is judged by the tag of a field above it, false findings and
 // missed ones the port keeps for parity, the original's, shown by parity's `severalNames` and `severalNamesMissed`.
-// It reports with no option, so a generated
-// file is judged like any other. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same packages, and the two differ nowhere they hold.
+// It reports with no option, so a generated file is judged like any other. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package invalid_struct_tag
 
 import (

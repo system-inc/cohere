@@ -8,12 +8,12 @@
 // function to the next: each assertion is judged alone, by the method sets of its two types. It reads those sets from
 // the program's method set cache, which it reaches through staticcheck's buildir result; the port reaches the same
 // cache through the function's own program, the one buildir built, and a cache only spares work, never changes a
-// set. So the port judges one function at a time and finds what the original finds. The original stays the oracle:
-// the parity tests beside this file run both over the same packages, and they differ nowhere. The places the port
-// could differ are an assertion with no syntax, where staticcheck's report panics and the port reports nothing, and a
-// method set entry that is no function, where the original's unchecked assertion panics and the port passes over the
-// method; staticcheck builds every assertion from its syntax, and a method set holds only functions, so neither
-// reaches either.
+// set. So the port judges one function at a time and finds what the original finds. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and they differ nowhere. The places the port could differ are an assertion with no
+// syntax, where staticcheck's report panics and the port reports nothing, and a method set entry that is no function,
+// where the original's unchecked assertion panics and the port passes over the method; staticcheck builds every
+// assertion from its syntax, and a method set holds only functions, so neither reaches either.
 package impossible_type_assertion
 
 import (

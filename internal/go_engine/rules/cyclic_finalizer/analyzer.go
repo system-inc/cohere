@@ -11,8 +11,8 @@
 // the call reads the value stored and no load; parity's literalFirst shows it, and the port keeps the miss. The
 // original walks every source function of a package in one run, but keeps nothing from one function to the next: each
 // call to runtime.SetFinalizer is judged alone, by its two arguments. So the port judges one function at a time and
-// finds what the original finds. The original stays the oracle: the parity tests beside this file run both over the
-// same packages, and they differ nowhere.
+// finds what the original finds. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and they differ nowhere.
 package cyclic_finalizer
 
 import (

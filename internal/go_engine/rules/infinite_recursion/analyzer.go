@@ -6,10 +6,10 @@
 // puts it. The original walks every source function of a package in one run, but keeps nothing from one function to
 // the next: it compares each call's static callee with the function the call is in, and judges the call by the
 // dominator tree of that one function. So the port judges one function at a time and finds what the original finds.
-// The original stays the oracle: the parity tests beside this file run both over the same packages, and they differ
-// nowhere. The one place the port could differ is a call with no syntax, where staticcheck's report panics and the
-// port reports nothing; staticcheck builds every call in a source function from its syntax, so no such call reaches
-// either.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and they differ nowhere. The one place the port could
+// differ is a call with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds
+// every call in a source function from its syntax, so no such call reaches either.
 package infinite_recursion
 
 import (
