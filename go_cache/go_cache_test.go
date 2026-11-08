@@ -214,9 +214,9 @@ func TestEachPolicyRemovesExactlyItsEntries(test *testing.T) {
 			limit:   Limit{Cap: 80 * kibibyte, Target: 60 * kibibyte, Spare: 24 * time.Hour},
 			removed: "ABC",
 		},
-		{name: "to nothing, the minimum spare", limit: Limit{Spare: MinimumSpare}, removed: "ABCDEF"},
-		{name: "to nothing, ninety minutes", limit: Limit{Spare: 90 * time.Minute}, removed: "ABCDE"},
-		{name: "to nothing, two hours", limit: Limit{Spare: 2 * time.Hour}, removed: "ABCDE"},
+		{name: "to nothing, the minimum spare", limit: Limit{Spare: MinimumSpare}, removed: "ABCDE"},
+		{name: "to nothing, three hours", limit: Limit{Spare: 3 * time.Hour}, removed: "ABCDE"},
+		{name: "to nothing, four hours", limit: Limit{Spare: 4 * time.Hour}, removed: "ABCD"},
 		{name: "to nothing, a day", limit: Limit{Spare: 24 * time.Hour}, removed: "ABCD"},
 		{name: "to nothing, Go's five days and an hour", limit: Limit{Spare: 5*24*time.Hour + time.Hour}, removed: "A"},
 	} {
@@ -257,11 +257,24 @@ func TestEachPolicyRemovesExactlyItsEntries(test *testing.T) {
 	}
 }
 
-// A spare under Go's lag in marking an entry used is refused before anything is read or removed, however far
-// over its cap the cache is.
+// The floor is two hours, Go's one-hour lag in marking an entry used and an hour of margin, and a spare under
+// it, the lag alone included, is refused before anything is read or removed, however far over its cap the
+// cache is.
 func TestASpareUnderTheMinimumIsRefused(test *testing.T) {
 	test.Parallel()
-	for _, spare := range []time.Duration{0, 10 * time.Minute, MinimumSpare - time.Nanosecond} {
+	if MinimumSpare != 2*time.Hour {
+		test.Errorf(
+			"MinimumSpare is %s, want 2h: Go's lag of an hour (mtimeInterval) and an hour of margin",
+			MinimumSpare,
+		)
+	}
+	for _, spare := range []time.Duration{
+		0,
+		10 * time.Minute,
+		time.Hour,
+		90 * time.Minute,
+		MinimumSpare - time.Nanosecond,
+	} {
 		written := newFixture(test)
 		if _, trimError := Trim(
 			written.directory,

@@ -8,18 +8,23 @@ import (
 	"time"
 )
 
-// MinimumSpare is the shortest spare any trim here takes: Go's lag in refreshing a used entry's time,
-// mtimeInterval in cmd/go/internal/cache's cache.go (one hour, Go 1.27). Go marks an entry used by
-// touching its modification time, but only when that time is an hour old or more, so an entry a build
-// looked up a minute ago can carry a time 59 minutes old. A spare shorter than the lag removes entries
-// whose time is newer than a just-used entry's may be, which is reading as unused what Go has not had
-// the chance to mark, and is refused.
-//
-// It is a floor, not a guarantee. An entry used a moment ago may carry a time up to the lag old, so a
-// spare of S keeps out only the entries used within S less the lag, and Go's own trim adds the lag to
-// its five days for that reason. A caller beside builds it cannot see spares the lag plus how long such
-// a build reads after a lookup; one that keeps every build out while it trims may take the floor.
-const MinimumSpare = time.Hour
+// markUsedLag is Go's lag in refreshing a used entry's time: mtimeInterval in cmd/go/internal/cache's
+// cache.go:348 (one hour, Go 1.27). Go marks an entry used by touching its modification time, but only
+// when that time is an hour old or more, so an entry a build looked up a moment ago can carry a time
+// almost an hour old.
+const markUsedLag = time.Hour
+
+// inUseMargin is how long after its last use an entry is still taken to be in use by a build no lock
+// keeps out: a build reads an entry some time after looking it up.
+const inUseMargin = time.Hour
+
+// MinimumSpare is the shortest spare any trim here takes, Go's lag in marking an entry used plus an hour
+// of margin, the shape Go's own trim has (its five days plus the lag) and the spare Loom's MakeRoom takes.
+// An entry last used at some moment carries a time no more than the lag older than that moment, so one
+// whose time is older than MinimumSpare was last used more than the margin ago. It protects any build,
+// inside a caller's lock or outside it, that used an entry within the last hour. A shorter spare reads as
+// unused what Go has not had the chance to mark, and is refused.
+const MinimumSpare = markUsedLag + inUseMargin
 
 // Limit is the size a cache may reach before it is trimmed, the size a trim brings it down to, and how
 // recently used an entry may be and still be spared. Trimming below the cap means a cache growing steadily

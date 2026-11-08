@@ -131,7 +131,7 @@ took 65s, a reused one 79 and 28s. A name is per hand, not per member, so a lead
 hands at once gives each its own, such as `system_cohere_tools_1`. `--branch <branch>` starts a branch
 in it, and `worktree remove <name>` retires one, under the same refusals.
 
-The Go build cache is held under a cap, 40 GB unless `COHERE_DEV_CACHE_GB` says otherwise (#jc6ca7r).
+The Go build cache is held under a cap, 64 GB unless `COHERE_DEV_CACHE_GB` says otherwise (#jc6ca7r).
 When a token's run ends, at most once every ten minutes for the machine, `cohere-dev` looks at the
 cache in the background, and when it is over the cap it takes every token, trims the least recently
 used entries to three quarters of the cap, and gives the tokens back. `cohere-dev status` shows the
@@ -326,20 +326,24 @@ member's test run compiles the packages the launcher's next build needs, and a p
 stored them twice: it had reached 40 GB beside the default cache's 81 GB. The launcher still builds
 with cgo off, which compiles only the few packages that use cgo differently, measured at 46 MB.
 
-**Go does not bound the cache, so the launcher does.** Go trims by age alone, five days
+**Go does not bound the cache, so cohere-dev does.** Go trims by age alone, five days
 unused, and developing cohere filled the default cache far faster: on 2026-10-03 it regrew 223 GB in
 nine hours and filled the disk (#3sgjy0h), most of it `TestEveryReleaseTargetCompiles` building cohere
 for six platforms on every `go test ./...`, until `3dc6e70` made it type-check them instead.
-The `go_cache` module trims a cache of its least recently used entries once it is over a cap,
-down to three quarters of it. On any run, at most every ten minutes, the launcher starts a background
-copy of itself that trims the cache at 48 GB. The run pays one stat for that and never waits on the
-walk. What it removed is logged to `.cache/cohere/prune.log`.
+`cohere-dev` holds the cache at a 64 GB cap (`command/cohere-dev/cache.go`): when a token's run ends,
+at most every ten minutes for the machine, it measures the cache in the background, and when it is over
+the cap it holds every token of the pool and trims the least recently used entries down to a 48 GB
+target. The layout and the delete live in the `go_cache` module, which Loom shares. What each look did
+is logged to `gocache-trim.log` beside the pool's tokens.
 
-**No trim removes an entry used in the last 90 minutes**, so a burst can stand above the cap by what it
-wrote inside that window. Go marks an entry used at most once an hour, so within the hour, age cannot
-tell an entry nobody wants from one a running build is reading, and removing one of those fails the
-build with `could not import ... no such file`, which reads as a compile error. A gate that trimmed
-young entries to hold a burst under the cap did exactly that.
+**No trim removes an entry used in the last two hours**, so a burst can stand above the cap by what it
+used inside that window. Go marks an entry used at most once an hour, so an entry a build looked up a
+moment ago can carry a time almost an hour old; `go_cache` refuses any spare under that hour plus an
+hour of margin. Holding the pool keeps out only the builds that go through it, and removing an entry a
+build outside it still reads fails that build with `could not import ... no such file`, which reads as
+a compile error. A gate that trimmed young entries to hold a burst under the cap did exactly that. About
+28 GB of the cache is used each hour under the house's load, so the cap sits above the two hours' worth
+the trim can never take.
 
 **A missing binary is a loud error, never a fallback.** With no Go toolchain the dispatcher runs the
 binary shipped for the platform, and if there is none it exits non-zero naming the platform and

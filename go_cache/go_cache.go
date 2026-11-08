@@ -49,7 +49,7 @@ type Entry struct {
 	Path  string
 	Bytes int64
 	// Used is the entry's modification time, which Go sets when it writes the entry and refreshes when
-	// it uses it, but at most once every MinimumSpare.
+	// it uses it, but at most once an hour (markUsedLag).
 	Used time.Time
 	// Executable is set for an executable output, whose Files are removed by name before its directory.
 	Executable bool
