@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +26,9 @@ import (
 // constrained to linux, windows, unix and neither, and staticcheck's own run reads those its host builds; this one
 // loads it for each of targets, so every file and every mark is read.
 const upstreamPackage = "CheckGOOSComparison"
+
+// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
+const differencesFile = "differences/differences.go"
 
 // Staticcheck's own fixture marks each finding the original makes with `//@ diag(...)`, read by staticcheck_wants and
 // matched as staticcheck's own test runner matches them, each by one finding on its line whose message contains the
@@ -140,9 +144,6 @@ func compareAdjudicated(test *testing.T, side string, actual []finding, expected
 	}
 }
 
-// differencesFile is the differences fixture, by its path below testdata/src, the path a finding names its file by.
-const differencesFile = "differences/differences.go"
-
 // finding is one finding as the differential compares it, its file named by its path below testdata/src, so two
 // fixtures of one name in two packages stay apart. Staticcheck's report gives a finding the end of its call's
 // syntax as well as its start, so the end is compared too.
@@ -179,8 +180,8 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 	portMost := map[finding]int{}
 	for _, target := range targets {
 		targetOriginal, targetPort := findingsForTarget(test, target, patterns)
-		mergeMost(originalMost, targetOriginal)
-		mergeMost(portMost, targetPort)
+		originalMost = mergedMost(originalMost, targetOriginal)
+		portMost = mergedMost(portMost, targetPort)
 	}
 	original = expanded(originalMost)
 	port = expanded(portMost)
@@ -192,15 +193,18 @@ func findingsOf(test *testing.T, patterns ...string) (original []finding, port [
 	return original, port
 }
 
-// mergeMost raises each finding's count in most to the count findings holds of it, if that is more.
-func mergeMost(most map[finding]int, findings []finding) {
+// mergedMost is most with each finding's count raised to the count findings holds of it, if that is more, made anew so
+// the caller's map is left as it was.
+func mergedMost(most map[finding]int, findings []finding) map[finding]int {
+	merged := maps.Clone(most)
 	counts := map[finding]int{}
 	for _, found := range findings {
 		counts[found]++
 	}
 	for found, count := range counts {
-		most[found] = max(most[found], count)
+		merged[found] = max(merged[found], count)
 	}
+	return merged
 }
 
 // expanded is each finding of counts repeated its count of times.

@@ -1,4 +1,4 @@
-// Package impossible_target_comparison is staticcheck's SA4032, a comparison of runtime.GOOS or runtime.GOARCH with
+// Package impossible_target_comparison is staticcheck's SA4032, a comparison of `runtime.GOOS` or `runtime.GOARCH` with
 // a value the file's build constraints rule out, ported as a check on syntax that reports through the kit every port
 // of staticcheck shares.
 //
@@ -7,14 +7,14 @@
 // through report.Report: a generated file is reported too. It reads each file's constraint with
 // staticcheck_code.BuildConstraints, the port of the code.BuildConstraints the original calls, and the known
 // operating systems and architectures from staticcheck's knowledge package, as data. The original matches the
-// patterns `(BinaryExpr (Symbol "runtime.GOOS") op@(Or "==" "!=") lit@(BasicLit "STRING" _))` and its GOARCH twin
+// patterns `(BinaryExpr (Symbol "runtime.GOOS") op@(Or "==" "!=") lit@(BasicLit "STRING" _))` and its `GOARCH` twin
 // against every node of every constrained file; the port matches what they match without importing pattern: a
 // comparison, equal or not equal, through any parentheses around it, whose left side is, through parentheses, the
-// package-level runtime.GOOS or runtime.GOARCH however it is named, and whose right side is, through parentheses, a
-// string literal. Every node is matched, so a parenthesized comparison is met twice, as the parentheses and as the
+// package-level `runtime.GOOS` or `runtime.GOARCH` however it is named, and whose right side is, through parentheses,
+// a string literal. Every node is matched, so a parenthesized comparison is met twice, as the parentheses and as the
 // comparison inside them, and both are reported, each over its own range; parity's parenthesized shows it, and the
-// port keeps it. The original first asks code.CouldMatchAny whether the package's type index holds runtime.GOOS or
-// runtime.GOARCH at all, and walks nothing when it does not; a package that names either imports runtime, which the
+// port keeps it. The original first asks code.CouldMatchAny whether the package's type index holds `runtime.GOOS` or
+// `runtime.GOARCH` at all, and walks nothing when it does not; a package that names either imports runtime, which the
 // index then holds, so the port walks every package and finds the same. The original keeps nothing from one
 // comparison to the next, and stays the oracle: the parity tests beside this file run both over the same packages,
 // loaded for several targets, and the two differ nowhere they hold.
@@ -55,8 +55,8 @@ var Analyzer = dispatch.RuleAnalyzer(
 // judged, since judging it tries every combination of them, two to the power of their count.
 const maximumOtherTags = 10
 
-// Check judges one file: when it has a build constraint, each comparison in it of runtime.GOOS or runtime.GOARCH with
-// a known value the constraint rules out.
+// Check judges one file: when it has a build constraint, each comparison in it of `runtime.GOOS` or `runtime.GOARCH`
+// with a known value the constraint rules out.
 func Check(context *rule.Context, file *ast.File) {
 	expression, isConstrained := staticcheck_code.BuildConstraints(context, file)
 	if !isConstrained {
@@ -69,7 +69,8 @@ func Check(context *rule.Context, file *ast.File) {
 		}
 		switch target {
 		case "GOOS":
-			// A value the knowledge does not hold may be a target of a newer Go or of a fork, and is not reasoned about.
+			// A value the knowledge does not hold may be a target of a newer Go or of a fork, and is not reasoned
+			// about.
 			if _, isKnown := knowledge.KnownGOOS[value]; !isKnown {
 				return true
 			}
@@ -96,8 +97,8 @@ func Check(context *rule.Context, file *ast.File) {
 	})
 }
 
-// comparedTarget is, for a node that is through any parentheses a comparison of runtime.GOOS or runtime.GOARCH, equal
-// or not equal, with a string literal, which of the two it compares, "GOOS" or "GOARCH", and the literal's value.
+// comparedTarget is, for a node that is through any parentheses a comparison of `runtime.GOOS` or `runtime.GOARCH`,
+// equal or not equal, with a string literal, which of the two it compares, "GOOS" or "GOARCH", and the literal's value.
 func comparedTarget(context *rule.Context, node ast.Node) (string, string, bool) {
 	expression, isExpression := node.(ast.Expr)
 	if !isExpression {
@@ -118,7 +119,7 @@ func comparedTarget(context *rule.Context, node ast.Node) (string, string, bool)
 	return target, constant.StringVal(context.TypesInfo.Types[literal].Value), true
 }
 
-// runtimeTarget is the name of the runtime package's GOOS or GOARCH that expression names, as the pattern's Symbol
+// runtimeTarget is the name of the runtime package's `GOOS` or `GOARCH` that expression names, as the pattern's Symbol
 // reads it: through any parentheses and an index, an identifier or a selector whose recorded object is a constant or
 // variable declared at the runtime package's top level.
 func runtimeTarget(context *rule.Context, expression ast.Expr) (string, bool) {
