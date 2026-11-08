@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -33,6 +34,11 @@ import (
 //     only files inside the test's module, so a command run outside it reads nothing the cache could miss, and
 //     OutsideModule fails the test when the directory is not outside, so the claim is checked when it runs. A
 //     command with no Dir runs in its package's directory, inside the module, and needs Record.
+//
+// A test file in a nested module (a directory between it and the root holds a go.mod of its own) cannot import
+// internal/build_inputs, so there its Dir may instead be set from a call of a function named outsideModule that
+// its package's own test files declare, which makes the same check OutsideModule does. In the root module that
+// spelling is refused: the check there is build_inputs.OutsideModule, the one the guard's claim rests on.
 func TestEveryGoCommandATestStartsRecordsWhatItReads(test *testing.T) {
 	test.Parallel()
 	module, absolutePathError := filepath.Abs(filepath.Join("..", ".."))
@@ -43,12 +49,7 @@ func TestEveryGoCommandATestStartsRecordsWhatItReads(test *testing.T) {
 	uncovered := []string{}
 	started := 0
 	for _, path := range files {
-		fileSet := token.NewFileSet()
-		file, parseError := parser.ParseFile(fileSet, path, nil, parser.SkipObjectResolution)
-		if parseError != nil {
-			test.Fatal(parseError)
-		}
-		commands, unrecorded := goCommandsWithoutRecord(fileSet, file)
+		commands, unrecorded := goCommandsWithoutRecordIn(test, module, path)
 		started += commands
 		for _, position := range unrecorded {
 			relative, relativeError := filepath.Rel(module, position.Filename)
@@ -167,7 +168,7 @@ func readsNothing(test *testing.T) {
 			wanted = append(wanted, index+1)
 		}
 	}
-	commands, unrecorded := goCommandsWithoutRecord(fileSet, file)
+	commands, unrecorded := goCommandsWithoutRecord(fileSet, file, false)
 	got := []int{}
 	for _, position := range unrecorded {
 		got = append(got, position.Line)
@@ -177,6 +178,80 @@ func readsNothing(test *testing.T) {
 	}
 	if commands != 15 {
 		test.Errorf("counted %d go commands, want 15: eight refused, five covered and two reading nothing", commands)
+	}
+	// A local outsideModule covers a command only in a nested module, and only as the Dir it sets.
+	planted := map[string]string{
+		"go.mod":                   "module example.com/root\n",
+		"nested/go.mod":            "module example.com/root/nested\n",
+		"nested/helper_test.go":    "package nested\n\nfunc outsideModule(test any, directory string) string { return directory }\n",
+		"nested/elsewhere_test.go": "package nested\n\nfunc elsewhere(test any, directory string) string { return directory }\n",
+		"nested/command_test.go": `package nested
+
+import (
+	"os/exec"
+	"testing"
+)
+
+func coveredByItsOwn(test *testing.T, fixture string) {
+	command := exec.Command("go", "list", ".")
+	command.Dir = outsideModule(test, fixture)
+}
+
+func uncoveredByAnother(test *testing.T, fixture string) {
+	command := exec.Command("go", "list", ".") // want
+	command.Dir = elsewhere(test, fixture)
+}
+`,
+		"rooted_test.go": `package rooted
+
+import (
+	"os/exec"
+	"testing"
+)
+
+func outsideModule(test *testing.T, directory string) string { return directory }
+
+func uncoveredAtTheRoot(test *testing.T, fixture string) {
+	command := exec.Command("go", "list", ".") // want
+	command.Dir = outsideModule(test, fixture)
+}
+`,
+	}
+	root := test.TempDir()
+	for name, content := range planted {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(path, []byte(content), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	for _, plantedCase := range []struct {
+		name     string
+		commands int
+	}{
+		{name: "nested/command_test.go", commands: 2},
+		{name: "rooted_test.go", commands: 1},
+	} {
+		plantedWanted := []int{}
+		for index, line := range strings.Split(planted[plantedCase.name], "\n") {
+			if strings.HasSuffix(line, "// want") {
+				plantedWanted = append(plantedWanted, index+1)
+			}
+		}
+		plantedPath := filepath.Join(root, filepath.FromSlash(plantedCase.name))
+		plantedCommands, plantedUnrecorded := goCommandsWithoutRecordIn(test, root, plantedPath)
+		plantedGot := []int{}
+		for _, position := range plantedUnrecorded {
+			plantedGot = append(plantedGot, position.Line)
+		}
+		if strings.Join(lineNumbers(plantedGot), " ") != strings.Join(lineNumbers(plantedWanted), " ") {
+			test.Errorf("%s: refused lines %v, want %v", plantedCase.name, plantedGot, plantedWanted)
+		}
+		if plantedCommands != plantedCase.commands {
+			test.Errorf("%s: counted %d go commands, want %d", plantedCase.name, plantedCommands, plantedCase.commands)
+		}
 	}
 }
 
@@ -233,9 +308,77 @@ var readsPackages = map[string]bool{
 // buildInputsPath is the package whose Record covers a go command.
 const buildInputsPath = "github.com/system-inc/cohere/internal/build_inputs"
 
+// goCommandsWithoutRecordIn parses the test file at path, in the module rooted at module, and runs
+// goCommandsWithoutRecord on it, letting its package's own outsideModule cover a command when the file sits in a
+// nested module.
+func goCommandsWithoutRecordIn(test *testing.T, module string, path string) (int, []token.Position) {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, path, nil, parser.SkipObjectResolution)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	ownOutsideModule := inNestedModule(module, path) && declaresOutsideModule(test, path, file.Name.Name)
+	return goCommandsWithoutRecord(fileSet, file, ownOutsideModule)
+}
+
+// localOutsideModule is the name a nested module's test helper goes by when it makes build_inputs.OutsideModule's
+// check, since a nested module cannot import build_inputs.
+const localOutsideModule = "outsideModule"
+
+// inNestedModule reports whether path sits in a module nested in the one rooted at module: a directory between
+// them, the file's own included and module's left out, holds a go.mod.
+func inNestedModule(module string, path string) bool {
+	for directory := filepath.Dir(path); directory != module; directory = filepath.Dir(directory) {
+		if directory == filepath.Dir(directory) {
+			// The file is not under module at all, so nothing here is nested in it.
+			return false
+		}
+		if _, statError := os.Stat(filepath.Join(directory, "go.mod")); statError == nil {
+			return true
+		}
+	}
+	return false
+}
+
+// declaresOutsideModule reports whether a test file in path's directory, of the package packageName, declares a
+// function named outsideModule.
+func declaresOutsideModule(test *testing.T, path string, packageName string) bool {
+	test.Helper()
+	entries, readError := os.ReadDir(filepath.Dir(path))
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "_test.go") || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		sibling, parseError := parser.ParseFile(
+			token.NewFileSet(),
+			filepath.Join(filepath.Dir(path), entry.Name()),
+			nil,
+			parser.SkipObjectResolution,
+		)
+		if parseError != nil {
+			test.Fatal(parseError)
+		}
+		if sibling.Name.Name != packageName {
+			continue
+		}
+		for _, declaration := range sibling.Decls {
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if isFunction && function.Recv == nil && function.Name.Name == localOutsideModule {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // goCommandsWithoutRecord counts the go commands a file starts and returns where each that reads packages sits
-// in a top-level declaration with no call of build_inputs' Record.
-func goCommandsWithoutRecord(fileSet *token.FileSet, file *ast.File) (int, []token.Position) {
+// in a top-level declaration with no call of build_inputs' Record. With ownOutsideModule, a call of the package's
+// own outsideModule sets a covering Dir as build_inputs.OutsideModule does.
+func goCommandsWithoutRecord(fileSet *token.FileSet, file *ast.File, ownOutsideModule bool) (int, []token.Position) {
 	execNames := importNames(file, "os/exec")
 	buildInputsNames := importNames(file, buildInputsPath)
 	commands := 0
@@ -243,7 +386,11 @@ func goCommandsWithoutRecord(fileSet *token.FileSet, file *ast.File) (int, []tok
 	for _, declaration := range file.Decls {
 		recorded := false
 		reading := []*ast.CallExpr{}
-		holders := commandHolders{heldIn: map[*ast.CallExpr]string{}, outside: map[string]bool{}}
+		holders := commandHolders{
+			heldIn:           map[*ast.CallExpr]string{},
+			outside:          map[string]bool{},
+			ownOutsideModule: ownOutsideModule,
+		}
 		ast.Inspect(declaration, func(node ast.Node) bool {
 			switch typed := node.(type) {
 			case *ast.AssignStmt:
@@ -284,10 +431,11 @@ func goCommandsWithoutRecord(fileSet *token.FileSet, file *ast.File) (int, []tok
 }
 
 // commandHolders is, for one declaration, the variable each go command is held in, and the variables whose Dir is
-// set from build_inputs.OutsideModule.
+// set from build_inputs.OutsideModule, or from the package's own outsideModule when ownOutsideModule is set.
 type commandHolders struct {
-	heldIn  map[*ast.CallExpr]string
-	outside map[string]bool
+	heldIn           map[*ast.CallExpr]string
+	outside          map[string]bool
+	ownOutsideModule bool
 }
 
 // note reads one assignment of values to targets into the holders. Only an assignment of one value to each target
@@ -309,7 +457,11 @@ func (holders *commandHolders) note(targets []ast.Expr, values []ast.Expr, build
 		}
 		holder, isIdentifier := selector.X.(*ast.Ident)
 		call, isCall := value.(*ast.CallExpr)
-		if isIdentifier && isCall && isPackageCall(call, buildInputsNames, "OutsideModule") {
+		if !isIdentifier || !isCall {
+			continue
+		}
+		if isPackageCall(call, buildInputsNames, "OutsideModule") ||
+			(holders.ownOutsideModule && isLocalCall(call, localOutsideModule)) {
 			holders.outside[holder.Name] = true
 		}
 	}
@@ -340,6 +492,12 @@ func isPackageCall(call *ast.CallExpr, names map[string]bool, function string) b
 	}
 	identifier, isIdentifier := selector.X.(*ast.Ident)
 	return isIdentifier && names[identifier.Name]
+}
+
+// isLocalCall reports whether call is of the function named function, declared in the package itself.
+func isLocalCall(call *ast.CallExpr, function string) bool {
+	identifier, isIdentifier := call.Fun.(*ast.Ident)
+	return isIdentifier && identifier.Name == function
 }
 
 // goSubcommand reports whether call starts the go command through os/exec, and with which subcommand, empty when

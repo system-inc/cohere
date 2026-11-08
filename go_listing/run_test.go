@@ -25,7 +25,7 @@ func listFixture(test *testing.T) ([]go_listing.Package, string) {
 	if argumentsError != nil {
 		test.Fatal(argumentsError)
 	}
-	packages, runError := go_listing.Run(goCommand(root, arguments))
+	packages, runError := go_listing.Run(goCommand(test, root, arguments))
 	if runError != nil {
 		test.Fatal(runError)
 	}
@@ -300,11 +300,11 @@ func TestRunNamesAFailedGoList(test *testing.T) {
 	test.Parallel()
 	root := writeFixture(test)
 	// Without -e a package's error fails the whole run.
-	packages, runError := go_listing.Run(goCommand(root, []string{"list", "-deps", "-json", "./user"}))
+	packages, runError := go_listing.Run(goCommand(test, root, []string{"list", "-deps", "-json", "./user"}))
 	if runError == nil || !strings.Contains(runError.Error(), "string literal not terminated") || packages != nil {
 		test.Errorf("a failed go list is %d packages and %v", len(packages), runError)
 	}
-	command := goCommand(root, []string{"list", "-json", "./dep"})
+	command := goCommand(test, root, []string{"list", "-json", "./dep"})
 	command.Stdout = os.Stdout
 	if _, runError := go_listing.Run(command); runError == nil {
 		test.Error("a command whose output is set ran")

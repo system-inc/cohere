@@ -1,9 +1,12 @@
 package go_listing_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -103,10 +106,12 @@ func writeFixture(test *testing.T) string {
 // goCommand is go run in root with arguments, under this process's environment less what would make
 // the fixture's listing another one: no workspace, no `GOFLAGS`, no module proxy, the local toolchain,
 // and cgo on, so the cgo package is listed as cgo on a machine with no C compiler too (go list
-// compiles nothing).
-func goCommand(root string, arguments []string) *exec.Cmd {
+// compiles nothing). root is checked to lie outside this module, so the command reads nothing Go's
+// test cache could miss.
+func goCommand(test testing.TB, root string, arguments []string) *exec.Cmd {
+	test.Helper()
 	command := exec.Command("go", arguments...)
-	command.Dir = root
+	command.Dir = outsideModule(test, root)
 	command.Env = append(
 		os.Environ(),
 		"GOWORK=off",
@@ -117,4 +122,110 @@ func goCommand(root string, arguments []string) *exec.Cmd {
 		"PWD="+root,
 	)
 	return command
+}
+
+// outsideModule returns directory, a place a test runs the go command, after failing the test unless
+// it lies outside the module the test runs in, symbolic links followed. Go keys a cached test result
+// only on files inside that module, so a go command run on a module the test wrote somewhere of its
+// own reads nothing the cache could miss. It is cohere's build_inputs.OutsideModule, which this
+// module cannot import; cohere's guard accepts a go command whose directory is set from it, here in a
+// nested module alone, and this makes that claim checked rather than trusted.
+func outsideModule(test testing.TB, directory string) string {
+	test.Helper()
+	workingDirectory, workingDirectoryError := os.Getwd()
+	if workingDirectoryError != nil {
+		test.Fatal(workingDirectoryError)
+	}
+	module := workingDirectory
+	for {
+		if _, statError := os.Stat(filepath.Join(module, "go.mod")); statError == nil {
+			break
+		}
+		parent := filepath.Dir(module)
+		if parent == module {
+			test.Fatalf("no go.mod above %s, so there is no module to be outside of", workingDirectory)
+		}
+		module = parent
+	}
+	resolvedModule, moduleError := filepath.EvalSymlinks(module)
+	if moduleError != nil {
+		test.Fatal(moduleError)
+	}
+	absolute, absoluteError := filepath.Abs(directory)
+	if absoluteError != nil {
+		test.Fatal(absoluteError)
+	}
+	resolved, resolveError := filepath.EvalSymlinks(absolute)
+	if resolveError != nil {
+		test.Fatal(resolveError)
+	}
+	relative, relativeError := filepath.Rel(resolvedModule, resolved)
+	if relativeError != nil {
+		test.Fatal(relativeError)
+	}
+	if relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		test.Fatalf(
+			"%s is inside the module at %s, so the go command run there reads this module's code",
+			directory,
+			resolvedModule,
+		)
+	}
+	return directory
+}
+
+// outsideModule fails a test for a directory inside this module, the module's own root and one below
+// it, and passes a directory the test made of its own.
+func TestOutsideModuleFailsADirectoryInsideTheModule(test *testing.T) {
+	test.Parallel()
+	for _, inside := range []string{".", "testdata"} {
+		if failure, _ := outsideModuleFailure(test, inside); failure == "" {
+			test.Errorf("%s passed as outside the module", inside)
+		}
+	}
+	outside := test.TempDir()
+	failure, returned := outsideModuleFailure(test, outside)
+	if failure != "" {
+		test.Errorf("a temporary directory failed as inside the module: %s", failure)
+	}
+	if returned != outside {
+		test.Errorf("outsideModule returned %q for %q", returned, outside)
+	}
+}
+
+// outsideModuleFailure runs outsideModule on directory against a recorder in place of the test, and
+// returns what it failed with, empty when it passed, and what it returned.
+func outsideModuleFailure(test *testing.T, directory string) (string, string) {
+	test.Helper()
+	recorder := &failureRecorder{TB: test}
+	returned := ""
+	done := make(chan struct{})
+	// A failure ends the goroutine as a real test's Fatal does, so outsideModule goes no further.
+	go func() {
+		defer close(done)
+		returned = outsideModule(recorder, directory)
+	}()
+	<-done
+	return recorder.failure, returned
+}
+
+// failureRecorder is a test whose Fatal and Fatalf record the failure and end the calling goroutine,
+// as a real test's do, without failing the test it wraps.
+type failureRecorder struct {
+	testing.TB
+	failure string
+}
+
+func (recorder *failureRecorder) Helper() {
+	// Marking a frame of the wrapped test from this goroutine would touch it from another goroutine, and the
+	// recorder reports nothing, so there are no lines to attribute.
+}
+
+func (recorder *failureRecorder) Fatal(arguments ...any) {
+	recorder.failure = fmt.Sprint(arguments...)
+	runtime.Goexit()
+}
+
+func (recorder *failureRecorder) Fatalf(format string, arguments ...any) {
+	recorder.failure = fmt.Sprintf(format, arguments...)
+	runtime.Goexit()
 }
