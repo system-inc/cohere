@@ -20,6 +20,10 @@ var Analyzer = &analysis.Analyzer{
 	Requires:   []*analysis.Analyzer{positions.Analyzer},
 	Run:        run,
 	ResultType: reflect.TypeFor[*Indexes](),
+	// It reads only comments and the line table, never type information, so a package with errors indexes as any
+	// other. That keeps the syntax dispatcher, which requires what its listeners require, running on such a package
+	// as it promises, so each rule there is skipped for the errors, never failed for a prerequisite.
+	RunDespiteErrors: true,
 }
 
 // Indexes is what Analyzer gives: a package's comment indexes, one for each of its files.

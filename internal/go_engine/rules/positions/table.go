@@ -24,6 +24,9 @@ var Analyzer = &analysis.Analyzer{
 	Doc:        "the line table of every file the package's rules are given, read without the FileSet's lock",
 	Run:        run,
 	ResultType: reflect.TypeFor[*Table](),
+	// It reads only the file set's line tables, never type information, so a package with errors gives its table as
+	// any other, for marker and the syntax dispatcher, which run despite errors too.
+	RunDespiteErrors: true,
 }
 
 // Table answers what fileSet.PositionFor(position, false) answers for any position in the files it was built from,

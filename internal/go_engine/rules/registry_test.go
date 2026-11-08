@@ -21,7 +21,9 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
@@ -364,6 +366,48 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 // TestNoRuleRequiresXToolsSingleAssignmentForm holds the run to one program form: no registered rule, nor
 // anything it requires, needs x/tools' buildssa, which cost 1.2 to 1.7 CPU-s a cold run on cohere for two passes
 // whose ports read the form staticcheck's checks already build (#pn1xvnd).
+// The syntax dispatcher runs despite errors, so on a package with errors each syntax rule is skipped for the errors,
+// as it was when it walked on its own, never failed for a prerequisite. That holds only while everything it requires,
+// its own requirements and every listener's, transitively, runs despite errors too; a listener requiring an analyzer
+// that does not would fail the dispatcher, and every syntax rule with it, on every package with errors.
+func TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors(test *testing.T) {
+	test.Parallel()
+	visited := map[*analysis.Analyzer]bool{}
+	var visit func(analyzer *analysis.Analyzer)
+	visit = func(analyzer *analysis.Analyzer) {
+		if visited[analyzer] {
+			return
+		}
+		visited[analyzer] = true
+		if !analyzer.RunDespiteErrors {
+			test.Errorf("the syntax dispatcher requires %s, which does not run despite errors", analyzer.Name)
+		}
+		for _, required := range analyzer.Requires {
+			visit(required)
+		}
+	}
+	syntaxListeners := 0
+	for _, registered := range All() {
+		if registered.Listener == nil || !registered.Listener.IsSyntax() {
+			continue
+		}
+		syntaxListeners++
+		dispatcher, held := dispatch.Shared(registered.Listener)
+		if !held {
+			test.Fatalf("rule %s's listener is not held by the shared syntax dispatcher", registered.Name)
+		}
+		visit(dispatcher)
+	}
+	if syntaxListeners == 0 {
+		test.Fatal("no registered rule listens to the syntax, so nothing here was checked")
+	}
+	// The shared readers a syntax rule may require, checked whether or not one does yet, so the first rule to require
+	// one never turns every syntax rule's skip on a package with errors into a failed prerequisite.
+	for _, reader := range []*analysis.Analyzer{marker.Analyzer, positions.Analyzer} {
+		visit(reader)
+	}
+}
+
 func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
 	test.Parallel()
 	seen := map[*analysis.Analyzer]bool{}
