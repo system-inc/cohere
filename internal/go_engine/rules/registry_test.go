@@ -865,6 +865,7 @@ var portedPasses = []string{
 	"misplaced_error_result",
 	"modulo_by_one",
 	"nan_comparison",
+	"nanosecond_sleep",
 	"negative_length_comparison",
 	"negative_zero_float",
 	"never_nil_comparison",
