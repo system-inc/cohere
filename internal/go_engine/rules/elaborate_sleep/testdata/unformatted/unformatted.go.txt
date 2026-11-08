@@ -1,0 +1,16 @@
+package unformatted
+
+import "time"
+
+// waits holds the shapes gofmt would rewrite, which the pattern still judges.
+func waits() {
+	select { // reported, fixed: parentheses doubled around the receive
+	case ((<-time.After(0))):
+	}
+	select { // reported, fixed: parentheses doubled around the call and tripled around the argument
+	case <-((time.After(((0))))):
+	}
+	select { // reported, no fix: the lone semicolon is an empty statement, and the body holds it
+	case <-time.After(0): ;
+	}
+}

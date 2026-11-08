@@ -847,6 +847,7 @@ var portedPasses = []string{
 	"duplicate_build_constraint",
 	"duplicate_import",
 	"duration_unit_suffix",
+	"elaborate_sleep",
 	"error_variable_name",
 	"errors_new_of_sprintf",
 	"extreme_comparison",
