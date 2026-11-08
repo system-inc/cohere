@@ -135,6 +135,11 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 			uncheckedSwiftFile{},
 		},
 		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
+		"summary.swift":        {summary.Properties["swift"], swiftSummary{}},
+		"summary.swift.sdkIndexSeed": {
+			summary.Properties["swift"].Properties["sdkIndexSeed"],
+			sdkIndexSeedUse{},
+		},
 		"summary.gaps.withheldInDependencyCgo": {
 			*summary.Properties["gaps"].Properties["withheldInDependencyCgo"].Items,
 			withheldCgoFile{},

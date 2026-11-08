@@ -24,6 +24,8 @@ struct ScriptTypesPhase {
     /* Where the driver and the frontends run, the run's root: every path they are given is absolute. */
     let workingDirectory: URL
     let runner: ProcessRunner
+    /* Where the SDK index seeds live (`SDKIndexSeed`), nil for none: the user's caches, unless a proof points it elsewhere. */
+    var sdkIndexSeedRoot: URL? = SDKIndexSeed.root()
 
     /* What the check found, which scripts it could not vouch for, and the words for the types record. */
     struct Result {
@@ -31,6 +33,8 @@ struct ScriptTypesPhase {
         var filesWithoutRecord: [String]
         var words: String
         var elapsedMilliseconds: Int
+        /* What the check did with the SDK index seed, nil when its store was not empty or it had none to use. */
+        var sdkIndexSeed: SDKIndexSeed.Use? = nil
     }
 
     /* The scripts' scratch under a run's: a check layout of its own, `.check(scratchPath:)`, beside the package's. */
@@ -91,14 +95,20 @@ struct ScriptTypesPhase {
         var findings: [FindingRecord] = []
         var withoutRecord = unchecked.map(\.file)
         var failure = ""
+        var seedUsed: SDKIndexSeed.Use?
         if !modules.isEmpty {
-            let frontend = FrontendCheck(
+            let storePath = IndexStore.storePath(layout: .check(scratchPath: scratch))
+            let seed = sdkIndexSeedRoot.map {
+                SDKIndexSeed(root: $0, swiftVersion: EngineVersion.versionOutput(runner: runner), runner: runner)
+            }
+            var frontend = FrontendCheck(
                 swiftc: swiftc,
                 diagnosticsRoot: TypesPhase.checkDirectory(scratchPath: scratch),
-                indexStorePath: IndexStore.storePath(layout: .check(scratchPath: scratch)),
+                indexStorePath: storePath,
                 workingDirectory: workingDirectory,
                 runner: runner,
             )
+            frontend.sdkIndexSeed = seed
             let outcome: FrontendCheck.Outcome?
             do throws(FrontendCheck.Failure) {
                 outcome = try frontend.check(modules)
@@ -108,6 +118,13 @@ struct ScriptTypesPhase {
                 outcome = nil
             }
             if let outcome {
+                seedUsed = outcome.sdkIndexSeed
+                /* Only a check that missed, started from an empty store and finished every job makes a seed of what it indexed. */
+                if let seed, let used = outcome.sdkIndexSeed, !used.hit, outcome.failedJobs.isEmpty,
+                    outcome.crashes.isEmpty
+                {
+                    seed.publish(from: storePath, key: used.key)
+                }
                 CompileCommands(commands: modules.compactMap(CompileCommands.command(checking:)))
                     .store(scratchPath: scratch)
                 let reading = try CompilerRecords(files: checked, runner: runner).read(
@@ -164,6 +181,7 @@ struct ScriptTypesPhase {
             filesWithoutRecord: withoutRecord,
             words: words,
             elapsedMilliseconds: Pipeline.milliseconds(since: start),
+            sdkIndexSeed: seedUsed,
         )
     }
 
@@ -228,6 +246,9 @@ struct ScriptTypesPhase {
         result.record.filesWithoutRecord = (result.record.filesWithoutRecord + scripts.filesWithoutRecord).sorted()
         result.record.elapsedMilliseconds += scripts.elapsedMilliseconds
         result.record.build += "; \(scripts.words)"
+        result.record.sdkIndexSeed = scripts.sdkIndexSeed.map {
+            TypesRecord.SDKIndexSeed(key: $0.key.name, hit: $0.hit)
+        }
         result.hasErrors = result.findings.contains { $0.severity == .error }
         return result
     }

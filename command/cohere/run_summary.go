@@ -86,6 +86,9 @@ type runSummary struct {
 
 	Gaps runGaps
 
+	// Swift is what only a Swift run says of itself, nil for every other run and for a Swift run with nothing to say.
+	Swift *swiftSummary
+
 	// EngineBuilds are the engines this invocation built before it checked, which no record or replay keeps,
 	// since a build is this invocation's (engine_build.go).
 	EngineBuilds []engineBuild `json:"-"`
@@ -283,4 +286,18 @@ func (summary runSummary) phasesNotRun() []string {
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
 		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0
+}
+
+// swiftSummary is what only a Swift run says of itself.
+type swiftSummary struct {
+	// SdkIndexSeed is what the check of the standalone scripts did with the toolchain's SDK index seed, nil when no
+	// seed applied, since the check's store was not empty.
+	SdkIndexSeed *sdkIndexSeedUse `json:"sdkIndexSeed,omitempty"`
+}
+
+// sdkIndexSeedUse is the seed's key, the name of its folder under the user's caches, and whether the run's store was
+// seeded from it rather than indexing the SDK afresh.
+type sdkIndexSeedUse struct {
+	Key string `json:"key"`
+	Hit bool   `json:"hit"`
 }

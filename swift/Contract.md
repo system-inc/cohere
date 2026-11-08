@@ -476,6 +476,21 @@ as `swift <name>` runs it, and that a script needing other files to compile belo
 script needing companion files fails exactly so. `build` ends by counting the scripts checked alone with `-emit-sib`,
 by platform, and names each script kept unchecked because this Xcode lacks its SDK, which is in `filesWithoutRecord`.
 
+The scripts' check indexes the SDK modules they import (`-index-system-modules`), which `--unused` and the typed rules
+read. Into an empty store, every `--no-cache` run and every first run, it seeds them first from the toolchain's SDK
+index seed (#f6pqraj): a store of the SDK's units alone, never a project's, under
+`~/Library/Caches/cohere/sdk-index/<key>`, outside every project, cloned in whole. The key is everything the units
+depend on, each part compared: the seed's format, the contract, `swift --version`'s whole output, the SDK's path and
+build version, the target, the index flags, the job's whole argument list without its own file and outputs, and the
+modules the scripts import, since Clang writes an SDK header's record differently in another import context. A
+unit the seed cannot vouch for (its bytes, its records, or the module file it was indexed from not as recorded) is
+taken out with every unit that imports it, and indexed afresh; a seed that cannot be read, or none, is a miss, and
+the check indexes everything, then makes the key's seed from what it wrote, in a folder of its own renamed into
+place, never changed after. The types record says so, additive within contract 3, as
+`"sdkIndexSeed": {"key": "<the key's SHA-256>", "hit": true}`, absent when the store was not empty or no seed
+applied; the front door names it under `--verbose` and in `--json`'s summary as `swift.sdkIndexSeed`, never in
+the default line. `COHERE_SDK_INDEX_SEED_ROOT` points the seeds elsewhere, for a bench or a proof.
+
 The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
 not read them yet loses only what they count. The Go engine type-checks every package from source and runs no
 cgo tool, so a dependency's package `"C"` is faked, and every C name is of an invalid type.

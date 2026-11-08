@@ -13,6 +13,19 @@ public struct TypesRecord: Codable, Equatable, Sendable {
     public var elapsedMilliseconds: Int
     public var filesWithoutRecord: [String]
     public var build: String
+    /*
+     Additive within contract 3: what the check of the standalone scripts did with the SDK index seed (`SDKIndexSeed`),
+     its key and whether it was there and used, absent when the check's store was not empty or no seed applied. A cold
+     run that took the toolchain's SDK units is named, never hidden: the front door says it under `--verbose` and in
+     `--json`'s summary as `swift.sdkIndexSeed`.
+     */
+    public var sdkIndexSeed: SDKIndexSeed?
+
+    /* The seed's key, the name of its folder, and whether this run's store was seeded from it. */
+    public struct SDKIndexSeed: Codable, Equatable, Sendable {
+        public var key: String
+        public var hit: Bool
+    }
 
     public init(diagnostics: Int, files: Int, elapsedMilliseconds: Int, filesWithoutRecord: [String], build: String) {
         self.diagnostics = diagnostics

@@ -152,6 +152,10 @@ type engineTypesRecord struct {
 		Packages     int `json:"packages"`
 		Milliseconds int `json:"milliseconds"`
 	} `json:"cgoTranslation"`
+	// SdkIndexSeed is the Swift engine's, additive within contract 3: what the check of its standalone scripts did
+	// with the toolchain's SDK index seed, its key and whether the run's store was seeded from it, absent when no
+	// seed applied. A Go engine sends none.
+	SdkIndexSeed *sdkIndexSeedUse `json:"sdkIndexSeed"`
 }
 
 type engineLintRecord struct {
@@ -786,6 +790,18 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
+
+	// Said, so a cold run that took the toolchain's SDK index units never reads like one that indexed them: in the
+	// account `--verbose` prints and in `--json`'s summary, never in the default line, as #f6pqraj ruled.
+	if seed := record.SdkIndexSeed; seed != nil {
+		if seed.Hit {
+			fmt.Fprintf(accountOutput(run.out), "  types: SDK index units from the toolchain seed %s\n", seed.Key)
+		} else {
+			fmt.Fprintf(accountOutput(run.out),
+				"  types: no toolchain seed %s held the SDK's index units, so they were indexed afresh\n", seed.Key)
+		}
+		activeSummary.Swift = &swiftSummary{SdkIndexSeed: seed}
+	}
 
 	// Said, so a run that withheld what no cgo tool could settle never reads like one with nothing to withhold:
 	// counted under the types line, then each file by name, since a withheld file nobody can find is half said.
