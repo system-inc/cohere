@@ -21,26 +21,27 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-require-error-clause"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_require_error_clause",
-	Doc: "Flags the literal text given to errors.New or fmt.Errorf when it opens on an ordinary English word from " +
-		"policy/ErrorOpeningWords.json written with a sentence's capital, ends with a period, exclamation mark or " +
-		"colon, or opens with failed to, failure, error:, err:, unable to or could not, since an error's text is a " +
-		"clause that reads right after a caller wraps it. A capitalized word outside the vocabulary is never " +
-		"flagged, since a proper name cannot be told by its shape. A text that is not a string literal is not " +
-		"judged, and neither is whether the clause is a gerund, which cannot be told without a dictionary.",
-	Run: run,
-}
+// listener hears every call of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_error_clause", "Flags the literal text given to "+
+	"errors.New or fmt.Errorf when it opens on an ordinary English word from policy/ErrorOpeningWords.json written "+
+	"with a sentence's capital, ends with a period, exclamation mark or colon, or opens with failed to, failure, "+
+	"error:, err:, unable to or could not, since an error's text is a clause that reads right after a caller wraps "+
+	"it. A capitalized word outside the vocabulary is never flagged, since a proper name cannot be told by its shape. "+
+	"A text that is not a string literal is not judged, and neither is whether the clause is a gerund, which cannot "+
+	"be told without a dictionary.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var capitalizedOpeningMessage = policy.MessageOf(Name, "capitalizedOpening")
 
@@ -54,34 +55,29 @@ var failurePrefixes = []string{"failed to", "failure", "error:", "err:", "unable
 // trailingMarks are the marks an error's text may not end on, since each lands mid-line once a caller wraps it.
 const trailingMarks = ".!:"
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall || len(call.Args) == 0 || !isErrorConstructor(pass, call) {
-				return true
-			}
-			argument := ast.Unparen(call.Args[0])
-			if !isLiteralText(argument) {
-				return true
-			}
-			value := pass.TypesInfo.Types[argument].Value
-			// A package that fails to type-check is never run, so a literal always has its value. One that somehow
-			// does not is left alone, since a finding guessed without types is worse than none.
-			if value == nil || value.Kind() != constant.String {
-				return true
-			}
-			judge(pass, argument, constant.StringVal(value))
-			return true
-		})
+// judgeCall judges the literal text a call to errors.New or fmt.Errorf is given.
+func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall || len(call.Args) == 0 || !isErrorConstructor(context, call) {
+		return
 	}
-	return nil, nil
+	argument := ast.Unparen(call.Args[0])
+	if !isLiteralText(argument) {
+		return
+	}
+	value := context.TypesInfo.Types[argument].Value
+	// A package that fails to type-check is never run, so a literal always has its value. One that somehow does not
+	// is left alone, since a finding guessed without types is worse than none.
+	if value == nil || value.Kind() != constant.String {
+		return
+	}
+	judge(context, argument, constant.StringVal(value))
 }
 
 // isErrorConstructor is whether call calls the standard library's errors.New or fmt.Errorf, resolved by the callee's
 // package and name so a function of the same name anywhere else, or a method, is never mistaken for either.
-func isErrorConstructor(pass *analysis.Pass, call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func isErrorConstructor(context *rule.Context, call *ast.CallExpr) bool {
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	if !isFunc || function.Pkg() == nil || function.Signature().Recv() != nil {
 		return false
 	}
@@ -108,19 +104,19 @@ func isLiteralText(expression ast.Expr) bool {
 }
 
 // judge reports each problem with text, the value of the literal argument, at that literal.
-func judge(pass *analysis.Pass, argument ast.Expr, text string) {
+func judge(context *rule.Context, argument ast.Expr, text string) {
 	// A failure prefix is also the opening, so a capitalized one, `Failed to`, is one problem and not two: removing
 	// the prefix removes the capital with it.
 	if prefix, found := failurePrefixOf(text); found {
-		report(pass, argument, failurePrefixMessage, map[string]string{"prefix": prefix})
+		report(context, argument, failurePrefixMessage, map[string]string{"prefix": prefix})
 	} else if word := sentenceCapitalOpening(text); word != "" {
-		report(pass, argument, capitalizedOpeningMessage, map[string]string{"word": word})
+		report(context, argument, capitalizedOpeningMessage, map[string]string{"word": word})
 	}
 	// Trailing space or a newline after the mark still leaves the mark at the end of the clause.
 	trimmed := strings.TrimRightFunc(text, unicode.IsSpace)
 	last, _ := utf8.DecodeLastRuneInString(trimmed)
 	if trimmed != "" && strings.ContainsRune(trailingMarks, last) {
-		report(pass, argument, trailingPunctuationMessage, map[string]string{"punctuation": string(last)})
+		report(context, argument, trailingPunctuationMessage, map[string]string{"punctuation": string(last)})
 	}
 }
 
@@ -168,8 +164,8 @@ func sentenceCapitalOpening(text string) string {
 }
 
 // report flags argument with message rendered from values.
-func report(pass *analysis.Pass, argument ast.Expr, message policy.MessageHandle, values map[string]string) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, argument ast.Expr, message policy.MessageHandle, values map[string]string) {
+	context.Report(analysis.Diagnostic{
 		Pos:      argument.Pos(),
 		End:      argument.End(),
 		Category: message.Id,

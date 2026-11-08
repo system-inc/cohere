@@ -48,24 +48,25 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-boolean-outcome"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_boolean_outcome",
-	Doc: "Flags a declared struct type with a bool field named success, succeeded, ok, isSuccess, isOk, failed, " +
-		"isError or isFailure beside a field named error, errors, message, value, result, reason or data, the " +
-		"result envelope that says how an operation turned out in one bit. A function's (value, ok) and " +
-		"(value, error) results are Go's idiom and are not read, nor is a struct spelled inline.",
-	Run: run,
-}
+// listener hears every type spec of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.TypeSpec)(nil)}, Node: judgeTypeSpec}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_boolean_outcome", "Flags a declared struct type with a "+
+	"bool field named success, succeeded, ok, isSuccess, isOk, failed, isError or isFailure beside a field named "+
+	"error, errors, message, value, result, reason or data, the result envelope that says how an operation turned out "+
+	"in one bit. A function's (value, ok) and (value, error) results are Go's idiom and are not read, nor is a struct "+
+	"spelled inline.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var booleanOutcomeMessage = policy.MessageOf(Name, "booleanOutcome")
 
@@ -115,53 +116,48 @@ type field struct {
 	end   token.Pos
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			typeSpec, isTypeSpec := node.(*ast.TypeSpec)
-			if !isTypeSpec {
-				return true
-			}
-			// Only the bare struct literal is a named field set, as only a bare object literal is in TypeScript.
-			structType, isStruct := typeSpec.Type.(*ast.StructType)
-			if !isStruct {
-				return true
-			}
-			// React properties describe what to render, not how an operation turned out, and the twins exempt the
-			// name everywhere, so the three languages agree on it.
-			if strings.HasSuffix(typeSpec.Name.Name, "Properties") {
-				return true
-			}
-			fields := structFields(pass, structType)
-			flag := booleanOutcomeFlag(fields)
-			if flag == nil {
-				return true
-			}
-			suggested := roleSuffixes.ReplaceAllString(typeSpec.Name.Name, "")
-			if suggested == "" {
-				suggested = typeSpec.Name.Name
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      flag.start,
-				End:      flag.end,
-				Category: booleanOutcomeMessage.Id,
-				Message: booleanOutcomeMessage.Render(map[string]string{
-					"flagName":    flag.name,
-					"declaration": "struct " + typeSpec.Name.Name,
-					"suggested":   suggested,
-				}),
-			})
-			return true
-		})
+// judgeTypeSpec reports the first outcome flag of a type spec that declares a bare struct literal.
+func judgeTypeSpec(context *rule.Context, node ast.Node, _ []ast.Node) {
+	typeSpec, isTypeSpec := node.(*ast.TypeSpec)
+	if !isTypeSpec {
+		return
 	}
-	return nil, nil
+	// Only the bare struct literal is a named field set, as only a bare object literal is in TypeScript.
+	structType, isStruct := typeSpec.Type.(*ast.StructType)
+	if !isStruct {
+		return
+	}
+	// React properties describe what to render, not how an operation turned out, and the twins exempt the name
+	// everywhere, so the three languages agree on it.
+	if strings.HasSuffix(typeSpec.Name.Name, "Properties") {
+		return
+	}
+	fields := structFields(context, structType)
+	flag := booleanOutcomeFlag(fields)
+	if flag == nil {
+		return
+	}
+	suggested := roleSuffixes.ReplaceAllString(typeSpec.Name.Name, "")
+	if suggested == "" {
+		suggested = typeSpec.Name.Name
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      flag.start,
+		End:      flag.end,
+		Category: booleanOutcomeMessage.Id,
+		Message: booleanOutcomeMessage.Render(map[string]string{
+			"flagName":    flag.name,
+			"declaration": "struct " + typeSpec.Name.Name,
+			"suggested":   suggested,
+		}),
+	})
 }
 
 // structFields is every field structType declares, in declaration order, each with its type read from the type
 // checker so that bool is the predeclared type and not a spelling. It is nil when the checker has no struct for the
 // literal, which only broken code gives.
-func structFields(pass *analysis.Pass, structType *ast.StructType) []field {
-	checked, isStruct := pass.TypesInfo.TypeOf(structType).(*types.Struct)
+func structFields(context *rule.Context, structType *ast.StructType) []field {
+	checked, isStruct := context.TypesInfo.TypeOf(structType).(*types.Struct)
 	if !isStruct {
 		return nil
 	}
