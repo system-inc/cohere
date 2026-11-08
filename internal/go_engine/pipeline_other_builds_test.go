@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -246,6 +247,58 @@ func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
 	if hashed != want {
 		test.Errorf("want the host's %d files and each extra build's own hashed, %d in all, got %d hashed",
 			len(hostFiles), want, hashed)
+	}
+}
+
+// describeFile is a file of the other-builds fixture's label package, which every build compiles, with a line past
+// the limit that the long-line wrap breaks after a comma.
+const describeFile = "package label\n\nimport \"fmt\"\n\n" +
+	"// Describe says where a delivery goes and when, as one sentence a reader can follow.\n" +
+	"func Describe(sender string, recipient string, street string, city string, weekday string) string {\n" +
+	"\treturn fmt.Sprintf(\"%s sends a parcel to %s, who lives at %s in %s, and it arrives on %s\", " +
+	"sender, recipient, street, city, weekday)\n}\n"
+
+// When the long-line wrap writes a file in a run under `--other-builds`, the load the lint reads is a second one, whose
+// Restore keys every file again, and each extra build reads the digests of that Restore, of the bytes on disk after
+// the wrap, never the first's, of the bytes it replaced: an extra build keyed on the replaced bytes would save entries
+// under keys of a file no longer on disk. The digests are what this holds every build to. Once the wrapped file is put
+// back as it was, a cached `--no-fix` run also finds what a `--no-cache` one does, though the merge's verdict alone
+// does not tell the stale digests apart: the host's finding on the file stands whatever its extra builds restore.
+func TestOtherBuildsReadTheDigestsOfTheBytesTheWrapWrote(test *testing.T) {
+	test.Parallel()
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	file := filepath.Join(root, "internal", "label", "describe.go")
+	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	engine, stream := runOverWith(test, root, exitFindings, "--other-builds")
+	if !strings.Contains(stream, `"fixedBy":{"cohere-go/consistency-no-long-line":1}`) {
+		test.Fatalf("want the wrap to break the long line of %s, got\n%s", file, stream)
+	}
+	wrapped, readError := os.ReadFile(file)
+	if readError != nil || string(wrapped) == describeFile {
+		test.Fatalf("the run left %s as it was (%v)", file, readError)
+	}
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	}
+	onDisk := sha256.Sum256(wrapped)
+	for _, run := range engine.buildRuns {
+		digest, held := run.files.Digest(file)
+		if !held || digest != onDisk {
+			test.Errorf("%s keyed %s at %x (held %t), want the wrapped bytes on disk, %x", run.build, file, digest,
+				held, onDisk)
+		}
+	}
+
+	if writeError := os.WriteFile(file, []byte(describeFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	_, cached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix")
+	_, uncached := runOverWith(test, root, exitFindings, "--other-builds", "--no-fix", "--no-cache")
+	if withoutCache(cached) != withoutCache(uncached) {
+		test.Errorf("over the bytes the wrap replaced, the cached run's stream differs from a --no-cache run's:\n"+
+			"cached\n%s\nwithout the cache\n%s", cached, uncached)
 	}
 }
 

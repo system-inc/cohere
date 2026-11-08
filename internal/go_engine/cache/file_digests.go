@@ -25,6 +25,12 @@ func (digests FileDigests) Paths() iter.Seq[string] {
 	return maps.Keys(digests.byPath)
 }
 
+// Digest is the sha256 digests holds of file, and false when it holds none.
+func (digests FileDigests) Digest(file string) ([sha256.Size]byte, bool) {
+	digest, held := digests.byPath[file]
+	return digest, held
+}
+
 // filesHashed counts the files this process has hashed for a key, which FilesHashed reads.
 var filesHashed atomic.Int64
 
