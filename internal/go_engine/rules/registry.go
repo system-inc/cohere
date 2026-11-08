@@ -6,8 +6,6 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/nilness"
-	"golang.org/x/tools/go/analysis/passes/unusedwrite"
 	"golang.org/x/tools/go/analysis/suite/vet"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
@@ -61,6 +59,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_wrapped_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_sql_string"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_machine_path"
@@ -68,14 +67,16 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_uncached_run"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
 
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
 // x/tools v0.49.0 and staticcheck v0.8.1, and still true at v0.50.0, which go.mod requires: the four vet passes
-// below are byte-identical between the two. Every other pass in vet's suite reads pass.TypesInfo, nilness and
-// unusedwrite read the `SSA` form built from it, and staticcheck's checks read it through the helpers they
-// share (analysis/code, pattern, buildir). A pass missing from this table counts as type aware, so a pass a
-// newer release adds is never described as running without types before someone has read it.
+// below are byte-identical between the two. Every other pass in vet's suite reads pass.TypesInfo, the ports of
+// nilness and unusedwrite read staticcheck's intermediate form built from it, and staticcheck's checks read it
+// through the helpers they share (analysis/code, pattern, buildir). A pass missing from this table counts as
+// type aware, so a pass a newer release adds is never described as running without types before someone has
+// read it.
 var syntaxOnly = map[string]bool{
 	// buildtag reads build constraint lines from the files' comments and text.
 	"buildtag": true,
@@ -125,7 +126,9 @@ var stylecheckRuledOn = map[string]bool{
 // vet's suite comes first, read from vet.Suite rather than retyped, so `cohere` in a Go repository is
 // never weaker than `go vet`, and a newer x/tools that adds a pass adds its rule here with no edit. Then
 // two of x/tools' own passes that vet leaves out, which find real bugs: a nil dereference or a comparison
-// with nil whose answer is already known, and a write to a struct or array nothing reads again. Then
+// with nil whose answer is already known, and a write to a struct or array nothing reads again. Each runs as
+// our port onto staticcheck's intermediate form, under the original's name, so the run builds one program form
+// where x/tools' would build a second for these two alone (#pn1xvnd). Then
 // staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 through an
 // analyzer that reports what it finds. staticcheck's QF checks are quick fixes an editor offers, not
 // findings.
@@ -147,8 +150,8 @@ func All() []rule.Rule {
 	for _, analyzer := range vet.Suite {
 		registered = append(registered, portedRule(analyzer, rule.OriginVet))
 	}
-	registered = append(registered, portedRule(nilness.Analyzer, rule.OriginTools))
-	registered = append(registered, portedRule(unusedwrite.Analyzer, rule.OriginTools))
+	registered = append(registered, portedRule(nil_ness.Analyzer, rule.OriginTools))
+	registered = append(registered, portedRule(unused_write.Analyzer, rule.OriginTools))
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
