@@ -13,9 +13,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/analysis/passes/loopclosure"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -298,26 +296,43 @@ func checkedByHand(test *testing.T, packagePath string, fileName string, source 
 	return handChecked{fileSet: fileSet, file: file, typesPackage: checked, information: information}
 }
 
-// runByHand runs analyzer's Run on a pass over the file checked holds, with the inspector it requires, and returns
-// what it reports.
+// runByHand runs analyzer's Run on a pass over the file checked holds, and returns what it reports. Everything
+// analyzer requires runs first over the same file, as a driver runs it: the original's inspector, and the port's
+// syntax dispatcher with what that walk reads.
 func runByHand(test *testing.T, analyzer *analysis.Analyzer, checked handChecked) []finding {
 	test.Helper()
 	found := []finding{}
-	pass := &analysis.Pass{
-		Analyzer:   analyzer,
-		Fset:       checked.fileSet,
-		Files:      []*ast.File{checked.file},
-		Pkg:        checked.typesPackage,
-		TypesInfo:  checked.information,
-		TypesSizes: types.SizesFor("gc", "arm64"),
-		ResultOf:   map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New([]*ast.File{checked.file})},
-		Report: func(diagnostic analysis.Diagnostic) {
-			found = append(found, findingOf(checked.fileSet, diagnostic))
-		},
+	results := map[*analysis.Analyzer]any{}
+	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic))
+	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) {
+		resultOf := map[*analysis.Analyzer]any{}
+		for _, required := range running.Requires {
+			if _, isRun := results[required]; !isRun {
+				run(required, func(analysis.Diagnostic) {
+					// A requirement's findings are not the analyzer's, and none of these makes any.
+				})
+			}
+			resultOf[required] = results[required]
+		}
+		pass := &analysis.Pass{
+			Analyzer:   running,
+			Fset:       checked.fileSet,
+			Files:      []*ast.File{checked.file},
+			Pkg:        checked.typesPackage,
+			TypesInfo:  checked.information,
+			TypesSizes: types.SizesFor("gc", "arm64"),
+			ResultOf:   resultOf,
+			Report:     report,
+		}
+		result, runError := running.Run(pass)
+		if runError != nil {
+			test.Fatalf("running %s: %v", running.Name, runError)
+		}
+		results[running] = result
 	}
-	if _, runError := analyzer.Run(pass); runError != nil {
-		test.Fatalf("running %s: %v", analyzer.Name, runError)
-	}
+	run(analyzer, func(diagnostic analysis.Diagnostic) {
+		found = append(found, findingOf(checked.fileSet, diagnostic))
+	})
 	return found
 }
 

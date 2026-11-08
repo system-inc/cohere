@@ -17,6 +17,9 @@
 // constraint's one term. The registry runs the port in the original's place, and the original stays the oracle: the
 // parity tests beside this file run both over the same packages and compare findings and fixes, and the differences
 // fixture pins each fix withheld.
+//
+// It sits on the engine's syntax dispatcher, entering each file and hearing each call within it on the walk the
+// dispatcher makes once for every syntax rule.
 package string_int_conv
 
 import (
@@ -25,51 +28,74 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "stringintconv",
-	Doc: "check for string(int) conversions\n\n" +
-		"This checker flags conversions of the form string(x) where x is an integer\n" +
-		"(but not byte or rune) type. Such conversions are discouraged because they\n" +
-		"return the UTF-8 representation of the Unicode code point x, and not a decimal\n" +
-		"string representation of x as one might expect. Furthermore, if x denotes an\n" +
-		"invalid code point, the conversion cannot be statically rejected.\n\n" +
-		"For conversions that intend on using the code point, consider replacing them\n" +
-		"with string(rune(x)). Otherwise, strconv.Itoa and its equivalents return the\n" +
-		"string representation of the value in the desired base.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/stringintconv",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "stringintconv"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for string(int) conversions\n\n" +
+	"This checker flags conversions of the form string(x) where x is an integer\n" +
+	"(but not byte or rune) type. Such conversions are discouraged because they\n" +
+	"return the UTF-8 representation of the Unicode code point x, and not a decimal\n" +
+	"string representation of x as one might expect. Furthermore, if x denotes an\n" +
+	"invalid code point, the conversion cannot be statically rejected.\n\n" +
+	"For conversions that intend on using the code point, consider replacing them\n" +
+	"with string(rune(x)). Otherwise, strconv.Itoa and its equivalents return the\n" +
+	"string representation of the value in the desired base."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/stringintconv"
+
+// Listener is what the port hears of each package from the dispatcher: each file as the walk enters it, and every
+// call within it, in preorder, as the original's Preorder over files and calls visits them, of which it judges the
+// conversions of an integer to a string.
+var Listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      checkCall,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("string_int_conv: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// walkState is what the port keeps over the package's walk, held in its context's state.
+type walkState struct {
+	// file is the file the walk is in, which the fix that imports fmt edits. The walk enters each file before the
+	// calls within it, as the original's Preorder does.
+	file *ast.File
+}
+
+// enterFile records file as the one the walk is in.
+func enterFile(context *rule.Context, file *ast.File) {
+	rule.State[walkState](context).file = file
+}
+
+// checkCall judges node, a call within the file the walk is in, as a conversion.
+func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	// The file the walk is in, which the fix that imports fmt edits. Preorder visits each file before the calls within
-	// it, as the original's does, and its type switch hands each node over typed, with no assertion to check.
-	var file *ast.File
-	inspected.Preorder([]ast.Node{(*ast.File)(nil), (*ast.CallExpr)(nil)}, func(node ast.Node) {
-		switch visited := node.(type) {
-		case *ast.File:
-			file = visited
-		case *ast.CallExpr:
-			checkConversion(pass, file, visited)
-		}
-	})
-	return nil, nil
+	checkConversion(context, rule.State[walkState](context).file, call)
 }
 
 // checkConversion reports call, within file, when it converts an integer that is neither a byte nor a rune to a
 // string, with the fixes that apply.
-func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
+func checkConversion(context *rule.Context, file *ast.File, call *ast.CallExpr) {
 	if len(call.Args) != 1 {
 		return
 	}
@@ -78,9 +104,9 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	var converter types.Object
 	switch named := call.Fun.(type) {
 	case *ast.Ident:
-		converter = pass.TypesInfo.Uses[named]
+		converter = context.TypesInfo.Uses[named]
 	case *ast.SelectorExpr:
-		converter = pass.TypesInfo.Uses[named.Sel]
+		converter = context.TypesInfo.Uses[named.Sel]
 	}
 	// A call of a function, a method or a value of function type is no conversion.
 	target, isTypeName := converter.(*types.TypeName)
@@ -112,7 +138,7 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	// Next, the first type in V's set whose underlying type is an integer that is neither a byte nor a rune. types.Byte
 	// and types.Rune are the kinds of uint8 and int32, so those are passed over too.
 	argument := call.Args[0]
-	sourceType := pass.TypesInfo.TypeOf(argument)
+	sourceType := context.TypesInfo.TypeOf(argument)
 	sourceTypes, sourceError := structuralTypes(sourceType)
 	if sourceError != nil {
 		return // An invalid type, as the original reads one.
@@ -158,7 +184,7 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 	// the original's.
 	if len(targetTypes) == 1 && len(sourceTypes) == 1 && types.NewMethodSet(sourceInteger).Len() == 0 &&
 		!printsItself(sourceType) {
-		prefix, importEdits := addImport(pass.TypesInfo, file, "fmt", "fmt", "Sprint", argument.Pos())
+		prefix, importEdits := addImport(context.TypesInfo, file, "fmt", "fmt", "Sprint", argument.Pos())
 		switch {
 		case !types.Identical(targetString, types.Typ[types.String]):
 			// `mystring(x)` becomes `mystring(fmt.Sprint(x))`, which keeps the conversion and so its type.
@@ -169,7 +195,7 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 					analysis.TextEdit{Pos: call.Rparen, End: call.Rparen, NewText: []byte(")")},
 				),
 			})
-		case types.Identical(pass.TypesInfo.TypeOf(call), types.Typ[types.String]):
+		case types.Identical(context.TypesInfo.TypeOf(call), types.Typ[types.String]):
 			// `string(x)` becomes `fmt.Sprint(x)`, a string as the conversion was. A conversion to a type parameter
 			// whose one term is string, `AllString(x)`, is not one, so the original's fix there would change the
 			// result's type, and the port does not offer it.
@@ -194,7 +220,7 @@ func checkConversion(pass *analysis.Pass, file *ast.File, call *ast.CallExpr) {
 			},
 		})
 	}
-	pass.Report(diagnostic)
+	context.Report(diagnostic)
 }
 
 // convertibleToRune is whether every one of candidates converts to a rune.

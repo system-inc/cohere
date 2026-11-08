@@ -3,15 +3,17 @@
 // context.WithCancel returns a cancel function that must be called. Two lists name what is judged, each a flag: funcs,
 // the package-level functions by import path and name, and stringmethods, the names of methods of type
 // `func() string`, Error and String by default. A call in the body of a `for b.Loop()` benchmark loop is left alone,
-// since testing.B.Loop keeps its results alive by design.
+// since testing.B.Loop keeps its results alive by design. It sits on the engine's syntax dispatcher, hearing each
+// expression statement on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unusedresult/unusedresult.go,
 // whose logic it keeps and whose messages it reports word for word, at the same position. The one difference is
 // where the flags live: the original binds them to package variables, so every copy of its analyzer shares one
-// setting, and the port reads them from the analyzer running the pass, so a configured copy and the default can run
-// side by side. The names, defaults and parsing of the two flags are the original's. The registry runs the port in
-// the original's place, and the original stays the oracle: the parity tests beside this file run both over the same
-// packages, under the default flags and under others. The two agree everywhere, so there is no differences fixture.
+// setting, and the port reads them as its context's options, the flags of the analyzer the rule was built as, so a
+// configured copy and the default can run side by side. The names, defaults and parsing of the two flags are the
+// original's. The registry runs the port in the original's place, and the original stays the oracle: the parity
+// tests beside this file run both over the same packages, under the default flags and under others. The two agree
+// everywhere, so there is no differences fixture.
 package unused_result
 
 import (
@@ -23,10 +25,27 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
+
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "unusedresult"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for unused results of calls to some functions\n\n" +
+	"Some functions like fmt.Errorf return a result and have no side\n" +
+	"effects, so it is always a mistake to discard the result. Other\n" +
+	"functions may return an error that must not be ignored, or a cleanup\n" +
+	"operation that must be called. This analyzer reports calls to\n" +
+	"functions like these when the result of the call is ignored.\n\n" +
+	"The set of functions may be controlled using flags."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unusedresult"
 
 // functionsOption names the flag listing the package-level functions whose results must be used, each as its
 // package's import path, a dot and its name.
@@ -36,9 +55,18 @@ const functionsOption = "funcs"
 // used.
 const stringMethodsOption = "stringmethods"
 
-// Analyzer runs the port under the original's name, documentation, address and flags, so the rule, its settings and
-// every `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = newAnalyzer()
+// Listener is what the port hears of each package from the dispatcher: every expression statement, in preorder, as
+// the original's Preorder visits them, with its ancestors, of which the benchmark loop's exemption reads the parent
+// and grandparent. The two lists are read from the context's options once for the package, on the first statement,
+// and kept in the context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.ExprStmt)(nil)},
+	Node:  checkStatement,
+}
+
+// Analyzer runs the port under the original's name, documentation, address and flags, reporting what the shared
+// syntax dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
 // defaultFunctions is the original's list of the standard library's functions whose results must be used. Its
 // context.With entries are effectively redundant with the lostcancel pass, as the original notes.
@@ -113,22 +141,13 @@ type qualifiedName struct {
 	name        string
 }
 
-// newAnalyzer is the analyzer with each flag holding a set of its own, filled with the original's default, so a copy
-// configured in a test never changes the one the registry runs.
-func newAnalyzer() *analysis.Analyzer {
-	analyzer := &analysis.Analyzer{
-		Name: "unusedresult",
-		Doc: "check for unused results of calls to some functions\n\n" +
-			"Some functions like fmt.Errorf return a result and have no side\n" +
-			"effects, so it is always a mistake to discard the result. Other\n" +
-			"functions may return an error that must not be ignored, or a cleanup\n" +
-			"operation that must be called. This analyzer reports calls to\n" +
-			"functions like these when the result of the call is ignored.\n\n" +
-			"The set of functions may be controlled using flags.",
-		URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unusedresult",
-		Requires: []*analysis.Analyzer{inspect.Analyzer},
-		Run:      run,
-	}
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset, and the original's two flags, the options the listener's context reads, each holding a
+// set of its own, filled with the original's default, so a copy configured in a test never changes the one the
+// registry runs.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
 	// A set of its own, so nothing done to one analyzer's flag reaches another's or the defaults.
 	functions := maps.Clone(defaultFunctions)
 	analyzer.Flags.Var(&functions, functionsOption, "comma-separated list of functions whose results must be used")
@@ -138,76 +157,79 @@ func newAnalyzer() *analysis.Analyzer {
 	return analyzer
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unused_result: inspect's result is missing")
-	}
-	// Split once per package, as the original does, so each call is looked up by a key rather than by built text. An
-	// entry with no dot, or only a leading one, names no package, and is skipped.
-	functions := map[qualifiedName]bool{}
-	for entry := range *optionOf(pass, functionsOption) {
-		if index := strings.LastIndexByte(entry, '.'); index > 0 {
-			functions[qualifiedName{packagePath: entry[:index], name: entry[index+1:]}] = true
-		}
-	}
-	stringMethods := optionOf(pass, stringMethodsOption)
-	// Preorder visits each expression statement in the order the original's Preorder does, and a cursor knows its
-	// parent and grandparent, which the benchmark loop's exemption reads.
-	for cursor := range inspected.Root().Preorder((*ast.ExprStmt)(nil)) {
-		statement, isStatement := cursor.Node().(*ast.ExprStmt)
-		if !isStatement {
-			// Invariant: Preorder yields only the node types it was asked for.
-			panic("unused_result: Preorder yielded a node that is not an expression statement")
-		}
-		// `(fmt.Sprint(""))` is a call statement too: the specification lets one be parenthesized.
-		call, isCall := ast.Unparen(statement.X).(*ast.CallExpr)
-		if !isCall {
-			continue
-		}
-		if inBenchmarkLoop(pass.TypesInfo, cursor) {
-			continue
-		}
-		// A call of a function value, a builtin or a conversion has no *types.Func, and is never judged. Callee looks
-		// through parentheses and type arguments, and resolves a method value or expression to its method.
-		function, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-		if !isFunction {
-			continue
-		}
-		if function.Signature().Recv() != nil {
-			if types.Identical(function.Signature(), stringResultSignature) && (*stringMethods)[function.Name()] {
-				pass.Report(analysis.Diagnostic{
-					Pos: call.Pos(),
-					End: call.Lparen,
-					Message: fmt.Sprintf("result of (%s).%s call not used",
-						function.Signature().Recv().Type(), function.Name()),
-				})
-			}
-			continue
-		}
-		// Only a declared function has no receiver, and every declared function belongs to a package: the universe
-		// declares none, so Pkg is never nil here.
-		if functions[qualifiedName{packagePath: function.Pkg().Path(), name: function.Name()}] {
-			pass.Report(analysis.Diagnostic{
-				Pos:     call.Pos(),
-				End:     call.Lparen,
-				Message: fmt.Sprintf("result of %s.%s call not used", function.Pkg().Path(), function.Name()),
-			})
-		}
-	}
-	return nil, nil
+// packageState is what the port reads once for its package, in the context's state, as the original reads it before
+// it walks anything: its two lists.
+type packageState struct {
+	// decided is whether the lists have been read yet.
+	decided bool
+	// functions is funcs, each entry split at its last dot.
+	functions map[qualifiedName]bool
+	// stringMethods is stringmethods as its flag holds it.
+	stringMethods *nameSet
 }
 
-// optionOf is the set the named flag of the analyzer running pass holds. It is read from the pass rather than bound
-// to a package variable, so a configured copy of the analyzer and the registry's can run side by side.
-func optionOf(pass *analysis.Pass, option string) *nameSet {
-	defined := pass.Analyzer.Flags.Lookup(option)
-	if defined == nil {
-		// Invariant: run is only ever the Run of an analyzer newAnalyzer made, which defines both flags.
-		panic("unused_result: the analyzer has no " + option + " flag")
+// checkStatement reports node when it is a call statement dropping the result of a function or method the lists
+// name, outside the body of a benchmark loop.
+func checkStatement(context *rule.Context, node ast.Node, stack []ast.Node) {
+	statement, isStatement := node.(*ast.ExprStmt)
+	if !isStatement {
+		return
 	}
-	names, isNameSet := defined.Value.(*nameSet)
+	state := rule.State[packageState](context)
+	if !state.decided {
+		state.decided = true
+		// Split once per package, as the original does, so each call is looked up by a key rather than by built text.
+		// An entry with no dot, or only a leading one, names no package, and is skipped.
+		state.functions = map[qualifiedName]bool{}
+		for entry := range *optionOf(context, functionsOption) {
+			if index := strings.LastIndexByte(entry, '.'); index > 0 {
+				state.functions[qualifiedName{packagePath: entry[:index], name: entry[index+1:]}] = true
+			}
+		}
+		state.stringMethods = optionOf(context, stringMethodsOption)
+	}
+	// `(fmt.Sprint(""))` is a call statement too: the specification lets one be parenthesized.
+	call, isCall := ast.Unparen(statement.X).(*ast.CallExpr)
+	if !isCall {
+		return
+	}
+	if inBenchmarkLoop(context.TypesInfo, stack) {
+		return
+	}
+	// A call of a function value, a builtin or a conversion has no *types.Func, and is never judged. Callee looks
+	// through parentheses and type arguments, and resolves a method value or expression to its method.
+	function, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	if !isFunction {
+		return
+	}
+	if function.Signature().Recv() != nil {
+		if types.Identical(function.Signature(), stringResultSignature) && (*state.stringMethods)[function.Name()] {
+			context.Report(analysis.Diagnostic{
+				Pos: call.Pos(),
+				End: call.Lparen,
+				Message: fmt.Sprintf("result of (%s).%s call not used",
+					function.Signature().Recv().Type(), function.Name()),
+			})
+		}
+		return
+	}
+	// Only a declared function has no receiver, and every declared function belongs to a package: the universe
+	// declares none, so Pkg is never nil here.
+	if state.functions[qualifiedName{packagePath: function.Pkg().Path(), name: function.Name()}] {
+		context.Report(analysis.Diagnostic{
+			Pos:     call.Pos(),
+			End:     call.Lparen,
+			Message: fmt.Sprintf("result of %s.%s call not used", function.Pkg().Path(), function.Name()),
+		})
+	}
+}
+
+// optionOf is the set the named option of the rule holds, the flag of the analyzer the rule was built as. It is read
+// from the context rather than bound to a package variable, so a configured copy of the analyzer and the registry's
+// can run side by side.
+func optionOf(context *rule.Context, option string) *nameSet {
+	// Option panics on an option the analyzer has no flag for, and newAnalyzer defines both.
+	names, isNameSet := context.Option(option).(*nameSet)
 	if !isNameSet {
 		// Invariant: newAnalyzer defines both flags with a nameSet as their value.
 		panic("unused_result: the " + option + " flag does not hold a set of names")
@@ -215,16 +237,22 @@ func optionOf(pass *analysis.Pass, option string) *nameSet {
 	return names
 }
 
-// inBenchmarkLoop reports whether the expression statement at cursor is a statement of the body of a `for b.Loop()`
-// loop, where b is a *testing.B, whose Loop keeps the results of the calls there alive, so they are unused on purpose.
-// Only a statement directly in the body counts, as in the original: one nested in a block, an if or a label is judged.
-func inBenchmarkLoop(information *types.Info, cursor inspector.Cursor) bool {
-	// The statement's parent is the loop's body, and its grandparent the loop. A for statement's init and post are
-	// simple statements, never a block, so a block whose parent is a for statement is that loop's body.
-	if _, inBlock := cursor.Parent().Node().(*ast.BlockStmt); !inBlock {
+// inBenchmarkLoop reports whether the expression statement stack leads to, its ancestors outermost first, is a
+// statement of the body of a `for b.Loop()` loop, where b is a *testing.B, whose Loop keeps the results of the calls
+// there alive, so they are unused on purpose. Only a statement directly in the body counts, as in the original: one
+// nested in a block, an if or a label is judged.
+func inBenchmarkLoop(information *types.Info, stack []ast.Node) bool {
+	// The statement's parent, the last of its ancestors, is the loop's body, and its grandparent, the one before, the
+	// loop. A statement always sits in a file and a declaration, so it has both; one with fewer is in no loop.
+	if len(stack) < 2 {
 		return false
 	}
-	loop, isLoop := cursor.Parent().Parent().Node().(*ast.ForStmt)
+	// A for statement's init and post are simple statements, never a block, so a block whose parent is a for
+	// statement is that loop's body.
+	if _, inBlock := stack[len(stack)-1].(*ast.BlockStmt); !inBlock {
+		return false
+	}
+	loop, isLoop := stack[len(stack)-2].(*ast.ForStmt)
 	if !isLoop {
 		return false
 	}

@@ -2,7 +2,8 @@
 // 2006-02-01, year, day and month, which no common calendar standard writes, so 2006-01-02, year, month and day, was
 // almost surely meant. Only a layout the compiler knows, a constant, is judged; a layout held in a variable is left
 // alone. Where the layout is written as one string literal, the finding covers the mistake inside it and offers the
-// fix that swaps in 2006-01-02.
+// fix that swaps in 2006-01-02. It sits on the engine's syntax dispatcher, hearing each call on the walk the
+// dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/timeformat/timeformat.go, whose
 // logic it keeps and whose messages and fix it reports word for word. The registry runs the port in the original's
@@ -35,9 +36,10 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // badFormat is the layout the pass looks for, year, day and month, and goodFormat the one it suggests, year, month and
@@ -47,70 +49,91 @@ const (
 	goodFormat = "2006-01-02"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "timeformat",
-	Doc: "check for calls of (time.Time).Format or time.Parse with 2006-02-01\n\n" +
-		"The timeformat checker looks for time formats with the 2006-02-01 (yyyy-dd-mm)\n" +
-		"format. Internationally, \"yyyy-dd-mm\" does not occur in common calendar date\n" +
-		"standards, and so it is more likely that 2006-01-02 (yyyy-mm-dd) was intended.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/timeformat",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "timeformat"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for calls of (time.Time).Format or time.Parse with 2006-02-01\n\n" +
+	"The timeformat checker looks for time formats with the 2006-02-01 (yyyy-dd-mm)\n" +
+	"format. Internationally, \"yyyy-dd-mm\" does not occur in common calendar date\n" +
+	"standards, and so it is more likely that 2006-01-02 (yyyy-mm-dd) was intended."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/timeformat"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
+// Preorder visits them, of which it judges the calls of (time.Time).Format and time.Parse. Every package is heard,
+// even one that does not import "time": a value of time.Time, returned by a function of another package, has its
+// Format method called without the import.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node:  checkCall,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("time_format: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// checkCall reports node when it calls (time.Time).Format or time.Parse with a constant layout holding badFormat,
+// over the mistake and with its fix where the layout is one string literal.
+func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	// Every package is walked, even one that does not import "time": a value of time.Time, returned by a function of
-	// another package, has its Format method called without the import.
-	// All visits each call in preorder, as the original's Preorder does, and hands it over typed.
-	for call := range inspector.All[*ast.CallExpr](inspected) {
-		callee := typeutil.Callee(pass.TypesInfo, call)
-		if !isMethodNamed(callee, "time", "Time", "Format") && !isFunctionNamed(callee, "time", "Parse") {
-			continue
-		}
-		// Both take the layout first, after the receiver when Format is called as a method expression, so a call that
-		// type-checks always has it. The original's guard is kept for a package with type errors, whose calls may be
-		// missing arguments.
-		layoutIndex := 0
-		if isMethodExpression(pass.TypesInfo, call.Fun) {
-			layoutIndex = 1
-		}
-		if len(call.Args) <= layoutIndex {
-			continue
-		}
-		layout := call.Args[layoutIndex]
-		badAt := badFormatAt(pass.TypesInfo, layout)
-		if badAt < 0 {
-			continue
-		}
-		// Only a layout written as one literal has source text the fix can rewrite. A named constant or a constant
-		// expression is reported at its start, with no fix, as the original reports it.
-		literal, isLiteral := layout.(*ast.BasicLit)
-		if !isLiteral {
-			pass.Report(analysis.Diagnostic{Pos: layout.Pos(), Message: badFormat + " should be " + goodFormat})
-			continue
-		}
-		start, end, spanError := spanOf(pass, literal, badAt)
-		if spanError != nil {
-			return nil, spanError
-		}
-		pass.Report(analysis.Diagnostic{
-			Pos:     start,
-			End:     end,
-			Message: badFormat + " should be " + goodFormat,
-			SuggestedFixes: []analysis.SuggestedFix{{
-				Message:   "Replace " + badFormat + " with " + goodFormat,
-				TextEdits: []analysis.TextEdit{{Pos: start, End: end, NewText: []byte(goodFormat)}},
-			}},
-		})
+	callee := typeutil.Callee(context.TypesInfo, call)
+	if !isMethodNamed(callee, "time", "Time", "Format") && !isFunctionNamed(callee, "time", "Parse") {
+		return
 	}
-	return nil, nil
+	// Both take the layout first, after the receiver when Format is called as a method expression, so a call that
+	// type-checks always has it. The original's guard is kept for a package with type errors, whose calls may be
+	// missing arguments.
+	layoutIndex := 0
+	if isMethodExpression(context.TypesInfo, call.Fun) {
+		layoutIndex = 1
+	}
+	if len(call.Args) <= layoutIndex {
+		return
+	}
+	layout := call.Args[layoutIndex]
+	badAt := badFormatAt(context.TypesInfo, layout)
+	if badAt < 0 {
+		return
+	}
+	// Only a layout written as one literal has source text the fix can rewrite. A named constant or a constant
+	// expression is reported at its start, with no fix, as the original reports it.
+	literal, isLiteral := layout.(*ast.BasicLit)
+	if !isLiteral {
+		context.Report(analysis.Diagnostic{Pos: layout.Pos(), Message: badFormat + " should be " + goodFormat})
+		return
+	}
+	start, end, spanError := spanOf(context, literal, badAt)
+	if spanError != nil {
+		// A listener returns no error, so the one that ended the port's run on the package, a file that no longer
+		// holds the literal its syntax does, is raised as it is, its text unchanged, with no finding, as a run that
+		// returned it had none.
+		// Invariant: the dispatcher's recover makes this panic the rule's crash on the package, so it never stops
+		// the process.
+		panic(spanError)
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:     start,
+		End:     end,
+		Message: badFormat + " should be " + goodFormat,
+		SuggestedFixes: []analysis.SuggestedFix{{
+			Message:   "Replace " + badFormat + " with " + goodFormat,
+			TextEdits: []analysis.TextEdit{{Pos: start, End: end, NewText: []byte(goodFormat)}},
+		}},
+	})
 }
 
 // isMethodExpression reports whether callee, looking through parentheses, selects a method from a type,
@@ -148,15 +171,15 @@ func badFormatAt(information *types.Info, expression ast.Expr) int {
 
 // spanOf is where literal's source text spells the badFormat its value holds at badAt: from the first byte of the
 // source that decodes into the value at badAt to the byte after the last that decodes into it.
-func spanOf(pass *analysis.Pass, literal *ast.BasicLit, badAt int) (token.Pos, token.Pos, error) {
-	source, sourceError := sourceOf(pass, literal)
+func spanOf(context *rule.Context, literal *ast.BasicLit, badAt int) (token.Pos, token.Pos, error) {
+	source, sourceError := sourceOf(context, literal)
 	if sourceError != nil {
 		return token.NoPos, token.NoPos, sourceError
 	}
 	start, startError := sourceOffset(source, badAt)
 	if startError != nil {
 		return token.NoPos, token.NoPos,
-			fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), startError)
+			fmt.Errorf("time_format: %s: %w", context.Fset.Position(literal.Pos()), startError)
 	}
 	// The walk stops at the first byte after the value before the mistake, and in a raw literal the carriage returns
 	// there decode into nothing, so they spell no part of the mistake. The mistake follows them, so the loop ends on
@@ -167,7 +190,7 @@ func spanOf(pass *analysis.Pass, literal *ast.BasicLit, badAt int) (token.Pos, t
 	end, endError := sourceOffset(source, badAt+len(badFormat))
 	if endError != nil {
 		return token.NoPos, token.NoPos,
-			fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), endError)
+			fmt.Errorf("time_format: %s: %w", context.Fset.Position(literal.Pos()), endError)
 	}
 	return literal.Pos() + token.Pos(start), literal.Pos() + token.Pos(end), nil
 }
@@ -175,16 +198,16 @@ func spanOf(pass *analysis.Pass, literal *ast.BasicLit, badAt int) (token.Pos, t
 // sourceOf is literal's source text, quotes included. An interpreted literal's is the text its syntax keeps. A raw
 // literal's is read from its file, since the scanner drops a raw literal's carriage returns from the text it keeps,
 // while the positions it records count them.
-func sourceOf(pass *analysis.Pass, literal *ast.BasicLit) (string, error) {
+func sourceOf(context *rule.Context, literal *ast.BasicLit) (string, error) {
 	if !strings.HasPrefix(literal.Value, "`") {
 		return literal.Value, nil
 	}
-	file := pass.Fset.File(literal.Pos())
+	file := context.Fset.File(literal.Pos())
 	if file == nil {
-		// Invariant: every position in a package's syntax lies in a file of the pass's file set.
+		// Invariant: every position in a package's syntax lies in a file of the package's file set.
 		panic("time_format: a layout literal lies in no file of the file set")
 	}
-	content, readError := pass.ReadFile(file.Name())
+	content, readError := context.ReadFile(file.Name())
 	if readError != nil {
 		return "", fmt.Errorf("time_format: reading %s for a layout literal: %w", file.Name(), readError)
 	}
@@ -197,7 +220,7 @@ func sourceOf(pass *analysis.Pass, literal *ast.BasicLit) (string, error) {
 	}
 	if closing < 0 {
 		return "", fmt.Errorf("time_format: %s: %s no longer holds the raw literal the syntax holds there",
-			pass.Fset.Position(literal.Pos()), file.Name())
+			context.Fset.Position(literal.Pos()), file.Name())
 	}
 	return string(content[opening : opening+1+closing+1]), nil
 }

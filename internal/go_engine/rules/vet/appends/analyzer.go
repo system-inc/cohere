@@ -1,7 +1,8 @@
 // Package appends is vet's appends pass, a call to the builtin append that passes the slice alone and no values to
 // append to it, which is always a no-op and often a sign of an underlying mistake. A function the package declares
 // under the name append, or a variable holding one, is not the builtin, so only a call the type checker resolves to
-// the builtin is judged.
+// the builtin is judged. It sits on the engine's syntax dispatcher, hearing each call on the walk the dispatcher makes
+// once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/appends/appends.go, whose logic
 // it keeps and whose message it reports word for word, over the same range. The registry runs the port in the
@@ -14,50 +15,64 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. Doc is the section of the
-// original's doc.go its analyzerutil.MustExtractDoc extracts, written out, since production code must not import the
-// original.
-var Analyzer = &analysis.Analyzer{
-	Name: "appends",
-	Doc: "check for missing values after append\n\n" +
-		"This checker reports calls to append that pass\n" +
-		"no values to be appended to the slice.\n\n" +
-		"\ts := []string{\"a\", \"b\", \"c\"}\n" +
-		"\t_ = append(s)\n\n" +
-		"Such calls are always no-ops and often indicate an\n" +
-		"underlying mistake.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/appends",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "appends"
+
+// passDoc is the section of the original's doc.go its analyzerutil.MustExtractDoc extracts, written out, since
+// production code must not import the original.
+const passDoc = "check for missing values after append\n\n" +
+	"This checker reports calls to append that pass\n" +
+	"no values to be appended to the slice.\n\n" +
+	"\ts := []string{\"a\", \"b\", \"c\"}\n" +
+	"\t_ = append(s)\n\n" +
+	"Such calls are always no-ops and often indicate an\n" +
+	"underlying mistake."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/appends"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
+// Preorder visits them, so a call nested in another's arguments is reported after the call that holds it.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node:  checkCall,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("appends: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// checkCall reports node when it calls the builtin append with the slice alone.
+func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	// All visits each call in preorder, as the original's Preorder does, and hands it over typed, so a call nested in
-	// another's arguments is reported after the call that holds it.
-	for call := range inspector.All[*ast.CallExpr](inspected) {
-		// Callee looks through parentheses around the called name, `(append)(values)`, and resolves it through Uses,
-		// so a package's own function or a local variable named append is not the builtin, and a conversion, which
-		// calls nothing, resolves to no object at all.
-		builtin, isBuiltin := typeutil.Callee(pass.TypesInfo, call).(*types.Builtin)
-		if !isBuiltin || builtin.Name() != "append" || len(call.Args) != 1 {
-			continue
-		}
-		pass.Report(analysis.Diagnostic{
-			Pos:     call.Pos(),
-			End:     call.End(),
-			Message: "append with no values",
-		})
+	// Callee looks through parentheses around the called name, `(append)(values)`, and resolves it through Uses, so a
+	// package's own function or a local variable named append is not the builtin, and a conversion, which calls
+	// nothing, resolves to no object at all.
+	builtin, isBuiltin := typeutil.Callee(context.TypesInfo, call).(*types.Builtin)
+	if !isBuiltin || builtin.Name() != "append" || len(call.Args) != 1 {
+		return
 	}
-	return nil, nil
+	context.Report(analysis.Diagnostic{
+		Pos:     call.Pos(),
+		End:     call.End(),
+		Message: "append with no values",
+	})
 }
