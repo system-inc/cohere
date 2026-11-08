@@ -13,87 +13,74 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-require-checked-assertion"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_require_checked_assertion",
-	Doc: "Flags a single-value type assertion, value.(Type), which panics when the value is not that type, so every " +
-		"assertion is the comma-ok form or a type switch. An assertion to an interface the static type already " +
-		"implements is flagged too, since a nil value fails every assertion. An assertion of a variable inside the " +
-		"single-type case of a type switch on that variable cannot miss, and gets its own message asking for the " +
-		"switch's bound value instead; an assignment to the variable between the switch and the assertion is not " +
-		"looked for.",
-	Run: run,
-}
+// listener hears every type assertion of the syntax dispatcher's walk, with the ancestors a type switch around it is
+// found among.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.TypeAssertExpr)(nil)}, Node: judgeAssertion}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_checked_assertion", "Flags a single-value type "+
+	"assertion, value.(Type), which panics when the value is not that type, so every assertion is the comma-ok form "+
+	"or a type switch. An assertion to an interface the static type already implements is flagged too, since a nil "+
+	"value fails every assertion. An assertion of a variable inside the single-type case of a type switch on that "+
+	"variable cannot miss, and gets its own message asking for the switch's bound value instead; an assignment to "+
+	"the variable between the switch and the assertion is not looked for.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var uncheckedAssertionMessage = policy.MessageOf(Name, "uncheckedAssertion")
 
 var assertionInMatchingCaseMessage = policy.MessageOf(Name, "assertionInMatchingCase")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// The nodes from the file down to the one being visited, so an assertion can find the type switch around
-		// it. ast.Inspect calls back with nil as it leaves a node it walked into, which is where that node is
-		// popped; the callback always returns true, so every push has its pop.
-		var ancestors []ast.Node
-		ast.Inspect(file, func(node ast.Node) bool {
-			if node == nil {
-				ancestors = ancestors[:len(ancestors)-1]
-				return true
-			}
-			ancestors = append(ancestors, node)
-			assertion, isAssertion := node.(*ast.TypeAssertExpr)
-			// A type switch's value.(type) has no Type and cannot panic: a value no case matches runs the default
-			// case or nothing. Its operand is still walked, since it may hold an assertion of its own.
-			if !isAssertion || assertion.Type == nil {
-				return true
-			}
-			recorded, isRecorded := pass.TypesInfo.Types[assertion]
-			// A package that fails to type-check is never run, so every assertion is recorded. One that somehow is
-			// not is left alone, since a finding guessed without types is worse than none.
-			if !isRecorded {
-				return true
-			}
-			// go/types records an assertion read as comma-ok, `typed, ok := value.(Type)` in any of its assignment
-			// and declaration forms and through any parentheses, as the tuple (Type, bool). That is the one form
-			// that cannot panic, so the type decides it rather than the shape of the statement around it.
-			if _, isCommaOk := recorded.Type.(*types.Tuple); isCommaOk {
-				return true
-			}
-			// Past the comma-ok check, the recorded type is the assertion's target, spelled as this package's own
-			// code would spell it.
-			target := types.TypeString(recorded.Type, types.RelativeTo(pass.Pkg))
-			// The ancestors end with the assertion itself, so its parents are everything before it.
-			if operand := matchedOperand(pass, assertion, recorded.Type, ancestors[:len(ancestors)-1]); operand != nil {
-				pass.Report(analysis.Diagnostic{
-					Pos:      assertion.Pos(),
-					End:      assertion.End(),
-					Category: assertionInMatchingCaseMessage.Id,
-					Message: assertionInMatchingCaseMessage.Render(map[string]string{
-						"type":  target,
-						"value": operand.Name,
-					}),
-				})
-				return true
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      assertion.Pos(),
-				End:      assertion.End(),
-				Category: uncheckedAssertionMessage.Id,
-				Message:  uncheckedAssertionMessage.Render(map[string]string{"type": target}),
-			})
-			return true
-		})
+// judgeAssertion reports node when it is a single-value type assertion, with the message for one a type switch among
+// stack, its ancestors, already matched.
+func judgeAssertion(context *rule.Context, node ast.Node, stack []ast.Node) {
+	assertion, isAssertion := node.(*ast.TypeAssertExpr)
+	// A type switch's value.(type) has no Type and cannot panic: a value no case matches runs the default case or
+	// nothing. Its operand is still walked, since it may hold an assertion of its own.
+	if !isAssertion || assertion.Type == nil {
+		return
 	}
-	return nil, nil
+	recorded, isRecorded := context.TypesInfo.Types[assertion]
+	// A package that fails to type-check is never run, so every assertion is recorded. One that somehow is not is
+	// left alone, since a finding guessed without types is worse than none.
+	if !isRecorded {
+		return
+	}
+	// go/types records an assertion read as comma-ok, `typed, ok := value.(Type)` in any of its assignment and
+	// declaration forms and through any parentheses, as the tuple (Type, bool). That is the one form that cannot
+	// panic, so the type decides it rather than the shape of the statement around it.
+	if _, isCommaOk := recorded.Type.(*types.Tuple); isCommaOk {
+		return
+	}
+	// Past the comma-ok check, the recorded type is the assertion's target, spelled as this package's own code would
+	// spell it.
+	target := types.TypeString(recorded.Type, types.RelativeTo(context.Package))
+	if operand := matchedOperand(context, assertion, recorded.Type, stack); operand != nil {
+		context.Report(analysis.Diagnostic{
+			Pos:      assertion.Pos(),
+			End:      assertion.End(),
+			Category: assertionInMatchingCaseMessage.Id,
+			Message: assertionInMatchingCaseMessage.Render(map[string]string{
+				"type":  target,
+				"value": operand.Name,
+			}),
+		})
+		return
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      assertion.Pos(),
+		End:      assertion.End(),
+		Category: uncheckedAssertionMessage.Id,
+		Message:  uncheckedAssertionMessage.Render(map[string]string{"type": target}),
+	})
 }
 
 // matchedOperand returns the assertion's operand when a type switch around the assertion already matched it:
@@ -102,7 +89,7 @@ func run(pass *analysis.Pass) (any, error) {
 // assertion cannot miss, so it is told to use the switch's bound value rather than that it panics. Anything else
 // returns nil and gets the ordinary message.
 func matchedOperand(
-	pass *analysis.Pass,
+	context *rule.Context,
 	assertion *ast.TypeAssertExpr,
 	target types.Type,
 	parents []ast.Node,
@@ -111,7 +98,7 @@ func matchedOperand(
 	if !isIdentifier {
 		return nil
 	}
-	operandVariable, isVariable := pass.TypesInfo.Uses[operand].(*types.Var)
+	operandVariable, isVariable := context.TypesInfo.Uses[operand].(*types.Var)
 	if !isVariable {
 		return nil
 	}
@@ -128,10 +115,10 @@ func matchedOperand(
 				continue
 			}
 			typeSwitch, isTypeSwitch := parents[index-2].(*ast.TypeSwitchStmt)
-			if !isTypeSwitch || typeSwitchSubject(pass, typeSwitch) != operandVariable {
+			if !isTypeSwitch || typeSwitchSubject(context, typeSwitch) != operandVariable {
 				continue
 			}
-			caseType := pass.TypesInfo.TypeOf(parent.List[0])
+			caseType := context.TypesInfo.TypeOf(parent.List[0])
 			if caseType != nil && types.Identical(caseType, target) {
 				return operand
 			}
@@ -142,7 +129,7 @@ func matchedOperand(
 
 // typeSwitchSubject returns the variable a type switch switches on, `value` in `switch value.(type)` and in
 // `switch typed := value.(type)`, or nil when the subject is anything but an identifier naming a variable.
-func typeSwitchSubject(pass *analysis.Pass, typeSwitch *ast.TypeSwitchStmt) *types.Var {
+func typeSwitchSubject(context *rule.Context, typeSwitch *ast.TypeSwitchStmt) *types.Var {
 	var guard ast.Expr
 	switch statement := typeSwitch.Assign.(type) {
 	case *ast.ExprStmt:
@@ -162,6 +149,6 @@ func typeSwitchSubject(pass *analysis.Pass, typeSwitch *ast.TypeSwitchStmt) *typ
 	if !isIdentifier {
 		return nil
 	}
-	subjectVariable, _ := pass.TypesInfo.Uses[subject].(*types.Var)
+	subjectVariable, _ := context.TypesInfo.Uses[subject].(*types.Var)
 	return subjectVariable
 }
