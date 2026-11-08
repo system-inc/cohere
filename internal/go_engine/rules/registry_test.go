@@ -876,6 +876,7 @@ var portedPasses = []string{
 	"nil_context_argument",
 	"nil_ness",
 	"non_canonical_header_key",
+	"non_pointer_unmarshal",
 	"receiver_name",
 	"repeated_if_else_condition",
 	"self_assignment",
