@@ -843,6 +843,7 @@ var portedPasses = []string{
 	"duplicate_build_constraint",
 	"duplicate_import",
 	"duration_unit_suffix",
+	"dynamic_printf_format",
 	"error_variable_name",
 	"extreme_comparison",
 	"http_status_literal",
