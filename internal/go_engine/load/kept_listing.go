@@ -54,15 +54,17 @@ type keptListing struct {
 // walk to find packages, and each one a package it listed lives in, which reaches the workspace's other modules. An
 // edit below a file's imports, the edit nearly every edit is, moves none of it. When the fingerprint of all of that
 // is the one the kept answer was read from, the answer is go list's own; any difference, or anything that cannot be
-// read, asks go list. It reports whether the answer was kept.
+// read, asks go list. It reports whether the answer was kept. Every file held holds is read from its held bytes, by
+// the fingerprint and the lister alike.
 func cachedList(
 	workspace string,
 	environment []string,
 	patterns []string,
 	listings ListingStore,
+	held Held,
 ) (*listing, bool, error) {
 	if listings == nil {
-		listed, listError := list(workspace, environment, patterns)
+		listed, listError := list(workspace, environment, patterns, held)
 		return listed, false, listError
 	}
 	key, goEnvironment, keyError := listingKey(workspace, environment, patterns)
@@ -72,17 +74,17 @@ func cachedList(
 	if contents, stored := listings.Kept(key); stored {
 		var kept keptListing
 		if gob.NewDecoder(bytes.NewReader(contents)).Decode(&kept) == nil {
-			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles)
+			fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held)
 			if certain && fingerprint == kept.Fingerprint {
 				return kept.listing(), true, nil
 			}
 		}
 	}
-	listed, listError := list(workspace, environment, patterns)
+	listed, listError := list(workspace, environment, patterns, held)
 	if listError != nil {
 		return nil, false, listError
 	}
-	kept, keepable := keepListing(workspace, goEnvironment["GOMODCACHE"], goEnvironment["GOROOT"], listed)
+	kept, keepable := keepListing(workspace, goEnvironment["GOMODCACHE"], goEnvironment["GOROOT"], listed, held)
 	var encoded bytes.Buffer
 	if keepable && gob.NewEncoder(&encoded).Encode(kept) == nil {
 		// Ignored: a listing that cannot be kept is asked of go list again next run, which is all its keeping saves.
@@ -137,8 +139,15 @@ func listingKey(
 // A package's directory is left out only when it cannot move: one in the module cache whose module has a version,
 // which the cache never rewrites under that version, and one in the toolchain's root that is in no module, the
 // standard library, which moves only with the toolchain's version the key hashes. Anything else there, a replace
-// into the module cache by path, say, is read like any directory of the workspace.
-func keepListing(workspace string, moduleCache string, toolchainRoot string, listed *listing) (keptListing, bool) {
+// into the module cache by path, say, is read like any directory of the workspace. Each file held holds is
+// fingerprinted from its held bytes.
+func keepListing(
+	workspace string,
+	moduleCache string,
+	toolchainRoot string,
+	listed *listing,
+	held Held,
+) (keptListing, bool) {
 	roots := []string{workspace}
 	directories := map[string]bool{}
 	moduleFiles := map[string]bool{}
@@ -174,7 +183,7 @@ func keepListing(workspace string, moduleCache string, toolchainRoot string, lis
 		RootPaths:   sortedKeys(listed.roots),
 		TestOnly:    sortedKeys(listed.testOnly),
 	}
-	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles)
+	fingerprint, certain := listingFingerprint(kept.Roots, kept.Directories, kept.ModuleFiles, held)
 	kept.Fingerprint = fingerprint
 	return kept, certain
 }
@@ -216,8 +225,14 @@ func isUnder(path string, roots []string) bool {
 // module file's bytes, and each directory's entries with each Go file's header, the directories being those the
 // roots hold, walked as go walks a pattern, and the listed ones. It reports whether it read all of it: a module
 // file that is absent is read as absent, but anything that could not be read, a directory, a Go file or a module
-// file, is a doubt, and a doubt is never taken for nothing having moved.
-func listingFingerprint(roots []string, directories []string, moduleFiles []string) ([sha256.Size]byte, bool) {
+// file, is a doubt, and a doubt is never taken for nothing having moved. A Go file held holds is read from its held
+// bytes, which are the disk's.
+func listingFingerprint(
+	roots []string,
+	directories []string,
+	moduleFiles []string,
+	held Held,
+) ([sha256.Size]byte, bool) {
 	digest := sha256.New()
 	certain := true
 	for _, file := range moduleFiles {
@@ -256,7 +271,7 @@ func listingFingerprint(roots []string, directories []string, moduleFiles []stri
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			parts[index], readWhole[index] = directoryFingerprint(directory)
+			parts[index], readWhole[index] = directoryFingerprint(directory, held)
 		}()
 	}
 	group.Wait()
@@ -299,8 +314,9 @@ func packageDirectories(root string) ([]string, bool) {
 
 // directoryFingerprint is the sha256 of one directory's entries, each by name and kind, and of each Go file's header.
 // A directory with a `//go:embed` line has every entry below it hashed too, since the files a pattern embeds are
-// listed, and a pattern can reach into a subdirectory and into testdata. It reports whether it read all of it.
-func directoryFingerprint(directory string) ([sha256.Size]byte, bool) {
+// listed, and a pattern can reach into a subdirectory and into testdata. It reports whether it read all of it. A Go
+// file held holds is read from its held bytes.
+func directoryFingerprint(directory string, held Held) ([sha256.Size]byte, bool) {
 	digest := sha256.New()
 	entries, readError := os.ReadDir(directory)
 	if readError != nil {
@@ -313,7 +329,7 @@ func directoryFingerprint(directory string) ([sha256.Size]byte, bool) {
 		if !entry.Type().IsRegular() || filepath.Ext(entry.Name()) != ".go" {
 			continue
 		}
-		header, embedding, readable := goFileHeader(filepath.Join(directory, entry.Name()))
+		header, embedding, readable := goFileHeader(filepath.Join(directory, entry.Name()), held)
 		writeParts(digest, []string{header})
 		embeds = embeds || embedding
 		whole = whole && readable
@@ -340,9 +356,9 @@ func directoryFingerprint(directory string) ([sha256.Size]byte, bool) {
 // error there, so an edit to a function's body moves no listing. readGoInfo is the reason this is enough, so a Go
 // whose readGoInfo reads more of a file is a reason to look here again. A file that does not parse that far is hashed
 // whole, since go list's error about it can depend on any of it. It returns whether the file embeds, and whether it
-// could be read.
-func goFileHeader(file string) (string, bool, bool) {
-	contents, readError := os.ReadFile(file)
+// could be read. A file held holds is read from its held bytes, and any other from disk.
+func goFileHeader(file string, held Held) (string, bool, bool) {
+	contents, readError := held.read(file)
 	if readError != nil {
 		return "", false, false
 	}

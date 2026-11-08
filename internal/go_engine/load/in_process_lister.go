@@ -98,10 +98,10 @@ var (
 )
 
 // listInProcess is list without go list: the same listing, in the same order, with the same fields, read in this
-// process (see inProcessLister). It returns why it could not answer when it could not, and then the listing is nil
-// and go list answers instead.
-func listInProcess(workspace string, environment []string, patterns []string) (*listing, string) {
-	lister, doubt := newInProcessLister(workspace, environment)
+// process (see inProcessLister), each file held holds read from its held bytes. It returns why it could not answer
+// when it could not, and then the listing is nil and go list answers instead.
+func listInProcess(workspace string, environment []string, patterns []string, held Held) (*listing, string) {
+	lister, doubt := newInProcessLister(workspace, environment, held)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -174,12 +174,14 @@ func listInProcess(workspace string, environment []string, patterns []string) (*
 }
 
 // newInProcessLister reads the build list, the build context and the go environment, and says why it cannot list
-// at all when something in them is beyond what it carries.
-func newInProcessLister(workspace string, environment []string) (*inProcessLister, string) {
+// at all when something in them is beyond what it carries. Its build context opens a file held holds from its held
+// bytes, and any other on disk, so go/build reads no file the run already holds again.
+func newInProcessLister(workspace string, environment []string, held Held) (*inProcessLister, string) {
 	read, doubt := readGoState(workspace, environment)
 	if doubt != "" {
 		return nil, doubt
 	}
+	read.context.OpenFile = held.openFile()
 	lister := &inProcessLister{
 		workspace:     workspace,
 		environment:   environment,

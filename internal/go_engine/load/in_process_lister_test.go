@@ -131,7 +131,7 @@ func requireGoListsAnswer(test *testing.T, directory string, extra []string, pat
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	inProcess, doubt := listInProcess(directory, environment, patterns)
+	inProcess, doubt := listInProcess(directory, environment, patterns, nil)
 	if doubt != "" {
 		test.Fatalf("the in-process lister did not answer: %s", doubt)
 	}
@@ -254,7 +254,7 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 			if environmentError != nil {
 				test.Fatal(environmentError)
 			}
-			listed, doubt := listInProcess(directory, environment, []string{"./..."})
+			listed, doubt := listInProcess(directory, environment, []string{"./..."}, nil)
 			if doubt == "" {
 				test.Fatalf("the lister answered with %d packages", len(listed.packages))
 			}
@@ -278,7 +278,7 @@ func TestADoubtIsGoListsToAnswer(test *testing.T) {
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, listError := list(directory, environment, []string{"./..."})
+	listed, listError := list(directory, environment, []string{"./..."}, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}

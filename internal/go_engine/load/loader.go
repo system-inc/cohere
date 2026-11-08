@@ -38,8 +38,10 @@ type loader struct {
 
 	withheld *withheldErrors
 
-	// overlay is the bytes a file is parsed from in place of what is on disk, by its absolute path.
+	// overlay is the bytes a file is parsed from in place of what is on disk, by its absolute path, and held the bytes
+	// the run holds of what is on disk, read in place of opening a file it holds again.
 	overlay map[string][]byte
+	held    Held
 
 	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
 	restored map[*packages.Package]*Restored
@@ -283,13 +285,14 @@ func (loader *loader) parseFiles(files []string) ([]*ast.File, []error) {
 	return syntax, parseErrors
 }
 
-// parseFile reads and parses one file in the mode go/packages parses in, from the overlay when it holds the file.
+// parseFile reads and parses one file in the mode go/packages parses in, from the overlay when it holds the file, else
+// from the bytes the run holds of it, else from disk.
 func (loader *loader) parseFile(file string) (*ast.File, error) {
 	loader.filesParsed.Add(1)
 	if contents, overlaid := loader.overlay[file]; overlaid {
 		return parser.ParseFile(loader.fileSet, file, contents, parser.AllErrors|parser.ParseComments)
 	}
-	contents, readError := os.ReadFile(file)
+	contents, readError := loader.held.read(file)
 	if readError != nil {
 		return nil, readError
 	}
@@ -443,8 +446,15 @@ func newTypesInfo() *types.Info {
 	}
 }
 
-// newLoader is a loader for graph, with one slot per core, parsing each file in overlay from its bytes there.
-func newLoader(built *graph, sizes types.Sizes, withheld *withheldErrors, overlay map[string][]byte) *loader {
+// newLoader is a loader for graph, with one slot per core, parsing each file in overlay from its bytes there and each
+// other file held holds from its held bytes.
+func newLoader(
+	built *graph,
+	sizes types.Sizes,
+	withheld *withheldErrors,
+	overlay map[string][]byte,
+	held Held,
+) *loader {
 	return &loader{
 		graph:    built,
 		fileSet:  token.NewFileSet(),
@@ -453,5 +463,6 @@ func newLoader(built *graph, sizes types.Sizes, withheld *withheldErrors, overla
 		parsed:   map[string]*parsedFile{},
 		withheld: withheld,
 		overlay:  overlay,
+		held:     held,
 	}
 }

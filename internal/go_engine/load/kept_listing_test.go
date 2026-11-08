@@ -233,7 +233,7 @@ func TestOnlyWhatCannotMoveIsLeftOutOfTheListing(test *testing.T) {
 		{ImportPath: "moduled", Directory: filepath.Join(toolchainRoot, "moduled"),
 			Module: &packages.Module{Path: "moduled"}},
 	}
-	kept, keepable := keepListing(filepath.Join(root, "workspace"), moduleCache, toolchainRoot, listed)
+	kept, keepable := keepListing(filepath.Join(root, "workspace"), moduleCache, toolchainRoot, listed, nil)
 	if !keepable {
 		test.Fatalf("want a listing without errors kept")
 	}
@@ -242,7 +242,7 @@ func TestOnlyWhatCannotMoveIsLeftOutOfTheListing(test *testing.T) {
 		test.Fatalf("want only what can move read, %q, got %q", want, kept.Directories)
 	}
 	listed.packages[0].Error = &listedError{Message: "cannot find module"}
-	if _, keepable := keepListing(filepath.Join(root, "workspace"), moduleCache, toolchainRoot, listed); keepable {
+	if _, keepable := keepListing(filepath.Join(root, "workspace"), moduleCache, toolchainRoot, listed, nil); keepable {
 		test.Fatalf("want a listing with an error never kept")
 	}
 }
