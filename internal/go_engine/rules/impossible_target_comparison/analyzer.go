@@ -28,42 +28,32 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none, and walks
-// each file itself, as the original does, rather than through the inspector.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4032",
-	Doc: "Flags a comparison of runtime.GOOS or runtime.GOARCH with a value the file's build constraints rule out: " +
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it, which
+// Check walks itself, as the original does.
+var Listener = rule.Listener{FileEnter: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4032",
+	"SA4032",
+	"Flags a comparison of runtime.GOOS or runtime.GOARCH with a value the file's build constraints rule out: "+
 		"staticcheck's SA4032, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{generated.Analyzer},
-	Run:      run,
-}
+	&Listener,
+)
 
 // maximumOtherTags is how many tags other than operating systems or architectures a constraint may name and still be
 // judged, since judging it tries every combination of them, two to the power of their count.
 const maximumOtherTags = 10
-
-// run builds the pass's context and judges every constrained file of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	for _, file := range context.Files {
-		Check(context, file)
-	}
-	return nil, nil
-}
 
 // Check judges one file: when it has a build constraint, each comparison in it of runtime.GOOS or runtime.GOARCH with
 // a known value the constraint rules out.
