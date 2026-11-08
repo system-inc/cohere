@@ -106,15 +106,15 @@ func compareDifferences(test *testing.T, directory string, pattern string) {
 		test.Fatal(readError)
 	}
 	records := recordsOf(test, pattern+".go", content)
-	originalAlone := difference(original, port)
-	portAlone := difference(port, original)
+	originalAlone := unclaimedFindings(difference(original, port))
+	portAlone := unclaimedFindings(difference(port, original))
 	moves := 0
 	finds := 0
 	for _, recorded := range records {
-		portFound := takeRecorded(test, "the port", &portAlone, recorded.found)
+		portFound := portAlone.claim(test, "the port", recorded.found)
 		if recorded.kind == "moves" {
 			moves++
-			originalFound := takeRecorded(test, "the original", &originalAlone, recorded.found)
+			originalFound := originalAlone.claim(test, "the original", recorded.found)
 			if originalFound != nil && checkFix(content, *originalFound) == nil {
 				test.Errorf("the original's fix at %s is right, so %s:%d records no difference",
 					described(*originalFound), recorded.found.file, recorded.found.line)
@@ -195,12 +195,15 @@ func recordsOf(test *testing.T, file string, content []byte) []record {
 	return records
 }
 
-// takeRecorded removes from alone the one finding on pinned's line with pinned's message and returns it, and fails the
-// test, returning nil, unless there is exactly one.
-func takeRecorded(test *testing.T, side string, alone *[]finding, pinned finding) *finding {
+// unclaimedFindings is the findings one side alone makes that no record of a differences fixture has claimed yet.
+type unclaimedFindings []finding
+
+// claim removes the one finding on pinned's line with pinned's message and returns it, and fails the test, returning
+// nil, unless there is exactly one.
+func (unclaimed *unclaimedFindings) claim(test *testing.T, side string, pinned finding) *finding {
 	test.Helper()
 	matching := []int{}
-	for index, found := range *alone {
+	for index, found := range *unclaimed {
 		if found.file == pinned.file && found.line == pinned.line && found.message == pinned.message {
 			matching = append(matching, index)
 		}
@@ -210,9 +213,9 @@ func takeRecorded(test *testing.T, side string, alone *[]finding, pinned finding
 			side, pinned.message, len(matching))
 		return nil
 	}
-	taken := (*alone)[matching[0]]
-	*alone = slices.Delete(*alone, matching[0], matching[0]+1)
-	return &taken
+	claimed := (*unclaimed)[matching[0]]
+	*unclaimed = slices.Delete(*unclaimed, matching[0], matching[0]+1)
+	return &claimed
 }
 
 // checkFix applies found's one fix to content and reports what is wrong with it: anything but one edit of found's
@@ -235,7 +238,8 @@ func checkFix(content []byte, found finding) error {
 	if !strings.HasPrefix(before.Value, "`") {
 		unquoted, unquoteError := strconv.Unquote(`"` + replaced + `"`)
 		if unquoteError != nil {
-			return fmt.Errorf("it replaces %q, which is not whole characters of the literal: %w", replaced, unquoteError)
+			return fmt.Errorf("it replaces %q, which is not whole characters of the literal: %w", replaced,
+				unquoteError)
 		}
 		decoded = unquoted
 	}
@@ -304,8 +308,8 @@ func described(found finding) string {
 		found.message, found.fixes)
 }
 
-// findingsOf loads the fixture packages patterns name in the tree at directory, runs x/tools' timeformat and the port over them in one checker,
-// and returns each one's findings, sorted.
+// findingsOf loads the fixture packages patterns name in the tree at directory, runs x/tools' timeformat and the port
+// over them in one checker, and returns each one's findings, sorted.
 func findingsOf(test *testing.T, directory string, patterns ...string) (original []finding, port []finding) {
 	test.Helper()
 	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.

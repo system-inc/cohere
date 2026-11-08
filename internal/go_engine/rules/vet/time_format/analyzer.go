@@ -155,7 +155,8 @@ func spanOf(pass *analysis.Pass, literal *ast.BasicLit, badAt int) (token.Pos, t
 	}
 	start, startError := sourceOffset(source, badAt)
 	if startError != nil {
-		return token.NoPos, token.NoPos, fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), startError)
+		return token.NoPos, token.NoPos,
+			fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), startError)
 	}
 	// The walk stops at the first byte after the value before the mistake, and in a raw literal the carriage returns
 	// there decode into nothing, so they spell no part of the mistake. The mistake follows them, so the loop ends on
@@ -165,7 +166,8 @@ func spanOf(pass *analysis.Pass, literal *ast.BasicLit, badAt int) (token.Pos, t
 	}
 	end, endError := sourceOffset(source, badAt+len(badFormat))
 	if endError != nil {
-		return token.NoPos, token.NoPos, fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), endError)
+		return token.NoPos, token.NoPos,
+			fmt.Errorf("time_format: %s: %w", pass.Fset.Position(literal.Pos()), endError)
 	}
 	return literal.Pos() + token.Pos(start), literal.Pos() + token.Pos(end), nil
 }
