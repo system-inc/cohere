@@ -16,47 +16,36 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1000",
-	Doc:      "Flags a select of one case, and a for loop around one that receives: staticcheck's S1000, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every for and select statement of the package, in one preorder.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("single_case_select: the inspect pass's result is missing")
-	}
-	// The check depends on the preorder's order, as the original's seen set does: a for statement comes before every
-	// statement nested in it, so the select its finding names is in seen by the time the preorder reaches that select,
-	// and the select is not reported a second time.
-	seen := &Seen{}
-	inspected.Preorder([]ast.Node{(*ast.ForStmt)(nil), (*ast.SelectStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every for and select statement, in one
+// preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.ForStmt)(nil), (*ast.SelectStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		// The check depends on the preorder's order, as the original's seen set does: a for statement comes before
+		// every statement nested in it, so the select its finding names is in seen by the time the preorder reaches
+		// that select, and the select is not reported a second time. The seen set is the rule's state over the
+		// package, the same one on every call there.
+		seen := rule.State[Seen](context)
 		if covering := Check(context, node, seen); covering != nil {
 			seen.record(covering)
 		}
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1000",
+	"S1000",
+	"Flags a select of one case, and a for loop around one that receives: staticcheck's S1000, ported.",
+	&Listener,
+)
 
 // Check judges one node of the preorder against seen, which it reads and never writes, and returns the select a for
 // statement's finding names, for the caller to record in seen, or nil. A for statement with no clauses around a sole
@@ -83,8 +72,8 @@ func Check(context *rule.Context, node ast.Node, seen *Seen) *ast.SelectStmt {
 			staticcheck_report.FilterGenerated())
 		return nil
 	default:
-		// Invariant: the preorder hands Check only the for and select statements it was asked for.
-		panic("single_case_select: the inspector handed over a node that is neither a for nor a select statement")
+		// Invariant: the dispatcher hands Node, and Node Check, only the for and select statements it was asked for.
+		panic("single_case_select: the dispatcher handed over a node that is neither a for nor a select statement")
 	}
 }
 
