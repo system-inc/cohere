@@ -12,69 +12,59 @@ package spaced_compiler_directive
 
 import (
 	"fmt"
+	"go/ast"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA9009",
-	Doc: "Flags a compiler directive the compiler ignores for a space after its slashes: staticcheck's SA9009, " +
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it.
+var Listener = rule.Listener{FileEnter: CheckFile}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA9009",
+	"SA9009",
+	"Flags a compiler directive the compiler ignores for a space after its slashes: staticcheck's SA9009, "+
 		"ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{generated.Analyzer},
-	Run:      run,
-}
+	&Listener,
+)
 
-// run builds the pass's context and judges every file of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	Check(context)
-	return nil, nil
-}
-
-// Check judges every comment of the package's files: a line comment that starts its line, whose text after the
-// slashes opens with spaces or tabs and then `go:` and a lowercase letter, is a directive the compiler does not read,
-// since a directive has its `go:` straight after the slashes.
-func Check(context *rule.Context) {
-	for _, file := range context.Files {
-		for _, group := range file.Comments {
-			for _, comment := range group.List {
-				// A directive is a line comment, never a block comment.
-				body, isLineComment := strings.CutPrefix(comment.Text, "//")
-				if !isLineComment {
-					continue
-				}
-				// A directive starts its line. A comment after code, such as `import _ "unsafe" // go:linkname`, is
-				// prose. The column is the file's own, not one a line directive moves it to.
-				if context.Fset.PositionFor(comment.Pos(), false).Column != 1 {
-					continue
-				}
-				directive := strings.TrimLeft(body, " \t")
-				// No space or tab after the slashes, so the comment is a directive the compiler reads, or prose.
-				if len(directive) == len(body) {
-					continue
-				}
-				name, isDirective := strings.CutPrefix(directive, "go:")
-				if !isDirective {
-					continue
-				}
-				// Only a lowercase letter after `go:` reads as a directive's name; `// go: is fun` is prose.
-				if len(name) == 0 || name[0] < 'a' || name[0] > 'z' {
-					continue
-				}
-				staticcheck_report.Report(context, comment,
-					fmt.Sprintf("ineffectual compiler directive due to extraneous space: %q", comment.Text))
+// CheckFile judges every comment of one file: a line comment that starts its line, whose text after the slashes
+// opens with spaces or tabs and then `go:` and a lowercase letter, is a directive the compiler does not read, since a
+// directive has its `go:` straight after the slashes.
+func CheckFile(context *rule.Context, file *ast.File) {
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			// A directive is a line comment, never a block comment.
+			body, isLineComment := strings.CutPrefix(comment.Text, "//")
+			if !isLineComment {
+				continue
 			}
+			// A directive starts its line. A comment after code, such as `import _ "unsafe" // go:linkname`, is
+			// prose. The column is the file's own, not one a line directive moves it to.
+			if context.Fset.PositionFor(comment.Pos(), false).Column != 1 {
+				continue
+			}
+			directive := strings.TrimLeft(body, " \t")
+			// No space or tab after the slashes, so the comment is a directive the compiler reads, or prose.
+			if len(directive) == len(body) {
+				continue
+			}
+			name, isDirective := strings.CutPrefix(directive, "go:")
+			if !isDirective {
+				continue
+			}
+			// Only a lowercase letter after `go:` reads as a directive's name; `// go: is fun` is prose.
+			if len(name) == 0 || name[0] < 'a' || name[0] > 'z' {
+				continue
+			}
+			staticcheck_report.Report(context, comment,
+				fmt.Sprintf("ineffectual compiler directive due to extraneous space: %q", comment.Text))
 		}
 	}
 }
