@@ -20,6 +20,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
@@ -28,20 +29,24 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-no-machine-path"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "testing_no_machine_path",
-	Doc: "Flags a string literal in a _test.go file that names a home directory, /Users/<name>/ or /home/<name>/, " +
-		"since a test reading one developer's machine covers nothing anywhere else, unless a comment opening with " +
-		"// Not a machine path: <reason> ends the literal's line or sits on lines of its own directly above the " +
-		"statement or declaration holding it.",
-	Requires: []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
-	Run:      run,
+// listener reads the file's comments as the syntax dispatcher's walk enters each _test.go file, and hears every
+// literal in it.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
+	Node:      judgeLiteral,
 }
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "testing_no_machine_path", "Flags a string literal in a _test.go file "+
+	"that names a home directory, /Users/<name>/ or /home/<name>/, since a test reading one developer's machine "+
+	"covers nothing anywhere else, unless a comment opening with // Not a machine path: <reason> ends the literal's "+
+	"line or sits on lines of its own directly above the statement or declaration holding it.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. It reads no types: a literal's text and the comments around
 // it decide everything.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var machinePathMessage = policy.MessageOf(Name, "machinePath")
 
@@ -51,56 +56,88 @@ var machinePathWithoutReasonMessage = policy.MessageOf(Name, "machinePathWithout
 // so /Users/ alone and /AllUsers/x/ are not home directories.
 var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
 
-func run(pass *analysis.Pass) (any, error) {
-	indexes, isIndexes := pass.ResultOf[marker.Analyzer].(*marker.Indexes)
-	if !isIndexes {
-		return nil, fmt.Errorf("reading the comment indexes: marker gave %T", pass.ResultOf[marker.Analyzer])
-	}
-	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
-	if !isTable {
-		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
-	}
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
-			continue
+// fileState is what the rule reads once for its package and once for each file, held in its context's state.
+type fileState struct {
+	// table is the package's line table, read as the walk enters its first file.
+	table *positions.Table
+	// indexes is the package's comment indexes, read with table.
+	indexes *marker.Indexes
+	// isTest is whether the file being walked is a _test.go file, the only kind whose literals are judged.
+	isTest bool
+	// comments is the comment index of the file being walked.
+	comments *marker.Index
+	// coveredAbove is linesCoveredAbove of the file being walked, read at its first home directory, since it walks
+	// every node of the file and nearly every file names none.
+	coveredAbove map[int]marker.Excuse
+}
+
+// enterFile reads the package's comment indexes and line table the first time, and whether file holds tests.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[fileState](context)
+	if state.table == nil {
+		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
+		if !isIndexes {
+			// Invariant: marker's result is always its Indexes, so another is a mistake in the engine, and the
+			// dispatcher's recover makes it this rule's crash on the package, so it never stops the process.
+			panic(fmt.Sprintf("reading the comment indexes: marker gave %T", context.ResultOf(marker.Analyzer)))
 		}
-		comments := indexes.ForFile(file)
-		coveredAbove := linesCoveredAbove(table, file, comments)
-		ast.Inspect(file, func(node ast.Node) bool {
-			literal, isLiteral := node.(*ast.BasicLit)
-			if !isLiteral || literal.Kind != token.STRING {
-				return true
-			}
-			// A literal the parser accepted always unquotes; one that does not is left alone rather than guessed at.
-			value, unquoteError := strconv.Unquote(literal.Value)
-			if unquoteError != nil || !homeDirectory.MatchString(value) {
-				return true
-			}
-			// The marker above the statement or declaration holding the literal, or one at the end of the literal's
-			// own last line.
-			given := coveredAbove[table.Line(literal.Pos())]
-			for _, group := range comments.Trailing(literal) {
-				given = max(given, marker.Read(group, marker.NotAMachinePath))
-			}
-			message := machinePathMessage
-			switch given {
-			case marker.WithReason:
-				return true
-			case marker.WithoutReason:
-				message = machinePathWithoutReasonMessage
-			case marker.None:
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      literal.Pos(),
-				End:      literal.End(),
-				Category: message.Id,
-				Message:  message.Render(map[string]string{}),
-			})
-			return true
-		})
+		table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
+		if !isTable {
+			// Invariant: positions' result is always its Table, for the reason above.
+			panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
+		}
+		state.indexes = indexes
+		state.table = table
 	}
-	return nil, nil
+	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
+	state.isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
+	state.comments = nil
+	state.coveredAbove = nil
+	if state.isTest {
+		state.comments = state.indexes.ForFile(file)
+	}
+}
+
+// judgeLiteral reports node when it is a string literal in a _test.go file naming a home directory that no marker
+// excuses with a reason.
+func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[fileState](context)
+	literal, isLiteral := node.(*ast.BasicLit)
+	if !state.isTest || !isLiteral || literal.Kind != token.STRING || len(stack) == 0 {
+		return
+	}
+	// A literal the parser accepted always unquotes; one that does not is left alone rather than guessed at.
+	value, unquoteError := strconv.Unquote(literal.Value)
+	if unquoteError != nil || !homeDirectory.MatchString(value) {
+		return
+	}
+	if state.coveredAbove == nil {
+		file, isFile := stack[0].(*ast.File)
+		if !isFile {
+			return
+		}
+		state.coveredAbove = linesCoveredAbove(state.table, file, state.comments)
+	}
+	// The marker above the statement or declaration holding the literal, or one at the end of the literal's own last
+	// line.
+	given := state.coveredAbove[state.table.Line(literal.Pos())]
+	for _, group := range state.comments.Trailing(literal) {
+		given = max(given, marker.Read(group, marker.NotAMachinePath))
+	}
+	message := machinePathMessage
+	switch given {
+	case marker.WithReason:
+		return
+	case marker.WithoutReason:
+		message = machinePathWithoutReasonMessage
+	case marker.None:
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      literal.Pos(),
+		End:      literal.End(),
+		Category: message.Id,
+		Message:  message.Render(map[string]string{}),
+	})
 }
 
 // linesCoveredAbove is the excuse each line of file takes from a marker directly above a node: every line of each node

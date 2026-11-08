@@ -18,24 +18,25 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-require-wrapped-error"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_require_wrapped_error",
-	Doc: "Flags an error formatted into fmt.Errorf by a verb that prints its text (%v, %s, %q, %x, %X) instead of " +
-		"%w, and an errors.New or fmt.Errorf built from an error's Error() text, since both cut the chain errors.Is " +
-		"and errors.As read. A call whose verbs cannot be mapped to its arguments with certainty, through a * width " +
-		"or precision, a malformed index, a missing argument or a spread slice, is not judged.",
-	Run: run,
-}
+// listener hears every call of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_wrapped_error", "Flags an error formatted into "+
+	"fmt.Errorf by a verb that prints its text (%v, %s, %q, %x, %X) instead of %w, and an errors.New or fmt.Errorf "+
+	"built from an error's Error() text, since both cut the chain errors.Is and errors.As read. A call whose verbs "+
+	"cannot be mapped to its arguments with certainty, through a * width or precision, a malformed index, a missing "+
+	"argument or a spread slice, is not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var unwrappedErrorMessage = policy.MessageOf(Name, "unwrappedError")
 
@@ -55,37 +56,32 @@ var errorInterface = func() *types.Interface {
 // type and the address, which describe the error rather than stand in for it, so they are no lost wrap.
 const textVerbs = "vsqxX"
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall || len(call.Args) == 0 {
-				return true
-			}
-			function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
-			// Package functions only, so a method that happens to be named New or Errorf is never mistaken for them.
-			if !isFunc || function.Pkg() == nil || function.Signature().Recv() != nil {
-				return true
-			}
-			switch {
-			case function.Pkg().Path() == "errors" && function.Name() == "New":
-				reportRebuilds(pass, call.Args[0])
-			case function.Pkg().Path() == "fmt" && function.Name() == "Errorf":
-				judgeErrorf(pass, call)
-			}
-			return true
-		})
+// judgeCall judges a call of errors.New or fmt.Errorf.
+func judgeCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall || len(call.Args) == 0 {
+		return
 	}
-	return nil, nil
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
+	// Package functions only, so a method that happens to be named New or Errorf is never mistaken for them.
+	if !isFunc || function.Pkg() == nil || function.Signature().Recv() != nil {
+		return
+	}
+	switch {
+	case function.Pkg().Path() == "errors" && function.Name() == "New":
+		reportRebuilds(context, call.Args[0])
+	case function.Pkg().Path() == "fmt" && function.Name() == "Errorf":
+		judgeErrorf(context, call)
+	}
 }
 
 // judgeErrorf reports every error argument of a fmt.Errorf call that a text verb formats, and every Error() text
 // the call builds from. A format that is not a constant is no format the rule can read, but it may still be an
 // error's text, fmt.Errorf(readError.Error()), which is the rebuild.
-func judgeErrorf(pass *analysis.Pass, call *ast.CallExpr) {
-	format := pass.TypesInfo.Types[call.Args[0]].Value
+func judgeErrorf(context *rule.Context, call *ast.CallExpr) {
+	format := context.TypesInfo.Types[call.Args[0]].Value
 	if format == nil || format.Kind() != constant.String {
-		reportRebuilds(pass, call.Args[0])
+		reportRebuilds(context, call.Args[0])
 		return
 	}
 	// A spread slice, fmt.Errorf("%v", values...), holds arguments the rule cannot see one by one.
@@ -110,9 +106,9 @@ func judgeErrorf(pass *analysis.Pass, call *ast.CallExpr) {
 		}
 		argument := arguments[each.argument]
 		// An error the same call also wraps keeps its chain, so printing it a second time loses nothing.
-		if isError(pass, argument) && !isAnyOf(pass, argument, wrapped) {
+		if isError(context, argument) && !isAnyOf(context, argument, wrapped) {
 			reported[each.argument] = true
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos:      argument.Pos(),
 				End:      argument.End(),
 				Category: unwrappedErrorMessage.Id,
@@ -120,9 +116,9 @@ func judgeErrorf(pass *analysis.Pass, call *ast.CallExpr) {
 			})
 			continue
 		}
-		if receiver := errorTextReceiver(pass, argument); receiver != nil && !isAnyOf(pass, receiver, wrapped) {
+		if receiver := errorTextReceiver(context, argument); receiver != nil && !isAnyOf(context, receiver, wrapped) {
 			reported[each.argument] = true
-			reportRebuild(pass, argument, receiver)
+			reportRebuild(context, argument, receiver)
 		}
 	}
 }
@@ -130,20 +126,20 @@ func judgeErrorf(pass *analysis.Pass, call *ast.CallExpr) {
 // reportRebuilds reports each Error() text that expression is made of, directly or as a part of a string
 // concatenation, `"reading: " + readError.Error()`, since every one of them is an error whose chain the new error
 // drops.
-func reportRebuilds(pass *analysis.Pass, expression ast.Expr) {
+func reportRebuilds(context *rule.Context, expression ast.Expr) {
 	unwrapped := ast.Unparen(expression)
 	if binary, isBinary := unwrapped.(*ast.BinaryExpr); isBinary && binary.Op == token.ADD {
-		reportRebuilds(pass, binary.X)
-		reportRebuilds(pass, binary.Y)
+		reportRebuilds(context, binary.X)
+		reportRebuilds(context, binary.Y)
 		return
 	}
-	if receiver := errorTextReceiver(pass, unwrapped); receiver != nil {
-		reportRebuild(pass, unwrapped, receiver)
+	if receiver := errorTextReceiver(context, unwrapped); receiver != nil {
+		reportRebuild(context, unwrapped, receiver)
 	}
 }
 
-func reportRebuild(pass *analysis.Pass, call ast.Expr, receiver ast.Expr) {
-	pass.Report(analysis.Diagnostic{
+func reportRebuild(context *rule.Context, call ast.Expr, receiver ast.Expr) {
+	context.Report(analysis.Diagnostic{
 		Pos:      call.Pos(),
 		End:      call.End(),
 		Category: rebuiltErrorMessage.Id,
@@ -154,7 +150,7 @@ func reportRebuild(pass *analysis.Pass, call ast.Expr, receiver ast.Expr) {
 // errorTextReceiver is the error whose text expression reads, when expression is a call of the Error method of the
 // error interface on a value whose type implements it, and nil otherwise. An Error method of another shape, one
 // taking arguments or returning something other than a string, makes no error and is not the text of one.
-func errorTextReceiver(pass *analysis.Pass, expression ast.Expr) ast.Expr {
+func errorTextReceiver(context *rule.Context, expression ast.Expr) ast.Expr {
 	call, isCall := ast.Unparen(expression).(*ast.CallExpr)
 	if !isCall || len(call.Args) != 0 {
 		return nil
@@ -164,11 +160,11 @@ func errorTextReceiver(pass *analysis.Pass, expression ast.Expr) ast.Expr {
 		return nil
 	}
 	// A method value only: a method expression, error.Error(readError), names its receiver as an argument.
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	if !isSelection || selection.Kind() != types.MethodVal || selection.Obj().Name() != "Error" {
 		return nil
 	}
-	if !isError(pass, selector.X) {
+	if !isError(context, selector.X) {
 		return nil
 	}
 	return selector.X
@@ -176,8 +172,8 @@ func errorTextReceiver(pass *analysis.Pass, expression ast.Expr) ast.Expr {
 
 // isError is whether expression's static type implements error. The untyped nil implements nothing, and a value
 // held in an any is not known to be an error, so neither is judged.
-func isError(pass *analysis.Pass, expression ast.Expr) bool {
-	recorded, isRecorded := pass.TypesInfo.Types[expression]
+func isError(context *rule.Context, expression ast.Expr) bool {
+	recorded, isRecorded := context.TypesInfo.Types[expression]
 	if !isRecorded || !recorded.IsValue() || recorded.IsNil() {
 		return false
 	}
@@ -186,16 +182,16 @@ func isError(pass *analysis.Pass, expression ast.Expr) bool {
 
 // isAnyOf is whether expression is the same value as one of candidates, judged by objects rather than spelling: the
 // same variable, or the same field reached through the same value.
-func isAnyOf(pass *analysis.Pass, expression ast.Expr, candidates []ast.Expr) bool {
+func isAnyOf(context *rule.Context, expression ast.Expr, candidates []ast.Expr) bool {
 	for _, candidate := range candidates {
-		if sameValue(pass, expression, candidate) {
+		if sameValue(context, expression, candidate) {
 			return true
 		}
 	}
 	return false
 }
 
-func sameValue(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
+func sameValue(context *rule.Context, left ast.Expr, right ast.Expr) bool {
 	unwrappedLeft := ast.Unparen(left)
 	unwrappedRight := ast.Unparen(right)
 	switch leftNode := unwrappedLeft.(type) {
@@ -204,21 +200,21 @@ func sameValue(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
 		if !isIdentifier {
 			return false
 		}
-		object := pass.TypesInfo.Uses[leftNode]
+		object := context.TypesInfo.Uses[leftNode]
 		_, isVariable := object.(*types.Var)
-		return isVariable && object == pass.TypesInfo.Uses[rightNode]
+		return isVariable && object == context.TypesInfo.Uses[rightNode]
 	case *ast.SelectorExpr:
 		rightNode, isSelector := unwrappedRight.(*ast.SelectorExpr)
 		if !isSelector {
 			return false
 		}
-		leftSelection, leftIsSelection := pass.TypesInfo.Selections[leftNode]
-		rightSelection, rightIsSelection := pass.TypesInfo.Selections[rightNode]
+		leftSelection, leftIsSelection := context.TypesInfo.Selections[leftNode]
+		rightSelection, rightIsSelection := context.TypesInfo.Selections[rightNode]
 		// Fields only: a method call may answer differently each time, so two calls are never the same value.
 		if !leftIsSelection || !rightIsSelection || leftSelection.Kind() != types.FieldVal {
 			return false
 		}
-		return leftSelection.Obj() == rightSelection.Obj() && sameValue(pass, leftNode.X, rightNode.X)
+		return leftSelection.Obj() == rightSelection.Obj() && sameValue(context, leftNode.X, rightNode.X)
 	}
 	return false
 }

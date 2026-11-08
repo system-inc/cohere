@@ -61,6 +61,7 @@ import (
 	"golang.org/x/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/sql_text"
 	"github.com/system-inc/cohere/policy"
 )
@@ -68,18 +69,30 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/security-no-interpolated-sql-string"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "security_no_interpolated_sql_string",
-	Doc: "Flags a value built with + or fmt.Sprintf into the query of a database/sql Query, QueryRow, Exec or " +
-		"Prepare call where its text becomes SQL: inside a single-quoted string when it can hold a quote, or bare " +
-		"after a comparison when it can hold text. A name, a placeholder list or a number built into a query is " +
-		"left alone, since no bound parameter can take its place.",
-	Run: run,
+// listener gathers the package's locals and query calls over the syntax dispatcher's walk, and judges the calls once
+// every write to a local has been seen.
+var listener = rule.Listener{
+	Nodes: []ast.Node{
+		(*ast.AssignStmt)(nil),
+		(*ast.ValueSpec)(nil),
+		(*ast.RangeStmt)(nil),
+		(*ast.IncDecStmt)(nil),
+		(*ast.UnaryExpr)(nil),
+		(*ast.CallExpr)(nil),
+	},
+	Node:        gather,
+	PackageExit: judgeQueries,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "security_no_interpolated_sql_string", "Flags a value built with + or "+
+	"fmt.Sprintf into the query of a database/sql Query, QueryRow, Exec or Prepare call where its text becomes SQL: "+
+	"inside a single-quoted string when it can hold a quote, or bare after a comparison when it can hold text. A "+
+	"name, a placeholder list or a number built into a query is left alone, since no bound parameter can take its "+
+	"place.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var interpolatedSqlStringMessage = policy.MessageOf(Name, "interpolatedSqlString")
 
@@ -106,57 +119,143 @@ var queryReceivers = map[string]bool{"DB": true, "Tx": true, "Conn": true}
 // smaller expression or an earlier declaration, so the bound only stops a pathological chain.
 const readingDepth = 16
 
-func run(pass *analysis.Pass) (any, error) {
-	reader := queryReader{pass: pass, initializers: singleAssignmentInitializers(pass)}
+// packageState is what the rule gathers over its package, held in its context's state.
+type packageState struct {
+	// writes counts each local's writes, its declaration's included.
+	writes map[*types.Var]int
+	// initializers is the value each local was given where it was declared.
+	initializers map[*types.Var]ast.Expr
+	// addressTaken holds each local whose address is taken.
+	addressTaken map[*types.Var]bool
+	// queries is every query method call, with the index of its query argument, in the order the walk met them.
+	queries []queryCall
+}
+
+// queryCall is one call of a query method, kept for judging once the walk is over.
+type queryCall struct {
+	call          *ast.CallExpr
+	argumentIndex int
+}
+
+// gather reads node into the package's locals, as singleAssignmentInitializers reads them, or keeps it when it is a
+// query method call. Every local is visible only inside the function declaring it, so walking the package's files
+// sees every write it can have.
+func gather(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	if state.writes == nil {
+		state.writes = map[*types.Var]int{}
+		state.initializers = map[*types.Var]ast.Expr{}
+		state.addressTaken = map[*types.Var]bool{}
+	}
+	variableOf := func(expression ast.Expr) *types.Var {
+		identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
+		if !isIdentifier {
+			return nil
+		}
+		variable, isVariable := context.TypesInfo.ObjectOf(identifier).(*types.Var)
+		if !isVariable || variable.Parent() == nil || variable.Parent() == context.Package.Scope() {
+			return nil
+		}
+		return variable
+	}
+	switch statement := node.(type) {
+	case *ast.AssignStmt:
+		for index, left := range statement.Lhs {
+			variable := variableOf(left)
+			if variable == nil {
+				continue
+			}
+			state.writes[variable]++
+			// Only a := that declares the name gives it its value; one that reuses a name declared earlier is a
+			// second write, which the count above already refuses.
+			if statement.Tok == token.DEFINE && declares(context, left) && len(statement.Lhs) == len(statement.Rhs) {
+				state.initializers[variable] = statement.Rhs[index]
+			}
+		}
+	case *ast.ValueSpec:
+		for index, name := range statement.Names {
+			variable := variableOf(name)
+			if variable == nil {
+				continue
+			}
+			state.writes[variable]++
+			if len(statement.Names) == len(statement.Values) {
+				state.initializers[variable] = statement.Values[index]
+			}
+		}
+	case *ast.RangeStmt:
+		for _, assigned := range []ast.Expr{statement.Key, statement.Value} {
+			if variable := variableOf(assigned); variable != nil {
+				state.writes[variable]++
+			}
+		}
+	case *ast.IncDecStmt:
+		if variable := variableOf(statement.X); variable != nil {
+			state.writes[variable]++
+		}
+	case *ast.UnaryExpr:
+		if statement.Op == token.AND {
+			if variable := variableOf(statement.X); variable != nil {
+				state.addressTaken[variable] = true
+			}
+		}
+	case *ast.CallExpr:
+		if argumentIndex, isQuery := queryArgumentIndex(context, statement); isQuery {
+			state.queries = append(state.queries, queryCall{call: statement, argumentIndex: argumentIndex})
+		}
+	}
+}
+
+// declares is whether left is a name a := declares here, rather than one it reuses from an earlier declaration.
+func declares(context *rule.Context, left ast.Expr) bool {
+	identifier, isIdentifier := ast.Unparen(left).(*ast.Ident)
+	return isIdentifier && context.TypesInfo.Defs[identifier] != nil
+}
+
+// judgeQueries reports every value the walk's query calls write into their query's text where it becomes SQL.
+func judgeQueries(context *rule.Context) {
+	state := rule.State[packageState](context)
+	if len(state.queries) == 0 {
+		return
+	}
+	reader := queryReader{context: context, initializers: singleAssignmentInitializers(state)}
 	// A local read in place may reach two query calls, and its value is one mistake, reported once.
 	reported := map[ast.Expr]bool{}
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			call, isCall := node.(*ast.CallExpr)
-			if !isCall {
-				return true
+	for _, queryCall := range state.queries {
+		query := reader.read(queryCall.call.Args[queryCall.argumentIndex], 0)
+		if len(query.holes) == 0 {
+			continue
+		}
+		statement, certain := sql_text.ReadStatement(query.texts)
+		if !certain {
+			continue
+		}
+		for _, spanIndex := range statement.QuotedSpans {
+			found := query.holes[spanIndex]
+			if !reported[found.expression] && reader.canHoldQuote(found) && !reader.isEscaped(found.expression) {
+				reported[found.expression] = true
+				report(context, found.expression, interpolatedSqlStringMessage)
 			}
-			argumentIndex, isQuery := queryArgumentIndex(pass, call)
-			if !isQuery {
-				return true
+		}
+		for _, spanIndex := range statement.BareSpans {
+			found := query.holes[spanIndex]
+			if !reported[found.expression] && reader.canHoldText(found) {
+				reported[found.expression] = true
+				report(context, found.expression, interpolatedSqlValueMessage)
 			}
-			query := reader.read(call.Args[argumentIndex], 0)
-			if len(query.holes) == 0 {
-				return true
-			}
-			statement, certain := sql_text.ReadStatement(query.texts)
-			if !certain {
-				return true
-			}
-			for _, spanIndex := range statement.QuotedSpans {
-				found := query.holes[spanIndex]
-				if !reported[found.expression] && reader.canHoldQuote(found) && !reader.isEscaped(found.expression) {
-					reported[found.expression] = true
-					report(pass, found.expression, interpolatedSqlStringMessage)
-				}
-			}
-			for _, spanIndex := range statement.BareSpans {
-				found := query.holes[spanIndex]
-				if !reported[found.expression] && reader.canHoldText(found) {
-					reported[found.expression] = true
-					report(pass, found.expression, interpolatedSqlValueMessage)
-				}
-			}
-			return true
-		})
+		}
 	}
-	return nil, nil
 }
 
 // queryArgumentIndex is the index of call's query argument when call is a query method of database/sql's *DB,
 // *Tx or *Conn called as a method value, and whether it is one. A method expression, (*sql.DB).Query(database,
 // query), shifts its arguments by one and is not read.
-func queryArgumentIndex(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
+func queryArgumentIndex(context *rule.Context, call *ast.CallExpr) (int, bool) {
 	selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr)
 	if !isSelector {
 		return 0, false
 	}
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	if !isSelection || selection.Kind() != types.MethodVal {
 		return 0, false
 	}
@@ -254,8 +353,8 @@ func readFormat(format string) ([]string, []verb, bool) {
 }
 
 // isSprintf is whether call calls fmt.Sprintf, by its object, so a function of that name elsewhere never counts.
-func isSprintf(pass *analysis.Pass, call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func isSprintf(context *rule.Context, call *ast.CallExpr) bool {
+	function, isFunc := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	return isFunc && function.Pkg() != nil && function.Pkg().Path() == "fmt" && function.Name() == "Sprintf"
 }
 
@@ -290,79 +389,14 @@ func canHoldText(candidate types.Type) bool {
 }
 
 // singleAssignmentInitializers is every local of the package assigned exactly once, by the declaration that
-// gives it a value, and never through its address, each with that value. Such a local holds its initializer
-// everywhere it is read, so reading the initializer in its place is exact. A package variable is left out, since
-// another package may assign an exported one, and code here may reach any one through a pointer.
-func singleAssignmentInitializers(pass *analysis.Pass) map[*types.Var]ast.Expr {
-	writes := map[*types.Var]int{}
-	initializers := map[*types.Var]ast.Expr{}
-	addressTaken := map[*types.Var]bool{}
-	variableOf := func(expression ast.Expr) *types.Var {
-		identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
-		if !isIdentifier {
-			return nil
-		}
-		variable, isVariable := pass.TypesInfo.ObjectOf(identifier).(*types.Var)
-		if !isVariable || variable.Parent() == nil || variable.Parent() == pass.Pkg.Scope() {
-			return nil
-		}
-		return variable
-	}
-	// declares is whether left is a name a := declares here, rather than one it reuses from an earlier declaration.
-	declares := func(left ast.Expr) bool {
-		identifier, isIdentifier := ast.Unparen(left).(*ast.Ident)
-		return isIdentifier && pass.TypesInfo.Defs[identifier] != nil
-	}
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch statement := node.(type) {
-			case *ast.AssignStmt:
-				for index, left := range statement.Lhs {
-					variable := variableOf(left)
-					if variable == nil {
-						continue
-					}
-					writes[variable]++
-					// Only a := that declares the name gives it its value; one that reuses a name declared
-					// earlier is a second write, which the count above already refuses.
-					if statement.Tok == token.DEFINE && declares(left) && len(statement.Lhs) == len(statement.Rhs) {
-						initializers[variable] = statement.Rhs[index]
-					}
-				}
-			case *ast.ValueSpec:
-				for index, name := range statement.Names {
-					variable := variableOf(name)
-					if variable == nil {
-						continue
-					}
-					writes[variable]++
-					if len(statement.Names) == len(statement.Values) {
-						initializers[variable] = statement.Values[index]
-					}
-				}
-			case *ast.RangeStmt:
-				for _, assigned := range []ast.Expr{statement.Key, statement.Value} {
-					if variable := variableOf(assigned); variable != nil {
-						writes[variable]++
-					}
-				}
-			case *ast.IncDecStmt:
-				if variable := variableOf(statement.X); variable != nil {
-					writes[variable]++
-				}
-			case *ast.UnaryExpr:
-				if statement.Op == token.AND {
-					if variable := variableOf(statement.X); variable != nil {
-						addressTaken[variable] = true
-					}
-				}
-			}
-			return true
-		})
-	}
+// gives it a value, and never through its address, each with that value, as the walk gathered them into state.
+// Such a local holds its initializer everywhere it is read, so reading the initializer in its place is exact. A
+// package variable is left out, since another package may assign an exported one, and code here may reach any one
+// through a pointer.
+func singleAssignmentInitializers(state *packageState) map[*types.Var]ast.Expr {
 	single := map[*types.Var]ast.Expr{}
-	for variable, initializer := range initializers {
-		if writes[variable] == 1 && !addressTaken[variable] {
+	for variable, initializer := range state.initializers {
+		if state.writes[variable] == 1 && !state.addressTaken[variable] {
 			single[variable] = initializer
 		}
 	}
@@ -370,8 +404,8 @@ func singleAssignmentInitializers(pass *analysis.Pass) map[*types.Var]ast.Expr {
 }
 
 // report flags expression with message.
-func report(pass *analysis.Pass, expression ast.Expr, message policy.MessageHandle) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, expression ast.Expr, message policy.MessageHandle) {
+	context.Report(analysis.Diagnostic{
 		Pos:      expression.Pos(),
 		End:      expression.End(),
 		Category: message.Id,

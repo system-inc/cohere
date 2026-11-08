@@ -5,16 +5,16 @@ import (
 	"go/types"
 	"go/version"
 
-	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 )
 
 // checker holds what every judgment in one package reads.
 type checker struct {
-	pass *analysis.Pass
-	// errorInterface is the predeclared error's, which a result implements to count as an error.
-	errorInterface *types.Interface
+	context *rule.Context
 	// hashInterface is hash.Hash's, or nil when no package this one imports, directly or not, is hash. A type that
 	// implements hash.Hash without the package ever seeing hash makes no promise about its Write, so it is judged.
 	hashInterface *types.Interface
@@ -26,7 +26,7 @@ func (checker checker) returnsError(call *ast.CallExpr) bool {
 	if !checker.isFunctionCall(call) {
 		return false
 	}
-	switch result := checker.pass.TypesInfo.TypeOf(call).(type) {
+	switch result := checker.context.TypesInfo.TypeOf(call).(type) {
 	case *types.Tuple:
 		for index := range result.Len() {
 			if checker.isError(result.At(index).Type()) {
@@ -50,7 +50,7 @@ func (checker checker) callsDroppingError(left []ast.Expr, right []ast.Expr) []*
 			return calls
 		}
 		// A map index, a channel receive or a type assertion fills two names too, and is no call.
-		results, isTuple := checker.pass.TypesInfo.TypeOf(call).(*types.Tuple)
+		results, isTuple := checker.context.TypesInfo.TypeOf(call).(*types.Tuple)
 		if !isTuple {
 			return calls
 		}
@@ -72,7 +72,7 @@ func (checker checker) callsDroppingError(left []ast.Expr, right []ast.Expr) []*
 		if !isCall || !isBlank(name) || !checker.isFunctionCall(call) {
 			continue
 		}
-		if checker.isError(checker.pass.TypesInfo.TypeOf(call)) && !checker.isExempt(call) {
+		if checker.isError(checker.context.TypesInfo.TypeOf(call)) && !checker.isExempt(call) {
 			calls = append(calls, call)
 		}
 	}
@@ -82,18 +82,18 @@ func (checker checker) callsDroppingError(left []ast.Expr, right []ast.Expr) []*
 // isFunctionCall is whether call calls a function, rather than converting to a type or calling a builtin, neither
 // of which returns an error of its own.
 func (checker checker) isFunctionCall(call *ast.CallExpr) bool {
-	callee, known := checker.pass.TypesInfo.Types[call.Fun]
+	callee, known := checker.context.TypesInfo.Types[call.Fun]
 	return known && !callee.IsType() && !callee.IsBuiltin()
 }
 
 // isError is whether a result of type candidate is an error: the predeclared error, or any type implementing it.
 func (checker checker) isError(candidate types.Type) bool {
-	return candidate != nil && types.Implements(candidate, checker.errorInterface)
+	return candidate != nil && types.Implements(candidate, errorInterface)
 }
 
 // isExempt is whether call is one of the callees above whose error need not be checked at the call.
 func (checker checker) isExempt(call *ast.CallExpr) bool {
-	function, isFunc := typeutil.Callee(checker.pass.TypesInfo, call).(*types.Func)
+	function, isFunc := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
 	if !isFunc {
 		return false
 	}
@@ -115,7 +115,7 @@ func (checker checker) isExempt(call *ast.CallExpr) bool {
 		return false
 	}
 	// The writer's static type: an io.Writer that happens to hold a Builder promises nothing at the call.
-	writer := checker.pass.TypesInfo.TypeOf(call.Args[0])
+	writer := checker.context.TypesInfo.TypeOf(call.Args[0])
 	if isExemptWriterType(writer) {
 		return true
 	}
@@ -134,7 +134,7 @@ func (checker checker) isHashReceiver(call *ast.CallExpr) bool {
 	}
 	// A method value, hasher.Write(data), or a method expression, hash.Hash.Write(hasher, data); either way the
 	// selection's receiver is the type written to.
-	selection, isSelection := checker.pass.TypesInfo.Selections[selector]
+	selection, isSelection := checker.context.TypesInfo.Selections[selector]
 	if !isSelection {
 		return false
 	}
@@ -182,7 +182,7 @@ func (checker checker) isExemptCallee(function *types.Func) bool {
 // isAtGoVersion is whether the analyzed package's Go version is since or later; an empty since is every version. A
 // package with no version, loaded outside a module, is read as the latest, as the type checker reads it.
 func (checker checker) isAtGoVersion(since string) bool {
-	packageVersion := checker.pass.Pkg.GoVersion()
+	packageVersion := checker.context.Package.GoVersion()
 	if since == "" || packageVersion == "" {
 		return true
 	}
@@ -192,12 +192,12 @@ func (checker checker) isAtGoVersion(since string) bool {
 // calleeName is how the message names what call calls: a function or method by its package and receiver type,
 // with this package's own names left bare, and anything else, a function value or literal, as written.
 func (checker checker) calleeName(call *ast.CallExpr) string {
-	function, isFunc := typeutil.Callee(checker.pass.TypesInfo, call).(*types.Func)
+	function, isFunc := typeutil.Callee(checker.context.TypesInfo, call).(*types.Func)
 	if !isFunc {
 		return types.ExprString(call.Fun)
 	}
 	qualifier := func(other *types.Package) string {
-		if other == checker.pass.Pkg {
+		if other == checker.context.Package {
 			return ""
 		}
 		return other.Name()
@@ -205,7 +205,7 @@ func (checker checker) calleeName(call *ast.CallExpr) string {
 	if receiver := function.Signature().Recv(); receiver != nil {
 		return "(" + types.TypeString(receiver.Type(), qualifier) + ")." + function.Name()
 	}
-	if function.Pkg() == nil || function.Pkg() == checker.pass.Pkg {
+	if function.Pkg() == nil || function.Pkg() == checker.context.Package {
 		return function.Name()
 	}
 	return function.Pkg().Name() + "." + function.Name()
@@ -221,7 +221,7 @@ func (checker checker) report(call *ast.CallExpr, given marker.Excuse) {
 		message = unhandledErrorWithoutReasonMessage
 	case marker.None:
 	}
-	checker.pass.Report(analysis.Diagnostic{
+	checker.context.Report(analysis.Diagnostic{
 		Pos:      call.Pos(),
 		End:      call.End(),
 		Category: message.Id,

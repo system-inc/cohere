@@ -5,8 +5,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
 	"github.com/system-inc/cohere/internal/naming/go_origin_names"
 )
@@ -32,14 +31,14 @@ type variableWrites struct {
 // reuses a name as well as one that declares it, since go/types resolves both, a var declaration, an increment or
 // decrement, and a range clause's key and value. A write inside a closure is a write like any other. It marks every
 // parameter too.
-func writesOf(pass *analysis.Pass) map[*types.Var]*variableWrites {
+func writesOf(context *rule.Context) map[*types.Var]*variableWrites {
 	writes := map[*types.Var]*variableWrites{}
 	variableOf := func(expression ast.Expr) (*types.Var, *ast.Ident) {
 		identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
 		if !isIdentifier {
 			return nil, nil
 		}
-		variable, isVariable := pass.TypesInfo.ObjectOf(identifier).(*types.Var)
+		variable, isVariable := context.TypesInfo.ObjectOf(identifier).(*types.Var)
 		if !isVariable {
 			return nil, nil
 		}
@@ -48,7 +47,7 @@ func writesOf(pass *analysis.Pass) map[*types.Var]*variableWrites {
 		}
 		return variable, identifier
 	}
-	for _, file := range pass.Files {
+	for _, file := range context.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch typed := node.(type) {
 			case *ast.FuncType:
@@ -70,7 +69,7 @@ func writesOf(pass *analysis.Pass) map[*types.Var]*variableWrites {
 						continue
 					}
 					writes[variable].count++
-					if pass.TypesInfo.Defs[identifier] == variable {
+					if context.TypesInfo.Defs[identifier] == variable {
 						writes[variable].defined = true
 						writes[variable].values = typed.Rhs
 					}
@@ -119,13 +118,13 @@ func writesOf(pass *analysis.Pass) map[*types.Var]*variableWrites {
 // once is a web of definitions that a single rename can't split, so it is left to the advice, as is one whose call
 // names nothing (a constructed error, a context from a call outside the table) or whose name is taken.
 func originName(
-	pass *analysis.Pass,
+	context *rule.Context,
 	reachable reach,
 	writes func() map[*types.Var]*variableWrites,
 	identifier *ast.Ident,
 ) (string, string, bool) {
-	variable, isVariable := pass.TypesInfo.Defs[identifier].(*types.Var)
-	if !isVariable || variable.IsField() || variable.Parent() == nil || variable.Parent() == pass.Pkg.Scope() {
+	variable, isVariable := context.TypesInfo.Defs[identifier].(*types.Var)
+	if !isVariable || variable.IsField() || variable.Parent() == nil || variable.Parent() == context.Package.Scope() {
 		return "", "", false
 	}
 	written := writes()[variable]
@@ -133,7 +132,7 @@ func originName(
 	switch {
 	case types.Identical(variable.Type(), types.Universe.Lookup("error").Type()):
 		if call, isOne := singleCall(written); isOne {
-			newName, _, _ = go_origin_names.CallErrorName(pass.TypesInfo, call, errorNameWords)
+			newName, _, _ = go_origin_names.CallErrorName(context.TypesInfo, call, errorNameWords)
 			messageId = namedForItsCall
 		}
 	case go_origin_names.IsContext(variable.Type()) && written != nil && written.parameter:
@@ -144,7 +143,7 @@ func originName(
 		}
 	case go_origin_names.IsContext(variable.Type()):
 		if call, isOne := singleCall(written); isOne {
-			newName, _, _ = go_origin_names.ContextCallName(pass.TypesInfo, call)
+			newName, _, _ = go_origin_names.ContextCallName(context.TypesInfo, call)
 			messageId = contextNamedForItsOrigin
 		}
 	}

@@ -1,7 +1,8 @@
-// Package staticcheck_ir hands a rule the functions of staticcheck's intermediate representation, the very ones
-// staticcheck's own checks read, built once per package by staticcheck's buildir pass. A rule written as a
-// rule.FunctionCheck reads them here, and until the engine's dispatcher calls such checks itself, FunctionCheckAnalyzer
-// runs one as a plain analyzer.
+//cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
+
+// Package staticcheck_ir reads the functions of staticcheck's intermediate representation, the very ones staticcheck's
+// own checks read, built once per package by staticcheck's buildir pass. The engine's IR dispatcher, package
+// dispatch, reads them here and calls every dispatched rule's listener over them.
 package staticcheck_ir
 
 import (

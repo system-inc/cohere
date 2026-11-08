@@ -19,58 +19,56 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-lone-block"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_lone_block",
-	Doc: "Flags a bare { } block standing among statements that declares nothing directly inside it, no :=, var, " +
-		"const or type, and carries no label, since such braces scope nothing and only indent the code. A bare " +
-		"block that declares something is Go's way of scoping a variable and is left alone.",
-	Run: run,
+// listener hears every statement list of the syntax dispatcher's walk, a block's or a clause's.
+var listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
+	Node:  judgeHolder,
 }
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_lone_block", "Flags a bare { } block standing among "+
+	"statements that declares nothing directly inside it, no :=, var, const or type, and carries no label, since such "+
+	"braces scope nothing and only indent the code. A bare block that declares something is Go's way of scoping a "+
+	"variable and is left alone.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. A bare block and what it declares are syntax, so the rule
 // reads no types.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var redundantBlockMessage = policy.MessageOf(Name, "redundantBlock")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// The walk reaches every statement list, the ones inside function literals included. A block reached any
-		// other way is one the syntax requires, a function, if, else, for, switch or select body, and is never in a
-		// list, so it is never judged. A labeled block is the LabeledStmt's statement rather than a list's member, so
-		// it is never judged either.
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch holder := node.(type) {
-			case *ast.BlockStmt:
-				judgeList(pass, holder.List)
-			case *ast.CaseClause:
-				// A case clause is already a scope of its own in Go, so braces wrapping a whole case add a scope only
-				// when they declare something, and are judged the same as anywhere else.
-				judgeList(pass, holder.Body)
-			case *ast.CommClause:
-				judgeList(pass, holder.Body)
-			}
-			return true
-		})
+// judgeHolder judges the statement list node holds. The walk reaches every statement list, the ones inside function
+// literals included. A block reached any other way is one the syntax requires, a function, if, else, for, switch or
+// select body, and is never in a list, so it is never judged. A labeled block is the LabeledStmt's statement rather
+// than a list's member, so it is never judged either.
+func judgeHolder(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch holder := node.(type) {
+	case *ast.BlockStmt:
+		judgeList(context, holder.List)
+	case *ast.CaseClause:
+		// A case clause is already a scope of its own in Go, so braces wrapping a whole case add a scope only when
+		// they declare something, and are judged the same as anywhere else.
+		judgeList(context, holder.Body)
+	case *ast.CommClause:
+		judgeList(context, holder.Body)
 	}
-	return nil, nil
 }
 
 // judgeList reports every bare block among statements that declares nothing directly inside it.
-func judgeList(pass *analysis.Pass, statements []ast.Stmt) {
+func judgeList(context *rule.Context, statements []ast.Stmt) {
 	for _, statement := range statements {
 		block, isBlock := statement.(*ast.BlockStmt)
 		if !isBlock || declaresSomething(block) {
 			continue
 		}
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos:      block.Pos(),
 			End:      block.End(),
 			Category: redundantBlockMessage.Id,

@@ -23,6 +23,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
@@ -30,19 +31,23 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-dash-punctuation"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_dash_punctuation",
-	Doc: "Flags each em-dash or en-dash written as itself in a comment or a string literal, because readers clock " +
-		"them as generated text and tune out. A dash spelled with an escape is data and is left alone, so a dash " +
-		"in an interpreted string comes with a fix that rewrites it as its escape, keeping the value the same. A " +
-		"dash in a raw string, which cannot hold an escape, or in a comment is reported with no fix.",
-	Requires: []*analysis.Analyzer{positions.Analyzer},
-	Run:      run,
+// listener reads each file's comments as the syntax dispatcher's walk enters the file, and hears every literal in it.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{positions.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
+	Node:      judgeLiteral,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_dash_punctuation", "Flags each em-dash or en-dash "+
+	"written as itself in a comment or a string literal, because readers clock them as generated text and tune out. "+
+	"A dash spelled with an escape is data and is left alone, so a dash in an interpreted string comes with a fix "+
+	"that rewrites it as its escape, keeping the value the same. A dash in a raw string, which cannot hold an "+
+	"escape, or in a comment is reported with no fix.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var dashPunctuationMessage = policy.MessageOf(Name, "dashPunctuation")
 
@@ -75,43 +80,58 @@ const (
 	rawStringText
 )
 
-func run(pass *analysis.Pass) (any, error) {
-	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
-	if !isTable {
-		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
-	}
-	for _, file := range pass.Files {
-		// Each comment and literal starts a line in this file, so its line table is looked up once for all of them.
-		tokenFile := pass.Fset.File(file.FileStart)
-		for _, group := range file.Comments {
-			for _, comment := range group.List {
-				// comment.Text is the comment's source from its first slash, so it starts at comment.Pos().
-				reportDashes(pass, table, tokenFile, comment.Pos(), comment.Text, commentText)
-			}
+// fileState is what the rule holds of the file the walk is in, in its context's state.
+type fileState struct {
+	// table is the package's line table, which reads a comment's or a literal's line without the FileSet's lock.
+	table *positions.Table
+	// tokenFile is the file being walked. Each comment and literal starts a line in it, so its line table is looked up
+	// once for all of them.
+	tokenFile *token.File
+}
+
+// enterFile reads the line table the first time, looks up the file's own line table, and reports the dashes in
+// file's comments.
+func enterFile(context *rule.Context, file *ast.File) {
+	state := rule.State[fileState](context)
+	if state.table == nil {
+		table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
+		if !isTable {
+			// Invariant: the listener requires positions, whose result is always a table, so anything else is a
+			// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
+			panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
 		}
-		ast.Inspect(file, func(node ast.Node) bool {
-			literal, isLiteral := node.(*ast.BasicLit)
-			// A rune literal names a character, as this rule's own constants do, so only strings are read.
-			if !isLiteral || literal.Kind != token.STRING {
-				return true
-			}
-			// literal.Value is the literal's source, quotes included, so it starts at literal.Pos(). Only a dash
-			// written as itself is in the source as a dash, so an escaped one is never seen here.
-			if strings.HasPrefix(literal.Value, "`") {
-				reportDashes(pass, table, tokenFile, literal.Pos(), literal.Value, rawStringText)
-			} else {
-				reportDashes(pass, table, tokenFile, literal.Pos(), literal.Value, interpretedStringText)
-			}
-			return true
-		})
+		state.table = table
 	}
-	return nil, nil
+	state.tokenFile = context.Fset.File(file.FileStart)
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			// comment.Text is the comment's source from its first slash, so it starts at comment.Pos().
+			reportDashes(context, state.table, state.tokenFile, comment.Pos(), comment.Text, commentText)
+		}
+	}
+}
+
+// judgeLiteral reports the dashes in a string literal's source.
+func judgeLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
+	literal, isLiteral := node.(*ast.BasicLit)
+	// A rune literal names a character, as this rule's own constants do, so only strings are read.
+	if !isLiteral || literal.Kind != token.STRING {
+		return
+	}
+	state := rule.State[fileState](context)
+	// literal.Value is the literal's source, quotes included, so it starts at literal.Pos(). Only a dash written as
+	// itself is in the source as a dash, so an escaped one is never seen here.
+	if strings.HasPrefix(literal.Value, "`") {
+		reportDashes(context, state.table, state.tokenFile, literal.Pos(), literal.Value, rawStringText)
+	} else {
+		reportDashes(context, state.table, state.tokenFile, literal.Pos(), literal.Value, interpretedStringText)
+	}
 }
 
 // reportDashes reports each dash written as itself in source, the source text starting at start in tokenFile, as kind
 // decides. start's line is read from table, without the FileSet's lock, which every comment and literal would take.
 func reportDashes(
-	pass *analysis.Pass,
+	context *rule.Context,
 	table *positions.Table,
 	tokenFile *token.File,
 	start token.Pos,
@@ -176,6 +196,6 @@ func reportDashes(
 		case commentText:
 			// A comment is prose with no value to keep, so the dash is rewritten by hand, as the message says.
 		}
-		pass.Report(diagnostic)
+		context.Report(diagnostic)
 	}
 }

@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are six.
+// The changes are eight.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -103,6 +103,27 @@
 //
 // Peak RSS, 8.4 to 8.5 GB, and involuntary context switches, 82,000 to
 // 123,000, did not move.
+//
+// The seventh is Options.Dependents. When it is set, each pass holds,
+// in its ResultOf under that analyzer, the set of analyzers whose
+// actions on the same package require this action: the horizontal
+// dependents the first change already counts as readers of its Result.
+// The engine's dispatchers walk a package once for every rule
+// registered on them, and a rule registers as its package initializes,
+// whether or not a run enables it; the set is how a dispatcher calls
+// only the listeners of the rules this graph runs, per graph, with no
+// state shared between runs.
+//
+// The eighth is Options.Failed and Options.Tolerant. A dispatcher requires
+// every one of its listeners' Requires, so where upstream fails any action
+// whose prerequisite failed, one listener's requirement failing on a
+// package, staticcheck's config on a malformed staticcheck.conf, would
+// fail the dispatcher there and every rule on it, where the rule alone
+// would have failed walking by itself. An action Tolerant names runs past
+// a failed prerequisite on its own package, without its input, and reads
+// under Failed what failed and how, so a dispatcher starts every listener
+// but those whose own requirements failed. A failed vertical prerequisite
+// still fails it, and every other action fails as upstream's does.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -205,6 +226,26 @@ type Options struct {
 	// are (see releaseSyntax). Unset, a given package keeps them.
 	Finished func(*packages.Package)
 
+	// cohere: Dependents, when set, keys a set in every pass's ResultOf:
+	// a map[*analysis.Analyzer]bool holding each analyzer whose action on
+	// the pass's package requires this action, so an analyzer that serves
+	// several can serve only those this graph runs. It is a key, never
+	// run, and nothing should require it. Unset, ResultOf holds exactly
+	// the results of what the analyzer requires, as upstream's does.
+	Dependents *analysis.Analyzer
+
+	// cohere: Failed and Tolerant, when both are set, let an action run
+	// past a failed prerequisite on its own package. Tolerant reports
+	// whether an analyzer's actions do; such an action is failed only by a
+	// failed vertical prerequisite, a failed horizontal one's input is
+	// absent from its ResultOf, and its ResultOf holds, under Failed, a
+	// map[*analysis.Analyzer]error from each failed horizontal
+	// prerequisite's analyzer to that dependency's error, nil when none
+	// failed. Failed is a key, never run, as Dependents is. Unset, every
+	// action fails with a failed prerequisite, as upstream's does.
+	Failed   *analysis.Analyzer
+	Tolerant func(*analysis.Analyzer) bool
+
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
 	// in place of the default; workers, above 0, is how many actions; and
@@ -285,6 +326,10 @@ type Action struct {
 	// this action's Result, its horizontal dependents. The last of them
 	// releases a non-root Result (see releaseInputs).
 	resultReaders atomic.Int32
+
+	// cohere: dependents is the analyzers of those readers, which a pass
+	// reads under Options.Dependents, and nil while that is unset.
+	dependents map[*analysis.Analyzer]bool
 
 	// cohere: syntax is shared by every action on this action's package,
 	// so the last of them to finish can release the package's syntax
@@ -391,11 +436,18 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 	}
 
 	// cohere: count each action's horizontal dependents, the readers
-	// of its Result, so the last of them can release it.
+	// of its Result, so the last of them can release it, and, under
+	// Options.Dependents, gather their analyzers.
 	for _, act := range actions {
 		for _, dep := range act.Deps {
 			if dep.Package == act.Package {
 				dep.resultReaders.Add(1)
+				if opts.Dependents != nil {
+					if dep.dependents == nil {
+						dep.dependents = make(map[*analysis.Analyzer]bool)
+					}
+					dep.dependents[act.Analyzer] = true
+				}
 			}
 		}
 	}
@@ -498,8 +550,18 @@ func (act *Action) execOnce() {
 
 	// Report an error if any dependency failed.
 	var failed []string
+	// cohere: what a tolerant action runs past, for Options.Failed.
+	var tolerated map[*analysis.Analyzer]error
 	for _, dep := range act.Deps {
 		if dep.Err != nil {
+			// cohere: a tolerant action runs past a failed horizontal edge.
+			if act.tolerant() && dep.Package == act.Package {
+				if tolerated == nil {
+					tolerated = make(map[*analysis.Analyzer]error)
+				}
+				tolerated[dep.Analyzer] = dep.Err
+				continue
+			}
 			failed = append(failed, dep.String())
 		}
 	}
@@ -519,6 +581,11 @@ func (act *Action) execOnce() {
 			// Same package, different analysis (horizontal edge):
 			// in-memory outputs of prerequisite analyzers
 			// become inputs to this analysis pass.
+			// cohere: one that failed, which only a tolerant action reaches, is
+			// absent, its error under Options.Failed instead.
+			if dep.Err != nil {
+				continue
+			}
 			inputs[dep.Analyzer] = dep.Result
 		} else if dep.Analyzer == act.Analyzer { // (always true)
 			// Same analysis, different package (vertical edge):
@@ -526,6 +593,17 @@ func (act *Action) execOnce() {
 			// become available to this analysis pass.
 			inheritFacts(act, dep)
 		}
+	}
+	// cohere: Options.Dependents, the set Analyze gathered for this action.
+	// An action nothing on its package requires holds a nil map, an empty
+	// set, which still reads as one, never as a graph that gathered none.
+	if act.opts.Dependents != nil {
+		inputs[act.opts.Dependents] = act.dependents
+	}
+	// cohere: Options.Failed, what a tolerant action ran past, nil when it
+	// ran past nothing, which still reads as a map.
+	if act.tolerant() {
+		inputs[act.opts.Failed] = tolerated
 	}
 
 	// cohere: a restored package's own facts come from the cache, in
@@ -671,6 +749,13 @@ func (act *Action) releaseSyntax() {
 	}
 	act.Package.Syntax = nil
 	act.Package.TypesInfo = nil
+}
+
+// cohere: tolerant is whether act runs past a failed prerequisite on its
+// own package, which it does only when Options.Failed and Options.Tolerant
+// are both set, so it is always told what it ran past.
+func (act *Action) tolerant() bool {
+	return act.opts.Failed != nil && act.opts.Tolerant != nil && act.opts.Tolerant(act.Analyzer)
 }
 
 // inheritFacts populates act.facts with

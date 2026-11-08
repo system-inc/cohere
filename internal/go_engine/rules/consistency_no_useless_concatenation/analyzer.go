@@ -21,6 +21,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/policy"
 )
@@ -28,55 +29,72 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-useless-concatenation"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_no_useless_concatenation",
-	Doc: "Flags a + between two string literals on one line, since nothing is computed between them and one literal " +
-		"says the same with no operator to follow. A join across lines, which is how a long string is wrapped, is " +
-		"left alone, and so is a raw literal joined to an interpreted one whose texts cannot be pasted into one.",
-	Requires: []*analysis.Analyzer{positions.Analyzer},
-	Run:      run,
+// listener reads the package's line table as the syntax dispatcher's walk enters its first file, and hears every
+// binary expression of the walk.
+var listener = rule.Listener{
+	Requires:  []*analysis.Analyzer{positions.Analyzer},
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node:      judgeBinary,
 }
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_useless_concatenation", "Flags a + between two string "+
+	"literals on one line, since nothing is computed between them and one literal says the same with no operator to "+
+	"follow. A join across lines, which is how a long string is wrapped, is left alone, and so is a raw literal "+
+	"joined to an interpreted one whose texts cannot be pasted into one.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry. It reads no type information: a + with a string literal
 // beside it is string concatenation in any package that compiles, so the literals' syntax is the whole judgment.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var uselessConcatenationMessage = policy.MessageOf(Name, "uselessConcatenation")
 
-func run(pass *analysis.Pass) (any, error) {
-	table, isTable := pass.ResultOf[positions.Analyzer].(*positions.Table)
+// packageState is what the rule reads once for its package, held in its context's state.
+type packageState struct {
+	// table is the package's line table, read as the walk enters its first file.
+	table *positions.Table
+}
+
+// enterFile reads the package's line table, the first time the walk enters one of its files.
+func enterFile(context *rule.Context, _ *ast.File) {
+	state := rule.State[packageState](context)
+	if state.table != nil {
+		return
+	}
+	table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
 	if !isTable {
-		return nil, fmt.Errorf("reading the line table: positions gave %T", pass.ResultOf[positions.Analyzer])
+		// Invariant: positions' result is a *Table, its declared ResultType, which the checker holds it to. Anything
+		// else is a mistake in positions, and the dispatcher's recover makes it this rule's crash on the package.
+		panic(fmt.Sprintf("reading the line table: positions gave %T", context.ResultOf(positions.Analyzer)))
 	}
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			binary, isBinary := node.(*ast.BinaryExpr)
-			if !isBinary {
-				return true
-			}
-			left, right, joins := JoinedLiterals(binary)
-			if !joins || !onOneLine(table, left, right) {
-				return true
-			}
-			// The operator rather than the expression, as the core port reports, so a chain's findings point at the
-			// one join each is about.
-			pass.Report(analysis.Diagnostic{
-				Pos:      binary.OpPos,
-				End:      binary.OpPos + token.Pos(len(token.ADD.String())),
-				Category: uselessConcatenationMessage.Id,
-				Message:  uselessConcatenationMessage.Render(map[string]string{}),
-			})
-			return true
-		})
+	state.table = table
+}
+
+// judgeBinary reports a + between two string literals that stand on one line.
+func judgeBinary(context *rule.Context, node ast.Node, _ []ast.Node) {
+	binary, isBinary := node.(*ast.BinaryExpr)
+	if !isBinary {
+		return
 	}
-	return nil, nil
+	left, right, joins := JoinedLiterals(binary)
+	if !joins || !onOneLine(rule.State[packageState](context).table, left, right) {
+		return
+	}
+	// The operator rather than the expression, as the core port reports, so a chain's findings point at the one join
+	// each is about.
+	context.Report(analysis.Diagnostic{
+		Pos:      binary.OpPos,
+		End:      binary.OpPos + token.Pos(len(token.ADD.String())),
+		Category: uselessConcatenationMessage.Id,
+		Message:  uselessConcatenationMessage.Render(map[string]string{}),
+	})
 }
 
 // JoinedLiterals are the two string literals beside binary's operator when binary is a + the rule reports once both
 // stand on one line: the literals found by descending into a + on either side through parentheses, whose texts paste
-// into one literal. The rule's run reports through it, and the fix phase's long-line wrap asks it of every + it could
-// break after, so it never breaks a join the rule would report, which a join across lines would hide from it.
+// into one literal. The rule's listener reports through it, and the fix phase's long-line wrap asks it of every + it
+// could break after, so it never breaks a join the rule would report, which a join across lines would hide from it.
 func JoinedLiterals(binary *ast.BinaryExpr) (left *ast.BasicLit, right *ast.BasicLit, joins bool) {
 	if binary.Op != token.ADD {
 		return nil, nil, false

@@ -32,8 +32,8 @@
 // Two branches are the same when they are the same syntax tree, with comments and layout ignored and every literal
 // compared as written, so `"pro"` and a raw-string `pro` stay different. Go narrows no type through a condition, so
 // most of what made the TypeScript twin ask its type checker does not arise. What remains is a name that means one
-// thing in one branch and another in the other, and that is checked through pass.TypesInfo: every name must denote
-// the same object on both sides, or two objects each side declares in the same place. Three shapes hinge on it:
+// thing in one branch and another in the other, and that is checked through the type information: every name must
+// denote the same object on both sides, or two objects each side declares in the same place. Three shapes hinge on it:
 //
 //   - A type switch that binds a variable, `switch value := x.(type)`, gives it its own type in each clause, so
 //     `fmt.Println(value)` under `case int` and under `default` passes two different types. The clauses' variables
@@ -62,66 +62,60 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/correctness-no-identical-branches"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "correctness_no_identical_branches",
-	Doc: "Flags an if with an else, and a switch or type switch with a default, whose every branch is the same code, " +
-		"since its condition then chooses nothing and one branch was usually meant to differ. Comments and layout do " +
-		"not count, and every name must denote the same thing on both sides. Empty branches, a select, and a type " +
-		"switch that binds a variable are left alone.",
-	Run: run,
+// listener hears every if, switch and type switch of the syntax dispatcher's walk. Nested conditionals are heard as
+// the walk goes on, so each is judged on its own branches.
+var listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IfStmt)(nil), (*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil)},
+	Node:  judgeConditional,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It reads pass.TypesInfo to tell a name that means the same
-// thing in both branches from one that only looks the same.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_no_identical_branches", "Flags an if with an else, and a "+
+	"switch or type switch with a default, whose every branch is the same code, since its condition then chooses "+
+	"nothing and one branch was usually meant to differ. Comments and layout do not count, and every name must "+
+	"denote the same thing on both sides. Empty branches, a select, and a type switch that binds a variable are left "+
+	"alone.", &listener)
+
+// Rule is this rule's entry in the Go engine's registry. It reads the type information to tell a name that means the
+// same thing in both branches from one that only looks the same.
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var identicalBranchesMessage = policy.MessageOf(Name, "identicalBranches")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// elseOf maps an if that is another's else to that other if. The walk reaches a parent before its children,
-		// so by the time the last if of a chain is judged, every link above it is here to widen the finding through.
-		elseOf := map[*ast.IfStmt]*ast.IfStmt{}
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch statement := node.(type) {
-			case *ast.IfStmt:
-				if elseIf, isIf := statement.Else.(*ast.IfStmt); isIf {
-					elseOf[elseIf] = statement
-				}
-				judgeIf(pass, statement, elseOf)
-			case *ast.SwitchStmt:
-				judgeSwitch(pass, statement.Switch, statement.Body)
-			case *ast.TypeSwitchStmt:
-				judgeSwitch(pass, statement.Switch, statement.Body)
-			}
-			// Nested conditionals are reached by the walk going on, so each is judged on its own branches.
-			return true
-		})
+// judgeConditional judges an if, with its ancestors in stack, or a switch or type switch.
+func judgeConditional(context *rule.Context, node ast.Node, stack []ast.Node) {
+	switch statement := node.(type) {
+	case *ast.IfStmt:
+		judgeIf(context, statement, stack)
+	case *ast.SwitchStmt:
+		judgeSwitch(context, statement.Switch, statement.Body)
+	case *ast.TypeSwitchStmt:
+		judgeSwitch(context, statement.Switch, statement.Body)
 	}
-	return nil, nil
 }
 
 // judgeIf reports statement when its two branches match, widened up its else-if chain over every earlier if whose
-// branch matches too. elseOf holds the chain's links above statement.
-func judgeIf(pass *analysis.Pass, statement *ast.IfStmt, elseOf map[*ast.IfStmt]*ast.IfStmt) {
+// branch matches too. stack is statement's ancestors, and an if that is another's else has that other if as its
+// parent, so the chain's links above statement are the ifs that end stack, each the else of the one before it.
+func judgeIf(context *rule.Context, statement *ast.IfStmt, stack []ast.Node) {
 	switch elseBranch := statement.Else.(type) {
 	case *ast.BlockStmt:
 		if isEmpty(statement.Body.List) || isEmpty(elseBranch.List) ||
-			!newComparison(pass).sameStatements(statement.Body.List, elseBranch.List) {
+			!newComparison(context).sameStatements(statement.Body.List, elseBranch.List) {
 			return
 		}
 	case *ast.IfStmt:
 		// An if whose else is another if compares its branch against that whole if, which differs from it except in
 		// the rare `if a { if c { p() } else { q() } } else if c { p() } else { q() }`, where a really is ignored. The
 		// usual chain is judged at its last if and reaches back up through the widening below.
-		if len(statement.Body.List) != 1 || !newComparison(pass).same(statement.Body.List[0], elseBranch) {
+		if len(statement.Body.List) != 1 || !newComparison(context).same(statement.Body.List[0], elseBranch) {
 			return
 		}
 	default:
@@ -129,19 +123,20 @@ func judgeIf(pass *analysis.Pass, statement *ast.IfStmt, elseOf map[*ast.IfStmt]
 		return
 	}
 	anchor := statement
-	for {
-		parent, isElse := elseOf[anchor]
-		if !isElse || !newComparison(pass).sameStatements(parent.Body.List, statement.Body.List) {
+	for index := len(stack) - 1; index >= 0; index-- {
+		parent, isIf := stack[index].(*ast.IfStmt)
+		if !isIf || parent.Else != anchor ||
+			!newComparison(context).sameStatements(parent.Body.List, statement.Body.List) {
 			break
 		}
 		anchor = parent
 	}
-	report(pass, anchor.If, anchor.Body.Lbrace)
+	report(context, anchor.If, anchor.Body.Lbrace)
 }
 
 // judgeSwitch reports the expression or type switch that opens at keyword with body when it has a default, at least
 // two clauses, and every clause the same non-empty code.
-func judgeSwitch(pass *analysis.Pass, keyword token.Pos, body *ast.BlockStmt) {
+func judgeSwitch(context *rule.Context, keyword token.Pos, body *ast.BlockStmt) {
 	if len(body.List) < 2 {
 		return
 	}
@@ -165,11 +160,11 @@ func judgeSwitch(pass *analysis.Pass, keyword token.Pos, body *ast.BlockStmt) {
 	// Each clause body is compared with no clause's variable mapped to another's, so a type switch's bound variable,
 	// a different object in every clause, keeps its clauses apart.
 	for _, clause := range clauses[1:] {
-		if !newComparison(pass).sameStatements(clauses[0].Body, clause.Body) {
+		if !newComparison(context).sameStatements(clauses[0].Body, clause.Body) {
 			return
 		}
 	}
-	report(pass, keyword, body.Lbrace)
+	report(context, keyword, body.Lbrace)
 }
 
 // isEmpty is whether a branch runs nothing: no statements, or only the empty statements a stray semicolon leaves.
@@ -183,8 +178,8 @@ func isEmpty(statements []ast.Stmt) bool {
 	return true
 }
 
-func newComparison(pass *analysis.Pass) *comparison {
-	return &comparison{information: pass.TypesInfo, counterparts: map[types.Object]types.Object{}}
+func newComparison(context *rule.Context) *comparison {
+	return &comparison{information: context.TypesInfo, counterparts: map[types.Object]types.Object{}}
 }
 
 // The syntax tree types the walk treats specially, found once.
@@ -201,8 +196,8 @@ var (
 
 // report flags the conditional that opens at keyword with its first brace at brace, so the finding covers the
 // header, `if ready {` or `switch mode {`, and not the branches.
-func report(pass *analysis.Pass, keyword token.Pos, brace token.Pos) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, keyword token.Pos, brace token.Pos) {
+	context.Report(analysis.Diagnostic{
 		Pos:      keyword,
 		End:      brace + 1,
 		Category: identicalBranchesMessage.Id,

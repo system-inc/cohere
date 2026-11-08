@@ -1,17 +1,14 @@
 package consistency_no_uppercase_initialism
 
-import (
-	"go/types"
-
-	"golang.org/x/tools/go/analysis"
-)
+import "go/types"
 
 // foreignInterfaces are the interfaces of every package in this package's import graph, and the predeclared error,
 // by the names of their methods. A method whose receiver implements one of them is named by that interface, and a
 // rename would stop it implementing it. The index is built the first time a method's name holds an initialism, since
 // a package with none never needs it.
 type foreignInterfaces struct {
-	pass     *analysis.Pass
+	// current is the package whose methods are judged, where the walk through the imports starts.
+	current  *types.Package
 	byMethod map[string][]*types.Interface
 	// genericByMethod holds the generic interfaces apart, since one is implemented only through an instantiation
 	// whose type arguments the rule cannot know, and so is matched by shape rather than by types.Implements.
@@ -45,8 +42,8 @@ func (interfaces *foreignInterfaces) build() {
 	interfaces.genericByMethod = map[string][]*types.Interface{}
 	// The predeclared error belongs to no package, and fixes Error on every error type.
 	interfaces.add(types.Universe.Lookup("error").Type())
-	visited := map[*types.Package]bool{interfaces.pass.Pkg: true}
-	pending := []*types.Package{interfaces.pass.Pkg}
+	visited := map[*types.Package]bool{interfaces.current: true}
+	pending := []*types.Package{interfaces.current}
 	for len(pending) > 0 {
 		current := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]

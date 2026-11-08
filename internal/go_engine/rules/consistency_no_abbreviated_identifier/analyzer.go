@@ -28,6 +28,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/naming/abbreviation"
 	"github.com/system-inc/cohere/policy"
 )
@@ -35,31 +36,48 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-abbreviated-identifier"
 
-// NewAnalyzer builds the rule's analyzer with a flag set of its own, so a test can run it with renameExports set
-// without setting the flag another test's analyzer reads.
+// listener reads what the package reaches as the syntax dispatcher's walk enters its first file, and hears every
+// identifier and type switch of the walk.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.TypeSwitchStmt)(nil), (*ast.Ident)(nil)},
+	Node:      judgeNode,
+}
+
+// analyzerName and doc are the rule's analyzer's name and documentation, the same on every analyzer built for it.
+const (
+	analyzerName = "consistency_no_abbreviated_identifier"
+	doc          = "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the " +
+		"house vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded " +
+		"fields, and a method whose name and signature another package's interface or type fixes are not judged, " +
+		"since those names are someone else's. Where the vocabulary names exactly one full spelling for the whole " +
+		"name, the finding offers it as a rename, which the engine applies at every reference. A local error " +
+		"written once by a single call is named for that call instead, and a context.Context for its caller when " +
+		"it is a parameter or for the call that made it, the name the finding gives and offers. The " +
+		"renameExports option lets a rename reach an exported name of an importable package, and never changes a " +
+		"finding."
+)
+
+// NewAnalyzer builds the rule's analyzer on a syntax dispatcher of its own, with a flag set of its own, so a test can
+// run it with renameExports set without setting the flag another test's analyzer reads. The shared dispatcher holds
+// each rule's name once, so a second analyzer for the rule is registered on a dispatcher of its own.
 func NewAnalyzer() *analysis.Analyzer {
-	analyzer := &analysis.Analyzer{
-		Name: "consistency_no_abbreviated_identifier",
-		Doc: "Flags a name this package declares that abbreviates a word in policy/Abbreviations.json, the house " +
-			"vocabulary every engine shares, and suggests the full word. Uses, imported package names, embedded " +
-			"fields, and a method whose name and signature another package's interface or type fixes are not " +
-			"judged, since those names are someone else's. Where the vocabulary names exactly one full spelling for " +
-			"the whole name, the finding offers it as a rename, which the engine applies at every reference. A local " +
-			"error written once by a single call is named for that call instead, and a context.Context for its " +
-			"caller when it is a parameter or for the call that made it, the name the finding gives and offers. " +
-			"The renameExports option lets a rename reach an exported name of an importable package, and never " +
-			"changes a finding.",
-		Run: run,
-	}
+	return newAnalyzer(dispatch.NewSyntax())
+}
+
+// newAnalyzer registers the rule's listener on dispatcher and gives the analyzer it returns its renameExports flag,
+// which the engine sets from the rule's settings and the context's Option reads off this analyzer.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(Name, analyzerName, doc, &listener)
 	rule.AddRenameExportsOption(analyzer)
 	return analyzer
 }
 
-// Analyzer runs the rule over one package.
-var Analyzer = NewAnalyzer()
+// Analyzer runs the rule over one package, reporting what the shared syntax dispatcher's walk found for it.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 // messages are the four shapes a finding takes, by the id the vocabulary names, from the message file this rule
 // shares with its TypeScript and Swift twins, so each renders the same id with the same values.
@@ -123,39 +141,55 @@ func methodsNamed(reachable reach, name string) iter.Seq[foreignMethod] {
 	}
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	reachable := reachOf(declarationsOf(pass.Fset), pass.Pkg)
-	// Counted only once a finding asks, so a package with no abbreviated error pays no second walk.
-	writes := sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(pass) })
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch typed := node.(type) {
-			case *ast.TypeSwitchStmt:
-				// The symbolic variable of `switch value := x.(type)` is ours, though go/types records no object
-				// for it in Defs, only one per clause in Implicits.
-				assignment, isAssignment := typed.Assign.(*ast.AssignStmt)
-				if !isAssignment || len(assignment.Lhs) != 1 {
-					return true
-				}
-				if identifier, isIdentifier := assignment.Lhs[0].(*ast.Ident); isIdentifier {
-					judge(pass, reachable, writes, identifier)
-				}
-			case *ast.Ident:
-				object, isDefinition := pass.TypesInfo.Defs[typed]
-				// Only a declaration: every other identifier is a use, the declaring code's spelling. A definition
-				// with no object is the package clause's name or the type switch variable handled above.
-				if isDefinition && object != nil && isOurs(pass, reachable, object) {
-					judge(pass, reachable, writes, typed)
-				}
-			}
-			return true
-		})
+// packageState is what the rule reads once for its package, held in its context's state.
+type packageState struct {
+	// reachable is what the rule knows of the packages this one reaches, read as the walk enters its first file.
+	reachable reach
+	// writes counts the package's writes of every variable, only once a finding asks, so a package with no
+	// abbreviated error pays no second walk.
+	writes func() map[*types.Var]*variableWrites
+}
+
+// enterFile reads what the package reaches, the first time.
+func enterFile(context *rule.Context, _ *ast.File) {
+	state := rule.State[packageState](context)
+	if state.writes != nil {
+		return
 	}
-	return nil, nil
+	state.reachable = reachOf(declarationsOf(context.Fset), context.Package)
+	state.writes = sync.OnceValue(func() map[*types.Var]*variableWrites { return writesOf(context) })
+}
+
+// judgeNode judges a name the package declares, or the name a type switch binds.
+func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch typed := node.(type) {
+	case *ast.TypeSwitchStmt:
+		// The symbolic variable of `switch value := x.(type)` is ours, though go/types records no object for it in
+		// Defs, only one per clause in Implicits.
+		assignment, isAssignment := typed.Assign.(*ast.AssignStmt)
+		if !isAssignment || len(assignment.Lhs) != 1 {
+			return
+		}
+		if identifier, isIdentifier := assignment.Lhs[0].(*ast.Ident); isIdentifier {
+			state := rule.State[packageState](context)
+			judge(context, state.reachable, state.writes, identifier)
+		}
+	case *ast.Ident:
+		object, isDefinition := context.TypesInfo.Defs[typed]
+		// Only a declaration: every other identifier is a use, the declaring code's spelling. A definition with no
+		// object is the package clause's name or the type switch variable handled above.
+		if !isDefinition || object == nil {
+			return
+		}
+		state := rule.State[packageState](context)
+		if isOurs(context, state.reachable, object) {
+			judge(context, state.reachable, state.writes, typed)
+		}
+	}
 }
 
 // isOurs is whether a declared object's name is this package's to choose.
-func isOurs(pass *analysis.Pass, reachable reach, object types.Object) bool {
+func isOurs(context *rule.Context, reachable reach, object types.Object) bool {
 	switch declared := object.(type) {
 	case *types.PkgName:
 		// An import's name, renamed or not, is the imported package's.
@@ -164,7 +198,7 @@ func isOurs(pass *analysis.Pass, reachable reach, object types.Object) bool {
 		// An embedded field is named for its type, which is judged where it is declared, if it is ours at all.
 		return !declared.Embedded()
 	case *types.Func:
-		return !fixedByAnotherPackage(pass, reachable, declared)
+		return !fixedByAnotherPackage(context, reachable, declared)
 	}
 	return true
 }
@@ -181,7 +215,7 @@ func isOurs(pass *analysis.Pass, reachable reach, object types.Object) bool {
 //
 // A method of a generic foreign type is compared through the instance our method would have to match, its type
 // arguments read off our signature, so `func (reader) Src() int` is checked against `Source[int]` as any other.
-func fixedByAnotherPackage(pass *analysis.Pass, reachable reach, method *types.Func) bool {
+func fixedByAnotherPackage(context *rule.Context, reachable reach, method *types.Func) bool {
 	receiver := method.Signature().Recv()
 	if receiver == nil {
 		return false
@@ -374,7 +408,7 @@ func declaredMethodsOf(declaring *types.Package) map[string][]foreignMethod {
 
 // judge reports a declared name the vocabulary finds abbreviated.
 func judge(
-	pass *analysis.Pass,
+	context *rule.Context,
 	reachable reach,
 	writes func() map[*types.Var]*variableWrites,
 	identifier *ast.Ident,
@@ -411,7 +445,7 @@ func judge(
 	// A local error or context the advice asks a descriptive name of has one when where it came from names it, so
 	// the finding names that spelling and offers it as the rename, the name the codemods give the same local.
 	if descriptive {
-		if newName, messageId, named := originName(pass, reachable, writes, identifier); named {
+		if newName, messageId, named := originName(context, reachable, writes, identifier); named {
 			renameValues := map[string]string{"name": identifier.Name, "suggestedName": newName}
 			diagnostic.Category = messageId
 			diagnostic.Message = originMessages[messageId].Render(renameValues)
@@ -423,7 +457,7 @@ func judge(
 			map[string]string{"name": identifier.Name, "suggestedName": spelling},
 		))
 	}
-	pass.Report(diagnostic)
+	context.Report(diagnostic)
 }
 
 // oneSpelling is the full spelling a finding's advice names for the whole name, when it names exactly one and that

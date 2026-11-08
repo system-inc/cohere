@@ -16,37 +16,32 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-require-octal-prefix"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_require_octal_prefix",
-	Doc: "Flags an integer literal written in legacy octal, a leading zero followed by digits like 0755, and offers " +
-		"0o755 in its place, because only the zero says the number is not decimal. Floats and imaginary literals " +
-		"are not judged.",
-	Run: run,
-}
+// listener hears every basic literal of the syntax dispatcher's walk.
+var listener = rule.Listener{Nodes: []ast.Node{(*ast.BasicLit)(nil)}, Node: judgeLiteral}
+
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_octal_prefix", "Flags an integer literal written in "+
+	"legacy octal, a leading zero followed by digits like 0755, and offers 0o755 in its place, because only the zero "+
+	"says the number is not decimal. Floats and imaginary literals are not judged.", &listener)
 
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var legacyOctalMessage = policy.MessageOf(Name, "legacyOctal")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			literal, isLiteral := node.(*ast.BasicLit)
-			if isLiteral && isLegacyOctal(literal) {
-				report(pass, literal)
-			}
-			return true
-		})
+// judgeLiteral reports a basic literal written in legacy octal.
+func judgeLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
+	literal, isLiteral := node.(*ast.BasicLit)
+	if isLiteral && isLegacyOctal(literal) {
+		report(context, literal)
 	}
-	return nil, nil
 }
 
 // isLegacyOctal is whether literal is an integer the scanner reads as octal for its leading zero alone: a zero, then
@@ -62,9 +57,9 @@ func isLegacyOctal(literal *ast.BasicLit) bool {
 
 // report flags literal and offers the same digits after a `0o` prefix. The digits are kept as written, separators
 // included, so `0_600` becomes `0o_600`, which the grammar accepts, rather than a respelling the writer did not choose.
-func report(pass *analysis.Pass, literal *ast.BasicLit) {
+func report(context *rule.Context, literal *ast.BasicLit) {
 	suggestion := "0o" + literal.Value[1:]
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:      literal.Pos(),
 		End:      literal.End(),
 		Category: legacyOctalMessage.Id,

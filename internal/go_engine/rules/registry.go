@@ -230,8 +230,8 @@ func All() []rule.Rule {
 	for _, analyzer := range vet.Suite {
 		registered = append(registered, portedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
 	}
-	registered = append(registered, portedRule(nil_ness.Analyzer, rule.OriginTools))
-	registered = append(registered, portedRule(unused_write.Analyzer, rule.OriginTools))
+	registered = append(registered, dispatchedRule(nil_ness.Analyzer, &nil_ness.Listener, rule.OriginTools))
+	registered = append(registered, dispatchedRule(unused_write.Analyzer, &unused_write.Listener, rule.OriginTools))
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
@@ -313,6 +313,14 @@ func House() []rule.Rule {
 		testing_require_failure_path.Rule,
 		testing_require_parallel.Rule,
 	}
+}
+
+// dispatchedRule is the rule that runs an upstream pass's port, whose analyzer reports what a dispatcher's walk found
+// for listener, under the name it has upstream.
+func dispatchedRule(analyzer *analysis.Analyzer, listener *rule.Listener, origin rule.Origin) rule.Rule {
+	registered := portedRule(analyzer, origin)
+	registered.Listener = listener
+	return registered
 }
 
 // portedRule is the rule that runs an upstream analyzer under the name it has upstream.
