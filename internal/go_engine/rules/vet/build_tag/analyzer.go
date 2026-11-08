@@ -21,6 +21,10 @@
 // says only that file is to be ignored, and vet's directive pass, which has the same loop, skips just that file. The
 // port skips just that file and checks the rest, so it finds what the original would find in them had the broken file
 // not been there. The differences fixture holds the case.
+//
+// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it reads the pass's OtherFiles and
+// IgnoredFiles, which rule.Context does not carry, and it walks no syntax tree, so there is no walk for the
+// dispatcher's to replace.
 package build_tag
 
 import (

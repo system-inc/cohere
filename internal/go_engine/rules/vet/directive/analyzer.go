@@ -11,6 +11,10 @@
 // nothing for inspect to hand it. The registry runs the port in the original's place, and the original stays the
 // oracle: the parity tests beside this file run both over the same packages. The two agree everywhere, so there is
 // no differences fixture.
+//
+// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it reads the pass's OtherFiles and
+// IgnoredFiles, which rule.Context does not carry, and it walks no syntax tree, so there is no walk for the
+// dispatcher's to replace.
 package directive
 
 import (
