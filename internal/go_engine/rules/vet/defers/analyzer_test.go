@@ -32,18 +32,6 @@ func TestPortMatchesParityWants(test *testing.T) {
 	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "parity")
 }
 
-// The port's documentation is the original's, byte for byte, as the registry's test holds every port to once it
-// runs in vet's place; this holds it here, before then.
-func TestPortIsDocumentedAsTheOriginal(test *testing.T) {
-	test.Parallel()
-	if Analyzer.Name != upstream.Analyzer.Name || Analyzer.Doc != upstream.Analyzer.Doc ||
-		Analyzer.URL != upstream.Analyzer.URL {
-		test.Errorf("the port is %q at %q documented %q, the original %q at %q documented %q",
-			Analyzer.Name, Analyzer.URL, Analyzer.Doc,
-			upstream.Analyzer.Name, upstream.Analyzer.URL, upstream.Analyzer.Doc)
-	}
-}
-
 // The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
 // holding every branch of the judgment and the shapes most likely to differ, and their findings must be the same
 // multiset of file, line, column and message. Each side's count is logged, since two empty sides would match and
