@@ -71,6 +71,23 @@ struct PlainRunFormatTests {
     }
 
     /*
+     `--format-all` formats every file, a file the store holds as formatted among them, as TypeScript's flag does. A run
+     without it leaves the file as it is first, the control that the planted verdict is read. Red under: the format
+     phase reading the store under `--format-all`, and Pipeline not handing the flag on.
+     */
+    @Test func formatAllFormatsAFileHeldAsFormatted() async throws {
+        let package = try LintVerdictCacheTests.Package(files: [Self.control: "let  value = 1\n"])
+        Self.plantFormatted(package, [Self.control: "let  value = 1\n"])
+        _ = try await package.run(["--fix"])
+        #expect(
+            try Self.text(package, Self.control) == "let  value = 1\n",
+            "the control: the planted verdict is read",
+        )
+        _ = try await package.run(["--fix", "--format-all"])
+        #expect(try Self.text(package, Self.control) == "let value = 1\n")
+    }
+
+    /*
      The two stores compose. An unchanged plain run skips the fixer on the file's kept lint verdict and the formatter
      on its kept format verdict, writes no file and leaves the format store as it is, and lint reads the kept verdict,
      with the findings the first run's walk gave. Red under: the fixer walking a file whose kept verdict proposes no

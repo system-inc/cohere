@@ -34,7 +34,8 @@ struct FormatPhase {
      The formatted text of every file, for a run that writes it. With a scratch, a file whose kept verdict
      (`FormatVerdictCache`) says these very bytes are formatted is not formatted again, since formatting it would hand
      back the same text, unless the fixer rewrote it (`fixed`, by path): a file the fixer touched is always formatted,
-     so the formatter has the last word on every fix.
+     so the formatter has the last word on every fix. Under `--format-all` (`everyFile`) no verdict is read and every
+     file is formatted, as TypeScript's flag formats every file rather than the ones not on record.
 
      What it learns is kept for the next run, and only what the formatter said. A file it left as it was is kept as
      formatted under its bytes. A file it rewrote is formatted once more and kept under the rewritten bytes with that
@@ -44,6 +45,7 @@ struct FormatPhase {
     func run(
         _ files: [ParsedFile],
         fixed: Set<String> = [],
+        everyFile: Bool = false,
         scratchPath: URL?,
         swiftFormatVersion: String = EngineVersion.swiftFormat,
     ) async -> Result {
@@ -55,7 +57,8 @@ struct FormatPhase {
             )
         }
         let (result, verdicts) = await outcomes(of: files) { file in
-            if !fixed.contains(file.url.path), let kept = cache?.verdict(path: file.url.path, source: file.source),
+            if !everyFile, !fixed.contains(file.url.path),
+                let kept = cache?.verdict(path: file.url.path, source: file.source),
                 kept.firstChangedLine == nil
             {
                 return (.unchanged, nil)

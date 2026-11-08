@@ -427,7 +427,8 @@ public struct Pipeline {
              A run that writes is handed the formatted text. `--no-fix` asks only the verdict. Either way each verdict
              is kept in the package's scratch for the next run (`FormatVerdictCache`), and a file the store holds as
              formatted for its bytes is not formatted again, unless the fixer just moved them, since the formatter
-             has the last word on every fix. Under `--no-cache` nothing is read or kept.
+             has the last word on every fix, or the run asked for `--format-all`. Under `--no-cache` nothing is read
+             or kept.
              */
             let formatting: FormatPhase.Result
             if !options.runFormat {
@@ -437,6 +438,7 @@ public struct Pipeline {
                 formatting = await FormatPhase().run(
                     toFormat,
                     fixed: Set(toFormat.filter { $0.source != originals[$0.url.path] }.map(\.url.path)),
+                    everyFile: options.formatAll,
                     scratchPath: options.noCache ? nil : runScratch(for: root),
                 )
             }
