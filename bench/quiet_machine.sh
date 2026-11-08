@@ -81,6 +81,8 @@
 #
 # usage: quiet_machine.sh [options]
 #   --project DIR        the project to copy (default ~/Projects/ahra)
+#   --commit REF         the project's commit to copy, so an older tree is measured on today's machine; its
+#                        node_modules are still the checkout's as they stand (default the checkout's own)
 #   --modes LIST         the modes to measure, comma-separated: cold, warm, edit, idle, first (default cold)
 #   --runs N             at most N rounds, so at most N runs of each mode (default 5)
 #   --band PERCENT       stop once every measured mode's quiet runs, at least 3 of them, are within this
@@ -122,6 +124,7 @@ edit=modules/tasks/TasksSearchQuery.ts
 cohere=cohere
 generate=
 links=()
+commit=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
 
@@ -137,6 +140,7 @@ while (( $# > 0 )); do
     --edit) edit=$2; shift 2 ;;
     --cohere) cohere=$2; shift 2 ;;
     --generate) generate=$2; shift 2 ;;
+    --commit) commit=$2; shift 2 ;;
     --link) links+=($2); shift 2 ;;
     --work) work=$2; shift 2 ;;
     --record) record=true; shift ;;
