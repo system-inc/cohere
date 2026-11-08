@@ -20,13 +20,10 @@ import (
 	"go/token"
 	"reflect"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
@@ -41,39 +38,28 @@ var (
 	objectType = reflect.TypeFor[*ast.Object]()
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1033",
-	Doc:      "Flags a delete guarded by a lookup of the key it deletes: staticcheck's S1033, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every if statement of the package. The query names no symbol, so
-// code.Matches walks every package, and its root is an if statement, so it walks the inspector's if statements, nested
-// ones included.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("guarded_delete: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.IfStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every if statement, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		statement, isIf := node.(*ast.IfStmt)
 		if !isIf {
-			// Invariant: Preorder hands this function only the if statements it was asked for.
-			panic("guarded_delete: the inspector handed over a node that is not an if statement")
+			// Invariant: the dispatcher hands Node only the if statements it was asked for.
+			panic("guarded_delete: the dispatcher handed over a node that is not an if statement")
 		}
 		Check(context, statement)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1033",
+	"S1033",
+	"Flags a delete guarded by a lookup of the key it deletes: staticcheck's S1033, ported.",
+	&Listener,
+)
 
 // Check judges one if statement: one with no else, or an empty one, whose initializer declares the blank identifier
 // and one variable from a map lookup, whose condition is that variable, and whose body is a call of the builtin delete

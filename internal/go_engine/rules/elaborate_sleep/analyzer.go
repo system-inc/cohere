@@ -22,51 +22,40 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1037",
-	Doc: "Flags a select whose one case receives from time.After, in place of time.Sleep: " +
-		"staticcheck's S1037, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every select statement, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.SelectStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		selectStatement, isSelect := node.(*ast.SelectStmt)
+		if !isSelect {
+			// Invariant: the dispatcher hands Node only the select statements it was asked for.
+			panic("elaborate_sleep: the dispatcher handed over a node that is not a select statement")
+		}
+		Check(context, selectStatement)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1037",
+	"S1037",
+	"Flags a select whose one case receives from time.After, in place of time.Sleep: "+
+		"staticcheck's S1037, ported.",
+	&Listener,
+)
 
 // message is the original's, in both of its branches.
 const message = "should use time.Sleep instead of elaborate way of sleeping"
-
-// run builds the pass's context and judges every select statement of the package, the one root the query names.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("elaborate_sleep: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.SelectStmt)(nil)}, func(node ast.Node) {
-		selectStatement, isSelect := node.(*ast.SelectStmt)
-		if !isSelect {
-			// Invariant: Preorder hands this function only the select statements it was asked for.
-			panic("elaborate_sleep: the inspector handed over a node that is not a select statement")
-		}
-		Check(context, selectStatement)
-	})
-	return nil, nil
-}
 
 // Check judges one select statement: a select of one case, which receives from a call of time.After on one argument
 // and keeps nothing it receives, waits as time.Sleep does, and where the case's body is empty, the fix calls

@@ -15,44 +15,28 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1023",
-	Doc: "Flags a break that ends a case clause and a return that ends a function with no results: " +
-		"staticcheck's S1023, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every case clause, function declaration and
+// function literal, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CaseClause)(nil), (*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	Node:  func(context *rule.Context, node ast.Node, _ []ast.Node) { Check(context, node) },
 }
 
-// run builds the pass's context and judges every case clause, function declaration and function literal of the
-// package, in one walk where the original takes two, since each node's judgment reads that node alone.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("redundant_control_flow: the inspect pass's result is missing")
-	}
-	inspected.Preorder(
-		[]ast.Node{(*ast.CaseClause)(nil), (*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
-		func(node ast.Node) { Check(context, node) },
-	)
-	return nil, nil
-}
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1023",
+	"S1023",
+	"Flags a break that ends a case clause and a return that ends a function with no results: "+
+		"staticcheck's S1023, ported.",
+	&Listener,
+)
 
 // Check judges one node: a case clause by its last statement, and a function declaration or literal by its results
 // and its body's last statement.

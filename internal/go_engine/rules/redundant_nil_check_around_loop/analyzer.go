@@ -18,49 +18,36 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1031",
-	Doc:      "Flags a nil check around a range over a slice or a map: staticcheck's S1031, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every if statement of the package. The query names no symbol, so the
-// original walks every package, its own standard library ones included, and the port needs no guard for them.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("redundant_nil_check_around_loop: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.IfStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every if statement, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		statement, isIf := node.(*ast.IfStmt)
 		if !isIf {
-			// Invariant: Preorder hands this function only the if statements it was asked for.
-			panic("redundant_nil_check_around_loop: the inspector handed over a node that is not an if statement")
+			// Invariant: the dispatcher hands Node only the if statements it was asked for.
+			panic("redundant_nil_check_around_loop: the dispatcher handed over a node that is not an if statement")
 		}
 		Check(context, statement)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1031",
+	"S1031",
+	"Flags a nil check around a range over a slice or a map: staticcheck's S1031, ported.",
+	&Listener,
+)
 
 // Check judges one if statement: one with no init statement and no else, whose condition says a variable, named by
 // an identifier, is not the predeclared nil, and whose body is a range over that very variable and nothing else,

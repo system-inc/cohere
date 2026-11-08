@@ -29,49 +29,38 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1018",
-	Doc: "Flags a loop that slides a slice's elements down one by one, which a call to copy says: " +
-		"staticcheck's S1018, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every for statement of the package, the one root the query names.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("sliding_copy: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.ForStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every for statement, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.ForStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		loop, isLoop := node.(*ast.ForStmt)
 		if !isLoop {
-			// Invariant: Preorder hands this function only the for statements it was asked for.
-			panic("sliding_copy: the inspector handed over a node that is not a for statement")
+			// Invariant: the dispatcher hands Node only the for statements it was asked for.
+			panic("sliding_copy: the dispatcher handed over a node that is not a for statement")
 		}
 		Check(context, loop)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1018",
+	"S1018",
+	"Flags a loop that slides a slice's elements down one by one, which a call to copy says: "+
+		"staticcheck's S1018, ported.",
+	&Listener,
+)
 
 // Check judges one for statement: a counter set to the integer literal zero, run while it is less than a limit named
 // by an identifier and incremented, around a body of one assignment that stores at the counter an element of the same

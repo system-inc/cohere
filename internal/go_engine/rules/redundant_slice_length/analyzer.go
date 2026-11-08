@@ -15,47 +15,35 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1010",
-	Doc:      "Flags a slice expression whose high index is the length of what it slices: staticcheck's S1010, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every slice expression of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("redundant_slice_length: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.SliceExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every slice expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.SliceExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		slice, isSlice := node.(*ast.SliceExpr)
 		if !isSlice {
-			// Invariant: Preorder hands this function only the slice expressions it was asked for.
-			panic("redundant_slice_length: the inspector handed over a node that is not a slice expression")
+			// Invariant: the dispatcher hands Node only the slice expressions it was asked for.
+			panic("redundant_slice_length: the dispatcher handed over a node that is not a slice expression")
 		}
 		Check(context, slice)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1010",
+	"S1010",
+	"Flags a slice expression whose high index is the length of what it slices: staticcheck's S1010, ported.",
+	&Listener,
+)
 
 // Check judges one slice expression: one of two indexes whose high index calls the builtin len on the very variable
 // it slices, named by an identifier, says what the default already is, and the fix deletes the high index.

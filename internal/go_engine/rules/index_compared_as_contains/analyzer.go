@@ -26,49 +26,36 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1003",
-	Doc:      "Flags strings.Index or bytes.Index compared to ask for containment: staticcheck's S1003, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every binary expression of the package, as the original's code.Preorder
-// walks the inspector's, in every package, since no symbol filters which.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("index_compared_as_contains: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BinaryExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		binary, isBinary := node.(*ast.BinaryExpr)
 		if !isBinary {
-			// Invariant: Preorder hands this function only the binary expressions it was asked for.
-			panic("index_compared_as_contains: the inspector handed over a node that is not a binary expression")
+			// Invariant: the dispatcher hands Node only the binary expressions it was asked for.
+			panic("index_compared_as_contains: the dispatcher handed over a node that is not a binary expression")
 		}
 		Check(context, binary)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1003",
+	"S1003",
+	"Flags strings.Index or bytes.Index compared to ask for containment: staticcheck's S1003, ported.",
+	&Listener,
+)
 
 // Check judges one binary expression: a call of strings' or bytes' Index, IndexAny or IndexRune through the name its
 // file imports the package under, on its left, compared with -1 or 0 on its right in a way that asks for

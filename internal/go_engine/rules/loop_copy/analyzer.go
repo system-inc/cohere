@@ -25,27 +25,33 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1001",
-	Doc: "Flags a loop that copies a slice or an array element by element, which copy or an assignment says: " +
-		"staticcheck's S1001, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every range statement and for statement, in
+// preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.RangeStmt)(nil), (*ast.ForStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		Check(context, node)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1001",
+	"S1001",
+	"Flags a loop that copies a slice or an array element by element, which copy or an assignment says: "+
+		"staticcheck's S1001, ported.",
+	&Listener,
+)
 
 // copiedLoop is what the query binds of a loop it matches: the key, the value when a range names one, the slice or
 // array read from and the one written to, each without the parentheses the pattern looks through before it binds.
@@ -54,24 +60,6 @@ type copiedLoop struct {
 	value       *ast.Ident
 	source      ast.Expr
 	destination ast.Expr
-}
-
-// run builds the pass's context and judges every range and for statement of the package, the two roots the query's
-// alternatives name.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("loop_copy: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.RangeStmt)(nil), (*ast.ForStmt)(nil)}, func(node ast.Node) {
-		Check(context, node)
-	})
-	return nil, nil
 }
 
 // Check judges one range or for statement: a loop the query matches, whose source and destination are the same
