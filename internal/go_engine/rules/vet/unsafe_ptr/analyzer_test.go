@@ -1,10 +1,14 @@
 package unsafe_ptr
 
 import (
+	"bufio"
 	"cmp"
 	"fmt"
+	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -40,6 +44,78 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	}
 	for _, extra := range difference(port, original) {
 		test.Errorf("the port found %s, and the original did not", described(extra))
+	}
+}
+
+// adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
+// the message of a finding only the port makes, `renames:`, the original's message, `=>` and the port's, for a
+// finding both make in words that differ, or `drops:` and the exact message of a finding only the original makes,
+// which is wrong.
+var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?))\s*$`)
+
+// Over the differences fixture the two disagree, and only where each disagreement was adjudicated in the port's
+// favour: every finding the port alone makes is recorded on its line, as found or as a renaming, every finding the
+// original alone makes is recorded on its line as dropped, by its exact message, or is the original's side of a
+// renaming, and every record is matched. A drop's reason is the comment on the line above it. A finding the original
+// makes and the port does not, unrecorded, fails, since the port is never worse than the original.
+func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
+	test.Parallel()
+	original, port := findingsOf(test, "differences")
+	test.Logf("the original found %d, the port %d", len(original), len(port))
+	expectedPort := []finding{}
+	expectedOriginal := []finding{}
+	path := filepath.Join(analysistest.TestData(), "src", "differences", "differences.go")
+	file, openError := os.Open(path)
+	if openError != nil {
+		test.Fatal(openError)
+	}
+	defer func() {
+		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
+	}()
+	scanner := bufio.NewScanner(file)
+	previous := ""
+	for line := 1; scanner.Scan(); line++ {
+		for _, comment := range strings.Split(scanner.Text(), "// port ")[1:] {
+			match := adjudicatedPattern.FindStringSubmatch(comment)
+			switch {
+			case match == nil:
+				test.Fatalf("differences.go:%d holds a comment the test cannot read: %q", line, comment)
+			case match[1] != "":
+				expectedPort = append(expectedPort, finding{file: "differences.go", line: line, message: match[1]})
+			case match[4] != "":
+				// A drop removes a finding for being wrong, so it says why, as a comment of its own just above.
+				reason := strings.TrimSpace(previous)
+				if !strings.HasPrefix(reason, "//") || strings.Contains(reason, "// port ") {
+					test.Errorf("differences.go:%d drops %q with no reason on the line above", line, match[4])
+				}
+				dropped := finding{file: "differences.go", line: line, message: match[4]}
+				expectedOriginal = append(expectedOriginal, dropped)
+			default:
+				renamed := finding{file: "differences.go", line: line, message: match[2]}
+				expectedOriginal = append(expectedOriginal, renamed)
+				expectedPort = append(expectedPort, finding{file: "differences.go", line: line, message: match[3]})
+			}
+		}
+		previous = scanner.Text()
+	}
+	if scanError := scanner.Err(); scanError != nil {
+		test.Fatal(scanError)
+	}
+	if len(expectedPort) == 0 && len(expectedOriginal) == 0 {
+		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
+	}
+	compareAdjudicated(test, "the port", withoutColumns(difference(port, original)), expectedPort)
+	compareAdjudicated(test, "the original", withoutColumns(difference(original, port)), expectedOriginal)
+}
+
+// compareAdjudicated fails the test unless the findings side alone makes are exactly those the fixture records.
+func compareAdjudicated(test *testing.T, side string, actual []finding, expected []finding) {
+	test.Helper()
+	for _, unrecorded := range difference(actual, expected) {
+		test.Errorf("%s alone found %s, which the fixture does not record", side, described(unrecorded))
+	}
+	for _, unmatched := range difference(expected, actual) {
+		test.Errorf("the fixture records that %s alone finds %s, and it does not", side, described(unmatched))
 	}
 }
 
@@ -136,6 +212,16 @@ func difference(from []finding, without []finding) []finding {
 		missing = append(missing, found)
 	}
 	return missing
+}
+
+// withoutColumns is findings with their columns and ends dropped, for comparing with the differences fixture's
+// comments, which name a line.
+func withoutColumns(findings []finding) []finding {
+	dropped := []finding{}
+	for _, found := range findings {
+		dropped = append(dropped, finding{file: found.file, line: found.line, message: found.message})
+	}
+	return dropped
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

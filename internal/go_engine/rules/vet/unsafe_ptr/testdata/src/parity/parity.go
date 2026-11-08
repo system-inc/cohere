@@ -27,10 +27,6 @@ type stringHeaderAlias = reflect.StringHeader
 
 type sliceHeaderPointerAlias = *reflect.SliceHeader
 
-// sliceHeaderPointerType is a defined pointer type, through which `Data` is a field selector, but whose type is
-// named rather than a pointer.
-type sliceHeaderPointerType *reflect.SliceHeader
-
 type valueAlias = reflect.Value
 
 type embedsValue struct {
@@ -43,6 +39,22 @@ type embedsHeaderPointer struct {
 
 type embedsHeader struct {
 	reflect.SliceHeader
+}
+
+type embedsEmbedsHeader struct {
+	embedsHeader
+}
+
+// shadowsPointer embeds a reflect.Value and declares a Pointer of its own, which a call on it resolves to.
+type shadowsPointer struct {
+	reflect.Value
+}
+
+func (shadowsPointer) Pointer() uintptr { return 0 }
+
+type holdsHeader struct {
+	header        reflect.SliceHeader
+	headerPointer *reflect.SliceHeader
 }
 
 type generic[T any] struct {
@@ -130,9 +142,17 @@ func arithmetic(pointer unsafe.Pointer, defined pointerType, offset uintptr) {
 	_ = unsafe.Pointer(uintptr(unsafe.Pointer(uintptr(pointer))) + 1)
 }
 
-// Rule 5: the result of reflect.Value's Pointer or UnsafeAddr. The method is matched by name on a receiver of type
-// reflect.Value, written as the call's function, and its result must be converted as it is.
-func reflectValues(value reflect.Value, pointer *reflect.Value, embedded embedsValue, aliased valueAlias) {
+// Rule 5: the result of reflect.Value's Pointer or UnsafeAddr, converted as it is. The shapes where the original's
+// match on the receiver's type misses the method, a pointer or embedded receiver, a method expression or parentheses,
+// are in the differences fixture. A call through an interface, a function value or a method of another type that
+// shadows reflect's is not the method, and is reported by both.
+func reflectValues(
+	value reflect.Value,
+	pointer *reflect.Value,
+	embedded embedsValue,
+	aliased valueAlias,
+	shadow shadowsPointer,
+) {
 	_ = unsafe.Pointer(value.Pointer())
 	_ = unsafe.Pointer(value.UnsafeAddr())
 	_ = unsafe.Pointer((value).Pointer())
@@ -140,23 +160,25 @@ func reflectValues(value reflect.Value, pointer *reflect.Value, embedded embedsV
 	_ = unsafe.Pointer(aliased.Pointer())
 	_ = unsafe.Pointer(reflect.ValueOf(&value).Pointer())
 	_ = unsafe.Pointer(reflect.ValueOf(&value).Elem().UnsafeAddr())
-	_ = unsafe.Pointer(value.Pointer() - 1)             // reported
-	_ = unsafe.Pointer(value.UnsafeAddr() &^ 1)         // reported
-	_ = unsafe.Pointer((value.Pointer)())               // reported
-	_ = unsafe.Pointer(reflect.Value.Pointer(value))    // reported
-	_ = unsafe.Pointer(reflect.Value.UnsafeAddr(value)) // reported
-	_ = unsafe.Pointer(pointer.Pointer())               // reported
+	_ = unsafe.Pointer(value.Pointer() - 1)     // reported
+	_ = unsafe.Pointer(value.UnsafeAddr() &^ 1) // reported
 	_ = unsafe.Pointer((*pointer).Pointer())
-	_ = unsafe.Pointer(embedded.Pointer()) // reported
 	_ = unsafe.Pointer(embedded.Value.Pointer())
 	_ = unsafe.Pointer(uintptr(value.UnsafePointer()))
 	_ = unsafe.Pointer(uintptr(value.UnsafePointer()) + 1)
 	pointerMethod := value.Pointer
 	_ = unsafe.Pointer(pointerMethod())       // reported
 	_ = unsafe.Pointer(uintptr(value.Uint())) // reported
+	var addresser interface{ Pointer() uintptr } = value
+	_ = unsafe.Pointer(addresser.Pointer()) // reported
+	_ = unsafe.Pointer(shadow.Pointer())    // reported
+	_ = unsafe.Pointer(shadow.Value.Pointer())
 }
 
-// Rule 6: the Data field of a header, allowed only through a pointer to one.
+// Rule 6: the Data field of a header, allowed only through a pointer to one. The shapes where the original's match on
+// the receiver's type misses a pointer, an embedded pointer, a defined pointer type or a dereference, are in the
+// differences fixture. A header held by value, in a variable, a field, an element of a slice or array, or an
+// embedding by value however deep, is reported by both.
 func headers(
 	slice *reflect.SliceHeader,
 	text *reflect.StringHeader,
@@ -164,13 +186,16 @@ func headers(
 	aliasedPointer *sliceHeaderAlias,
 	aliasedStringPointer *stringHeaderAlias,
 	pointerAliased sliceHeaderPointerAlias,
-	pointerDefined sliceHeaderPointerType,
 	throughPointer embedsHeaderPointer,
 	throughValue embedsHeader,
 	throughValuePointer *embedsHeader,
 	box *generic[int],
 	values []byte,
 	pointers []*reflect.SliceHeader,
+	headerSlice []reflect.SliceHeader,
+	headerArray *[2]reflect.SliceHeader,
+	holds *holdsHeader,
+	deep *embedsEmbedsHeader,
 ) {
 	_ = unsafe.Pointer(slice.Data)
 	_ = unsafe.Pointer(text.Data)
@@ -183,15 +208,18 @@ func headers(
 	_ = unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&values)).Data)
 	_ = unsafe.Pointer(throughPointer.SliceHeader.Data)
 	_ = unsafe.Pointer(sliceValue.Data)          // reported
-	_ = unsafe.Pointer(pointerDefined.Data)      // reported
-	_ = unsafe.Pointer(throughPointer.Data)      // reported
 	_ = unsafe.Pointer(throughValue.Data)        // reported
 	_ = unsafe.Pointer(throughValuePointer.Data) // reported
 	_ = unsafe.Pointer(box.Data)                 // reported
 	_ = unsafe.Pointer(slice.Data + 8)           // reported
 	_ = unsafe.Pointer(uintptr(slice.Len))       // reported
-	_ = unsafe.Pointer((*slice).Data)            // reported twice
 	_ = unsafe.Pointer(uintptr(unsafe.Pointer(slice.Data)))
+	_ = unsafe.Pointer(headerSlice[0].Data) // reported
+	_ = unsafe.Pointer(headerArray[0].Data) // reported
+	_ = unsafe.Pointer(holds.header.Data)   // reported
+	_ = unsafe.Pointer(holds.headerPointer.Data)
+	_ = unsafe.Pointer(deep.Data)                          // reported
+	_ = unsafe.Pointer(deep.embedsHeader.SliceHeader.Data) // reported
 }
 
 // A header made or read as a value: dereferenced, its address taken, or a composite literal's address taken.
