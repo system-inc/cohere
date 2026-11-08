@@ -709,6 +709,7 @@ var portedPasses = []string{
 	"identical_operands",
 	"inconsistent_receiver_name",
 	"ineffective_copy",
+	"ineffective_field_assignment",
 	"invisible_character",
 	"misplaced_error_result",
 	"nil_ness",
