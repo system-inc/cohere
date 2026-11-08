@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // The formatter's identity: what the format record is keyed by, so it survives a cohere commit that
@@ -81,10 +83,16 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 	}
 
 	inputs := []FormatterInput{}
+	listedDirectories := map[string]bool{}
+	var listed []listed_directories.Package
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		fields := strings.Split(line, "\t")
 		if len(fields) != 3 {
 			continue
+		}
+		if !listedDirectories[fields[1]] {
+			listedDirectories[fields[1]] = true
+			listed = append(listed, listed_directories.Package{ImportPath: fields[0], Directory: fields[1]})
 		}
 		sum, fileSumError := fileSum(filepath.Join(fields[1], fields[2]))
 		if fileSumError != nil {
@@ -92,6 +100,9 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 		}
 		inputs = append(inputs, FormatterInput{Name: fields[0] + "/" + filepath.ToSlash(fields[2]), Sum: sum})
 	}
+	// What go list read, read again in this process, so a test of the inputs has its result keyed on a file added to
+	// a formatter package (#cmpsz8p).
+	listed_directories.Open(moduleDirectory, []string{formatterPackage}, listed)
 	// The printers alone are dozens of files, so a short list is a `go list` that answered about
 	// something else, and an identity hashed from it would match a formatter it does not describe.
 	if len(inputs) < 10 {

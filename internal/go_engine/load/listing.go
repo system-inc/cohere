@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // listedPackage is what `go list -deps -json -e` says of one package, the fields the load reads. Module decodes
@@ -196,6 +198,21 @@ func runList(workspace string, environment []string, patterns []string) ([]*list
 		}
 		listed = append(listed, listedPackage)
 	}
+	// What go list read in its process, read again in this one, so a test that loads fixtures has its result keyed
+	// on them (#cmpsz8p).
+	reads := make([]listed_directories.Package, 0, len(listed))
+	for _, listedPackage := range listed {
+		each := listed_directories.Package{
+			ImportPath: listedPackage.ImportPath,
+			Directory:  listedPackage.Directory,
+			Root:       !listedPackage.DepOnly,
+		}
+		if listedPackage.Module != nil && listedPackage.Module.Main {
+			each.MainModule, each.MainGoMod = true, listedPackage.Module.GoMod
+		}
+		reads = append(reads, each)
+	}
+	listed_directories.Open(workspace, patterns, reads)
 	return listed, nil
 }
 

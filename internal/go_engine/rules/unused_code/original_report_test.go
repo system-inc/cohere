@@ -1,4 +1,4 @@
-package rules
+package unused_code
 
 import (
 	"fmt"
@@ -8,21 +8,22 @@ import (
 	"honnef.co/go/tools/unused"
 )
 
-// unusedReport is staticcheck's U1000 as an analyzer that reports. unused.Analyzer reports nothing itself:
-// it returns an unused.Result, and staticcheck's own runner turns that into findings, so this does the
-// same, with the runner's message and U1000 as the finding's message id.
+// originalReport is staticcheck's U1000 as an analyzer that reports, the oracle the port is held to. It is what the
+// registry ran as U1000 before the port took its place, moved here from package rules unchanged but for its name.
+// unused.Analyzer reports nothing itself: it returns an unused.Result, and staticcheck's own runner turns that into
+// findings, so this does the same, with the runner's message and U1000 as the finding's message id.
 //
-// staticcheck's runner also merges the result across a package's variants, so a function only its tests
-// call is not reported from the build without them. This reports one variant at a time, so that merge is
-// the engine's to make if it loads test variants.
-var unusedReport = &analysis.Analyzer{
+// staticcheck's runner also merges the result across a package's variants, so a function only its tests call is not
+// reported from the build without them. This reports one variant at a time, as the port does, so that merge is the
+// engine's to make if it loads test variants.
+var originalReport = &analysis.Analyzer{
 	Name:     "unusedreport",
 	Doc:      "reports the unused code staticcheck's U1000 finds",
 	Requires: []*analysis.Analyzer{unused.Analyzer.Analyzer},
-	Run:      runUnusedReport,
+	Run:      runOriginalReport,
 }
 
-func runUnusedReport(pass *analysis.Pass) (any, error) {
+func runOriginalReport(pass *analysis.Pass) (any, error) {
 	result, isResult := pass.ResultOf[unused.Analyzer.Analyzer].(unused.Result)
 	if !isResult {
 		return nil, fmt.Errorf("reading U1000's result: it is %T", pass.ResultOf[unused.Analyzer.Analyzer])

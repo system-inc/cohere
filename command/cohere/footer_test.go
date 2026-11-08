@@ -241,9 +241,10 @@ func TestFooterColor(test *testing.T) {
 	}
 }
 
-// TestCheckedAndCachedAreEveryFileInScope is the first count invariant: the two add up to the files in
-// scope, and a summary where they do not is refused rather than printed.
-func TestCheckedAndCachedAreEveryFileInScope(test *testing.T) {
+// TestCheckedAndCachedAreAtMostEveryFileInScope is the first count invariant: the two are at most the files in
+// scope, short of it only by files no phase reached, which a gap names (#1hva1ya), and a summary where they are more
+// is refused rather than printed.
+func TestCheckedAndCachedAreAtMostEveryFileInScope(test *testing.T) {
 	test.Parallel()
 	summary := cleanSummary()
 	warmSummary(&summary)
@@ -251,8 +252,12 @@ func TestCheckedAndCachedAreEveryFileInScope(test *testing.T) {
 		test.Fatalf("a consistent summary was refused: %v", countsAgreeError)
 	}
 	summary.FilesCached--
+	if countsAgreeError := summary.countsAgree(); countsAgreeError != nil {
+		test.Errorf("one file no phase reached was refused: %v", countsAgreeError)
+	}
+	summary.FilesCached += 2
 	if summary.countsAgree() == nil {
-		test.Error("checked and cached fall one short of the files in scope, and the summary was accepted")
+		test.Error("checked and cached are one more than the files in scope, and the summary was accepted")
 	}
 }
 

@@ -14,4 +14,4 @@ func tryLockFile(*os.File) (bool, error) {
 	return true, nil
 }
 
-func unlockFile(*os.File) {}
+func unlockFile(*os.File) { /* tryLockFile took no lock here, so there is nothing to release. */ }
