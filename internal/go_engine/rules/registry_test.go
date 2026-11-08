@@ -880,6 +880,7 @@ var portedPasses = []string{
 	"non_pointer_unmarshal",
 	"receiver_name",
 	"repeated_if_else_condition",
+	"replace_zero_count",
 	"self_assignment",
 	"shell_command_as_program",
 	"single_argument_append",
