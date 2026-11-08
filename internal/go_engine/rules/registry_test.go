@@ -1057,6 +1057,7 @@ var portedPasses = []string{
 	"nil_map_assignment",
 	"nil_ness",
 	"non_canonical_header_key",
+	"non_octal_file_mode",
 	"non_pointer_unmarshal",
 	"odd_slice_argument",
 	"overlapping_encode_buffers",
