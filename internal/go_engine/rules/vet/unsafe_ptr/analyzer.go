@@ -8,9 +8,10 @@
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/unsafeptr/unsafeptr.go, whose
 // logic it keeps, isSafeArith exactly as written, and whose messages it reports word for word, over the same range.
-// It walks the three kinds of node the original inspects in one preorder, as the original's Preorder does, through
-// inspector's public PreorderSeq. The registry runs the port in the original's place, and the original stays the
-// oracle: the parity tests beside this file run both over the same packages.
+// It sits on the engine's syntax dispatcher, hearing the three kinds of node the original inspects in one preorder, as
+// the original's Preorder does, on the walk the dispatcher makes once for every syntax rule. The registry runs the
+// port in the original's place, and the original stays the oracle: the parity tests beside this file run both over
+// the same packages.
 //
 // The two differ only where the original reports valid code, each case in testdata/src/differences and held by
 // TestPortDiffersFromOriginalOnlyWhereItIsRight, and the port reports nothing the original does not. For rules 5 and
@@ -31,61 +32,73 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "unsafeptr",
-	Doc: "check for invalid conversions of uintptr to unsafe.Pointer\n\n" +
-		"The unsafeptr analyzer reports likely incorrect uses of unsafe.Pointer\n" +
-		"to convert integers to pointers. A conversion from uintptr to\n" +
-		"unsafe.Pointer is invalid if it implies that there is a uintptr-typed\n" +
-		"word in memory that holds a pointer value, because that word will be\n" +
-		"invisible to stack copying and to the garbage collector.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unsafeptr",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// name is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
+// read the same as before the port took the original's place.
+const name = "unsafeptr"
+
+// doc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const doc = "check for invalid conversions of uintptr to unsafe.Pointer\n\n" +
+	"The unsafeptr analyzer reports likely incorrect uses of unsafe.Pointer\n" +
+	"to convert integers to pointers. A conversion from uintptr to\n" +
+	"unsafe.Pointer is invalid if it implies that there is a uintptr-typed\n" +
+	"word in memory that holds a pointer value, because that word will be\n" +
+	"invisible to stack copying and to the garbage collector."
+
+// url is the original's address.
+const url = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unsafeptr"
+
+// Listener is what the port hears of each package from the dispatcher: every call, dereference and unary expression,
+// in one preorder, as the original's Preorder over the same three kinds visits them.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil), (*ast.StarExpr)(nil), (*ast.UnaryExpr)(nil)},
+	Node:  checkNode,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unsafe_ptr: inspect's result is missing")
-	}
-	// PreorderSeq visits the calls, dereferences and unary expressions in one preorder, as the original's Preorder
-	// over the same three kinds does, and the switch hands each over typed.
-	for node := range inspected.PreorderSeq((*ast.CallExpr)(nil), (*ast.StarExpr)(nil), (*ast.UnaryExpr)(nil)) {
-		switch inspectedNode := node.(type) {
-		case *ast.CallExpr:
-			// A conversion to unsafe.Pointer, or to a type defined on it, takes one argument; a call of a function
-			// value has a signature, never a basic type, so only a conversion is judged.
-			if len(inspectedNode.Args) == 1 &&
-				hasBasicType(pass.TypesInfo, inspectedNode.Fun, types.UnsafePointer) &&
-				hasBasicType(pass.TypesInfo, inspectedNode.Args[0], types.Uintptr) &&
-				!isSafeUintptr(pass.TypesInfo, inspectedNode.Args[0]) {
-				pass.ReportRangef(inspectedNode, "possible misuse of unsafe.Pointer")
-			}
-		case *ast.StarExpr:
-			// A dereference of a pointer to a header has the header's type, and the pointer type written as a type
-			// expression, `*reflect.SliceHeader`, has the pointer's, so only the dereference is judged.
-			if dereferenced := pass.TypesInfo.Types[inspectedNode].Type; isReflectHeader(dereferenced) {
-				pass.ReportRangef(inspectedNode, "possible misuse of %s", dereferenced)
-			}
-		case *ast.UnaryExpr:
-			if inspectedNode.Op != token.AND {
-				continue
-			}
-			if addressed := pass.TypesInfo.Types[inspectedNode.X].Type; isReflectHeader(addressed) {
-				pass.ReportRangef(inspectedNode, "possible misuse of %s", addressed)
-			}
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+name, name, doc, &Listener)
+	analyzer.URL = url
+	return analyzer
+}
+
+// checkNode reports node when it is a conversion of a uintptr to unsafe.Pointer the rules forbid, or a reflect header
+// made or read as a value; the switch hands each kind over typed.
+func checkNode(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch inspectedNode := node.(type) {
+	case *ast.CallExpr:
+		// A conversion to unsafe.Pointer, or to a type defined on it, takes one argument; a call of a function value
+		// has a signature, never a basic type, so only a conversion is judged.
+		if len(inspectedNode.Args) == 1 &&
+			hasBasicType(context.TypesInfo, inspectedNode.Fun, types.UnsafePointer) &&
+			hasBasicType(context.TypesInfo, inspectedNode.Args[0], types.Uintptr) &&
+			!isSafeUintptr(context.TypesInfo, inspectedNode.Args[0]) {
+			context.ReportRangef(inspectedNode, "possible misuse of unsafe.Pointer")
+		}
+	case *ast.StarExpr:
+		// A dereference of a pointer to a header has the header's type, and the pointer type written as a type
+		// expression, `*reflect.SliceHeader`, has the pointer's, so only the dereference is judged.
+		if dereferenced := context.TypesInfo.Types[inspectedNode].Type; isReflectHeader(dereferenced) {
+			context.ReportRangef(inspectedNode, "possible misuse of %s", dereferenced)
+		}
+	case *ast.UnaryExpr:
+		if inspectedNode.Op != token.AND {
+			return
+		}
+		if addressed := context.TypesInfo.Types[inspectedNode.X].Type; isReflectHeader(addressed) {
+			context.ReportRangef(inspectedNode, "possible misuse of %s", addressed)
 		}
 	}
-	return nil, nil
 }
 
 // isSafeUintptr reports whether expression, already known to be a uintptr, is safe to convert to unsafe.Pointer,
