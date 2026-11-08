@@ -80,6 +80,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/frame_pointer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/host_port"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/http_response"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/lost_cancel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
@@ -181,6 +182,7 @@ var ports = map[string]*analysis.Analyzer{
 	"framepointer": frame_pointer.Analyzer,
 	"hostport":     host_port.Analyzer,
 	"httpresponse": http_response.Analyzer,
+	"lostcancel":   lost_cancel.Analyzer,
 	"nilfunc":      nil_func.Analyzer,
 	"printf":       printf.Analyzer,
 	"scannererr":   scanner_error.Analyzer,
