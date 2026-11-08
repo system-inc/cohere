@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -87,23 +88,36 @@ func (fixtures fixtureLoad) fileName(path string) string {
 	return filepath.ToSlash(filepath.Join(fixtures.module, filepath.Base(path)))
 }
 
-// folderOf is the folder that holds the fixture package pattern names in the load: the module's own folder for a
-// module a pattern named, the pattern's folder in a testdata that is a module, and its folder under src in the tree.
-func (fixtures fixtureLoad) folderOf(pattern string) string {
-	switch {
-	case fixtures.module != "":
-		return fixtures.directory
-	case isModule(fixtures.directory):
-		return filepath.Join(fixtures.directory, filepath.FromSlash(pattern))
-	default:
-		return filepath.Join(fixtures.directory, "src", filepath.FromSlash(pattern))
-	}
-}
-
 // loadedFixtures is one load's root packages, beside the load.
 type loadedFixtures struct {
 	fixtureLoad
 	roots []*packages.Package
+}
+
+// recordsFolder is the folder that holds the one fixture package fixtures loaded, read from what the load found rather
+// than from where a layout would put it: a module a pattern named is its own folder, and otherwise it is the folder
+// the root package's files sit in, wherever the go command found them, under src in a tree or wherever a module's
+// go.work points, as time_until's differences module sits under its testdata's src. A package and its test variants
+// share that folder, so roots in more than one folder, or none, fail the test, since records read from a guessed
+// folder would read as none.
+func recordsFolder(test testing.TB, fixtures loadedFixtures) string {
+	test.Helper()
+	if fixtures.module != "" {
+		return fixtures.directory
+	}
+	folders := []string{}
+	for _, root := range fixtures.roots {
+		for _, file := range root.GoFiles {
+			if folder := filepath.Dir(file); !slices.Contains(folders, folder) {
+				folders = append(folders, folder)
+			}
+		}
+	}
+	if len(folders) != 1 {
+		test.Fatalf("the packages of %s sit in %d folders, %v, where a differences fixture is one package's, so its "+
+			"records could not be read", fixtures.described(), len(folders), folders)
+	}
+	return folders[0]
 }
 
 // loadFixtures loads the fixture packages patterns name from testdata, a load for the tree and one for each module.

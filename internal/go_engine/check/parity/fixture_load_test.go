@@ -1,6 +1,7 @@
 package parity
 
 import (
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -60,5 +61,27 @@ func TestRequireOnlyAdjudicatedReadsAModulesRecords(test *testing.T) {
 			"in the port's words, and it does not",
 		"the fixture records that the original alone finds module_adjudicated/module_adjudicated.go:15:0: call to "+
 			"renamed in the original's words, renamed, and it does",
+	)
+}
+
+// A testdata that is a module may name its differences fixture by an import path its go.work resolves below src, as
+// time_until's go1.8 testdata does: the records are read from the folder the load found the package in, so they pair
+// the port's findings, and a port that finds what the original does leaves each of them unmatched. Read from where a
+// layout would put the pattern, testdata/workspaced, they would be none, and the fixture would fail as recording
+// nothing.
+func TestRequireOnlyAdjudicatedReadsRecordsWhereTheLoadFoundThem(test *testing.T) {
+	test.Parallel()
+	workspace := filepath.Join(analysistest.TestData(), "module_workspace")
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, workspace, "workspaced")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, calling(originalMessages), workspace, "workspaced")
+	}),
+		"the fixture records that the port alone finds workspaced.go:15:0: call to gained, and it does not",
+		"the fixture records that the port alone finds workspaced.go:16:0: call to renamed in the port's words, and "+
+			"it does not",
+		"the fixture records that the original alone finds workspaced.go:16:0: call to renamed in the original's "+
+			"words, renamed, and it does",
 	)
 }

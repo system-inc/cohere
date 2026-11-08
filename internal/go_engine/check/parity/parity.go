@@ -150,8 +150,20 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
+	return findingsOver(test, original, port, loadFixtures(test, testdata, patterns))
+}
+
+// findingsOver is Findings over loads already made, so a caller that reads the loaded packages as well, as
+// RequireOnlyAdjudicated reads where its records sit, loads them once.
+func findingsOver(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	loads []loadedFixtures,
+) (originalFindings []Finding, portFindings []Finding) {
+	test.Helper()
 	originalFindings, portFindings = []Finding{}, []Finding{}
-	for _, fixtures := range loadFixtures(test, testdata, patterns) {
+	for _, fixtures := range loads {
 		// The roots, as analysistest analyzes them: every package the patterns match and every test variant of it.
 		outcomes, analyzeError := Analyze([]Pair{{Original: original, Port: port}}, fixtures.roots)
 		if analyzeError != nil {
@@ -210,8 +222,9 @@ var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?))\s*$`,
 )
 
-// RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture under testdata's src,
-// or the fixture module of that name (see fixtureLoad), where the two disagree, and only where each disagreement was
+// RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture names, its records
+// read from the folder the load found it in (see recordsFolder), or the fixture module of that name (see
+// fixtureLoad), where the two disagree, and only where each disagreement was
 // adjudicated: every finding the port alone makes is recorded on its line, as found or as the port's side of a
 // renaming; every finding the original alone makes is recorded on its line, as the original's side of a renaming or as
 // dropped, a false positive ruled with the finding in hand; a finding both make in other spans or fixes is recorded as
@@ -234,10 +247,10 @@ func RequireOnlyAdjudicated(
 	fixture string,
 ) {
 	test.Helper()
-	originalFindings, portFindings := Findings(test, original, port, testdata, fixture)
+	loads := loadFixtures(test, testdata, []string{fixture})
+	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
-	fixtures := fixtureLoads(testdata, []string{fixture})[0]
-	recorded := adjudicated(test, fixtures.folderOf(fixture), fixtures.fileName)
+	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
 	if len(recorded.portAlone)+len(recorded.dropped)+len(recorded.moved)+len(recorded.withheld)+
 		len(recorded.omitted) == 0 {
 		test.Fatalf("the differences fixture %s records nothing, so the comparison proves nothing", fixture)
