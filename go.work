@@ -23,6 +23,7 @@ use (
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
 	./git_tree
+	./go_cache
 	./go_listing
 	./memory_limit
 	./mutation_aliasing
