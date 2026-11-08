@@ -881,6 +881,7 @@ var portedPasses = []string{
 	"single_append_concatenation",
 	"single_argument_append",
 	"single_case_select",
+	"time_since",
 	"typed_nil_interface_comparison",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
