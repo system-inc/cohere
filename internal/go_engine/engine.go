@@ -64,7 +64,8 @@ var engineRuleNames = []string{
 var mainHasRun atomic.Bool
 
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
-// prose to standardError, and returns the exit code.
+// prose to standardError, and returns the exit code. A command line that names one of the release's hidden verbs
+// for the standard library's table first runs that verb instead (see runStandardLibraryVerb).
 func Main(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
 	// A run sets its rule options on the registry's analyzers, which outlive it, so a second run in this process
 	// would be judged by the first's options with no error. The front door starts one engine process per Go root
@@ -75,6 +76,14 @@ func Main(arguments []string, standardOutput io.Writer, standardError io.Writer)
 	}
 	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
 	capMemory(os.LookupEnv, debug.SetMemoryLimit)
+	if isStandardLibraryVerb(arguments) {
+		generator, generatorError := binaryGenerator()
+		if generatorError != nil {
+			return refuse(standardError, generatorError)
+		}
+		return runStandardLibraryVerb(arguments, standardOutput, standardError, rules.All(),
+			embeddedStandardLibrary.table, generator)
+	}
 	return run(arguments, standardOutput, standardError, rules.All())
 }
 

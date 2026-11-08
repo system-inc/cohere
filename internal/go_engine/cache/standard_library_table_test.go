@@ -3,6 +3,7 @@ package cache
 import (
 	"bytes"
 	"compress/gzip"
+	"slices"
 	"testing"
 )
 
@@ -24,7 +25,7 @@ func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 	test.Parallel()
 
 	entries := sampleStandardLibraryEntries()
-	written := WriteStandardLibraryTable(entries)
+	written := WriteStandardLibraryTable(entries, nil)
 	table := NewStandardLibraryTable(written)
 	for key, want := range entries {
 		got, held := table.Lookup(key)
@@ -42,7 +43,7 @@ func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 	if problem := table.Problem(); problem != nil {
 		test.Errorf("want a table that parses, got %v", problem)
 	}
-	if again := WriteStandardLibraryTable(sampleStandardLibraryEntries()); !bytes.Equal(again, written) {
+	if again := WriteStandardLibraryTable(sampleStandardLibraryEntries(), nil); !bytes.Equal(again, written) {
 		test.Error("want the same entries to write the same bytes")
 	}
 	plainSize := func(compressed []byte) int {
@@ -60,7 +61,8 @@ func TestAStandardLibraryTableReadsBackWhatItWasWrittenWith(test *testing.T) {
 	one := map[Key]StandardLibraryEntry{{0x01}: entries[Key{0x01}]}
 	// A row is the key, and two one-byte positions.
 	if both, single := plainSize(WriteStandardLibraryTable(map[Key]StandardLibraryEntry{{0x01}: entries[Key{0x01}],
-		{0x02}: entries[Key{0x02}]})), plainSize(WriteStandardLibraryTable(one)); both != single+len(Key{})+2 {
+		{0x02}: entries[Key{0x02}]}, nil)), plainSize(WriteStandardLibraryTable(one, nil)); both !=
+		single+len(Key{})+2 {
 		test.Errorf("want the shared entry held once, a row of %d bytes more, got %d bytes for one key and %d for "+
 			"both", len(Key{})+2, single, both)
 	}
@@ -76,7 +78,7 @@ func TestAStandardLibraryTableThatDoesNotParseHoldsNothing(test *testing.T) {
 	if _, held := empty.Lookup(Key{0x01}); held || empty.Problem() != nil || !empty.Empty() {
 		test.Errorf("want an empty table holding nothing with no problem, got problem %v", empty.Problem())
 	}
-	written := WriteStandardLibraryTable(sampleStandardLibraryEntries())
+	written := WriteStandardLibraryTable(sampleStandardLibraryEntries(), nil)
 	gzipped := func(plain string) []byte {
 		test.Helper()
 		var compressed bytes.Buffer
@@ -93,11 +95,15 @@ func TestAStandardLibraryTableThatDoesNotParseHoldsNothing(test *testing.T) {
 		"no gzip":           []byte("not a table"),
 		"cut short":         written[:len(written)/2],
 		"of another format": gzipped("some other table\n"),
-		// No contents, and one key whose entry is the first content.
-		"past its contents": gzipped(standardLibraryTableMagic + "\x00\x01" + string(make([]byte, len(Key{}))) +
+		// No variants, no contents, and one key whose entry is the first content.
+		"past its contents": gzipped(standardLibraryTableMagic + "\x00\x00\x01" + string(make([]byte, len(Key{}))) +
 			"\x00\x00"),
-		// No contents, no keys, and then a byte.
-		"with a byte after its keys": gzipped(standardLibraryTableMagic + "\x00\x00x"),
+		// No variants, no contents, no keys, and then a byte.
+		"with a byte after its keys": gzipped(standardLibraryTableMagic + "\x00\x00\x00x"),
+		// One variant whose target says it is longer than the table.
+		"inside a variant": gzipped(standardLibraryTableMagic + "\x01\x7f"),
+		// The first format, which held no variants.
+		"of the first format": gzipped("cohere standard library table 1\n\x00\x00"),
 	} {
 		table := NewStandardLibraryTable(contents)
 		if table.Empty() {
@@ -109,5 +115,39 @@ func TestAStandardLibraryTableThatDoesNotParseHoldsNothing(test *testing.T) {
 		if table.Problem() == nil {
 			test.Errorf("%s: want the problem said", name)
 		}
+	}
+}
+
+// A table says which variants it holds, in one order whatever order it was written with, and its keys in theirs: the
+// same entries and variants always write the same bytes, and a table that holds nothing holds no variant and no key.
+func TestAStandardLibraryTableSaysWhichVariantsItHolds(test *testing.T) {
+	test.Parallel()
+
+	variants := []StandardLibraryVariant{
+		{Target: "linux/amd64", CgoEnabled: "1", GoVersion: "go1.27.1", Packages: 329},
+		{Target: "darwin/arm64", CgoEnabled: "1", GoVersion: "go1.27.0", Packages: 328},
+		{Target: "darwin/arm64", CgoEnabled: "0", GoVersion: "go1.27.0", Packages: 327},
+	}
+	written := WriteStandardLibraryTable(sampleStandardLibraryEntries(), variants)
+	table := NewStandardLibraryTable(written)
+	want := []StandardLibraryVariant{variants[2], variants[1], variants[0]}
+	if got := table.Variants(); !slices.Equal(got, want) {
+		test.Errorf("want the variants in order\n%+v\ngot\n%+v", want, got)
+	}
+	if got := table.Keys(); !slices.Equal(got, []Key{{0x01}, {0x02}, {0x03}}) {
+		test.Errorf("want the three keys in order, got %v", got)
+	}
+	reversed := slices.Clone(variants)
+	slices.Reverse(reversed)
+	if again := WriteStandardLibraryTable(sampleStandardLibraryEntries(), reversed); !bytes.Equal(again, written) {
+		test.Error("want the same variants in another order to write the same bytes")
+	}
+	if withoutVariants := WriteStandardLibraryTable(sampleStandardLibraryEntries(), nil); bytes.Equal(
+		withoutVariants, written) {
+		test.Error("want the variants among the bytes")
+	}
+	empty := NewStandardLibraryTable(nil)
+	if len(empty.Variants()) > 0 || len(empty.Keys()) > 0 {
+		test.Errorf("want an empty table to hold no variant and no key, got %+v and %v", empty.Variants(), empty.Keys())
 	}
 }

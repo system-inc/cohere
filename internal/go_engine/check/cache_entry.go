@@ -329,6 +329,17 @@ func decodeEntry(
 	if decodeError := gob.NewDecoder(bytes.NewReader(contents)).Decode(&entry); decodeError != nil {
 		return nil, fmt.Errorf("decoding the entry of %s: %w", restoring.ID, decodeError)
 	}
+	return restoredOf(known, restoring, entry, readExportData)
+}
+
+// restoredOf is an entry gob has decoded, read whole as decodeEntry reads it: the binary's table holds its entries in
+// a form of its own (see standardLibraryEntry), which is read through here too.
+func restoredOf(
+	known *cacheAnalyzers,
+	restoring *packages.Package,
+	entry cacheEntry,
+	readExportData func() ([]byte, error),
+) (*restoredPackage, error) {
 	if entry.Version != CacheFormatVersion {
 		return nil, fmt.Errorf("reading the entry of %s: it is in format %q, not %q", restoring.ID, entry.Version,
 			CacheFormatVersion)
