@@ -68,6 +68,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
 )
 
@@ -153,6 +154,7 @@ var duplicatesOfVet = map[string]string{
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
+	"appends": appends.Analyzer,
 	"nilfunc": nil_func.Analyzer,
 }
 
