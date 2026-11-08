@@ -286,7 +286,7 @@ var ports = map[string]port{
 	"bools":            {analyzer: bools.Analyzer},
 	"buildtag":         {analyzer: build_tag.Analyzer},
 	"cgocall":          {analyzer: cgo_call.Analyzer},
-	"composites":       {analyzer: composite.Analyzer},
+	"composites":       {analyzer: composite.Analyzer, listener: &composite.Listener},
 	"copylocks":        {analyzer: copy_lock.Analyzer, listener: &copy_lock.Listener},
 	"defers":           {analyzer: defers.Analyzer, listener: &defers.Listener},
 	"directive":        {analyzer: directive.Analyzer},
