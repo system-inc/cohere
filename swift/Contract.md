@@ -399,14 +399,19 @@ At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that 
 through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
 `build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
 `xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
-run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Packages resolve into the scratch,
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Beside the build, the one write a
+check leaves in the developer's tree is the empty `.swiftpm/xcode` and `.swiftpm/configuration` xcodebuild makes in
+each local package the project links, which no flag stops (#8f8vy1n): removed after each build, they moved the
+package directory's times, which the inputs record names, so every build cost each project naming that package its
+next replay. Left there, they move it once. Any other empty folder a build made in a package's `.swiftpm` is
+removed, a folder holding a file stays, and no file is ever deleted. Packages resolve into the scratch,
 under `--no-fix` too (#s8p20fe): a generated bundle is in the scratch already, and under `--no-fix` a committed
 bundle is built through a workspace in the scratch that names it, so its pins land there and the bundle is left as
 it was found. A resolution the repository commits (a committed bundle's own, or one kept in the bundle beside a
 spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
 that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
 are judged by the same rules as a package's, and `build` reads
-`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, or that the last build's records were reused
+`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, then, when a package it links holds those folders, `; it leaves the empty .swiftpm/xcode and .swiftpm/configuration xcodebuild makes in each local package the project links, in <n> packages here, the one write into the tree a check allows`, or that the last build's records were reused
 because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.

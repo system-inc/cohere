@@ -410,6 +410,39 @@ struct XcodeProjectPipelineTests {
         return files
     }
 
+    /*
+     What a check wrote into the tree between two snapshots of `directory`, by path: every entry added, removed or
+     changed, but the empty folders xcodebuild makes in a package a build links, which a check leaves where they are
+     (`XcodeTypesPhase`, #8f8vy1n). An added folder is one of those only when it is a package's `.swiftpm` or inside
+     one, and nothing but folders is in it, at any depth.
+     */
+    static func written(under directory: URL, before: [String: Data], after: [String: Data]) -> [String] {
+        let base = directory.resolvingSymlinksInPath().path
+        return Set(before.keys).union(after.keys).filter { path in
+            guard before[path] != after[path] else { return false }
+            return before[path] != nil || !Self.isEmptyPackageFolder(URL(fileURLWithPath: base + path))
+        }
+        .sorted()
+    }
+
+    /* Whether `folder` is a package's `.swiftpm` or a folder inside one, holding no file at any depth. */
+    static func isEmptyPackageFolder(_ folder: URL) -> Bool {
+        var package = folder
+        while package.lastPathComponent != ".swiftpm" {
+            guard package.pathComponents.count > 1 else { return false }
+            package.deleteLastPathComponent()
+        }
+        package.deleteLastPathComponent()
+        guard FileManager.default.fileExists(atPath: package.appendingPathComponent("Package.swift").path),
+            RunInputs.isDirectory(folder),
+            let walker = FileManager.default.enumerator(at: folder, includingPropertiesForKeys: [.isDirectoryKey])
+        else { return false }
+        for case let entry as URL in walker where !RunInputs.isDirectory(entry) {
+            return false
+        }
+        return true
+    }
+
     /* The DerivedData folders under the home folder named for a project, which no check may create. */
     static func derivedDataFolders(named project: String) throws -> Set<String> {
         let derivedData = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
@@ -774,8 +807,9 @@ struct XcodeProjectPipelineTests {
     }
 
     /*
-     @system_cohere's invariant: a check writes nothing into the user's tree. Under `--no-cache` the engine's scratch
-     is outside the project, so the whole tree must be byte for byte what it was. Without it the scratch is the
+     @system_cohere's invariant: a check writes nothing into the user's tree but the empty folders xcodebuild makes in
+     the packages it links (#8f8vy1n), and this fixture links none. Under `--no-cache` the engine's scratch is outside
+     the project, so the whole tree must be byte for byte what it was. Without it the scratch is the
      project's own `.cache/cohere/swift`, the engine's cache as it is for every package, and everything else must be
      untouched. Neither may write a DerivedData folder under the home folder: the project is named for this test
      alone, so any folder named for it there is this run's.
@@ -902,8 +936,9 @@ struct XcodeProjectPipelineTests {
 
     /*
      #s8p20fe: the read-only gate on a fresh checkout of an xcodegen project with package dependencies resolves them
-     into the engine's scratch and type-checks every file, and the tree is byte for byte what it was. Before, `--no-fix`
-     disabled resolution, the scratch held none, and the build failed until someone ran a mutating check.
+     into the engine's scratch and type-checks every file, and the tree is byte for byte what it was, but the empty
+     folders xcodebuild makes in the package it links (#8f8vy1n). Before, `--no-fix` disabled resolution, the scratch
+     held none, and the build failed until someone ran a mutating check.
      */
     @Test func aNoFixRunResolvesAGeneratedProjectsPackagesIntoTheScratch() async throws {
         try Self.requireXcodegen()
@@ -918,7 +953,64 @@ struct XcodeProjectPipelineTests {
         #expect(run.typesRecord["files"] as? Int == 4)
         #expect(run.filesWithoutRecord.isEmpty, "\(run.typesBuild)")
         let after = try Self.snapshot(of: fixture.repository)
-        #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+        let written = Self.written(under: fixture.repository, before: before, after: after)
+        #expect(written.isEmpty, "written into the tree: \(written)")
+    }
+
+    /*
+     #8f8vy1n: a build moves nothing the last run's inputs record names, so the run after it can replay. xcodebuild
+     makes empty `.swiftpm` folders in each package a build links. Removed after every build, they left the package's
+     listing as it was and moved its directory's times, which the record names, so every build cost each project
+     naming that package its next replay: CapturePhone's builds cost CapturePhone/PhoneCapture its replays on
+     ahraos-presence. Here the first run builds and makes them, the second reads that build and is the record, and a
+     third builds again into a scratch of its own, as a `--no-cache` run does. Every path the record names must read
+     as the front door's replay compares it, unmoved. An edit to the linked package's source still moves one.
+     */
+    @Test func aBuildMovesNothingTheLastRunsRecordNames() async throws {
+        try Self.requireXcodegen()
+        let fixture = try Self.fixtureWithPackages()
+        defer { Self.remove(fixture.repository) }
+        let lib = fixture.repository.appendingPathComponent("Lib", isDirectory: true)
+
+        let first = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        #expect(first.typesBuild.hasPrefix("xcodebuild of 1 targets"), "\(first.typesBuild)")
+        let recorded = try await Self.run(root: fixture.root, arguments: ["--no-fix"])
+        let inputs = try #require(recorded.of("inputs").first)
+        let record = InputsRecord(
+            files: inputs["files"] as? [String] ?? [],
+            directories: inputs["directories"] as? [String] ?? [],
+            absent: inputs["absent"] as? [String] ?? [],
+        )
+        #expect(
+            RunInputsTests.Moved(paths: record.directories).holds(lib),
+            "the record does not name the linked package's directory, so the check below proves nothing",
+        )
+        let signatures = RunInputsTests.signatures(of: record)
+        func moved() -> RunInputsTests.Moved {
+            let now = RunInputsTests.signatures(of: record)
+            return RunInputsTests.Moved(paths: signatures.keys.filter { signatures[$0] != now[$0] }.sorted())
+        }
+        /* The file systems' clocks are fine-grained, so a move in the same instant as the reading would still show; the pause keeps a reader of a failure from wondering. */
+        try await Task.sleep(for: .milliseconds(10))
+
+        let rebuilt = try await Self.run(root: fixture.root, arguments: ["--no-fix", "--no-cache"])
+        #expect(rebuilt.typesBuild.hasPrefix("xcodebuild of 1 targets"), "\(rebuilt.typesBuild)")
+        #expect(rebuilt.filesWithoutRecord.isEmpty, "\(rebuilt.typesBuild)")
+        #expect(
+            rebuilt.typesBuild.hasSuffix(
+                "; it leaves the empty .swiftpm/xcode and .swiftpm/configuration xcodebuild makes in each local package the project links, in 1 package here, the one write into the tree a check allows"
+            ),
+            "the record does not say what the build left in the tree: \(rebuilt.typesBuild)",
+        )
+        #expect(moved().isEmpty, "a build moved what the last run's record names: \(moved().paths)")
+
+        let source = lib.appendingPathComponent("Sources/Lib/Lib.swift")
+        try "public func libGreeting() -> String { \"edited\" }\n".write(
+            to: source,
+            atomically: false,
+            encoding: .utf8,
+        )
+        #expect(moved().holds(source), "an edit to the linked package's source moved nothing: \(moved().paths)")
     }
 
     /*
@@ -940,7 +1032,8 @@ struct XcodeProjectPipelineTests {
         #expect(run.typesRecord["files"] as? Int == 4)
         #expect(run.filesWithoutRecord.isEmpty, "\(run.typesBuild)")
         let after = try Self.snapshot(of: fixture.repository)
-        #expect(after == before, "written into the tree: \(Set(after.keys).symmetricDifference(before.keys).sorted())")
+        let written = Self.written(under: fixture.repository, before: before, after: after)
+        #expect(written.isEmpty, "written into the tree: \(written)")
     }
 
     /*
