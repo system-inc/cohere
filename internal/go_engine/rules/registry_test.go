@@ -1026,6 +1026,7 @@ var portedPasses = []string{
 	"address_compared_to_nil",
 	"argument_overwritten_before_use",
 	"assertion_to_own_type",
+	"assigned_benchmark_iterations",
 	"boolean_constant_comparison",
 	"boolean_return_of_condition",
 	"buffer_string_conversion",
