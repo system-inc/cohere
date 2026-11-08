@@ -714,6 +714,7 @@ var portedPasses = []string{
 	"ineffective_copy",
 	"ineffective_field_assignment",
 	"invisible_character",
+	"math_on_converted_integer",
 	"misplaced_error_result",
 	"nan_comparison",
 	"nil_ness",
