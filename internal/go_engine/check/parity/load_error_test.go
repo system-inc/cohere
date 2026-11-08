@@ -1,6 +1,8 @@
 package parity
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -141,21 +143,59 @@ var (
 	}
 )
 
+// truncatedSource is the truncated fixture's one file, which holds a call both sides find and ends inside a function,
+// so it loads with a parse error. The guard holds every .go file of the tree to parse, so the file is written out at
+// test time rather than kept in testdata.
+const truncatedSource = "// Package truncated holds a call both sides find in a file that ends early, so it loads " +
+	"with a parse error.\npackage truncated\n\nfunc shared() {}\n\nfunc calls() {\n\tshared()\n"
+
+// withTruncated is a testdata of the test's own: the truncated fixture written from truncatedSource, beside a copy of
+// each fixture package patterns name from the package's testdata, so all of them load in one call.
+func withTruncated(test *testing.T, patterns ...string) string {
+	test.Helper()
+	testdata := test.TempDir()
+	write := func(pattern string, name string, source []byte) {
+		directory := filepath.Join(testdata, "src", pattern)
+		if makeError := os.MkdirAll(directory, 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(filepath.Join(directory, name), source, 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	write("truncated", "truncated.go", []byte(truncatedSource))
+	for _, pattern := range patterns {
+		names, globError := filepath.Glob(filepath.Join(analysistest.TestData(), "src", pattern, "*.go"))
+		if globError != nil {
+			test.Fatal(globError)
+		}
+		for _, name := range names {
+			source, readError := os.ReadFile(name)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			write(pattern, filepath.Base(name), source)
+		}
+	}
+	return testdata
+}
+
 // Several ill-typed packages compare in one call, each with its own errors listed, and a package that does not parse
 // is listed by its parse error as one that does not type-check is by its type error. Each package's error left off
 // the list fails, named, so every package's errors are held, not only the first's.
 func TestRequireIdenticalDespiteLoadErrorsHoldsEachPackagesErrors(test *testing.T) {
 	test.Parallel()
+	testdata := withTruncated(test, "despite", "despite_again")
 	listed := slices.Concat(despiteListed, []LoadError{despiteAgainListed}, truncatedListed)
 	patterns := []string{"despite", "despite_again", "truncated"}
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
-		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, analysistest.TestData(),
-			listed, patterns...)
+		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, testdata, listed,
+			patterns...)
 	}))
 	for _, leftOff := range []LoadError{despiteAgainListed, truncatedListed[0]} {
 		requireFailures(test, failuresOf(test, func(recording testing.TB) {
-			RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors,
-				analysistest.TestData(), slices.DeleteFunc(slices.Clone(listed), func(loadError LoadError) bool {
+			RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, testdata,
+				slices.DeleteFunc(slices.Clone(listed), func(loadError LoadError) bool {
 					return loadError == leftOff
 				}), patterns...)
 		}), "the fixture packages load with "+leftOff.String()+", which is not listed",
