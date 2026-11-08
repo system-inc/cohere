@@ -8,9 +8,11 @@
 // helpers it calls from x/tools' internal packages (typesinternal.NoEffects, astutil.Format and refactor.DeleteStmt)
 // translated beside it, and it reports the original's messages word for word, at the same position, with the same
 // suggested fix, edit for edit. The original walks cursors, not nodes, because the fix that removes a whole statement
-// reads its parent and siblings, which only a cursor reaches, so the port walks cursors too. The registry runs the
-// port in the original's place, and the original stays the oracle: the parity tests beside this file run both over
-// the same packages and compare findings and fixes. The two agree everywhere, so there is no differences fixture.
+// reads its parent and siblings, which only a cursor reaches. The port sits on the engine's syntax dispatcher, hearing
+// each assignment on the walk the dispatcher makes once for every syntax rule, and reads the assignment's cursor from
+// its context, so its cursor helpers read what the original's do. The registry runs the port in the original's place,
+// and the original stays the oracle: the parity tests beside this file run both over the same packages and compare
+// findings and fixes. The two agree everywhere, so there is no differences fixture.
 package assign
 
 import (
@@ -22,46 +24,58 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "assign",
-	Doc: "check for useless assignments\n\n" +
-		"This checker reports assignments of the form x = x or a[i] = a[i].\n" +
-		"These are almost always useless, and even when they aren't they are\n" +
-		"usually a mistake.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/assign",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "assign"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for useless assignments\n\n" +
+	"This checker reports assignments of the form x = x or a[i] = a[i].\n" +
+	"These are almost always useless, and even when they aren't they are\n" +
+	"usually a mistake."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/assign"
+
+// Listener is what the port hears of each package from the dispatcher: every assignment, in preorder, as the
+// original's Preorder visits them, with its cursor, which the fix that removes a whole statement needs for the
+// statement's parent and siblings.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.AssignStmt)(nil)},
+	Node:  checkAssignment,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("assign: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// checkAssignment reports node, an assignment, when it assigns a value to itself, reading its cursor from context.
+func checkAssignment(context *rule.Context, node ast.Node, _ []ast.Node) {
+	assignment, isAssignment := node.(*ast.AssignStmt)
+	if !isAssignment {
+		return
 	}
-	// Preorder visits each assignment in the order the original's does, as a cursor, which the fix that removes a
-	// whole statement needs for the statement's parent and siblings.
-	for cursor := range inspected.Root().Preorder((*ast.AssignStmt)(nil)) {
-		assignment, isAssignment := cursor.Node().(*ast.AssignStmt)
-		if !isAssignment {
-			// Invariant: Preorder filtered by a node type hands over only nodes of that type.
-			panic("assign: Preorder handed over a node that is not an assignment")
-		}
-		reportSelfAssignments(pass, cursor, assignment)
-	}
-	return nil, nil
+	reportSelfAssignments(context, context.Cursor(), assignment)
 }
 
 // reportSelfAssignments reports assignment, the node at cursor, when any pair of its sides assigns a value to itself,
 // with a fix that removes those pairs, keeping the commas between the pairs that stay, or the whole statement when
 // every pair is one.
-func reportSelfAssignments(pass *analysis.Pass, cursor inspector.Cursor, assignment *ast.AssignStmt) {
+func reportSelfAssignments(context *rule.Context, cursor inspector.Cursor, assignment *ast.AssignStmt) {
 	// `:=` declares, and `+=` and its kin compute, so only a plain `=` can assign a value to itself.
 	if assignment.Tok != token.ASSIGN {
 		return
@@ -80,8 +94,8 @@ func reportSelfAssignments(pass *analysis.Pass, cursor inspector.Cursor, assignm
 	runStartLeft, runStartRight := token.NoPos, token.NoPos
 	for index, left := range assignment.Lhs {
 		right := assignment.Rhs[index]
-		if isSelfAssignment(pass, left, right) {
-			selfAssigned = append(selfAssigned, formatted(pass.Fset, left))
+		if isSelfAssignment(context, left, right) {
+			selfAssigned = append(selfAssigned, formatted(context.Fset, left))
 			if !runStartLeft.IsValid() {
 				if index > 0 {
 					runStartLeft, runStartRight = assignment.Lhs[index-1].End(), assignment.Rhs[index-1].End()
@@ -119,9 +133,9 @@ func reportSelfAssignments(pass *analysis.Pass, cursor inspector.Cursor, assignm
 	// deleteStatement returns nil, and the fix offers no edit, as the original's does, rather than the pairs' edits,
 	// which would leave a bare `=`.
 	if len(selfAssigned) == len(assignment.Lhs) {
-		edits = deleteStatement(pass.Fset.File(assignment.Pos()), cursor, assignment)
+		edits = deleteStatement(context.Fset.File(assignment.Pos()), cursor, assignment)
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:     assignment.Pos(),
 		Message: "self-assignment of " + strings.Join(selfAssigned, ", "),
 		SuggestedFixes: []analysis.SuggestedFix{{
@@ -133,13 +147,13 @@ func reportSelfAssignments(pass *analysis.Pass, cursor inspector.Cursor, assignm
 
 // isSelfAssignment is whether assigning right to left assigns a value to itself: neither side has an effect, left is
 // not an element of a map, and the two print the same.
-func isSelfAssignment(pass *analysis.Pass, left ast.Expr, right ast.Expr) bool {
+func isSelfAssignment(context *rule.Context, left ast.Expr, right ast.Expr) bool {
 	// Two sides of different node types never print the same, and the check saves printing them.
-	return hasNoEffects(pass.TypesInfo, left) &&
-		hasNoEffects(pass.TypesInfo, right) &&
-		!isMapIndex(pass.TypesInfo, left) &&
+	return hasNoEffects(context.TypesInfo, left) &&
+		hasNoEffects(context.TypesInfo, right) &&
+		!isMapIndex(context.TypesInfo, left) &&
 		reflect.TypeOf(left) == reflect.TypeOf(right) &&
-		formatted(pass.Fset, left) == formatted(pass.Fset, right)
+		formatted(context.Fset, left) == formatted(context.Fset, right)
 }
 
 // isMapIndex is whether expression, through parentheses, indexes a map, whose element the assignment may create, so

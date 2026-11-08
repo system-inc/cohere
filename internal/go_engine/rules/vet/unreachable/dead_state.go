@@ -7,12 +7,15 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // deadState is one function's walk, x/tools' deadState: what findLabels learns of its labels and breaks, and, as
 // findDead goes, whether the statement it comes to next is reachable.
 type deadState struct {
-	pass *analysis.Pass
+	// context is the rule's over the package, where a dead statement is reported.
+	context *rule.Context
 	// function is the cursor of the function walked, under which a dead statement's cursor is found for its fix.
 	function inspector.Cursor
 	// panicDeclared is whether the package declares its own `panic` at package level, in any of its files.
@@ -274,13 +277,13 @@ func (state *deadState) report(statement ast.Stmt) {
 	statementCursor, _ := state.function.FindNode(statement)
 	// This report is a frequent source of findings beyond the end of a truncated file, as in the original; see
 	// go.dev/issue/71659.
-	state.pass.Report(analysis.Diagnostic{
+	state.context.Report(analysis.Diagnostic{
 		Pos:     statement.Pos(),
 		End:     statement.End(),
 		Message: "unreachable code",
 		SuggestedFixes: []analysis.SuggestedFix{{
 			Message:   "Remove",
-			TextEdits: deleteStatement(state.pass.Fset.File(statement.Pos()), statementCursor),
+			TextEdits: deleteStatement(state.context.Fset.File(statement.Pos()), statementCursor),
 		}},
 	})
 }

@@ -9,9 +9,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/analysis/passes/unreachable"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/txtar"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -101,23 +99,52 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	parity.RequireOnlyAdjudicated(test, unreachable.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
 
-// typeless is the port run with no type information: no types, package or type checker's information at all, and
-// inspect's result built from the syntax alone, reporting through the checker's report, which holds every fix to be
-// well formed, and cuts an edit's end just past the file's, as the deletion in a file cut off makes, back to the
-// file's end. It runs despite errors as the port does, and requires nothing, so the checker hands it every package.
+// runWithoutTypes runs the port over checked's syntax alone: first every analyzer it requires, the syntax dispatcher
+// and what the dispatcher requires, each once and over the same syntax, each handed the results of what it requires,
+// then the port's own analyzer, which reports what the dispatcher's walk found through checked's report, the
+// checker's, which holds every fix to be well formed, and cuts an edit's end just past the file's, as the deletion in
+// a file cut off makes, back to the file's end. A pass here holds no types, package or type checker's information,
+// so an analyzer that read any would find nothing there or fail.
+func runWithoutTypes(checked *analysis.Pass) (any, error) {
+	// results is each analyzer's result once it has run, as a pass's ResultOf holds them.
+	results := map[*analysis.Analyzer]any{}
+	var run func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) error
+	run = func(running *analysis.Analyzer, report func(diagnostic analysis.Diagnostic)) error {
+		resultOf := map[*analysis.Analyzer]any{}
+		for _, required := range running.Requires {
+			if _, isRun := results[required]; !isRun {
+				runError := run(required, func(analysis.Diagnostic) {
+					// A requirement's findings are not the port's, and none of these makes any.
+				})
+				if runError != nil {
+					return fmt.Errorf("running %s with no types: %w", required.Name, runError)
+				}
+			}
+			resultOf[required] = results[required]
+		}
+		result, runError := running.Run(&analysis.Pass{
+			Analyzer: running,
+			Fset:     checked.Fset,
+			Files:    checked.Files,
+			ResultOf: resultOf,
+			Report:   report,
+		})
+		results[running] = result
+		return runError
+	}
+	if runError := run(Analyzer, checked.Report); runError != nil {
+		return nil, runError
+	}
+	return results[Analyzer], nil
+}
+
+// typeless is the port run with no type information (see runWithoutTypes). It runs despite errors as the port does,
+// and requires nothing, so the checker hands it every package and runs nothing for it.
 var typeless = &analysis.Analyzer{
 	Name:             Analyzer.Name,
 	Doc:              "typeless runs the port with no type information.",
 	RunDespiteErrors: true,
-	Run: func(pass *analysis.Pass) (any, error) {
-		return Analyzer.Run(&analysis.Pass{
-			Analyzer: Analyzer,
-			Fset:     pass.Fset,
-			Files:    pass.Files,
-			ResultOf: map[*analysis.Analyzer]any{inspect.Analyzer: inspector.New(pass.Files)},
-			Report:   pass.Report,
-		})
-	},
+	Run:              runWithoutTypes,
 }
 
 // The registry lists unreachable among the passes that read no type information, so a run may hand it a pass with
