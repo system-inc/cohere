@@ -122,14 +122,15 @@ func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
 	}
 }
 
-// differencesDirectory is the differences fixture, which no load reads: its declarations crash the original, which
-// would take the checker and the test binary down, so the test runs each side on a pass built by hand. The harness
-// loads every fixture it compares and reads records from .go files alone, where these are in an assembly file, so
-// this tier keeps its own pass, recover and reader, and compares through the harness's Finding and Difference.
+// differencesDirectory is the differences fixture, whose declarations crash the original. Its records sit on the
+// findings' own lines in an assembly file, where the harness reads records from .go files alone, and its
+// RequirePortWhereOriginalPanics takes none given beside the call, so this tier keeps its own pass, recover and
+// reader, and compares through the harness's Finding and Difference.
 var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differences")
 
 // The original lays out every bodiless declaration's frame before it reads a line of assembly, and crashes in
-// go/types' sizes on one holding a type parameter by value (go/types/gcsizes.go:54), which go/types type-checks: a
+// go/types' sizes on one holding a type parameter by value, which go/types type-checks (the assertion at
+// go/types/gcsizes.go:54 fails, and the panic recovered names the result check at line 17 that runs after it): a
 // method of a generic type taking a T, a [2]T or a struct of T, or returning a T. The port judges nothing of such a
 // function, since without its frame nothing true can be said of its assembly, and goes on judging the rest of the
 // package. The original runs on a hand-built pass under a recover, which pins its crash, and the port runs alone on
