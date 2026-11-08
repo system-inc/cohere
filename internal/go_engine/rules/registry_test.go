@@ -879,6 +879,7 @@ var portedPasses = []string{
 	"range_over_string_directly",
 	"receiver_name",
 	"redundant_assertion_nil_check",
+	"redundant_canonical_header_key",
 	"redundant_control_flow",
 	"redundant_make_arguments",
 	"redundant_nil_check_around_loop",
