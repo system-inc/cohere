@@ -530,10 +530,12 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 		case outputJson:
 			writeSummaryLine(streams.Output, summaryAsJson(summary))
 		default:
-			fmt.Fprintln(
-				streams.Output,
-				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}),
-			)
+			if !handSummaryToRoot(summary) {
+				fmt.Fprintln(
+					streams.Output,
+					footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}),
+				)
+			}
 		}
 	}
 	exitProcess(stored.ExitCode)
