@@ -12,7 +12,8 @@
 // gates the wrong way, and the kit's is the maximum its name says. No staticcheck check calls it, so no port's
 // findings move. TestReportMatchesStaticcheck holds the rest finding for finding against staticcheck's, which stays
 // in the tree as the oracle. Render and RenderArguments, which write code into a message, are staticcheck's Render and
-// RenderArgs, held by TestRenderMatchesStaticcheck.
+// RenderArgs, held by TestRenderMatchesStaticcheck. HasRange, which TestReportMatchesStaticcheck asks at every node
+// beside the reports, and Ordinal, held by TestOrdinalMatchesStaticcheck, are staticcheck's own.
 package staticcheck_report
 
 import (
@@ -21,6 +22,7 @@ import (
 	"go/token"
 	"go/version"
 	"path/filepath"
+	"strconv"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -101,6 +103,19 @@ func Report(context *rule.Context, node Positioner, message string, options ...O
 		SuggestedFixes: shape.fixes,
 		Related:        shape.related,
 	})
+}
+
+// HasRange is whether a finding or related information can be reported at node: false for an instruction or value of
+// staticcheck's intermediate representation that has no source, and true for anything else, as staticcheck's
+// report.HasRange answers. A check asks it before Report or Related at a value that may have been built with no
+// syntax, Report panicking there and Related adding nothing. Like staticcheck's, it asks for both the full and the
+// short range, since it cannot know which the report will want, though the two agree on whether there is one.
+func HasRange(node Positioner) bool {
+	if _, _, hasRange := rangeOf(node, false); !hasRange {
+		return false
+	}
+	_, _, hasRange := rangeOf(node, true)
+	return hasRange
 }
 
 // rangeOf is where a finding at node spans, short or full, and false for an instruction with no source. A node that
@@ -198,4 +213,23 @@ func DisplayPosition(fileSet *token.FileSet, position token.Pos) token.Position 
 		return adjusted
 	}
 	return fileSet.PositionFor(position, false)
+}
+
+// Ordinal is number written as an English ordinal, 1st, 2nd, 3rd, 4th, for a message that counts, such as which
+// return value of a call it means: staticcheck's report.Ordinal. Like staticcheck's, it gives 11 to 20 their "th" by
+// their range alone, so 111 reads "111st" and 112 "112nd", and a negative number takes the suffix of its last digit
+// only where Go's remainder is positive, so -1 reads "-1th"; no staticcheck check counts that far or below one.
+func Ordinal(number int) string {
+	suffix := "th"
+	if number < 10 || number > 20 {
+		switch number % 10 {
+		case 1:
+			suffix = "st"
+		case 2:
+			suffix = "nd"
+		case 3:
+			suffix = "rd"
+		}
+	}
+	return strconv.Itoa(number) + suffix
 }

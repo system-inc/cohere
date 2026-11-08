@@ -99,7 +99,8 @@ var comparingAnalyzer = &analysis.Analyzer{
 // the syntax, every function, parameter and instruction of staticcheck's intermediate representation and every object
 // the package defines, under every option and every version gate, and each pair of calls must report the same
 // diagnostics, its position, end, message, related information and suggested fixes, or panic alike. The kit's File,
-// LanguageVersion, StandardLibraryVersion and DisplayPosition must answer as staticcheck's do at each node too. shapes
+// LanguageVersion, StandardLibraryVersion, DisplayPosition and HasRange must answer as staticcheck's do at each node
+// too, HasRange both true and false. shapes
 // holds every shape shortRange cuts, a file tagged with its own version and three generated files, two of them moved
 // by line directives; older_module, at go 1.20, and newer_module, at go 1.22, each hold a file tagged older and one
 // tagged newer than the module, so StandardLibraryVersion's two readings of a module's go line are both met. The test
@@ -162,6 +163,29 @@ func TestReportMatchesStaticcheck(test *testing.T) {
 		test.Logf("%s: %d", label, met[label])
 		if met[label] == 0 {
 			test.Errorf("the fixtures never met %s, so the comparison proves nothing of it", label)
+		}
+	}
+}
+
+// The kit's Ordinal writes every number from -125 to 1250 as staticcheck's report.Ordinal does, so the teens, the
+// hundreds whose last two digits are 11 to 13, zero and negative numbers all read alike, and a few it writes are
+// held by their text too, so a change both sides could share still shows.
+func TestOrdinalMatchesStaticcheck(test *testing.T) {
+	test.Parallel()
+	compared := 0
+	for number := -125; number <= 1250; number++ {
+		compared++
+		if upstream, kit := report.Ordinal(number), staticcheck_report.Ordinal(number); upstream != kit {
+			test.Errorf("Ordinal(%d): staticcheck %q, the kit %q", number, upstream, kit)
+		}
+	}
+	test.Logf("%d numbers compared", compared)
+	for number, written := range map[int]string{
+		-1: "-1th", 0: "0th", 1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 10: "10th", 11: "11th", 12: "12th", 13: "13th",
+		20: "20th", 21: "21st", 22: "22nd", 23: "23rd", 101: "101st", 111: "111st", 112: "112nd",
+	} {
+		if kit := staticcheck_report.Ordinal(number); kit != written {
+			test.Errorf("Ordinal(%d) is %q, where %q was expected", number, kit, written)
 		}
 	}
 }
@@ -243,6 +267,11 @@ func compareReporters(pass *analysis.Pass) (any, error) {
 			mismatch("StandardLibraryVersion", node, fmt.Sprintf("%+v", upstreamStandardLibrary),
 				fmt.Sprintf("%+v", kitStandardLibrary))
 		}
+		upstreamHasRange := report.HasRange(node)
+		if kitHasRange := staticcheck_report.HasRange(node); upstreamHasRange != kitHasRange {
+			mismatch("HasRange", node, fmt.Sprint(upstreamHasRange), fmt.Sprint(kitHasRange))
+		}
+		compared.met[map[bool]string{true: "HasRange true", false: "HasRange false"}[upstreamHasRange]]++
 		upstreamDisplay := report.DisplayPosition(pass.Fset, node.Pos())
 		if kitDisplay := staticcheck_report.DisplayPosition(pass.Fset, node.Pos()); upstreamDisplay != kitDisplay {
 			mismatch("DisplayPosition", node, upstreamDisplay.String(), kitDisplay.String())
@@ -382,9 +411,9 @@ func optionSets(pass *analysis.Pass, node staticcheck_report.Positioner) []optio
 }
 
 // requiredLabels are what the fixtures must meet for the comparison to prove each case: every shape shortRange
-// cuts and the ones it leaves whole, instructions with and without a source, an object, each gate below, at and
-// above the node's version and both withholding and keeping, and the generated filter withholding in a generated
-// file and keeping in one whose line directives move its findings into another Go file.
+// cuts and the ones it leaves whole, instructions with and without a source, HasRange answering each way, an object,
+// each gate below, at and above the node's version and both withholding and keeping, and the generated filter
+// withholding in a generated file and keeping in one whose line directives move its findings into another Go file.
 func requiredLabels() []string {
 	labels := []string{
 		"an instruction with a source",
@@ -392,6 +421,8 @@ func requiredLabels() []string {
 		"a types.Object, which has no end",
 		"FilterGenerated in a generated file, withheld",
 		"FilterGenerated in a generated file, kept",
+		"HasRange true",
+		"HasRange false",
 	}
 	for _, shape := range []string{
 		"File", "CaseClause", "CommClause", "DeferStmt", "ExprStmt", "ForStmt with a post statement",
