@@ -890,6 +890,7 @@ var portedPasses = []string{
 	"receiver_name",
 	"repeated_if_else_condition",
 	"replace_zero_count",
+	"reversed_errors_is_arguments",
 	"self_assignment",
 	"shell_command_as_program",
 	"single_argument_append",
