@@ -88,6 +88,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/shift"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/signal_channel_analyzer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
@@ -203,6 +204,7 @@ var ports = map[string]*analysis.Analyzer{
 	"printf":           printf.Analyzer,
 	"scannererr":       scanner_error.Analyzer,
 	"shift":            shift.Analyzer,
+	"sigchanyzer":      signal_channel_analyzer.Analyzer,
 	"slog":             slog.Analyzer,
 	"sqlrowserr":       sql_rows_err.Analyzer,
 	"stdmethods":       std_methods.Analyzer,
