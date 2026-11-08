@@ -140,6 +140,10 @@ type Caching struct {
 	Restorer Restorer
 	Listings ListingStore
 
+	// GoEnvironment is go env's answer the run already has, from its census, which the load reads in place of asking
+	// again when it is for the load's workspace and environment (see GoEnvironment).
+	GoEnvironment *GoEnvironment
+
 	// Held is the bytes the run already holds of the workspace's files, read in place of opening each again by every
 	// reader of the load: the in-process lister and the kept listing's fingerprint, which read each file's header, the
 	// parse, and the build constraints of the files no package holds. go list, when the in-process lister doubts, and
@@ -175,10 +179,19 @@ func loadWorkspace(
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
-	fullEnvironment, buildContext, reported, contextError := sourceContext(workspace, environment, caching.Held)
-	if contextError != nil {
-		return nil, contextError
+	goEnvironment := caching.GoEnvironment
+	if !goEnvironment.answers(workspace, environment) {
+		var environmentError error
+		if goEnvironment, environmentError = readGoEnvironment(
+			workspace,
+			environment,
+			caching.Held,
+		); environmentError != nil {
+			return nil, environmentError
+		}
 	}
+	fullEnvironment, reported := goEnvironment.fullEnvironment, goEnvironment.reported
+	buildContext := goEnvironment.contextFor(caching.Held)
 	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings, caching.Held)
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)

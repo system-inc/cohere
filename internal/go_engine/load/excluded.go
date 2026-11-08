@@ -28,21 +28,26 @@ type Excluded struct {
 // in directory with the current environment plus environment, sorted, with the target they were read for. It
 // reads each file's name and build lines as go does, so it names a file in a directory whose every file is
 // left out, which go list matches as no package at all and so never reports. A file held holds is read from its
-// held bytes, and any other from disk.
-func ExcludedByConstraints(directory string, environment []string, files []string, held Held) ([]Excluded, error) {
-	workspace, absoluteError := filepath.Abs(directory)
-	if absoluteError != nil {
-		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
+// held bytes, and any other from disk. It returns go env's answer too, for the load to take in place of asking again
+// (see GoEnvironment), or nil when there were no files and go env was not asked.
+func ExcludedByConstraints(
+	directory string,
+	environment []string,
+	files []string,
+	held Held,
+) ([]Excluded, *GoEnvironment, error) {
+	if _, absoluteError := filepath.Abs(directory); absoluteError != nil {
+		return nil, nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
 	}
 	if len(files) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
-	_, buildContext, _, contextError := sourceContext(workspace, environment, held)
-	if contextError != nil {
-		return nil, contextError
+	goEnvironment, environmentError := readGoEnvironment(directory, environment, held)
+	if environmentError != nil {
+		return nil, nil, environmentError
 	}
-	excluded, _, matchError := matchConstraints(buildContext, files)
-	return excluded, matchError
+	excluded, _, matchError := matchConstraints(goEnvironment.buildContext, files)
+	return excluded, goEnvironment, matchError
 }
 
 // excludedAndUnseen is what the load left out of the workspace. The root packages' ignored files inside
