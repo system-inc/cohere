@@ -110,9 +110,11 @@ type scheduler struct {
 // Here packages are admitted a bounded number at a time. A group waits until every action that any of its actions
 // inherits facts from has finished: the count covers every action of the group, since its actions are not ordered
 // so that the first's prerequisites cover the rest. Then it waits for a slot, of which there are slotsPerProcessor
-// times `GOMAXPROCS`, one under Options.Sequential. Slots go to the ready group with the largest cost first, ties by
-// package ID, so the long packages start early and fewer packages are live at once. A group gives its slot back once
-// its last action has finished, which is where releaseSyntax lets its syntax go.
+// times `GOMAXPROCS`, one under Options.Sequential. Slots go to the ready group with the longest weighted path to the
+// end of the graph first (packageGroup.priority), then the largest, then by package ID: granting by cost alone held
+// the TypeScript checker's chain on cohere's root behind about 344 larger groups for 0.45 to 0.63s, though more of the
+// run waited behind it than behind any of them. A group gives its slot back once its last action has finished, which
+// is where releaseSyntax lets its syntax go.
 //
 // Within the granted groups only ready actions run, those whose horizontal prerequisites have all finished, from
 // one queue, on `GOMAXPROCS` workers, one on the caller's goroutine under Options.Sequential. A goroutine for every
@@ -273,11 +275,11 @@ func (scheduler *scheduler) work() {
 	}
 }
 
-// admit grants a slot to each ready group while one is free, largest first, and queues each granted group's actions
-// that require nothing on their own package. The lock is held.
+// admit grants a slot to each ready group while one is free, the longest path first (takeFirst), and queues each
+// granted group's actions that require nothing on their own package. The lock is held.
 func (scheduler *scheduler) admit() {
 	for scheduler.running < scheduler.slots && len(scheduler.ready) > 0 {
-		next := scheduler.takeLargest()
+		next := scheduler.takeFirst()
 		next.granted = true
 		next.unexecuted = len(next.actions)
 		scheduler.remaining--
@@ -293,19 +295,19 @@ func (scheduler *scheduler) admit() {
 	}
 }
 
-// takeLargest removes and returns the ready group with the largest cost, of those alike the one whose package ID
-// sorts first, so the order is the same every run.
-func (scheduler *scheduler) takeLargest() *packageGroup {
-	largest := 0
+// takeFirst removes and returns the ready group with the largest priority, of those alike the largest cost, and of
+// those the one whose package ID sorts first, so the order is the same every run.
+func (scheduler *scheduler) takeFirst() *packageGroup {
+	first := 0
 	for index, candidate := range scheduler.ready {
-		chosen := scheduler.ready[largest]
-		if order := cmp.Compare(chosen.cost, candidate.cost); order < 0 ||
-			order == 0 && candidate.analyzedPackage.ID < chosen.analyzedPackage.ID {
-			largest = index
+		chosen := scheduler.ready[first]
+		order := cmp.Or(cmp.Compare(chosen.priority, candidate.priority), cmp.Compare(chosen.cost, candidate.cost))
+		if order < 0 || order == 0 && candidate.analyzedPackage.ID < chosen.analyzedPackage.ID {
+			first = index
 		}
 	}
-	taken := scheduler.ready[largest]
-	scheduler.ready = append(scheduler.ready[:largest], scheduler.ready[largest+1:]...)
+	taken := scheduler.ready[first]
+	scheduler.ready = append(scheduler.ready[:first], scheduler.ready[first+1:]...)
 	return taken
 }
 
