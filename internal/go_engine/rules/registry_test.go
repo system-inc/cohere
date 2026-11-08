@@ -850,6 +850,7 @@ var portedPasses = []string{
 	"identical_operands",
 	"impossible_target_comparison",
 	"inconsistent_receiver_name",
+	"index_compared_as_contains",
 	"ineffective_bitwise_operation",
 	"ineffective_break",
 	"ineffective_copy",
