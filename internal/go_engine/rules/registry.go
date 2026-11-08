@@ -71,6 +71,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/assign"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/bools"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/cgo_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/composite"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/copy_lock"
@@ -175,6 +176,7 @@ var ports = map[string]*analysis.Analyzer{
 	"appends":      appends.Analyzer,
 	"assign":       assign.Analyzer,
 	"atomic":       atomic.Analyzer,
+	"bools":        bools.Analyzer,
 	"cgocall":      cgo_call.Analyzer,
 	"composites":   composite.Analyzer,
 	"copylocks":    copy_lock.Analyzer,
