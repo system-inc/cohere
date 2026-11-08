@@ -334,16 +334,33 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own:
 // marker reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a
 // sum type's variant whose methods only mark it, served finds the types a file serves for the two rules that count
-// them, positions is the line table rules read a node's position from without the FileSet's lock, and staticcheck_ir
-// hands the ported passes the functions of staticcheck's intermediate representation.
-var sharedReaders = map[string]bool{
-	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true, "staticcheck_ir": true,
+// them, positions is the line table rules read a node's position from without the FileSet's lock, staticcheck_ir
+// hands the ported passes the functions of staticcheck's intermediate representation, and the four kits the ports of
+// staticcheck's checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they
+// call, staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures.
+// One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would
+// rewrite every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
+var sharedReaders = []string{
+	"inert_value",
+	"marker",
+	"marker_type",
+	"positions",
+	"served",
+	"staticcheck_call",
+	"staticcheck_code",
+	"staticcheck_ir",
+	"staticcheck_report",
+	"staticcheck_wants",
 }
 
 // portedPasses is the packages under rules/ that hold an upstream pass ported onto staticcheck's intermediate
 // representation. Each runs beside its original until it matches it finding for finding, and then All registers it
-// under the original's name in the original's place (#pn1xvnd), so House never lists it.
-var portedPasses = map[string]bool{"unused_write": true, "nil_ness": true}
+// under the original's name in the original's place (#pn1xvnd), so House never lists it. One entry a line, so each
+// port's branch adds its own line and the ports land one after another without touching each other's lines.
+var portedPasses = []string{
+	"nil_ness",
+	"unused_write",
+}
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
 // testdata, the shared readers and the ported passes, is one house rule named for it, and House lists it. A rule
@@ -360,7 +377,8 @@ func TestEveryRulePackageIsInHouse(test *testing.T) {
 	}
 	packages := 0
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == "testdata" || sharedReaders[entry.Name()] || portedPasses[entry.Name()] {
+		if !entry.IsDir() || entry.Name() == "testdata" || slices.Contains(sharedReaders, entry.Name()) ||
+			slices.Contains(portedPasses, entry.Name()) {
 			continue
 		}
 		packages++
