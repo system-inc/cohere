@@ -4,7 +4,8 @@
 // such a value where it is copied: assigned, declared, placed in a composite literal, returned, passed to a call,
 // taken by a function as a receiver or parameter, bound by a range clause, or, from Go 1.22, copied into a fresh
 // loop variable on every iteration of a three-clause for loop. A composite literal or a call on the right is a new
-// value, not a copy, so it is not judged.
+// value, not a copy, so it is not judged. It sits on the engine's syntax dispatcher, hearing the nine kinds it judges
+// on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/copylock/copylock.go, whose
 // logic it keeps and whose messages it reports word for word, at the same position. What the original takes from
@@ -30,41 +31,29 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. It runs despite type
-// errors, as the original does.
-var Analyzer = &analysis.Analyzer{
-	Name: "copylocks",
-	Doc: "check for locks erroneously passed by value\n\n" +
-		"Inadvertently copying a value containing a lock, such as sync.Mutex or\n" +
-		"sync.WaitGroup, may cause both copies to malfunction. Generally such\n" +
-		"values should be referred to through a pointer.",
-	URL:              "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/copylock",
-	Requires:         []*analysis.Analyzer{inspect.Analyzer},
-	RunDespiteErrors: true,
-	Run:              run,
-}
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "copylocks"
 
-// loopVariablesPerIteration is the Go version from which each iteration of a for loop declares its variables afresh,
-// copying their values from the previous iteration's.
-const loopVariablesPerIteration = "go1.22"
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for locks erroneously passed by value\n\n" +
+	"Inadvertently copying a value containing a lock, such as sync.Mutex or\n" +
+	"sync.WaitGroup, may cause both copies to malfunction. Generally such\n" +
+	"values should be referred to through a pointer."
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("copy_lock: inspect's result is missing")
-	}
-	// The effective Go version of the file being walked, "" when it is unknown. The walk meets each file before
-	// anything inside it, as the original's WithStack does.
-	currentFileVersion := ""
-	// Preorder visits the nodes the original's WithStack visits, in the same order, and a cursor knows its parent,
-	// which the original reads from its stack.
-	for cursor := range inspected.Root().Preorder(
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/copylock"
+
+// Listener is what the port hears of each package from the dispatcher: every node of the nine kinds the original's
+// WithStack visits, in the same preorder, each file before anything inside it, and each with its ancestors, whose
+// last is the parent the original reads from its stack.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{
 		(*ast.AssignStmt)(nil),
 		(*ast.CallExpr)(nil),
 		(*ast.CompositeLit)(nil),
@@ -74,46 +63,75 @@ func run(pass *analysis.Pass) (any, error) {
 		(*ast.GenDecl)(nil),
 		(*ast.RangeStmt)(nil),
 		(*ast.ReturnStmt)(nil),
-	) {
-		switch node := cursor.Node().(type) {
-		case *ast.File:
-			currentFileVersion = fileVersion(pass.TypesInfo, node)
-		case *ast.RangeStmt:
-			checkRange(pass, node)
-		case *ast.FuncDecl:
-			checkFunction(pass, node.Name.Name, node.Recv, node.Type)
-		case *ast.FuncLit:
-			checkFunction(pass, "func", nil, node.Type)
-		case *ast.CallExpr:
-			checkCall(pass, node)
-		case *ast.AssignStmt:
-			checkAssignment(pass, node, currentFileVersion, cursor.Parent().Node())
-		case *ast.GenDecl:
-			checkVariableDeclaration(pass, node)
-		case *ast.CompositeLit:
-			checkCompositeLiteral(pass, node)
-		case *ast.ReturnStmt:
-			checkReturn(pass, node)
-		}
+	},
+	Node: checkNode,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener. It runs despite type errors, as the original does.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, and its
+// running despite type errors, which RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	analyzer.RunDespiteErrors = true
+	return analyzer
+}
+
+// loopVariablesPerIteration is the Go version from which each iteration of a for loop declares its variables afresh,
+// copying their values from the previous iteration's.
+const loopVariablesPerIteration = "go1.22"
+
+// walkState is what the port keeps over a package's walk, in the context's state.
+type walkState struct {
+	// currentFileVersion is the effective Go version of the file being walked, "" when it is unknown. The walk meets
+	// each file before anything inside it, as the original's WithStack does.
+	currentFileVersion string
+}
+
+// checkNode judges node by its kind, as the original's WithStack callback does. stack is node's ancestors, so its
+// last is node's parent.
+func checkNode(context *rule.Context, node ast.Node, stack []ast.Node) {
+	switch node := node.(type) {
+	case *ast.File:
+		rule.State[walkState](context).currentFileVersion = fileVersion(context.TypesInfo, node)
+	case *ast.RangeStmt:
+		checkRange(context, node)
+	case *ast.FuncDecl:
+		checkFunction(context, node.Name.Name, node.Recv, node.Type)
+	case *ast.FuncLit:
+		checkFunction(context, "func", nil, node.Type)
+	case *ast.CallExpr:
+		checkCall(context, node)
+	case *ast.AssignStmt:
+		// An assignment sits inside a file, so its ancestors hold the file at least, and their last is its parent.
+		checkAssignment(context, node, rule.State[walkState](context).currentFileVersion, stack[len(stack)-1])
+	case *ast.GenDecl:
+		checkVariableDeclaration(context, node)
+	case *ast.CompositeLit:
+		checkCompositeLiteral(context, node)
+	case *ast.ReturnStmt:
+		checkReturn(context, node)
 	}
-	return nil, nil
 }
 
 // checkAssignment reports a value an assignment copies a lock from, and, in a file at Go 1.22 or later, a variable
 // a for loop's `:=` init declares holding a lock, since each iteration copies it into the next one's variable. Once
 // any value is reported, no loop variable is, so one statement is not reported twice. x/tools'
 // checkCopyLocksAssign.
-func checkAssignment(pass *analysis.Pass, assignment *ast.AssignStmt, currentFileVersion string, parent ast.Node) {
+func checkAssignment(context *rule.Context, assignment *ast.AssignStmt, currentFileVersion string, parent ast.Node) {
 	reportedValue := false
 	for index, value := range assignment.Rhs {
-		path := lockPathOfValue(pass, value)
+		path := lockPathOfValue(context, value)
 		// A value past the last operand does not type-check, and has no name to be reported against (see the
 		// package doc).
 		if path == nil || index >= len(assignment.Lhs) {
 			continue
 		}
-		pass.ReportRangef(
-			value, "assignment copies lock value to %v: %v", formatted(pass.Fset, assignment.Lhs[index]), path,
+		context.ReportRangef(
+			value, "assignment copies lock value to %v: %v", formatted(context.Fset, assignment.Lhs[index]), path,
 		)
 		reportedValue = true
 	}
@@ -131,20 +149,20 @@ func checkAssignment(pass *analysis.Pass, assignment *ast.AssignStmt, currentFil
 		}
 		// Defs holds nothing for a name `:=` redeclares rather than declares, which a for init cannot do, and the
 		// object's type is missing only in code that does not type-check.
-		object := pass.TypesInfo.Defs[identifier]
+		object := context.TypesInfo.Defs[identifier]
 		if object == nil || object.Type() == nil {
 			continue
 		}
 		if path := lockPath(object.Type()); path != nil {
-			pass.ReportRangef(
-				operand, "for loop iteration copies lock value to %v: %v", formatted(pass.Fset, operand), path,
+			context.ReportRangef(
+				operand, "for loop iteration copies lock value to %v: %v", formatted(context.Fset, operand), path,
 			)
 		}
 	}
 }
 
 // checkVariableDeclaration reports a value a var declaration copies a lock from. x/tools' checkCopyLocksGenDecl.
-func checkVariableDeclaration(pass *analysis.Pass, declaration *ast.GenDecl) {
+func checkVariableDeclaration(context *rule.Context, declaration *ast.GenDecl) {
 	if declaration.Tok != token.VAR {
 		return
 	}
@@ -155,14 +173,14 @@ func checkVariableDeclaration(pass *analysis.Pass, declaration *ast.GenDecl) {
 			continue
 		}
 		for index, value := range valueSpecification.Values {
-			path := lockPathOfValue(pass, value)
+			path := lockPathOfValue(context, value)
 			// A value past the last name does not type-check, and the type checker leaves it untyped, so its path is
 			// nil and the original never indexes past the names here. The bound keeps an index past them from
 			// panicking should that change.
 			if path == nil || index >= len(valueSpecification.Names) {
 				continue
 			}
-			pass.ReportRangef(
+			context.ReportRangef(
 				value, "variable declaration copies lock value to %v: %v", valueSpecification.Names[index].Name, path,
 			)
 		}
@@ -171,30 +189,30 @@ func checkVariableDeclaration(pass *analysis.Pass, declaration *ast.GenDecl) {
 
 // checkCompositeLiteral reports an element of a composite literal, or the value of a keyed one, that copies a lock.
 // A key is not judged, as the original does not judge it. x/tools' checkCopyLocksCompositeLit.
-func checkCompositeLiteral(pass *analysis.Pass, literal *ast.CompositeLit) {
+func checkCompositeLiteral(context *rule.Context, literal *ast.CompositeLit) {
 	for _, element := range literal.Elts {
 		value := element
 		if keyed, isKeyed := element.(*ast.KeyValueExpr); isKeyed {
 			value = keyed.Value
 		}
-		if path := lockPathOfValue(pass, value); path != nil {
-			pass.ReportRangef(value, "literal copies lock value from %v: %v", formatted(pass.Fset, value), path)
+		if path := lockPathOfValue(context, value); path != nil {
+			context.ReportRangef(value, "literal copies lock value from %v: %v", formatted(context.Fset, value), path)
 		}
 	}
 }
 
 // checkReturn reports a result a return statement copies a lock from. x/tools' checkCopyLocksReturnStmt.
-func checkReturn(pass *analysis.Pass, statement *ast.ReturnStmt) {
+func checkReturn(context *rule.Context, statement *ast.ReturnStmt) {
 	for _, result := range statement.Results {
-		if path := lockPathOfValue(pass, result); path != nil {
-			pass.ReportRangef(result, "return copies lock value: %v", path)
+		if path := lockPathOfValue(context, result); path != nil {
+			context.ReportRangef(result, "return copies lock value: %v", path)
 		}
 	}
 }
 
 // checkCall reports an argument a call copies a lock from, except to a builtin that reads only its argument's type
 // or copies nothing. x/tools' checkCopyLocksCallExpr.
-func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
+func checkCall(context *rule.Context, call *ast.CallExpr) {
 	// The identifier naming the function called, nil when the call names none, as a call of a function literal or of
 	// an indexed function does. Uses holds nothing for nil.
 	var called *ast.Ident
@@ -204,7 +222,7 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 	case *ast.SelectorExpr:
 		called = function.Sel
 	}
-	if builtin, isBuiltin := pass.TypesInfo.Uses[called].(*types.Builtin); isBuiltin {
+	if builtin, isBuiltin := context.TypesInfo.Uses[called].(*types.Builtin); isBuiltin {
 		switch builtin.Name() {
 		case "len", "cap", "Sizeof", "Offsetof", "Alignof":
 			// The argument of this operation is used only for its type, `len(array)`, or the operation does not
@@ -213,8 +231,8 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 		}
 	}
 	for _, argument := range call.Args {
-		if path := lockPathOfValue(pass, argument); path != nil {
-			pass.ReportRangef(argument, "call of %s copies lock value: %v", formatted(pass.Fset, call.Fun), path)
+		if path := lockPathOfValue(context, argument); path != nil {
+			context.ReportRangef(argument, "call of %s copies lock value: %v", formatted(context.Fset, call.Fun), path)
 		}
 	}
 }
@@ -222,34 +240,34 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 // checkFunction reports a receiver or a parameter, once for each field however many names it declares, whose type
 // holds a lock, so every call copies one. Results are not judged: `return T{}` returns a zero value, and copying
 // one is left to checkReturn. x/tools' checkCopyLocksFunc.
-func checkFunction(pass *analysis.Pass, name string, receiver *ast.FieldList, signature *ast.FuncType) {
+func checkFunction(context *rule.Context, name string, receiver *ast.FieldList, signature *ast.FuncType) {
 	if receiver != nil && len(receiver.List) > 0 {
 		receiverType := receiver.List[0].Type
-		if path := lockPath(pass.TypesInfo.Types[receiverType].Type); path != nil {
-			pass.ReportRangef(receiverType, "%s passes lock by value: %v", name, path)
+		if path := lockPath(context.TypesInfo.Types[receiverType].Type); path != nil {
+			context.ReportRangef(receiverType, "%s passes lock by value: %v", name, path)
 		}
 	}
 	if signature.Params == nil {
 		return
 	}
 	for _, field := range signature.Params.List {
-		if path := lockPath(pass.TypesInfo.Types[field.Type].Type); path != nil {
-			pass.ReportRangef(field.Type, "%s passes lock by value: %v", name, path)
+		if path := lockPath(context.TypesInfo.Types[field.Type].Type); path != nil {
+			context.ReportRangef(field.Type, "%s passes lock by value: %v", name, path)
 		}
 	}
 }
 
 // checkRange reports a range clause's key or value that copies a lock out of what it ranges over. x/tools'
 // checkCopyLocksRange.
-func checkRange(pass *analysis.Pass, statement *ast.RangeStmt) {
-	checkRangeVariable(pass, statement.Tok, statement.Key)
-	checkRangeVariable(pass, statement.Tok, statement.Value)
+func checkRange(context *rule.Context, statement *ast.RangeStmt) {
+	checkRangeVariable(context, statement.Tok, statement.Key)
+	checkRangeVariable(context, statement.Tok, statement.Value)
 }
 
 // checkRangeVariable reports one of a range clause's key or value, absent when variable is nil, that copies a lock.
 // A variable `:=` declares is judged by the object it defines, and one `=` assigns by the type of the expression.
 // x/tools' checkCopyLocksRangeVar.
-func checkRangeVariable(pass *analysis.Pass, operator token.Token, variable ast.Expr) {
+func checkRangeVariable(context *rule.Context, operator token.Token, variable ast.Expr) {
 	if variable == nil {
 		return
 	}
@@ -263,19 +281,19 @@ func checkRangeVariable(pass *analysis.Pass, operator token.Token, variable ast.
 		if !isIdentifier {
 			return
 		}
-		object := pass.TypesInfo.Defs[identifier]
+		object := context.TypesInfo.Defs[identifier]
 		if object == nil {
 			return
 		}
 		variableType = object.Type()
 	} else {
-		variableType = pass.TypesInfo.Types[variable].Type
+		variableType = context.TypesInfo.Types[variable].Type
 	}
 	if variableType == nil {
 		return
 	}
 	if path := lockPath(variableType); path != nil {
-		pass.Reportf(variable.Pos(), "range var %s copies lock: %v", formatted(pass.Fset, variable), path)
+		context.Reportf(variable.Pos(), "range var %s copies lock: %v", formatted(context.Fset, variable), path)
 	}
 }
 
