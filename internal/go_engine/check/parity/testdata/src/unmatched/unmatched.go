@@ -2,9 +2,9 @@
 package unmatched
 
 func gained() {}
-
 func shared() {}
 
+// calls holds records ruled here, which the findings do not bear out.
 func calls() {
 	gained() // port finds: call to gained
 	shared() // port finds: call to shared

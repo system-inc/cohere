@@ -4,6 +4,7 @@ package drop_misplaced
 
 func lost() {}
 
+// calls holds a drop ruled here, recorded on the wrong line.
 func calls() {
 	_ = 0 // port drops: call to lost
 	lost()

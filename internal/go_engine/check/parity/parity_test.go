@@ -257,7 +257,7 @@ func TestRequireOnlyAdjudicatedFailsAnUnrecordedDifference(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unrecorded")
-	}), "the port alone found unrecorded.go:8:0: call to gained, which the fixture does not record")
+	}), "the port alone found unrecorded.go:9:0: call to gained, which the fixture does not record")
 }
 
 func TestRequireOnlyAdjudicatedFailsAnUnreadableRecord(test *testing.T) {
@@ -311,7 +311,7 @@ func TestRequireOnlyAdjudicatedFailsADropThatDidNotHappen(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_unmatched")
-	}), "the fixture records that the port drops drop_unmatched.go:7:0: call to shared, and the original alone does "+
+	}), "the fixture records that the port drops drop_unmatched.go:8:0: call to shared, and the original alone does "+
 		"not find it")
 }
 
@@ -322,8 +322,8 @@ func TestRequireOnlyAdjudicatedFailsADropOnAnotherLine(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "drop_misplaced")
 	}),
-		"the original found drop_misplaced.go:9:0: call to lost, and the port did not, a regression",
-		"the fixture records that the port drops drop_misplaced.go:8:0: call to lost, and the original alone does "+
+		"the original found drop_misplaced.go:10:0: call to lost, and the port did not, a regression",
+		"the fixture records that the port drops drop_misplaced.go:9:0: call to lost, and the original alone does "+
 			"not find it",
 	)
 }
@@ -410,6 +410,35 @@ func TestRequireOnlyAdjudicatedOmitsOnlyTheOriginalsRelatedEntry(test *testing.T
 		"the port alone found omitted.go:9:0: call to shared, which the fixture does not record",
 		"the original found omitted.go:9:0: call to shared, and the port did not, a regression",
 	)
+}
+
+// A record with no comment above it and no doc comment on the function it is in fails, named by file and line.
+func TestRequireOnlyAdjudicatedFailsARecordWithNoReason(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "unreasoned")
+	}), "unreasoned.go:8 holds a record with no reason: write why on the line above it, or in the doc comment of the "+
+		"declaration it is in")
+}
+
+// A record on the line above is no reason for the one below it: the first record's reason is above it, and the
+// second, with a record above it and no doc comment on its function, fails.
+func TestRequireOnlyAdjudicatedTakesNoRecordAsAReason(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "record_above")
+	}), "record_above.go:10 holds a record with no reason")
+}
+
+// A reason on the line above passes, as in dropped, and so does one in the doc comment of the enclosing function
+// alone, as in adjudicated and wave 1's fixtures.
+func TestRequireOnlyAdjudicatedTakesEitherReason(test *testing.T) {
+	test.Parallel()
+	for _, fixture := range []string{"dropped", "adjudicated"} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), fixture)
+		}))
+	}
 }
 
 // Each planted pair agrees in everything but one part of a finding, and RequireIdentical fails on that part alone,

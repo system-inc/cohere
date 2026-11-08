@@ -2,11 +2,11 @@
 package adjudicated
 
 func shared() {}
-
 func gained() {}
 
 func renamed() {}
 
+// calls holds the planted records, each ruled in this doc comment: the port rightly finds gained and renames renamed.
 func calls() {
 	shared()
 	gained()  // port finds: call to gained
