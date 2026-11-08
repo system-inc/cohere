@@ -27,8 +27,9 @@ const upstreamFile = "loop-append.go"
 
 // fixtures is every fixture package where the original and the port agree, fixes and all: staticcheck's; parity, which
 // holds every shape the query's three alternatives and the checks after it branch on, the near miss of each, and a
-// generated file, which both filter; and shadow, which declares an append of its own at package scope.
-var fixtures = []string{upstream, "parity", "shadow"}
+// generated file, which both filter; shadow, which declares an append of its own at package scope; and walk, which
+// holds every place the port's walk over the functions where syntax starts must reach, each once.
+var fixtures = []string{upstream, "parity", "shadow", "walk"}
 
 // differencesFixture is the fixture where the port parts from the original, each part recorded on its line, and the
 // shapes where the two could most plausibly part and agree.

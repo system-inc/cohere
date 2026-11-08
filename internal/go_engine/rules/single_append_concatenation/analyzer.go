@@ -28,6 +28,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 	"honnef.co/go/tools/analysis/facts/purity"
+	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -35,31 +36,15 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every range statement, in preorder. It
-// requires staticcheck's purity pass, whose facts say which calls in the loop's slices may have side effects.
+// Listener is what the port hears of each package from the dispatcher: every function of the intermediate
+// representation, whose syntax it walks when the function is where syntax starts, so each range statement is judged
+// once. It listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which say which calls
+// in the loop's slices may have side effects and are built from the representation, so only on a package without
+// errors, as the original runs: the syntax walk runs on every package, and so must everything a syntax listener
+// requires.
 var Listener = rule.Listener{
 	Requires: []*analysis.Analyzer{purity.Analyzer},
-	Nodes:    []ast.Node{(*ast.RangeStmt)(nil)},
-	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
-		statement, isRange := node.(*ast.RangeStmt)
-		if !isRange {
-			// Invariant: the dispatcher hands Node only the range statements it was asked for.
-			panic("single_append_concatenation: the dispatcher handed over a node that is not a range statement")
-		}
-		pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
-		if !isPurity {
-			// Invariant: the listener requires purity, whose result is always a purity.Result, so anything else is a
-			// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
-			panic("single_append_concatenation: the purity pass's result is missing")
-		}
-		// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function
-		// is pure where the map holds it.
-		isPure := func(function *types.Func) bool {
-			_, isHeld := pure[function]
-			return isHeld
-		}
-		Check(context, isPure, statement)
-	},
+	Function: judgeFunction,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
@@ -72,6 +57,36 @@ var Analyzer = dispatch.RuleAnalyzer(
 		"staticcheck's S1011, ported.",
 	&Listener,
 )
+
+// judgeFunction judges every range statement in the syntax of function, nested function literals included, when
+// function is where that syntax starts: a declared function, the blank-named among them, which the representation
+// builds too, or a function literal of the package's initializer, whose parent, the initializer itself, has no syntax.
+// Every other function is a literal inside one of those and is judged in its walk. A range statement is written only
+// inside a function's body, so these walks reach every one the original's walk over the files reaches, each once.
+func judgeFunction(context *rule.Context, function *ir.Function) {
+	syntax := function.Syntax()
+	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
+		return
+	}
+	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
+	if !isPurity {
+		// Invariant: the listener requires purity, whose result is always a purity.Result, so anything else is a
+		// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
+		panic("single_append_concatenation: the purity pass's result is missing")
+	}
+	// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function is
+	// pure where the map holds it.
+	isPure := func(callee *types.Func) bool {
+		_, isHeld := pure[callee]
+		return isHeld
+	}
+	ast.Inspect(syntax, func(node ast.Node) bool {
+		if statement, isRange := node.(*ast.RangeStmt); isRange {
+			Check(context, isPure, statement)
+		}
+		return true
+	})
+}
 
 // loopAppend is what one range statement bound, as the original's query binds it: destination is lhs, the slice
 // appended to, and source is x, the slice ranged over, each with its parentheses removed as the pattern language
