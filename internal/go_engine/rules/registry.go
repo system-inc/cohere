@@ -308,7 +308,7 @@ var ports = map[string]port{
 	"stdversion":       {analyzer: std_version.Analyzer, listener: &std_version.Listener},
 	"stringintconv":    {analyzer: string_int_conv.Analyzer, listener: &string_int_conv.Listener},
 	"structtag":        {analyzer: struct_tag.Analyzer, listener: &struct_tag.Listener},
-	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
+	"testinggoroutine": {analyzer: testing_goroutine.Analyzer, listener: &testing_goroutine.Listener},
 	"tests":            {analyzer: tests.Analyzer, listener: &tests.Listener},
 	"timeformat":       {analyzer: time_format.Analyzer, listener: &time_format.Listener},
 	"unmarshal":        {analyzer: unmarshal.Analyzer, listener: &unmarshal.Listener},
