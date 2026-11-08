@@ -69,6 +69,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/defers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
@@ -157,6 +158,7 @@ var duplicatesOfVet = map[string]string{
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
 	"appends":  appends.Analyzer,
+	"atomic":   atomic.Analyzer,
 	"defers":   defers.Analyzer,
 	"errorsas": errors_as.Analyzer,
 	"nilfunc":  nil_func.Analyzer,
