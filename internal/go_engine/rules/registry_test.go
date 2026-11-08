@@ -885,6 +885,7 @@ var portedPasses = []string{
 	"single_argument_append",
 	"swapped_seek_arguments",
 	"typed_nil_interface_comparison",
+	"unbuffered_signal_channel",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unencodable_binary_value",
