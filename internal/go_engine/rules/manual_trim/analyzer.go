@@ -1,4 +1,4 @@
-// Package manual_prefix_trim is staticcheck's S1017, an if statement whose condition asks strings.HasPrefix,
+// Package manual_trim is staticcheck's S1017, an if statement whose condition asks strings.HasPrefix,
 // HasSuffix or Contains, or their bytes twins, and whose body only trims or replaces what was asked about, which an
 // unconditional TrimPrefix, TrimSuffix or Replace says without the guard, ported as a check on types and syntax that
 // reports through the kit every port of staticcheck shares.
@@ -12,7 +12,7 @@
 // which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ in
 // two places alone, adjudicated, both in sameNonDynamic: the port drops a guard on a selector or index that holds a
 // call, and declines where astutil.Equal would panic.
-package manual_prefix_trim
+package manual_trim
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ var Listener = rule.Listener{
 		ifStatement, isIf := node.(*ast.IfStmt)
 		if !isIf {
 			// Invariant: the dispatcher hands Node only the if statements it was asked for.
-			panic("manual_prefix_trim: the dispatcher handed over a node that is not an if statement")
+			panic("manual_trim: the dispatcher handed over a node that is not an if statement")
 		}
 		// The check depends on the preorder's order, as the original's seen set does: an if statement comes before
 		// its else, so an else if is in seen by the time the preorder reaches it, and is left alone. The set is the

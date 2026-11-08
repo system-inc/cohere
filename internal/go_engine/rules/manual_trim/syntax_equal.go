@@ -1,4 +1,4 @@
-package manual_prefix_trim
+package manual_trim
 
 import (
 	"go/ast"
