@@ -19,6 +19,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
 
@@ -310,8 +311,8 @@ func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
 }
 
 // TestStaticcheckFollowsTheToolsPasses holds the registry, after the x/tools passes, to every default SA
-// and S check, then the ruled ST checks, then U1000 through the analyzer that reports it, then the house
-// rules, and nothing else, which also keeps out every QF check, since a quick fix is not a finding.
+// and S check, then the ruled ST checks, then U1000 as our port, then the house rules, and nothing else, which
+// also keeps out every QF check, since a quick fix is not a finding.
 func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 	test.Parallel()
 	offset := len(vet.Suite) + 2
@@ -330,7 +331,7 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 		Origin:       rule.OriginStaticcheck,
 		UpstreamName: "U1000",
 		TypeAware:    true,
-		Analyzer:     unusedReport,
+		Analyzer:     unused_code.Analyzer,
 	}
 	// reflect.DeepEqual because ConfiguredBy is a slice, which leaves rule.Rule without ==.
 	if unusedRule := registry[unusedIndex]; !reflect.DeepEqual(unusedRule, expectedUnused) {
@@ -342,6 +343,26 @@ func TestStaticcheckFollowsTheToolsPasses(test *testing.T) {
 			test.Errorf("rule %d is %q (%s), expected the house rule %q", unusedIndex+1+index, registeredRule.Name,
 				registeredRule.Origin, houseRule.Name)
 		}
+	}
+}
+
+// TestU1000RunsThePort holds the U1000 rule to cohere's port, under the original's name, so its settings, its docs
+// and every //cohere:ignore naming it read as they did when it ran staticcheck's original, which is now the oracle
+// the port's own tests hold it to.
+func TestU1000RunsThePort(test *testing.T) {
+	test.Parallel()
+	registeredRule, found := registeredRuleNamed("cohere-go/U1000")
+	if !found {
+		test.Fatal("the registry holds no cohere-go/U1000")
+	}
+	if registeredRule.Analyzer != unused_code.Analyzer {
+		test.Errorf("cohere-go/U1000 runs another analyzer named %q, not unused_code.Analyzer, cohere's port",
+			registeredRule.Analyzer.Name)
+	}
+	if registeredRule.UpstreamName != "U1000" || registeredRule.Origin != rule.OriginStaticcheck ||
+		!registeredRule.TypeAware {
+		test.Errorf("cohere-go/U1000 is %+v, expected upstream U1000, origin staticcheck and type aware",
+			registeredRule)
 	}
 }
 
@@ -466,13 +487,14 @@ var sharedReaders = []string{
 	"staticcheck_wants",
 }
 
-// portedPasses is the packages under rules/ that hold an upstream pass ported as ours: two onto staticcheck's
-// intermediate representation, and vet, which holds vet's passes, one package each (#z2x1c7g). Each runs beside its
-// original until it matches it finding for finding, and then All registers it under the original's name in the
-// original's place (#pn1xvnd), so House never lists it. One entry a line, so each port's branch adds its own line
-// and the ports land one after another without touching each other's lines.
+// portedPasses is the packages under rules/ that hold an upstream pass ported as cohere's own: onto staticcheck's
+// intermediate representation, over the syntax, or, for vet, one package for each of vet's passes (#z2x1c7g). Each
+// runs beside its original until it matches it finding for finding, and then All registers it under the original's
+// name in the original's place (#pn1xvnd), so House never lists it. One entry a line, and this comment names none, so
+// each port's branch adds its own line and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
 	"nil_ness",
+	"unused_code",
 	"unused_write",
 	"vet",
 }
