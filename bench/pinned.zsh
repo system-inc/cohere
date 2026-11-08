@@ -27,6 +27,7 @@ bench_directory=${0:A:h}
 # What a sourcing script that sets neither leaves empty: no generator, and nothing linked.
 (( ${+generate} )) || generate=
 (( ${+links} )) || links=()
+(( ${+commit} )) || commit=
 
 fail() { print -u2 "$name: $*"; exit 1; }
 load() { sysctl -n vm.loadavg | awk '{print $2}'; }
@@ -101,7 +102,10 @@ tree_hash() {
 prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
-  project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
+  # The commit the sourcing script named in `commit`, or the checkout's own. A named one measures an older
+  # tree on today's machine (#r1kf434); its dependencies are still the checkout's, linked as they stand.
+  project_commit=$(git -C $project rev-parse --verify "${commit:-HEAD}^{commit}") ||
+    fail "$project has no commit ${commit:-HEAD}"
   # The layout is in the name, so a copy extracted before it was a repository is never reused, and so is the
   # generator, so a copy made with one is never taken for a copy made without it, or with another.
   local layout=git
