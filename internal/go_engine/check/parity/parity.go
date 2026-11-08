@@ -11,6 +11,7 @@
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
+// RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireOnlyAdjudicated over its differences fixture, RequireStaticcheckGolden over staticcheck's golden files for
 // a port that offers fixes, and RequirePortWhereOriginalPanics over a fixture the original panics on. Each takes
 // testdata and patterns, and a pattern naming a folder of testdata that holds a go.mod loads that folder as a module
@@ -153,7 +154,7 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
-	return findingsOver(test, original, port, loadFixtures(test, Target{}, testdata, patterns))
+	return findingsOver(test, original, port, loadFixtures(test, Target{}, testdata, patterns, nil))
 }
 
 // findingsOver is Findings over loads already made, so a caller that reads the loaded packages as well, as
@@ -200,21 +201,23 @@ func RequireIdentical(
 	patterns ...string,
 ) {
 	test.Helper()
-	requireIdentical(test, Target{}, original, port, testdata, patterns...)
+	requireIdentical(test, Target{}, original, port, testdata, nil, patterns...)
 }
 
-// requireIdentical is RequireIdentical with the fixtures loaded for target.
+// requireIdentical is RequireIdentical with the fixtures loaded for target, over fixture packages that load with
+// exactly the errors expected, or clean when it expects none (see loadFixtures).
 func requireIdentical(
 	test testing.TB,
 	target Target,
 	original *analysis.Analyzer,
 	port *analysis.Analyzer,
 	testdata string,
+	expected []LoadError,
 	patterns ...string,
 ) {
 	test.Helper()
 	originalFindings, portFindings := findingsOver(test, original, port,
-		loadFixtures(test, target, testdata, patterns))
+		loadFixtures(test, target, testdata, patterns, expected))
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	if len(originalFindings) == 0 {
 		test.Fatalf("the original found nothing in the fixtures, so the comparison proves nothing")
@@ -279,7 +282,7 @@ func requireOnlyAdjudicated(
 	fixture string,
 ) {
 	test.Helper()
-	loads := loadFixtures(test, target, testdata, []string{fixture})
+	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)

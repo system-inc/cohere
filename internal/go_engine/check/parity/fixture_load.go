@@ -121,11 +121,20 @@ func recordsFolder(test testing.TB, fixtures loadedFixtures) string {
 }
 
 // loadFixtures loads the fixture packages patterns name from testdata for target, a load for the tree and one for
-// each module. A load that found nothing and a fixture package that did not load clean each fail the test, since
-// silence there would read as agreement.
-func loadFixtures(test testing.TB, target Target, testdata string, patterns []string) []loadedFixtures {
+// each module. A load that found nothing fails the test, since silence there would read as agreement, and so do the
+// fixture packages' load errors unless they are exactly expected (see requireLoadErrors). With nothing expected, as
+// every caller but RequireIdenticalDespiteLoadErrors expects, a fixture package that did not load clean fails on its
+// own.
+func loadFixtures(
+	test testing.TB,
+	target Target,
+	testdata string,
+	patterns []string,
+	expected []LoadError,
+) []loadedFixtures {
 	test.Helper()
 	loads := []loadedFixtures{}
+	loadErrors := []LoadError{}
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
 		loaded, loadError := load.Packages(fixtures.directory, fixtures.patterns, target.environmentOf(test, fixtures),
 			nil)
@@ -133,15 +142,20 @@ func loadFixtures(test testing.TB, target Target, testdata string, patterns []st
 			test.Fatalf("loading %s: %v", fixtures.described(), loadError)
 		}
 		// The checker passes over a root that does not type-check without a word, so a fixture with one type error
-		// would compare nothing and read green. There must be a root, and every root must load clean.
+		// would compare nothing and read green. There must be a root, and every root must load clean or with exactly
+		// the errors expected.
 		if len(loaded.Roots) == 0 {
 			test.Fatalf("loading %s found no package, so the comparison would prove nothing", fixtures.described())
 		}
-		for _, failure := range LoadFailures(loaded.Roots) {
-			test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
-				failure.Package, failure.Error)
+		if len(expected) == 0 {
+			for _, failure := range LoadFailures(loaded.Roots) {
+				test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
+					failure.Package, failure.Error)
+			}
 		}
+		loadErrors = append(loadErrors, loadErrorsOf(loaded.Roots, fixtures.fileName)...)
 		loads = append(loads, loadedFixtures{fixtureLoad: fixtures, roots: loaded.Roots})
 	}
+	requireLoadErrors(test, loadErrors, expected)
 	return loads
 }

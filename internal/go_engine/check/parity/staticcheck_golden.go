@@ -45,7 +45,7 @@ func requireStaticcheckGolden(
 	test.Helper()
 	suggested := 0
 	held := 0
-	for _, fixtures := range loadFixtures(test, target, testdata, patterns) {
+	for _, fixtures := range loadFixtures(test, target, testdata, patterns, nil) {
 		for _, action := range portActions(test, port, fixtures.roots) {
 			// editsByFile is the package's edits by the file they edit, and in each by their fix's message.
 			editsByFile := map[string]map[string][]Edit{}

@@ -59,7 +59,7 @@ func requirePortWhereOriginalPanics(
 ) {
 	test.Helper()
 	portFindings := []Finding{}
-	loads := loadFixtures(test, target, testdata, []string{fixture})
+	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
 	for _, fixtures := range loads {
 		outcomes, analyzeError := Analyze([]Pair{{Original: recovering(original), Port: port}}, fixtures.roots)
 		if analyzeError != nil {
