@@ -18,16 +18,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
-// x/tools' own fixtures for directive, copied into testdata/src and run as x/tools' test runs them, with no flags.
-// The copy is upstream's byte for byte but for badspace.go, which is gofmt'd, as every Go file under testdata is:
-// gofmt drops its trailing blank line, and every line keeps its place, so each want still names its line. Every
-// `// want` the original expects, the port reports at the same line with the same message, and analysistest fails on
-// a finding no want expects as much as on a want nothing found, so the port adds nothing there either. Most of the
-// fixtures are files the build excludes, and one is assembly: analysistest reads the wants of a package's other
-// files, and, for an analyzer named directive, of its excluded files too, as x/tools' does.
+// x/tools' own fixtures for directive, byte for byte in testdata/a.txtar, run as x/tools' test runs them, with no
+// flags: every `// want` the original expects, the port reports at the same line with the same message, and
+// analysistest fails on a finding no want expects as much as on a want nothing found, so the port adds nothing there
+// either. Most of the fixtures are files the build excludes, and one is assembly: analysistest reads the wants of a
+// package's other files, and, for an analyzer named directive, of its excluded files too, as x/tools' does.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
+	analysistest.Run(errorsOnly{test}, extractedFixtures(test), Analyzer, "a")
 }
 
 // The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
@@ -49,7 +47,7 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 	roots := fixtureRoots(test)
 	original, _ := findingsOf(test, roots)
 	untyped := []finding{}
-	for _, loadedPackage := range slices.Concat(roots...) {
+	for _, loadedPackage := range roots {
 		pass := &analysis.Pass{
 			Analyzer:     Analyzer,
 			Fset:         loadedPackage.Fset,
@@ -114,41 +112,46 @@ func expectSame(test *testing.T, original []finding, other []finding) {
 	}
 }
 
-// fixtureRoots loads every fixture package the comparisons run over, each with its test variants, as analysistest
-// loads one: x/tools' package a from testdata/src, and parity's packages, parity, which is neither main nor a test,
-// and parity/command, which is main, from testdata/parity.txtar, extracted into a temporary tree. Each tree is a
-// load of its own.
-func fixtureRoots(test *testing.T) [][]*packages.Package {
+// fixtureArchives are the fixture trees, each laid out by import path: x/tools' package a, and parity's packages,
+// parity, which is neither main nor a test, and parity/command, which is main. They are archives because they hold
+// what gofmt would change or cannot parse, the odd spaces and broken syntax under test, and cohere's gofmt guard reads
+// every Go file under testdata.
+var fixtureArchives = []string{"a.txtar", "parity.txtar"}
+
+// extractedFixtures extracts every fixture archive into one temporary tree, a `GOPATH`, and returns its root.
+func extractedFixtures(test *testing.T) string {
 	test.Helper()
-	parityTree := test.TempDir()
-	archive, parseError := txtar.ParseFile(filepath.Join(analysistest.TestData(), "parity.txtar"))
-	if parseError != nil {
-		test.Fatalf("reading the parity archive: %v", parseError)
-	}
-	for _, file := range archive.Files {
-		path := filepath.Join(parityTree, filepath.FromSlash(file.Name))
-		if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
-			test.Fatal(makeError)
+	tree := test.TempDir()
+	for _, archiveName := range fixtureArchives {
+		archive, parseError := txtar.ParseFile(filepath.Join(analysistest.TestData(), archiveName))
+		if parseError != nil {
+			test.Fatalf("reading %s: %v", archiveName, parseError)
 		}
-		if writeError := os.WriteFile(path, file.Data, 0o644); writeError != nil {
-			test.Fatal(writeError)
+		for _, file := range archive.Files {
+			path := filepath.Join(tree, filepath.FromSlash(file.Name))
+			if makeError := os.MkdirAll(filepath.Dir(path), 0o755); makeError != nil {
+				test.Fatal(makeError)
+			}
+			if writeError := os.WriteFile(path, file.Data, 0o644); writeError != nil {
+				test.Fatal(writeError)
+			}
 		}
 	}
 	// An archive ends every file it holds with a newline, so the one fixture whose last line has none, which the
 	// reader of a non-Go file cuts as it cuts every other, is written here.
-	noFinalNewline := filepath.Join(parityTree, "src", "parity", "command", "no_newline.s")
+	noFinalNewline := filepath.Join(tree, "src", "parity", "command", "no_newline.s")
 	if writeError := os.WriteFile(noFinalNewline, []byte("//go:debug panicnil=1"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	return [][]*packages.Package{
-		loadTree(test, analysistest.TestData(), "a"),
-		loadTree(test, parityTree, "parity", "parity/command"),
-	}
+	return tree
 }
 
-// loadTree loads the packages patterns name from directory, a tree laid out by import path, as analysistest loads one.
-func loadTree(test *testing.T, directory string, patterns ...string) []*packages.Package {
+// fixtureRoots loads every fixture package from the extracted tree, each with its test variants, as analysistest
+// loads one.
+func fixtureRoots(test *testing.T) []*packages.Package {
 	test.Helper()
+	directory := extractedFixtures(test)
+	patterns := []string{"a", "parity", "parity/command"}
 	loadedPackages, loadError := load.Packages(directory, patterns, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
@@ -158,23 +161,8 @@ func loadTree(test *testing.T, directory string, patterns ...string) []*packages
 	return loadedPackages.Roots
 }
 
-// findingsOf runs x/tools' directive and the port over each load's roots, in one checker for each load, and returns
-// each analyzer's findings, sorted.
-func findingsOf(test *testing.T, roots [][]*packages.Package) (original []finding, port []finding) {
-	test.Helper()
-	for _, loadRoots := range roots {
-		loadOriginal, loadPort := findingsOfOneLoad(test, loadRoots)
-		original = append(original, loadOriginal...)
-		port = append(port, loadPort...)
-	}
-	slices.SortFunc(original, compareFindings)
-	slices.SortFunc(port, compareFindings)
-	return original, port
-}
-
-// findingsOfOneLoad runs x/tools' directive and the port over roots, which share one load's file set, in one checker,
-// and returns each one's findings.
-func findingsOfOneLoad(test *testing.T, roots []*packages.Package) (original []finding, port []finding) {
+// findingsOf runs x/tools' directive and the port over roots in one checker, and returns each one's findings, sorted.
+func findingsOf(test *testing.T, roots []*packages.Package) (original []finding, port []finding) {
 	test.Helper()
 	graph, analyzeError := checker.Analyze(
 		[]*analysis.Analyzer{directive.Analyzer, Analyzer}, roots, &checker.Options{},
@@ -196,6 +184,8 @@ func findingsOfOneLoad(test *testing.T, roots []*packages.Package) (original []f
 			}
 		}
 	}
+	slices.SortFunc(original, compareFindings)
+	slices.SortFunc(port, compareFindings)
 	return original, port
 }
 
