@@ -459,7 +459,7 @@ var ports = map[string]port{
 	"shift":            {analyzer: shift.Analyzer, listener: &shift.Listener},
 	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer, listener: &signal_channel_analyzer.Listener},
 	"slog":             {analyzer: slog.Analyzer, listener: &slog.Listener},
-	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
+	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer, listener: &sql_rows_err.Listener},
 	"stdmethods":       {analyzer: std_methods.Analyzer, listener: &std_methods.Listener},
 	"stdversion":       {analyzer: std_version.Analyzer, listener: &std_version.Listener},
 	"stringintconv":    {analyzer: string_int_conv.Analyzer, listener: &string_int_conv.Listener},

@@ -9,8 +9,10 @@
 // requires inspect alone and builds what it reads from typeindex by walking: the calls whose callee, by
 // typeutil.Callee, is one of database/sql's seven query methods, judged method by method in the original's order and
 // within a method in preorder, as typeindex.Index.Calls yields them, and the identifiers that use each candidate
-// variable, in preorder, as typeindex.Index.Uses yields them. It walks with cursors rather than inspector.All, since
-// the judgment reads each node's parent and its enclosing loop. The registry runs the port in the original's place,
+// variable, in preorder, as typeindex.Index.Uses yields them. It reads cursors rather than a stack, since the
+// judgment reads each node's parent edge and its enclosing loop. It sits on the engine's syntax dispatcher, hearing
+// each call on the walk the dispatcher makes once for every syntax rule with the call's cursor, and walks the
+// package's identifiers itself only where a call was a candidate. The registry runs the port in the original's place,
 // and the original stays the oracle: the parity tests beside this file run both over the same packages. The two agree
 // everywhere, so there is no differences fixture.
 package sql_rows_err
@@ -23,14 +25,20 @@ import (
 	"iter"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/edge"
 	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// doc is the original's documentation, byte for byte.
-const doc = `sqlrowserr: report failure to check sql.Rows.Err
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "sqlrowserr"
+
+// passDoc is the original's documentation, byte for byte.
+const passDoc = `sqlrowserr: report failure to check sql.Rows.Err
 
 This analyzer reports uses of sql.Rows in which the result of a query
 such as db.Query() is assigned to a local variable that is then used
@@ -68,15 +76,29 @@ all cases, but merely the simple mistakes where the user may have been
 oblivious to the existence of the Rows.Err method.
 `
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. The original requires
-// x/tools' internal typeindex beside inspect; the port requires inspect alone and walks for what typeindex holds.
-var Analyzer = &analysis.Analyzer{
-	Name:     "sqlrowserr",
-	Doc:      doc,
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/sqlrowserr",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/sqlrowserr"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
+// typeindex yields them, each with its cursor, of which it gathers the query calls whose rows go to a variable, and
+// the package's end, where it judges them. The original requires x/tools' internal typeindex beside inspect; the
+// port requires nothing beyond the dispatcher's walk, and walks for what typeindex holds.
+var Listener = rule.Listener{
+	Nodes:       []ast.Node{(*ast.CallExpr)(nil)},
+	Node:        gatherCall,
+	PackageExit: judgePackage,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
 }
 
 // sqlPath is the import path of the package whose query methods the pass judges.
@@ -107,64 +129,80 @@ type candidate struct {
 	rows *types.Var
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("sql_rows_err: inspect's result is missing")
+// packageState is what the port gathers over a package's walk, in the context's state.
+type packageState struct {
+	// candidatesByMethod is the candidates of each query method, at that method's index in queryMethods, each in
+	// preorder.
+	candidatesByMethod [len(queryMethods)][]candidate
+	// candidateVariables is every candidate's rows variable, nil until the first candidate.
+	candidateVariables map[*types.Var]bool
+	// inspected is the package's inspector, read from a candidate's cursor, which judgePackage walks for the
+	// identifiers that use the candidates' variables. A query can assign rows to a variable used before it, so the
+	// uses are walked for once every candidate is known, as the original does.
+	inspected *inspector.Inspector
+}
+
+// gatherCall keeps node when it is a call to one of the query methods whose rows go to a variable.
+func gatherCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	// The candidates of each query method, at that method's index in queryMethods, each in preorder.
-	candidatesByMethod := [len(queryMethods)][]candidate{}
-	candidateVariables := map[*types.Var]bool{}
-	for callCursor := range inspected.Root().Preorder((*ast.CallExpr)(nil)) {
-		call, isCall := callCursor.Node().(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder yields only the node types it is given.
-			panic("sql_rows_err: a call's cursor holds no call")
-		}
-		methodIndex, isQuery := queryMethodIndex(pass, call)
-		if !isQuery {
-			continue
-		}
-		rows, isAssigned := assignedRows(pass.TypesInfo, callCursor)
-		if !isAssigned {
-			continue
-		}
-		candidatesByMethod[methodIndex] = append(candidatesByMethod[methodIndex], candidate{call: call, rows: rows})
-		candidateVariables[rows] = true
+	methodIndex, isQuery := queryMethodIndex(context, call)
+	if !isQuery {
+		return
 	}
-	if len(candidateVariables) == 0 {
-		return nil, nil
+	callCursor := context.Cursor()
+	rows, isAssigned := assignedRows(context.TypesInfo, callCursor)
+	if !isAssigned {
+		return
 	}
-	uses := variableUses(pass.TypesInfo, inspected, candidateVariables)
-	for _, candidates := range candidatesByMethod {
+	state := rule.State[packageState](context)
+	state.candidatesByMethod[methodIndex] = append(
+		state.candidatesByMethod[methodIndex], candidate{call: call, rows: rows},
+	)
+	if state.candidateVariables == nil {
+		state.candidateVariables = map[*types.Var]bool{}
+	}
+	state.candidateVariables[rows] = true
+	state.inspected = callCursor.Inspector()
+}
+
+// judgePackage reports each candidate whose rows are iterated by Next and never asked Err, method by method in the
+// original's order and within a method in preorder.
+func judgePackage(context *rule.Context) {
+	state := rule.State[packageState](context)
+	if len(state.candidateVariables) == 0 {
+		return
+	}
+	uses := variableUses(context.TypesInfo, state.inspected, state.candidateVariables)
+	for _, candidates := range state.candidatesByMethod {
 		for _, judged := range candidates {
 			nextLoop := uncheckedNextLoop(judged.rows, uses[judged.rows])
 			if !nextLoop.IsValid() {
 				continue
 			}
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos: judged.call.Pos(),
 				End: judged.call.End(),
 				Message: fmt.Sprintf("sql.Rows %q is used in Next loop at line %d without final check of %s.Err()",
-					judged.rows.Name(), pass.Fset.Position(nextLoop).Line, judged.rows.Name()),
+					judged.rows.Name(), context.Fset.Position(nextLoop).Line, judged.rows.Name()),
 			})
 		}
 	}
-	return nil, nil
 }
 
 // queryMethodIndex is the index in queryMethods of the method call calls, and false when it calls none of them. The
 // original reads the calls of each method from typeindex.Index.Calls, which yields a call whose function, looking
 // through parentheses, a selector and type arguments, is an identifier using the method, and whose typeutil.Callee is
 // the method, so typeutil.Callee alone picks the same calls.
-func queryMethodIndex(pass *analysis.Pass, call *ast.CallExpr) (int, bool) {
-	method, isFunction := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func queryMethodIndex(context *rule.Context, call *ast.CallExpr) (int, bool) {
+	method, isFunction := typeutil.Callee(context.TypesInfo, call).(*types.Func)
 	// typeindex indexes the packages a package refers to, never the package itself, so typeindex.Index.Selection
 	// finds no method of database/sql while database/sql itself is analyzed, and the original is silent there. No
 	// fixture can reach this skip, since a fixture package cannot stand in for the standard library's database/sql,
 	// so the whole-tree tier over the standard library holds it.
-	if !isFunction || method.Pkg() == nil || method.Pkg().Path() != sqlPath || method.Pkg() == pass.Pkg {
+	if !isFunction || method.Pkg() == nil || method.Pkg().Path() != sqlPath || method.Pkg() == context.Package {
 		return 0, false
 	}
 	for index, query := range queryMethods {
