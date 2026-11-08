@@ -1,6 +1,6 @@
-// Package differences holds the shapes where the port and x/tools' nilness disagree, each adjudicated. A finding only
-// the port makes is recorded on its line by a "finds" comment with its message, and one only the original makes by a
-// "misses" comment.
+// Package differences holds the shapes where the port and x/tools' nilness disagree, each adjudicated in the port's
+// favour. A finding only the port makes is recorded on its line by a "finds" comment with its message. Nothing the
+// original finds is missing from the port here, so no "drops" comment records a false positive of the original's.
 package differences
 
 type valueReceiver struct{ value int }
