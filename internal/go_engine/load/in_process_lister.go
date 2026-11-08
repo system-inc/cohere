@@ -227,6 +227,12 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 		group.Go(func() {
 			if pattern == "./..." {
 				matches[index], doubts[index] = lister.matchLocal()
+			} else if strings.HasPrefix(pattern, ".") || filepath.IsAbs(pattern) {
+				// A directory pattern below or outside the workspace, `./sub/...` or an absolute path, is matched by
+				// directory, which only matchLocal does and only for the workspace itself. Read as a module import
+				// path it would name no module, match nothing and answer an empty listing, which go list never does.
+				doubts[index] = fmt.Sprintf("the pattern %s names a directory, which the lister matches only as ./...",
+					pattern)
 			} else if prefix, wildcard := strings.CutSuffix(
 				pattern,
 				"/...",
@@ -243,6 +249,11 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 	for index := range patterns {
 		if doubts[index] != "" {
 			return nil, doubts[index]
+		}
+		if len(matches[index]) == 0 {
+			// go list warns that such a pattern matched no packages and lists the others, so an empty match is
+			// go list's to answer, never an empty listing that would check nothing and say nothing.
+			return nil, fmt.Sprintf("the pattern %s matched no packages", patterns[index])
 		}
 		for _, each := range matches[index] {
 			if !seen[each] {
