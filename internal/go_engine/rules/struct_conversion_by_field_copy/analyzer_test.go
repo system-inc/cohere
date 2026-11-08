@@ -1,21 +1,15 @@
 package struct_conversion_by_field_copy
 
 import (
-	"bytes"
-	"cmp"
-	"go/format"
-	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 
-	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1016"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstream is staticcheck's own fixture for S1016, which it keeps five times, under simple/s1016/testdata/go1.0,
@@ -30,15 +24,6 @@ const upstream = "CheckSimplerStructConversion"
 
 // versions are the modules the fixtures load from, each named for the version its go.mod says, staticcheck's five.
 var versions = []string{"go1.0", "go1.7", "go1.8", "go1.9", "go1.18"}
-
-// upstreamFiles is the one file of the upstream fixture under each version, the one its golden file fixes.
-var upstreamFiles = map[string]string{
-	"go1.0":  "convert.go",
-	"go1.7":  "convert.go",
-	"go1.8":  "convert.go",
-	"go1.9":  "convert_alias.go",
-	"go1.18": "convert_generics.go",
-}
 
 // parityPackages is the fixtures written for the comparison, by the module each loads from: under go1.18, parity,
 // which holds every shape the check branches on and the near miss of each, a renamed import and a generated file, and
@@ -100,72 +85,22 @@ func TestFixtureModulesCarryTheirVersions(test *testing.T) {
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
 	for _, version := range versions {
-		fixture := filepath.Join(module(version), upstream)
-		wants, readError := staticcheck_wants.Read(fixture)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		if len(wants) == 0 {
-			test.Fatalf("under %s the upstream fixture holds no notes, so the comparison proves nothing", version)
-		}
-		_, port := parity.Findings(test, s1016.Analyzer, Analyzer, module(version), "./"+upstream)
-		found := []staticcheck_wants.Finding{}
-		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its path below its module's folder.
-			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
-				Message: each.Message,
-			})
-		}
-		test.Logf("under %s the fixture expects %d, the port found %d", version, len(wants), len(found))
-		unexpected, untaken := staticcheck_wants.Compare(wants, found)
-		for _, extra := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-				extra.Message)
-		}
-		for _, missing := range untaken {
-			test.Errorf("the port reported nothing matching %s", missing)
-		}
+		test.Run(version, func(test *testing.T) {
+			test.Parallel()
+			parity.RequireStaticcheckWants(test, Analyzer, module(version), "./"+upstream)
+		})
 	}
 }
 
 // The port's fixes, applied to each version's upstream fixture, make its golden file, as staticcheck's testutil
-// requires of the original's: the golden file is read as a txtar archive, whose comment is the whole fixed file when
-// it holds no sections, and the fixed file is gofmt'd before it is compared.
+// requires of the original's. None of the golden files holds sections, so each is the whole fixed file.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
 	for _, version := range versions {
-		_, port := parity.Findings(test, s1016.Analyzer, Analyzer, module(version), "./"+upstream)
-		path := filepath.Join(module(version), upstream, upstreamFiles[version])
-		source, readError := os.ReadFile(path)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		golden, goldenError := os.ReadFile(path + ".golden")
-		if goldenError != nil {
-			test.Fatal(goldenError)
-		}
-		archive := txtar.Parse(golden)
-		if len(archive.Files) > 0 {
-			test.Fatalf("under %s the golden file holds %d sections, one a fix's message, which this test does not "+
-				"read", version, len(archive.Files))
-		}
-		edits := editsIn(port, upstream+"/"+upstreamFiles[version])
-		test.Logf("under %s the port found %d, with %d edits", version, len(port), len(edits))
-		if len(edits) == 0 {
-			test.Fatalf("under %s the port made no edit to the upstream fixture, so the comparison proves nothing",
-				version)
-		}
-		fixed := applied(test, upstreamFiles[version], source, edits)
-		formatted, formatError := format.Source(fixed)
-		if formatError != nil {
-			test.Fatalf("under %s the port's fixes make source gofmt cannot format: %v\n%s", version, formatError,
-				fixed)
-		}
-		if !bytes.Equal(formatted, archive.Comment) {
-			test.Errorf("under %s the port's fixes make\n%s\nand the golden file is\n%s", version, formatted,
-				archive.Comment)
-		}
+		test.Run(version, func(test *testing.T) {
+			test.Parallel()
+			parity.RequireStaticcheckGolden(test, Analyzer, module(version), "./"+upstream)
+		})
 	}
 }
 
@@ -191,37 +126,4 @@ func TestPortMatchesOriginal(test *testing.T) {
 func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 	test.Parallel()
 	parity.RequireOnlyAdjudicated(test, s1016.Analyzer, Analyzer, analysistest.TestData(), differencesFixture)
-}
-
-// editsIn is every edit of every fix of findings in the file named file, by its path below its module's folder.
-func editsIn(findings []parity.Finding, file string) []parity.Edit {
-	edits := []parity.Edit{}
-	for _, finding := range findings {
-		for _, fix := range finding.Fixes {
-			for _, edit := range fix.Edits {
-				if edit.File == file {
-					edits = append(edits, edit)
-				}
-			}
-		}
-	}
-	return edits
-}
-
-// applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
-// were read against. Two edits that overlap fail the test.
-func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
-	test.Helper()
-	ordered := slices.Clone(edits)
-	slices.SortFunc(ordered, func(first parity.Edit, second parity.Edit) int {
-		return cmp.Compare(second.Start, first.Start)
-	})
-	fixed := slices.Clone(source)
-	for index, edit := range ordered {
-		if index > 0 && edit.End > ordered[index-1].Start {
-			test.Fatalf("the edits to %s overlap at offset %d", file, edit.Start)
-		}
-		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
-	}
-	return fixed
 }

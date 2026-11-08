@@ -1,7 +1,6 @@
 package index_compared_as_contains
 
 import (
-	"bytes"
 	"cmp"
 	"go/format"
 	"os"
@@ -10,13 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1003"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstream is staticcheck's own fixture for S1003, copied unchanged from simple/s1003/testdata/go1.0/
@@ -24,9 +21,6 @@ import (
 // version of staticcheck's run, which S1003 never reads, so the fixture loads from a tree laid out by import path as
 // the house's fixtures do.
 const upstream = "CheckStringsContains"
-
-// upstreamFile is the upstream fixture's one file, beside its golden file.
-const upstreamFile = "contains.go"
 
 // fixtures is every fixture package where the original and the port agree, fixes and all: staticcheck's, and
 // parity's, with its dot import and its generated file.
@@ -40,67 +34,15 @@ const differencesFixture = "differences"
 // matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	fixture := filepath.Join(analysistest.TestData(), "src", upstream)
-	wants, readError := staticcheck_wants.Read(fixture)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	if len(wants) == 0 {
-		test.Fatal("the upstream fixture holds no notes, so the comparison proves nothing")
-	}
-	_, port := parity.Findings(test, s1003.Analyzer, Analyzer, analysistest.TestData(), upstream)
-	found := []staticcheck_wants.Finding{}
-	for _, each := range port {
-		// The wants name a file by its full path, and the findings by its path below testdata's src.
-		found = append(found, staticcheck_wants.Finding{
-			File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
-			Message: each.Message,
-		})
-	}
-	test.Logf("the fixture expects %d, the port found %d", len(wants), len(found))
-	unexpected, untaken := staticcheck_wants.Compare(wants, found)
-	for _, extra := range unexpected {
-		test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-			extra.Message)
-	}
-	for _, missing := range untaken {
-		test.Errorf("the port reported nothing matching %s", missing)
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), upstream)
 }
 
 // The port's fixes, applied to the upstream fixture, make its golden file, as staticcheck's testutil requires of the
-// original's: the golden file is read as a txtar archive, whose comment is the whole fixed file when it holds no
-// sections, and the fixed file is gofmt'd before it is compared, which is what aligns the fixed lines' comments.
+// original's. The golden file holds no sections, so its comment is the whole fixed file, and gofmt, which the fixed
+// file passes through before it is compared, is what aligns the fixed lines' comments.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
-	_, port := parity.Findings(test, s1003.Analyzer, Analyzer, analysistest.TestData(), upstream)
-	path := filepath.Join(analysistest.TestData(), "src", upstream, upstreamFile)
-	source, readError := os.ReadFile(path)
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	golden, goldenError := os.ReadFile(path + ".golden")
-	if goldenError != nil {
-		test.Fatal(goldenError)
-	}
-	archive := txtar.Parse(golden)
-	if len(archive.Files) > 0 {
-		test.Fatalf("the golden file holds %d sections, one a fix's message, which this test does not read",
-			len(archive.Files))
-	}
-	edits := editsIn(port, upstream+"/"+upstreamFile)
-	test.Logf("the port found %d, with %d edits", len(port), len(edits))
-	if len(edits) == 0 {
-		test.Fatal("the port made no edit to the upstream fixture, so the comparison proves nothing")
-	}
-	fixed := applied(test, upstreamFile, source, edits)
-	formatted, formatError := format.Source(fixed)
-	if formatError != nil {
-		test.Fatalf("the port's fixes make source gofmt cannot format: %v\n%s", formatError, fixed)
-	}
-	if !bytes.Equal(formatted, archive.Comment) {
-		test.Errorf("the port's fixes make\n%s\nand the golden file is\n%s", formatted, archive.Comment)
-	}
+	parity.RequireStaticcheckGolden(test, Analyzer, analysistest.TestData(), upstream)
 }
 
 // The original and the port run in one checker over staticcheck's fixture and parity's, the second holding every
@@ -223,7 +165,8 @@ func editsIn(findings []parity.Finding, file string) []parity.Edit {
 }
 
 // applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
-// were read against. Two edits that overlap fail the test.
+// were read against. Two edits that overlap fail the test. The harness applies fixes only to hold them to a golden
+// file, and the differences fixture's are held instead by whether they type-check, so fixedErrors applies them here.
 func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
 	test.Helper()
 	ordered := slices.Clone(edits)

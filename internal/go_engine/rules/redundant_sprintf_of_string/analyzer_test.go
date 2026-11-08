@@ -1,9 +1,7 @@
 package redundant_sprintf_of_string
 
 import (
-	"bytes"
 	"cmp"
-	"go/format"
 	"os"
 	"path/filepath"
 	"slices"
@@ -11,13 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1025"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstream is staticcheck's own fixture for S1025, which it keeps four times, under simple/s1025/testdata/go1.0,
@@ -30,11 +26,15 @@ import (
 // TestFixtureModulesCarryTheirVersions checks that the version reached every package.
 const upstream = "CheckRedundantSprintf"
 
-// upstreamFile is the upstream fixture's one file under every version, beside its golden file.
-const upstreamFile = "LintRedundantSprintf.go"
-
 // versions are the modules the fixtures load from, each named for the version its go.mod says, staticcheck's four.
 var versions = []string{"go1.0", "go1.9", "go1.17", "go1.18"}
+
+// notedVersions are the versions whose upstream fixture holds a note, every one but silentVersion.
+var notedVersions = []string{"go1.0", "go1.9", "go1.18"}
+
+// silentVersion is the version whose upstream fixture holds no note: a slice of a type defined on byte converts to a
+// string only from go1.18 on, so under go1.17 neither analyzer reports the call go1.18's note expects.
+const silentVersion = "go1.17"
 
 // moduleEnvironment loads a fixture module as the parity harness loads a fixture directory that holds a go.mod, in
 // module mode with nothing fetched.
@@ -94,88 +94,47 @@ func TestFixtureModulesCarryTheirVersions(test *testing.T) {
 	}
 }
 
-// Every `//@ diag(...)` note the upstream fixture holds, under each version, the port reports on the same line with
-// a message the note matches, and the port reports nothing no note expects. The go1.17 fixture holds no note, so there
-// the original must report nothing too, as staticcheck's own test requires of it, and the call it holds is the one
-// the go1.18 fixture's note expects, so the version is what parts them.
+// Every `//@ diag(...)` note the upstream fixture holds, under each version that holds one, the port reports on the
+// same line with a message the note matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	wanted := 0
-	for _, version := range versions {
-		fixture := filepath.Join(module(version), upstream)
-		wants, readError := staticcheck_wants.Read(fixture)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		wanted += len(wants)
-		original, port := parity.Findings(test, s1025.Analyzer, Analyzer, module(version), "./"+upstream)
-		found := []staticcheck_wants.Finding{}
-		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its path below its module's folder.
-			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(module(version), filepath.FromSlash(each.File)), Line: each.Line,
-				Message: each.Message,
-			})
-		}
-		test.Logf("under %s the fixture expects %d, the original found %d, the port %d", version, len(wants),
-			len(original), len(found))
-		if len(wants) == 0 && len(original) != 0 {
-			test.Errorf("under %s the fixture expects nothing, and the original found %v, so the version did not "+
-				"reach it as staticcheck's testutil hands it over", version, original)
-		}
-		unexpected, untaken := staticcheck_wants.Compare(wants, found)
-		for _, extra := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-				extra.Message)
-		}
-		for _, missing := range untaken {
-			test.Errorf("the port reported nothing matching %s", missing)
-		}
+	for _, version := range notedVersions {
+		test.Run(version, func(test *testing.T) {
+			test.Parallel()
+			parity.RequireStaticcheckWants(test, Analyzer, module(version), "./"+upstream)
+		})
 	}
-	if wanted == 0 {
-		test.Fatal("the upstream fixtures hold no notes, so the comparison proves nothing")
+}
+
+// The go1.17 fixture holds no note, so there the original must report nothing, as staticcheck's own test requires of
+// it, and the port nothing either, and the call it holds is the one the go1.18 fixture's note expects, so the version
+// is what parts them. RequireStaticcheckWants refuses a fixture with no note, and RequireIdentical one where the
+// original finds nothing, since either alone would prove nothing; here the silence is the claim, held beside
+// TestFixtureModulesCarryTheirVersions, so this test reads both sides' findings through the harness and requires none.
+func TestNeitherReportsUnderTheSilentVersion(test *testing.T) {
+	test.Parallel()
+	original, port := parity.Findings(test, s1025.Analyzer, Analyzer, module(silentVersion), "./"+upstream)
+	test.Logf("under %s the fixture expects nothing, the original found %d, the port %d", silentVersion,
+		len(original), len(port))
+	for _, finding := range original {
+		test.Errorf("under %s the fixture expects nothing, and the original found %s, so the version did not reach "+
+			"it as staticcheck's testutil hands it over", silentVersion, finding)
+	}
+	for _, finding := range port {
+		test.Errorf("under %s the fixture expects nothing, and the port found %s", silentVersion, finding)
 	}
 }
 
 // The port's fixes, applied to the upstream fixture of each version, make its golden file, as staticcheck's testutil
-// requires of the original's: the golden file is read as a txtar archive, whose comment is the whole fixed file when
-// it holds no sections, as none of the four does, and the fixed file is gofmt'd before it is compared. The go1.17
-// golden file is its fixture unchanged, which no fix touches.
+// requires of the original's. None of the four golden files holds sections, so each is the whole fixed file, and the
+// go1.17 one is its fixture unchanged, which no fix touches.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
-	edited := 0
 	for _, version := range versions {
-		_, port := parity.Findings(test, s1025.Analyzer, Analyzer, module(version), "./"+upstream)
-		path := filepath.Join(module(version), upstream, upstreamFile)
-		source, readError := os.ReadFile(path)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		golden, goldenError := os.ReadFile(path + ".golden")
-		if goldenError != nil {
-			test.Fatal(goldenError)
-		}
-		archive := txtar.Parse(golden)
-		if len(archive.Files) > 0 {
-			test.Fatalf("the %s golden file holds %d sections, one a fix's message, which this test does not read",
-				version, len(archive.Files))
-		}
-		edits := editsIn(port, upstream+"/"+upstreamFile)
-		edited += len(edits)
-		test.Logf("under %s the port found %d, with %d edits", version, len(port), len(edits))
-		fixed := applied(test, upstreamFile, source, edits)
-		formatted, formatError := format.Source(fixed)
-		if formatError != nil {
-			test.Fatalf("the port's fixes under %s make source gofmt cannot format: %v\n%s", version, formatError,
-				fixed)
-		}
-		if !bytes.Equal(formatted, archive.Comment) {
-			test.Errorf("the port's fixes under %s make\n%s\nand the golden file is\n%s", version, formatted,
-				archive.Comment)
-		}
-	}
-	if edited == 0 {
-		test.Fatal("the port made no edit to the upstream fixtures, so the comparison proves nothing")
+		test.Run(version, func(test *testing.T) {
+			test.Parallel()
+			parity.RequireStaticcheckGolden(test, Analyzer, module(version), "./"+upstream)
+		})
 	}
 }
 
@@ -255,7 +214,8 @@ func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 // block, or calls a string that is no type, and the port writes what compiles or nothing. A drop is of a finding whose
 // fix compiles, which no fix applied could tell, and so is the move in regroupedFile, whose meaning
 // TestPortMovedFixesKeepTheirMeaning holds instead. The fixed files are loaded through an overlay over the fixtures on
-// disk, which changes no import, so go list's answer for the tree holds.
+// disk, which changes no import, so go list's answer for the tree holds. No harness call applies fixes and
+// type-checks the result, so this test keeps its own helpers for it.
 func TestPortMovedFixesCompile(test *testing.T) {
 	test.Parallel()
 	files := differencesFiles(test)
@@ -353,8 +313,8 @@ func withoutEditText(findings []parity.Finding) []parity.Finding {
 	return textless
 }
 
-// differencesFiles is every .go file of the differences fixture's packages, by absolute path. The findings name a
-// file by its base name, so two files that share one fail the test.
+// differencesFiles is every .go file of the differences fixture's packages, by absolute path. The findings and the
+// type errors TestPortMovedFixesCompile reads name a file by its path below testdata's src, so no two are confused.
 func differencesFiles(test *testing.T) []string {
 	test.Helper()
 	files := []string{}
@@ -365,16 +325,7 @@ func differencesFiles(test *testing.T) []string {
 		if globError != nil {
 			test.Fatalf("listing %s: %v", pattern, globError)
 		}
-		for _, name := range names {
-			isShared := slices.ContainsFunc(files, func(other string) bool {
-				return filepath.Base(other) == filepath.Base(name)
-			})
-			if isShared {
-				test.Fatalf("%s shares its base name with another file of the fixture, which the findings cannot tell "+
-					"apart", name)
-			}
-			files = append(files, name)
-		}
+		files = append(files, names...)
 	}
 	if len(files) == 0 {
 		test.Fatal("the differences fixture holds no file, so the comparison proves nothing")
@@ -435,7 +386,9 @@ func editsIn(findings []parity.Finding, file string) []parity.Edit {
 }
 
 // applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
-// were read against. Two edits that overlap fail the test.
+// were read against. Two edits that overlap fail the test. The harness applies fixes only to hold them to a golden
+// file, and the differences fixture's are held by type-checking the result and reading the fixed line, so this stays
+// the port's own.
 func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
 	test.Helper()
 	ordered := slices.Clone(edits)
@@ -453,7 +406,8 @@ func applied(test *testing.T, file string, source []byte, edits []parity.Edit) [
 }
 
 // unformattedTree writes the unformatted fixture out as Go into a tree laid out by import path in a directory of the
-// test's own, and returns the tree. It loads with no module, so its version is none, which the go1.18 judgment of a
+// test's own, and returns the tree. No call of the parity harness writes a fixture out before it loads it, so this
+// stays the port's own. It loads with no module, so its version is none, which the go1.18 judgment of a
 // slice of bytes reads as older on both sides.
 func unformattedTree(test *testing.T) string {
 	test.Helper()
