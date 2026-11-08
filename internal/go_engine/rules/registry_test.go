@@ -1151,6 +1151,7 @@ var portedPasses = []string{
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unencodable_binary_value",
+	"unexiting_test_main",
 	"unnecessary_blank_identifier",
 	"unnecessary_sprint",
 	"unobserved_append",
