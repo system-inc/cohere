@@ -892,6 +892,7 @@ var portedPasses = []string{
 	"single_argument_append",
 	"single_case_select",
 	"sliding_copy",
+	"sort_helper_call",
 	"struct_conversion_by_field_copy",
 	"time_since",
 	"time_until",
