@@ -183,13 +183,18 @@ link_hash() {
 #
 # The generator may change tracked files, as it does in any checkout (`next typegen` rewrites next-env.d.ts),
 # and every one it changed is kept in bench-generated with the command, and printed in the header, so nothing
-# hides in the hash. It runs where the network is denied, and a generator that exits nonzero, network refused
-# or not, refuses the copy. A generator that sends telemetry is told not to in the command, as
+# hides in the hash. It runs where the network is denied but for this machine's own loopback, which a
+# generator may serve itself on (October's `next typegen` listens on 127.0.0.1), and the header says so; a
+# generator that exits nonzero, network refused or not, refuses the copy. A generator that sends telemetry is told not to in the command, as
 # `NEXT_TELEMETRY_DISABLED=1 next typegen`.
 run_generator() {
   local profile=$work/bench-no-network.sb repository changed
-  print -l '(version 1)' '(allow default)' '(deny network*)' '(allow network* (local unix))' > $profile
-  print -u2 "generating in the copy, with no network: $generate"
+  # `(local ip "localhost:*")` alone would let a connection out to anywhere from a loopback address, so
+  # binding and accepting are allowed on loopback, and connecting only to it.
+  print -l '(version 1)' '(allow default)' '(deny network*)' '(allow network* (local unix))' \
+    '(allow network-bind (local ip "localhost:*"))' '(allow network-inbound (local ip "localhost:*"))' \
+    '(allow network-outbound (remote ip "localhost:*"))' > $profile
+  print -u2 "generating in the copy, with no network but loopback: $generate"
   (cd $copy && sandbox-exec -f $profile zsh -c $generate) >&2 ||
     fail "the generator failed in $copy, so the copy is refused: $generate"
   print -r -- $generate > $copy/bench-generated
@@ -295,7 +300,7 @@ print_pinned_header() {
     print "# linked   $linked, content $(link_hash $copy/$linked), from ${project:t}/$linked"
   done
   if [[ -f $copy/bench-generated ]]; then
-    print "# generate $(head -1 $copy/bench-generated)"
+    print "# generate $(head -1 $copy/bench-generated), with no network but this machine's loopback"
     tail -n +2 $copy/bench-generated | sed 's/^/#   changed /'
   fi
   print "# machine  $(sysctl -n hw.model), $(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores," \
