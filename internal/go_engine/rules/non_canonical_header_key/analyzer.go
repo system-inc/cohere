@@ -48,7 +48,8 @@ var Listener = rule.Listener{
 			panic("non_canonical_header_key: the dispatcher handed over a node that is not an index expression")
 		}
 		for _, ancestor := range stack {
-			if assignment, isAssignment := ancestor.(*ast.AssignStmt); isAssignment && WritesHeader(context, assignment) {
+			assignment, isAssignment := ancestor.(*ast.AssignStmt)
+			if isAssignment && WritesHeader(context, assignment) {
 				return
 			}
 		}
