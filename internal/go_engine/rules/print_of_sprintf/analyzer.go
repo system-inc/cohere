@@ -19,27 +19,41 @@ import (
 	"go/format"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since the fmt form filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1038",
-	Doc: "Flags a print of fmt.Sprintf's result where the print's formatting form would do, staticcheck's S1038, " +
-		"ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
+	// The original first asks staticcheck's type index whether the package could hold any of its queries' symbols at
+	// all. The port needs no such filter: the gate in Check fails as cheaply on every call of a package that never
+	// names fmt.Sprintf, and every form wants it. Where the filter answers otherwise than the gate, inside fmt
+	// itself, Check says why.
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("print_of_sprintf: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1038",
+	"S1038",
+	"Flags a print of fmt.Sprintf's result where the print's formatting form would do, staticcheck's S1038, "+
+		"ported.",
+	&Listener,
+)
 
 // alternative is the formatting form a print's finding names: the receiver its method must be declared on, as
 // typeutil.FuncName writes one and empty for a package's function, and the form's name, a method's own or a
@@ -71,32 +85,6 @@ var alternatives = map[string]alternative{
 	"log.Panicln":             {"", "log.Panicf"},
 	"log.Print":               {"", "log.Printf"},
 	"log.Println":             {"", "log.Printf"},
-}
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("print_of_sprintf: the inspect pass's result is missing")
-	}
-	// The original first asks staticcheck's type index whether the package could hold any of its queries' symbols at
-	// all. The port needs no such filter: the gate in Check fails as cheaply on every call of a package that never
-	// names fmt.Sprintf, and every form wants it. Where the filter answers otherwise than the gate, inside fmt
-	// itself, Check says why.
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("print_of_sprintf: the inspector handed over a node that is not a call")
-		}
-		Check(context, call)
-	})
-	return nil, nil
 }
 
 // Check judges one call: a print given the result of fmt.Sprintf as its one argument, or as its second after a

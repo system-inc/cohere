@@ -1,21 +1,18 @@
 package print_of_sprintf
 
 import (
-	"cmp"
-	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/simple/s1038"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
@@ -61,7 +58,8 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 // formats, parentheses at every level, fmt.Sprintf through a variable, a generic function of the package's own,
 // testing's methods on types that embed them, declare their own or hold fields of the same names, and a generated
 // file, where the fmt form alone is filtered. dotted imports fmt and log with dots, which a package declaring its
-// own Sprintf cannot.
+// own Sprintf cannot. Each finding is held whole, its range to its end and its fixes, and S1038 suggests none, so the
+// port is held to suggesting none as well.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, s1038.Analyzer, Analyzer, analysistest.TestData(), "CheckPrintSprintf", "parity",
@@ -70,109 +68,20 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 
 // The differences fixture holds the shapes where the port could most plausibly part from the original, and records
 // none, since the two agree on every one. parity.RequireOnlyAdjudicated refuses a fixture that records nothing, so
-// the agreement there is held finding for finding instead, and fails should the original find nothing in it.
+// the agreement there is held finding for finding instead, each finding whole, and fails should the original find
+// nothing in it.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, s1038.Analyzer, Analyzer, analysistest.TestData(), "differences")
 }
 
-// The harness compares where a finding starts and what it says. Over every fixture, this compares the rest of each
-// finding: where it ends, and each suggested fix's message and edits. S1038 suggests no fix, and the comparison
-// holds the port to suggesting none as well.
-func TestPortFixesAndRangesMatchOriginal(test *testing.T) {
-	test.Parallel()
-	original, port := wholeFindings(test, "CheckPrintSprintf", "parity", "dotted", "differences")
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
-}
-
-// wholeFindings loads the fixture packages patterns name, as parity.Findings loads them, runs the original and the
-// port in one checker, and returns each one's findings written out whole, sorted: its file by base name, its range
-// from start to end, its message, and its suggested fixes, each its message and every edit's range and new text.
-func wholeFindings(test *testing.T, patterns ...string) (original []string, port []string) {
-	test.Helper()
-	directory := analysistest.TestData()
-	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, patterns, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	for _, root := range loaded.Roots {
-		// A fixture that does not type-check is one both sides skip, and would compare nothing.
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean: %v", root.ID, root.Errors)
-		}
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{s1038.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			fileSet := action.Package.Fset
-			written := []string{fmt.Sprintf("%s-%s: %s", based(fileSet.Position(diagnostic.Pos)),
-				based(fileSet.Position(diagnostic.End)), diagnostic.Message)}
-			for _, fix := range diagnostic.SuggestedFixes {
-				written = append(written, "fix: "+fix.Message)
-				for _, edit := range fix.TextEdits {
-					written = append(written, fmt.Sprintf("edit %s-%s: %q", based(fileSet.Position(edit.Pos)),
-						based(fileSet.Position(edit.End)), edit.NewText))
-				}
-			}
-			switch action.Analyzer {
-			case s1038.Analyzer:
-				original = append(original, strings.Join(written, "; "))
-			case Analyzer:
-				port = append(port, strings.Join(written, "; "))
-			}
-		}
-	}
-	slices.SortFunc(original, cmp.Compare[string])
-	slices.SortFunc(port, cmp.Compare[string])
-	return original, port
-}
-
-// based is position with its file named by its base name.
-func based(position fmt.Stringer) string {
-	return filepath.Base(position.String())
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []string, without []string) []string {
-	remaining := map[string]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []string{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
 // BenchmarkOverFixtures weighs the original against the port over the four fixtures: each package is loaded once and
-// every prerequisite run once on it, so each sub-benchmark times the analyzer's own Run alone, and the allocations it
-// reports are the check's and none of what it requires. It loads the fixtures, so it is skipped under -short.
+// every prerequisite run once on it, so each sub-benchmark times one Run alone, and the allocations it reports are
+// the check's and none of what it requires. The port's own analyzer only reads what the dispatcher found, so its side
+// times a dispatcher of the benchmark's own that holds the port's listener alone: the walk and the check, as the
+// original's Run walks and checks, and the dispatcher's start on each package beside them. It loads the fixtures with
+// a loader of its own, since the harness runs a checker and hands back findings, never the passes a benchmark times,
+// and it is skipped under -short.
 func BenchmarkOverFixtures(benchmark *testing.B) {
 	if testing.Short() {
 		benchmark.Skip("loads the fixtures")
@@ -184,10 +93,14 @@ func BenchmarkOverFixtures(benchmark *testing.B) {
 	if loadError != nil {
 		benchmark.Fatal(loadError)
 	}
+	// A dispatcher names each rule once, and the shared one already holds the port, so the benchmark's is new. The
+	// rule's analyzer it returns is never run: the dispatcher's own Run is what calls the listener.
+	dispatcher := dispatch.NewSyntax()
+	dispatcher.RuleAnalyzer(rule.Namespace+"S1038", "S1038", Analyzer.Doc, &Listener)
 	for _, side := range []struct {
 		name     string
 		analyzer *analysis.Analyzer
-	}{{"original", s1038.Analyzer}, {"port", Analyzer}} {
+	}{{"original", s1038.Analyzer}, {"port", dispatcher.Analyzer()}} {
 		passes := []*analysis.Pass{}
 		for _, root := range loaded.Roots {
 			if len(root.Errors) > 0 {
