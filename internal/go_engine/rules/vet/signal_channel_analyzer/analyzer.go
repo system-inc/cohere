@@ -95,7 +95,9 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 		// made is the call the channel was declared as. Only make with one argument proves it unbuffered: a size of
-		// zero is a second argument, and any other call's channel may hold any number.
+		// zero is a second argument, and any other call's channel may hold any number. An assignment to the variable
+		// after its declaration is not read, as the original reads none: the declaration proves the channel unbuffered
+		// when declared, and judging what is assigned later would need flow analysis.
 		made, isCall := ast.Unparen(declarations.valueOf(pass.TypesInfo, channel)).(*ast.CallExpr)
 		if !isCall || !isBuiltinMake(pass.TypesInfo, made) || len(made.Args) != 1 {
 			continue

@@ -54,27 +54,27 @@ func parenthesized() {
 
 // Channels made by calls other than the builtin make with one argument, passed straight or declared.
 func otherCalls() {
-	// newChannel's channel holds as many as it is asked for, four here.
+	// Nothing proves newChannel's channel unbuffered without reading into newChannel, and it holds four.
 	signal.Notify(newChannel(4), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
-	// A conversion keeps the channel it converts, which holds one.
+	// Nothing proves a conversion's channel unbuffered without reading what it converts, which holds one.
 	signal.Notify((chan os.Signal)(bufferedElsewhere), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
-	// newGeneric's channel holds two.
+	// Nothing proves newGeneric's channel unbuffered without reading into newGeneric, and it holds two.
 	signal.Notify(newGeneric[os.Signal](2), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
-	// variadicChannel's channel holds one for each size, one here.
+	// Nothing proves variadicChannel's channel unbuffered without reading into it, and it holds one.
 	signal.Notify(variadicChannel([]int{1}...), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
-	// newChannel's channel holds the size it is given, two.
+	// Nothing proves newChannel's channel unbuffered without reading into newChannel, and it holds two.
 	signal.Notify(newChannel(newChannelSize(2)), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
-	// make written straight into the call is exempt, parenthesized or not: no one else holds the channel, so no receive can miss a signal.
+	// A fresh make written straight into the call is exempt by the original's own rule, parenthesized or not: no one else holds the channel, so no receive can miss a signal.
 	signal.Notify((make)(chan os.Signal), os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
 	fromCall := newChannel(3)
-	// fromCall holds three.
+	// Nothing proves fromCall's buffer without reading into newChannel, and it holds three.
 	signal.Notify(fromCall, os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
 	converted := (chan os.Signal)(bufferedElsewhere)
-	// converted is the channel it converts, which holds one.
+	// Nothing proves converted's buffer without reading what it converts, which holds one.
 	signal.Notify(converted, os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
 	make := newChannel
 	shadowed := make(5)
-	// make is a local function here, not the builtin, and its channel holds five.
+	// make is a local function here, not the builtin, so nothing proves its channel unbuffered, and it holds five.
 	signal.Notify(shadowed, os.Interrupt) // port drops: misuse of unbuffered os.Signal channel as argument to signal.Notify
 }
 

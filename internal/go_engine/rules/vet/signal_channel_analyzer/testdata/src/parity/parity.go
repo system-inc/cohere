@@ -111,7 +111,9 @@ func declarationShapes() {
 	keptUnbuffered, failureToo := make(chan os.Signal, 1), error(nil)
 	signal.Notify(keptUnbuffered, os.Interrupt) // finding
 	_ = failureToo
-	// An assignment after the declaration is not read: the declaration is.
+	// An assignment after the declaration is not read: the declaration is. Both report reassigned, since its
+	// declaration, make with no size, proves it unbuffered when declared, and judging the assignment would need flow
+	// analysis.
 	reassigned := make(chan os.Signal)
 	reassigned = make(chan os.Signal, 1)
 	signal.Notify(reassigned, os.Interrupt) // finding
