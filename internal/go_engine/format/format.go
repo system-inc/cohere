@@ -43,8 +43,8 @@ type Options struct {
 	// file whose bytes are the same, and given what this run learns. Nil formats every file.
 	Known *KnownFiles
 
-	// Held is the bytes the run holds of a file, as load.Held gives them, false when it holds none, read in place of the
-	// disk by a run that does not write, so a check opens no file the run already read. A run that writes reads the
+	// Held is the bytes the run holds of a file, as load.Held gives them, false when it holds none, read in place of
+	// the disk by a run that does not write, so a check opens no file the run already read. A run that writes reads the
 	// disk, so a rewrite never starts from bytes older than the file it replaces. Nil reads every file from disk.
 	Held func(file string) ([]byte, bool)
 
