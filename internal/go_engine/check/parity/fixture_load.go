@@ -120,15 +120,15 @@ func recordsFolder(test testing.TB, fixtures loadedFixtures) string {
 	return folders[0]
 }
 
-// loadFixtures loads the fixture packages patterns name from testdata, a load for the tree and one for each module.
-// A load that found nothing and a fixture package that did not load clean each fail the test, since silence there
-// would read as agreement.
-func loadFixtures(test testing.TB, testdata string, patterns []string) []loadedFixtures {
+// loadFixtures loads the fixture packages patterns name from testdata for target, a load for the tree and one for
+// each module. A load that found nothing and a fixture package that did not load clean each fail the test, since
+// silence there would read as agreement.
+func loadFixtures(test testing.TB, target Target, testdata string, patterns []string) []loadedFixtures {
 	test.Helper()
 	loads := []loadedFixtures{}
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
-		loaded, loadError := load.Packages(fixtures.directory, fixtures.patterns,
-			fixtureEnvironment(fixtures.directory), nil)
+		loaded, loadError := load.Packages(fixtures.directory, fixtures.patterns, target.environmentOf(test, fixtures),
+			nil)
 		if loadError != nil {
 			test.Fatalf("loading %s: %v", fixtures.described(), loadError)
 		}

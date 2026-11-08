@@ -13,8 +13,10 @@
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
 // RequireOnlyAdjudicated over its differences fixture, and RequireStaticcheckGolden over staticcheck's golden files for
 // a port that offers fixes. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a
-// go.mod loads that folder as a module (see fixtureLoad). The census command, command/cohere-parity, runs Analyze over
-// a real tree.
+// go.mod loads that folder as a module (see fixtureLoad). Each loads for the machine's own target, and a port whose
+// check judges another calls the same on the target it judges, as `parity.On("GOOS=linux", "GOARCH=386",
+// "CGO_ENABLED=0").RequireIdentical(...)` (see Target). The census command, command/cohere-parity, runs Analyze over a
+// real tree.
 package parity
 
 import (
@@ -141,7 +143,8 @@ func LoadFailures(loadedPackages []*packages.Package) []Failure {
 // Findings loads the fixture packages patterns name from testdata, runs original and port over them in one checker
 // for each load, and returns each one's findings, sorted, each in its file's base name, after its module's pattern in
 // a fixture module (see fixtureLoad). A load that found nothing, a fixture package that did not load clean, and an
-// analyzer that did not run on a fixture package each fail the test, since silence there would read as agreement.
+// analyzer that did not run on a fixture package each fail the test, since silence there would read as agreement. It
+// loads for the machine's own target, and Target.Findings for another.
 func Findings(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -150,7 +153,7 @@ func Findings(
 	patterns ...string,
 ) (originalFindings []Finding, portFindings []Finding) {
 	test.Helper()
-	return findingsOver(test, original, port, loadFixtures(test, testdata, patterns))
+	return findingsOver(test, original, port, loadFixtures(test, Target{}, testdata, patterns))
 }
 
 // findingsOver is Findings over loads already made, so a caller that reads the loaded packages as well, as
@@ -188,7 +191,7 @@ func findingsOver(
 // RequireIdentical runs original and port over the fixture packages patterns name, and their findings must be the
 // same multiset, each the same in every field: its range, its message, its related entries and its fixes. Each side's
 // count is logged, since two empty sides would match and prove nothing, and the test fails if the original finds
-// nothing at all.
+// nothing at all. It loads for the machine's own target, and Target.RequireIdentical for another.
 func RequireIdentical(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -197,7 +200,21 @@ func RequireIdentical(
 	patterns ...string,
 ) {
 	test.Helper()
-	originalFindings, portFindings := Findings(test, original, port, testdata, patterns...)
+	requireIdentical(test, Target{}, original, port, testdata, patterns...)
+}
+
+// requireIdentical is RequireIdentical with the fixtures loaded for target.
+func requireIdentical(
+	test testing.TB,
+	target Target,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	patterns ...string,
+) {
+	test.Helper()
+	originalFindings, portFindings := findingsOver(test, original, port,
+		loadFixtures(test, target, testdata, patterns))
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	if len(originalFindings) == 0 {
 		test.Fatalf("the original found nothing in the fixtures, so the comparison proves nothing")
@@ -238,7 +255,9 @@ var adjudicatedPattern = regexp.MustCompile(
 //
 // A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden file
 // or by applying the edit and checking the result. It reads the one package directory fixture names, not the packages
-// nested below it, so a fixture tree with nested packages takes one call for each.
+// nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
+// target, and Target.RequireOnlyAdjudicated for another, and reads the records of every file of that directory,
+// whichever target builds it, so a record in a file the target does not build fails unmatched.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -247,7 +266,20 @@ func RequireOnlyAdjudicated(
 	fixture string,
 ) {
 	test.Helper()
-	loads := loadFixtures(test, testdata, []string{fixture})
+	requireOnlyAdjudicated(test, Target{}, original, port, testdata, fixture)
+}
+
+// requireOnlyAdjudicated is RequireOnlyAdjudicated with the fixtures loaded for target.
+func requireOnlyAdjudicated(
+	test testing.TB,
+	target Target,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	fixture string,
+) {
+	test.Helper()
+	loads := loadFixtures(test, target, testdata, []string{fixture})
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName)
