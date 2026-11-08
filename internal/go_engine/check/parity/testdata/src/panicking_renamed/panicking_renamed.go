@@ -2,7 +2,7 @@
 // original's there to rename.
 package panicking_renamed
 
-func panics() {}
+func panics()  {}
 func renamed() {}
 
 // calls holds the planted record, ruled in this doc comment: the port renames renamed.
