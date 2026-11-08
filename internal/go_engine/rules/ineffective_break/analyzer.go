@@ -15,50 +15,38 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4011",
-	Doc: "Flags a break that ends a switch or select case inside a loop, which leaves the switch or select and not " +
-		"the loop: staticcheck's SA4011, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges the body of every for and range loop of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("ineffective_break: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every for and range loop, in preorder, whose
+// body it judges.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch loop := node.(type) {
 		case *ast.ForStmt:
 			Check(context, loop.Body)
 		case *ast.RangeStmt:
 			Check(context, loop.Body)
 		default:
-			// Invariant: Preorder hands this function only the for and range statements it was asked for.
-			panic("ineffective_break: the inspector handed over a node that is not a loop")
+			// Invariant: the dispatcher hands Node only the for and range statements it was asked for.
+			panic("ineffective_break: the dispatcher handed over a node that is not a loop")
 		}
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4011",
+	"SA4011",
+	"Flags a break that ends a switch or select case inside a loop, which leaves the switch or select and not "+
+		"the loop: staticcheck's SA4011, ported as a check on syntax.",
+	&Listener,
+)
 
 // Check judges the body of one loop: each switch or select among its statements has the break that ends any of its
 // cases reported.
