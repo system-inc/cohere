@@ -231,9 +231,13 @@ type handChecked struct {
 func checkedByHand(test *testing.T, filename string, source string) handChecked {
 	test.Helper()
 	fileSet := token.NewFileSet()
-	var content any
-	if source != "" {
-		content = source
+	content := []byte(source)
+	if source == "" {
+		read, readError := os.ReadFile(filename)
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		content = read
 	}
 	file, parseError := parser.ParseFile(fileSet, filename, content, parser.ParseComments)
 	if parseError != nil {

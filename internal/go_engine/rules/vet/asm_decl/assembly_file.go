@@ -31,7 +31,7 @@ var (
 	unnamedFramePointerPattern = regexp.MustCompile(`[^+\-0-9](([0-9]+)\(FP\))`)
 	// stackPointerPattern finds a reference through a register by offset, `8(SP)`. x/tools' asmdecl asmSP.
 	stackPointerPattern = regexp.MustCompile(`[^+\-0-9](([0-9]+)\(([A-Z0-9]+)\))`)
-	// abiSelectorPattern finds a function name's ABI selector, `name<ABIInternal>`. x/tools' asmdecl abiSuff.
+	// abiSelectorPattern finds a function name's `ABI` selector, `name<ABIInternal>`. x/tools' asmdecl abiSuff.
 	abiSelectorPattern = regexp.MustCompile(`^(.+)<(ABI.+)>$`)
 )
 
@@ -53,7 +53,7 @@ type assemblyFile struct {
 	frame *argumentFrame
 	// functionName is the function being judged, empty outside one or in a function of another package.
 	functionName string
-	// abi is the function's ABI selector, `ABIInternal` in `·name<ABIInternal>(SB)`, empty when it has none.
+	// abi is the function's `ABI` selector, `ABIInternal` in `·name<ABIInternal>(SB)`, empty when it has none.
 	abi string
 	// localSize is the offset from the stack pointer at which the arguments start, and argumentSize their size as
 	// the `TEXT` line states them.
@@ -205,7 +205,7 @@ func (walk *assemblyFile) startFunction(lineNumber int, text []string) bool {
 			return true
 		}
 	}
-	walk.functionName, walk.abi = withoutABISelector(walk.functionName)
+	walk.functionName, walk.abi = withoutAbiSelector(walk.functionName)
 	if walk.unmeasured[walk.functionName] {
 		// A declaration whose frame go/types cannot measure, where the original crashes. Nothing of the function is
 		// judged, as nothing of another package's is.
@@ -266,7 +266,7 @@ func (walk *assemblyFile) writesStackPointer(code string) bool {
 }
 
 // readResultWrites notes when code does what is taken as writing the function's result without naming it: a wasm
-// `CallImport`, a call out that may write it, and in a function of the register ABI an instruction that writes a
+// `CallImport`, a call out that may write it, and in a function of the register `ABI` an instruction that writes a
 // result register or a mention of one.
 func (walk *assemblyFile) readResultWrites(code string) {
 	if walk.architectureName == "wasm" && strings.Contains(code, "CallImport") {
@@ -370,9 +370,9 @@ func (walk *assemblyFile) report(lineNumber int, message string) {
 		message)
 }
 
-// withoutABISelector is name without its ABI selector, and the selector, `ABIInternal` from `name<ABIInternal>`, or
+// withoutAbiSelector is name without its `ABI` selector, and the selector, `ABIInternal` from `name<ABIInternal>`, or
 // name and nothing when it has none. x/tools' asmdecl run's trimABI.
-func withoutABISelector(name string) (string, string) {
+func withoutAbiSelector(name string) (string, string) {
 	if selected := abiSelectorPattern.FindStringSubmatch(name); selected != nil {
 		return selected[1], selected[2]
 	}
@@ -383,7 +383,8 @@ func withoutABISelector(name string) (string, string) {
 // or nothing at all, which reads as zero, as the original reads it; a number too large for an int reads as the
 // largest, which is what strconv.Atoi returns beside its range error, and the original ignores the error the same.
 func numberOrZero(text string) int {
-	// The error says only that text is empty or too large, and either way the number Atoi returns is the reading.
+	// Ignored: the error says only that text is empty or too large, and either way the number Atoi returns is the
+	// reading; the original drops the error too.
 	number, _ := strconv.Atoi(text)
 	return number
 }

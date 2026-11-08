@@ -124,7 +124,7 @@ func operandSizes(architectureName string, instruction string) (variableKind, va
 		return 2, 0, false
 	case "arm.MOVB", "arm.MOVBU":
 		return 1, 0, false
-	// LEA instructions take their second operand's address and never read it.
+	// `LEA` instructions take their second operand's address and never read it.
 	case "386.LEAL":
 		return 0, 4, true
 	case "amd64.LEAQ":
@@ -180,26 +180,26 @@ func operandSizes(architectureName string, instruction string) (variableKind, va
 // asmCheckVar's case for 386 and amd64.
 func x86SourceSize(instruction string) variableKind {
 	switch {
-	// FMOVDP, FXCHD and the like.
+	// `FMOVDP`, `FXCHD` and the like.
 	case strings.HasPrefix(instruction, "F") &&
 		(strings.HasSuffix(instruction, "D") || strings.HasSuffix(instruction, "DP")):
 		return 8
-	// PINSRD, PEXTRD and the like.
+	// `PINSRD`, `PEXTRD` and the like.
 	case strings.HasPrefix(instruction, "P") && strings.HasSuffix(instruction, "RD"):
 		return 4
-	// FMOVFP, FXCHF and the like.
+	// `FMOVFP`, `FXCHF` and the like.
 	case strings.HasPrefix(instruction, "F") &&
 		(strings.HasSuffix(instruction, "F") || strings.HasSuffix(instruction, "FP")):
 		return 4
-	// MOVSD, SQRTSD and the like.
+	// `MOVSD`, `SQRTSD` and the like.
 	case strings.HasSuffix(instruction, "SD"):
 		return 8
-	// MOVSS, SQRTSS and the like.
+	// `MOVSS`, `SQRTSS` and the like.
 	case strings.HasSuffix(instruction, "SS"):
 		return 4
 	case instruction == "MOVO" || instruction == "MOVOU":
 		return 16
-	// SETEQ and the like.
+	// `SETEQ` and the like.
 	case strings.HasPrefix(instruction, "SET"):
 		return 1
 	}

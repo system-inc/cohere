@@ -14,7 +14,7 @@ type architecture struct {
 	// linkRegister is whether a call leaves the return address in a register, which a function with a frame saves on
 	// its stack, so the arguments sit one word further from the stack pointer.
 	linkRegister bool
-	// resultRegisters are the first integer and the first floating-point register a function of the register ABI
+	// resultRegisters are the first integer and the first floating-point register a function of the register `ABI`
 	// (`ABIInternal`) returns its results in. Only whether a result is written is judged, so naming either counts as
 	// writing one.
 	resultRegisters []string
