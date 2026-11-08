@@ -58,7 +58,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_wrapped_error"
-	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/go_engine/rules/security_no_interpolated_sql_string"
@@ -153,26 +152,6 @@ var stylecheckRuledOn = map[string]bool{
 	"ST1019": true,
 }
 
-// irDispatcher is the one dispatcher over staticcheck's intermediate representation, built once with the package, so
-// every dispatched rule's analyzer requires this very pointer and the checker walks each package once for all of them.
-var irDispatcher = dispatch.NewIr()
-
-// dispatched is the rules irDispatcher calls, built once beside it rather than on each call to All, which the engine,
-// the docs and the tests each make: built per call, a second call would register its listeners on a second
-// dispatcher, or hand out analyzers other than the ones the settings set options on.
-var dispatched = []rule.Rule{
-	dispatchedRule(nil_ness.Name, nil_ness.Doc, &nil_ness.Listener, rule.OriginTools),
-	dispatchedRule(unused_write.Name, unused_write.Doc, &unused_write.Listener, rule.OriginTools),
-}
-
-// dispatchedRule is the rule whose listener irDispatcher calls, run by its own analyzer under the name it has
-// upstream.
-func dispatchedRule(name string, doc string, listener *rule.Listener, origin rule.Origin) rule.Rule {
-	registered := portedRule(dispatch.RuleAnalyzer(name, doc, listener, irDispatcher), origin)
-	registered.Listener = listener
-	return registered
-}
-
 // All is every rule the Go engine knows, in the order `--rules` lists them before sorting.
 //
 // vet's suite comes first, read from vet.Suite rather than retyped, so `cohere` in a Go repository is
@@ -251,7 +230,8 @@ func All() []rule.Rule {
 	for _, analyzer := range vet.Suite {
 		registered = append(registered, portedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
 	}
-	registered = append(registered, dispatched...)
+	registered = append(registered, dispatchedRule(nil_ness.Analyzer, &nil_ness.Listener, rule.OriginTools))
+	registered = append(registered, dispatchedRule(unused_write.Analyzer, &unused_write.Listener, rule.OriginTools))
 	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
@@ -333,6 +313,14 @@ func House() []rule.Rule {
 		testing_require_failure_path.Rule,
 		testing_require_parallel.Rule,
 	}
+}
+
+// dispatchedRule is the rule that runs an upstream pass's port, whose analyzer reports what a dispatcher's walk found
+// for listener, under the name it has upstream.
+func dispatchedRule(analyzer *analysis.Analyzer, listener *rule.Listener, origin rule.Origin) rule.Rule {
+	registered := portedRule(analyzer, origin)
+	registered.Listener = listener
+	return registered
 }
 
 // portedRule is the rule that runs an upstream analyzer under the name it has upstream.

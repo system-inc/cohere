@@ -33,9 +33,12 @@ type Context struct {
 	// ReadFile reads a file of the package, such as an assembly or embedded file, as the pass's ReadFile does,
 	// refusing a file the package does not hold.
 	ReadFile func(filename string) ([]byte, error)
-	// IsGenerated is staticcheck's own judgment of whether filename, a file as a finding's display position names it,
-	// was generated, read from honnef.co/go/tools/analysis/facts/generated, the judgment report.FilterGenerated
-	// reads, so a check ported from staticcheck leaves alone the files staticcheck's leaves alone.
+	// IsGenerated is staticcheck's own judgment of whether filename was generated, read from
+	// honnef.co/go/tools/analysis/facts/generated, so a check ported from staticcheck leaves alone the files
+	// staticcheck's leaves alone. filename is the name the file was parsed from, `Fset.PositionFor(pos,
+	// false).Filename`, which is how staticcheck keys the judgment. A caller asking by display name, as
+	// report.FilterGenerated does, misses under a `//line` directive naming another file, exactly as staticcheck's own
+	// does.
 	IsGenerated func(filename string) bool
 	// TypesSizes is the sizes of the package's types under the target's word size and alignment, as the pass holds
 	// them.

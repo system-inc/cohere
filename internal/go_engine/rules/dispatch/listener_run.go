@@ -2,6 +2,7 @@ package dispatch
 
 import (
 	"fmt"
+	"go/ast"
 	"runtime"
 	"strings"
 
@@ -66,6 +67,33 @@ func (run *listenerRun) functionExit(function *ir.Function) {
 	}
 	defer run.recoverCrash()
 	run.registered.listener.FunctionExit(run.context, function)
+}
+
+// fileEnter calls the listener's FileEnter as the walk enters file.
+func (run *listenerRun) fileEnter(file *ast.File) {
+	if run.crash != nil || run.registered.listener.FileEnter == nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.FileEnter(run.context, file)
+}
+
+// node calls the listener's Node on node, a kind the listener lists, with its ancestors.
+func (run *listenerRun) node(node ast.Node, stack []ast.Node) {
+	if run.crash != nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.Node(run.context, node, stack)
+}
+
+// fileExit calls the listener's FileExit as the walk leaves file.
+func (run *listenerRun) fileExit(file *ast.File) {
+	if run.crash != nil || run.registered.listener.FileExit == nil {
+		return
+	}
+	defer run.recoverCrash()
+	run.registered.listener.FileExit(run.context, file)
 }
 
 // packageExit calls the listener's PackageExit once the package has been walked.
