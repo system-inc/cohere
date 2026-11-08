@@ -6,9 +6,9 @@
 // message it reports word for word, at the same range, the loop's header. The original matches no query through
 // staticcheck's pattern language: it walks every for statement and asks code.IsBoolConst and code.BoolConst of its
 // condition, which the port asks of the same statements through the kit's staticcheck_code, and it reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package infinite_loop_condition
 
 import (

@@ -14,9 +14,9 @@
 // The port asks the same of each range and for statement directly, reading pattern/match.go for what each construct
 // matches. The query's one symbol, len, sits under a ForStmt the two RangeStmt alternatives stand beside, and an Or
 // with a symbolless alternative is one the type index's prefilter always lets through, so the original walks every
-// package and the port needs no guard for the package under analysis. The registry still runs the original, which
-// stays the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they
-// hold.
+// package and the port needs no guard for the package under analysis. The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over the
+// same packages, and the two differ nowhere they hold.
 package loop_copy
 
 import (

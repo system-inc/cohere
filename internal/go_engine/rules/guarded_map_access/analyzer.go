@@ -17,8 +17,8 @@
 //
 // and skips an index expression that may have side effects. The port asks the same of each if statement directly,
 // reading pattern/match.go for what each construct matches, and reports through staticcheck_report.Report where the
-// original reports through report.Report. The registry still runs the original, which stays the oracle: the parity
-// tests beside this file run both over the same packages.
+// original reports through report.Report. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same packages.
 //
 // The port parts from the original three times, where the original is wrong, each recorded in the differences
 // fixture. The pattern's CallExpr has no Ellipsis, so the original takes `append(m[k], v...)` against an else of

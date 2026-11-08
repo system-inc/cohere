@@ -11,8 +11,8 @@
 // staticcheck_report.Report where the original reports through report.Report. Unlike the ports before it, the query's
 // bindings hold syntax, not objects, so its second m, its second key and its second ok are compared with the first as
 // match.go compares two nodes, field by field through reflection, which sameSyntax and sameFields mirror line for
-// line. The registry still runs the original, which stays the oracle: the parity tests beside this file run both over
-// the same packages, and the two differ nowhere they hold.
+// line. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package guarded_delete
 
 import (

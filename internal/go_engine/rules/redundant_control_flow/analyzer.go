@@ -6,9 +6,9 @@
 // messages it reports word for word, at the same ranges, the break or the return. The original matches no pattern; it
 // walks the case clauses in one preorder and then the function declarations and literals in a second, and the port
 // walks all three kinds in one, which reports the same findings in another order, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package redundant_control_flow
 
 import (

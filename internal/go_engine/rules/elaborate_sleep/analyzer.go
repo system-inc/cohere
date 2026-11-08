@@ -9,11 +9,11 @@
 // (SelectorExpr (Ident "time") (Ident "Sleep")) [arg])`, through edit.ReplaceWithPattern. The port asks the same of
 // each select statement directly, reading pattern/match.go for what each construct of the query matches, builds the
 // fix's syntax itself as pattern.NodeToAST builds it, around the argument as bound, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ only
-// where the original's fix names the package time by a name the file does not give it, each case recorded in the
-// differences fixture: the port moves the fix to the name the file does give it, and withholds the fix where no name
-// it could write calls time.Sleep.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ only where the original's fix names the package time by a name the
+// file does not give it, each case recorded in the differences fixture: the port moves the fix to the name the file
+// does give it, and withholds the fix where no name it could write calls time.Sleep.
 package elaborate_sleep
 
 import (

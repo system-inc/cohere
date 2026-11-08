@@ -9,9 +9,9 @@
 // range statements by syntax already; the port asks the same of each assignment directly, reading pattern/match.go for
 // what each construct of the queries matches, and reports through staticcheck_report.Report where the original reports
 // through report.Report, behind the same gate: a range statement may leave out its variables from go1.4 on, so a file
-// whose language is older is told nothing of one. The registry still runs the original, which stays the oracle: the
-// parity tests beside this file run both over the same packages, under go1.0, go1.3 and go1.4 alike, and the two
-// differ nowhere they hold.
+// whose language is older is told nothing of one. The registry runs the port in the original's place, under its name,
+// and the original stays only as the oracle: the parity tests beside this file run both over the same packages, under
+// go1.0, go1.3 and go1.4 alike, and the two differ nowhere they hold.
 package unnecessary_blank_identifier
 
 import (

@@ -17,10 +17,11 @@
 // what each construct of the query matches, builds the fix's syntax itself as pattern.NodeToAST builds it, around the
 // loop's own identifiers, and reports through staticcheck_report.Report where the original reports through
 // report.Report. The query names no symbol, so code.Matches walks every package and the port needs no guard for the
-// package under analysis. The registry still runs the original, which stays the oracle: the parity tests beside this
-// file run both over the same packages, and the two differ only where the original is wrong and the port right, each
-// recorded in the differences fixture: the port drops a loop whose counter starts where it stood or doubles as the
-// offset or the limit, and withholds the fix where copy is not the builtin or the counter outlives the loop.
+// package under analysis. The registry runs the port in the original's place, under its name, and the original stays
+// only as the oracle: the parity tests beside this file run both over the same packages, and the two differ only where
+// the original is wrong and the port right, each recorded in the differences fixture: the port drops a loop whose
+// counter starts where it stood or doubles as the offset or the limit, and withholds the fix where copy is not the
+// builtin or the counter outlives the loop.
 package sliding_copy
 
 import (

@@ -10,13 +10,13 @@
 // call directly, reading pattern/match.go for what each construct of the query matches, builds the fix's syntax itself
 // as pattern.NodeToAST builds it, around the receiver as written, and reports through staticcheck_report.Report where
 // the original reports through report.Report, behind the same gate: time.Until is go1.8's, so a file whose standard
-// library is older is told nothing. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same packages, under go1.7 and go1.8 alike, and the two make the same findings
-// everywhere. Their fixes part only where the original's writes code that does not compile, each case recorded in the
-// differences fixture: where time names no import of the package time at the call, the port names time.Until as the
-// call names time.Now, and where the receiver is not a time.Time, a pointer to one or a struct that embeds one, the
-// port hands time.Until the time.Time itself. Where no spelling reaches either, the port keeps the finding and
-// withholds the fix.
+// library is older is told nothing. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same packages, under go1.7 and
+// go1.8 alike, and the two make the same findings everywhere. Their fixes part only where the original's writes code
+// that does not compile, each case recorded in the differences fixture: where time names no import of the package time
+// at the call, the port names time.Until as the call names time.Now, and where the receiver is not a time.Time, a
+// pointer to one or a struct that embeds one, the port hands time.Until the time.Time itself. Where no spelling reaches
+// either, the port keeps the finding and withholds the fix.
 package time_until
 
 import (

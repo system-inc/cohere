@@ -10,14 +10,14 @@
 // port asks the same of each type switch directly, reading pattern/match.go for what each construct of the query
 // matches, builds the same assignment as syntax for edit.ReplaceWithNode, and reports through
 // staticcheck_report.Report where the original reports through report.Report. No binding of the query is recalled
-// within it, so nothing is compared by syntax. The registry still runs the original, which stays the oracle: the
-// parity tests beside this file run both over the same packages, and the two differ only where the original's fix
-// would be wrong, which the differences fixture records. An assertion in the case's own type, `case
-// [unsafe.Sizeof(x.([8]byte))]byte:`, is outside the scope the binding declares, so the port leaves it as it is,
-// names it in no related entry, and finds nothing where it is all a switch would replace. A comma-ok assertion,
-// `v, ok := x.(int)`, is replaced with `v, ok := x, true`, where the original's `v, ok := x` assigns one value to
-// two. And where the switch writes to x or a clause declares its own x, the rebinding would not compile or would
-// write to a copy, so the port keeps the finding and withholds the fix.
+// within it, so nothing is compared by syntax. The registry runs the port in the original's place, under its name, and
+// the original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
+// differ only where the original's fix would be wrong, which the differences fixture records. An assertion in the
+// case's own type, `case [unsafe.Sizeof(x.([8]byte))]byte:`, is outside the scope the binding declares, so the port
+// leaves it as it is, names it in no related entry, and finds nothing where it is all a switch would replace. A
+// comma-ok assertion, `v, ok := x.(int)`, is replaced with `v, ok := x, true`, where the original's `v, ok := x`
+// assigns one value to two. And where the switch writes to x or a clause declares its own x, the rebinding would not
+// compile or would write to a copy, so the port keeps the finding and withholds the fix.
 package type_switch_bound_value
 
 import (

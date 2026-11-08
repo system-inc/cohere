@@ -13,8 +13,8 @@
 // It differs in one place, and not in what it finds: the original builds every file's comment map as its preorder
 // enters the file, and the port builds the map only for a file holding a pair the queries match, at that pair, since
 // a comment map depends on its file alone and a matched pair is rare. The port keeps no state across nodes. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
+// tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package boolean_return_of_condition
 
 import (

@@ -17,9 +17,9 @@
 // of 0.0 or a rune literal '\x00', which it calls not zero; each is a nil check that changes the answer. And it
 // leaves alone `x == nil || len(x) == 0.0`, whose nil check is redundant. The port reads the constant's value and
 // asks what the original means to ask, whether a nil x, of length zero, makes the length check answer what the nil
-// check would, so it drops the first kind and finds the second. The registry still runs the original, which stays
-// the oracle: the parity tests beside this file run both over the same packages, and the differences fixture records
-// each finding the port drops or finds.
+// check would, so it drops the first kind and finds the second. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and the differences fixture records each finding the port drops or finds.
 package redundant_nil_check_on_length
 
 import (

@@ -8,10 +8,10 @@
 // a guarded slice. The original queries no pattern; it walks every if statement with code.Preorder and judges it with
 // code.CallName, code.IsCallTo, code.ExprToInt, code.ExprToString and astutil.Equal, and the port asks the same of the
 // same nodes, the code helpers from the kit and astutil.Equal mirrored as syntaxEqual, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ in
-// two places alone, adjudicated, both in sameNonDynamic: the port drops a guard on a selector or index that holds a
-// call, and declines where astutil.Equal would panic.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ in two places alone, adjudicated, both in sameNonDynamic: the port
+// drops a guard on a selector or index that holds a call, and declines where astutil.Equal would panic.
 package manual_trim
 
 import (

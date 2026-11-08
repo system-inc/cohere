@@ -8,8 +8,8 @@
 // objects, and reports through staticcheck_report.Report where the original reports through report.Report. Where the
 // original walks only blocks, the port walks the statements of a switch's and a select's clauses too, which are lists
 // of statements as a block's are and which the original misses, since a clause is no block (the differences fixture
-// records each). The registry still runs the original, which stays the oracle: the parity tests beside this file run
-// both over the same packages, and the two differ nowhere else they hold.
+// records each). The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere else they hold.
 package separate_declaration_and_assignment
 
 import (

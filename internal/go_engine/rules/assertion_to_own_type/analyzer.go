@@ -7,9 +7,9 @@
 // the type assertions, skips a type switch's `x.(type)`, and asks go/types whether the asserted type is an interface
 // identical to the asserted value's. The port asks the same of each type assertion, renders the message's code with
 // go/format over the package's file set as staticcheck's report.Render does, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package assertion_to_own_type
 
 import (

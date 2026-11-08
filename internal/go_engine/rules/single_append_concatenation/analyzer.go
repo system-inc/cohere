@@ -16,8 +16,8 @@
 // spread, so the original suggests appending the elements themselves, a different program: the port drops it. And a
 // loop that assigns its key or value with = to a variable declared outside the for statement leaves the last one
 // there, which the one append does not: the port keeps the finding and withholds the fix. The differences fixture
-// records each. The registry still runs the original, which stays the oracle: the parity tests beside this file run
-// both over the same packages, and the two differ nowhere else they hold.
+// records each. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere else they hold.
 package single_append_concatenation
 
 import (

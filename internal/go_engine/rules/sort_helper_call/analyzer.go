@@ -17,9 +17,9 @@
 // `Sort(IntSlice(x))`, through parentheses, `sort.Sort((sort.IntSlice(x)))` or `sort.Sort((sort.IntSlice)(x))`, or
 // through an alias of the helper type, and takes each for a type of the code's own: it reports nothing for that call
 // and, holding the function permissible, nothing for any other call in it. The port reports each, so it finds a
-// superset of the original's findings and never fewer. The registry still runs the original, which stays the oracle:
-// the parity tests beside this file run both over the same packages, and every finding only the port makes is
-// recorded in the differences fixture.
+// superset of the original's findings and never fewer. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// and every finding only the port makes is recorded in the differences fixture.
 package sort_helper_call
 
 import (

@@ -7,9 +7,9 @@
 // as staticcheck_code.RangeStringRunes, proven beside both originals there, and this package only names it S1029, as
 // range_over_rune_conversion names it SA6003. The original keeps nothing from one function to the next, so judging
 // one at a time finds the same; it reports with the pass's Reportf, at the start of the range statement, with no end,
-// no fix and no filter on generated files, and so does the port, word for word. The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// no fix and no filter on generated files, and so does the port, word for word. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package range_over_string_directly
 
 import (

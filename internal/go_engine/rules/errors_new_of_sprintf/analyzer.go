@@ -9,11 +9,12 @@
 // code.EditMatch, which is edit.ReplaceWithPattern by another name. The port asks the same of each call directly,
 // reading pattern/match.go for what each construct of the query matches, and analysis/code/visit.go for which calls
 // code.Matches hands it, builds the fix's syntax itself around Sprintf's own arguments, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ only
-// where the original's fix writes broken code, each case recorded in the differences fixture: the port keeps a
-// spread's ellipsis the original drops, moves the fix to the name the code itself calls fmt.Sprintf by where fmt
-// names no import of fmt, and withholds the fix where no name it could write calls fmt.Errorf.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ only where the original's fix writes broken code, each case recorded
+// in the differences fixture: the port keeps a spread's ellipsis the original drops, moves the fix to the name the code
+// itself calls fmt.Sprintf by where fmt names no import of fmt, and withholds the fix where no name it could write
+// calls fmt.Errorf.
 package errors_new_of_sprintf
 
 import (

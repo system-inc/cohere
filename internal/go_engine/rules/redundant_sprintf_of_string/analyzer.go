@@ -11,13 +11,13 @@
 // staticcheck's intermediate representation, the program's method set cache, whose answer is types.NewMethodSet's,
 // so the port asks types.NewMethodSet and requires no intermediate representation at all.
 //
-// The registry still runs the original, which stays the oracle: the parity tests beside this file run both over the
-// same packages, and the two differ only where the original is wrong, each case recorded in the differences fixture.
-// The port drops the finding on a value whose type is an alias of a type parameter, which the original skips when the
-// type parameter is named as itself. It moves a fix that would regroup the expression, parenthesizing the argument
-// where the call is indexed or sliced, or where a composite literal of a named type would land bare in a control
-// clause, and withholds a fix that leaves a bare value as a statement, or writes `string(x)` where `string` is not the
-// predeclared type.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ only where the original is wrong,
+// each case recorded in the differences fixture. The port drops the finding on a value whose type is an alias of a type
+// parameter, which the original skips when the type parameter is named as itself. It moves a fix that would regroup the
+// expression, parenthesizing the argument where the call is indexed or sliced, or where a composite literal of a named
+// type would land bare in a control clause, and withholds a fix that leaves a bare value as a statement, or writes
+// `string(x)` where `string` is not the predeclared type.
 package redundant_sprintf_of_string
 
 import (

@@ -8,8 +8,8 @@
 // (CommClause (Or (UnaryExpr "<-" _) (AssignStmt _ _ (UnaryExpr "<-" _))) _)))` and `(SelectStmt (CommClause _ _))`;
 // the port asks the same of each for and select statement directly, reading pattern/match.go for what each construct
 // of the queries matches, and reports through staticcheck_report.Report where the original reports through
-// report.Report. The registry still runs the original, which stays the oracle: the parity tests beside this file run
-// both over the same packages, and the two differ nowhere they hold.
+// report.Report. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package single_case_select
 
 import (

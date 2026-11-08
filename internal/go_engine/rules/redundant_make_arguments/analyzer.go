@@ -13,8 +13,9 @@
 //
 // It parts from the original in one place, where the original is wrong: a length that receives from a channel is
 // read anew for the capacity, so `make([]T, <-c, <-c)` receives twice and is not `make([]T, <-c)`, as the original's
-// own `TODO` says. The port drops those findings. The registry still runs the original, which stays the oracle: the
-// parity tests beside this file run both over the same packages, and the differences fixture records each drop.
+// own `TODO` says. The port drops those findings. The registry runs the port in the original's place, under its name,
+// and the original stays only as the oracle: the parity tests beside this file run both over the same packages, and the
+// differences fixture records each drop.
 package redundant_make_arguments
 
 import (

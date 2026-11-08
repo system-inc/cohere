@@ -5,9 +5,9 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 simple/s1016/s1016.go, whose logic it keeps and whose
 // message and fix it reports word for word, at the same range, the literal. The original queries no pattern: it walks
 // every composite literal through code.Cursor, the inspector's root, and judges each by its types and syntax, as the
-// port does, reporting through staticcheck_report.Report where the original reports through report.Report. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages.
+// port does, reporting through staticcheck_report.Report where the original reports through report.Report. The registry
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages.
 //
 // The port parts from the original twice, where the original is wrong, each recorded in the differences fixture as a
 // drop. The original declines a literal whose address is taken, since a conversion has none, but asks only the

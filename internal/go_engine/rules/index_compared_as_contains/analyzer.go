@@ -17,8 +17,9 @@
 // variable, or another path's package, spelled strings or bytes is no call of the standard library's, and the
 // original's fix for it calls a Contains that its methods or functions need not have, so the port drops it; and a
 // renamed import of strings or bytes is the same call under another name, which the port finds, its fix under that
-// name. The registry still runs the original, which stays the oracle: the parity tests beside this file run both over
-// the same packages, and the two differ only where the differences fixture records it.
+// name. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over the same packages, and the two differ only where the differences
+// fixture records it.
 package index_compared_as_contains
 
 import (

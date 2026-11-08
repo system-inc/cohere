@@ -8,8 +8,9 @@
 // can fail; the port fails first on a gate that allocates nothing, the call's last argument resolving by types to
 // fmt.Sprintf, and only past it asks what the three forms ask. It asks staticcheck_code.CallName where the original
 // asks code.CallName, and reports through staticcheck_report.Report where the original reports through
-// report.Report, each the port of the one the original calls. The registry still runs the original, which stays the
-// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// report.Report, each the port of the one the original calls. The registry runs the port in the original's place, under
+// its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and the two differ nowhere they hold.
 package print_of_sprintf
 
 import (

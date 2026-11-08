@@ -6,9 +6,9 @@
 // message and fix it reports word for word, at the same range, the high index. The original matches its one query,
 // `(SliceExpr x@(Object _) low (CallExpr (Builtin "len") [x]) nil)`, through staticcheck's pattern language; the port
 // asks the same of each slice expression directly, reading pattern/match.go for what each construct of the query
-// matches, and reports through staticcheck_report.Report where the original reports through report.Report. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// matches, and reports through staticcheck_report.Report where the original reports through report.Report. The registry
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package redundant_slice_length
 
 import (

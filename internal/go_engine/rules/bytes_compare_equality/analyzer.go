@@ -10,11 +10,11 @@
 // "Equal")) args)` and its negation, through edit.ReplaceWithPattern. The port asks the same of each binary
 // expression directly, reading pattern/match.go for what each construct of the query matches, builds the fix's
 // syntax itself as pattern.NodeToAST builds it, around the call's own arguments, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ only
-// where the original's fix names the package bytes by a name the file does not give it there, each case recorded in
-// the differences fixture: the port moves the fix to the name the matched call uses, and withholds the fix where no
-// name it could write calls bytes.Equal.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ only where the original's fix names the package bytes by a name the
+// file does not give it there, each case recorded in the differences fixture: the port moves the fix to the name the
+// matched call uses, and withholds the fix where no name it could write calls bytes.Equal.
 package bytes_compare_equality
 
 import (

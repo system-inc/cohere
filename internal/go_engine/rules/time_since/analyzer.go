@@ -10,10 +10,11 @@
 // same of each call directly, reading pattern/match.go for what each construct of the query matches, builds the fix's
 // syntax itself as pattern.NodeToAST builds it, around the argument the match binds, and reports through
 // staticcheck_report.Report where the original reports through report.Report. time.Since is as old as Go 1, so
-// neither gates on a version. The registry still runs the original, which stays the oracle: the parity tests beside
-// this file run both over the same packages, and the two differ only where the original's fix names the package time
-// by a name the code does not give it, each case recorded in the differences fixture: the port moves the fix to the
-// name the matched call of time.Now uses, and withholds the fix where no name it could write calls time.Since.
+// neither gates on a version. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and the two differ only
+// where the original's fix names the package time by a name the code does not give it, each case recorded in the
+// differences fixture: the port moves the fix to the name the matched call of time.Now uses, and withholds the fix
+// where no name it could write calls time.Since.
 package time_since
 
 import (

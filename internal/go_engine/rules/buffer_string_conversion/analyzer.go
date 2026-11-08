@@ -9,10 +9,10 @@
 // its Bytes twin through edit.ReplaceWithPattern. The port asks the same of each call directly, reading
 // pattern/match.go for what each construct of the query matches, builds the fix's syntax itself as
 // pattern.NodeToAST builds it, around the receiver the query binds, and reports through staticcheck_report.Report
-// where the original reports through report.Report. The registry still runs the original, which stays the oracle:
-// the parity tests beside this file run both over the same packages, and the two differ in one way, where the
-// original is wrong: the port drops a finding whose receiver's other method, the one the message asks for, is not
-// the buffer's own, recorded in the differences fixture.
+// where the original reports through report.Report. The registry runs the port in the original's place, under its name,
+// and the original stays only as the oracle: the parity tests beside this file run both over the same packages, and the
+// two differ in one way, where the original is wrong: the port drops a finding whose receiver's other method, the one
+// the message asks for, is not the buffer's own, recorded in the differences fixture.
 package buffer_string_conversion
 
 import (
