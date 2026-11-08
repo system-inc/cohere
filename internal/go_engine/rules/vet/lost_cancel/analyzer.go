@@ -11,7 +11,13 @@
 // function, the graph that already knows which calls never return, in this package and, through ctrlflow's facts, in
 // its dependencies, so the port walks the same paths the original walks. The registry runs the port in the
 // original's place, and the original stays the oracle: the parity tests beside this file run both over the same
-// packages. The two agree everywhere, so there is no differences fixture.
+// packages.
+//
+// The two differ in one place, adjudicated in testdata/src/differences and held by
+// TestPortDiffersFromOriginalOnlyWhereItIsRight: where a call's qualifier is no package name, the original falls
+// back on its spelling, taking a variable, parameter or type named context for the package, and judges a method of
+// it named WithCancel or a sibling. That heuristic is for an import that failed, and lostcancel never runs over a
+// package that does not type-check, so it only ever finds wrongly, and the port drops it.
 //
 // The port reports a function's cancel variables in the order their definitions are found, where the original
 // ranges over a map, so its findings come out in a stable order; the findings themselves are the same. The
@@ -226,8 +232,9 @@ func isCall(node ast.Node) bool {
 }
 
 // contextWithCancel is node when it is one of the qualified identifiers context.With{Cancel,Timeout,Deadline} or
-// their Cause variants, and nil otherwise. x/tools' lostcancel.isContextWithCancel, returning the selector the
-// original asserts node to be when it reports a discard.
+// their Cause variants, qualified by a name for the context package, and nil otherwise. x/tools'
+// lostcancel.isContextWithCancel, less its heuristic for a failed import, returning the selector the original
+// asserts node to be when it reports a discard.
 func contextWithCancel(information *types.Info, node ast.Node) *ast.SelectorExpr {
 	selector, isSelector := node.(*ast.SelectorExpr)
 	if !isSelector {
@@ -244,15 +251,12 @@ func contextWithCancel(information *types.Info, node ast.Node) *ast.SelectorExpr
 	if !isIdentifier {
 		return nil
 	}
-	if packageName, isPackageName := information.Uses[qualifier].(*types.PkgName); isPackageName {
-		if packageName.Imported().Path() != contextPackage {
-			return nil
-		}
-		return selector
-	}
-	// The original's heuristic for an import that failed, whose package path can't be checked: the local name
-	// alone. It also takes a variable named context, of a type with a method of one of these names, as the package.
-	if qualifier.Name != "context" {
+	// The original falls back on the local name, `context`, when the qualifier is no package name, a heuristic for
+	// an import that failed. The port drops it: lostcancel does not run despite errors, so the checker never runs it
+	// over a package whose import failed, and a qualifier named context that is no package name is then a variable,
+	// a parameter or a type, never the package, so the heuristic only ever made wrong findings.
+	packageName, isPackageName := information.Uses[qualifier].(*types.PkgName)
+	if !isPackageName || packageName.Imported().Path() != contextPackage {
 		return nil
 	}
 	return selector

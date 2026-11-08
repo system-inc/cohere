@@ -1,7 +1,7 @@
 // Package parity holds every branch of lostcancel's judgment, each with a clean case beside it, and the shapes most
 // likely to differ between the original and the port: every path shape the search walks (returns, panics, calls
 // that never return, here and in a dependency, loops, gotos, selects, switches), closures, the cancel function
-// stored or passed rather than called, generics, aliased and dot imports, and named results. A comment says what
+// stored or passed rather than called, generics, aliased and dot imports, and named results. The original and the port agree on every line here. A comment says what
 // each line is expected to draw; the test compares the two analyzers' findings, not these comments.
 package parity
 
@@ -94,24 +94,14 @@ func oneName() {
 	_ = pair
 }
 
-// A local variable named context, of a type with a method named WithCancel, is taken for the package, by the
-// original's heuristic for a failed import.
+// A variable of a type with a method named WithCancel is not the package. One named context, which the original
+// takes for the package, is in testdata/src/differences, where the port drops what the original finds there.
 type canceller struct{}
 
 func (canceller) WithCancel(parent context.Context) (context.Context, func()) {
 	return parent, func() {}
 }
 
-func shadowedContext() {
-	context := canceller{}
-	ctx, _ := context.WithCancel(background) // finds: discarded, by the heuristic
-	_, cancel := context.WithCancel(ctx)     // finds: not used on all paths, by the heuristic
-	if condition {
-		cancel()
-	}
-} // finds: this return
-
-// A variable of another name with the same method is not taken for the package.
 func namedOtherwise() {
 	maker := canceller{}
 	ctx, _ := maker.WithCancel(background)
