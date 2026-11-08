@@ -22,6 +22,7 @@ public struct CommandOptions: Equatable, Sendable {
     public var fixOnly = false
     public var typesOnly = false
     public var lintOnly = false
+    /* `--format-all`: every file formatted, no kept verdict read, as TypeScript's flag formats past its record. */
     public var formatAll = false
     /* `--format`, which changes nothing for Swift but is kept so `--no-format` can refuse it by name. */
     public var formatNamed = false
