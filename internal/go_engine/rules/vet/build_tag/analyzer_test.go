@@ -61,7 +61,7 @@ func TestPortReadsNoTypeInformation(test *testing.T) {
 			ReadFile:     os.ReadFile,
 			ResultOf:     map[*analysis.Analyzer]any{},
 			Report: func(diagnostic analysis.Diagnostic) {
-				untyped = append(untyped, findingAt(test, loadedPackage, diagnostic))
+				untyped = append(untyped, findingAt(test, directory, loadedPackage, diagnostic))
 			},
 		}
 		if _, runError := Analyzer.Run(pass); runError != nil {
@@ -99,7 +99,8 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 		test.Fatal(readError)
 	}
 	for _, entry := range entries {
-		recorded = append(recorded, recordsIn(test, filepath.Join(directory, "src", "differences", entry.Name()))...)
+		path := filepath.Join(directory, "src", "differences", entry.Name())
+		recorded = append(recorded, recordsIn(test, directory, path)...)
 	}
 	if len(recorded) == 0 {
 		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
@@ -116,11 +117,13 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	}
 }
 
-// recordsIn is every finding the fixture file at path records as the port's alone, each at its line. Each record
-// must give its reason on the line above, a comment that is no record, as the harness requires of its records; a
-// file here has no declaration whose doc could hold one, and an assembly file has none at all.
-func recordsIn(test *testing.T, path string) []parity.Finding {
+// recordsIn is every finding the fixture file at path, in the tree extracted at directory, records as the port's
+// alone, each at its line, the file named as the harness names it. Each record must give its reason on the line
+// above, a comment that is no record, as the harness requires of its records; a file here has no declaration whose
+// doc could hold one, and an assembly file has none at all.
+func recordsIn(test *testing.T, directory string, path string) []parity.Finding {
 	test.Helper()
+	name := fixtureFileName(directory, path)
 	file, openError := os.Open(path)
 	if openError != nil {
 		test.Fatal(openError)
@@ -136,14 +139,13 @@ func recordsIn(test *testing.T, path string) []parity.Finding {
 		for _, comment := range strings.Split(text, "// port ")[1:] {
 			match := recordPattern.FindStringSubmatch(comment)
 			if match == nil {
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", filepath.Base(path), line, comment)
+				test.Fatalf("%s:%d holds a comment the test cannot read: %q", name, line, comment)
 			}
 			reasoned := strings.HasPrefix(strings.TrimSpace(previous), "//") && !strings.Contains(previous, "// port ")
 			if !reasoned {
-				test.Errorf("%s:%d holds a record with no reason: write why on the line above it", filepath.Base(path),
-					line)
+				test.Errorf("%s:%d holds a record with no reason: write why on the line above it", name, line)
 			}
-			recorded = append(recorded, parity.Finding{File: filepath.Base(path), Line: line, Message: match[1]})
+			recorded = append(recorded, parity.Finding{File: name, Line: line, Message: match[1]})
 		}
 		previous = text
 	}
@@ -163,10 +165,15 @@ func lineOnly(findings []parity.Finding) []parity.Finding {
 	return dropped
 }
 
-// findingAt is diagnostic, reported in loadedPackage, as the harness records a finding, its file by its base name.
-// Neither side relates a position or offers a fix, so a diagnostic that does fails here rather than being compared
-// without them.
-func findingAt(test *testing.T, loadedPackage *packages.Package, diagnostic analysis.Diagnostic) parity.Finding {
+// findingAt is diagnostic, reported in loadedPackage from the tree extracted at directory, as the harness records a
+// finding, its file named as the harness names it. Neither side relates a position or offers a fix, so a diagnostic
+// that does fails here rather than being compared without them.
+func findingAt(
+	test *testing.T,
+	directory string,
+	loadedPackage *packages.Package,
+	diagnostic analysis.Diagnostic,
+) parity.Finding {
 	test.Helper()
 	if len(diagnostic.Related) > 0 || len(diagnostic.SuggestedFixes) > 0 {
 		test.Errorf("the port with no types relates a position or offers a fix, which this comparison does not "+
@@ -174,7 +181,7 @@ func findingAt(test *testing.T, loadedPackage *packages.Package, diagnostic anal
 	}
 	position := loadedPackage.Fset.Position(diagnostic.Pos)
 	found := parity.Finding{
-		File:    filepath.Base(position.Filename),
+		File:    fixtureFileName(directory, position.Filename),
 		Line:    position.Line,
 		Column:  position.Column,
 		Message: diagnostic.Message,
@@ -184,6 +191,18 @@ func findingAt(test *testing.T, loadedPackage *packages.Package, diagnostic anal
 		found.EndLine, found.EndColumn = end.Line, end.Column
 	}
 	return found
+}
+
+// fixtureFileName is file named as the harness's Findings names a file of a fixture tree laid out by import path: its
+// path below the tree's src, in forward slashes, or its path as it is when it lies outside, so a hand tier's findings
+// and records pair with the harness's. The harness keeps that naming in an unexported method of its loads, so it is
+// written out here for the one layout this package's fixtures take.
+func fixtureFileName(directory string, file string) string {
+	below, relativeError := filepath.Rel(filepath.Join(directory, "src"), file)
+	if relativeError != nil || strings.HasPrefix(below, "..") {
+		return filepath.ToSlash(file)
+	}
+	return filepath.ToSlash(below)
 }
 
 // fixtureArchives are the fixture trees, each laid out by import path: x/tools' packages a and b, parity's package,
