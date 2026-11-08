@@ -96,6 +96,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/time_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
@@ -212,6 +213,7 @@ var ports = map[string]*analysis.Analyzer{
 	"structtag":        struct_tag.Analyzer,
 	"testinggoroutine": testing_goroutine.Analyzer,
 	"tests":            tests.Analyzer,
+	"timeformat":       time_format.Analyzer,
 	"unmarshal":        unmarshal.Analyzer,
 	"unsafeptr":        unsafe_ptr.Analyzer,
 	"unusedresult":     unused_result.Analyzer,
