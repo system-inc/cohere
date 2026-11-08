@@ -80,6 +80,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_canonical_header_key"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_pointer_unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
@@ -332,6 +333,7 @@ var portedStaticcheck = []struct {
 	{"SA5007", infinite_recursion.Analyzer},
 	{"SA5008", invalid_struct_tag.Analyzer},
 	{"SA5010", impossible_type_assertion.Analyzer},
+	{"SA5012", odd_slice_argument.Analyzer},
 }
 
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order

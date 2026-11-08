@@ -116,6 +116,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_canonical_header_key"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_pointer_unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/repeated_if_else_condition"
@@ -350,6 +351,7 @@ var ports = map[string]port{
 	"SA5007":           {analyzer: infinite_recursion.Analyzer, listener: &infinite_recursion.Listener},
 	"SA5008":           {analyzer: invalid_struct_tag.Analyzer, listener: &invalid_struct_tag.Listener},
 	"SA5010":           {analyzer: impossible_type_assertion.Analyzer, listener: &impossible_type_assertion.Listener},
+	"SA5012":           {analyzer: odd_slice_argument.Analyzer},
 	"ST1001":           {analyzer: dot_import.Analyzer, listener: &dot_import.Listener},
 	"ST1006":           {analyzer: receiver_name.Analyzer, listener: &receiver_name.Listener},
 	"ST1008":           {analyzer: misplaced_error_result.Analyzer, listener: &misplaced_error_result.Listener},
