@@ -2,15 +2,16 @@
 // `value.(Target)`, or a case of a type switch on value, where value's static type is an interface holding a method
 // of the same name as one of Target's with a different signature, so no type can implement both. Where either
 // interface holds a free type parameter, in a method or in its type set, the pass says nothing, since it cannot know
-// the signatures it would compare.
+// the signatures it would compare. It sits on the engine's syntax dispatcher, hearing each type assertion and type
+// switch on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/ifaceassert/ifaceassert.go, whose
 // logic it keeps and whose messages it reports word for word, at the same position. The search for a free type
 // parameter is x/tools' internal typeparams.Free, and the type set of a constraint it reads is typeparams'
 // InterfaceTermSet, both translated here (free_type_parameters.go, term_set.go, term_list.go, term.go), the second
 // with its term operations. The search remembers its answers across the whole package, and an answer given for a
-// type met inside its own computation stands, so the port walks the assertions and switches in one preorder, as the
-// original does, and asks about the same types in the same order. The registry runs the port in the original's
+// type met inside its own computation stands, so the port hears the assertions and switches in one preorder, as the
+// original walks them, and asks about the same types in the same order. The registry runs the port in the original's
 // place, and the original stays the oracle: the parity tests beside this file run both over the same packages. The
 // two agree everywhere, so there is no differences fixture.
 package iface_assert
@@ -20,78 +21,94 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "ifaceassert",
-	Doc: "detect impossible interface-to-interface type assertions\n\n" +
-		"This checker flags type assertions v.(T) and corresponding type-switch cases\n" +
-		"in which the static type V of v is an interface that cannot possibly implement\n" +
-		"the target interface T. This occurs when V and T contain methods with the same\n" +
-		"name but different signatures. Example:\n\n" +
-		"\tvar v interface {\n" +
-		"\t\tRead()\n" +
-		"\t}\n" +
-		"\t_ = v.(io.Reader)\n\n" +
-		"The Read method in v has a different signature than the Read method in\n" +
-		"io.Reader, so this assertion cannot succeed.",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/ifaceassert",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "ifaceassert"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "detect impossible interface-to-interface type assertions\n\n" +
+	"This checker flags type assertions v.(T) and corresponding type-switch cases\n" +
+	"in which the static type V of v is an interface that cannot possibly implement\n" +
+	"the target interface T. This occurs when V and T contain methods with the same\n" +
+	"name but different signatures. Example:\n\n" +
+	"\tvar v interface {\n" +
+	"\t\tRead()\n" +
+	"\t}\n" +
+	"\t_ = v.(io.Reader)\n\n" +
+	"The Read method in v has a different signature than the Read method in\n" +
+	"io.Reader, so this assertion cannot succeed."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/ifaceassert"
+
+// Listener is what the port hears of each package from the dispatcher: every type assertion and every type switch,
+// in one preorder over both kinds, as the original's Preorder with its two-type filter visits them. The dispatcher's
+// walk reads the inspector's events in the order Preorder reads them and never prunes a subtree holding a kind
+// listed here, so the search, kept in the context's state for the whole package, is asked in the original's order.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.TypeAssertExpr)(nil), (*ast.TypeSwitchStmt)(nil)},
+	Node:  checkAssertion,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("iface_assert: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// checkAssertion reports each interface node asserts to, by itself or in a case of its type switch, that the value
+// it asserts on can never hold.
+func checkAssertion(context *rule.Context, node ast.Node, _ []ast.Node) {
+	// assertion is the `value.(Target)` judged, and targets the interfaces it asserts to: its own type, or each
+	// case's of a type switch.
+	var assertion *ast.TypeAssertExpr
+	var targets []ast.Expr
+	switch visited := node.(type) {
+	case *ast.TypeAssertExpr:
+		// A switch's `value.(type)` has no type of its own, and is judged with its switch.
+		if visited.Type == nil {
+			return
+		}
+		assertion = visited
+		targets = append(targets, visited.Type)
+	case *ast.TypeSwitchStmt:
+		assertion = switchedAssertion(visited)
+		for _, clause := range visited.Body.List {
+			caseClause, isCaseClause := clause.(*ast.CaseClause)
+			if !isCaseClause {
+				// Invariant: go/parser fills a type switch's body with case clauses alone.
+				panic("iface_assert: a type switch whose body holds something other than a case clause")
+			}
+			targets = append(targets, caseClause.List...)
+		}
+	default:
+		return
 	}
 	// One search for the whole package, as the original keeps one, since its remembered answers depend on the order
 	// it is asked in.
-	var free freeTypeParameters
-	// One preorder over both kinds of node, as the original's Preorder with its two-type filter, rather than an
-	// inspector.All walk per kind, which would ask the search in another order.
-	for node := range inspected.PreorderSeq((*ast.TypeAssertExpr)(nil), (*ast.TypeSwitchStmt)(nil)) {
-		// assertion is the `value.(Target)` judged, and targets the interfaces it asserts to: its own type, or each
-		// case's of a type switch.
-		var assertion *ast.TypeAssertExpr
-		var targets []ast.Expr
-		switch visited := node.(type) {
-		case *ast.TypeAssertExpr:
-			// A switch's `value.(type)` has no type of its own, and is judged with its switch.
-			if visited.Type == nil {
-				continue
-			}
-			assertion = visited
-			targets = append(targets, visited.Type)
-		case *ast.TypeSwitchStmt:
-			assertion = switchedAssertion(visited)
-			for _, clause := range visited.Body.List {
-				caseClause, isCaseClause := clause.(*ast.CaseClause)
-				if !isCaseClause {
-					// Invariant: go/parser fills a type switch's body with case clauses alone.
-					panic("iface_assert: a type switch whose body holds something other than a case clause")
-				}
-				targets = append(targets, caseClause.List...)
-			}
-		}
-		asserted := pass.TypesInfo.TypeOf(assertion.X)
-		for _, target := range targets {
-			targetType := pass.TypesInfo.TypeOf(target)
-			if conflicting := assertableTo(&free, asserted, targetType); conflicting != nil {
-				pass.Reportf(
-					target.Pos(),
-					"impossible type assertion: no type can implement both %v and %v (conflicting types for %v method)",
-					asserted, targetType, conflicting.Name(),
-				)
-			}
+	free := rule.State[freeTypeParameters](context)
+	asserted := context.TypesInfo.TypeOf(assertion.X)
+	for _, target := range targets {
+		targetType := context.TypesInfo.TypeOf(target)
+		if conflicting := assertableTo(free, asserted, targetType); conflicting != nil {
+			context.Reportf(
+				target.Pos(),
+				"impossible type assertion: no type can implement both %v and %v (conflicting types for %v method)",
+				asserted, targetType, conflicting.Name(),
+			)
 		}
 	}
-	return nil, nil
 }
 
 // switchedAssertion is the `value.(type)` a type switch switches on, written alone or assigned, `name := value.(type)`.
