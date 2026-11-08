@@ -35,6 +35,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/deferred_lock_after_lock"
+	"github.com/system-inc/cohere/internal/go_engine/rules/deprecated_use"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
@@ -86,7 +87,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/leaky_time_tick"
 	"github.com/system-inc/cohere/internal/go_engine/rules/loop_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/manual_trim"
-	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marshaled_struct_without_exported_fields"
 	"github.com/system-inc/cohere/internal/go_engine/rules/math_on_converted_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misaligned_atomic_field"
@@ -108,7 +108,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/oversized_shift"
-	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/internal/go_engine/rules/print_of_sprintf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/range_over_rune_conversion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/range_over_string_directly"
@@ -372,6 +371,7 @@ var portedStaticcheck = []struct {
 	{"SA1016", untrappable_signal.Analyzer},
 	{"SA1017", unbuffered_signal_channel.Analyzer},
 	{"SA1018", replace_zero_count.Analyzer},
+	{"SA1019", deprecated_use.Analyzer},
 	{"SA1020", invalid_listen_address.Analyzer},
 	{"SA1021", ip_compared_as_bytes.Analyzer},
 	{"SA1023", modified_writer_buffer.Analyzer},
@@ -716,11 +716,18 @@ func TestEveryRuleRequiringADispatcherCarriesItsListener(test *testing.T) {
 	}
 }
 
-// TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors holds the dispatcher's prerequisites to running despite
-// errors. The syntax dispatcher runs despite errors, so on a package with errors each syntax rule is skipped for the
-// errors, as it was when it walked on its own, never failed for a prerequisite. That holds only while everything it
-// requires, its own requirements and every listener's, transitively, runs despite errors too; a listener requiring an
-// analyzer that does not would fail the dispatcher, and every syntax rule with it, on every package with errors.
+// TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors holds the syntax dispatcher's own walk to running despite
+// errors, and every listener's requirement that does not to its rule's own analyzer. The syntax dispatcher runs
+// despite errors, so on a package with errors each syntax rule is skipped for the errors, as it was when it walked on
+// its own. That holds while everything the walk itself reads, transitively, runs despite errors too: a requirement of
+// the walk that did not would fail the dispatcher, and every syntax rule with it, on every package with errors. A
+// dispatcher made here, with no listener registered, requires exactly what the shared one's walk requires.
+//
+// A listener's own requirement is not held to running despite errors: the dispatcher runs past one skipped or failed
+// on a package (rule.Failed), starting every other listener there. It is held instead to being required by its rule's
+// own analyzer, on either dispatcher, so the checker fails the rule's action on that package with the sentence the
+// rule gives walking by itself, "failed prerequisites" naming the requirement, as staticcheck's SA1019 did requiring
+// its deprecated facts. check's TestAListenersRequirementSkippedForErrorsFailsOnlyItsOwnRule holds that sentence.
 func TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors(test *testing.T) {
 	test.Parallel()
 	visited := map[*analysis.Analyzer]bool{}
@@ -731,32 +738,53 @@ func TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors(test *testing.T)
 		}
 		visited[analyzer] = true
 		if !analyzer.RunDespiteErrors {
-			test.Errorf("the syntax dispatcher requires %s, which does not run despite errors", analyzer.Name)
+			test.Errorf("the syntax dispatcher's walk requires %s, which does not run despite errors", analyzer.Name)
 		}
 		for _, required := range analyzer.Requires {
 			visit(required)
 		}
 	}
+	visit(dispatch.NewSyntax().Analyzer())
+	if len(visited) < 3 {
+		test.Fatalf("the walk's requirements reached %d analyzers, where the dispatcher, inspect and staticcheck's "+
+			"generated pass at least were expected", len(visited))
+	}
 	syntaxListeners := 0
 	for _, registered := range All() {
-		if registered.Listener == nil || !registered.Listener.IsSyntax() {
+		if registered.Listener == nil {
 			continue
 		}
-		syntaxListeners++
-		dispatcher, held := dispatch.Shared(registered.Listener)
-		if !held {
-			test.Fatalf("rule %s's listener is not held by the shared syntax dispatcher", registered.Name)
+		if registered.Listener.IsSyntax() {
+			syntaxListeners++
+			if _, held := dispatch.Shared(registered.Listener); !held {
+				test.Fatalf("rule %s's listener is not held by the shared syntax dispatcher", registered.Name)
+			}
 		}
-		visit(dispatcher)
+		for _, required := range registered.Listener.Requires {
+			if runsDespiteErrorsThroughout(required) || slices.Contains(registered.Analyzer.Requires, required) {
+				continue
+			}
+			test.Errorf("rule %s's listener requires %s, which does not run despite errors, and the rule's own "+
+				"analyzer does not require it", registered.Name, required.Name)
+		}
 	}
 	if syntaxListeners == 0 {
 		test.Fatal("no registered rule listens to the syntax, so nothing here was checked")
 	}
-	// The shared readers a syntax rule may require, checked whether or not one does yet, so the first rule to require
-	// one never turns every syntax rule's skip on a package with errors into a failed prerequisite.
-	for _, reader := range []*analysis.Analyzer{marker.Analyzer, positions.Analyzer} {
-		visit(reader)
+}
+
+// runsDespiteErrorsThroughout is whether analyzer and everything it requires, transitively, run despite errors, so
+// it finishes on a package with errors.
+func runsDespiteErrorsThroughout(analyzer *analysis.Analyzer) bool {
+	if !analyzer.RunDespiteErrors {
+		return false
 	}
+	for _, required := range analyzer.Requires {
+		if !runsDespiteErrorsThroughout(required) {
+			return false
+		}
+	}
+	return true
 }
 
 // TestNoRuleRequiresXToolsSingleAssignmentForm holds the run to one program form: no registered rule, nor

@@ -73,6 +73,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/deferred_lock_after_lock"
+	"github.com/system-inc/cohere/internal/go_engine/rules/deprecated_use"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
 	"github.com/system-inc/cohere/internal/go_engine/rules/double_negation"
@@ -384,6 +385,7 @@ var ports = map[string]port{
 	"SA1016": {analyzer: untrappable_signal.Analyzer, listener: &untrappable_signal.Listener},
 	"SA1017": {analyzer: unbuffered_signal_channel.Analyzer, listener: &unbuffered_signal_channel.Listener},
 	"SA1018": {analyzer: replace_zero_count.Analyzer, listener: &replace_zero_count.Listener},
+	"SA1019": {analyzer: deprecated_use.Analyzer, listener: &deprecated_use.Listener},
 	"SA1020": {analyzer: invalid_listen_address.Analyzer, listener: &invalid_listen_address.Listener},
 	"SA1021": {analyzer: ip_compared_as_bytes.Analyzer, listener: &ip_compared_as_bytes.Listener},
 	"SA1023": {analyzer: modified_writer_buffer.Analyzer, listener: &modified_writer_buffer.Listener},
