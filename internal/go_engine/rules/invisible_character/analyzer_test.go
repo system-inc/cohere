@@ -44,6 +44,13 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	parity.RequireStaticcheckWants(test, Analyzer, upstreamTestdata(test), "go1.0")
 }
 
+// The port's fixes make the golden file staticcheck's fixtures hold beside CheckInvisibleCharacters.go, one section
+// for each fix's message, as staticcheck's testutil requires of the original's.
+func TestPortFixesMakeUpstreamGolden(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckGolden(test, Analyzer, upstreamTestdata(test), "go1.0")
+}
+
 // Over staticcheck's fixtures the original and the port find the same findings, fixes and all. They sit in a testdata
 // of their own, apart from parity's, so they take a call of their own.
 func TestPortMatchesOriginalOverUpstreamFixtures(test *testing.T) {
