@@ -36,7 +36,7 @@ func runCachedEngine(test *testing.T, root string, extra ...string) cachedRun {
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root, "--no-fix"}, extra...)
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
-	if exitCode := run(arguments, &standardOutput, &standardError, rules.All()); exitCode != exitClean &&
+	if exitCode := run(arguments, &standardOutput, &standardError, rules.All(), nil); exitCode != exitClean &&
 		exitCode != exitFindings {
 		test.Fatalf("exit %d, want %d or %d; stderr:\n%s", exitCode, exitClean, exitFindings, standardError.String())
 	}
@@ -314,7 +314,7 @@ func TestACleanVerdictWithoutTheWrapStillWraps(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, &standardOutput, &standardError,
-		rules.All())
+		rules.All(), nil)
 	if !strings.Contains(standardOutput.String(), `"fixedBy":{"cohere-go/consistency-no-long-line":3}`) {
 		test.Fatalf("want the run that writes to wrap three lines after gofmt's verdict was kept, got\n%s\n%s",
 			standardOutput.String(), standardError.String())
@@ -343,7 +343,7 @@ func TestARenamingRunLeavesTheCacheAsAnEditWould(test *testing.T) {
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	run([]string{"--contract", fmt.Sprint(contract.Version), "--root", renamed}, &standardOutput, &standardError,
-		rules.All())
+		rules.All(), nil)
 	var record contract.FixRecord
 	for line := range strings.Lines(standardOutput.String()) {
 		if strings.HasPrefix(line, `{"kind":"fix"`) {

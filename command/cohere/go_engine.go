@@ -26,9 +26,10 @@ const goEngineChildVariable = "COHERE_GO_ENGINE_CHILD"
 
 // runGoEngineVerb is the hidden `go-engine` mode, matched by main before anything else reads the command
 // line: the Go engine, given everything after the verb, writing contract 3 to standardOutput for the front
-// door that started it.
+// door that started it. The memory available is this process's own policy's reading, taken at init, which the
+// engine sizes its limit from (go_engine's capMemory).
 func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError io.Writer) int {
-	return go_engine.Main(arguments, standardOutput, standardError)
+	return go_engine.Main(arguments, activeMemoryPolicy.available, standardOutput, standardError)
 }
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
