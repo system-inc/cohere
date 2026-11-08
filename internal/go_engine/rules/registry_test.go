@@ -704,6 +704,7 @@ var portedPasses = []string{
 	"discarded_pure_call",
 	"dot_import",
 	"double_negation",
+	"duplicate_build_constraint",
 	"duplicate_import",
 	"duration_unit_suffix",
 	"error_variable_name",
