@@ -17,6 +17,13 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "go1.0")
 }
 
+// The port's fixes make the golden file staticcheck's fixtures hold beside CheckYodaConditions.go, as staticcheck's
+// testutil requires of the original's.
+func TestPortFixesMakeUpstreamGolden(test *testing.T) {
+	test.Parallel()
+	parity.RequireStaticcheckGolden(test, Analyzer, analysistest.TestData(), "go1.0")
+}
+
 // Over staticcheck's fixtures and parity's, the original and the port find the same findings, each with the same fix.
 // parity holds every comparison shape the check reads, parenthesized, nested and spread over lines, and every near
 // miss, a constant that names an identifier among them. The port differs from the original nowhere, so there is no
