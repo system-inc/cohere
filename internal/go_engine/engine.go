@@ -79,12 +79,25 @@ func Main(arguments []string, standardOutput io.Writer, standardError io.Writer)
 }
 
 // run is Main with the analyzer rules handed in, so a test can run the engine with a rule planted in place of
-// the registry's, such as one that panics.
+// the registry's, such as one that panics. It reads the standard library's entries the binary carries.
 func run(arguments []string, standardOutput io.Writer, standardError io.Writer, registered []rule.Rule) int {
+	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, embeddedStandardLibrary)
+}
+
+// runWithStandardLibrary is run reading builtIn in place of the binary's own standard-library entries, so a test can
+// give a run a table and a stamp of its own, or collect the entries a run saves, without a release build.
+func runWithStandardLibrary(
+	arguments []string,
+	standardOutput io.Writer,
+	standardError io.Writer,
+	registered []rule.Rule,
+	builtIn builtInStandardLibrary,
+) int {
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		return refuse(standardError, parseError)
 	}
+	request.standardLibrary = builtIn
 	switch request.mode() {
 	case modeVersion:
 		return writeVersion(standardOutput, standardError)

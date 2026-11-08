@@ -45,8 +45,8 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
-	// session is the findings cache the load and the lint phase share, nil under `--no-cache` or when the cache
-	// sat the run out.
+	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, and under
+	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads.
 	session *check.CacheSession
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -314,9 +314,10 @@ func (engine *pipeline) wrapsLongLines() bool {
 // knownFilesLabel names gofmt's verdicts among what the findings cache keeps.
 const knownFilesLabel = "gofmt verdicts"
 
-// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache.
+// knownFiles is gofmt's verdicts the findings cache kept from an earlier run, nil without the cache or its store, so
+// a run under `--no-cache` neither reads nor keeps them.
 func (engine *pipeline) knownFiles() *format.KnownFiles {
-	if engine.session == nil {
+	if engine.session == nil || !engine.session.HasStore() {
 		return nil
 	}
 	encoded, _ := engine.session.Kept(engine.session.KeyFor(knownFilesLabel))
