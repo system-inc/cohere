@@ -891,6 +891,7 @@ var portedPasses = []string{
 	"unobserved_append",
 	"unreachable_type_case",
 	"unread_assigned_value",
+	"untrappable_signal",
 	"unused_code",
 	"unused_write",
 	"vet",
