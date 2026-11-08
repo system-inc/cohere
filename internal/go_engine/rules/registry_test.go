@@ -1150,6 +1150,7 @@ var portedPasses = []string{
 	"unused_code",
 	"unused_write",
 	"vet",
+	"wait_group_add_in_goroutine",
 	"yoda_condition",
 }
 
