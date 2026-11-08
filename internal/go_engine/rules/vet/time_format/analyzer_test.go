@@ -22,11 +22,10 @@ import (
 // x/tools' own fixtures for timeformat, copied unchanged into testdata/src, a.go beside its golden file and the b it
 // imports, and run as x/tools' test runs them, with suggested fixes and no flags: every `// want` the original
 // expects, the port reports at the same line with the same message, analysistest fails on a finding no want expects as
-// much as on a want nothing found, and the port's fixes, applied, turn a.go into a.go.golden. It stays its own call,
-// since the harness's RequireUpstreamWants runs without suggested fixes and would leave the golden unread.
+// much as on a want nothing found, and the port's fixes, applied, turn a.go into a.go.golden.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, analysistest.TestData(), "a")
 }
 
 // Over x/tools' fixtures and those written for the port, parity holding every branch of the judgment and the shapes
@@ -229,14 +228,4 @@ func literalAt(content []byte, offset int) (*ast.BasicLit, error) {
 		return nil, fmt.Errorf("no string literal opens at or before offset %d", offset)
 	}
 	return enclosing, nil
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
