@@ -265,6 +265,49 @@ func TestInProcessListingDoubtsWhatItDoesNotCarry(test *testing.T) {
 	}
 }
 
+// A pattern the lister cannot match by module, a directory below or outside the workspace, or one that matches
+// nothing, is doubted, so go list answers it: an empty listing would check nothing and say nothing.
+func TestAPatternTheListerCannotMatchIsDoubted(test *testing.T) {
+	test.Parallel()
+	directory := test.TempDir()
+	writeListingFiles(test, directory, map[string]string{
+		"go.mod":   "module example.com/patterned\n\ngo 1.27\n",
+		"a.go":     "package a\n",
+		"sub/b.go": "package b\n",
+	})
+	environment, environmentError := sourceEnvironment(directory, []string{"GOWORK=off"})
+	if environmentError != nil {
+		test.Fatal(environmentError)
+	}
+	cases := []struct {
+		pattern string
+		reason  string
+	}{
+		{"./sub/...", "names a directory"},
+		{filepath.Join(directory, "sub") + "/...", "names a directory"},
+		{"example.com/patterned/missing/...", "matched no packages"},
+	}
+	for _, each := range cases {
+		listed, doubt := listInProcess(directory, environment, []string{each.pattern}, nil)
+		if doubt == "" {
+			test.Errorf("the lister answered %s with %d packages", each.pattern, len(listed.packages))
+			continue
+		}
+		if !strings.Contains(doubt, each.reason) {
+			test.Errorf("the lister doubted %s for %q, not for %q", each.pattern, doubt, each.reason)
+		}
+	}
+	// Through list, the directory pattern is go list's to answer, and it names the package below it.
+	listed, listError := list(directory, environment, []string{"./sub/..."}, nil)
+	if listError != nil {
+		test.Fatal(listError)
+	}
+	if listed.inProcess || listed.byPath["example.com/patterned/sub"] == nil {
+		test.Errorf("list of ./sub/... answered in process %v with %v, want go list's answer naming "+
+			"example.com/patterned/sub", listed.inProcess, sortedKeys(listed.roots))
+	}
+}
+
 // A doubt hands the listing to go list, which says what is wrong as the package's own error, and the listing says why
 // go list was asked.
 func TestADoubtIsGoListsToAnswer(test *testing.T) {
