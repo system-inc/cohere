@@ -301,7 +301,7 @@ var ports = map[string]port{
 	"printf":           {analyzer: printf.Analyzer},
 	"scannererr":       {analyzer: scanner_error.Analyzer},
 	"shift":            {analyzer: shift.Analyzer, listener: &shift.Listener},
-	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer},
+	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer, listener: &signal_channel_analyzer.Listener},
 	"slog":             {analyzer: slog.Analyzer, listener: &slog.Listener},
 	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
 	"stdmethods":       {analyzer: std_methods.Analyzer, listener: &std_methods.Listener},
