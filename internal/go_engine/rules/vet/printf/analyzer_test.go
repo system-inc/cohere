@@ -46,18 +46,18 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 // gets the non-constant format finding and its suggested fix, which must give the archive's golden file, and an
 // earlier file gets neither. The original extracts them with x/tools' internal testfiles and skips with its internal
 // testenv on a Go before 1.23 or 1.24; here the public txtar does the extracting, and no skip is needed, since this
-// module's go line is 1.27. The harness's RequireUpstreamWants runs without suggested fixes, so it would leave the
-// golden files unread, and these keep their own call.
+// module's go line is 1.27. The original runs them with suggested fixes, so they run through the harness's
+// RequireUpstreamWantsWithFixes, which reads the golden files, over the extracted module.
 func TestNonConstantFormatStringGo123(test *testing.T) {
 	test.Parallel()
 	directory := extractArchive(test, "nonconst_go123.txtar")
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, directory, Analyzer, "example.com/nonconst")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, directory, "example.com/nonconst")
 }
 
 func TestNonConstantFormatStringGo124(test *testing.T) {
 	test.Parallel()
 	directory := extractArchive(test, "nonconst_go124.txtar")
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, directory, Analyzer, "example.com/nonconst")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, directory, "example.com/nonconst")
 }
 
 // Over x/tools' fixtures and parity's, the second holding a violation of every message and every branch, a clean
@@ -152,14 +152,4 @@ func extractArchive(test *testing.T, name string) string {
 		test.Fatal(copyError)
 	}
 	return directory
-}
-
-// errorsOnly hands analysistest.RunWithSuggestedFixes a reporter that isn't a testing.TB. Given a testing.TB, it first
-// proves the go command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test
-// that builds. Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
