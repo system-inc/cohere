@@ -2,6 +2,7 @@ package rules
 
 import (
 	"fmt"
+	"go/ast"
 	"os"
 	"reflect"
 	"slices"
@@ -24,7 +25,8 @@ import (
 var registry = All()
 
 // registryProblems is every reason a list of rules could not be the registry: a rule that does not
-// validate, or a name two rules share, which would make a finding's rule ambiguous and its config key
+// validate, a listener that listens to syntax, which no dispatcher walks yet, a listener with PackageExit alone, which
+// no walk gathers for, or a name two rules share, which would make a finding's rule ambiguous and its config key
 // configure two rules at once.
 func registryProblems(registered []rule.Rule) []string {
 	problems := []string{}
@@ -32,6 +34,19 @@ func registryProblems(registered []rule.Rule) []string {
 	for _, registeredRule := range registered {
 		if validateError := registeredRule.Validate(); validateError != nil {
 			problems = append(problems, validateError.Error())
+		}
+		listener := registeredRule.Listener
+		switch {
+		case listener == nil:
+			// A rule whose analyzer walks the package itself.
+		case len(listener.Nodes) > 0 || listener.Node != nil || listener.FileEnter != nil || listener.FileExit != nil:
+			problems = append(problems, fmt.Sprintf("rule %q has a listener that listens to syntax, with Nodes, "+
+				"Node, FileEnter or FileExit, and no syntax dispatcher exists yet to call them, so it would hear "+
+				"nothing there", registeredRule.Name))
+		case listener.PackageExit != nil && listener.Function == nil && listener.Instruction == nil &&
+			listener.FunctionExit == nil:
+			problems = append(problems, fmt.Sprintf("rule %q has a listener with PackageExit alone, and no "+
+				"dispatcher walks the package for it, so it would judge what nothing gathered", registeredRule.Name))
 		}
 		if seen[registeredRule.Name] {
 			problems = append(problems, fmt.Sprintf("rule %q is registered twice", registeredRule.Name))
@@ -70,9 +85,18 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 		{Name: "cohere-go/printf", Origin: rule.OriginVet, UpstreamName: "printf", Analyzer: planted},
 		{Name: "cohere-go/consistency-no-long-line", Origin: rule.OriginHouse, UpstreamName: "lll", Analyzer: planted},
 		{Name: "cohere-go/printf", Origin: rule.OriginVet, UpstreamName: "printf", Analyzer: planted},
+		{Name: "cohere-go/U1000", Origin: rule.OriginStaticcheck, UpstreamName: "U1000", Analyzer: planted,
+			Listener: &rule.Listener{FileEnter: plantedFileEnter, PackageExit: plantedPackageExit}},
+		{Name: "cohere-go/nilness", Origin: rule.OriginTools, UpstreamName: "nilness", Analyzer: planted,
+			Listener: &rule.Listener{Requires: []*analysis.Analyzer{planted}}},
+		{Name: "cohere-go/unusedwrite", Origin: rule.OriginTools, UpstreamName: "unusedwrite", Analyzer: planted,
+			Listener: &rule.Listener{PackageExit: plantedPackageExit}},
 	}
 	plantedProblems := registryProblems(plantedRegistry)
-	expected := []string{"a house rule has no upstream", `rule "cohere-go/printf" is registered twice`}
+	expected := []string{
+		"a house rule has no upstream", `rule "cohere-go/printf" is registered twice`,
+		"no syntax dispatcher exists yet", "declares no callback", "PackageExit alone",
+	}
 	if len(plantedProblems) != len(expected) {
 		test.Fatalf(
 			"the planted registry has %d problems, expected %d: %q",
@@ -84,6 +108,16 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 			test.Errorf("planted problem %d is %q, expected it to say %q", index, plantedProblems[index], saying)
 		}
 	}
+}
+
+// plantedFileEnter is a syntax callback for a planted listener, which the registry refuses before it is ever called.
+func plantedFileEnter(*rule.Context, *ast.File) {
+	// Never called: the registry reads only whether a callback is set.
+}
+
+// plantedPackageExit is a planted listener's PackageExit, which the registry refuses before it is ever called.
+func plantedPackageExit(*rule.Context) {
+	// Never called: the registry reads only whether a callback is set.
 }
 
 // expectBlock holds the registry, from offset on, to one rule per analyzer in order, each named for its
@@ -155,16 +189,60 @@ func TestVetsSuiteOpensTheRegistryInItsOwnOrder(test *testing.T) {
 
 // TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
 // after vet's suite, as tools rules under the originals' names, each running our port onto staticcheck's
-// intermediate form.
+// intermediate form through the IR dispatcher.
 func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 	test.Parallel()
-	expected := []*analysis.Analyzer{nil_ness.Analyzer, unused_write.Analyzer}
-	expectBlock(test, len(vet.Suite), expected, rule.OriginTools)
-	for _, analyzer := range expected {
-		registeredRule, found := registeredRuleNamed(rule.Namespace + analyzer.Name)
-		if found && !registeredRule.TypeAware {
-			test.Errorf("%q reads a program form built from type information, so it is type aware", analyzer.Name)
+	expected := []struct {
+		name     string
+		listener *rule.Listener
+	}{{"nilness", &nil_ness.Listener}, {"unusedwrite", &unused_write.Listener}}
+	analyzers := []*analysis.Analyzer{}
+	for _, port := range expected {
+		registeredRule, found := registeredRuleNamed(rule.Namespace + port.name)
+		if !found {
+			test.Fatalf("%s is not registered", port.name)
 		}
+		if registeredRule.Listener != port.listener {
+			test.Errorf("%q does not register its port's listener", port.name)
+		}
+		if !registeredRule.TypeAware {
+			test.Errorf("%q reads a program form built from type information, so it is type aware", port.name)
+		}
+		analyzers = append(analyzers, registeredRule.Analyzer)
+	}
+	expectBlock(test, len(vet.Suite), analyzers, rule.OriginTools)
+}
+
+// TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener holds every rule with a listener, over two calls to
+// All as the engine, the docs and the tests make them, to one dispatcher: its analyzer requires irDispatcher's, which
+// holds its listener, and both calls hand out the same analyzer, the one the settings set options on.
+func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testing.T) {
+	test.Parallel()
+	first, second := All(), All()
+	analyzerOf := map[string]*analysis.Analyzer{}
+	dispatchedRules := 0
+	for _, registered := range slices.Concat(first, second) {
+		if registered.Listener == nil {
+			continue
+		}
+		dispatchedRules++
+		if !slices.Contains(registered.Analyzer.Requires, irDispatcher.Analyzer) {
+			test.Errorf("%s does not require irDispatcher's analyzer, so another dispatcher would walk for it",
+				registered.Name)
+		}
+		if !irDispatcher.Holds(registered.Listener) {
+			test.Errorf("irDispatcher does not hold %s's listener, so its analyzer would read no outcome",
+				registered.Name)
+		}
+		if earlier, seen := analyzerOf[registered.Name]; seen && earlier != registered.Analyzer {
+			test.Errorf("two calls to All hand out two analyzers for %s, so options set on one miss the other",
+				registered.Name)
+		}
+		analyzerOf[registered.Name] = registered.Analyzer
+	}
+	if dispatchedRules < 4 {
+		test.Errorf("two calls to All hold %d dispatched rules, where nilness and unusedwrite twice are 4",
+			dispatchedRules)
 	}
 }
 
@@ -334,10 +412,13 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own:
 // marker reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a
 // sum type's variant whose methods only mark it, served finds the types a file serves for the two rules that count
-// them, positions is the line table rules read a node's position from without the FileSet's lock, and staticcheck_ir
-// hands the ported passes the functions of staticcheck's intermediate representation.
+// them, positions is the line table rules read a node's position from without the FileSet's lock, staticcheck_ir
+// reads the functions of staticcheck's intermediate representation, and dispatch walks a package once for every rule
+// with a listener and builds each such rule's analyzer, holding no rule itself: the registry names which rules it
+// calls.
 var sharedReaders = map[string]bool{
 	"marker": true, "inert_value": true, "marker_type": true, "served": true, "positions": true, "staticcheck_ir": true,
+	"dispatch": true,
 }
 
 // portedPasses is the packages under rules/ that hold an upstream pass ported onto staticcheck's intermediate
