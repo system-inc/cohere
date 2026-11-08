@@ -455,7 +455,7 @@ var ports = map[string]port{
 	"lostcancel":       {analyzer: lost_cancel.Analyzer},
 	"nilfunc":          {analyzer: nil_func.Analyzer, listener: &nil_func.Listener},
 	"printf":           {analyzer: printf.Analyzer},
-	"scannererr":       {analyzer: scanner_error.Analyzer},
+	"scannererr":       {analyzer: scanner_error.Analyzer, listener: &scanner_error.Listener},
 	"shift":            {analyzer: shift.Analyzer, listener: &shift.Listener},
 	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer, listener: &signal_channel_analyzer.Listener},
 	"slog":             {analyzer: slog.Analyzer, listener: &slog.Listener},
