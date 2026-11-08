@@ -92,6 +92,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
 )
 
@@ -177,31 +178,32 @@ var duplicatesOfVet = map[string]string{
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
-	"appends":       appends.Analyzer,
-	"assign":        assign.Analyzer,
-	"atomic":        atomic.Analyzer,
-	"bools":         bools.Analyzer,
-	"cgocall":       cgo_call.Analyzer,
-	"composites":    composite.Analyzer,
-	"copylocks":     copy_lock.Analyzer,
-	"defers":        defers.Analyzer,
-	"directive":     directive.Analyzer,
-	"errorsas":      errors_as.Analyzer,
-	"framepointer":  frame_pointer.Analyzer,
-	"hostport":      host_port.Analyzer,
-	"httpresponse":  http_response.Analyzer,
-	"ifaceassert":   iface_assert.Analyzer,
-	"lostcancel":    lost_cancel.Analyzer,
-	"nilfunc":       nil_func.Analyzer,
-	"printf":        printf.Analyzer,
-	"scannererr":    scanner_error.Analyzer,
-	"shift":         shift.Analyzer,
-	"slog":          slog.Analyzer,
-	"sqlrowserr":    sql_rows_err.Analyzer,
-	"stdmethods":    std_methods.Analyzer,
-	"stringintconv": string_int_conv.Analyzer,
-	"structtag":     struct_tag.Analyzer,
-	"tests":         tests.Analyzer,
+	"appends":          appends.Analyzer,
+	"assign":           assign.Analyzer,
+	"atomic":           atomic.Analyzer,
+	"bools":            bools.Analyzer,
+	"cgocall":          cgo_call.Analyzer,
+	"composites":       composite.Analyzer,
+	"copylocks":        copy_lock.Analyzer,
+	"defers":           defers.Analyzer,
+	"directive":        directive.Analyzer,
+	"errorsas":         errors_as.Analyzer,
+	"framepointer":     frame_pointer.Analyzer,
+	"hostport":         host_port.Analyzer,
+	"httpresponse":     http_response.Analyzer,
+	"ifaceassert":      iface_assert.Analyzer,
+	"lostcancel":       lost_cancel.Analyzer,
+	"nilfunc":          nil_func.Analyzer,
+	"printf":           printf.Analyzer,
+	"scannererr":       scanner_error.Analyzer,
+	"shift":            shift.Analyzer,
+	"slog":             slog.Analyzer,
+	"sqlrowserr":       sql_rows_err.Analyzer,
+	"stdmethods":       std_methods.Analyzer,
+	"stringintconv":    string_int_conv.Analyzer,
+	"structtag":        struct_tag.Analyzer,
+	"testinggoroutine": testing_goroutine.Analyzer,
+	"tests":            tests.Analyzer,
 }
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
