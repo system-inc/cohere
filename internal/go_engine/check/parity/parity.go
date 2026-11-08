@@ -11,9 +11,10 @@
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
 // RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
-// RequireOnlyAdjudicated over its differences fixture. Each takes testdata and patterns, and a pattern naming a folder
-// of testdata that holds a go.mod loads that folder as a module (see fixtureLoad). The census command,
-// command/cohere-parity, runs Analyze over a real tree.
+// RequireOnlyAdjudicated over its differences fixture, and RequireStaticcheckGolden over staticcheck's golden files for
+// a port that offers fixes. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a
+// go.mod loads that folder as a module (see fixtureLoad). The census command, command/cohere-parity, runs Analyze over
+// a real tree.
 package parity
 
 import (
