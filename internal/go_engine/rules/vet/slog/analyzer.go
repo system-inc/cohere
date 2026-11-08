@@ -40,13 +40,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// name is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same as before the port took the original's place.
-const name = "slog"
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "slog"
 
-// doc is the original's documentation, word for word, so the rule is described in `go vet`'s own words. It keeps the
-// original's missing space in "For example,it".
-const doc = "check for invalid structured logging calls\n\n" +
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words. It
+// keeps the original's missing space in "For example,it".
+const passDoc = "check for invalid structured logging calls\n\n" +
 	"The slog checker looks for calls to functions from the log/slog\n" +
 	"package that take alternating key-value pairs. It reports calls\n" +
 	"where an argument in a key position is neither a string nor a\n" +
@@ -56,8 +56,8 @@ const doc = "check for invalid structured logging calls\n\n" +
 	"and\n\n" +
 	"\tslog.Info(\"message\", \"k1\", v1, \"k2\") // call to slog.Info missing a final value"
 
-// url is the original's address.
-const url = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog"
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog"
 
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
 // Preorder visits them, of which it judges those of log/slog's functions taking key-value pairs.
@@ -73,8 +73,8 @@ var Analyzer = newAnalyzer(dispatch.SharedSyntax())
 // newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
 // RuleAnalyzer leaves unset.
 func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
-	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+name, name, doc, &Listener)
-	analyzer.URL = url
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
 	return analyzer
 }
 
