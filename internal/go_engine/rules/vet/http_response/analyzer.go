@@ -4,11 +4,11 @@
 // nil.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/httpresponse/httpresponse.go,
-// whose logic it keeps and whose messages it reports word for word, at the same position. The original walks with
-// the inspector's stack to find the statement list a call sits in; the port climbs from the call with the inspector's
-// public cursor instead, visiting the same calls in the same order and reading the same statements. The registry runs
-// the port in the original's place, and the original stays the oracle: the parity tests beside this file run both
-// over the same packages.
+// whose logic it keeps and whose messages it reports word for word, at the same position. It sits on the engine's
+// syntax dispatcher, hearing each call on the walk the dispatcher makes once for every syntax rule, and like the
+// original it finds the statement list a call sits in from the walk's stack of the call's ancestors. The registry
+// runs the port in the original's place, and the original stays the oracle: the parity tests beside this file run
+// both over the same packages.
 //
 // The two differ in one judgment only, each case in testdata/src/differences and held by
 // TestPortDiffersFromOriginalOnlyWhereItIsRight. The original holds the deferred call's root to the response's name
@@ -24,15 +24,17 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "httpresponse",
-	Doc: `check for mistakes using HTTP responses
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "httpresponse"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = `check for mistakes using HTTP responses
 
 A common mistake when using the net/http package is to defer a function
 call to close the http.Response Body before checking the error that
@@ -46,73 +48,96 @@ determines whether the response is valid:
 	// (defer statement belongs here)
 
 This checker helps uncover latent nil dereference bugs by reporting a
-diagnostic for such mistakes.`,
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/httpresponse",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+diagnostic for such mistakes.`
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/httpresponse"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
+// WithStack visits them, with the call's ancestors, from which it reads the statements around the call. It judges
+// only a package that imports net/http, which it asks once for the package, on the first call, and keeps in the
+// context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node:  checkCall,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("http_response: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// packageGate is whether the package imports net/http, asked once, on its first call.
+type packageGate struct {
+	// decided is whether the package has been asked about yet.
+	decided bool
+	// importsHttp is whether the package imports net/http itself, without which nothing is judged.
+	importsHttp bool
+}
+
+// checkCall reports a deferred call on the response call returns, placed straight after the statement holding call
+// and before its error is checked, reading the statements around call from stack, its ancestors.
+func checkCall(context *rule.Context, node ast.Node, stack []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
 	}
-	// A package that does not import net/http itself is passed over without a walk, as the original passes it over,
+	// A package that does not import net/http itself is passed over, as the original passes it over without a walk,
 	// even when a call in it returns a response through a package that does.
-	if !imports(pass.Pkg, "net/http") {
-		return nil, nil
+	gate := rule.State[packageGate](context)
+	if !gate.decided {
+		gate.decided, gate.importsHttp = true, imports(context.Package, "net/http")
 	}
-	// Preorder visits each call in the order the original's WithStack does, and its cursor can climb to the
-	// statements around the call, which is all the original reads of the stack.
-	for cursor := range inspected.Root().Preorder((*ast.CallExpr)(nil)) {
-		call, isCall := cursor.Node().(*ast.CallExpr)
-		if !isCall {
-			// Invariant: Preorder filtered to call expressions yields only cursors at call expressions.
-			panic("http_response: Preorder yielded a node that is not a call")
-		}
-		if !isHttpFunctionOrMethodOnClient(pass.TypesInfo, call) {
-			continue
-		}
-		statements, calls := restOfBlock(cursor)
-		// The call is in the last statement of its block, so no defer follows it.
-		if len(statements) < 2 {
-			continue
-		}
-		// A call wrapped in another, `response, err := checked(http.Get(url))`, has its error checked by the wrapper
-		// (golang/go#52661).
-		if calls > 1 {
-			continue
-		}
-		assignment, isAssignment := statements[0].(*ast.AssignStmt)
-		if !isAssignment {
-			continue
-		}
-		response := rootIdentifier(assignment.Lhs[0])
-		if response == nil {
-			continue
-		}
-		deferred, isDefer := statements[1].(*ast.DeferStmt)
-		if !isDefer {
-			continue
-		}
-		receiver := rootIdentifier(deferred.Call.Fun)
-		if receiver == nil {
-			continue
-		}
-		// The two names are judged by the objects the type checker gives them, where the original compares the
-		// parser's: two names the parser left unresolved, such as `_` assigned with `=`, a package-level variable
-		// declared in another file, an imported package's name or a predeclared function, both hold nil there and
-		// count as one, so `defer log.Println()` after `_, err = http.Get(url)` was reported as a use of `_`. A name
-		// with no object, `_` assigned with `=`, is never the same as another. Two names without objects would match
-		// without the nil check, but a deferred call's root always denotes something in a package that type-checks,
-		// so no fixture can make that check fire; it is kept so a pair of unknowns is never taken for one variable.
-		responseObject := pass.TypesInfo.ObjectOf(response)
-		if responseObject != nil && responseObject == pass.TypesInfo.ObjectOf(receiver) {
-			pass.ReportRangef(receiver, "using %s before checking for errors", response.Name)
-		}
+	if !gate.importsHttp {
+		return
 	}
-	return nil, nil
+	if !isHttpFunctionOrMethodOnClient(context.TypesInfo, call) {
+		return
+	}
+	statements, calls := restOfBlock(call, stack)
+	// The call is in the last statement of its block, so no defer follows it.
+	if len(statements) < 2 {
+		return
+	}
+	// A call wrapped in another, `response, err := checked(http.Get(url))`, has its error checked by the wrapper
+	// (golang/go#52661).
+	if calls > 1 {
+		return
+	}
+	assignment, isAssignment := statements[0].(*ast.AssignStmt)
+	if !isAssignment {
+		return
+	}
+	response := rootIdentifier(assignment.Lhs[0])
+	if response == nil {
+		return
+	}
+	deferred, isDefer := statements[1].(*ast.DeferStmt)
+	if !isDefer {
+		return
+	}
+	receiver := rootIdentifier(deferred.Call.Fun)
+	if receiver == nil {
+		return
+	}
+	// The two names are judged by the objects the type checker gives them, where the original compares the
+	// parser's: two names the parser left unresolved, such as `_` assigned with `=`, a package-level variable
+	// declared in another file, an imported package's name or a predeclared function, both hold nil there and
+	// count as one, so `defer log.Println()` after `_, err = http.Get(url)` was reported as a use of `_`. A name
+	// with no object, `_` assigned with `=`, is never the same as another. Two names without objects would match
+	// without the nil check, but a deferred call's root always denotes something in a package that type-checks,
+	// so no fixture can make that check fire; it is kept so a pair of unknowns is never taken for one variable.
+	responseObject := context.TypesInfo.ObjectOf(response)
+	if responseObject != nil && responseObject == context.TypesInfo.ObjectOf(receiver) {
+		context.ReportRangef(receiver, "using %s before checking for errors", response.Name)
+	}
 }
 
 // isHttpFunctionOrMethodOnClient is whether call is to a function of a package named http, or a method of
@@ -155,25 +180,30 @@ func isHttpFunctionOrMethodOnClient(information *types.Info, call *ast.CallExpr)
 	return isPointerType && isTypeNamed(pointer.Elem(), "net/http", "Client")
 }
 
-// restOfBlock finds the innermost block enclosing the node at call and returns its statements from the one holding
-// the call to the end, with the number of calls met on the climb to that block, the call itself among them. x/tools'
-// httpresponse.restOfBlock, which reads the same nodes from the traversal's stack.
-func restOfBlock(call inspector.Cursor) ([]ast.Stmt, int) {
-	calls := 0
+// restOfBlock finds the innermost block enclosing call, whose ancestors stack holds, outermost first, and returns its
+// statements from the one holding the call to the end, with the number of calls met on the climb to that block, the
+// call itself among them. x/tools' httpresponse.restOfBlock, which reads the same nodes from a stack holding the call
+// on its top. It stands in for the climb with the inspector's cursor, `cursor.Enclosing()`, which yields the call,
+// then its ancestors innermost first: stack read from its end is that climb after its first step.
+func restOfBlock(call *ast.CallExpr, stack []ast.Node) ([]ast.Stmt, int) {
+	// The call itself is the first call met, the first node Enclosing yields and the top of the original's stack,
+	// which the dispatcher's stack leaves out.
+	calls := 1
 	// child is the node last climbed through, on the path from the block down to the call.
-	child := call
-	for enclosing := range call.Enclosing() {
-		if block, isBlock := enclosing.Node().(*ast.BlockStmt); isBlock {
-			for index, statement := range block.List {
-				if statement == child.Node() {
-					return block.List[index:], calls
+	var child ast.Node = call
+	for index := len(stack) - 1; index >= 0; index-- {
+		enclosing := stack[index]
+		if block, isBlock := enclosing.(*ast.BlockStmt); isBlock {
+			for statementIndex, statement := range block.List {
+				if statement == child {
+					return block.List[statementIndex:], calls
 				}
 			}
 			// Unreachable: a block's only children are its statements, so the node climbed through is among them.
 			// Kept as the original keeps it, ending the climb at the innermost block either way.
 			break
 		}
-		if _, isCall := enclosing.Node().(*ast.CallExpr); isCall {
+		if _, isCall := enclosing.(*ast.CallExpr); isCall {
 			calls++
 		}
 		child = enclosing

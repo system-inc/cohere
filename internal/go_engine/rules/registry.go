@@ -293,7 +293,7 @@ var ports = map[string]port{
 	"errorsas":         {analyzer: errors_as.Analyzer, listener: &errors_as.Listener},
 	"framepointer":     {analyzer: frame_pointer.Analyzer},
 	"hostport":         {analyzer: host_port.Analyzer},
-	"httpresponse":     {analyzer: http_response.Analyzer},
+	"httpresponse":     {analyzer: http_response.Analyzer, listener: &http_response.Listener},
 	"ifaceassert":      {analyzer: iface_assert.Analyzer, listener: &iface_assert.Listener},
 	"loopclosure":      {analyzer: loop_closure.Analyzer},
 	"lostcancel":       {analyzer: lost_cancel.Analyzer},
