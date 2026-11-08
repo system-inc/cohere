@@ -8,10 +8,11 @@
 // the next: the reads and writes it gathers belong to one method's receiver. So the port judges one function at a
 // time and finds what the original finds. The original gathers the writes in a map keyed by field and ranges over it,
 // in an order Go leaves to chance; the port ranges over the fields in order, which changes only the order findings
-// are reported in. The original stays the oracle: the parity tests beside this file run both over the same packages,
-// and they differ nowhere. The places the port could differ are those where the original panics: a store with no
-// syntax, which the port does not report, and a receiver whose type has no name, which the port passes over; a
-// method's receiver always has a named type, and staticcheck builds every store to a field from its assignment.
+// are reported in. The registry runs the port in the original's place, under its name, and the original stays only as
+// the oracle: the parity tests beside this file run both over the same packages, and they differ nowhere. The places
+// the port could differ are those where the original panics: a store with no syntax, which the port does not report,
+// and a receiver whose type has no name, which the port passes over; a method's receiver always has a named type, and
+// staticcheck builds every store to a field from its assignment.
 //
 // The port keeps one false positive the original makes, so as to find what it finds: a read earlier in the write's own
 // block does not see the write, even when a loop brings control back to the read, so a loop's body that reads a field

@@ -9,8 +9,8 @@
 // spared for cgo, `&*_Cvar_name`, through parentheses as the pattern binds it. Neither pattern names a symbol, so the
 // original walks every package, and so does the port. It reports through staticcheck_report.Report where the
 // original reports through report.Report, with no option, so a generated file is judged like any other. The registry
-// still runs the original, which stays the oracle: the parity tests beside this file run both over the same packages,
-// and the two differ nowhere they hold.
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package ineffective_copy
 
 import (

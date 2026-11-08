@@ -12,8 +12,8 @@
 // syntax enclosing a constant's declaration with staticcheck's go/ast/astutil.PathEnclosingInterval and an expression's
 // set of types with its go/types/typeutil, as the original does. Like the original, it judges only a zero on the
 // right, so `0 | x` is left alone, and only a constant of this package declared alone as `name = iota`. The registry
-// still runs the original, which stays the oracle: the parity tests beside this file run both over the same modules,
-// and the two differ nowhere they hold.
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same modules, and the two differ nowhere they hold.
 package ineffective_bitwise_operation
 
 import (

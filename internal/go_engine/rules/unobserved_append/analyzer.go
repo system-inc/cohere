@@ -9,10 +9,11 @@
 // every append. So the port judges one function at a time and finds what the original finds. The original ranges over
 // a map of the values its first judgment reached, in an order Go leaves to chance; the port ranges over them in the
 // order reached, and the outcome never depended on the order, since every reader is judged the first time any walk
-// reaches it and any reader judged wrong ends the judgment. The original stays the oracle: the parity tests beside
-// this file run both over the same packages, and they differ nowhere. The one place the port could differ is a call
-// with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every append from
-// its call expression, so no such call reaches either.
+// reaches it and any reader judged wrong ends the judgment. The registry runs the port in the original's place, under
+// its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and they differ nowhere. The one place the port could differ is a call with no syntax, where staticcheck's
+// report panics and the port reports nothing; staticcheck builds every append from its call expression, so no such call
+// reaches either.
 package unobserved_append
 
 import (

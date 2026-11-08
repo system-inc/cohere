@@ -15,8 +15,8 @@
 // the context, keyed by a file's name as parsed, as code.Generator reads it, handing Check the lookup for every
 // function.
 //
-// The original stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package unread_assigned_value
 
 import (

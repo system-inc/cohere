@@ -9,10 +9,11 @@
 // the original finds. Like the original, it judges every binary operation, arithmetic as much as comparison, and sees
 // through phis whose edges are all one call to math.NaN, through irutil.Flatten, and no further. The builder replaces a
 // phi whose edges are one value with that value, so Flatten counts only where phis reach the call through one another,
-// none of them trivial, as in the parity fixture's phisOfOneCall. The original stays the oracle: the parity tests
-// beside this file run both over the same packages, and they differ nowhere. The one place the port could differ is an
-// operation with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every
-// binary operation from an expression, so no such operation reaches either.
+// none of them trivial, as in the parity fixture's phisOfOneCall. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and they differ nowhere. The one place the port could differ is an operation with no syntax, where
+// staticcheck's report panics and the port reports nothing; staticcheck builds every binary operation from an
+// expression, so no such operation reaches either.
 package nan_comparison
 
 import (

@@ -8,8 +8,8 @@
 // staticcheck_report.Report where the original reports through report.Report, each the port of the one the original
 // calls, proven against it beside it. It renders each side with staticcheck's own report.Render, given a pass that
 // holds only the context's file set, which is all Render reads, so the two sides compare and print as the original's
-// do. The registry still runs the original, which stays the oracle: the parity tests beside this file run both over
-// the same packages, and the two differ nowhere they hold.
+// do. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package self_assignment
 
 import (

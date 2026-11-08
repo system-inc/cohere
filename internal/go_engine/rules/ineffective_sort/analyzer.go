@@ -18,8 +18,8 @@
 // since the original asks none. The message renders the conversion through staticcheck_report.Render, and the fix, a
 // call of sort.Ints, sort.Float64s or sort.Strings spelled sort whatever the file names the package, is printed by
 // staticcheck's analysis/edit, borrowed in this wave as the original uses it, through staticcheck_report.Fixes. The
-// registry still runs the original, which stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
+// tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package ineffective_sort
 
 import (

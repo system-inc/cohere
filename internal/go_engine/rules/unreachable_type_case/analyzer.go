@@ -7,9 +7,9 @@
 // puts it with its short range. A type parameter named in a case is never taken as the interface that subsumes a
 // later type, as the original asks golang.org/x/exp/typeparams, whose IsTypeParam is that one type assertion, here
 // written out. Like the original, it reports a clause once for each earlier clause that subsumes it, naming the first
-// pair of types in each, and judges a `nil` in a case list as reachable always. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same modules, and the two differ
-// nowhere they hold.
+// pair of types in each, and judges a `nil` in a case list as reachable always. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same modules, and the two differ nowhere they hold.
 package unreachable_type_case
 
 import (

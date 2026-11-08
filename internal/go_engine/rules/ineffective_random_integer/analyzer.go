@@ -14,8 +14,9 @@
 // staticcheck_code.IntegerLiteral, the port of the pattern's IntegerLiteral, takes for a literal whose constant prints
 // as 1. Every call the pattern accepts is one the index records, since both read the object the type checker recorded
 // for the function's identifier, so the two walks reach the same findings, in another order. The pattern has no field
-// for a call's ellipsis, so neither does the port. The original keeps nothing from one call to the next, and stays the
-// oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// for a call's ellipsis, so neither does the port. The original keeps nothing from one call to the next. The registry
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package ineffective_random_integer
 
 import (

@@ -9,9 +9,10 @@
 // variable holds. So the port judges one function at a time and finds what the original finds. The syntax of a
 // function holds the syntax of the function literals inside it, which are functions of their own, so both the
 // original and the port walk a loop inside a literal twice, once from each; the enclosing function holds no value for
-// the literal's expressions, so only the literal judges the loop, and it is reported once. The original stays the
-// oracle: the parity tests beside this file run both over the same packages, and they differ nowhere, since the port
-// walks the same syntax and asks the same function the same question of it.
+// the literal's expressions, so only the literal judges the loop, and it is reported once. The registry runs the port
+// in the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over the same packages, and they differ nowhere, since the port walks the same syntax and asks the same
+// function the same question of it.
 package unchanging_loop_condition
 
 import (

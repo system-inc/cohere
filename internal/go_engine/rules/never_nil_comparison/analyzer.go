@@ -13,8 +13,9 @@
 // shapes in the syntax and the type information directly: a comparison by == or != whose right side is the universe's
 // nil and whose left side is no address taken with &, parentheses stripped wherever the pattern strips them. It sorts
 // the related values by position as the original does, stably where the original's sort.Slice leaves equal positions
-// in an order it does not promise. The original stays the oracle: the parity tests beside this file run both over the
-// same packages, related places included, and they differ nowhere.
+// in an order it does not promise. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, related places included,
+// and they differ nowhere.
 package never_nil_comparison
 
 import (

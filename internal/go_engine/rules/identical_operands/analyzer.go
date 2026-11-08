@@ -10,9 +10,9 @@
 // calls, proven against it beside it. It reads a type's set of types through staticcheck's go/types/typeutil, as the
 // original does, and reads the parent the original's code.Cursor reads from the ancestors the dispatcher hands. Like
 // the original, it judges operands by their printed text alone, so `f() == f()` is reported even when f has effects,
-// and only math/rand's random functions are spared that (upstream's fn2 shows them). The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// and only math/rand's random functions are spared that (upstream's fn2 shows them). The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package identical_operands
 
 import (

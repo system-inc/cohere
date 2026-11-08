@@ -20,9 +20,9 @@
 // that is no type name, for which the original reports its -0.0 message, as the port does. The pattern names no
 // symbol, so code.Matches walks every package, generated files among them, since the original filters none. The
 // messages render code through staticcheck_report.Render, and the fix is printed by staticcheck's analysis/edit,
-// borrowed in this wave as the original uses it, through staticcheck_report.Fixes. The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// borrowed in this wave as the original uses it, through staticcheck_report.Fixes. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package negative_zero_float
 
 import (

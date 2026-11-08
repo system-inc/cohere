@@ -11,8 +11,9 @@
 // has no field for a call's ellipsis, so neither does the port. The original reports a call whose one argument is a
 // call returning several values, `append(pair())`, which appends the rest, since the pattern counts the syntax's
 // arguments; parity's multipleResults shows it, and the port keeps it, as the parity doctrine asks. The original keeps
-// nothing from one call to the next, and stays the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// nothing from one call to the next. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
+// differ nowhere they hold.
 package single_argument_append
 
 import (

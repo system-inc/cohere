@@ -14,8 +14,8 @@
 // The original keeps one piece of state across the package: the if statements it has already walked as part of a
 // chain, so the else if of a chain is not judged again as a chain of its own. The port keeps the same in the
 // context's state for the package, made on the first if the dispatcher hands Node and handed to Check. The registry
-// still runs the original, which stays the oracle: the parity tests beside this file run both over the same packages,
-// and the two differ nowhere they hold.
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package repeated_if_else_condition
 
 import (

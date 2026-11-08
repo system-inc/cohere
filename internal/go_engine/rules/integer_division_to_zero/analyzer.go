@@ -10,9 +10,9 @@
 // none of the symbols it names, and this one names none, so every package is walked, generated files among them,
 // since the original filters none. The message writes the division as staticcheck's report.Render prints it, called
 // with a pass that holds only the file set, the one part of a pass Render reads, since Render is not ported yet. It
-// reports through staticcheck_report.Report where the original reports through report.Report. The registry still runs
-// the original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// reports through staticcheck_report.Report where the original reports through report.Report. The registry runs the
+// port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside this
+// file run both over the same packages, and the two differ nowhere they hold.
 package integer_division_to_zero
 
 import (

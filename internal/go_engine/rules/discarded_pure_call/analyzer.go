@@ -20,8 +20,8 @@
 // name it was parsed from, never one a line directive gives, so a function taking a *testing.B under a directive
 // naming a test file is still judged, and its finding is shown at the directive's name (parity's directive.go).
 //
-// The original stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package discarded_pure_call
 
 import (

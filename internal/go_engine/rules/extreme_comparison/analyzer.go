@@ -10,8 +10,8 @@
 // staticcheck_report.Report, each the port of the one the original calls, proven against it beside it. Like the
 // original, it knows only the math package's limits and integer literals, never other constant expressions, whose
 // values can differ under build tags, and it takes int and uint to be 64 bits wide whatever the target. The registry
-// still runs the original, which stays the oracle: the parity tests beside this file run both over the same packages,
-// and the two differ nowhere they hold.
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over the same packages, and the two differ nowhere they hold.
 package extreme_comparison
 
 import (

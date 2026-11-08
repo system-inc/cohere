@@ -11,9 +11,10 @@
 // judges each parameter by that same function's intermediate representation. So the port judges one function at a
 // time and finds what the original finds. The syntax of a function holds the syntax of the function literals inside
 // it, whose parameters are none of the enclosing function's, so each literal's parameters are judged only by the
-// literal's own function, and each is reported once. The original stays the oracle: the parity tests beside this file
-// run both over the same packages, comparing the related information too, and they differ nowhere, since the port
-// walks the same syntax and asks the same function the same questions of it.
+// literal's own function, and each is reported once. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// comparing the related information too, and they differ nowhere, since the port walks the same syntax and asks the
+// same function the same questions of it.
 package argument_overwritten_before_use
 
 import (

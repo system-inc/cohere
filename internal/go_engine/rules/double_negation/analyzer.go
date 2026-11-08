@@ -13,8 +13,8 @@
 //
 // The original's second fix drops the parentheses x stood in, so !!(a || b) && c becomes a || b && c, which groups
 // differently; the port keeps it, the original's, for parity, and the parity fixture's precedence function shows it.
-// The registry still runs the original, which stays the oracle: the parity tests beside this file run both over the
-// same packages, and the two differ nowhere they hold.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package double_negation
 
 import (

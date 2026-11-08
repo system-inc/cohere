@@ -9,9 +9,9 @@
 // !=, and the right operand is the builtin nil by staticcheck_code.IsBuiltin, the pattern's Builtin as a helper.
 // code.Matches skips a pattern only when the package holds none of the symbols it names, and a Builtin is no symbol,
 // so every package is walked, generated files among them, since the original filters none. It reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package address_compared_to_nil
 
 import (

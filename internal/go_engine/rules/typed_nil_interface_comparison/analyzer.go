@@ -21,8 +21,9 @@
 // every instantiation (parity's generic). The original's second message, for a value made into the interface that
 // has no syntax to point a related place at, is kept, but no fixture reaches it: staticcheck's IR gives every value
 // it builds from source code a source, zero values, comma-ok forms and range variables included (parity's zeroValues
-// and madeFromOtherValues). The registry still runs the original, which stays the oracle: the parity tests beside
-// this file run both over the same packages, related places included, and the two differ nowhere they hold.
+// and madeFromOtherValues). The registry runs the port in the original's place, under its name, and the original stays
+// only as the oracle: the parity tests beside this file run both over the same packages, related places included, and
+// the two differ nowhere they hold.
 package typed_nil_interface_comparison
 
 import (

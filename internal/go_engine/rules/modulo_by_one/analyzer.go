@@ -9,8 +9,9 @@
 // the helper that reads the pattern's IntegerLiteral, and its value prints as 1. code.Matches skips a pattern only when
 // the package holds none of the symbols it names, and this one names none, so every package is walked, generated
 // files among them, since the original filters none. It reports through staticcheck_report.Report where the original
-// reports through report.Report. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same packages, and the two differ nowhere they hold.
+// reports through report.Report. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and the two differ
+// nowhere they hold.
 package modulo_by_one
 
 import (

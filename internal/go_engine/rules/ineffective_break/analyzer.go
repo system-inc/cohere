@@ -7,8 +7,9 @@
 // the report.Report the original calls, proven against it beside it. It keeps the original's reach as well: a switch
 // or select that is a statement of the loop's own body, not a type switch and not one nested deeper, and a break that
 // is a case's last statement, or the last of an if that ends the case, and of its else block, one level deep. The
-// original keeps no state from one loop to the next. The registry still runs the original, which stays the oracle:
-// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// original keeps no state from one loop to the next. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// and the two differ nowhere they hold.
 package ineffective_break
 
 import (

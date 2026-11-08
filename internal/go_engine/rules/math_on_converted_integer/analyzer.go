@@ -4,10 +4,10 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4015/sa4015.go, whose rules it keeps
 // and whose message it reports word for word over the same range, the call. It reads a type parameter's type set
-// through staticcheck's typeutil, as the original does. The original stays the oracle: the parity tests beside this
-// file run both over staticcheck's own fixtures and the house's. The two differ nowhere: staticcheck_call departs
-// from callcheck only where it would panic, on calls the math functions are never part of, as
-// testdata/src/differences records.
+// through staticcheck's typeutil, as the original does. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over staticcheck's own
+// fixtures and the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic,
+// on calls the math functions are never part of, as testdata/src/differences records.
 package math_on_converted_integer
 
 import (

@@ -10,9 +10,9 @@
 // space, and its terms are its fields, each compared as written, so `a,b` and `b,a` are two different terms. Two
 // lines are identical when they hold the same terms the same number of times in any order, and each such pair, the
 // earlier line first, is one finding, so three identical lines are three. `//go:build` lines are not read, as the
-// original reads none. Generated files are filtered, as the original's report asks. The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// original reads none. Generated files are filtered, as the original's report asks. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package duplicate_build_constraint
 
 import (

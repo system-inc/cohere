@@ -12,8 +12,9 @@
 // finding: a loop whose top level has no exit or no branching statement is not descended into, so a loop nested in it
 // goes unjudged (parity's nestedInLoopWithoutExit); a function literal is walked both as part of the function holding
 // it and as itself, so a finding in a loop inside it is reported twice (parity's nestedLiteral); and only the last
-// exit at the top level is reported. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same modules, and the two differ nowhere they hold.
+// exit at the top level is reported. The registry runs the port in the original's place, under its name, and the
+// original stays only as the oracle: the parity tests beside this file run both over the same modules, and the two
+// differ nowhere they hold.
 package unconditional_loop_exit
 
 import (

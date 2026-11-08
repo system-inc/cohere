@@ -13,8 +13,8 @@
 // code.IsOfPointerToTypeWithName whether the receiver, its parentheses removed as the pattern's bindings remove them,
 // is a pointer to net/url.URL, which is go/types/typeutil's IsPointerToTypeWithName of the receiver's type, and the
 // port asks that directly, and whether the method is Add, Del or Set. The original keeps nothing from one call to the
-// next, and stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// next. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package ineffective_url_query_modification
 
 import (

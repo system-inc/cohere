@@ -16,8 +16,9 @@
 // port keeps it. The original first asks code.CouldMatchAny whether the package's type index holds `runtime.GOOS` or
 // `runtime.GOARCH` at all, and walks nothing when it does not; a package that names either imports runtime, which the
 // index then holds, so the port walks every package and finds the same. The original keeps nothing from one
-// comparison to the next, and stays the oracle: the parity tests beside this file run both over the same packages,
-// loaded for several targets, and the two differ nowhere they hold.
+// comparison to the next. The registry runs the port in the original's place, under its name, and the original stays
+// only as the oracle: the parity tests beside this file run both over the same packages, loaded for several targets,
+// and the two differ nowhere they hold.
 package impossible_target_comparison
 
 import (
