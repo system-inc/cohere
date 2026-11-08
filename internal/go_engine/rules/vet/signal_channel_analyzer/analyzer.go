@@ -1,20 +1,30 @@
 // Package signal_channel_analyzer is vet's sigchanyzer pass, an unbuffered channel handed to signal.Notify. Notify
 // never blocks sending a signal, so a signal that arrives while no receiver is ready at an unbuffered channel is
-// dropped. The pass judges the channel by how it was made: a call to signal.Notify, named directly or through a
-// variable declared as it, whose channel is a variable declared as a call with one argument, or is itself such a call
-// other than the builtin make, is reported, with a fix that passes that call a second argument, 1.
+// dropped. The pass judges the channel by how it was made: a call to signal.Notify whose channel is a variable
+// declared as the builtin make with one argument, `make(chan os.Signal)`, is reported, with a fix that passes make a
+// second argument, 1.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/sigchanyzer/sigchanyzer.go, whose
-// logic it keeps and whose message and fix it reports word for word and edit for edit, at the same position. The
+// message and fix it reports word for word and edit for edit, at the same position, wherever the two report. The
 // registry runs the port in the original's place, and the original stays the oracle: the parity tests beside this
-// file run both over the same packages.
+// file run both over the same packages, and the differences fixture holds every shape where they disagree.
 //
-// It differs in one way, where it is right. The original finds a variable's declaration through the parser's
-// resolution of identifiers (ast.Ident.Obj, deprecated since Go 1.22), which resolves a name within its own file
-// alone, so a channel, or a variable holding signal.Notify, declared at package level in another file of the
-// package goes unseen. The port finds the declaration through the type checker's definitions, across the package's
-// files, so it reports those calls too, with the fix in the declaring file. Within one file the two resolutions name
-// the same declaration, and the differences fixture holds the cross-file shapes.
+// It differs where it is right, in four ways.
+//
+//   - The original finds a variable's declaration through the parser's resolution of identifiers (ast.Ident.Obj,
+//     deprecated since Go 1.22), which resolves a name within its own file alone, so a channel, or a variable holding
+//     signal.Notify, declared at package level in another file of the package goes unseen. The port reads the type
+//     checker's definitions, across the package's files, and fixes the declaring file.
+//   - The original knows Notify only as a selector, `signal.Notify`, or a variable declared as one, so it misses
+//     Notify named bare where os/signal is dot-imported. The port compares the object named with os/signal's Notify.
+//   - The original reads no parentheses, so `(signal.Notify)(channel)`, `signal.Notify((channel))` and
+//     `channel := (make(chan os.Signal))` go unseen. The port looks through them.
+//   - The original treats a channel made by any call of one argument as unbuffered, conservatively
+//     (golang/go#45043): `newChannel(5)`, a conversion `(chan os.Signal)(buffered)`, a function a package names make,
+//     or `(make)(chan os.Signal)` written straight into the call, which its own exemption for make passes over only
+//     for want of reading the parentheses. Each finding there is wrong whenever the channel is buffered, and its fix,
+//     a size appended to the call's arguments, does not compile. The port reports only the builtin make with one
+//     argument, which proves a channel unbuffered, and drops the rest with their fixes.
 package signal_channel_analyzer
 
 import (
@@ -46,11 +56,20 @@ var Analyzer = &analysis.Analyzer{
 // signalPackagePath is the import path of the package whose Notify the pass judges.
 const signalPackagePath = "os/signal"
 
+// builtinMake is the universe's make, which the type checker records as the object of every identifier naming it.
+var builtinMake = types.Universe.Lookup("make")
+
 func run(pass *analysis.Pass) (any, error) {
 	// A package that does not import os/signal itself cannot name its Notify, so it is passed over unread. Without
 	// this the walk would find nothing there either, so it saves the walk and changes no finding.
-	if !imports(pass.Pkg, signalPackagePath) {
+	signalPackage := importedPackage(pass.Pkg, signalPackagePath)
+	if signalPackage == nil {
 		return nil, nil
+	}
+	notify, isFunction := signalPackage.Scope().Lookup("Notify").(*types.Func)
+	if !isFunction {
+		// Invariant: os/signal declares Notify, a function, in every release the type checker can load.
+		panic("signal_channel_analyzer: os/signal declares no function Notify")
 	}
 	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	if !isInspector {
@@ -60,7 +79,7 @@ func run(pass *analysis.Pass) (any, error) {
 	declarations := declaredValuesOf(inspected, pass.TypesInfo)
 	// All visits each call in preorder, as the original's Preorder does, and hands it over typed.
 	for call := range inspector.All[*ast.CallExpr](inspected) {
-		if !isSignalNotify(pass.TypesInfo, declarations, call) {
+		if !callsNotify(pass.TypesInfo, declarations, notify, call) {
 			continue
 		}
 		// A call to Notify that type-checks passes its channel, and the pass runs only over packages that type-check,
@@ -68,29 +87,20 @@ func run(pass *analysis.Pass) (any, error) {
 		if len(call.Args) == 0 {
 			continue
 		}
-		// channelDeclaration is the call that made the channel: the one that declared the variable passed, or the call
-		// passed itself.
-		var channelDeclaration *ast.CallExpr
-		switch channel := call.Args[0].(type) {
-		case *ast.Ident:
-			if declared, isCall := declarations.valueOf(pass.TypesInfo, channel).(*ast.CallExpr); isCall {
-				channelDeclaration = declared
-			}
-		case *ast.CallExpr:
-			// Only signal.Notify(make(chan os.Signal), os.Interrupt) is safe, since no one else holds the channel to
-			// receive from it. Any other call is conservatively treated as unsafe, as the original does, see
-			// golang/go#45043.
-			if isBuiltinMake(pass.TypesInfo, channel) {
-				continue
-			}
-			channelDeclaration = channel
-		}
-		// A call with no argument, or with a second already, a size, is left alone: there is nothing to append a size
-		// to, or the channel has one.
-		if channelDeclaration == nil || len(channelDeclaration.Args) != 1 {
+		// Only a channel passed by name is judged. make written straight into the call is exempt, as the original
+		// exempts it: no one else holds that channel, so there is no receive to miss a signal (golang/go#45043). Any
+		// other expression passed, a call among them, makes a channel whose size the pass cannot know.
+		channel, isIdentifier := ast.Unparen(call.Args[0]).(*ast.Ident)
+		if !isIdentifier {
 			continue
 		}
-		replacement, formatted := withBuffer(channelDeclaration)
+		// made is the call the channel was declared as. Only make with one argument proves it unbuffered: a size of
+		// zero is a second argument, and any other call's channel may hold any number.
+		made, isCall := ast.Unparen(declarations.valueOf(pass.TypesInfo, channel)).(*ast.CallExpr)
+		if !isCall || !isBuiltinMake(pass.TypesInfo, made) || len(made.Args) != 1 {
+			continue
+		}
+		replacement, formatted := withBuffer(made)
 		if !formatted {
 			continue
 		}
@@ -101,8 +111,8 @@ func run(pass *analysis.Pass) (any, error) {
 			SuggestedFixes: []analysis.SuggestedFix{{
 				Message: "Change to buffer channel",
 				TextEdits: []analysis.TextEdit{{
-					Pos:     channelDeclaration.Pos(),
-					End:     channelDeclaration.End(),
+					Pos:     made.Pos(),
+					End:     made.End(),
 					NewText: replacement,
 				}},
 			}},
@@ -125,51 +135,44 @@ func withBuffer(declaration *ast.CallExpr) ([]byte, bool) {
 	return printed.Bytes(), true
 }
 
-// isSignalNotify reports whether call calls os/signal's Notify, by a selector naming it, `signal.Notify(...)`, or by
-// a variable declared as such a selector, `notify := signal.Notify; notify(...)`.
-func isSignalNotify(information *types.Info, declarations declaredValues, call *ast.CallExpr) bool {
-	switch function := call.Fun.(type) {
+// callsNotify reports whether call calls notify, os/signal's Notify, through any parentheses: named by a selector,
+// `signal.Notify(...)`, or bare where os/signal is dot-imported, `Notify(...)`, or by a variable declared as either,
+// `listen := signal.Notify; listen(...)`.
+func callsNotify(information *types.Info, declarations declaredValues, notify *types.Func, call *ast.CallExpr) bool {
+	function := ast.Unparen(call.Fun)
+	if names(information, function, notify) {
+		return true
+	}
+	variable, isIdentifier := function.(*ast.Ident)
+	return isIdentifier && names(information, ast.Unparen(declarations.valueOf(information, variable)), notify)
+}
+
+// names reports whether expression, an identifier or a selector, names object.
+func names(information *types.Info, expression ast.Expr, object types.Object) bool {
+	switch named := expression.(type) {
+	case *ast.Ident:
+		return information.Uses[named] == object
 	case *ast.SelectorExpr:
-		return isNotify(information, function.Sel)
-	case *ast.Ident:
-		if declared, isSelector := declarations.valueOf(information, function).(*ast.SelectorExpr); isSelector {
-			return isNotify(information, declared.Sel)
-		}
-		return false
+		return information.Uses[named.Sel] == object
 	default:
 		return false
 	}
 }
 
-// isNotify reports whether name names an object called Notify in os/signal.
-func isNotify(information *types.Info, name *ast.Ident) bool {
-	object := information.ObjectOf(name)
-	// The type checker records the object of every selector's name in a package that type-checks, and only the
-	// universe's objects have no package, none of them called Notify, so neither guard is taken. The original would
-	// panic where they are.
-	if object == nil || object.Pkg() == nil {
-		return false
-	}
-	return object.Name() == "Notify" && object.Pkg().Path() == signalPackagePath
-}
-
-// isBuiltinMake reports whether call calls the builtin make, named by an identifier, so a parenthesized `(make)(...)`
-// is not, as in the original.
+// isBuiltinMake reports whether call calls the builtin make, through any parentheses, as the type checker resolves the
+// name, so a function a package names make is not.
 func isBuiltinMake(information *types.Info, call *ast.CallExpr) bool {
-	if !information.Types[call.Fun].IsBuiltin() {
-		return false
-	}
-	switch function := call.Fun.(type) {
-	case *ast.Ident:
-		return information.ObjectOf(function).Name() == "make"
-	default:
-		return false
-	}
+	function, isIdentifier := ast.Unparen(call.Fun).(*ast.Ident)
+	return isIdentifier && information.Uses[function] == builtinMake
 }
 
-// imports reports whether importer imports the package at path directly. x/tools' typesinternal.Imports.
-func imports(importer *types.Package, path string) bool {
-	return slices.ContainsFunc(importer.Imports(), func(imported *types.Package) bool {
-		return imported.Path() == path
-	})
+// importedPackage is the package at path that importer imports directly, or nil when it imports none there. x/tools'
+// typesinternal.Imports, which reports only whether it does.
+func importedPackage(importer *types.Package, path string) *types.Package {
+	for _, imported := range importer.Imports() {
+		if imported.Path() == path {
+			return imported
+		}
+	}
+	return nil
 }

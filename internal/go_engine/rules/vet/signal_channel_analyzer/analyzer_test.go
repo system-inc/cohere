@@ -1,7 +1,6 @@
 package signal_channel_analyzer
 
 import (
-	"bufio"
 	"cmp"
 	"fmt"
 	"os"
@@ -48,41 +47,57 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 }
 
 // adjudicatedPattern is one comment in the differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes, on the line the finding starts, or `fixes:` and the text one of those
-// findings' fixes puts in place of what starts on the comment's line.
-var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|fixes: (.+?))\s*$`)
+// the message of a true finding only the port makes, on the line the finding starts, `fixes:` and the text one of
+// those findings' fixes puts in place of what starts on the comment's line, or `drops:` and the message of a false
+// finding only the original makes, on the line it starts, with the reason it is false on the line above.
+var adjudicatedPattern = regexp.MustCompile(`^(?:finds: (.+?)|fixes: (.+?)|drops: (.+?))\s*$`)
 
 // Over the differences fixture the two disagree, and only where each disagreement was adjudicated in the port's
 // favour: every finding the port alone makes is recorded on its line, every edit of its fixes is recorded on the line
-// it starts, and every record is matched. The original makes no finding the port does not, since the port is never
-// worse than the original, and the sides' common findings show the fixture is read the same by both.
+// it starts, every finding the original alone makes is a drop recorded on its line, with its reason above it, and
+// every record is matched exactly, by line and message, so a drop that does not happen fails too. The sides' common
+// findings show the fixture is read the same by both.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	original, port := findingsOf(test, "differences")
 	test.Logf("the original found %d, the port %d", len(original), len(port))
 	expectedFindings := []finding{}
 	expectedEdits := []edit{}
+	expectedDrops := []finding{}
 	paths, globError := filepath.Glob(filepath.Join(analysistest.TestData(), "src", "differences", "*.go"))
 	if globError != nil {
 		test.Fatal(globError)
 	}
 	for _, path := range paths {
-		for line, comment := range adjudicatedComments(test, path) {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			test.Fatal(readError)
+		}
+		lines := strings.Split(string(contents), "\n")
+		for index, text := range lines {
+			// A line holds one record at most, since a comment holds the rest of its line.
+			_, comment, holdsOne := strings.Cut(text, "// port ")
+			if !holdsOne {
+				continue
+			}
+			file, line := filepath.Base(path), index+1
 			match := adjudicatedPattern.FindStringSubmatch(comment)
 			switch {
 			case match == nil:
-				test.Fatalf("%s:%d holds a comment the test cannot read: %q", filepath.Base(path), line, comment)
+				test.Fatalf("%s:%d holds a comment the test cannot read: %q", file, line, comment)
 			case match[1] != "":
-				expectedFindings = append(expectedFindings, finding{
-					file: filepath.Base(path), line: line, message: match[1],
-				})
+				expectedFindings = append(expectedFindings, finding{file: file, line: line, message: match[1]})
+			case match[2] != "":
+				expectedEdits = append(expectedEdits, edit{file: file, line: line, text: match[2]})
+			case index == 0 || !strings.HasPrefix(strings.TrimSpace(lines[index-1]), "//"):
+				test.Errorf("%s:%d drops a finding with no reason on the line above", file, line)
 			default:
-				expectedEdits = append(expectedEdits, edit{file: filepath.Base(path), line: line, text: match[2]})
+				expectedDrops = append(expectedDrops, finding{file: file, line: line, message: match[3]})
 			}
 		}
 	}
-	if len(expectedFindings) == 0 {
-		test.Fatal("the differences fixture records nothing, so the comparison proves nothing")
+	if len(expectedFindings) == 0 || len(expectedDrops) == 0 {
+		test.Fatal("the differences fixture records no finding or no drop, so the comparison proves nothing")
 	}
 	portAlone := difference(port, original, described)
 	for _, unrecorded := range difference(withoutDetail(portAlone), expectedFindings, described) {
@@ -101,33 +116,14 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	for _, unmatched := range difference(expectedEdits, editsAlone, editDescribed) {
 		test.Errorf("the fixture records that the port alone fixes %s, and it does not", editDescribed(unmatched))
 	}
-	for _, originalAlone := range difference(original, port, described) {
-		test.Errorf("the original alone found %s, and the port is never weaker", described(originalAlone))
+	originalAlone := withoutDetail(difference(original, port, described))
+	for _, unrecorded := range difference(originalAlone, expectedDrops, described) {
+		test.Errorf("the original alone found %s, which the fixture does not record as dropped", described(unrecorded))
 	}
-}
-
-// adjudicatedComments is every `// port ` comment in the file at path, the text after its opening, keyed by its line.
-// A line holds one at most, since a comment holds the rest of its line.
-func adjudicatedComments(test *testing.T, path string) map[int]string {
-	test.Helper()
-	file, openError := os.Open(path)
-	if openError != nil {
-		test.Fatal(openError)
+	for _, unmatched := range difference(expectedDrops, originalAlone, described) {
+		test.Errorf("the fixture records that the port drops %s, and the original does not find it alone",
+			described(unmatched))
 	}
-	defer func() {
-		_ = file.Close() // Ignored: the file was only read, and every line it holds has been read.
-	}()
-	comments := map[int]string{}
-	scanner := bufio.NewScanner(file)
-	for line := 1; scanner.Scan(); line++ {
-		if _, comment, holdsOne := strings.Cut(scanner.Text(), "// port "); holdsOne {
-			comments[line] = comment
-		}
-	}
-	if scanError := scanner.Err(); scanError != nil {
-		test.Fatal(scanError)
-	}
-	return comments
 }
 
 // finding is one finding as the differential compares it.

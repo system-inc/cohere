@@ -1,7 +1,8 @@
 // Package parity holds every branch of sigchanyzer's judgment and of the fix it offers, with clean cases beside each,
 // and the shapes most likely to differ between the port and x/tools' sigchanyzer. The differential test runs both
 // over each and compares their findings and fixes. Every channel and every variable holding signal.Notify is declared
-// in the file that uses it, where the two resolutions agree; the differences fixture holds the other files.
+// in the file that uses it, where the two resolutions agree, and every channel judged is made by the builtin make or
+// by no call at all; the differences fixture holds the other files, the other calls and the parenthesized shapes.
 package parity
 
 import (
@@ -56,8 +57,6 @@ func throughVariable() {
 	var assigned func(chan<- os.Signal, ...os.Signal)
 	assigned = signal.Notify
 	assigned(unbuffered, os.Interrupt)
-	// Parentheses around the function are neither a selector nor an identifier.
-	(signal.Notify)(unbuffered, os.Interrupt)
 	// Other functions of os/signal are not Notify.
 	signal.Stop(unbuffered)
 	signal.Reset(os.Interrupt)
@@ -68,14 +67,8 @@ func calls() {
 	// The builtin make, unbuffered or not, is safe: no one else holds the channel.
 	signal.Notify(make(chan os.Signal), os.Interrupt)
 	signal.Notify(make(chan os.Signal, 1), os.Interrupt)
-	// Parenthesized, make is not named by an identifier, so the call is judged as any other.
-	signal.Notify((make)(chan os.Signal), os.Interrupt) // finding
-	// Any other call with one argument is conservatively treated as unsafe.
-	signal.Notify(newChannel(0), os.Interrupt)                       // finding
-	signal.Notify((chan os.Signal)(bufferedPackage), os.Interrupt)   // finding
-	signal.Notify(newGeneric[os.Signal](0), os.Interrupt)            // finding
-	signal.Notify(variadicChannel([]int{1}...), os.Interrupt)        // finding
-	signal.Notify(newChannel(newSize(newSize(2))), os.Interrupt)     // finding
+	// A call with no argument or two, wrapped, indexed, received from or selected, is neither judged.
+	signal.Notify((make(chan os.Signal)), os.Interrupt)              // parenthesized
 	signal.Notify(newSizedChannel(1, 2), os.Interrupt)               // two arguments
 	signal.Notify(newDefaultChannel(), os.Interrupt)                 // no argument
 	signal.Notify(channelAndSignal())                                // no argument
@@ -84,20 +77,12 @@ func calls() {
 	signal.Notify(holder{channel: bufferedPackage}.channel, os.Kill) // a selector
 }
 
-// A variable declared as a call other than make, with one argument or another number.
+// A variable declared as a call other than make, with no argument or two.
 func declaredCalls() {
-	fromCall := newChannel(3)
-	signal.Notify(fromCall, os.Interrupt) // finding
 	fromTwo := newSizedChannel(1, 2)
 	signal.Notify(fromTwo, os.Interrupt)
 	fromNone := newDefaultChannel()
 	signal.Notify(fromNone, os.Interrupt)
-	// Parentheses around the declared value are not a call.
-	parenthesized := (make(chan os.Signal))
-	signal.Notify(parenthesized, os.Interrupt)
-	// A conversion declared, as a call of one argument.
-	converted := (chan os.Signal)(bufferedPackage)
-	signal.Notify(converted, os.Interrupt) // finding
 }
 
 // Declarations whose names and values differ in number, or that reuse a name.
@@ -230,17 +215,9 @@ func (holder) Notify(channel chan<- os.Signal, notified ...os.Signal) {}
 
 type embedded struct{ holder }
 
-func newChannel(size int) chan os.Signal { return make(chan os.Signal, size) }
-
 func newSizedChannel(size int, extra int) chan os.Signal { return make(chan os.Signal, size+extra) }
 
 func newDefaultChannel() chan os.Signal { return make(chan os.Signal, 1) }
-
-func newGeneric[T any](size int) chan T { return make(chan T, size) }
-
-func variadicChannel(sizes ...int) chan os.Signal { return make(chan os.Signal, len(sizes)) }
-
-func newSize(size int) int { return size }
 
 func channelAndSignal() (chan os.Signal, os.Signal) { return make(chan os.Signal, 1), os.Interrupt }
 
