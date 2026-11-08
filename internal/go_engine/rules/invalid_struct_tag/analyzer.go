@@ -9,9 +9,9 @@
 // escaped, holds no key the parser can find, and the port leaves it alone as the original does. Duplicate `choice`,
 // `optional-value` and `default` keys are left alone in a package any of whose files imports
 // github.com/jessevdk/go-flags, which accepts them; whether it does is read once per package, on its first struct
-// type, kept in the context's state, and handed to each struct's check. The `json` grammar is not judged in encoding/json, encoding/json/v2 or their
-// external tests, which test themselves; no fixture proves it, since a module's package of that path is ambiguous with
-// the standard library's and never loads.
+// type, kept in the context's state, and handed to each struct's check. The `json` grammar is not judged in
+// encoding/json, encoding/json/v2 or their external tests, which test themselves; no fixture proves it, since a
+// module's package of that path is ambiguous with the standard library's and never loads.
 //
 // The `xml` value is judged by staticcheck's fakexml, a fork of encoding/xml's field reading over go/types, and the
 // field it reads is built by staticcheck's fakereflect, both borrowed in this wave as data, since wave 5 ports them,
