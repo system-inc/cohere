@@ -25,56 +25,47 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/edge"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 	"honnef.co/go/tools/knowledge"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since three of its four findings filter them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1025",
-	Doc:      `Flags fmt.Sprintf("%s", x) where x is or has a string already: staticcheck's S1025, ported.`,
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, with its ancestors,
+// since where the call stands in its file decides its fix.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+		call, isCall := node.(*ast.CallExpr)
+		if !isCall {
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("redundant_sprintf_of_string: the dispatcher handed over a node that is not a call")
+		}
+		Check(context, call, stack)
+	},
 }
 
-// run builds the pass's context and judges every call of the package, each where it stands in its file.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("redundant_sprintf_of_string: the inspect pass's result is missing")
-	}
-	for cursor := range inspected.Root().Preorder((*ast.CallExpr)(nil)) {
-		Check(context, cursor)
-	}
-	return nil, nil
-}
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1025",
+	"S1025",
+	`Flags fmt.Sprintf("%s", x) where x is or has a string already: staticcheck's S1025, ported.`,
+	&Listener,
+)
 
-// Check judges the call at cursor: fmt.Sprintf of the format "%s" and one argument, whose type is no type parameter,
-// no reflect.Value and no fmt.Formatter, is the argument's String method where it has one, the argument itself where
-// it is a string, and a conversion to string where it converts to one. Where the call stands decides the fix's
-// shape, which is why Check takes a cursor and not the call alone: an argument parenthesized where the call's context
-// would regroup it, or no fix where the fix leaves a bare value as a statement or names no predeclared string.
-func Check(context *rule.Context, cursor inspector.Cursor) {
-	call, isCall := cursor.Node().(*ast.CallExpr)
-	if !isCall {
-		return
-	}
+// Check judges call, whose ancestors are stack, outermost first: fmt.Sprintf of the format "%s" and one argument,
+// whose type is no type parameter, no reflect.Value and no fmt.Formatter, is the argument's String method where it
+// has one, the argument itself where it is a string, and a conversion to string where it converts to one. Where the
+// call stands decides the fix's shape, which is why Check takes its ancestors and not the call alone: an argument
+// parenthesized where the call's context would regroup it, or no fix where the fix leaves a bare value as a statement
+// or names no predeclared string. Check keeps no part of stack, which the walk reuses.
+func Check(context *rule.Context, call *ast.CallExpr, stack []ast.Node) {
 	// The original walks the type index's calls of fmt.Sprintf, and the index keeps no symbol of the package it
 	// indexes, so the fmt package's own calls are never walked.
 	if context.Package.Path() == "fmt" {
@@ -120,7 +111,7 @@ func Check(context *rule.Context, cursor inspector.Cursor) {
 		// otherwise bind tighter, `(*value).String()`, and the port where a composite literal would land bare in a
 		// control clause, `(T{}).String()`.
 		receiver := argument
-		if isInControlClause(cursor) && hasBareCompositeLiteral(argument) {
+		if isInControlClause(call, stack) && hasBareCompositeLiteral(argument) {
 			receiver = &ast.ParenExpr{X: argument}
 		}
 		stringCall := &ast.CallExpr{Fun: &ast.SelectorExpr{X: receiver, Sel: &ast.Ident{Name: "String"}}}
@@ -132,10 +123,10 @@ func Check(context *rule.Context, cursor inspector.Cursor) {
 		fixes := []analysis.SuggestedFix{}
 		// The argument alone, as a statement, is a value evaluated and not used, and after go or defer no call at
 		// all, so no rewrite says what the call did.
-		if !isDiscarded(cursor) {
+		if !isDiscarded(stack) {
 			replacement := argument
-			if (isIndexed(cursor) && isOperation(argument)) ||
-				(isInControlClause(cursor) && hasBareCompositeLiteral(argument)) {
+			if (isIndexed(call, stack) && isOperation(argument)) ||
+				(isInControlClause(call, stack) && hasBareCompositeLiteral(argument)) {
 				replacement = &ast.ParenExpr{X: argument}
 			}
 			fixes = append(fixes, edit.Fix("Remove unnecessary call to fmt.Sprintf",
@@ -149,12 +140,12 @@ func Check(context *rule.Context, cursor inspector.Cursor) {
 		staticcheck_report.Report(context, call,
 			"the argument's underlying type is a string, should use a simple conversion instead of fmt.Sprintf",
 			staticcheck_report.FilterGenerated(),
-			staticcheck_report.Fixes(conversionFixes(context, cursor, call, argument)...))
+			staticcheck_report.Fixes(conversionFixes(context, call, stack, argument)...))
 	case staticcheck_code.IsOfStringConvertibleByteSlice(context, argument):
 		staticcheck_report.Report(context, call,
 			"the argument's underlying type is a slice of bytes, should use a simple conversion instead of fmt.Sprintf",
 			staticcheck_report.FilterGenerated(),
-			staticcheck_report.Fixes(conversionFixes(context, cursor, call, argument)...))
+			staticcheck_report.Fixes(conversionFixes(context, call, stack, argument)...))
 	}
 }
 
@@ -162,9 +153,9 @@ func Check(context *rule.Context, cursor inspector.Cursor) {
 // that conversion is a value evaluated and not used, or where string names something other than the predeclared type
 // at the call, a declaration of the code's own in a block or its package, so no conversion spelled any way is one.
 func conversionFixes(
-	context *rule.Context, cursor inspector.Cursor, call *ast.CallExpr, argument ast.Expr,
+	context *rule.Context, call *ast.CallExpr, stack []ast.Node, argument ast.Expr,
 ) []analysis.SuggestedFix {
-	if isDiscarded(cursor) {
+	if isDiscarded(stack) {
 		return nil
 	}
 	scope := context.Package.Scope().Innermost(call.Pos())
@@ -204,28 +195,42 @@ func isFormatter(typ types.Type) bool {
 	return signature.Params().Len() == 2 && signature.Results().Len() == 0
 }
 
-// isDiscarded is whether the call at cursor is a statement of its own, parenthesized or not, or the call a go or defer
-// statement makes, where nothing reads the value it makes.
-func isDiscarded(cursor inspector.Cursor) bool {
-	// The outermost parentheses around the call, or the call itself where it has none.
-	outermost := cursor
-	for outermost.ParentEdgeKind() == edge.ParenExpr_X {
-		outermost = outermost.Parent()
+// isDiscarded is whether the call whose ancestors are stack is a statement of its own, parenthesized or not, or the
+// call a go or defer statement makes, where nothing reads the value it makes. Each of the four holds no other
+// expression, so the ancestor's kind is the edge the call stands on.
+func isDiscarded(stack []ast.Node) bool {
+	// The nearest ancestor outside the parentheses around the call, the call's parent where it has none.
+	outside := len(stack) - 1
+	for outside >= 0 {
+		if _, isParenthesis := stack[outside].(*ast.ParenExpr); !isParenthesis {
+			break
+		}
+		outside--
 	}
-	switch outermost.ParentEdgeKind() {
-	case edge.ExprStmt_X, edge.GoStmt_Call, edge.DeferStmt_Call:
+	if outside < 0 {
+		// The walk's stack holds the file below every call, so this is never met.
+		return false
+	}
+	switch stack[outside].(type) {
+	case *ast.ExprStmt, *ast.GoStmt, *ast.DeferStmt:
 		return true
 	}
 	return false
 }
 
-// isIndexed is whether the call at cursor is, unparenthesized, what an index or slice expression indexes, where an
-// operator in what replaces it would bind looser than the index: `fmt.Sprintf("%s", a+b)[0]` is `(a + b)[0]`, and
-// `a + b[0]` indexes b alone.
-func isIndexed(cursor inspector.Cursor) bool {
-	switch cursor.ParentEdgeKind() {
-	case edge.IndexExpr_X, edge.SliceExpr_X:
-		return true
+// isIndexed is whether call, whose ancestors are stack, is, unparenthesized, what an index or slice expression
+// indexes, where an operator in what replaces it would bind looser than the index: `fmt.Sprintf("%s", a+b)[0]` is
+// `(a + b)[0]`, and `a + b[0]` indexes b alone.
+func isIndexed(call *ast.CallExpr, stack []ast.Node) bool {
+	if len(stack) == 0 {
+		// The walk's stack holds the file below every call, so this is never met.
+		return false
+	}
+	switch parent := stack[len(stack)-1].(type) {
+	case *ast.IndexExpr:
+		return parent.X == call
+	case *ast.SliceExpr:
+		return parent.X == call
 	}
 	return false
 }
@@ -240,28 +245,58 @@ func isOperation(expression ast.Expr) bool {
 	return false
 }
 
-// isInControlClause is whether the call at cursor stands in the clause of an if, for, switch or range statement
-// outside every parenthesis, bracket and brace, where the parser reads a brace after a type's name as the start of
-// the statement's block: through operators, selectors, indexed and sliced values, assertions and callees, and the
-// simple statements a clause holds, to the clause.
-func isInControlClause(cursor inspector.Cursor) bool {
+// isInControlClause is whether call, whose ancestors are stack, stands in the clause of an if, for, switch or range
+// statement outside every parenthesis, bracket and brace, where the parser reads a brace after a type's name as the
+// start of the statement's block: through operators, selectors, indexed and sliced values, assertions and callees, and
+// the simple statements a clause holds, to the clause.
+func isInControlClause(call *ast.CallExpr, stack []ast.Node) bool {
 	// The node the walk has climbed to, the call first and then each node that holds it at the clause's level.
-	reached := cursor
-	for {
-		switch reached.ParentEdgeKind() {
-		case edge.BinaryExpr_X, edge.BinaryExpr_Y, edge.UnaryExpr_X, edge.StarExpr_X, edge.SelectorExpr_X,
-			edge.IndexExpr_X, edge.IndexListExpr_X, edge.SliceExpr_X, edge.TypeAssertExpr_X, edge.CallExpr_Fun,
-			edge.AssignStmt_Lhs, edge.AssignStmt_Rhs, edge.ExprStmt_X, edge.SendStmt_Chan, edge.SendStmt_Value,
-			edge.IncDecStmt_X:
-			reached = reached.Parent()
-		case edge.IfStmt_Init, edge.IfStmt_Cond, edge.ForStmt_Init, edge.ForStmt_Cond, edge.ForStmt_Post,
-			edge.SwitchStmt_Init, edge.SwitchStmt_Tag, edge.TypeSwitchStmt_Init, edge.TypeSwitchStmt_Assign,
-			edge.RangeStmt_Key, edge.RangeStmt_Value, edge.RangeStmt_X:
-			return true
+	var reached ast.Node = call
+	for index := len(stack) - 1; index >= 0; index-- {
+		switch parent := stack[index].(type) {
+		case *ast.BinaryExpr, *ast.UnaryExpr, *ast.StarExpr, *ast.AssignStmt, *ast.ExprStmt, *ast.SendStmt,
+			*ast.IncDecStmt:
+			// Every expression each of these holds is at the clause's level.
+		case *ast.SelectorExpr:
+			if parent.X != reached {
+				return false
+			}
+		case *ast.IndexExpr:
+			if parent.X != reached {
+				return false
+			}
+		case *ast.IndexListExpr:
+			if parent.X != reached {
+				return false
+			}
+		case *ast.SliceExpr:
+			if parent.X != reached {
+				return false
+			}
+		case *ast.TypeAssertExpr:
+			if parent.X != reached {
+				return false
+			}
+		case *ast.CallExpr:
+			if parent.Fun != reached {
+				return false
+			}
+		case *ast.IfStmt:
+			return reached == parent.Init || reached == parent.Cond
+		case *ast.ForStmt:
+			return reached == parent.Init || reached == parent.Cond || reached == parent.Post
+		case *ast.SwitchStmt:
+			return reached == parent.Init || reached == parent.Tag
+		case *ast.TypeSwitchStmt:
+			return reached == parent.Init || reached == parent.Assign
+		case *ast.RangeStmt:
+			return reached == parent.Key || reached == parent.Value || reached == parent.X
 		default:
 			return false
 		}
+		reached = stack[index]
 	}
+	return false
 }
 
 // hasBareCompositeLiteral is whether expression holds, outside every parenthesis, bracket and brace, a composite
