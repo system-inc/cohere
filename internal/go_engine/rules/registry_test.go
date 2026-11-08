@@ -881,6 +881,7 @@ var portedPasses = []string{
 	"regular_expression_raw_string",
 	"repeated_if_else_condition",
 	"self_assignment",
+	"separate_declaration_and_assignment",
 	"single_append_concatenation",
 	"single_argument_append",
 	"single_case_select",
