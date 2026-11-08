@@ -3,20 +3,16 @@ package unnecessary_blank_identifier
 import (
 	"bytes"
 	"cmp"
-	"fmt"
 	"go/format"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1005"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
@@ -27,8 +23,9 @@ import (
 // only where the language is go1.4 or newer, so the version matters: staticcheck's testutil loads each folder as a
 // module whose go.mod, overlaid, says `go 1.N` for its folder's name, and the go line is what its loader and ours
 // alike hand the type checker as the package's version, which the gate reads. So testdata/src/go1.0, go1.3 and go1.4
-// are each a module, example.com as staticcheck's is, whose go.mod says its folder's version, and every load checks
-// that the version reached the package, so the go1.3 fixture's silence is the gate's and not a version lost.
+// are each a module, example.com as staticcheck's is, whose go.mod says its folder's version, which the harness loads
+// as a module since the folder holds a go.mod, and TestFixtureModulesLoadUnderTheirVersions checks that the version
+// reached every package, so the go1.3 fixture's silence is the gate's and not a version lost.
 const upstream = "CheckUnnecessaryBlank"
 
 // versions are the modules the fixtures load from, each named for the version its go.mod says, staticcheck's three.
@@ -44,13 +41,19 @@ var goldens = []struct {
 	{version: "go1.4", file: "range.go"},
 }
 
-// moduleEnvironment loads a fixture module as analysistest does, in module mode with nothing fetched, as the parity
-// harness loads a fixture directory that holds a go.mod.
-var moduleEnvironment = []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"}
-
 // module is the directory of the fixture module of version.
 func module(version string) string {
 	return filepath.Join(analysistest.TestData(), "src", version)
+}
+
+// Every package of every fixture module loads under the version its go.mod says, as the harness loads it, since that
+// is what both analyzers' version gates read. Were the go line lost, the type checker would hand every package the
+// newest language, and the go1.0 and go1.3 fixtures would compare the same findings under the wrong version.
+func TestFixtureModulesLoadUnderTheirVersions(test *testing.T) {
+	test.Parallel()
+	for _, version := range versions {
+		requireLoadsUnder(test, module(version), version, "./...")
+	}
 }
 
 // Every `//@ diag(...)` note the upstream fixture holds, under each version, the port reports on the same line with
@@ -67,8 +70,6 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 			test.Fatal(readError)
 		}
 		wanted += len(wants)
-		// The load checks the package's version, and parity.Findings below loads the same module the same way.
-		diagnosticsOf(test, module(version), version, "./"+upstream)
 		original, port := parity.Findings(test, s1005.Analyzer, Analyzer, module(version), "./"+upstream)
 		found := []staticcheck_wants.Finding{}
 		for _, each := range port {
@@ -103,7 +104,7 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
 	for _, golden := range goldens {
-		_, port := diagnosticsOf(test, module(golden.version), golden.version, "./"+upstream)
+		_, port := parity.Findings(test, s1005.Analyzer, Analyzer, module(golden.version), "./"+upstream)
 		path := filepath.Join(module(golden.version), upstream, golden.file)
 		source, readError := os.ReadFile(path)
 		if readError != nil {
@@ -118,37 +119,14 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 			test.Fatalf("%s's golden file holds %d sections, one a fix's message, which this test does not read",
 				golden.file, len(archive.Files))
 		}
-		edits := []offsetEdit{}
-		reported := 0
-		for _, diagnostic := range port {
-			// Every fix of S1005 edits the file its finding is in, so a finding's file is its edits'.
-			if diagnostic.file != golden.file {
-				continue
-			}
-			reported++
-			for _, fix := range diagnostic.fixes {
-				edits = append(edits, fix.edits...)
-			}
-		}
-		test.Logf("under %s in %s the port found %d, with %d edits", golden.version, golden.file, reported,
-			len(edits))
+		edits := editsIn(port, golden.file)
+		test.Logf("under %s in %s the port made %d edits", golden.version, golden.file, len(edits))
 		if len(edits) == 0 {
 			test.Fatalf("the port made no edit to %s, so the comparison proves nothing", golden.file)
 		}
-		// Applied from the last to the first, each edit's offsets still name the bytes they were read against.
-		slices.SortFunc(edits, func(first offsetEdit, second offsetEdit) int {
-			return cmp.Compare(second.start, first.start)
-		})
-		fixed := slices.Clone(source)
-		for index, each := range edits {
-			if index > 0 && each.end > edits[index-1].start {
-				test.Fatalf("the port's edits to %s overlap at offset %d", golden.file, each.start)
-			}
-			fixed = slices.Concat(fixed[:each.start], []byte(each.newText), fixed[each.end:])
-		}
-		formatted, formatError := format.Source(fixed)
+		formatted, formatError := format.Source(applied(test, golden.file, source, edits))
 		if formatError != nil {
-			test.Fatalf("the port's fixes make source gofmt cannot format: %v\n%s", formatError, fixed)
+			test.Fatalf("the port's fixes to %s make source gofmt cannot format: %v", golden.file, formatError)
 		}
 		if !bytes.Equal(formatted, archive.Comment) {
 			test.Errorf("the port's fixes to %s make\n%s\nand the golden file is\n%s", golden.file, formatted,
@@ -159,36 +137,47 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 
 // The original and the port run in one checker over staticcheck's fixture and parity's, under go1.4 and go1.3, and
 // over staticcheck's under go1.0. Parity's holds every shape the queries and the range branches on and the near miss
-// of each, a generated file, and files tagged newer than the module, and their findings must be the same multiset of
-// file, line, column and message.
-func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
+// of each, a generated file, and files tagged newer than the module, and the two must find the same multiset, each
+// finding the same to its end and its fixes. The receive fixes' text is printed from the syntax each side builds, the
+// original through its pattern's binding and its copy of the assignment and the port through its own, so this is
+// where the two are held byte for byte, comments inside and beside the assignment and right sides across lines among
+// them.
+func TestPortMatchesOriginal(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, module("go1.4"), "./"+upstream, "./parity")
 	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, module("go1.3"), "./"+upstream, "./parity")
 	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, module("go1.0"), "./"+upstream)
 }
 
-// Over every fixture of every version, each finding's end and every suggested fix, its message and each edit's start,
-// end and new text, are the original's, which the parity harness does not compare yet. The receive fixes' text is
-// printed from the syntax each side builds, the original through its pattern's binding and its copy of the
-// assignment and the port through its own, so this is where the two are held byte for byte, comments inside and
-// beside the assignment and right sides across lines among them.
-func TestPortFixesAndRangesMatchOriginal(test *testing.T) {
+// The differences fixture holds the shapes where the two could most plausibly part, parenthesized blanks in a range
+// and in an assignment, a definition's two-byte token, a receive-only channel, a labeled receive, both left sides
+// blank, and ranges over an alias of a function and over a named map, and records none, since the port parts from
+// the original nowhere. The parity harness's RequireOnlyAdjudicated fails a fixture that records nothing, so the two
+// are required to agree there finding for finding, fixes and all, which fails when the original finds nothing, so the
+// agreement is over findings.
+func TestPortDiffersFromOriginalNowhere(test *testing.T) {
 	test.Parallel()
-	original := []diagnostic{}
-	port := []diagnostic{}
+	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, module("go1.4"), "./differences")
+}
+
+// Over every fixture of every version, the original suggests both of its fixes, the receive alone's and the rest's,
+// which fix differently, so the comparisons above hold each branch's fix and not one alone.
+func TestFixturesHoldBothFixes(test *testing.T) {
+	test.Parallel()
+	original := []parity.Finding{}
 	for _, version := range versions {
-		originalOfVersion, portOfVersion := diagnosticsOf(test, module(version), version, "./...")
+		originalOfVersion, portOfVersion := parity.Findings(test, s1005.Analyzer, Analyzer, module(version), "./...")
+		test.Logf("under %s the original found %d, the port %d", version, len(originalOfVersion),
+			len(portOfVersion))
 		original = append(original, originalOfVersion...)
-		port = append(port, portOfVersion...)
 	}
-	requireSameFixesAndRanges(test, original, port)
+	requireBothFixes(test, original)
 }
 
 // The shapes gofmt rewrites, spacing inside the deleted ranges, no spacing around an assignment's token, and doubled
 // parentheses around a receive and a blank, are held the same way, ends and fixes included. The guard holds every .go
 // file of the tree to gofmt, so the fixture is kept as testdata/unformatted/unformatted.go.txt and written out as Go
-// into a go1.4 module of the test's own.
+// into a go1.4 module of the test's own, which the harness loads as a module since it holds a go.mod.
 func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 	test.Parallel()
 	source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "unformatted", "unformatted.go.txt"))
@@ -207,36 +196,45 @@ func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 	if writeError := os.WriteFile(filepath.Join(packageDirectory, "unformatted.go"), source, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
+	requireLoadsUnder(test, directory, "go1.4", "./unformatted")
 	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, directory, "./unformatted")
-	original, port := diagnosticsOf(test, directory, "go1.4", "./unformatted")
-	requireSameFixesAndRanges(test, original, port)
+	original, _ := parity.Findings(test, s1005.Analyzer, Analyzer, directory, "./unformatted")
+	requireBothFixes(test, original)
 }
 
-// The differences fixture holds the shapes where the two could most plausibly part, parenthesized blanks in a range
-// and in an assignment, a definition's two-byte token, a receive-only channel, a labeled receive, both left sides
-// blank, and ranges over an alias of a function and over a named map, and records none, since the port parts from
-// the original nowhere. The parity harness's RequireOnlyAdjudicated fails a fixture that records nothing, so the two
-// are required to agree there finding for finding, which fails when the original finds nothing, so the agreement is
-// over findings.
-func TestPortDiffersFromOriginalNowhere(test *testing.T) {
-	test.Parallel()
-	parity.RequireIdentical(test, s1005.Analyzer, Analyzer, module("go1.4"), "./differences")
-}
-
-// requireSameFixesAndRanges fails test unless original and port are the same findings, ends and fixes included, and
-// unless both of the original's fix messages are among them, since the receive alone and the rest fix differently.
-func requireSameFixesAndRanges(test *testing.T, original []diagnostic, port []diagnostic) {
+// requireLoadsUnder fails test unless every package patterns name in the fixture module in directory loads clean
+// under version, the go line its go.mod says. The harness loads the module the same way, in module mode with nothing
+// fetched, and hands back findings alone, so the version a package loaded under is read here, by a load of its own.
+func requireLoadsUnder(test *testing.T, directory string, version string, patterns ...string) {
 	test.Helper()
-	originalDescribed := describedAll(original)
-	portDescribed := describedAll(port)
-	test.Logf("the original found %d, the port %d", len(originalDescribed), len(portDescribed))
-	if len(originalDescribed) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
+	loaded, loadError := load.Packages(directory, patterns, []string{"GO111MODULE=on", "GOPROXY=off", "GOWORK=off"},
+		nil)
+	if loadError != nil {
+		test.Fatalf("loading %v under %s: %v", patterns, version, loadError)
 	}
+	if len(loaded.Roots) == 0 {
+		test.Fatalf("loading %v under %s found no package, so the check would prove nothing", patterns, version)
+	}
+	for _, failure := range parity.LoadFailures(loaded.Roots) {
+		test.Fatalf("fixture package %s does not load clean: %s", failure.Package, failure.Error)
+	}
+	for _, root := range loaded.Roots {
+		if root.Types.GoVersion() != version {
+			test.Fatalf("fixture package %s loaded under %q, where its module says %s", root.ID,
+				root.Types.GoVersion(), version)
+		}
+	}
+	test.Logf("under %s %d packages loaded under their module's version", version, len(loaded.Roots))
+}
+
+// requireBothFixes fails test unless original suggests both of S1005's fix messages, since the receive alone and the
+// rest fix differently, and a fixture that holds one branch alone compares only its fix.
+func requireBothFixes(test *testing.T, original []parity.Finding) {
+	test.Helper()
 	messages := map[string]int{}
-	for _, each := range original {
-		for _, suggested := range each.fixes {
-			messages[suggested.message]++
+	for _, finding := range original {
+		for _, fix := range finding.Fixes {
+			messages[fix.Message]++
 		}
 	}
 	test.Logf("the original's fixes by message: %v", messages)
@@ -245,151 +243,37 @@ func requireSameFixesAndRanges(test *testing.T, original []diagnostic, port []di
 			test.Errorf("the original suggested no fix %q, so the fixture does not hold its branch", message)
 		}
 	}
-	for _, missing := range difference(originalDescribed, portDescribed) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range difference(portDescribed, originalDescribed) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
 }
 
-// diagnostic is one finding as the fixes test compares it: where it starts and ends, its message and its fixes.
-type diagnostic struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	message   string
-	fixes     []fix
-}
-
-// fix is one suggested fix, its message and its edits.
-type fix struct {
-	message string
-	edits   []offsetEdit
-}
-
-// offsetEdit is one edit of a fix, by byte offsets in its file, so it applies to the file's bytes.
-type offsetEdit struct {
-	start   int
-	end     int
-	newText string
-}
-
-// described is found as one line, with where it ends and every fix and edit it suggests.
-func described(found diagnostic) string {
-	text := &strings.Builder{}
-	fmt.Fprintf(text, "%s:%d:%d-%d:%d: %s", found.file, found.line, found.column, found.endLine, found.endColumn,
-		found.message)
-	for _, each := range found.fixes {
-		fmt.Fprintf(text, " fix %q", each.message)
-		for _, edit := range each.edits {
-			fmt.Fprintf(text, " [%d,%d) %q", edit.start, edit.end, edit.newText)
-		}
-	}
-	return text.String()
-}
-
-// describedAll is every finding of found, described.
-func describedAll(found []diagnostic) []string {
-	all := []string{}
-	for _, each := range found {
-		all = append(all, described(each))
-	}
-	return all
-}
-
-// diagnosticsOf loads the packages patterns name from the fixture module in directory, runs staticcheck's S1005 and
-// the port over them in one checker, as parity.Findings does, and returns each one's findings with their ends and
-// fixes, sorted. Every package loaded must carry version as its own, the go line its module's go.mod says, which is
-// what both analyzers' version gates read.
-func diagnosticsOf(
-	test *testing.T,
-	directory string,
-	version string,
-	patterns ...string,
-) (original []diagnostic, port []diagnostic) {
-	test.Helper()
-	loaded, loadError := load.Packages(directory, patterns, moduleEnvironment, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v under %s: %v", patterns, version, loadError)
-	}
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %v under %s found no package, so the comparison would prove nothing", patterns, version)
-	}
-	for _, root := range loaded.Roots {
-		// A fixture that does not type-check is one both sides skip, and would compare nothing.
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean: %v", root.ID, root.Errors)
-		}
-		if root.Types.GoVersion() != version {
-			test.Fatalf("fixture package %s loaded under %q, where its module says %s", root.ID,
-				root.Types.GoVersion(), version)
-		}
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{s1005.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v under %s: %v", patterns, version, analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, reported := range action.Diagnostics {
-			position := action.Package.Fset.Position(reported.Pos)
-			end := action.Package.Fset.Position(reported.End)
-			found := diagnostic{
-				file:      filepath.Base(position.Filename),
-				line:      position.Line,
-				column:    position.Column,
-				endLine:   end.Line,
-				endColumn: end.Column,
-				message:   reported.Message,
-			}
-			for _, suggested := range reported.SuggestedFixes {
-				each := fix{message: suggested.Message}
-				for _, edit := range suggested.TextEdits {
-					each.edits = append(each.edits, offsetEdit{
-						start:   action.Package.Fset.Position(edit.Pos).Offset,
-						end:     action.Package.Fset.Position(edit.End).Offset,
-						newText: string(edit.NewText),
-					})
+// editsIn is every edit of every fix of findings in the file named file, by its base name.
+func editsIn(findings []parity.Finding, file string) []parity.Edit {
+	edits := []parity.Edit{}
+	for _, finding := range findings {
+		for _, fix := range finding.Fixes {
+			for _, edit := range fix.Edits {
+				if edit.File == file {
+					edits = append(edits, edit)
 				}
-				found.fixes = append(found.fixes, each)
-			}
-			switch action.Analyzer {
-			case s1005.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
 			}
 		}
 	}
-	compare := func(first diagnostic, second diagnostic) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
-	return original, port
+	return edits
 }
 
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []string, without []string) []string {
-	remaining := map[string]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []string{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
+// applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
+// were read against. Two edits that overlap fail the test.
+func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
+	test.Helper()
+	ordered := slices.Clone(edits)
+	slices.SortFunc(ordered, func(first parity.Edit, second parity.Edit) int {
+		return cmp.Compare(second.Start, first.Start)
+	})
+	fixed := slices.Clone(source)
+	for index, edit := range ordered {
+		if index > 0 && edit.End > ordered[index-1].Start {
+			test.Fatalf("the edits to %s overlap at offset %d", file, edit.Start)
 		}
-		missing = append(missing, found)
+		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
 	}
-	return missing
+	return fixed
 }

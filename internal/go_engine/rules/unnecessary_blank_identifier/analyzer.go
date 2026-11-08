@@ -19,60 +19,45 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/ast/astutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1005",
-	Doc:      "Flags an assignment to the blank identifier that can be left out: staticcheck's S1005, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every assignment and every range statement,
+// in preorder. The original judges every assignment of the package and then every range statement, and the walk
+// hands the two over as they stand, which changes the order the findings are reported in and none of them.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.AssignStmt)(nil), (*ast.RangeStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+		switch statement := node.(type) {
+		case *ast.AssignStmt:
+			Check(context, statement)
+		case *ast.RangeStmt:
+			CheckRange(context, statement)
+		default:
+			// Invariant: the dispatcher hands Node only the assignments and range statements it was asked for.
+			panic("unnecessary_blank_identifier: the dispatcher handed over a node that is neither an assignment " +
+				"nor a range statement")
+		}
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1005",
+	"S1005",
+	"Flags an assignment to the blank identifier that can be left out: staticcheck's S1005, ported.",
+	&Listener,
+)
 
 // message is the original's, in every branch.
 const message = "unnecessary assignment to the blank identifier"
-
-// run builds the pass's context and judges every assignment of the package, then every range statement, in the
-// original's order.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unnecessary_blank_identifier: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.AssignStmt)(nil)}, func(node ast.Node) {
-		assignment, isAssignment := node.(*ast.AssignStmt)
-		if !isAssignment {
-			// Invariant: Preorder hands this function only the assignments it was asked for.
-			panic("unnecessary_blank_identifier: the inspector handed over a node that is not an assignment")
-		}
-		Check(context, assignment)
-	})
-	inspected.Preorder([]ast.Node{(*ast.RangeStmt)(nil)}, func(node ast.Node) {
-		rangeStatement, isRange := node.(*ast.RangeStmt)
-		if !isRange {
-			// Invariant: Preorder hands this function only the range statements it was asked for.
-			panic("unnecessary_blank_identifier: the inspector handed over a node that is not a range statement")
-		}
-		CheckRange(context, rangeStatement)
-	})
-	return nil, nil
-}
 
 // Check judges one assignment: a channel receive assigned to the blank identifier alone, or to a second left side
 // that is the blank identifier, receives what it would without the blank. A comma-ok receive into one variable and
