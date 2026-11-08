@@ -1,0 +1,3 @@
+# carriage_return.s holds lines that end in a carriage return and a newline, the case it tests, so git keeps its
+# bytes as written rather than normalizing them to LF as the repository's .gitattributes does every text file.
+carriage_return.s -text
