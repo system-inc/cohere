@@ -843,6 +843,7 @@ var portedPasses = []string{
 	"double_negation",
 	"duplicate_build_constraint",
 	"duplicate_import",
+	"duplicate_trim_character",
 	"duration_unit_suffix",
 	"dynamic_printf_format",
 	"error_variable_name",
