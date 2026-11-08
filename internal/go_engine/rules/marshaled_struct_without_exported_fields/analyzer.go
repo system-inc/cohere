@@ -38,10 +38,11 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 	"(*encoding/json.Encoder).Encode": checkValue("(*encoding/json.Encoder).Encode.v", "MarshalJSON", "MarshalText"),
 	"(*encoding/xml.Encoder).Encode":  checkValue("(*encoding/xml.Encoder).Encode.v", "MarshalXML", "MarshalText"),
 
-	"encoding/json.Unmarshal":         checkValue("json.Unmarshal.v", "UnmarshalJSON", "UnmarshalText"),
-	"encoding/xml.Unmarshal":          checkValue("xml.Unmarshal.v", "UnmarshalXML", "UnmarshalText"),
-	"(*encoding/json.Decoder).Decode": checkValue("(*encoding/json.Decoder).Decode.v", "UnmarshalJSON", "UnmarshalText"),
-	"(*encoding/xml.Decoder).Decode":  checkValue("(*encoding/xml.Decoder).Decode.v", "UnmarshalXML", "UnmarshalText"),
+	"encoding/json.Unmarshal": checkValue("json.Unmarshal.v", "UnmarshalJSON", "UnmarshalText"),
+	"encoding/xml.Unmarshal":  checkValue("xml.Unmarshal.v", "UnmarshalXML", "UnmarshalText"),
+	"(*encoding/json.Decoder).Decode": checkValue(
+		"(*encoding/json.Decoder).Decode.v", "UnmarshalJSON", "UnmarshalText"),
+	"(*encoding/xml.Decoder).Decode": checkValue("(*encoding/xml.Decoder).Decode.v", "UnmarshalXML", "UnmarshalText"),
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
@@ -71,8 +72,8 @@ func checkValue(argument string, methods ...string) staticcheck_call.Rule {
 		if call.Context.IsGenerated(parsed.Filename) {
 			return
 		}
-		value := call.Arguments[position]
-		valueType := value.Value.Type()
+		marshaled := call.Arguments[position]
+		valueType := marshaled.Value.Type()
 		structure, isStructure := typeutil.Dereference(valueType).Underlying().(*types.Struct)
 		if !isStructure || structure.NumFields() == 0 {
 			return
@@ -90,7 +91,7 @@ func checkValue(argument string, methods ...string) staticcheck_call.Rule {
 				return
 			}
 		}
-		value.Invalid(fmt.Sprintf("struct type '%s' doesn't have any exported fields, nor custom marshaling",
+		marshaled.Invalid(fmt.Sprintf("struct type '%s' doesn't have any exported fields, nor custom marshaling",
 			typeutil.Dereference(valueType)))
 	}
 }
