@@ -17,6 +17,10 @@ type buildRun struct {
 	// analyzed is the load IDs the build analyzed: every root for the host's build, the closure's members for an
 	// extra one.
 	analyzed map[string]bool
+	// said is every file of ours the build compiled into a package it analyzed, by path: the files it has a say on.
+	// A file sits in p and in "p [p.test]" alike, and a closure may analyze one variant and not the other, so this is
+	// the join of compiled and analyzed the merge reads, made where the load is known.
+	said map[string]bool
 	// result is check.Run's over the analyzed packages: their findings before suppression and scope, the rules that
 	// ran, and every crash.
 	result *check.Result
