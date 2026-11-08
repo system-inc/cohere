@@ -16,6 +16,8 @@ import (
 
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // inProcessLister lists a workspace's packages the way `go list -e -deps -json` lists them, by reading what go list
@@ -272,7 +274,7 @@ func (lister *inProcessLister) matchLocal() ([]string, string) {
 	if owner == nil {
 		return nil, fmt.Sprintf("%s is in no main module", lister.workspace)
 	}
-	directories, doubt := walkPackageDirectories(lister.workspace, func(string) bool { return true })
+	directories, doubt := listed_directories.PackageDirectories(lister.workspace, func(string) bool { return true })
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -294,7 +296,7 @@ func (lister *inProcessLister) matchModules(prefix string) ([]string, string) {
 			return nil, fmt.Sprintf("the pattern %s/... could name packages of %s, which is not a main module",
 				prefix, each.Path)
 		}
-		directories, doubt := walkPackageDirectories(each.Dir, func(directory string) bool {
+		directories, doubt := listed_directories.PackageDirectories(each.Dir, func(directory string) bool {
 			return canMatch(importPathIn(each.Dir, each.Path, directory))
 		})
 		if doubt != "" {
@@ -350,42 +352,6 @@ func (lister *inProcessLister) packagesIn(
 		paths = append(paths, importPath)
 	}
 	return paths, ""
-}
-
-// walkPackageDirectories is every directory below root, root among them, that go's walk of a pattern looks in, in its
-// order: it leaves out a directory whose name starts with a dot or an underscore, testdata, one that holds a module
-// of its own, and one wanted declines, and never follows a symbolic link. A directory named vendor is looked in, as a
-// wildcard matches one, but nothing below it is, as no wildcard matches a vendored package (cmd/go's pkgpattern).
-func walkPackageDirectories(root string, wanted func(string) bool) ([]string, string) {
-	var directories []string
-	walkError := filepath.WalkDir(root, func(directory string, entry fs.DirEntry, pathError error) error {
-		if pathError != nil {
-			return pathError
-		}
-		if !entry.IsDir() {
-			return nil
-		}
-		if directory != root {
-			name := entry.Name()
-			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") || name == "testdata" ||
-				!wanted(directory) {
-				return filepath.SkipDir
-			}
-			if goModAt(directory) {
-				return filepath.SkipDir
-			}
-			if name == "vendor" {
-				directories = append(directories, directory)
-				return filepath.SkipDir
-			}
-		}
-		directories = append(directories, directory)
-		return nil
-	})
-	if walkError != nil {
-		return nil, fmt.Sprintf("walking %s: %v", root, walkError)
-	}
-	return directories, ""
 }
 
 // prefetchStandardLibrary starts reading every directory of the standard library at once, but the commands' and
@@ -659,7 +625,7 @@ func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 // no main module's.
 func (lister *inProcessLister) moduleRootOf(directory string) *packages.Module {
 	for each := directory; ; each = filepath.Dir(each) {
-		if goModAt(each) {
+		if listed_directories.GoModAt(each) {
 			for _, main := range lister.mainModules {
 				if main.Dir == each {
 					return main
@@ -866,7 +832,7 @@ func internalAllowed(importer string, importerStandard bool, imported string) bo
 // module, so directory is not moduleDirectory's.
 func nestedModule(moduleDirectory string, directory string) bool {
 	for each := directory; len(each) > len(moduleDirectory); each = filepath.Dir(each) {
-		if goModAt(each) {
+		if listed_directories.GoModAt(each) {
 			return true
 		}
 	}
@@ -902,12 +868,6 @@ func nonEmpty(list []string) []string {
 		return nil
 	}
 	return list
-}
-
-// goModAt reports whether directory holds a go.mod, by go's test of one: anything there but a directory.
-func goModAt(directory string) bool {
-	info, statError := os.Stat(filepath.Join(directory, "go.mod"))
-	return statError == nil && !info.IsDir()
 }
 
 // foldCollision is a doubt when two listed import paths differ only in case, which go list reports. Every import path
