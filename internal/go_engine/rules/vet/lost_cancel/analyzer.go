@@ -22,6 +22,10 @@
 // The port reports a function's cancel variables in the order their definitions are found, where the original
 // ranges over a map, so its findings come out in a stable order; the findings themselves are the same. The
 // original's debug printing of each graph is left out.
+//
+// It is not on the engine's syntax dispatcher, and stays a plain analyzer: it requires ctrlflow, which does not run
+// despite errors, and TestEverythingTheSyntaxDispatcherRequiresRunsDespiteErrors holds every listener's requirements
+// to running despite errors. It moves onto the dispatcher once that test holds only the walk's own requirements.
 package lost_cancel
 
 import (
