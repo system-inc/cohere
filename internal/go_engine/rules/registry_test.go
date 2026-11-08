@@ -20,19 +20,50 @@ import (
 	"honnef.co/go/tools/stylecheck"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
+	"github.com/system-inc/cohere/internal/go_engine/rules/argument_overwritten_before_use"
+	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/double_negation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_build_constraint"
 	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
 	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/extreme_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/identical_operands"
+	"github.com/system-inc/cohere/internal/go_engine/rules/impossible_target_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_bitwise_operation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_break"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_copy"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_field_assignment"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_random_integer"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_sort"
+	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_url_query_modification"
+	"github.com/system-inc/cohere/internal/go_engine/rules/integer_division_to_zero"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
 	"github.com/system-inc/cohere/internal/go_engine/rules/marker"
+	"github.com/system-inc/cohere/internal/go_engine/rules/math_on_converted_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
+	"github.com/system-inc/cohere/internal/go_engine/rules/modulo_by_one"
+	"github.com/system-inc/cohere/internal/go_engine/rules/nan_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/negative_length_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/negative_zero_float"
+	"github.com/system-inc/cohere/internal/go_engine/rules/never_nil_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/positions"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/repeated_if_else_condition"
+	"github.com/system-inc/cohere/internal/go_engine/rules/self_assignment"
+	"github.com/system-inc/cohere/internal/go_engine/rules/single_argument_append"
+	"github.com/system-inc/cohere/internal/go_engine/rules/typed_nil_interface_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unchanging_loop_condition"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unconditional_loop_exit"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unobserved_append"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unreachable_type_case"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unread_assigned_value"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
@@ -182,6 +213,47 @@ var portedStylecheck = []struct {
 	{"ST1017", yoda_condition.Analyzer},
 	{"ST1018", invisible_character.Analyzer},
 	{"ST1019", duplicate_import.Analyzer},
+}
+
+// portedStaticcheck is each of staticcheck's SA and S checks switched to its port, with the port, written out here
+// rather than read from ports, so a line dropped from or wrongly mapped in that table fails
+// TestEveryPortedStaticcheckRunsItsPort: a test that read ports would expect whatever the table says and pass with the
+// original back in place. One check a line; each family's switch adds its own lines.
+var portedStaticcheck = []struct {
+	name string
+	port *analysis.Analyzer
+}{
+	{"SA4000", identical_operands.Analyzer},
+	{"SA4001", ineffective_copy.Analyzer},
+	{"SA4003", extreme_comparison.Analyzer},
+	{"SA4004", unconditional_loop_exit.Analyzer},
+	{"SA4005", ineffective_field_assignment.Analyzer},
+	{"SA4006", unread_assigned_value.Analyzer},
+	{"SA4008", unchanging_loop_condition.Analyzer},
+	{"SA4009", argument_overwritten_before_use.Analyzer},
+	{"SA4010", unobserved_append.Analyzer},
+	{"SA4011", ineffective_break.Analyzer},
+	{"SA4012", nan_comparison.Analyzer},
+	{"SA4013", double_negation.Analyzer},
+	{"SA4014", repeated_if_else_condition.Analyzer},
+	{"SA4015", math_on_converted_integer.Analyzer},
+	{"SA4016", ineffective_bitwise_operation.Analyzer},
+	{"SA4017", discarded_pure_call.Analyzer},
+	{"SA4018", self_assignment.Analyzer},
+	{"SA4019", duplicate_build_constraint.Analyzer},
+	{"SA4020", unreachable_type_case.Analyzer},
+	{"SA4021", single_argument_append.Analyzer},
+	{"SA4022", address_compared_to_nil.Analyzer},
+	{"SA4023", typed_nil_interface_comparison.Analyzer},
+	{"SA4024", negative_length_comparison.Analyzer},
+	{"SA4025", integer_division_to_zero.Analyzer},
+	{"SA4026", negative_zero_float.Analyzer},
+	{"SA4027", ineffective_url_query_modification.Analyzer},
+	{"SA4028", modulo_by_one.Analyzer},
+	{"SA4029", ineffective_sort.Analyzer},
+	{"SA4030", ineffective_random_integer.Analyzer},
+	{"SA4031", never_nil_comparison.Analyzer},
+	{"SA4032", impossible_target_comparison.Analyzer},
 }
 
 // staticcheckAnalyzers is every SA and S check staticcheck runs by default, in its order, which is the order
@@ -563,6 +635,33 @@ func TestEveryPortedStylecheckRunsItsPort(test *testing.T) {
 			test.Errorf("stylecheck names no check %s, so there is no original for its port to replace", ported.name)
 		case registeredRule.Analyzer == original:
 			test.Errorf("%s runs stylecheck's original, where its port was switched in", registeredRule.Name)
+		case registeredRule.Analyzer != ported.port:
+			test.Errorf("%s runs %q, where its port's own analyzer was expected", registeredRule.Name,
+				registeredRule.Analyzer.Name)
+		}
+	}
+}
+
+// TestEveryPortedStaticcheckRunsItsPort holds each switched SA or S check to its port: the registered rule under the
+// check's name runs the port's own analyzer, and not staticcheck's original, which the switch replaced.
+func TestEveryPortedStaticcheckRunsItsPort(test *testing.T) {
+	test.Parallel()
+	originals := map[string]*analysis.Analyzer{}
+	for _, wrapped := range slices.Concat(staticcheck.Analyzers, simple.Analyzers) {
+		originals[wrapped.Analyzer.Name] = wrapped.Analyzer
+	}
+	for _, ported := range portedStaticcheck {
+		registeredRule, found := registeredRuleNamed(rule.Namespace + ported.name)
+		if !found {
+			test.Errorf("%s%s is not registered", rule.Namespace, ported.name)
+			continue
+		}
+		original, named := originals[ported.name]
+		switch {
+		case !named:
+			test.Errorf("staticcheck names no check %s, so there is no original for its port to replace", ported.name)
+		case registeredRule.Analyzer == original:
+			test.Errorf("%s runs staticcheck's original, where its port was switched in", registeredRule.Name)
 		case registeredRule.Analyzer != ported.port:
 			test.Errorf("%s runs %q, where its port's own analyzer was expected", registeredRule.Name,
 				registeredRule.Analyzer.Name)
