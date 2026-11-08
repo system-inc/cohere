@@ -633,6 +633,8 @@ public struct Pipeline {
 
         var typeErrors = 0
         var lintBuildFailure: String?
+        /* The names the types phase's in-process check recorded, handed to lint so it never checks those files again. */
+        var answeredSymbols: [String: FileSymbols] = [:]
         if !options.runTypes {
             /*
              A typed rule reads what names resolve to from the build's index and compile commands, so a `--lint` run
@@ -645,7 +647,9 @@ public struct Pipeline {
             if options.runLint && typedRulesApply {
                 do {
                     /* A build that failed after compiling something is said by a `buildFailed` finding rather than thrown. */
-                    lintBuildFailure = try build().findings.first { $0.messageId == "buildFailed" }?.message
+                    let types = try build()
+                    lintBuildFailure = types.findings.first { $0.messageId == "buildFailed" }?.message
+                    answeredSymbols = types.symbols
                 }
                 catch let failure as TypesPhase.TypesFailure {
                     /* Lint still runs: the rules that need no build judge every file, and each file the typed rules cannot judge says this build is why. */
@@ -657,6 +661,7 @@ public struct Pipeline {
         }
         else {
             let types = try build()
+            answeredSymbols = types.symbols
             for finding in types.findings {
                 try writer.write(finding)
             }
@@ -703,6 +708,7 @@ public struct Pipeline {
                 layouts: Self.symbolLayouts(package: package, scratch: runScratch(for: root)),
                 runner: runner,
             )
+            symbolProvider.answered = answeredSymbols
             symbolProvider.ownedModules = Self.ownedModules(of: package)
                 .union(Self.compiledModules(of: package, fileSet: fileSet, layouts: symbolProvider.layouts))
                 .union(fileSet.scripts.map(\.targetName))

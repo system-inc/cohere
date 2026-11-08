@@ -4,9 +4,11 @@ import Foundation
  Symbols for the files typed rules need, from the cheapest source that can vouch for each file as it stands.
 
  First the build's index store, which costs a record read, every file's read side by side: it holds every file
- the last build compiled, and a unit newer than the file vouches for it. Then sourcekitd in process, about half a
- second a file, for a file the index cannot vouch for: one the bodies-only path checked without building, or one
- edited since. A file neither can describe gets a reason instead, which the linter reports as unchecked.
+ the last build compiled, and a unit newer than the file vouches for it. Then the names the types phase's
+ in-process check recorded for a file it answered for (`answered`), from the check that gave its findings. Then
+ sourcekitd in process, about half a second a file, for a file none of those vouches for: one edited since, in a
+ run whose types phase did not answer for it. A file none can describe gets a reason instead, which the linter
+ reports as unchecked.
 
  The package's local packages build into their own scratch paths, so each has its own store and its own
  compile commands; every one is consulted. An Xcode root has one layout, its xcodebuild's derived data, read
@@ -33,6 +35,11 @@ struct SymbolProvider {
     let runner: ProcessRunner
     /* Handed to every file's symbols, so a rule can tell our declarations from a dependency's. */
     var ownedModules: Set<String> = []
+    /*
+     The names the types phase's in-process check recorded, by resolved path (`TypesPhase.Result.symbols`). Like
+     `indexsource`'s, they come with no record of the build's, so no verdict is ever kept under them.
+     */
+    var answered: [String: FileSymbols] = [:]
     /* How the demangler is loaded: the process's own, or a test's loader that fails, to drive the path where none loads. */
     var loadDemangler: (ProcessRunner) throws -> SwiftDemangler = { try SwiftDemangler.shared(runner: $0) }
 
@@ -101,6 +108,12 @@ struct SymbolProvider {
                 result.symbols[file.url.path] = found
                 result.records[file.url.path] = read.record.identity
                 result.fromIndex += 1
+            }
+            else if var found = answered[file.url.resolvingSymlinksInPath().path] {
+                found.ownedModules = ownedModules
+                found.demangler = demangler
+                result.symbols[file.url.path] = found
+                result.fromSourcekitd += 1
             }
             else {
                 needSourcekitd.append(file)
