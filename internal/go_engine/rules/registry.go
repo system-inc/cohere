@@ -71,6 +71,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/cyclic_finalizer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
+	"github.com/system-inc/cohere/internal/go_engine/rules/deferred_lock_after_lock"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
 	"github.com/system-inc/cohere/internal/go_engine/rules/double_negation"
@@ -81,6 +82,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dynamic_printf_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/early_deferred_close"
 	"github.com/system-inc/cohere/internal/go_engine/rules/elaborate_sleep"
+	"github.com/system-inc/cohere/internal/go_engine/rules/empty_critical_section"
 	"github.com/system-inc/cohere/internal/go_engine/rules/empty_select_default"
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/errors_new_of_sprintf"
@@ -174,6 +176,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/spinning_empty_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/struct_conversion_by_field_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/swapped_seek_arguments"
+	"github.com/system-inc/cohere/internal/go_engine/rules/test_failure_in_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_machine_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_timing_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_uncached_run"
@@ -235,6 +238,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
+	"github.com/system-inc/cohere/internal/go_engine/rules/wait_group_add_in_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
@@ -393,6 +397,10 @@ var ports = map[string]port{
 	},
 	"SA1031": {analyzer: overlapping_encode_buffers.Analyzer, listener: &overlapping_encode_buffers.Listener},
 	"SA1032": {analyzer: reversed_errors_is_arguments.Analyzer, listener: &reversed_errors_is_arguments.Listener},
+	"SA2000": {analyzer: wait_group_add_in_goroutine.Analyzer, listener: &wait_group_add_in_goroutine.Listener},
+	"SA2001": {analyzer: empty_critical_section.Analyzer, listener: &empty_critical_section.Listener},
+	"SA2002": {analyzer: test_failure_in_goroutine.Analyzer, listener: &test_failure_in_goroutine.Listener},
+	"SA2003": {analyzer: deferred_lock_after_lock.Analyzer, listener: &deferred_lock_after_lock.Listener},
 	"SA4000": {analyzer: identical_operands.Analyzer, listener: &identical_operands.Listener},
 	"SA4001": {analyzer: ineffective_copy.Analyzer, listener: &ineffective_copy.Listener},
 	"SA4003": {analyzer: extreme_comparison.Analyzer, listener: &extreme_comparison.Listener},

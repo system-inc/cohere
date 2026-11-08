@@ -33,6 +33,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/cyclic_finalizer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_channel_range_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
+	"github.com/system-inc/cohere/internal/go_engine/rules/deferred_lock_after_lock"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
@@ -44,6 +45,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dynamic_printf_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/early_deferred_close"
 	"github.com/system-inc/cohere/internal/go_engine/rules/elaborate_sleep"
+	"github.com/system-inc/cohere/internal/go_engine/rules/empty_critical_section"
 	"github.com/system-inc/cohere/internal/go_engine/rules/empty_select_default"
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/errors_new_of_sprintf"
@@ -137,6 +139,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/spinning_empty_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/struct_conversion_by_field_copy"
 	"github.com/system-inc/cohere/internal/go_engine/rules/swapped_seek_arguments"
+	"github.com/system-inc/cohere/internal/go_engine/rules/test_failure_in_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/time_since"
 	"github.com/system-inc/cohere/internal/go_engine/rules/time_until"
 	"github.com/system-inc/cohere/internal/go_engine/rules/timer_reset_result_used"
@@ -156,6 +159,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/untrappable_signal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/wait_group_add_in_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
@@ -378,6 +382,10 @@ var portedStaticcheck = []struct {
 	{"SA1030", invalid_string_conversion_argument.Analyzer},
 	{"SA1031", overlapping_encode_buffers.Analyzer},
 	{"SA1032", reversed_errors_is_arguments.Analyzer},
+	{"SA2000", wait_group_add_in_goroutine.Analyzer},
+	{"SA2001", empty_critical_section.Analyzer},
+	{"SA2002", test_failure_in_goroutine.Analyzer},
+	{"SA2003", deferred_lock_after_lock.Analyzer},
 	{"SA4000", identical_operands.Analyzer},
 	{"SA4001", ineffective_copy.Analyzer},
 	{"SA4003", extreme_comparison.Analyzer},
