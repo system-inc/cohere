@@ -8,7 +8,7 @@
 // comparison's syntax, asking staticcheck_report.HasRange and Ordinal and staticcheck_code.IsInTest where the original
 // asks report.HasRange, report.Ordinal and code.IsInTest, each the port of the one the original calls, proven against
 // it beside it. It reads what each function returns from staticcheck's nilness facts, which cross from every
-// dependency, straight from the pass, as SA1019's port reads staticcheck's deprecated facts, and asks
+// dependency, through the context, its listener requiring staticcheck's nilness pass, and asks
 // golang.org/x/exp/typeparams, honnef.co/go/tools/go/ir/irutil and honnef.co/go/tools/go/types/typeutil what the
 // original asks them, public packages and not framework.
 //
@@ -32,51 +32,42 @@ import (
 
 	"golang.org/x/exp/typeparams"
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/facts/nilness"
 	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/ir/irutil"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// buildir pass for the functions it judges, its nilness pass, whose facts say what each function returns, and its
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4023",
-	Doc: "Flags a comparison of an interface value with untyped nil that can never be true or is always true: " +
-		"staticcheck's SA4023, ported onto its intermediate representation.",
-	Requires: []*analysis.Analyzer{staticcheck_ir.Analyzer, nilness.Analysis, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own with
+// the nilness facts of the package. It requires staticcheck's nilness pass, whose result it reads.
+var Listener = rule.Listener{
+	Requires: []*analysis.Analyzer{nilness.Analysis},
+	Function: func(context *rule.Context, function *ir.Function) {
+		nilnesses, isNilnesses := context.ResultOf(nilness.Analysis).(*nilness.Result)
+		if !isNilnesses {
+			// Invariant: the listener requires the nilness pass, and the dispatcher hands over its result, of the type
+			// it declares.
+			panic("typed_nil_interface_comparison: the nilness pass's result is missing")
+		}
+		Check(context, nilnesses, function)
+	},
 }
 
-// run builds the pass's context, reads the nilness facts from the pass, and judges every source function of the
-// package.
-func run(pass *analysis.Pass) (any, error) {
-	functions, readError := staticcheck_ir.Functions(pass)
-	if readError != nil {
-		return nil, readError
-	}
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	nilnesses, isNilnesses := pass.ResultOf[nilness.Analysis].(*nilness.Result)
-	if !isNilnesses {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("typed_nil_interface_comparison: the nilness pass's result is missing")
-	}
-	for _, function := range functions {
-		Check(context, nilnesses, function)
-	}
-	return nil, nil
-}
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4023",
+	"SA4023",
+	"Flags a comparison of an interface value with untyped nil that can never be true or is always true: "+
+		"staticcheck's SA4023, ported onto its intermediate representation.",
+	&Listener,
+)
 
 // Check judges one function: each comparison by == or != of an interface value with untyped nil, where the value was
 // made from a concrete value, or is a result of a function nilnesses says never returns a nil interface but may
