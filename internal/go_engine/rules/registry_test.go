@@ -700,6 +700,7 @@ var sharedReaders = []string{
 // name in the original's place (#pn1xvnd), so House never lists it. One entry a line, and this comment names none, so
 // each port's branch adds its own line and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
+	"address_compared_to_nil",
 	"argument_overwritten_before_use",
 	"discarded_pure_call",
 	"dot_import",
