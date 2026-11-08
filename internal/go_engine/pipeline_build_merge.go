@@ -5,7 +5,9 @@ import (
 	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/suppression"
 )
 
@@ -22,6 +24,57 @@ type buildOutcome struct {
 	directiveFindings []suppression.DirectiveFinding
 	crashes           []check.Crash
 	typeErrors        []load.Diagnostic
+}
+
+// outcomeOf is run's findings in scope after its own //cohere:ignore comments, with only the readable files run has
+// a say on indexed, so a directive is judged only by the builds that compiled and analyzed its file. In scope is the
+// host's scope or a file in the paths the host's build constraints leave out, which another build compiles. ran are
+// the analyzer rules that ran, the same for every build.
+func (engine *pipeline) outcomeOf(run buildRun, ran []string) buildOutcome {
+	inScope := func(file string) bool {
+		return engine.described.inScopeSet[file] || engine.described.constrainedInScope[file]
+	}
+	var files []string
+	for file := range run.said {
+		if _, read := engine.described.contents[file]; read && inScope(file) {
+			files = append(files, file)
+		}
+	}
+	slices.Sort(files)
+	var found []check.Finding
+	for _, each := range run.result.Findings {
+		if inScope(each.File) {
+			found = append(found, each)
+		}
+	}
+	suppressed := engine.suppress(ran, found, files)
+	return buildOutcome{
+		said:              run.said,
+		kept:              suppressed.kept,
+		withheld:          suppressed.withheld,
+		directiveFindings: suppressed.directiveFindings,
+		crashes:           run.result.Crashes,
+		typeErrors:        run.typeErrors,
+	}
+}
+
+// mergeIfAllRules is the name of every rule of registered whose findings stand only where every build with a say on
+// the file reports them (see rule.Rule's MergeIfAll).
+func mergeIfAllRules(registered []rule.Rule) map[string]bool {
+	names := map[string]bool{}
+	for _, registeredRule := range registered {
+		if registeredRule.MergeIfAll {
+			names[registeredRule.Name] = true
+		}
+	}
+	return names
+}
+
+// buildsVerdict is what the lint phase writes when more than one build ran: the merge of every build's findings, and
+// what each build covered and brought, the host's first.
+type buildsVerdict struct {
+	merged  mergedBuilds
+	records []contract.BuildRecord
 }
 
 // mergedBuilds is what the run reports of every build at once.

@@ -125,14 +125,7 @@ func (engine *pipeline) run() int {
 		loaded, loadError = nil, nil
 	}
 	engine.runTypes(loaded, loadError)
-	pass := engine.runLint(loaded, loadError, linted)
-	// Under the hidden `--other-builds`, every other build the census needs checks what can differ from the host's,
-	// after the host's lint, and only when that lint ran: the host's run is what the others are read beside.
-	if engine.request.switches["other-builds"] && pass != nil {
-		if runs := engine.otherBuilds(loaded, pass); len(runs) > 0 {
-			engine.mergeBuildRuns(runs)
-		}
-	}
+	engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load

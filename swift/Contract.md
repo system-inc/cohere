@@ -717,7 +717,7 @@ within contract 3, the host's first:
 }
 ```
 
-`target` names the build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after ` tags `. Another build
+`target` names the build as `GOOS/GOARCH`, with ` cgo` when cgo is on and its tags after `tags`. Another build
 analyzes only the packages that could find what the host's did not, counted by why: `seeds`, whose files differ from
 the host's, `references`, which name something that differs, and `importers`, which import a package whose own
 surface differs; a package held for more than one reason counts under each. Every other package's findings are the

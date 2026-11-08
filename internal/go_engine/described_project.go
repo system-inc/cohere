@@ -40,7 +40,8 @@ type describedProject struct {
 	// may write it.
 	constrainedInScope map[string]bool
 
-	// contents are the in-scope files that could be read, as they were read.
+	// contents are the in-scope files that could be read, as they were read, the build constraints' too
+	// (constrainedInScope), for the other builds that compile them.
 	contents map[string][]byte
 
 	// unreadable are the in-scope files that could not be read, each written before the first phase.

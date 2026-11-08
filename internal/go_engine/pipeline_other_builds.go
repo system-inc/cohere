@@ -7,6 +7,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check"
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/platform"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -144,6 +145,7 @@ func (engine *pipeline) extraBuildRun(
 	if closureError != nil {
 		return buildRun{}, fmt.Errorf("the closure of the build %s: %w", extra, closureError)
 	}
+	run.closure = members
 	for _, member := range members {
 		run.analyzed[member.Id] = true
 	}
@@ -199,9 +201,42 @@ func compiledFiles(compiled []*packages.Package, ours map[string]bool) map[strin
 	return files
 }
 
-// mergeBuildRuns is where every build's run meets, the host's first. Front door wires the merge of their findings
-// across builds here (#72n9mq0): until then it writes nothing, and keeps the runs, so a test counts them and reads
-// what each build analyzed.
-func (engine *pipeline) mergeBuildRuns(runs []buildRun) {
+// mergeBuildRuns is where every build's run meets, the host's first (#72n9mq0): each build's findings in scope after
+// its own //cohere:ignore comments (outcomeOf), merged into the one verdict the lint phase writes (mergeBuilds), and
+// what each build covered and brought, for the lint record. ran are the analyzer rules that ran, the same in every
+// build. It keeps the runs too, so a test reads what each build analyzed.
+func (engine *pipeline) mergeBuildRuns(runs []buildRun, ran []string) *buildsVerdict {
 	engine.buildRuns = runs
+	outcomes := make([]buildOutcome, 0, len(runs))
+	for _, run := range runs {
+		outcomes = append(outcomes, engine.outcomeOf(run, ran))
+	}
+	verdict := &buildsVerdict{merged: mergeBuilds(outcomes, mergeIfAllRules(engine.registered))}
+	for index, run := range runs {
+		record := contract.BuildRecord{
+			Target:           run.build.String(),
+			Host:             index == 0,
+			CompiledFiles:    len(run.compiled),
+			AnalyzedPackages: len(run.analyzed),
+			FindingsAdded:    verdict.merged.added[index],
+			FindingsDropped:  verdict.merged.dropped[index],
+		}
+		for _, member := range run.closure {
+			counted := map[platform.ReasonKind]bool{}
+			for _, reason := range member.Reasons {
+				counted[reason.Kind] = true
+			}
+			if counted[platform.ReasonKindSeed] {
+				record.Seeds++
+			}
+			if counted[platform.ReasonKindReference] {
+				record.References++
+			}
+			if counted[platform.ReasonKindImporter] {
+				record.Importers++
+			}
+		}
+		verdict.records = append(verdict.records, record)
+	}
+	return verdict
 }

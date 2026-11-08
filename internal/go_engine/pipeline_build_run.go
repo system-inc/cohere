@@ -3,6 +3,7 @@ package go_engine
 import (
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/platform"
 	"github.com/system-inc/cohere/internal/go_engine/project"
 )
 
@@ -28,4 +29,7 @@ type buildRun struct {
 	// type-checks the whole workspace and what no digest can see, a call that type-checks on one platform only,
 	// shows here.
 	typeErrors []load.Diagnostic
+	// closure is an extra build's closure (platform.Closure), each member with why it is there, which the lint record
+	// counts by reason, and nil for the host's build, which analyzes every root.
+	closure []platform.Member
 }
