@@ -69,6 +69,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/nil_func"
 )
 
@@ -154,8 +155,9 @@ var duplicatesOfVet = map[string]string{
 // naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
-	"appends": appends.Analyzer,
-	"nilfunc": nil_func.Analyzer,
+	"appends":  appends.Analyzer,
+	"errorsas": errors_as.Analyzer,
+	"nilfunc":  nil_func.Analyzer,
 }
 
 // portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
