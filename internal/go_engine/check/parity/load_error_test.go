@@ -127,3 +127,38 @@ func TestRequireIdenticalDespiteLoadErrorsFailsAnAnalyzerThatDidNotRun(test *tes
 			despiteListed, "despite")
 	}), "running on despite: failed prerequisites: prerequisite@despite")
 }
+
+// despiteAgainListed is the one error despite_again loads with, and truncatedListed truncated's, two parse errors at
+// the end of a file that ends inside a function.
+var (
+	despiteAgainListed = LoadError{
+		Position: "despite_again.go:11:17",
+		Message:  "cannot use 1 (untyped int constant) as bool value in variable declaration",
+	}
+	truncatedListed = []LoadError{
+		{Position: "truncated.go:7:11", Message: "expected ';', found 'EOF'"},
+		{Position: "truncated.go:7:11", Message: "expected '}', found 'EOF'"},
+	}
+)
+
+// Several ill-typed packages compare in one call, each with its own errors listed, and a package that does not parse
+// is listed by its parse error as one that does not type-check is by its type error. Each package's error left off
+// the list fails, named, so every package's errors are held, not only the first's.
+func TestRequireIdenticalDespiteLoadErrorsHoldsEachPackagesErrors(test *testing.T) {
+	test.Parallel()
+	listed := slices.Concat(despiteListed, []LoadError{despiteAgainListed}, truncatedListed)
+	patterns := []string{"despite", "despite_again", "truncated"}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors, analysistest.TestData(),
+			listed, patterns...)
+	}))
+	for _, leftOff := range []LoadError{despiteAgainListed, truncatedListed[0]} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireIdenticalDespiteLoadErrors(recording, originalDespiteErrors, portDespiteErrors,
+				analysistest.TestData(), slices.DeleteFunc(slices.Clone(listed), func(loadError LoadError) bool {
+					return loadError == leftOff
+				}), patterns...)
+		}), "the fixture packages load with "+leftOff.String()+", which is not listed",
+			"the fixture packages do not fail as listed")
+	}
+}
