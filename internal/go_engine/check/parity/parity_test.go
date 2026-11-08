@@ -78,6 +78,17 @@ func fixingShort(shortBy token.Pos) shape {
 	}
 }
 
+// writing suggests replacing the call with text, the fix's message naming text, since the checker refuses two fixes
+// of one message on a finding.
+func writing(text string) shape {
+	return func(call *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.SuggestedFixes = append(diagnostic.SuggestedFixes, analysis.SuggestedFix{
+			Message:   "write " + text,
+			TextEdits: []analysis.TextEdit{{Pos: call.Pos(), End: call.End(), NewText: []byte(text)}},
+		})
+	}
+}
+
 // originalMessages are the calls the original finds: to shared and lost, and to renamed in its words. portMessages
 // are the port's: to shared and gained, and to renamed in other words.
 var (
@@ -92,6 +103,7 @@ var (
 		"renamed": "call to renamed in the port's words",
 	}
 	sharedMessages = map[string]string{"shared": "call to shared"}
+	gainedMessages = map[string]string{"gained": "call to gained"}
 )
 
 // original and port are the pair most tests run, with no end, related entry or fix.
@@ -559,13 +571,69 @@ func TestFindingsRecordAFixByOffsets(test *testing.T) {
 }
 
 // The differences fixture records a line and a message, so the port's lone findings match their records whatever
-// their ends, related entries and fixes, and so does the renaming.
+// their ends and related entries, and so does the renaming. Their fixes are held apart: the found call's fix, which
+// the fixture does not record, fails alone, and the renamed call's, a finding both make, is not held.
 func TestRequireOnlyAdjudicatedMatchesRecordsWithoutTheRestOfAFinding(test *testing.T) {
 	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording,
+			calling(originalMessages, endingShort(0), relatingShort(0)),
+			calling(portMessages, endingShort(0), relatingShort(0)),
+			analysistest.TestData(), "adjudicated")
+	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording,
 			calling(originalMessages, endingShort(0), relatingShort(0), fixingShort(0)),
 			calling(portMessages, endingShort(0), relatingShort(0), fixingShort(0)),
 			analysistest.TestData(), "adjudicated")
+	}), `the port alone fixes its finding at adjudicated/adjudicated.go:12 writing "", which the fixture does not `+
+		"record")
+}
+
+// A finding the port alone makes offers exactly the fixes its records name, one on the line of its `finds:` record and
+// one, written as a Go string, on the line after it.
+func TestRequireOnlyAdjudicatedPassesRecordedFixes(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, writing("fixed()")),
+			analysistest.TestData(), "fixed")
 	}))
+}
+
+// A fix the port offers on its lone finding that no record names fails, named by the finding's file and line and the
+// text the fix writes.
+func TestRequireOnlyAdjudicatedFailsAFixOfferedUnrecorded(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages),
+			calling(gainedMessages, writing("fixed()"), writing("again()")), analysistest.TestData(), "fixed")
+	}),
+		`the port alone fixes its finding at fixed/fixed.go:10 writing "again()", which the fixture does not record`,
+		`the port alone fixes its finding at fixed/fixed.go:11 writing "again()", which the fixture does not record`,
+	)
+}
+
+// A fix recorded that the port does not offer fails, named the same way.
+func TestRequireOnlyAdjudicatedFailsARecordedFixNotOffered(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages), analysistest.TestData(),
+			"fixed")
+	}),
+		`the fixture records that the port alone fixes its finding at fixed/fixed.go:10 writing "fixed()", and it `+
+			"does not",
+		`the fixture records that the port alone fixes its finding at fixed/fixed.go:11 writing "fixed()", and it `+
+			"does not",
+	)
+}
+
+// A `fixes:` record neither on the line of a `finds:` record nor on the line after one names no finding's fix, and
+// fails, named by its own file and line.
+func TestRequireOnlyAdjudicatedFailsAFixesRecordThatFollowsNoFinds(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages), analysistest.TestData(),
+			"fixes_unanchored")
+	}), "fixes_unanchored/fixes_unanchored.go:11 records `fixes:` with no `finds:` record on its line or the line "+
+		"above it")
 }

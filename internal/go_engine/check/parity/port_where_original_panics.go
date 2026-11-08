@@ -31,12 +31,13 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // testdata's src, or the fixture module of that name (see fixtureLoad), where the original panics, so no comparison
 // can hold it: the original must panic on every package of the fixture, each panic logged, and the port's findings
 // there must be exactly the fixture's `// port finds:` records, matched by file, line and message as
-// RequireOnlyAdjudicated matches them, each giving its reason as there. An original that runs there, or fails other
-// than by panicking, fails, since the fixture then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of
-// any other kind fails, since with no finding of the original's there is nothing for it to pair or rename, and so does
-// a fixture that records nothing, a `// port ` comment the harness cannot read, and a package the port did not run
-// on. Like RequireOnlyAdjudicated, it reads the one package directory fixture names. It loads for the machine's own
-// target, and Target.RequirePortWhereOriginalPanics for another.
+// RequireOnlyAdjudicated matches them, each giving its reason as there, and their fixes exactly its `// port fixes:`
+// records, held as there. An original that runs there, or fails other than by panicking, fails, since the fixture
+// then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind fails, since with no finding
+// of the original's there is nothing for it to pair or rename, and so does a fixture that records nothing, a `// port `
+// comment the harness cannot read, and a package the port did not run on. Like RequireOnlyAdjudicated, it reads the
+// one package directory fixture names. It loads for the machine's own target, and Target.RequirePortWhereOriginalPanics
+// for another.
 func RequirePortWhereOriginalPanics(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -119,4 +120,5 @@ func requirePortWhereOriginalPanics(
 	for _, unmatched := range Difference(recorded.portAlone, portAlone) {
 		test.Errorf("the fixture records that the port finds %s, and it does not", unmatched)
 	}
+	requireRecordedFixes(test, recorded, portFindings)
 }

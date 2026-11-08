@@ -9,13 +9,13 @@ import (
 // spelling, misses, and the port's fix names the package as the call does.
 func renamed(a string, b string, x []byte, y []byte) {
 	// text is strings, so this asks whether a holds b.
-	_ = text.Index(a, b) != -1 // port finds: should use text.Contains(a, b) instead
+	_ = text.Index(a, b) != -1 // port finds: should use text.Contains(a, b) instead // port fixes: text.Contains(a, b)
 	// text is strings, so this asks whether a holds any of b.
-	_ = text.IndexAny(a, b) >= 0 // port finds: should use text.ContainsAny(a, b) instead
+	_ = text.IndexAny(a, b) >= 0 // port finds: should use text.ContainsAny(a, b) instead // port fixes: text.ContainsAny(a, b)
 	// binary is bytes, so this asks whether x lacks the rune.
-	_ = binary.IndexRune(x, 'r') < 0 // port finds: should use !binary.ContainsRune(x, 'r') instead
+	_ = binary.IndexRune(x, 'r') < 0 // port finds: should use !binary.ContainsRune(x, 'r') instead // port fixes: !binary.ContainsRune(x, 'r')
 	// binary is bytes, so this asks whether x lacks y.
-	_ = binary.Index(x, y) == -1 // port finds: should use !binary.Contains(x, y) instead
+	_ = binary.Index(x, y) == -1 // port finds: should use !binary.Contains(x, y) instead // port fixes: !binary.Contains(x, y)
 	_ = text.LastIndex(a, b) != -1
 	_ = binary.IndexByte(x, 'b') >= 0
 }

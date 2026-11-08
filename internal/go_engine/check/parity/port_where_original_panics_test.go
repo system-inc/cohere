@@ -126,3 +126,18 @@ func TestRequirePortWhereOriginalPanicsRefusesARecordOtherThanFinds(test *testin
 	}), "panicking_renamed/panicking_renamed.go:11 records `renames:`, and where the original panics it finds "+
 		"nothing for the record to cover")
 }
+
+// Every finding of the port's there is its alone, so a fix it offers that no `fixes:` record names fails, as
+// RequireOnlyAdjudicated fails it.
+func TestRequirePortWhereOriginalPanicsHoldsTheFixesOfItsFindings(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(portMessages, writing("fixed()")), analysistest.TestData(), "panicking")
+	}),
+		`the port alone fixes its finding at panicking/panicking.go:13 writing "fixed()", which the fixture does not `+
+			"record",
+		`the port alone fixes its finding at panicking/panicking.go:14 writing "fixed()", which the fixture does not `+
+			"record",
+	)
+}

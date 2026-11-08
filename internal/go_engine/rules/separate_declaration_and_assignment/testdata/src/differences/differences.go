@@ -2,17 +2,18 @@ package differences
 
 // clauses holds the declarations the original misses: a switch's, a type switch's and a select's clause holds a list
 // of statements of its own, no block, which the original never walks. Each finding is the port's alone, and a block
-// nested in a clause, which both walk, is both's.
+// nested in a clause, which both walk, is both's. Each of the port's fixes is the one the original offers in a block,
+// the declaration merged with the assignment after it, which reads the same in a clause.
 func clauses(choice int, unknown interface{}, channel chan int) {
 	switch choice {
 	case 1:
 		// The original walks blocks only, and a case clause is none.
-		var switched int // port finds: should merge variable declaration with assignment on next line
+		var switched int // port finds: should merge variable declaration with assignment on next line // port fixes: var switched int = 1
 		switched = 1
 		_ = switched
 	default:
 		// The same of the default clause.
-		var defaulted string // port finds: should merge variable declaration with assignment on next line
+		var defaulted string // port finds: should merge variable declaration with assignment on next line // port fixes: var defaulted string = "default"
 		defaulted = "default"
 		_ = defaulted
 	}
@@ -20,7 +21,7 @@ func clauses(choice int, unknown interface{}, channel chan int) {
 	switch typed := unknown.(type) {
 	case int:
 		// The same of a type switch's clause, whose value is the clause's own.
-		var doubled int // port finds: should merge variable declaration with assignment on next line
+		var doubled int // port finds: should merge variable declaration with assignment on next line // port fixes: var doubled int = typed * 2
 		doubled = typed * 2
 		_ = doubled
 	}
@@ -28,7 +29,7 @@ func clauses(choice int, unknown interface{}, channel chan int) {
 	select {
 	case received := <-channel:
 		// The same of a select's clause.
-		var selected int // port finds: should merge variable declaration with assignment on next line
+		var selected int // port finds: should merge variable declaration with assignment on next line // port fixes: var selected int = received
 		selected = received
 		_ = selected
 	default:
@@ -38,7 +39,7 @@ func clauses(choice int, unknown interface{}, channel chan int) {
 	// found, while the next clause's, spelled alike, is assigned twice in its own clause and left alone.
 	switch choice {
 	case 2:
-		var shared int // port finds: should merge variable declaration with assignment on next line
+		var shared int // port finds: should merge variable declaration with assignment on next line // port fixes: var shared int = 1
 		shared = 1
 		_ = shared
 	case 3:

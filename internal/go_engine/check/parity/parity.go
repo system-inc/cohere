@@ -3,9 +3,10 @@
 // a fixture. A finding the original makes and the port misses is a regression, unless it was ruled a false positive
 // with the finding in hand, the reason written above the record that drops it; nothing else can record one. A finding
 // both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
-// withholds the one fix of the original's it leaves out, or that it omits the one related entry. Every record gives
-// its reason: a drop on the line directly above it, and any other there or in the doc comment of the declaration it
-// is in.
+// withholds the one fix of the original's it leaves out, or that it omits the one related entry. A finding the port
+// alone makes is recorded with the text each of its fixes writes, so no fix of the port's goes unread. Every record
+// gives its reason: a drop on the line directly above it, and any other there or in the doc comment of the declaration
+// it is in.
 //
 // A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
 // port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
@@ -31,6 +32,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -238,12 +240,26 @@ func requireIdentical(
 // the message of a finding only the original makes, ruled a false positive with the finding in hand; `moves:` and the
 // message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
 // original offers on a finding both make there and the port leaves out; or `omits:` and the message of a related
-// entry the original's finding carries there and the port's leaves out. Each record's reason is in the comment above
-// it, or for any but a drop in the doc comment of the declaration it is in, and each matches one finding on its own
-// line.
+// entry the original's finding carries there and the port's leaves out; or `fixes:` and the text one edit of a fix
+// writes, on a finding a `finds:` record covers, on that record's line or the line after it (see fixesText). Each
+// record's reason is in the comment above it, or for any but a drop in the doc comment of the declaration it is in, and
+// each matches one finding on its own line, a `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
-	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?))\s*$`,
+	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
+		`fixes: (.+?))\s*$`,
 )
+
+// fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
+// with a double quote, the string it spells, so a text that holds a newline, or that writes nothing, is recorded as
+// `fixes: "import \"strconv\"\n"` or `fixes: ""`, and a text that opens with a double quote is quoted too. A literal it
+// cannot read is no record.
+func fixesText(written string) (string, bool) {
+	if !strings.HasPrefix(written, `"`) {
+		return written, true
+	}
+	text, unquoteError := strconv.Unquote(written)
+	return text, unquoteError == nil
+}
 
 // RequireOnlyAdjudicated runs original and port over the differences fixture, the package fixture names, its records
 // read from the folder the load found it in (see recordsFolder), or the fixture module of that name (see
@@ -255,6 +271,10 @@ var adjudicatedPattern = regexp.MustCompile(
 // leaves out as omitted, each pairing the two sides' findings and nothing more; and every record is matched by a
 // finding on its own line, never another's. A finding the original makes and the port does not, unrecorded, is a
 // regression and fails, and so does any fix or related entry one side alone offers that no record withholds or omits.
+// A finding the port alone makes, recorded as found, offers fixes only as the fixture records them: each edit of each
+// fix is a `fixes:` record of its new text, on the `finds:` record's line or the line after it, and every `fixes:`
+// record is met by an edit of a finding that record covers, both ways as a multiset by file, line and text, so a fix
+// the port offers there unrecorded fails, and so does one recorded that it does not offer.
 // Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
 // of the declaration it is in, and one with none fails, named by file and line. A `// port ` comment it cannot read
 // fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
@@ -300,6 +320,7 @@ func requireOnlyAdjudicated(
 	originalOnly, portOnly = pairLeftOut(test, "omits the related entry", recorded.omitted, withoutRelated,
 		originalOnly, portOnly)
 	originalOnly, portOnly = pairMoved(test, recorded.moved, originalOnly, portOnly)
+	requireRecordedFixes(test, recorded, portOnly)
 	portAlone := asRecorded(portOnly)
 	for _, unrecorded := range Difference(portAlone, recorded.portAlone) {
 		test.Errorf("the port alone found %s, which the fixture does not record", unrecorded)
@@ -323,17 +344,52 @@ func requireOnlyAdjudicated(
 }
 
 // records are a differences fixture's records, each a file, a line and a message with no column: portAlone, what the
-// port alone finds, from `finds:` and the port's side of `renames:`; renamed, the original's side of `renames:`; and
-// dropped, what the original alone finds and the port rightly does not, from `drops:`; moved, a finding both make in
-// other spans or fixes, from `moves:`; withheld, from `withholds:`, whose Message is the fix's message, not the
-// finding's; and omitted, from `omits:`, whose Message is the related entry's.
+// port alone finds, from `finds:` and the port's side of `renames:`; found, the `finds:` records alone of those;
+// renamed, the original's side of `renames:`; and dropped, what the original alone finds and the port rightly does
+// not, from `drops:`; moved, a finding both make in other spans or fixes, from `moves:`; withheld, from `withholds:`,
+// whose Message is the fix's message, not the finding's; omitted, from `omits:`, whose Message is the related
+// entry's; and fixed, from `fixes:`, on the line of the `finds:` record it follows, whose Message is the text an edit
+// writes.
 type records struct {
 	portAlone []Finding
+	found     []Finding
 	renamed   []Finding
 	dropped   []Finding
 	moved     []Finding
 	withheld  []Finding
 	omitted   []Finding
+	fixed     []Finding
+}
+
+// requireRecordedFixes fails the test unless the edits of the fixes the port offers on its lone findings, portOnly,
+// that a `finds:` record covers are the fixture's `fixes:` records, as a multiset by the finding's file and line and
+// the edit's new text, naming each edit no record holds and each record no edit meets. The port's side of a renaming
+// is a finding both make, so its fixes are not held here.
+func requireRecordedFixes(test testing.TB, recorded records, portOnly []Finding) {
+	test.Helper()
+	found := map[string]bool{}
+	for _, record := range recorded.found {
+		found[record.key()] = true
+	}
+	offered := []Finding{}
+	for _, finding := range portOnly {
+		if !found[Finding{File: finding.File, Line: finding.Line, Message: finding.Message}.key()] {
+			continue
+		}
+		for _, fix := range finding.Fixes {
+			for _, edit := range fix.Edits {
+				offered = append(offered, Finding{File: finding.File, Line: finding.Line, Message: edit.NewText})
+			}
+		}
+	}
+	for _, unrecorded := range Difference(offered, recorded.fixed) {
+		test.Errorf("the port alone fixes its finding at %s:%d writing %q, which the fixture does not record",
+			unrecorded.File, unrecorded.Line, unrecorded.Message)
+	}
+	for _, unmatched := range Difference(recorded.fixed, offered) {
+		test.Errorf("the fixture records that the port alone fixes its finding at %s:%d writing %q, and it does not",
+			unmatched.File, unmatched.Line, unmatched.Message)
+	}
 }
 
 // pairLeftOut takes out of originalOnly and portOnly each pair a record covers: a finding of the original's on the
@@ -434,9 +490,10 @@ func pairMoved(
 }
 
 // adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, its
-// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines). It
-// reads comments as the parser finds them, so a `// port ` inside a string is no record. It reads that one directory,
-// not those below it.
+// file named by fileName as the findings name it, and fails each record that gives no reason (see reasonedLines). A
+// `fixes:` record is put on the line of the `finds:` record it follows, on its own line or the line above, and one
+// that follows none fails. It reads comments as the parser finds them, so a `// port ` inside a string is no record.
+// It reads that one directory, not those below it.
 func adjudicated(test testing.TB, directory string, fileName func(string) string) records {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
@@ -470,12 +527,17 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in "+
 							"the doc comment of the declaration it is in", at.File, line)
 					}
+					text, isText := "", true
+					if match != nil && match[8] != "" {
+						text, isText = fixesText(match[8])
+					}
 					switch {
-					case match == nil:
+					case match == nil || !isText:
 						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, line, record)
 					case match[1] != "":
 						at.Message = match[1]
 						recorded.portAlone = append(recorded.portAlone, at)
+						recorded.found = append(recorded.found, at)
 					case match[4] != "":
 						at.Message = match[4]
 						recorded.dropped = append(recorded.dropped, at)
@@ -488,6 +550,9 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 					case match[7] != "":
 						at.Message = match[7]
 						recorded.omitted = append(recorded.omitted, at)
+					case match[8] != "":
+						at.Message = text
+						recorded.fixed = append(recorded.fixed, at)
 					default:
 						renamed := at
 						renamed.Message = match[2]
@@ -499,7 +564,32 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 			}
 		}
 	}
+	recorded.fixed = followingFinds(test, recorded.fixed, recorded.found)
 	return recorded
+}
+
+// followingFinds is each of fixed, a `fixes:` record, on the line of the `finds:` record of found it follows: one on
+// its own line, or else one on the line above, where a line could not hold both. One that follows none fails, named by
+// file and line, and is left out, since it names no finding's fix.
+func followingFinds(test testing.TB, fixed []Finding, found []Finding) []Finding {
+	test.Helper()
+	onLine := func(file string, line int) func(Finding) bool {
+		return func(record Finding) bool { return record.File == file && record.Line == line }
+	}
+	following := []Finding{}
+	for _, record := range fixed {
+		switch {
+		case slices.ContainsFunc(found, onLine(record.File, record.Line)):
+		case slices.ContainsFunc(found, onLine(record.File, record.Line-1)):
+			record.Line--
+		default:
+			test.Errorf("%s:%d records `fixes:` with no `finds:` record on its line or the line above it, so it "+
+				"names no finding's fix", record.File, record.Line)
+			continue
+		}
+		following = append(following, record)
+	}
+	return following
 }
 
 // directivePrefixes open the directives a comment can be, to the go command, the compiler or cohere, as `//go:build
