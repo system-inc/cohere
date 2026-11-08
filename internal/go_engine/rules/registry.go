@@ -297,7 +297,7 @@ var ports = map[string]port{
 	"ifaceassert":      {analyzer: iface_assert.Analyzer},
 	"loopclosure":      {analyzer: loop_closure.Analyzer},
 	"lostcancel":       {analyzer: lost_cancel.Analyzer},
-	"nilfunc":          {analyzer: nil_func.Analyzer},
+	"nilfunc":          {analyzer: nil_func.Analyzer, listener: &nil_func.Listener},
 	"printf":           {analyzer: printf.Analyzer},
 	"scannererr":       {analyzer: scanner_error.Analyzer},
 	"shift":            {analyzer: shift.Analyzer},
