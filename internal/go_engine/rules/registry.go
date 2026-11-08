@@ -75,6 +75,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/composite"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/copy_lock"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/defers"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/directive"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/errors_as"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/frame_pointer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/host_port"
@@ -173,6 +174,7 @@ var ports = map[string]*analysis.Analyzer{
 	"composites":   composite.Analyzer,
 	"copylocks":    copy_lock.Analyzer,
 	"defers":       defers.Analyzer,
+	"directive":    directive.Analyzer,
 	"errorsas":     errors_as.Analyzer,
 	"framepointer": frame_pointer.Analyzer,
 	"hostport":     host_port.Analyzer,
