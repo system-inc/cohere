@@ -31,57 +31,46 @@ import (
 	"go/token"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4026",
-	Doc: "Flags a negative zero written as a constant, -0.0 or -float64(0), which Go folds to positive zero: " +
-		"staticcheck's SA4026, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// conversionNames are the names the pattern's Object accepts for the conversion.
-var conversionNames = []string{"float32", "float64"}
-
-// fixMessage is what the one fix says, whichever expression it replaces.
-const fixMessage = "Use math.Copysign to create negative zero"
-
-// run builds the pass's context and judges every unary expression and call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("negative_zero_float: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.UnaryExpr)(nil), (*ast.CallExpr)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every unary expression and call, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.UnaryExpr)(nil), (*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch expression := node.(type) {
 		case *ast.UnaryExpr:
 			CheckNegation(context, expression)
 		case *ast.CallExpr:
 			CheckConversion(context, expression)
 		default:
-			// Invariant: Preorder hands this function only the unary expressions and calls it was asked for.
-			panic("negative_zero_float: the inspector handed over a node that is neither a unary expression nor a call")
+			// Invariant: the dispatcher hands Node only the unary expressions and calls it was asked for.
+			panic("negative_zero_float: the dispatcher handed over a node that is neither a unary expression nor " +
+				"a call")
 		}
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4026",
+	"SA4026",
+	"Flags a negative zero written as a constant, -0.0 or -float64(0), which Go folds to positive zero: "+
+		"staticcheck's SA4026, ported as a check on syntax.",
+	&Listener,
+)
+
+// conversionNames are the names the pattern's Object accepts for the conversion.
+var conversionNames = []string{"float32", "float64"}
+
+// fixMessage is what the one fix says, whichever expression it replaces.
+const fixMessage = "Use math.Copysign to create negative zero"
 
 // CheckNegation judges one unary expression: -0.0 is positive zero, and so is -float32(0), -float64(0) or either
 // converting 0.0.
