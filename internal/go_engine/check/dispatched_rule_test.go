@@ -13,8 +13,10 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"honnef.co/go/tools/analysis/facts/deprecated"
 	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
@@ -699,5 +701,111 @@ func TestTheCursorOutsideANodeCallIsTheRulesCrash(test *testing.T) {
 				subtest.Errorf("the run found %q, where exactly %q was expected", messages, expected)
 			}
 		})
+	}
+}
+
+// skippedForErrorsFiles are a module of its own, so the shared fixtures' counts stay as they are: broken holds a type
+// error, so an analyzer that does not run despite errors is skipped there, and fine beside it is well typed.
+var skippedForErrorsFiles = map[string]string{
+	"go.mod": "module example.com/skipped\n\ngo 1.24\n",
+	"broken/broken.go": "package broken\n\n// Broken returns a string as an int.\n" +
+		"func Broken() int { return \"no\" }\n",
+	"fine/fine.go": "package fine\n\n// Fine is well typed.\nfunc Fine() int { return 1 }\n",
+}
+
+// A listener requiring an analyzer that does not run despite errors, staticcheck's deprecated facts as SA1019's
+// does, fails only its own rule on a package with errors: the checker skips the requirement there, the syntax
+// dispatcher, which runs despite errors and runs past a requirement that did not finish (rule.Failed), starts every
+// other listener, and each rule's crash reads exactly as check.Run writes it for the same rule as a plain analyzer:
+// the requiring one's with "failed prerequisites" naming the deprecated facts, its twin requiring them itself as the
+// original SA1019 does, and the one beside it skipped for the errors, as any rule that does not run despite errors
+// is. On the well-typed package beside it both report.
+func TestAListenersRequirementSkippedForErrorsFailsOnlyItsOwnRule(test *testing.T) {
+	test.Parallel()
+
+	root := test.TempDir()
+	writeFiles(test, root, skippedForErrorsFiles)
+	loaded, loadError := load.Packages(root, []string{"./..."}, []string{"GOWORK=off"}, nil)
+	if loadError != nil {
+		test.Fatalf("loading the fixture: %v", loadError)
+	}
+	illTyped := 0
+	for _, loadedPackage := range loaded.Packages {
+		if loadedPackage.IllTyped {
+			illTyped++
+		}
+	}
+	if illTyped != 1 {
+		test.Fatalf("want broken alone ill-typed, got %d ill-typed packages of %d", illTyped, len(loaded.Packages))
+	}
+
+	dispatcher := dispatch.NewSyntax()
+	listener := func(requires []*analysis.Analyzer) *rule.Listener {
+		return &rule.Listener{
+			Requires: requires,
+			Nodes:    []ast.Node{(*ast.FuncDecl)(nil)},
+			Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
+				declaration, isDeclaration := node.(*ast.FuncDecl)
+				if !isDeclaration {
+					return
+				}
+				if len(requires) > 0 {
+					if _, isResult := context.ResultOf(deprecated.Analyzer).(deprecated.Result); !isResult {
+						panic(fmt.Sprintf("the listener was handed no result for %s", deprecated.Analyzer.Name))
+					}
+				}
+				context.Report(analysis.Diagnostic{Pos: declaration.Name.Pos(), Message: "declares " +
+					declaration.Name.Name})
+			},
+		}
+	}
+	requiringName := rule.Namespace + "test-requires-deprecated"
+	besideName := rule.Namespace + "test-beside-the-skipped"
+	requiringListener, besideListener := listener([]*analysis.Analyzer{deprecated.Analyzer}), listener(nil)
+	dispatched, runError := Run(loaded.Packages, []rule.Rule{
+		{Name: requiringName, Origin: rule.OriginHouse, Listener: requiringListener,
+			Analyzer: dispatcher.RuleAnalyzer(requiringName, "requires_deprecated", "requires fact_deprecated",
+				requiringListener)},
+		{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
+			Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_the_skipped", "requires nothing", besideListener)},
+	}, Options{})
+	if runError != nil {
+		test.Fatalf("running the dispatched rules: %v", runError)
+	}
+	// The same two rules walking by themselves: one requiring the deprecated facts, one requiring nothing.
+	alone, aloneError := Run(loaded.Packages, []rule.Rule{
+		{Name: requiringName, Origin: rule.OriginHouse, Analyzer: &analysis.Analyzer{
+			Name:     "requires_deprecated_alone",
+			Doc:      "requires fact_deprecated and reports nothing",
+			Requires: []*analysis.Analyzer{deprecated.Analyzer},
+			Run:      func(*analysis.Pass) (any, error) { return nil, nil },
+		}},
+		{Name: besideName, Origin: rule.OriginHouse, Analyzer: &analysis.Analyzer{
+			Name: "beside_the_skipped_alone",
+			Doc:  "requires nothing and reports nothing",
+			Run:  func(*analysis.Pass) (any, error) { return nil, nil },
+		}},
+	}, Options{})
+	if aloneError != nil {
+		test.Fatalf("running the rules alone: %v", aloneError)
+	}
+	if len(alone.Crashes) != 2 || !strings.Contains(alone.Crashes[0].Error+alone.Crashes[1].Error,
+		"failed prerequisites: "+deprecated.Analyzer.Name+"@example.com/skipped/broken") {
+		test.Fatalf("the rules alone crashed %+v, where two crashes on broken, one naming %s as a failed "+
+			"prerequisite, were expected", alone.Crashes, deprecated.Analyzer.Name)
+	}
+	if !slices.Equal(dispatched.Crashes, alone.Crashes) {
+		test.Errorf("the dispatched rules crashed\n%+v\nwhere exactly what the rules alone crashed was expected,\n%+v",
+			dispatched.Crashes, alone.Crashes)
+	}
+	messages := []string{}
+	for _, finding := range dispatched.Findings {
+		messages = append(messages, finding.Rule+": "+finding.Message)
+	}
+	slices.Sort(messages)
+	expected := []string{besideName + ": declares Fine", requiringName + ": declares Fine"}
+	slices.Sort(expected)
+	if !slices.Equal(messages, expected) {
+		test.Errorf("the run found %q, where exactly %q was expected", messages, expected)
 	}
 }
