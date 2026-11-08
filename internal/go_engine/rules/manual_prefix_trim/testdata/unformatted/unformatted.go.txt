@@ -1,0 +1,22 @@
+package unformatted
+
+import "strings"
+
+// gofmt strips the parentheses around an if statement's condition, and the original takes the condition as written,
+// so a parenthesized guard is no call to it and is not reported, either form.
+func parenthesizedConditions(text string, affix string) {
+	if (strings.HasPrefix(text, affix)) {
+		text = text[len(affix):]
+	}
+	if ((strings.HasPrefix(text, affix))) {
+		text = strings.TrimPrefix(text, affix)
+	}
+	// The same guards unparenthesized are reported, so the fixture holds findings to compare.
+	if strings.HasPrefix(text, affix) {
+		text = text[len(affix):]
+	}
+	if strings.HasPrefix(text, affix) {
+		text = strings.TrimPrefix(text, affix)
+	}
+	_ = text
+}
