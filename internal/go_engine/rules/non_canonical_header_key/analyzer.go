@@ -4,8 +4,8 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1008/sa1008.go, whose logic it keeps
 // and whose message and fixes it reports word for word, across the whole index expression as the original's do. It
-// walks assignments and index expressions as the original's inspector does: an assignment with an http.Header
-// indexed on its left is a write, and nothing inside it is judged, its right side included, the original's
+// judges the index expressions the original's inspector reaches: an assignment with an http.Header indexed on its
+// left is a write, and nothing inside it is judged, its right side included, the original's
 // admitted miss of `h1["foo"] = h2["foo"]`, kept for parity. Any other index of a value whose type is named
 // net/http.Header, or an alias of it, by a constant string that http.CanonicalHeaderKey would change is reported:
 // a key written as a literal is fixed to the canonical literal, one written as an identifier is wrapped in
@@ -23,62 +23,49 @@ import (
 	"net/http"
 	"strconv"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA1008",
-	Doc: "Flags an http.Header map indexed directly by a constant key not in canonical form, which the Header's " +
-		"methods never find: staticcheck's SA1008, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
 // headerType is the qualified name of the map type whose keys the check judges.
 const headerType = "net/http.Header"
 
-// run builds the pass's context and walks every assignment and index expression of the package, skipping what an
-// assignment to a Header holds.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("non_canonical_header_key: the inspect pass's result is missing")
-	}
-	inspected.Nodes([]ast.Node{(*ast.AssignStmt)(nil), (*ast.IndexExpr)(nil)}, func(node ast.Node, push bool) bool {
-		if !push {
-			// The inspector ignores what a function answers on the way out of a node.
-			return false
+// Listener is what the port hears of each package from the dispatcher: every index expression, in preorder, with its
+// ancestors. The original's inspector stops descending at an assignment that writes a Header, so an index anywhere
+// inside one, its right side included, is never judged; the dispatcher walks every node, so the port leaves alone an
+// index with such an assignment among its ancestors, the same indexes.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IndexExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+		index, isIndex := node.(*ast.IndexExpr)
+		if !isIndex {
+			// Invariant: the dispatcher hands Node only the index expressions it was asked for.
+			panic("non_canonical_header_key: the dispatcher handed over a node that is not an index expression")
 		}
-		switch expression := node.(type) {
-		case *ast.AssignStmt:
-			return !WritesHeader(context, expression)
-		case *ast.IndexExpr:
-			CheckIndex(context, expression)
-			return true
-		default:
-			// Invariant: Nodes hands this function only the assignments and index expressions it was asked for.
-			panic("non_canonical_header_key: the inspector handed over a node neither an assignment nor an index")
+		for _, ancestor := range stack {
+			if assignment, isAssignment := ancestor.(*ast.AssignStmt); isAssignment && WritesHeader(context, assignment) {
+				return
+			}
 		}
-	})
-	return nil, nil
+		CheckIndex(context, index)
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA1008",
+	"SA1008",
+	"Flags an http.Header map indexed directly by a constant key not in canonical form, which the Header's "+
+		"methods never find: staticcheck's SA1008, ported as a check on syntax.",
+	&Listener,
+)
 
 // WritesHeader is whether assignment indexes an http.Header on its left, a write the original never judges, and
 // whose every part, its right side included, it leaves unvisited.
