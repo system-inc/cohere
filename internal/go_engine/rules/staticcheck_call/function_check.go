@@ -9,13 +9,15 @@
 // holds its ir.Value directly, where the original wraps it in a struct of that one field. And where the original
 // panics, on a call whose syntax is of a shape it does not know or a mark it has nowhere to report, the kit reports
 // at the next position it has, or drops the mark when there is none (report), since a panic loses every other
-// finding of the package along with the one it could not place.
+// finding of the package along with the one it could not place. It also passes over a call whose function's bare
+// name no Rule's key ends in before spelling the function's full name, which judges the same calls (ruledNamesOf).
 package staticcheck_call
 
 import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/go/ir"
@@ -33,6 +35,7 @@ type Rule func(call *Call)
 // Only a call whose callee is known without running the program, a function or a method called on a concrete type,
 // is judged.
 func FunctionCheck(rules map[string]Rule) rule.FunctionCheck {
+	ruledNames := ruledNamesOf(rules)
 	return func(context *rule.Context, function *ir.Function) {
 		for _, block := range function.Blocks {
 			for _, instruction := range block.Instrs {
@@ -41,17 +44,37 @@ func FunctionCheck(rules map[string]Rule) rule.FunctionCheck {
 					continue
 				}
 				if callee := site.Common().StaticCallee(); callee != nil {
-					checkCall(context, rules, site, callee)
+					checkCall(context, rules, ruledNames, site, callee)
 				}
 			}
 		}
 	}
 }
 
-// checkCall hands site, a call to callee, to its Rule, if rules holds one, and reports what the Rule marks.
-func checkCall(context *rule.Context, rules map[string]Rule, site ir.CallInstruction, callee *ir.Function) {
+// ruledNamesOf is the bare name of every function rules holds a Rule for, what follows the last dot of its key:
+// "Write" for "(*bytes.Buffer).Write". typeutil.FuncName ends in the function's own name after a dot, or is that
+// name alone, and a name holds no dot, so a function whose name is not among these has no Rule, and checkCall knows
+// it without spelling the full name. Spelling it writes the receiver's type into a new string, every static call of
+// every function, and was the walk's main cost and nearly all its allocation, the original's as much as the kit's.
+func ruledNamesOf(rules map[string]Rule) map[string]bool {
+	ruledNames := map[string]bool{}
+	for name := range rules {
+		ruledNames[name[strings.LastIndex(name, ".")+1:]] = true
+	}
+	return ruledNames
+}
+
+// checkCall hands site, a call to callee, to its Rule, if rules holds one, and reports what the Rule marks. A callee
+// whose bare name is not in ruledNames has no Rule, and is passed over before its full name is spelled.
+func checkCall(
+	context *rule.Context,
+	rules map[string]Rule,
+	ruledNames map[string]bool,
+	site ir.CallInstruction,
+	callee *ir.Function,
+) {
 	object, isFunction := callee.Object().(*types.Func)
-	if !isFunction {
+	if !isFunction || !ruledNames[object.Name()] {
 		return
 	}
 	check, isRuled := rules[typeutil.FuncName(object)]

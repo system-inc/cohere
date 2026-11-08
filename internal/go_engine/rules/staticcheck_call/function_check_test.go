@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"go/constant"
+	"maps"
 	"os"
 	"slices"
 	"testing"
@@ -111,6 +112,24 @@ func TestFunctionCheckMarksWhereCallcheckReports(test *testing.T) {
 	slices.SortFunc(actual, compare)
 	if !slices.Equal(actual, expected) {
 		test.Errorf("the kit marked\n%v\nwhere callcheck marks\n%v", actual, expected)
+	}
+}
+
+// A Rule's bare name is what follows the last dot of its key, the name typeutil.FuncName ends in, so a dot in a
+// package path, as gopkg.in/yaml.v3 has, or in a method's receiver, never takes a name for another.
+func TestRuledNamesOfTakesWhatFollowsTheLastDot(test *testing.T) {
+	test.Parallel()
+	noRule := func(*Call) { /* Never called: only the keys are read. */ }
+	actual := ruledNamesOf(map[string]Rule{
+		"regexp.Compile":                 noRule,
+		"(*bytes.Buffer).Write":          noRule,
+		"gopkg.in/yaml.v3.Unmarshal":     noRule,
+		"(gopkg.in/yaml.v3.Node).Decode": noRule,
+		"println":                        noRule,
+	})
+	expected := map[string]bool{"Compile": true, "Write": true, "Unmarshal": true, "Decode": true, "println": true}
+	if !maps.Equal(actual, expected) {
+		test.Errorf("the bare names are %v, where %v was expected", actual, expected)
 	}
 }
 
