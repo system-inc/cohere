@@ -424,15 +424,21 @@ public struct Pipeline {
                 uniquingKeysWith: { first, _ in first },
             )
             /*
-             A run that writes is handed the formatted text. `--no-fix` asks only the verdict, which is kept in the
-             package's scratch for the next run (`FormatVerdictCache`); under `--no-cache` nothing is read or kept.
+             A run that writes is handed the formatted text. `--no-fix` asks only the verdict. Either way each verdict
+             is kept in the package's scratch for the next run (`FormatVerdictCache`), and a file the store holds as
+             formatted for its bytes is not formatted again, unless the fixer just moved them, since the formatter
+             has the last word on every fix. Under `--no-cache` nothing is read or kept.
              */
             let formatting: FormatPhase.Result
             if !options.runFormat {
                 formatting = FormatPhase.Result(outcomes: toFormat.map { (file: $0, outcome: .unchanged) })
             }
             else if options.mutate {
-                formatting = await FormatPhase().run(toFormat)
+                formatting = await FormatPhase().run(
+                    toFormat,
+                    fixed: Set(toFormat.filter { $0.source != originals[$0.url.path] }.map(\.url.path)),
+                    scratchPath: options.noCache ? nil : runScratch(for: root),
+                )
             }
             else {
                 formatting = await FormatPhase().check(
