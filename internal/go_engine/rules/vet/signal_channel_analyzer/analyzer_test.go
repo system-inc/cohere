@@ -18,11 +18,10 @@ import (
 // x/tools' own fixture for sigchanyzer, a.go and its golden a.go.golden, copied unchanged into testdata/src and run as
 // x/tools' test runs it, with suggested fixes and no flags: every `// want` the original expects, the port reports at
 // the same line with the same message, analysistest fails on a finding no want expects as much as on a want nothing
-// found, and every fix the port offers, applied, turns a.go into the golden. The harness's RequireUpstreamWants runs
-// without suggested fixes, so it would leave the golden unread, and this tier keeps its own call.
+// found, and every fix the port offers, applied, turns a.go into the golden.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), Analyzer, "a")
+	parity.RequireUpstreamWantsWithFixes(test, Analyzer, analysistest.TestData(), "a")
 }
 
 // Over x/tools' fixture and parity's, the second holding every branch of the judgment and of the fix and the shapes
@@ -121,14 +120,4 @@ func fixRecords(test *testing.T, root string, directory string) []parity.Finding
 		}
 	}
 	return recorded
-}
-
-// errorsOnly hands analysistest.RunWithSuggestedFixes a reporter that isn't a testing.TB. Given a testing.TB, it first
-// proves the go command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test
-// that builds. Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
