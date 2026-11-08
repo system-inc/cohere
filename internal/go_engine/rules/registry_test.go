@@ -702,6 +702,7 @@ var sharedReaders = []string{
 var portedPasses = []string{
 	"argument_overwritten_before_use",
 	"dot_import",
+	"double_negation",
 	"duplicate_import",
 	"duration_unit_suffix",
 	"error_variable_name",
