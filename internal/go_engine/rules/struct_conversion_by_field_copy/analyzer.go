@@ -25,62 +25,57 @@ import (
 	"go/types"
 	"go/version"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name: "S1016",
-	Doc: "Flags a struct literal that copies every field of one value of another struct type: staticcheck's S1016, " +
-		"ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every composite literal of the package, as the original walks them from
-// the inspector's root, telling each whether it is the operand of an address operator.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("struct_conversion_by_field_copy: the inspect pass's result is missing")
-	}
-	for cursor := range inspected.Root().Preorder((*ast.CompositeLit)(nil)) {
-		literal, isLiteral := cursor.Node().(*ast.CompositeLit)
+// Listener is what the port hears of each package from the dispatcher: every composite literal, in preorder, as the
+// original walks them from the inspector's root, each with its ancestors, which tell whether it is the operand of an
+// address operator.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CompositeLit)(nil)},
+	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+		literal, isLiteral := node.(*ast.CompositeLit)
 		if !isLiteral {
-			// Invariant: Preorder hands over only the composite literals it was asked for.
-			panic("struct_conversion_by_field_copy: the inspector handed over a node that is not a composite literal")
+			// Invariant: the dispatcher hands Node only the composite literals it was asked for.
+			panic("struct_conversion_by_field_copy: the dispatcher handed over a node that is not a composite literal")
 		}
-		Check(context, literal, isAddressOperand(cursor))
-	}
-	return nil, nil
+		Check(context, literal, isAddressOperand(stack))
+	},
 }
 
-// isAddressOperand is whether the literal at cursor is what an address operator takes the address of, through any
-// parentheses around it. The original asks the literal's parent alone, so `&(T2{x.A})` is not an operand there; Go
-// reads it as `&T2{x.A}`, and the original's fix writes `&(T2(x))`, which does not compile.
-func isAddressOperand(cursor inspector.Cursor) bool {
-	parent := cursor.Parent()
-	for {
-		if _, isParenthesized := parent.Node().(*ast.ParenExpr); !isParenthesized {
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1016",
+	"S1016",
+	"Flags a struct literal that copies every field of one value of another struct type: staticcheck's S1016, "+
+		"ported.",
+	&Listener,
+)
+
+// isAddressOperand is whether the literal whose ancestors are stack, outermost first, is what an address operator
+// takes the address of, through any parentheses around it. The original asks the literal's parent alone, so
+// `&(T2{x.A})` is not an operand there; Go reads it as `&T2{x.A}`, and the original's fix writes `&(T2(x))`, which
+// does not compile.
+func isAddressOperand(stack []ast.Node) bool {
+	parent := len(stack) - 1
+	for parent >= 0 {
+		if _, isParenthesized := stack[parent].(*ast.ParenExpr); !isParenthesized {
 			break
 		}
-		parent = parent.Parent()
+		parent--
 	}
-	unary, isUnary := parent.Node().(*ast.UnaryExpr)
+	// Every literal's outermost ancestor is its file, so a literal has a parent past its parentheses; one handed no
+	// ancestors has no address operator over it.
+	if parent < 0 {
+		return false
+	}
+	unary, isUnary := stack[parent].(*ast.UnaryExpr)
 	return isUnary && unary.Op == token.AND
 }
 
