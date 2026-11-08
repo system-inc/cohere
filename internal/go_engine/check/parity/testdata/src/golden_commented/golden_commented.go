@@ -1,0 +1,10 @@
+// Package golden_commented holds a call, and its golden file a section beside a comment, which staticcheck refuses.
+package golden_commented
+
+func shared() {}
+
+func kept() {}
+
+func calls() {
+	shared()
+}
