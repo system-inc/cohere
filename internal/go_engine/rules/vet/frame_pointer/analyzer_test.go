@@ -1,13 +1,10 @@
 package frame_pointer
 
 import (
-	"cmp"
-	"fmt"
 	"go/build"
 	"go/token"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -15,7 +12,7 @@ import (
 	"golang.org/x/tools/go/analysis/passes/framepointer"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
@@ -29,11 +26,9 @@ var judgedTargets = []string{"darwin/arm64", "darwin/amd64", "linux/arm64", "lin
 // does, and an architecture it does not judge on an operating system it does.
 var unjudgedTargets = []string{"windows/amd64", "freebsd/arm64", "linux/riscv64"}
 
-// x/tools' own fixtures for framepointer, copied unchanged into testdata/src and run as x/tools' test runs them, with
-// no flags, on each target it judges: every `// want` the original expects, the port reports at the same line with
-// the same message, and analysistest fails on a finding no want expects as much as on a want nothing found, so the
-// port adds nothing there either. x/tools' test skips every operating system but linux and darwin, since asm_amd64.s
-// holds wants that hold only there, and no target here is another.
+// x/tools' own fixtures for framepointer, copied unchanged into testdata/src, hold the port to every want the original
+// expects, and to nothing more, on each target it judges. x/tools' test skips every operating system but linux and
+// darwin, since asm_amd64.s holds wants that hold only there, and no target here is another.
 //
 // Not parallel: each target is set in go/build's default context and the environment, which are the process's own.
 func TestPortMatchesUpstreamWants(test *testing.T) {
@@ -41,15 +36,14 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
 			onTarget(subtest, target)
-			analysistest.Run(errorsOnly{subtest}, analysistest.TestData(), Analyzer, "a")
+			parity.RequireUpstreamWants(subtest, Analyzer, analysistest.TestData(), "a")
 		})
 	}
 }
 
-// The original and the port run in one checker over the same fixture packages, x/tools' and parity's, the second
-// holding every branch of the judgment on each architecture, and their findings must be the same multiset of file,
-// line, column, end and message, on each target the pass judges. Each side's count is logged, since two empty sides
-// would match and prove nothing, and the test fails if the original finds nothing at all.
+// Over x/tools' fixtures and parity's, the second holding every branch of the judgment on each architecture, the
+// original and the port find the same findings, each the same in every field, on each target the pass judges. The
+// harness loads the fixtures under the environment onTarget set, so each target's load holds that target's files.
 //
 // Not parallel: each target is set in go/build's default context and the environment, which are the process's own.
 func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
@@ -57,18 +51,15 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
 			onTarget(subtest, target)
-			original, port := findingsOf(subtest, "a", "parity")
-			subtest.Logf("on %s, the original found %d, the port %d", target, len(original), len(port))
-			if len(original) == 0 {
-				subtest.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-			}
-			compareFindings(subtest, original, port)
+			parity.RequireIdentical(subtest, framepointer.Analyzer, Analyzer, analysistest.TestData(), "a", "parity")
 		})
 	}
 }
 
 // On a target the pass does not judge, neither the original nor the port finds anything in the same fixture packages,
-// although the load hands each assembly files, which hold findings on the targets it judges.
+// although the load hands each assembly files, which hold findings on the targets it judges. It keeps its own load and
+// comparison, on parity's pieces, since RequireIdentical fails on an original that finds nothing, which is what this
+// tier expects, and the harness does not hand back the load whose assembly files it counts.
 //
 // Not parallel: each target is set in go/build's default context and the environment, which are the process's own.
 func TestNeitherJudgesAnotherTarget(test *testing.T) {
@@ -102,7 +93,8 @@ func TestNeitherJudgesAnotherTarget(test *testing.T) {
 
 // Neither pass judges the runtime's assembly, which writes the frame pointer in frameless functions by design: the
 // runtime loaded on one target of each architecture, both find nothing, though the port's judgment of the same files,
-// asked directly, finds at least one write.
+// asked directly, finds at least one write. It keeps its own load and comparison, on parity's pieces, for the reasons
+// TestNeitherJudgesAnotherTarget does, the load also handing the runtime's assembly files to the direct judgment.
 //
 // Not parallel: each target is set in go/build's default context and the environment, which are the process's own.
 func TestNeitherJudgesTheRuntime(test *testing.T) {
@@ -165,39 +157,16 @@ func onTarget(subtest *testing.T, target string) {
 	})
 }
 
-// compareFindings fails the test for every finding one side makes and the other does not.
-func compareFindings(test *testing.T, original []finding, port []finding) {
+// compareFindings fails the test for every finding one side makes and the other does not, each the same in every
+// field.
+func compareFindings(test *testing.T, original []parity.Finding, port []parity.Finding) {
 	test.Helper()
-	for _, missing := range difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", described(missing))
+	for _, missing := range parity.Difference(original, port) {
+		test.Errorf("the original found %s, and the port did not", missing)
 	}
-	for _, extra := range difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", described(extra))
+	for _, extra := range parity.Difference(port, original) {
+		test.Errorf("the port found %s, and the original did not", extra)
 	}
-}
-
-// finding is one finding as the differential compares it. Neither side gives a finding an end, so both ends are
-// zero, and a side that gave one would differ.
-type finding struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	message   string
-}
-
-// described is found as a finding line prints it.
-func described(found finding) string {
-	return fmt.Sprintf("%s:%d:%d-%d:%d: %s", found.file, found.line, found.column, found.endLine, found.endColumn,
-		found.message)
-}
-
-// findingsOf loads the fixture packages patterns name, runs x/tools' framepointer and the port over them in one
-// checker, and returns each one's findings, sorted.
-func findingsOf(test *testing.T, patterns ...string) (original []finding, port []finding) {
-	test.Helper()
-	return findingsIn(test, loadedFixtures(test, patterns...))
 }
 
 // loadedFixtures loads the packages patterns name from the fixture tree, under the target onTarget set, and fails the
@@ -218,81 +187,32 @@ func loadedFixtures(test *testing.T, patterns ...string) *load.Loaded {
 	if len(loaded.Roots) == 0 {
 		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
 	}
-	for _, root := range loaded.Roots {
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %v", root.ID,
-				root.Errors)
-		}
+	for _, failure := range parity.LoadFailures(loaded.Roots) {
+		test.Fatalf("fixture package %s does not load clean, so its findings would go uncounted: %s",
+			failure.Package, failure.Error)
 	}
 	return loaded
 }
 
 // findingsIn runs x/tools' framepointer and the port over loaded's roots in one checker, and returns each one's
-// findings, sorted.
-func findingsIn(test *testing.T, loaded *load.Loaded) (original []finding, port []finding) {
+// findings, sorted, each in its file's base name. An analyzer that did not run on a root fails the test.
+func findingsIn(test *testing.T, loaded *load.Loaded) (original []parity.Finding, port []parity.Finding) {
 	test.Helper()
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{framepointer.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
+	outcomes, analyzeError := parity.Analyze(
+		[]parity.Pair{{Name: "framepointer", Original: framepointer.Analyzer, Port: Analyzer}}, loaded.Roots,
 	)
 	if analyzeError != nil {
-		test.Fatalf("analyzing: %v", analyzeError)
+		test.Fatalf("%v", analyzeError)
 	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, diagnostic := range action.Diagnostics {
-			position := action.Package.Fset.Position(diagnostic.Pos)
-			found := finding{
-				file:    filepath.Base(position.Filename),
-				line:    position.Line,
-				column:  position.Column,
-				message: diagnostic.Message,
-			}
-			if diagnostic.End.IsValid() {
-				end := action.Package.Fset.Position(diagnostic.End)
-				found.endLine, found.endColumn = end.Line, end.Column
-			}
-			switch action.Analyzer {
-			case framepointer.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
+	outcome := outcomes[0]
+	for _, failure := range append(outcome.Original.Failures, outcome.Port.Failures...) {
+		test.Fatalf("running on %s: %s", failure.Package, failure.Error)
 	}
-	compare := func(first finding, second finding) int {
-		return cmp.Compare(described(first), described(second))
+	for _, found := range outcome.Original.Findings {
+		original = append(original, found.WithFileNames(filepath.Base))
 	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
+	for _, found := range outcome.Port.Findings {
+		port = append(port, found.WithFileNames(filepath.Base))
+	}
 	return original, port
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []finding, without []finding) []finding {
-	remaining := map[finding]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []finding{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
-}
-
-// errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go
-// command works by building a throwaway program, and a runner of prebuilt test binaries refuses a test that builds.
-// Loading the fixtures needs only go list.
-type errorsOnly struct{ test *testing.T }
-
-func (reporter errorsOnly) Errorf(format string, arguments ...any) {
-	reporter.test.Helper()
-	reporter.test.Errorf(format, arguments...)
 }
