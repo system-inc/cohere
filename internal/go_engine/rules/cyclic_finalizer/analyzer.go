@@ -61,7 +61,8 @@ func Check(context *rule.Context, function *ir.Function) {
 			if !isLoad {
 				continue
 			}
-			// The object must be a variable of the function, loaded from where it lives, the allocation a closure binds.
+			// The object must be a variable of the function, loaded from where it lives, the allocation a closure
+			// binds.
 			allocation, isAllocation := load.X.(*ir.Alloc)
 			if !isAllocation {
 				continue
