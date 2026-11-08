@@ -1,7 +1,8 @@
 // Package slog is vet's slog pass, a call to a log/slog function or method taking alternating key-value pairs whose
 // arguments do not pair: an argument in a key position that is neither a string nor a slog.Attr, or a final key with no
 // value after it. It reads only the static types of the arguments, so an argument of an interface type may be either,
-// and the pass judges what follows it before it calls the call wrong.
+// and the pass judges what follows it before it calls the call wrong. It sits on the engine's syntax dispatcher,
+// hearing each call on the walk the dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/slog/slog.go, whose logic and
 // table of slog's functions it keeps entry for entry, and whose messages it reports word for word, over the same
@@ -33,28 +34,48 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"golang.org/x/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. The documentation keeps the
-// original's missing space in "For example,it".
-var Analyzer = &analysis.Analyzer{
-	Name: "slog",
-	Doc: "check for invalid structured logging calls\n\n" +
-		"The slog checker looks for calls to functions from the log/slog\n" +
-		"package that take alternating key-value pairs. It reports calls\n" +
-		"where an argument in a key position is neither a string nor a\n" +
-		"slog.Attr, and where a final key is missing its value.\n" +
-		"For example,it would report\n\n" +
-		"\tslog.Warn(\"message\", 11, \"k\") // slog.Warn arg \"11\" should be a string or a slog.Attr\n\n" +
-		"and\n\n" +
-		"\tslog.Info(\"message\", \"k1\", v1, \"k2\") // call to slog.Info missing a final value",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "slog"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words. It
+// keeps the original's missing space in "For example,it".
+const passDoc = "check for invalid structured logging calls\n\n" +
+	"The slog checker looks for calls to functions from the log/slog\n" +
+	"package that take alternating key-value pairs. It reports calls\n" +
+	"where an argument in a key position is neither a string nor a\n" +
+	"slog.Attr, and where a final key is missing its value.\n" +
+	"For example,it would report\n\n" +
+	"\tslog.Warn(\"message\", 11, \"k\") // slog.Warn arg \"11\" should be a string or a slog.Attr\n\n" +
+	"and\n\n" +
+	"\tslog.Info(\"message\", \"k1\", v1, \"k2\") // call to slog.Info missing a final value"
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog"
+
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
+// Preorder visits them, of which it judges those of log/slog's functions taking key-value pairs.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node:  checkCall,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
 }
 
 // stringType is the predeclared string, which a key's static type must be (isString): slog reads a key with a type
@@ -94,24 +115,15 @@ var keyValueFunctions = map[string]map[string]int{
 	},
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("slog: inspect's result is missing")
-	}
-	// All visits each call in preorder, as the original's Preorder does, and hands it over typed.
-	for call := range inspector.All[*ast.CallExpr](inspected) {
-		checkCall(pass, call)
-	}
-	return nil, nil
-}
-
-// checkCall judges call when it is a static call of a function or method keyValueFunctions names, reporting the first
+// checkCall judges node when it is a static call of a function or method keyValueFunctions names, reporting the first
 // argument in a key position that cannot be a key, and otherwise a final key with no value. It reports at most one
 // finding a call, since after one misplaced argument every position after it is a guess.
-func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
-	function := typeutil.StaticCallee(pass.TypesInfo, call)
+func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
+	call, isCall := node.(*ast.CallExpr)
+	if !isCall {
+		return
+	}
+	function := typeutil.StaticCallee(context.TypesInfo, call)
 	if function == nil {
 		// A call of a function value or an interface method names no function the table could hold.
 		return
@@ -127,7 +139,7 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 	// firstPair is where the pairs begin among call's arguments. A method expression's call passes the receiver as
 	// its first argument, `(*slog.Logger).Debug(logger, "message", ...)`, so its pairs begin one argument later.
 	firstPair := skipped
-	if isMethodExpression(pass.TypesInfo, call) {
+	if isMethodExpression(context.TypesInfo, call) {
 		firstPair++
 	}
 	if len(call.Args) <= firstPair {
@@ -143,7 +155,7 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 	// unknownArgument is nil, or the last argument at a position whose expectation was unknown.
 	var unknownArgument ast.Expr
 	for _, argument := range call.Args[firstPair:] {
-		argumentType := pass.TypesInfo.Types[argument].Type
+		argumentType := context.TypesInfo.Types[argument].Type
 		switch expected {
 		case expectKey:
 			switch {
@@ -161,7 +173,7 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 				expected = expectKey
 			default:
 				// Neither a string nor an Attr, nor an interface either could fill.
-				reportMisplaced(pass, function, argument, unknownArgument)
+				reportMisplaced(context, function, argument, unknownArgument)
 				return
 			}
 		case expectValue:
@@ -180,25 +192,25 @@ func checkCall(pass *analysis.Pass, call *ast.CallExpr) {
 	}
 	if expected == expectValue {
 		if unknownArgument == nil {
-			pass.ReportRangef(call, "call to %s missing a final value", shortName(function))
+			context.ReportRangef(call, "call to %s missing a final value", shortName(function))
 		} else {
-			pass.ReportRangef(call, "call to %s has a missing or misplaced value", shortName(function))
+			context.ReportRangef(call, "call to %s has a missing or misplaced value", shortName(function))
 		}
 	}
 }
 
 // reportMisplaced reports argument, in a key position, as neither a string nor an Attr, naming unknownArgument when an
 // argument before it left its position unknown, since then the mistake may be that argument's.
-func reportMisplaced(pass *analysis.Pass, function *types.Func, argument ast.Expr, unknownArgument ast.Expr) {
+func reportMisplaced(context *rule.Context, function *types.Func, argument ast.Expr, unknownArgument ast.Expr) {
 	if unknownArgument == nil {
-		pass.ReportRangef(argument, "%s arg %q should be a string or a slog.Attr (possible missing key or value)",
-			shortName(function), formatted(pass.Fset, argument))
+		context.ReportRangef(argument, "%s arg %q should be a string or a slog.Attr (possible missing key or value)",
+			shortName(function), formatted(context.Fset, argument))
 		return
 	}
-	pass.ReportRangef(
+	context.ReportRangef(
 		argument,
 		"%s arg %q should probably be a string or a slog.Attr (previous arg %q cannot be a key)",
-		shortName(function), formatted(pass.Fset, argument), formatted(pass.Fset, unknownArgument),
+		shortName(function), formatted(context.Fset, argument), formatted(context.Fset, unknownArgument),
 	)
 }
 

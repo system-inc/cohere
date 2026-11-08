@@ -1,12 +1,15 @@
 // Package struct_tag is vet's structtag pass, a struct field tag that reflect.StructTag.Get cannot read as written,
 // a json or xml tag on a field those encodings never see because it is unexported, and a json or xml name two
-// fields of one struct both claim, embedded structs' fields included at the depth their embedding puts them.
+// fields of one struct both claim, embedded structs' fields included at the depth their embedding puts them. It sits
+// on the engine's syntax dispatcher, hearing each struct type on the walk the dispatcher makes once for every syntax
+// rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/structtag/structtag.go, whose
 // logic it keeps and whose messages it reports word for word, at the same position. The registry runs the port in the
 // original's place, and the original stays the oracle: the parity tests beside this file run both over the same
 // packages. The two agree everywhere, so there is no differences fixture. The code differs in one place that changes
-// no finding: whether the package is under encoding/, which the original asks of every field, is asked once.
+// no finding: whether the package is under encoding/, which the original asks of every field, is asked once, on the
+// package's first struct type.
 package struct_tag
 
 import (
@@ -20,21 +23,50 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place. It runs despite type
-// errors, as the original does, since a tag is judged from the struct's fields alone.
-var Analyzer = &analysis.Analyzer{
-	Name: "structtag",
-	Doc: "check that struct field tags conform to reflect.StructTag.Get\n\n" +
-		"Also report certain struct tags (json, xml) used with unexported fields.",
-	URL:              "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/structtag",
-	Requires:         []*analysis.Analyzer{inspect.Analyzer},
-	RunDespiteErrors: true,
-	Run:              run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "structtag"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check that struct field tags conform to reflect.StructTag.Get\n\n" +
+	"Also report certain struct tags (json, xml) used with unexported fields."
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/structtag"
+
+// Listener is what the port hears of each package from the dispatcher: every struct type, in preorder, as the
+// original's Preorder visits them, judged only in a package not under encoding/, which it asks once for the package,
+// on the first struct type, and keeps in the context's state.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.StructType)(nil)},
+	Node:  checkStruct,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset. It runs despite type errors, as the original does, since a tag is judged from the
+// struct's fields alone.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	analyzer.RunDespiteErrors = true
+	return analyzer
+}
+
+// packageGate is whether the package is under encoding/, asked once, on its first struct type.
+type packageGate struct {
+	// decided is whether the package has been asked about yet.
+	decided bool
+	// isEncoding is whether the package's path is under encoding/, where nothing is judged.
+	isEncoding bool
 }
 
 // encodedName is one name an encoding gives a field, and the embedding depth the field sits at below the struct
@@ -53,41 +85,41 @@ type encodedName struct {
 // checkTagDups.
 var duplicateCheckedKeys = []string{"json", "xml"}
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("struct_tag: inspect's result is missing")
+// checkStruct judges each field of a struct type and its tag, in a package not under encoding/.
+func checkStruct(context *rule.Context, node ast.Node, _ []ast.Node) {
+	structType, isStructType := node.(*ast.StructType)
+	if !isStructType {
+		return
 	}
 	// The encoding packages know how to use their own tags, and sometimes test what happens to wrong ones. The
 	// original asks this of every field it checks, and the answer is the package's alone, so it is asked once here.
-	if strings.HasPrefix(pass.Pkg.Path(), "encoding/") {
-		return nil, nil
+	gate := rule.State[packageGate](context)
+	if !gate.decided {
+		gate.decided, gate.isEncoding = true, strings.HasPrefix(context.Package.Path(), "encoding/")
 	}
-	// All visits each struct type in preorder, as the original's Preorder does, and hands it over typed.
-	for structType := range inspector.All[*ast.StructType](inspected) {
-		// Type information may be incomplete, since the pass runs despite errors.
-		structure, isStruct := pass.TypesInfo.Types[structType].Type.(*types.Struct)
-		if !isStruct {
-			continue
-		}
-		// Each struct type remembers the names its own fields claim, and no other's.
-		seen := claimedNames{}
-		for index := range structure.NumFields() {
-			checkCanonicalFieldTag(pass, structure.Field(index), structure.Tag(index), seen)
-		}
+	if gate.isEncoding {
+		return
 	}
-	return nil, nil
+	// Type information may be incomplete, since the pass runs despite errors.
+	structure, isStruct := context.TypesInfo.Types[structType].Type.(*types.Struct)
+	if !isStruct {
+		return
+	}
+	// Each struct type remembers the names its own fields claim, and no other's.
+	seen := claimedNames{}
+	for index := range structure.NumFields() {
+		checkCanonicalFieldTag(context, structure.Field(index), structure.Tag(index), seen)
+	}
 }
 
 // checkCanonicalFieldTag judges one field of a struct and its tag: the names it claims against those seen, the tag's
 // syntax, and a json or xml tag on an unexported field.
-func checkCanonicalFieldTag(pass *analysis.Pass, field *types.Var, tag string, seen claimedNames) {
+func checkCanonicalFieldTag(context *rule.Context, field *types.Var, tag string, seen claimedNames) {
 	for _, key := range duplicateCheckedKeys {
-		checkTagDuplicates(pass, tag, key, field, field, seen, 1)
+		checkTagDuplicates(context, tag, key, field, field, seen, 1)
 	}
 	if validateError := validateStructTag(tag); validateError != nil {
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos: field.Pos(),
 			End: field.Pos() + token.Pos(len(field.Name())),
 			Message: fmt.Sprintf(
@@ -106,7 +138,7 @@ func checkCanonicalFieldTag(pass *analysis.Pass, field *types.Var, tag string, s
 		case "", "-":
 			continue
 		}
-		pass.Report(analysis.Diagnostic{
+		context.Report(analysis.Diagnostic{
 			Pos:     field.Pos(),
 			End:     field.Pos() + token.Pos(len(field.Name())),
 			Message: fmt.Sprintf("struct field %s has %s tag but is not exported", field.Name(), encoding),
@@ -120,7 +152,7 @@ func checkCanonicalFieldTag(pass *analysis.Pass, field *types.Var, tag string, s
 // fields one level down. nearest is the field of the struct being judged that field is, or is embedded below, and
 // is where a repeat is reported.
 func checkTagDuplicates(
-	pass *analysis.Pass,
+	context *rule.Context,
 	tag string,
 	key string,
 	nearest *types.Var,
@@ -148,7 +180,7 @@ func checkTagDuplicates(
 			if !embeddedField.Exported() {
 				continue
 			}
-			checkTagDuplicates(pass, embedded.Tag(index), key, nearest, embeddedField, seen, level+1)
+			checkTagDuplicates(context, embedded.Tag(index), key, nearest, embeddedField, seen, level+1)
 		}
 		return
 	}
@@ -173,15 +205,15 @@ func checkTagDuplicates(
 	}
 	// The other position is named relative to this field's directory, without its column, so the message is
 	// unambiguous even when the two fields sit in different packages and directories through embedding.
-	also := pass.Fset.Position(claimedAt)
+	also := context.Fset.Position(claimedAt)
 	also.Column = 0
-	relative, relativeError := filepath.Rel(filepath.Dir(pass.Fset.Position(field.Pos()).Filename), also.Filename)
+	relative, relativeError := filepath.Rel(filepath.Dir(context.Fset.Position(field.Pos()).Filename), also.Filename)
 	// Rel fails only when one path is absolute and the other is not, which a loaded package's files never are, and
 	// then the file name is left as it is, as the original leaves it.
 	if relativeError == nil {
 		also.Filename = relative
 	}
-	pass.Report(analysis.Diagnostic{
+	context.Report(analysis.Diagnostic{
 		Pos:     nearest.Pos(),
 		End:     nearest.Pos() + token.Pos(len(nearest.Name())),
 		Message: fmt.Sprintf("struct field %s repeats %s tag %q also at %s", field.Name(), namespace, name, also),

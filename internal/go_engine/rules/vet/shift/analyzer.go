@@ -12,6 +12,11 @@
 // parameter's type set, which an analyzer outside x/tools cannot import. The registry runs the port in the
 // original's place, and the original stays the oracle: the parity tests beside this file run both over the same
 // packages. The two agree everywhere, so there is no differences fixture.
+//
+// The port sits on the engine's syntax dispatcher. The original walks twice, marking every branch a constant rules
+// out and then judging every shift outside them; the port hears all four kinds on the dispatcher's one preorder walk,
+// marking as it goes, and judges the shifts it gathered once the walk is done, against the marks of the whole package,
+// in the order the original's second walk reads them.
 package shift
 
 import (
@@ -24,41 +29,85 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name:     "shift",
-	Doc:      "check for shifts that equal or exceed the width of the integer",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shift",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "shift"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for shifts that equal or exceed the width of the integer"
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/shift"
+
+// Listener is what the port hears of each package from the dispatcher: every if and switch, whose dead branches it
+// marks, and every assignment and binary expression, among which the shifts are, gathered in preorder and judged
+// once the package is walked.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{
+		(*ast.IfStmt)(nil),
+		(*ast.SwitchStmt)(nil),
+		(*ast.AssignStmt)(nil),
+		(*ast.BinaryExpr)(nil),
+	},
+	Node:        hearNode,
+	PackageExit: judgeShifts,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("shift: inspect's result is missing")
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// packageState is what the port gathers over a package's walk.
+type packageState struct {
+	// dead is every node of a branch a constant rules out, marked as the walk meets each if and switch.
+	dead map[ast.Node]bool
+	// candidates is every assignment and binary expression of the package, in preorder, the nodes the original's
+	// second walk reads.
+	candidates []ast.Node
+}
+
+// hearNode marks the dead branches of node, an if or a switch, or gathers node, an assignment or a binary expression,
+// to be judged once the walk is done.
+func hearNode(context *rule.Context, node ast.Node, _ []ast.Node) {
+	state := rule.State[packageState](context)
+	switch node.(type) {
+	case *ast.IfStmt, *ast.SwitchStmt:
+		if state.dead == nil {
+			state.dead = map[ast.Node]bool{}
+		}
+		// The ifs and switches are met in the preorder the original's first walk reads them, so each marks what it
+		// marked there: markDead passes over a statement an earlier one already marked.
+		markDead(context.TypesInfo, state.dead, node)
+	case *ast.AssignStmt, *ast.BinaryExpr:
+		state.candidates = append(state.candidates, node)
 	}
-	// A complete pass first, so every branch a constant rules out is known before any shift is judged.
-	dead := map[ast.Node]bool{}
-	// PreorderSeq rather than inspector.All, here and below, since the original visits two kinds of node in one
-	// preorder walk, and All walks one kind. The type switches are checked, so a node of another kind is passed over.
-	for statement := range inspected.PreorderSeq((*ast.IfStmt)(nil), (*ast.SwitchStmt)(nil)) {
-		markDead(pass.TypesInfo, dead, statement)
-	}
-	for node := range inspected.PreorderSeq((*ast.AssignStmt)(nil), (*ast.BinaryExpr)(nil)) {
-		if dead[node] {
+}
+
+// judgeShifts judges every shift the walk gathered that no constant condition ruled out, once every branch of the
+// package is marked, as the original's second walk does after its first is complete.
+func judgeShifts(context *rule.Context) {
+	state := rule.State[packageState](context)
+	for _, node := range state.candidates {
+		if state.dead[node] {
 			continue
 		}
 		switch shifting := node.(type) {
 		case *ast.BinaryExpr:
 			if shifting.Op == token.SHL || shifting.Op == token.SHR {
-				checkLongShift(pass, shifting, shifting.X, shifting.Y)
+				checkLongShift(context, shifting, shifting.X, shifting.Y)
 			}
 		case *ast.AssignStmt:
 			// A shift assignment takes one operand on each side, so the parser never builds another shape of one.
@@ -66,22 +115,21 @@ func run(pass *analysis.Pass) (any, error) {
 				continue
 			}
 			if shifting.Tok == token.SHL_ASSIGN || shifting.Tok == token.SHR_ASSIGN {
-				checkLongShift(pass, shifting, shifting.Lhs[0], shifting.Rhs[0])
+				checkLongShift(context, shifting, shifting.Lhs[0], shifting.Rhs[0])
 			}
 		}
 	}
-	return nil, nil
 }
 
 // checkLongShift reports shift, whose shifted operand is shifted and whose count is count, when the count is a
 // constant that equals or exceeds the width in bits of the shifted operand's type, or, for a type parameter, of the
 // narrowest type in its type set.
-func checkLongShift(pass *analysis.Pass, shift ast.Node, shifted ast.Expr, count ast.Expr) {
-	if pass.TypesInfo.Types[shifted].Value != nil {
+func checkLongShift(context *rule.Context, shift ast.Node, shifted ast.Expr, count ast.Expr) {
+	if context.TypesInfo.Types[shifted].Value != nil {
 		// A shift of a constant is left alone: `^uint(0) >> 63` and its kin tell a 32 bit target from a 64 bit one.
 		return
 	}
-	countValue := pass.TypesInfo.Types[count].Value
+	countValue := context.TypesInfo.Types[count].Value
 	if countValue == nil {
 		return
 	}
@@ -91,7 +139,7 @@ func checkLongShift(pass *analysis.Pass, shift ast.Node, shifted ast.Expr, count
 	if !isInt64 {
 		return
 	}
-	shiftedType := pass.TypesInfo.Types[shifted].Type
+	shiftedType := context.TypesInfo.Types[shifted].Type
 	// Types records every expression of a package that type-checks, so the original's guard never fires here.
 	if shiftedType == nil {
 		return
@@ -113,7 +161,7 @@ func checkLongShift(pass *analysis.Pass, shift ast.Node, shifted ast.Expr, count
 	}
 	widths := map[int64]struct{}{}
 	for _, structuralType := range structuralTypes {
-		widths[8*pass.TypesSizes.Sizeof(structuralType)] = struct{}{}
+		widths[8*context.TypesSizes.Sizeof(structuralType)] = struct{}{}
 	}
 	// With no width at all, a type parameter with no restriction on its type set, narrowest stays the largest int64,
 	// and the shift of a value whose type set is not all integers never type-checked anyway.
@@ -128,8 +176,9 @@ func checkLongShift(pass *analysis.Pass, shift ast.Node, shifted ast.Expr, count
 	if len(widths) > 1 {
 		qualifier = "may be "
 	}
-	pass.ReportRangef(
-		shift, "%s (%s%d bits) too small for shift of %d", formatted(pass.Fset, shifted), qualifier, narrowest, amount,
+	context.ReportRangef(
+		shift, "%s (%s%d bits) too small for shift of %d",
+		formatted(context.Fset, shifted), qualifier, narrowest, amount,
 	)
 }
 

@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"slices"
 
-	"golang.org/x/tools/go/analysis"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // judge reports each forbidden call region makes, once for each call in startedAt that starts it, on a receiver not
@@ -13,7 +13,7 @@ import (
 // judged as part of the region enclosing it, and in none when that is the test itself, rather than as part of the
 // region they start. The original walks them with the started region, and so reports a test's own call, such as the
 // `t.FailNow()` in `go fmt.Println(func() int { t.FailNow(); return 0 }())`, as made from another goroutine.
-func judge(pass *analysis.Pass, region ast.Node, startedAt map[ast.Node][]*asynchronousCall) {
+func judge(context *rule.Context, region ast.Node, startedAt map[ast.Node][]*asynchronousCall) {
 	var visit func(node ast.Node) bool
 	visit = func(node ast.Node) bool {
 		if startedAt[node] != nil {
@@ -28,13 +28,13 @@ func judge(pass *analysis.Pass, region ast.Node, startedAt map[ast.Node][]*async
 		if !isCall {
 			return true
 		}
-		receiver, selection, method := forbiddenMethod(pass.TypesInfo, call)
+		receiver, selection, method := forbiddenMethod(context.TypesInfo, call)
 		if receiver == nil {
 			return true
 		}
 		for _, started := range startedAt[region] {
 			if !withinScope(started.scope, receiver) {
-				report(pass, started, call, receiver, formatMethod(selection, method))
+				report(context, started, call, receiver, formatMethod(selection, method))
 			}
 		}
 		return true

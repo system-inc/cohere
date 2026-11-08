@@ -5,7 +5,7 @@ import (
 	"go/version"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // perIterationVersion is the Go version from which each iteration of a loop declares its own variables
@@ -15,16 +15,16 @@ const perIterationVersion = "go1.22"
 // fileUsesGoVersion reports whether file may use the features of goVersion, x/tools'
 // analyzerutil.FileUsesGoVersion. A file the type checker recorded no version for, one it was never handed, is
 // judged as older, the conservative answer.
-func fileUsesGoVersion(pass *analysis.Pass, file *ast.File, goVersion string) bool {
-	fileVersion, recorded := pass.TypesInfo.FileVersions[file]
+func fileUsesGoVersion(context *rule.Context, file *ast.File, goVersion string) bool {
+	fileVersion, recorded := context.TypesInfo.FileVersions[file]
 	if !recorded {
 		return false
 	}
 	// A bootstrap package must build with the bootstrap toolchain, so its files use no Go newer than that, whatever
 	// their module says. Its tests are not built by the bootstrap, and some rely on being judged at their own version.
 	// The file is named as it is on disk, not as a `//line` directive renames it, as the original's token.File.Name.
-	if bootstrapPackages[pass.Pkg.Path()] &&
-		!strings.HasSuffix(pass.Fset.PositionFor(file.Pos(), false).Filename, "_test.go") {
+	if bootstrapPackages[context.Package.Path()] &&
+		!strings.HasSuffix(context.Fset.PositionFor(file.Pos(), false).Filename, "_test.go") {
 		fileVersion = bootstrapVersion
 	}
 	return !versionBefore(fileVersion, goVersion)
