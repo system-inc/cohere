@@ -77,10 +77,10 @@ func Check(context *rule.Context, function *ir.Function) {
 	}
 }
 
-// guardedDirectory is the directory argument holds, and whether it is the result of a call that returns a directory
-// the check guards. The argument is flattened through its phis first, so a directory merged with itself is still found, and one
-// merged with any other value, a subdirectory joined onto it on some path, is not: on such a path the removal may be
-// right, and the original leaves it alone rather than report a path that may never run.
+// guardedDirectory is the directory argument holds, and whether it is the result of a call that returns a directory the
+// check guards. The argument is flattened through its phis first, so a directory merged with itself is still found, and
+// one merged with any other value, a subdirectory joined onto it on some path, is not: on such a path the removal may
+// be right, and the original leaves it alone rather than report a path that may never run.
 func guardedDirectory(argument ir.Value) (userDirectory, bool) {
 	switch value := irutil.Flatten(argument).(type) {
 	case *ir.Call:
@@ -99,16 +99,18 @@ func guardedDirectory(argument ir.Value) (userDirectory, bool) {
 		}
 		callName := irutil.CallName(&returning.Call)
 		directory := userDirectory{returning: value, callName: callName}
-		// An error leaves the example empty, which the message then leaves out, as the original's does.
 		switch callName {
 		case "os.UserCacheDir":
 			directory.kind = "cache"
+			// Ignored: an error leaves the example empty, which the message then leaves out, as the original's does.
 			directory.example, _ = os.UserCacheDir()
 		case "os.UserConfigDir":
 			directory.kind = "config"
+			// Ignored: an error leaves the example empty, which the message then leaves out, as the original's does.
 			directory.example, _ = os.UserConfigDir()
 		case "os.UserHomeDir":
 			directory.kind = "home"
+			// Ignored: an error leaves the example empty, which the message then leaves out, as the original's does.
 			directory.example, _ = os.UserHomeDir()
 		default:
 			return userDirectory{}, false
