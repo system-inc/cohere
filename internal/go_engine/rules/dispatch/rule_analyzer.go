@@ -26,6 +26,13 @@ func RuleAnalyzer(ruleName string, analyzerName string, doc string, listener *ru
 	return sharedIr.RuleAnalyzer(ruleName, analyzerName, doc, listener)
 }
 
+// SharedSyntax is the process's one dispatcher over the syntax, for a rule with options that builds its analyzer
+// through one constructor taking a dispatcher: the registry's analyzer on this one, and a test's configured copy on a
+// NewSyntax of its own, since a dispatcher names each rule once.
+func SharedSyntax() *Syntax {
+	return sharedSyntax
+}
+
 // Shared is the analyzer of the shared dispatcher listener's walk goes to, and whether that dispatcher holds it.
 func Shared(listener *rule.Listener) (*analysis.Analyzer, bool) {
 	if listener.IsSyntax() {

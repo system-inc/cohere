@@ -7,14 +7,14 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inert_value"
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
 // queryReader reads query expressions into templates within one package.
 type queryReader struct {
-	pass *analysis.Pass
+	context *rule.Context
 	// initializers are the package's locals assigned once, where declared, and never through a pointer, each
 	// with the expression that assigned it.
 	initializers map[*types.Var]ast.Expr
@@ -26,12 +26,12 @@ func (reader queryReader) read(expression ast.Expr, depth int) template {
 	if depth > readingDepth {
 		return holeTemplate(hole{expression: unwrapped})
 	}
-	if value := reader.pass.TypesInfo.Types[unwrapped].Value; value != nil && value.Kind() == constant.String {
+	if value := reader.context.TypesInfo.Types[unwrapped].Value; value != nil && value.Kind() == constant.String {
 		return textTemplate(constant.StringVal(value))
 	}
 	switch built := unwrapped.(type) {
 	case *ast.BinaryExpr:
-		if built.Op == token.ADD && isString(reader.pass.TypesInfo.TypeOf(built)) {
+		if built.Op == token.ADD && isString(reader.context.TypesInfo.TypeOf(built)) {
 			query := reader.read(built.X, depth+1)
 			query.appendTemplate(reader.read(built.Y, depth+1))
 			return query
@@ -54,14 +54,14 @@ func (reader queryReader) read(expression ast.Expr, depth int) template {
 // fmt.Sprintf.
 func (reader queryReader) buildsText(expression ast.Expr) bool {
 	unwrapped := ast.Unparen(expression)
-	if reader.pass.TypesInfo.Types[unwrapped].Value != nil {
+	if reader.context.TypesInfo.Types[unwrapped].Value != nil {
 		return true
 	}
 	switch built := unwrapped.(type) {
 	case *ast.BinaryExpr:
 		return built.Op == token.ADD
 	case *ast.CallExpr:
-		return isSprintf(reader.pass, built)
+		return isSprintf(reader.context, built)
 	}
 	return false
 }
@@ -70,10 +70,10 @@ func (reader queryReader) buildsText(expression ast.Expr) bool {
 // one after another, and whether it is.
 func (reader queryReader) readSprintf(call *ast.CallExpr, depth int) (template, bool) {
 	// A spread argument list, fmt.Sprintf(format, values...), hides which value each verb prints.
-	if !isSprintf(reader.pass, call) || len(call.Args) == 0 || call.Ellipsis.IsValid() {
+	if !isSprintf(reader.context, call) || len(call.Args) == 0 || call.Ellipsis.IsValid() {
 		return template{}, false
 	}
-	format := reader.pass.TypesInfo.Types[call.Args[0]].Value
+	format := reader.context.TypesInfo.Types[call.Args[0]].Value
 	if format == nil || format.Kind() != constant.String {
 		return template{}, false
 	}
@@ -88,7 +88,7 @@ func (reader queryReader) readSprintf(call *ast.CallExpr, depth int) (template, 
 		case printed.letter == 'x' || printed.letter == 'X':
 			query.appendTemplate(holeTemplate(hole{expression: argument, printsHex: true}))
 		case printed.plain && (printed.letter == 's' || printed.letter == 'v') &&
-			isString(reader.pass.TypesInfo.TypeOf(argument)):
+			isString(reader.context.TypesInfo.TypeOf(argument)):
 			// A plain %s or %v prints a string unchanged, so the string's own text and holes stand in its place.
 			query.appendTemplate(reader.read(argument, depth+1))
 		default:
@@ -104,26 +104,26 @@ func (reader queryReader) canHoldQuote(found hole) bool {
 	if found.printsHex {
 		return false
 	}
-	if value := reader.pass.TypesInfo.Types[found.expression].Value; value != nil {
+	if value := reader.context.TypesInfo.Types[found.expression].Value; value != nil {
 		// A constant is fixed text, and only one that itself holds a quote or a backslash breaks the string.
 		return value.Kind() == constant.String && strings.ContainsAny(constant.StringVal(value), `'\`)
 	}
-	return !reader.isInert(found.expression) && canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
+	return !reader.isInert(found.expression) && canHoldText(reader.context.TypesInfo.TypeOf(found.expression))
 }
 
 // canHoldText is whether found can print any text at all, rather than digits, a boolean or a fixed constant.
 func (reader queryReader) canHoldText(found hole) bool {
-	if found.printsHex || reader.pass.TypesInfo.Types[found.expression].Value != nil {
+	if found.printsHex || reader.context.TypesInfo.Types[found.expression].Value != nil {
 		return false
 	}
-	return !reader.isInert(found.expression) && canHoldText(reader.pass.TypesInfo.TypeOf(found.expression))
+	return !reader.isInert(found.expression) && canHoldText(reader.context.TypesInfo.TypeOf(found.expression))
 }
 
 // isInert is whether expression, or the initializer of the local it names, prints only as a number or a boolean:
 // package inert_value's judgment, which the shell rule shares, so `id = " + strconv.Itoa(id)` is as quiet as the
 // `%d` of the same id.
 func (reader queryReader) isInert(expression ast.Expr) bool {
-	if inert_value.Is(reader.pass.TypesInfo, expression) {
+	if inert_value.Is(reader.context.TypesInfo, expression) {
 		return true
 	}
 	identifier, isIdentifier := ast.Unparen(expression).(*ast.Ident)
@@ -131,7 +131,7 @@ func (reader queryReader) isInert(expression ast.Expr) bool {
 		return false
 	}
 	initializer := reader.localInitializer(identifier)
-	return initializer != nil && inert_value.Is(reader.pass.TypesInfo, initializer)
+	return initializer != nil && inert_value.Is(reader.context.TypesInfo, initializer)
 }
 
 // isEscaped is whether expression, or the initializer of the local it names, ends in the one escape the package
@@ -159,22 +159,22 @@ func (reader queryReader) replaceStep(expression ast.Expr) (string, ast.Expr) {
 	if !isCall {
 		return "", nil
 	}
-	function, isFunc := typeutil.Callee(reader.pass.TypesInfo, call).(*types.Func)
+	function, isFunc := typeutil.Callee(reader.context.TypesInfo, call).(*types.Func)
 	if !isFunc || function.Pkg() == nil || function.Pkg().Path() != "strings" {
 		return "", nil
 	}
 	switch {
 	case function.Name() == "ReplaceAll" && len(call.Args) == 3:
 	case function.Name() == "Replace" && len(call.Args) == 4:
-		count := reader.pass.TypesInfo.Types[call.Args[3]].Value
+		count := reader.context.TypesInfo.Types[call.Args[3]].Value
 		if count == nil || count.Kind() != constant.Int || constant.Sign(count) >= 0 {
 			return "", nil
 		}
 	default:
 		return "", nil
 	}
-	old := reader.pass.TypesInfo.Types[call.Args[1]].Value
-	replacement := reader.pass.TypesInfo.Types[call.Args[2]].Value
+	old := reader.context.TypesInfo.Types[call.Args[1]].Value
+	replacement := reader.context.TypesInfo.Types[call.Args[2]].Value
 	if old == nil || replacement == nil || old.Kind() != constant.String || replacement.Kind() != constant.String {
 		return "", nil
 	}
@@ -187,7 +187,7 @@ func (reader queryReader) replaceStep(expression ast.Expr) (string, ast.Expr) {
 
 // localInitializer is the expression that assigned identifier's local, when it was assigned once, where declared.
 func (reader queryReader) localInitializer(identifier *ast.Ident) ast.Expr {
-	variable, isVariable := reader.pass.TypesInfo.Uses[identifier].(*types.Var)
+	variable, isVariable := reader.context.TypesInfo.Uses[identifier].(*types.Var)
 	if !isVariable {
 		return nil
 	}

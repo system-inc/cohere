@@ -15,24 +15,30 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/testing-require-failure-path"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "testing_require_failure_path",
-	Doc: "Flags a test in a _test.go file whose body, its function literals and subtests included, cannot fail on " +
-		"a wrong result: no Error, Errorf, Fatal, Fatalf, Fail or FailNow on a *testing.T, no panic, and no test or " +
-		"reporter handed to code that could fail it, so only a crash in the code under test fails it. A test that " +
-		"skips unconditionally before doing anything is not judged.",
-	Run: run,
+// listener reads whether each file holds tests as the syntax dispatcher's walk enters it, and hears every function
+// declaration in it.
+var listener = rule.Listener{
+	FileEnter: enterFile,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil)},
+	Node:      judgeFunction,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "testing_require_failure_path", "Flags a test in a _test.go file whose "+
+	"body, its function literals and subtests included, cannot fail on a wrong result: no Error, Errorf, Fatal, "+
+	"Fatalf, Fail or FailNow on a *testing.T, no panic, and no test or reporter handed to code that could fail it, so "+
+	"only a crash in the code under test fails it. A test that skips unconditionally before doing anything is not "+
+	"judged.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer, Listener: &listener}
 
 var cannotFailMessage = policy.MessageOf(Name, "cannotFail")
 
@@ -54,30 +60,35 @@ var skippingMethods = map[string]bool{
 	"SkipNow": true,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-		if !strings.HasSuffix(pass.Fset.PositionFor(file.Package, false).Filename, "_test.go") {
-			continue
-		}
-		for _, declaration := range file.Decls {
-			function, isFunction := declaration.(*ast.FuncDecl)
-			if !isFunction {
-				continue
-			}
-			parameter := testParameter(pass, function)
-			if parameter == nil || skipsFirst(pass, function.Body, parameter) || mayFail(pass, function.Body) {
-				continue
-			}
-			pass.Report(analysis.Diagnostic{
-				Pos:      function.Name.Pos(),
-				End:      function.Name.End(),
-				Category: cannotFailMessage.Id,
-				Message:  cannotFailMessage.Render(map[string]string{}),
-			})
-		}
+// fileState is what the rule reads of the file being walked, held in its context's state.
+type fileState struct {
+	// isTest is whether the file is a _test.go file, the only kind whose tests are judged.
+	isTest bool
+}
+
+// enterFile reads whether file is a _test.go file.
+func enterFile(context *rule.Context, file *ast.File) {
+	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
+	rule.State[fileState](context).isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename,
+		"_test.go")
+}
+
+// judgeFunction reports node when it is a test in a _test.go file that cannot fail on a wrong result.
+func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
+	function, isFunction := node.(*ast.FuncDecl)
+	if !isFunction || !rule.State[fileState](context).isTest {
+		return
 	}
-	return nil, nil
+	parameter := testParameter(context, function)
+	if parameter == nil || skipsFirst(context, function.Body, parameter) || mayFail(context, function.Body) {
+		return
+	}
+	context.Report(analysis.Diagnostic{
+		Pos:      function.Name.Pos(),
+		End:      function.Name.End(),
+		Category: cannotFailMessage.Id,
+		Message:  cannotFailMessage.Render(map[string]string{}),
+	})
 }
 
 // mayFail is whether anything in body, its function literals included, is a way to fail the test. The walk is
@@ -85,7 +96,7 @@ func run(pass *analysis.Pass) (any, error) {
 // *testing.T and testing.TB both have, counts as handed on wherever it is used other than as the receiver of one of
 // testing's own methods, so passing it to a helper, storing it in a struct or wrapping it in a composite literal all
 // trust the code that receives it to fail the test when it should.
-func mayFail(pass *analysis.Pass, body *ast.BlockStmt) bool {
+func mayFail(context *rule.Context, body *ast.BlockStmt) bool {
 	// receivers are the expressions a testing method is called on, which hand the test nowhere.
 	receivers := map[ast.Expr]bool{}
 	// literalRuns are the Run selectors whose subtest is a function literal, whose body the walk reaches and judges.
@@ -104,7 +115,7 @@ func mayFail(pass *analysis.Pass, body *ast.BlockStmt) bool {
 			// Parentheses change nothing, so the expression inside is the one judged.
 			return true
 		case *ast.CallExpr:
-			if isBuiltinPanic(pass, expression) {
+			if isBuiltinPanic(context, expression) {
 				found = true
 				return false
 			}
@@ -115,7 +126,7 @@ func mayFail(pass *analysis.Pass, body *ast.BlockStmt) bool {
 				}
 			}
 		case *ast.SelectorExpr:
-			if selection, isSelection := pass.TypesInfo.Selections[expression]; isSelection &&
+			if selection, isSelection := context.TypesInfo.Selections[expression]; isSelection &&
 				isTestingMethod(selection.Obj()) {
 				name := selection.Obj().Name()
 				// A failing method counts whether it is called, held as a method value, or named as a method
@@ -130,7 +141,7 @@ func mayFail(pass *analysis.Pass, body *ast.BlockStmt) bool {
 				}
 			}
 		}
-		if !receivers[expression] && isReporterValue(pass, expression) {
+		if !receivers[expression] && isReporterValue(context, expression) {
 			found = true
 			return false
 		}
@@ -141,8 +152,8 @@ func mayFail(pass *analysis.Pass, body *ast.BlockStmt) bool {
 
 // isReporterValue is whether expression is a value whose type has an Errorf method: a *testing.T, a testing.TB, or a
 // reporter of its own such as the one analysistest.Run takes, any of which can fail the test it wraps.
-func isReporterValue(pass *analysis.Pass, expression ast.Expr) bool {
-	typeAndValue, recorded := pass.TypesInfo.Types[expression]
+func isReporterValue(context *rule.Context, expression ast.Expr) bool {
+	typeAndValue, recorded := context.TypesInfo.Types[expression]
 	if !recorded || !typeAndValue.IsValue() || typeAndValue.Type == nil {
 		return false
 	}
@@ -153,12 +164,12 @@ func isReporterValue(pass *analysis.Pass, expression ast.Expr) bool {
 }
 
 // isBuiltinPanic is whether call is the predeclared panic, which fails the test it runs in.
-func isBuiltinPanic(pass *analysis.Pass, call *ast.CallExpr) bool {
+func isBuiltinPanic(context *rule.Context, call *ast.CallExpr) bool {
 	identifier, isIdentifier := ast.Unparen(call.Fun).(*ast.Ident)
 	if !isIdentifier {
 		return false
 	}
-	builtin, isBuiltin := pass.TypesInfo.Uses[identifier].(*types.Builtin)
+	builtin, isBuiltin := context.TypesInfo.Uses[identifier].(*types.Builtin)
 	return isBuiltin && builtin.Name() == "panic"
 }
 
@@ -171,16 +182,16 @@ func isTestingMethod(object types.Object) bool {
 
 // skipsFirst is whether body skips unconditionally on parameter before doing anything, after at most a leading
 // Parallel. Such a test never runs, so whether it could fail is not yet a question.
-func skipsFirst(pass *analysis.Pass, body *ast.BlockStmt, parameter *types.Var) bool {
+func skipsFirst(context *rule.Context, body *ast.BlockStmt, parameter *types.Var) bool {
 	statements := body.List
-	if len(statements) > 0 && callsOnParameter(pass, statements[0], parameter, map[string]bool{"Parallel": true}) {
+	if len(statements) > 0 && callsOnParameter(context, statements[0], parameter, map[string]bool{"Parallel": true}) {
 		statements = statements[1:]
 	}
-	return len(statements) > 0 && callsOnParameter(pass, statements[0], parameter, skippingMethods)
+	return len(statements) > 0 && callsOnParameter(context, statements[0], parameter, skippingMethods)
 }
 
 // callsOnParameter is whether statement is a call of one of testing's methods named in names on parameter itself.
-func callsOnParameter(pass *analysis.Pass, statement ast.Stmt, parameter *types.Var, names map[string]bool) bool {
+func callsOnParameter(context *rule.Context, statement ast.Stmt, parameter *types.Var, names map[string]bool) bool {
 	expressionStatement, isExpression := statement.(*ast.ExprStmt)
 	if !isExpression {
 		return false
@@ -194,10 +205,10 @@ func callsOnParameter(pass *analysis.Pass, statement ast.Stmt, parameter *types.
 		return false
 	}
 	receiver, isIdentifier := ast.Unparen(selector.X).(*ast.Ident)
-	if !isIdentifier || pass.TypesInfo.Uses[receiver] != parameter {
+	if !isIdentifier || context.TypesInfo.Uses[receiver] != parameter {
 		return false
 	}
-	selection, isSelection := pass.TypesInfo.Selections[selector]
+	selection, isSelection := context.TypesInfo.Selections[selector]
 	return isSelection && selection.Kind() == types.MethodVal && isTestingMethod(selection.Obj()) &&
 		names[selection.Obj().Name()]
 }
@@ -206,11 +217,11 @@ func callsOnParameter(pass *analysis.Pass, statement ast.Stmt, parameter *types.
 // test runs as one: named Test, or Test followed by anything but a lower-case letter, with no receiver, no type
 // parameters, no results, and one *testing.T parameter. Benchmarks, fuzz targets, examples and TestMain take
 // something else or are named otherwise, so none of them is a test here.
-func testParameter(pass *analysis.Pass, function *ast.FuncDecl) *types.Var {
+func testParameter(context *rule.Context, function *ast.FuncDecl) *types.Var {
 	if function.Recv != nil || function.Body == nil || !isTestName(function.Name.Name) {
 		return nil
 	}
-	object, isFunc := pass.TypesInfo.Defs[function.Name].(*types.Func)
+	object, isFunc := context.TypesInfo.Defs[function.Name].(*types.Func)
 	if !isFunc {
 		return nil
 	}
