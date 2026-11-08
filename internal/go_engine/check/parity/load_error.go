@@ -109,8 +109,8 @@ func loadErrorsOf(roots []*packages.Package, fileName func(string) string) []Loa
 // it passes nothing loaded, which loadFixtures has already held clean.
 func requireLoadErrors(test testing.TB, loaded []LoadError, expected []LoadError) {
 	test.Helper()
-	unlisted := loadErrorsWithout(loaded, expected)
-	absent := loadErrorsWithout(expected, loaded)
+	unlisted := countedWithout(loaded, expected)
+	absent := countedWithout(expected, loaded)
 	for _, loadError := range unlisted {
 		test.Errorf("the fixture packages load with %s, which is not listed", loadError)
 	}
@@ -121,21 +121,4 @@ func requireLoadErrors(test testing.TB, loaded []LoadError, expected []LoadError
 		test.Fatalf("the fixture packages do not fail as listed, so their findings would be compared over packages " +
 			"other than the ones meant")
 	}
-}
-
-// loadErrorsWithout is what of from is not in without, counting repeats, in the order of from.
-func loadErrorsWithout(from []LoadError, without []LoadError) []LoadError {
-	remaining := map[LoadError]int{}
-	for _, loadError := range without {
-		remaining[loadError]++
-	}
-	missing := []LoadError{}
-	for _, loadError := range from {
-		if remaining[loadError] > 0 {
-			remaining[loadError]--
-			continue
-		}
-		missing = append(missing, loadError)
-	}
-	return missing
 }

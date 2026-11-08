@@ -58,19 +58,19 @@ func inside(moment time.Time) {
 // A method expression takes the receiver first and the layout after it, where the original never looks.
 func methodExpressions(moment time.Time, pointer *time.Time, embedded holder, variable string) {
 	// time.Time's own method expression, with the fix.
-	_ = time.Time.Format(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = time.Time.Format(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 	// The method expression of a pointer's method set.
-	_ = (*time.Time).Format(pointer, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = (*time.Time).Format(pointer, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 	// A parenthesized method expression.
-	_ = (time.Time.Format)(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = (time.Time.Format)(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 	// A method expression through an alias for time.Time.
-	_ = aliased.Format(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = aliased.Format(moment, "2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 	// A method expression of the Format holder's embedding promotes.
-	_ = holder.Format(embedded, "Mon 2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = holder.Format(embedded, "Mon 2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 	// A named constant, at its name, with no fix, as every layout that is not one literal.
 	_ = time.Time.Format(moment, layout) // port finds: 2006-02-01 should be 2006-01-02
 	// An escape before the mistake, in a method expression, where the original judges nothing.
-	_ = time.Time.Format(moment, "\t2006-02-01") // port finds: 2006-02-01 should be 2006-01-02
+	_ = time.Time.Format(moment, "\t2006-02-01") // port finds: 2006-02-01 should be 2006-01-02 // port fixes: 2006-01-02
 
 	_ = time.Time.Format(moment, "2006-01-02")
 	_ = time.Time.Format(moment, variable)

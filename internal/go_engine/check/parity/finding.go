@@ -194,3 +194,21 @@ func Difference(from []Finding, without []Finding) []Finding {
 	}
 	return missing
 }
+
+// countedWithout is what of from is not in without, counting repeats, in the order of from, as Difference is for
+// findings, for items compared whole, as a load error and a recorded fix are.
+func countedWithout[Item comparable](from []Item, without []Item) []Item {
+	remaining := map[Item]int{}
+	for _, item := range without {
+		remaining[item]++
+	}
+	missing := []Item{}
+	for _, item := range from {
+		if remaining[item] > 0 {
+			remaining[item]--
+			continue
+		}
+		missing = append(missing, item)
+	}
+	return missing
+}
