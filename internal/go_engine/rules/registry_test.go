@@ -930,6 +930,7 @@ var portedPasses = []string{
 	"invalid_listen_address",
 	"invalid_regular_expression",
 	"invalid_string_conversion_argument",
+	"invalid_struct_tag",
 	"invalid_template",
 	"invalid_time_layout",
 	"invalid_url",
