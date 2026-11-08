@@ -45,10 +45,14 @@ type LintRecord struct {
 // written entries left out because nothing outside their package can name their object, and FactsSkipped the
 // restored facts whose object the package's export data does not hold. Waves counts the times the lint phase analyzed
 // packages: at most two, those whose own inputs moved and then the rest that missed, once the hits the early cutoff
-// found among the packages above the first were restored. On is false, and every count 0, under `--no-cache`.
+// found among the packages above the first were restored. FromBinary counts the standard-library packages restored
+// from the entries the binary carries, which nothing analyzed, apart from hit; it is written only when it is not 0,
+// so a build with none writes the record it always has. On is false under `--no-cache`, and every count 0 but
+// FromBinary, which the binary's entries can still give, and FactsSkipped of what they restored.
 type LintCache struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
+	FromBinary   int  `json:"standardLibraryFromBinary,omitempty"`
 	Missed       int  `json:"missed"`
 	Written      int  `json:"written"`
 	Unstorable   int  `json:"unstorable"`

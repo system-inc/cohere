@@ -207,7 +207,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			graphs = append(graphs, firstGraph)
 		}
 		roots = slices.DeleteFunc(slices.Clone(analyzed), session.restoredInWave)
-		if len(roots) > 0 {
+		// A session without a store counts only what it restored from the binary, as a run without the cache counts
+		// no wave.
+		if len(roots) > 0 && session.HasStore() {
 			session.counts.Waves++
 		}
 	}
