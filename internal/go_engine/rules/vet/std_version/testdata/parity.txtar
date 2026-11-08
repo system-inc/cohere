@@ -1,0 +1,279 @@
+The parity fixtures for the port of stdversion: every kind of symbol the manifest holds, each where the version in
+force is too old for it and beside one old enough, at a module's version, a file's build line's, a module's patch
+release, and outside any module; the two packages judged from a version of their own; and the shapes most likely to
+differ, generics, aliases, method values and expressions, embedding, dot imports, shadowing. A module is a workspace
+module of its own, so each has its own go directive. Every line a finding is expected on says so in a want.
+
+-- go.mod --
+module example.com
+
+go 1.27
+
+-- go.work --
+go 1.27
+
+use .
+use ./mod20
+use ./mod21
+use ./mod21patch
+use ./mod24
+use ./mod25
+
+-- mod21/go.mod --
+module example.com/mod21
+
+go 1.21
+
+-- mod21/kinds.go --
+// Every kind of symbol, too new for the module's go1.21, beside one old enough.
+package mod21
+
+import (
+	"crypto/mlkem"
+	"go/types"
+	"iter"
+	"log/slog"
+	"maps"
+	"reflect"
+	"slices"
+	"sync"
+	"unique"
+)
+
+// Functions: generic by inference, instantiated by hand, and an old one.
+var _ = slices.Concat([]int{1}, []int{2}) // want `slices.Concat requires go1.22 or later \(module is go1.21\)`
+var _ = slices.Concat[[]int]               // want `slices.Concat requires go1.22 or later \(module is go1.21\)`
+var _ = maps.Keys(map[string]int{})        // want `maps.Keys requires go1.23 or later \(module is go1.21\)`
+var _ = slices.Contains([]int{1}, 1)       // slices.Contains is go1.21: no diagnostic
+
+// Types, generic and not. A method of a type that is itself too new is not reported.
+var _ types.Alias                // want `types.Alias requires go1.22 or later \(module is go1.21\)`
+var sequence iter.Seq[int]       // want `iter.Seq requires go1.23 or later \(module is go1.21\)`
+var handle unique.Handle[string] // want `unique.Handle requires go1.23 or later \(module is go1.21\)`
+var _ = handle.Value()           // no diagnostic: Handle is itself too new
+var _ types.Info                 // types.Info is go1.5: no diagnostic
+
+// A variable and a constant, and an old function of the same package.
+var _ = slog.DiscardHandler // want `slog.DiscardHandler requires go1.24 or later \(module is go1.21\)`
+
+const _ = mlkem.SeedSize // want `mlkem.SeedSize requires go1.24 or later \(module is go1.21\)`
+
+var _ = slog.Default() // slog.Default is go1.21: no diagnostic
+
+// Fields: selected, as a literal's key, promoted through an embedding of ours, through an alias of ours, and an old
+// one.
+type embedsInfo struct{ types.Info }
+
+type information = types.Info
+
+var _ = new(types.Info).FileVersions  // want `types.Info.FileVersions requires go1.22 or later \(module is go1.21\)`
+var _ = types.Info{FileVersions: nil} // want `types.Info.FileVersions requires go1.22 or later \(module is go1.21\)`
+var _ = embedsInfo{}.FileVersions     // want `types.Info.FileVersions requires go1.22 or later \(module is go1.21\)`
+var _ = information{}.FileVersions    // want `types.Info.FileVersions requires go1.22 or later \(module is go1.21\)`
+var _ = new(types.Info).Types         // types.Info.Types is go1.5: no diagnostic
+
+// An alias of ours for a too-new type: the alias's declaration names the type, and its uses name only ours.
+type alias = types.Alias // want `types.Alias requires go1.22 or later \(module is go1.21\)`
+
+var _ alias // no diagnostic: alias is this package's
+
+// An interface of ours embedding reflect.Type, whose too-new methods are reflect's own.
+type embedsType interface{ reflect.Type }
+
+// Methods: with a pointer receiver called, as a method value and as a method expression; promoted through the
+// standard library's own embedding, where the manifest names it twice and the shallower name is reported, and through
+// ours; with a value receiver; an interface's, directly and through an embedding of ours; and an old one.
+func methods(info *types.Info, checker *types.Checker, embedded *embedsInfo, value reflect.Value, kind reflect.Type,
+	ours embedsType, cache *sync.Map) {
+	info.PkgNameOf(nil)         // want `types.\(\*Info\).PkgNameOf requires go1.22 or later \(module is go1.21\)`
+	_ = info.PkgNameOf          // want `types.\(\*Info\).PkgNameOf requires go1.22 or later \(module is go1.21\)`
+	_ = (*types.Info).PkgNameOf // want `types.\(\*Info\).PkgNameOf requires go1.22 or later \(module is go1.21\)`
+	checker.PkgNameOf(nil)      // want `types.\(\*Info\).PkgNameOf requires go1.22 or later \(module is go1.21\)`
+	embedded.PkgNameOf(nil)     // want `types.\(\*Info\).PkgNameOf requires go1.22 or later \(module is go1.21\)`
+	value.Seq()                 // want `reflect.\(Value\).Seq requires go1.23 or later \(module is go1.21\)`
+	kind.CanSeq()               // want `reflect.\(Type\).CanSeq requires go1.23 or later \(module is go1.21\)`
+	ours.CanSeq()               // want `reflect.\(Type\).CanSeq requires go1.23 or later \(module is go1.21\)`
+	cache.Clear()               // want `sync.\(\*Map\).Clear requires go1.23 or later \(module is go1.21\)`
+	cache.Load(1)               // sync.(*Map).Load is go1.9: no diagnostic
+	_ = info.ObjectOf(nil)      // types.(*Info).ObjectOf is go1.5: no diagnostic
+}
+
+-- mod21/shadow.go --
+// Names of ours that shadow the standard library's, and the universe's, which no package declares.
+package mod21
+
+func shadows() {
+	slices := []int{1}
+	Concat := func() {}
+	Concat()
+	_ = len(slices)
+	var _ error
+	var _ any
+}
+
+func Keys[Element comparable](values map[Element]bool) []Element { return nil }
+
+var _ = Keys(map[int]bool{}) // no diagnostic: Keys is this package's
+
+-- mod21/dot.go --
+// A dot import names the standard library's symbols bare.
+package mod21
+
+import . "slices"
+
+var _ = Concat([]int{1}) // want `slices.Concat requires go1.22 or later \(module is go1.21\)`
+var _ = Index([]int{1}, 1) // slices.Index is go1.21: no diagnostic
+
+-- mod21/tag23.go --
+//go:build go1.23
+
+// The build line raises this file to go1.23, past the module's go1.21, and the message names the file's version.
+package mod21
+
+import (
+	"go/types"
+	"log/slog"
+	"maps"
+)
+
+var _ types.Alias                // types.Alias is go1.22: no diagnostic
+var _ = maps.Keys(map[int]int{}) // maps.Keys is go1.23: no diagnostic
+var _ = slog.DiscardHandler      // want `slog.DiscardHandler requires go1.24 or later \(file is go1.23\)`
+
+-- mod21/tag_either.go --
+//go:build go1.22 || go1.24
+
+// Of two versions either of which builds this file, the lower is in force.
+package mod21
+
+import (
+	"go/types"
+	"maps"
+)
+
+var _ types.Alias                // types.Alias is go1.22: no diagnostic
+var _ = maps.Keys(map[int]int{}) // want `maps.Keys requires go1.23 or later \(file is go1.22\)`
+
+-- mod21/tag_both.go --
+//go:build go1.23 && !windows
+
+// A version beside another constraint is in force.
+package mod21
+
+import "log/slog"
+
+var _ = slog.DiscardHandler // want `slog.DiscardHandler requires go1.24 or later \(file is go1.23\)`
+
+-- mod21/generated.go --
+// Code generated by hand for this fixture. DO NOT EDIT.
+
+// A generated file is not judged.
+package mod21
+
+import "go/types"
+
+var _ types.Alias // no diagnostic: the file is generated
+
+-- mod21patch/go.mod --
+module example.com/mod21patch
+
+go 1.21.3
+
+-- mod21patch/patch.go --
+// A module at a patch release: the file's version is its language version, go1.21, which is not the module's
+// go1.21.3, so the message says the file's.
+package mod21patch
+
+import "go/types"
+
+var _ types.Alias // want `types.Alias requires go1.22 or later \(file is go1.21\)`
+
+-- mod20/go.mod --
+module example.com/mod20
+
+go 1.20
+
+-- mod20/old.go --
+//go:build go1.21
+
+// A module before go1.21 is not judged, whatever its files' build lines say.
+package mod20
+
+import "go/types"
+
+var _ types.Alias // no diagnostic: the module is go1.20
+
+-- mod24/go.mod --
+module example.com/mod24
+
+go 1.24
+
+-- mod24/special.go --
+// From go1.24, testing/synctest is not judged, since a build tag the pass cannot see makes it available before its
+// release. encoding/json/v2 is judged until go1.25.
+package mod24
+
+import (
+	"bytes"
+	jsonv2 "encoding/json/v2"
+	"testing/synctest"
+)
+
+var _ = synctest.Test  // no diagnostic: synctest is not judged from go1.24
+var _ = synctest.Sleep // no diagnostic: synctest is not judged from go1.24
+var _ = jsonv2.Marshal // want `json.Marshal requires go1.27 or later \(module is go1.24\)`
+var _ = bytes.CutLast  // want `bytes.CutLast requires go1.27 or later \(module is go1.24\)`
+
+-- mod24/tag23.go --
+//go:build go1.23
+
+// Below go1.24, testing/synctest is judged like any other package.
+package mod24
+
+import (
+	"encoding/json/jsontext"
+	"testing/synctest"
+)
+
+var _ = synctest.Test       // want `synctest.Test requires go1.25 or later \(file is go1.23\)`
+var _ = jsontext.BeginArray // want `jsontext.BeginArray requires go1.27 or later \(file is go1.23\)`
+
+-- mod25/go.mod --
+module example.com/mod25
+
+go 1.25
+
+-- mod25/special.go --
+// From go1.25, encoding/json/v2 and encoding/json/jsontext are not judged either, and every other package still is.
+package mod25
+
+import (
+	"bytes"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
+	"testing/synctest"
+)
+
+var _ = jsonv2.Marshal      // no diagnostic: json v2 is not judged from go1.25
+var _ = jsontext.BeginArray // no diagnostic: jsontext is not judged from go1.25
+var _ = synctest.Sleep      // no diagnostic: synctest is not judged from go1.24
+var _ = bytes.CutLast       // want `bytes.CutLast requires go1.27 or later \(module is go1.25\)`
+
+-- gopath/src/nomodule/notag.go --
+// Outside a module the package has no version, which is newer than any, so it is judged, but a file the type checker
+// records no version for is not.
+package nomodule
+
+import "go/types"
+
+var _ types.Alias // no diagnostic: the file has no version
+
+-- gopath/src/nomodule/tag22.go --
+//go:build go1.22
+
+// Outside a module a build line gives the file its version.
+package nomodule
+
+import "log/slog"
+
+var _ = slog.DiscardHandler // want `slog.DiscardHandler requires go1.24 or later \(file is go1.22\)`

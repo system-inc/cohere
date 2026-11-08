@@ -109,9 +109,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/asm_decl"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/assign"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/bools"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/build_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/cgo_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/composite"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/copy_lock"
@@ -128,14 +130,18 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/printf"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/scanner_error"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/shift"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/signal_channel_analyzer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/slog"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/sql_rows_err"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_methods"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/std_version"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/string_int_conv"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/struct_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/time_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unreachable"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
@@ -274,9 +280,11 @@ var ports = map[string]port{
 	"ST1018":           {analyzer: invisible_character.Analyzer, listener: &invisible_character.Listener},
 	"ST1019":           {analyzer: duplicate_import.Analyzer, listener: &duplicate_import.Listener},
 	"appends":          {analyzer: appends.Analyzer},
+	"asmdecl":          {analyzer: asm_decl.Analyzer},
 	"assign":           {analyzer: assign.Analyzer},
 	"atomic":           {analyzer: atomic.Analyzer},
 	"bools":            {analyzer: bools.Analyzer},
+	"buildtag":         {analyzer: build_tag.Analyzer},
 	"cgocall":          {analyzer: cgo_call.Analyzer},
 	"composites":       {analyzer: composite.Analyzer},
 	"copylocks":        {analyzer: copy_lock.Analyzer},
@@ -293,14 +301,18 @@ var ports = map[string]port{
 	"printf":           {analyzer: printf.Analyzer},
 	"scannererr":       {analyzer: scanner_error.Analyzer},
 	"shift":            {analyzer: shift.Analyzer},
+	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer},
 	"slog":             {analyzer: slog.Analyzer},
 	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
 	"stdmethods":       {analyzer: std_methods.Analyzer},
+	"stdversion":       {analyzer: std_version.Analyzer},
 	"stringintconv":    {analyzer: string_int_conv.Analyzer},
 	"structtag":        {analyzer: struct_tag.Analyzer},
 	"testinggoroutine": {analyzer: testing_goroutine.Analyzer},
 	"tests":            {analyzer: tests.Analyzer},
+	"timeformat":       {analyzer: time_format.Analyzer},
 	"unmarshal":        {analyzer: unmarshal.Analyzer},
+	"unreachable":      {analyzer: unreachable.Analyzer},
 	"unsafeptr":        {analyzer: unsafe_ptr.Analyzer},
 	"unusedresult":     {analyzer: unused_result.Analyzer},
 	"waitgroup":        {analyzer: wait_group.Analyzer},
