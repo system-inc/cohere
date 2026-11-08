@@ -5,10 +5,10 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1030/sa1030.go, whose rules it keeps
 // and whose messages it reports word for word over the same range, the argument's expression. It reads the position
 // of each judged argument from staticcheck's knowledge package, the table of argument positions the original reads,
-// which this wave imports as data and a later wave ports. The original stays the oracle: the parity tests beside this
-// file run both over staticcheck's own fixtures and the house's. The two differ nowhere: staticcheck_call departs from
-// callcheck only where it would panic, on calls the strconv functions are never part of, as testdata/src/differences
-// records.
+// which this wave imports as data and a later wave ports. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over staticcheck's own
+// fixtures and the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic,
+// on calls the strconv functions are never part of, as testdata/src/differences records.
 package invalid_string_conversion_argument
 
 import (

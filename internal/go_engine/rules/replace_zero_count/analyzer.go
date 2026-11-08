@@ -10,9 +10,10 @@
 // reads the count as a constant only when the argument is one, not through a phi as other checks of the kind do, so a
 // count of zero on every path into the call is not reported. It departs from the original where the port is right:
 // on a constant with no value the original panics reading its kind, and the port judges nothing there; a constant of
-// an integer type always holds a value, so no fixture can show it. The original stays the oracle: the parity tests
-// beside this file run both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call
-// departs from callcheck only on calls the two functions are never part of, as testdata/src/differences records.
+// an integer type always holds a value, so no fixture can show it. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over
+// staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on
+// calls the two functions are never part of, as testdata/src/differences records.
 package replace_zero_count
 
 import (

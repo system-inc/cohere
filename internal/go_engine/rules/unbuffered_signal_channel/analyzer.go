@@ -10,9 +10,10 @@
 // converted to the send-only type Notify takes, and so misses one that reaches the call through a phi. It departs
 // from the original where the port is right: on a size that is a constant with no value the original panics reading
 // its kind, and the port judges nothing there; a constant of an integer type always holds a value, so no fixture can
-// show it. The original stays the oracle: the parity tests beside this file run both over staticcheck's own fixture
-// and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on calls Notify is never part
-// of, as testdata/src/differences records.
+// show it. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
+// nowhere: staticcheck_call departs from callcheck only on calls Notify is never part of, as testdata/src/differences
+// records.
 package unbuffered_signal_channel
 
 import (

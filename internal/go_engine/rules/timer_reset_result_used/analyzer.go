@@ -8,10 +8,11 @@
 // original does. The original walks every source function of a package in one run, but keeps nothing from one
 // function to the next: each call to Reset is judged by the branches its own result decides. So the port judges one
 // function at a time and finds what the original finds, including the original's one finding per branch on the
-// result, so a result two ifs read is reported twice. The original stays the oracle: the parity tests beside this file
-// run both over the same packages, and they differ nowhere. The one place the port could differ is a call with no
-// syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every call to Reset from
-// its call expression, so no such call reaches either.
+// result, so a result two ifs read is reported twice. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// and they differ nowhere. The one place the port could differ is a call with no syntax, where staticcheck's report
+// panics and the port reports nothing; staticcheck builds every call to Reset from its call expression, so no such call
+// reaches either.
 package timer_reset_result_used
 
 import (

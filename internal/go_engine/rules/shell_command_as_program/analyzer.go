@@ -7,9 +7,9 @@
 // `(CallExpr (Symbol "os/exec.Command") arg1:_)`, through staticcheck's pattern language; the port asks the same of
 // each call directly, reading pattern/match.go for what each construct of the query matches, asks
 // staticcheck_code.ExprToString where the original asks code.ExprToString, and reports through
-// staticcheck_report.Report where the original reports through report.Report. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// staticcheck_report.Report where the original reports through report.Report. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package shell_command_as_program
 
 import (

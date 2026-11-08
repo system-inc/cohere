@@ -5,9 +5,10 @@
 // whose messages, the URL and the url package's own error, it reports word for word over the same range, the URL
 // argument's expression. It finds the URL's position in staticcheck's knowledge package, a table of standard library
 // argument positions that the house ports in a later wave. The original keeps no state from one function to the next,
-// nor does the port. The original stays the oracle: the parity tests beside this file run both over staticcheck's own
-// fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on calls url.Parse is
-// never part of, as testdata/src/differences records.
+// nor does the port. The registry runs the port in the original's place, under its name, and the original stays only as
+// the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
+// nowhere: staticcheck_call departs from callcheck only on calls url.Parse is never part of, as
+// testdata/src/differences records.
 package invalid_url
 
 import (

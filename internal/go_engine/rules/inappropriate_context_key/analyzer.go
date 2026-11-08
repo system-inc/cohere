@@ -3,10 +3,11 @@
 // staticcheck_call, the house's translation of the callcheck framework the original rides.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1029/sa1029.go, whose rule it keeps
-// and whose messages it reports word for word over the same range, the key argument's expression. The original
-// stays the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The
-// two differ nowhere: staticcheck_call departs from callcheck only where it would panic, on calls context.WithValue is
-// never part of, as testdata/src/differences records.
+// and whose messages it reports word for word over the same range, the key argument's expression. The registry runs the
+// port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside this
+// file run both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from
+// callcheck only where it would panic, on calls context.WithValue is never part of, as testdata/src/differences
+// records.
 package inappropriate_context_key
 
 import (

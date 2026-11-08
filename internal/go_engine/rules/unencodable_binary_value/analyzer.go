@@ -6,13 +6,14 @@
 // whose message it reports word for word over the same range, the data argument's expression. It finds the data's
 // position in staticcheck's knowledge package, a table of standard library argument positions that the house ports
 // in a later wave, and reads the standard library's version, before which binary.Write could not encode a bool,
-// through staticcheck_report.StandardLibraryVersion. The original stays the oracle: the parity tests beside this file
-// run both over staticcheck's own fixtures and the house's, each a module of its own Go version. staticcheck_call
-// departs from callcheck only on calls binary.Write is never part of, as testdata/differences records, and the two
-// differ in one place. The original reads the version of the file the call's function is in, and the package
-// initializer, where a package-level variable's initializer runs, is in no file, so the original panics there on a
-// value whose type holds a bool; the port reads the version of the file the call is in, which is the same file for
-// every other function, and judges the call, as testdata/package_initializers records.
+// through staticcheck_report.StandardLibraryVersion. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over staticcheck's own
+// fixtures and the house's, each a module of its own Go version. staticcheck_call departs from callcheck only on calls
+// binary.Write is never part of, as testdata/differences records, and the two differ in one place. The original reads
+// the version of the file the call's function is in, and the package initializer, where a package-level variable's
+// initializer runs, is in no file, so the original panics there on a value whose type holds a bool; the port reads the
+// version of the file the call is in, which is the same file for every other function, and judges the call, as
+// testdata/package_initializers records.
 package unencodable_binary_value
 
 import (

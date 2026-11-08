@@ -6,9 +6,10 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1024/sa1024.go, whose rules it keeps
 // and whose message it reports word for word over the same range, the cutset argument's expression. It sorts the
 // cutset's runes with slices.Sort, where the original sorts them through a sort.Interface of its own, and finds the
-// same repeats. The original stays the oracle: the parity tests beside this file run both over staticcheck's own
-// fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic,
-// on calls the trimming functions are never part of, as testdata/src/differences records.
+// same repeats. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
+// nowhere: staticcheck_call departs from callcheck only where it would panic, on calls the trimming functions are never
+// part of, as testdata/src/differences records.
 package duplicate_trim_character
 
 import (

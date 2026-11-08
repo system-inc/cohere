@@ -17,8 +17,9 @@
 // It keeps the original's false positives and slips: a constant identifier is a format all the same, a parenthesized
 // callee's fix drops the f before the closing parenthesis rather than after it, and fmt.Errorf's fix writes errors.New
 // without importing errors; testdata/src/differences holds each, and both sides report them. The original keeps no
-// state from one call to the next. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same packages, fixes included, and the two differ nowhere they hold.
+// state from one call to the next. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, fixes included, and the
+// two differ nowhere they hold.
 package dynamic_printf_format
 
 import (

@@ -3,10 +3,11 @@
 // translation of the callcheck framework the original rides.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1028/sa1028.go, whose rules it keeps
-// and whose messages it reports word for word over the same range, the first argument's expression. The original
-// stays the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The
-// two differ nowhere: staticcheck_call departs from callcheck only where it would panic, on calls the sort functions
-// are never part of, as testdata/src/differences records.
+// and whose messages it reports word for word over the same range, the first argument's expression. The registry runs
+// the port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside
+// this file run both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs
+// from callcheck only where it would panic, on calls the sort functions are never part of, as testdata/src/differences
+// records.
 package sort_slice_on_non_slice
 
 import (

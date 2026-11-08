@@ -7,9 +7,10 @@
 // marshals is asked of staticcheck's fakejson and fakexml, its forks of the encoders' type walks onto go/types, which
 // this wave imports as data and wave 5 ports. A type is named relative to the context's package, where the original
 // names it relative to the package of the function the call is in, the same package for every function the check is
-// handed. The original stays the oracle: the parity tests beside this file run both over staticcheck's own fixture
-// and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on calls whose findings land
-// in the same place, as testdata/src/differences records.
+// handed. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
+// nowhere: staticcheck_call departs from callcheck only on calls whose findings land in the same place, as
+// testdata/src/differences records.
 package unsupported_marshal_type
 
 import (

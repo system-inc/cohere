@@ -6,14 +6,14 @@
 // and whose message it reports word for word over the same range, the address argument's expression. The platform is
 // the one the package was checked for, read from the context's TypesSizes where the original reads its pass's. The
 // original asserts the shape of the field's struct and panics should the representation hand it another; the port
-// asserts with a check and judges nothing there, a shape the representation never builds. The original stays the
-// oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's, on 32-bit and
-// 64-bit platforms. staticcheck_call departs from callcheck only on calls sync/atomic's functions are never part of,
-// as testdata/src/differences records, and the two differ in one place. In a generic function's own body, a field
-// placed after one sized by a type parameter has no offset, and go/types panics when the original asks for one: its
-// Offsetsof asks Alignof of the type parameter, which fails the assertion at go/types/gcsizes.go:54 (Go 1.27,
-// "assertion failed"), and the panic takes the original down with every other finding of the package. The port
-// judges nothing there, as testdata/src/type_parameters records.
+// asserts with a check and judges nothing there, a shape the representation never builds. The registry runs the port in
+// the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over staticcheck's own fixture and the house's, on 32-bit and 64-bit platforms. staticcheck_call departs
+// from callcheck only on calls sync/atomic's functions are never part of, as testdata/src/differences records, and the
+// two differ in one place. In a generic function's own body, a field placed after one sized by a type parameter has no
+// offset, and go/types panics when the original asks for one: its Offsetsof asks Alignof of the type parameter, which
+// fails the assertion at go/types/gcsizes.go:54 (Go 1.27, "assertion failed"), and the panic takes the original down
+// with every other finding of the package. The port judges nothing there, as testdata/src/type_parameters records.
 package misaligned_atomic_field
 
 import (

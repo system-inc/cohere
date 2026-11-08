@@ -12,9 +12,9 @@
 // http.CanonicalHeaderKey, and any other spelling, a parenthesized literal or a qualified constant among them, is
 // reported with no fix, as the original's switch on the key's own node type leaves it. The fixes are printed by
 // staticcheck's analysis/edit, borrowed in this wave as the original uses it, through staticcheck_report.Fixes. The
-// original filters no generated files, and neither does the port. The registry still runs the original, which stays
-// the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they
-// hold.
+// original filters no generated files, and neither does the port. The registry runs the port in the original's place,
+// under its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and the two differ nowhere they hold.
 package non_canonical_header_key
 
 import (

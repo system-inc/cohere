@@ -18,8 +18,9 @@
 // declaration, so a package-level variable after a deprecated function in its file is judged as if inside it. The port
 // keeps the same state over the dispatcher's walk, in rule.State, cleared as each file is entered, so that false
 // negative is the original's and stays (parity's afterDeprecatedFunction shows it). Like the original, it misses
-// dot-imported objects, and leaves alone a deprecated object of the standard library its knowledge does not date. The registry still runs the original, which stays the
-// oracle: the parity tests beside this file run both over the same modules, and the two differ nowhere they hold.
+// dot-imported objects, and leaves alone a deprecated object of the standard library its knowledge does not date. The
+// registry runs the port in the original's place, under its name, and the original stays only as the oracle: the parity
+// tests beside this file run both over the same modules, and the two differ nowhere they hold.
 package deprecated_use
 
 import (

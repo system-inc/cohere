@@ -5,9 +5,10 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1021/sa1021.go, whose rule it keeps
 // and whose message it reports word for word over the same range, the call. It reads the positions of bytes.Equal's
 // two arguments from staticcheck's knowledge package, the table of argument positions the original reads, which this
-// wave imports as data and a later wave ports. The original stays the oracle: the parity tests beside this file run
-// both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from
-// callcheck only where it would panic, on calls bytes.Equal is never part of, as testdata/src/differences records.
+// wave imports as data and a later wave ports. The registry runs the port in the original's place, under its name, and
+// the original stays only as the oracle: the parity tests beside this file run both over staticcheck's own fixture and
+// the house's. The two differ nowhere: staticcheck_call departs from callcheck only where it would panic, on calls
+// bytes.Equal is never part of, as testdata/src/differences records.
 package ip_compared_as_bytes
 
 import (

@@ -9,8 +9,8 @@
 // whether it ever returns. So the port judges one function at a time and finds what the original finds, asking
 // staticcheck_report.StandardLibraryVersion, staticcheck_code.IsMainLike and staticcheck_code.IsInTest where the
 // original asks code.StdlibVersion, code.IsMainLike and code.IsInTest, each the port of the one it replaces, proven
-// beside it. The original stays the oracle: the parity tests beside this file run both over the same packages, and
-// they differ nowhere they hold.
+// beside it. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, and they differ nowhere they hold.
 package leaky_time_tick
 
 import (

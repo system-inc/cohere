@@ -24,9 +24,9 @@
 // analysis/edit, edit.Fix and edit.ReplaceWithString, borrowed in this wave, and staticcheck_report.Fixes; wave 5
 // ports edit. One difference no fixture can reach: Render panics on a format error where code.EditMatch drops it, and
 // format.Node fails only on syntax it cannot print. The original filters no generated file, and the port none. The
-// original keeps no state from one call to the next. The registry still runs the original, which stays the oracle:
-// the parity tests beside this file run both over the same packages, fixes included, and the two differ nowhere they
-// hold.
+// original keeps no state from one call to the next. The registry runs the port in the original's place, under its
+// name, and the original stays only as the oracle: the parity tests beside this file run both over the same packages,
+// fixes included, and the two differ nowhere they hold.
 package swapped_seek_arguments
 
 import (

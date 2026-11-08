@@ -5,10 +5,10 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1031/sa1031.go, whose rules it keeps
 // and whose message it reports word for word over the same range, the destination argument's expression. It reads
 // the positions of each encoder's two buffers from staticcheck's knowledge package, the table of argument positions
-// the original reads, which this wave imports as data and a later wave ports. The original stays the oracle: the
-// parity tests beside this file run both over staticcheck's own fixtures and the house's. The two differ nowhere:
-// staticcheck_call departs from callcheck only where it would panic, on calls the encoders are never part of, as
-// testdata/src/differences records.
+// the original reads, which this wave imports as data and a later wave ports. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over staticcheck's own fixtures and the house's. The two differ nowhere: staticcheck_call departs from callcheck
+// only where it would panic, on calls the encoders are never part of, as testdata/src/differences records.
 //
 // It keeps one false positive the original makes, for parity until the port takes the original's place: two lower
 // bounds that are each a phi of differing values both flatten to nil, so the two are judged one bound and the call

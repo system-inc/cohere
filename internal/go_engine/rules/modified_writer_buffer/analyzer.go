@@ -8,10 +8,11 @@
 // framework, allowed in this wave and to be ported with the rest of knowledge later, and asks whether a call is to the
 // builtin append through honnef.co/go/tools/go/ir/irutil, as the original does. The original walks every source
 // function of a package in one run, but keeps nothing from one function to the next: each Write method is judged by
-// its own instructions. So the port judges one function at a time and finds what the original finds. The original
-// stays the oracle: the parity tests beside this file run both over the same packages, and they differ nowhere. The
-// one place the port could differ is a store or a call with no syntax, where staticcheck's report panics and the port
-// reports nothing; staticcheck builds every element store and every append from syntax, so none reaches either.
+// its own instructions. So the port judges one function at a time and finds what the original finds. The registry runs
+// the port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside
+// this file run both over the same packages, and they differ nowhere. The one place the port could differ is a store or
+// a call with no syntax, where staticcheck's report panics and the port reports nothing; staticcheck builds every
+// element store and every append from syntax, so none reaches either.
 package modified_writer_buffer
 
 import (

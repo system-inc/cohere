@@ -4,9 +4,10 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1000/sa1000.go, whose rules it keeps
 // and whose messages, the regexp package's own error, it reports word for word over the same range, the pattern
-// argument's expression. The original stays the oracle: the parity tests beside this file run both over staticcheck's
-// own fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on calls the
-// regexp functions are never part of, as testdata/src/differences records.
+// argument's expression. The registry runs the port in the original's place, under its name, and the original stays
+// only as the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The
+// two differ nowhere: staticcheck_call departs from callcheck only on calls the regexp functions are never part of, as
+// testdata/src/differences records.
 package invalid_regular_expression
 
 import (

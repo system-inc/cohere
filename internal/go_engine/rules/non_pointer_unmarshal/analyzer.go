@@ -7,9 +7,10 @@
 // the target argument's expression. The original keeps no state from one function to the next, nor does the port.
 // Both judge a target passed as an interface by what was converted to it, since staticcheck_call sees through the
 // conversion as callcheck does, so a map stored in an interface variable is reported where the variable is lifted
-// into the conversion itself. The original stays the oracle: the parity tests beside this file run both over
-// staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on
-// calls these functions are never part of, as testdata/src/differences records.
+// into the conversion itself. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's.
+// The two differ nowhere: staticcheck_call departs from callcheck only on calls these functions are never part of, as
+// testdata/src/differences records.
 package non_pointer_unmarshal
 
 import (

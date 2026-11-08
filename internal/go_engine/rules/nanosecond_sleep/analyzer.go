@@ -11,9 +11,9 @@
 // query names IntegerLiteral, builds each fix's syntax itself as pattern.NodeToAST builds it, around the literal's own
 // node, and prints it with staticcheck's analysis/edit, borrowed in this wave as the original uses it, through
 // staticcheck_report.Fixes. One difference no fixture can reach: edit.ReplaceWithNode panics on a format error where
-// edit.ReplaceWithPattern drops it, and format.Node fails only on syntax it cannot print. The registry still runs the
-// original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// edit.ReplaceWithPattern drops it, and format.Node fails only on syntax it cannot print. The registry runs the port in
+// the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over the same packages, and the two differ nowhere they hold.
 package nanosecond_sleep
 
 import (

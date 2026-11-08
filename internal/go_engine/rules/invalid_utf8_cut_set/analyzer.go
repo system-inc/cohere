@@ -4,10 +4,10 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1011/sa1011.go, whose rules it keeps,
 // one for each of the six functions, and whose message it reports word for word over the same range, the second
-// argument's expression. The original keeps no state from one function to the next, nor does the port. The original
-// stays the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The
-// two differ nowhere: staticcheck_call departs from callcheck only on calls these functions are never part of, as
-// testdata/src/differences records.
+// argument's expression. The original keeps no state from one function to the next, nor does the port. The registry
+// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
+// beside this file run both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call
+// departs from callcheck only on calls these functions are never part of, as testdata/src/differences records.
 package invalid_utf8_cut_set
 
 import (

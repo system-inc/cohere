@@ -7,10 +7,10 @@
 // argument's expression. The original keeps no state from one function to the next, nor does the port. Like the
 // original it judges the port alone and never the host, and it reads a service name more strictly than the network
 // stack does: a name with a hyphen anywhere, which IANA allows inside a name, is not one. That is the original's
-// false positive, kept for parity, and parity's serviceNames shows it. The original stays the oracle: the parity
-// tests beside this file run both over staticcheck's own fixture and the house's. The two differ nowhere:
-// staticcheck_call departs from callcheck only on calls the two functions are never part of, as
-// testdata/src/differences records.
+// false positive, kept for parity, and parity's serviceNames shows it. The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over
+// staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from callcheck only on
+// calls the two functions are never part of, as testdata/src/differences records.
 package invalid_listen_address
 
 import (

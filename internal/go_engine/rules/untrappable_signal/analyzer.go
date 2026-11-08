@@ -15,9 +15,9 @@
 // and only when it is a selector, unparenthesized, as the original asks. The fixes build each call anew from a copy
 // of the original's syntax, as the original does, and print it with staticcheck's analysis/edit, borrowed in this wave
 // as the original uses it, through staticcheck_report.Fixes; messages render code with staticcheck_report.Render. It
-// reports with no option, so a generated file is judged like any other. The registry still runs the original, which
-// stays the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere
-// they hold.
+// reports with no option, so a generated file is judged like any other. The registry runs the port in the original's
+// place, under its name, and the original stays only as the oracle: the parity tests beside this file run both over the
+// same packages, and the two differ nowhere they hold.
 package untrappable_signal
 
 import (

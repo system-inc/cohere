@@ -17,8 +17,9 @@
 // It keeps the original's false positive: in a method expression's call, (*T).Method(nil, ctx), the nil is the
 // receiver and not the first parameter, yet the signature read is the method's, whose first parameter is the context,
 // so both report it; methodExpression in testdata/src/differences shows it. The original keeps no state from one call
-// to the next. The registry still runs the original, which stays the oracle: the parity tests beside this file run
-// both over the same packages, fixes included, and the two differ nowhere they hold.
+// to the next. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, fixes included, and the two differ nowhere
+// they hold.
 package nil_context_argument
 
 import (
