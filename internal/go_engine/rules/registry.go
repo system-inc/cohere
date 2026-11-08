@@ -60,6 +60,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_invariant_reason"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/go_engine/rules/correctness_require_wrapped_error"
+	"github.com/system-inc/cohere/internal/go_engine/rules/cyclic_finalizer"
+	"github.com/system-inc/cohere/internal/go_engine/rules/defer_in_infinite_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/discarded_pure_call"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
 	"github.com/system-inc/cohere/internal/go_engine/rules/double_negation"
@@ -68,12 +70,15 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_trim_character"
 	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dynamic_printf_format"
+	"github.com/system-inc/cohere/internal/go_engine/rules/early_deferred_close"
+	"github.com/system-inc/cohere/internal/go_engine/rules/empty_select_default"
 	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/extreme_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/find_all_zero_limit"
 	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
 	"github.com/system-inc/cohere/internal/go_engine/rules/identical_operands"
 	"github.com/system-inc/cohere/internal/go_engine/rules/impossible_target_comparison"
+	"github.com/system-inc/cohere/internal/go_engine/rules/impossible_type_assertion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inappropriate_context_key"
 	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_bitwise_operation"
@@ -83,10 +88,12 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_random_integer"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_sort"
 	"github.com/system-inc/cohere/internal/go_engine/rules/ineffective_url_query_modification"
+	"github.com/system-inc/cohere/internal/go_engine/rules/infinite_recursion"
 	"github.com/system-inc/cohere/internal/go_engine/rules/integer_division_to_zero"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_listen_address"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_regular_expression"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_string_conversion_argument"
+	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_struct_tag"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_template"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_time_layout"
 	"github.com/system-inc/cohere/internal/go_engine/rules/invalid_url"
@@ -105,9 +112,11 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/negative_zero_float"
 	"github.com/system-inc/cohere/internal/go_engine/rules/never_nil_comparison"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_context_argument"
+	"github.com/system-inc/cohere/internal/go_engine/rules/nil_map_assignment"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_canonical_header_key"
 	"github.com/system-inc/cohere/internal/go_engine/rules/non_pointer_unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/odd_slice_argument"
 	"github.com/system-inc/cohere/internal/go_engine/rules/overlapping_encode_buffers"
 	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/repeated_if_else_condition"
@@ -119,6 +128,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/shell_command_as_program"
 	"github.com/system-inc/cohere/internal/go_engine/rules/single_argument_append"
 	"github.com/system-inc/cohere/internal/go_engine/rules/sort_slice_on_non_slice"
+	"github.com/system-inc/cohere/internal/go_engine/rules/spinning_empty_loop"
 	"github.com/system-inc/cohere/internal/go_engine/rules/swapped_seek_arguments"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_machine_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_timing_assertion"
@@ -332,6 +342,16 @@ var ports = map[string]port{
 		analyzer: impossible_target_comparison.Analyzer,
 		listener: &impossible_target_comparison.Listener,
 	},
+	"SA5000":           {analyzer: nil_map_assignment.Analyzer, listener: &nil_map_assignment.Listener},
+	"SA5001":           {analyzer: early_deferred_close.Analyzer, listener: &early_deferred_close.Listener},
+	"SA5002":           {analyzer: spinning_empty_loop.Analyzer, listener: &spinning_empty_loop.Listener},
+	"SA5003":           {analyzer: defer_in_infinite_loop.Analyzer, listener: &defer_in_infinite_loop.Listener},
+	"SA5004":           {analyzer: empty_select_default.Analyzer, listener: &empty_select_default.Listener},
+	"SA5005":           {analyzer: cyclic_finalizer.Analyzer, listener: &cyclic_finalizer.Listener},
+	"SA5007":           {analyzer: infinite_recursion.Analyzer, listener: &infinite_recursion.Listener},
+	"SA5008":           {analyzer: invalid_struct_tag.Analyzer, listener: &invalid_struct_tag.Listener},
+	"SA5010":           {analyzer: impossible_type_assertion.Analyzer, listener: &impossible_type_assertion.Listener},
+	"SA5012":           {analyzer: odd_slice_argument.Analyzer},
 	"ST1001":           {analyzer: dot_import.Analyzer, listener: &dot_import.Listener},
 	"ST1006":           {analyzer: receiver_name.Analyzer, listener: &receiver_name.Listener},
 	"ST1008":           {analyzer: misplaced_error_result.Analyzer, listener: &misplaced_error_result.Listener},
