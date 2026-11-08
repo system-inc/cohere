@@ -701,6 +701,7 @@ var sharedReaders = []string{
 // each port's branch adds its own line and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
 	"argument_overwritten_before_use",
+	"discarded_pure_call",
 	"dot_import",
 	"double_negation",
 	"duplicate_import",
