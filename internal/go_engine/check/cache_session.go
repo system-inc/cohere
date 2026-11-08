@@ -227,13 +227,7 @@ func (session *CacheSession) Restore(
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
-	for _, restoring := range reachable {
-		key, hasKey := session.keys[restoring]
-		if !hasKey || len(restoring.Errors) > 0 || session.fromBinary[restoring] {
-			continue
-		}
-		session.hitAt(restoring, key)
-	}
+	session.readHits(reachable)
 	// Each pass makes a hit that falls short a miss, which can only ask more of the rest.
 	dropping := true
 	for dropping {
@@ -281,21 +275,78 @@ func (session *CacheSession) KeyFor(label string) [sha256.Size]byte {
 	return [sha256.Size]byte(digest.Sum(nil))
 }
 
+// readHits makes a hit, as hitAt would, of every package among reachable that has a key, no list error, and no entry
+// from the binary, when the store holds a whole entry of it. The entries are read and decoded as many at once as there
+// are cores, since on a warm run of cohere's own root reading 1,167 of them one at a time was 119ms of a 268ms
+// restore. A worker writes only its own slot of what it read: what it calls reads files, the session's analyzers and
+// its store, none of which a restore writes, so the session's maps are written here alone, once every worker is done,
+// in reachable's order.
+func (session *CacheSession) readHits(reachable []*packages.Package) {
+	var reading []*packages.Package
+	var keys []cache.Key
+	for _, restoring := range reachable {
+		key, hasKey := session.keys[restoring]
+		if !hasKey || len(restoring.Errors) > 0 || session.fromBinary[restoring] {
+			continue
+		}
+		reading = append(reading, restoring)
+		keys = append(keys, key)
+	}
+	read := make([]storeHit, len(reading))
+	indexes := make(chan int)
+	var workers sync.WaitGroup
+	for range min(runtime.GOMAXPROCS(0), max(len(reading), 1)) {
+		workers.Go(func() {
+			for index := range indexes {
+				read[index] = session.readHit(reading[index], keys[index])
+			}
+		})
+	}
+	for index := range reading {
+		indexes <- index
+	}
+	close(indexes)
+	workers.Wait()
+	for index, restoring := range reading {
+		if read[index].restored != nil {
+			session.hits[restoring] = read[index].restored
+			session.stored[restoring] = read[index].storedKey
+		}
+	}
+}
+
+// storeHit is one package's entry as readHit read it: the entry decoded whole and the key it is stored under, or a nil
+// restored for a miss.
+type storeHit struct {
+	restored  *restoredPackage
+	storedKey cache.Key
+}
+
 // hitAt makes a hit of restoring when the store holds a whole entry under key, directly or through an alias, and
 // reports whether it did. Which analyzers the entry must hold is dropShortHits' to judge.
 func (session *CacheSession) hitAt(restoring *packages.Package, key cache.Key) bool {
+	read := session.readHit(restoring, key)
+	if read.restored == nil {
+		return false
+	}
+	session.hits[restoring] = read.restored
+	session.stored[restoring] = read.storedKey
+	return true
+}
+
+// readHit is restoring's entry under key, directly or through an alias, decoded whole, and a nil restored when the
+// store holds none that decodes. It writes nothing of the session's, so readHits runs it on many packages at once.
+func (session *CacheSession) readHit(restoring *packages.Package, key cache.Key) storeHit {
 	contents, storedKey, found := session.entryAt(key)
 	if !found {
-		return false
+		return storeHit{}
 	}
 	restored, decodeError := decodeEntry(session.known, restoring, contents,
 		session.exportDataReader(restoring, storedKey))
 	if decodeError != nil {
-		return false
+		return storeHit{}
 	}
-	session.hits[restoring] = restored
-	session.stored[restoring] = storedKey
-	return true
+	return storeHit{restored: restored, storedKey: storedKey}
 }
 
 // entryAt is the entry under key, or, when there is none, the entry the alias under key names, with the key it is
