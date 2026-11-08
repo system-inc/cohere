@@ -1,7 +1,6 @@
 package range_over_string_directly
 
 import (
-	"path/filepath"
 	"slices"
 	"testing"
 
@@ -9,7 +8,6 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
 )
 
 // upstreamPackages is staticcheck's own fixtures for S1029, copied unchanged from simple/s1029/testdata/go1.0 and
@@ -33,34 +31,7 @@ func TestPortCarriesTheOriginalsName(test *testing.T) {
 // matches, and the port reports nothing no note expects.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	for _, upstreamPackage := range upstreamPackages {
-		fixture := filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(upstreamPackage))
-		wants, readError := staticcheck_wants.Read(fixture)
-		if readError != nil {
-			test.Fatal(readError)
-		}
-		if len(wants) == 0 {
-			test.Fatalf("%s holds no notes, so the comparison proves nothing", upstreamPackage)
-		}
-		_, port := parity.Findings(test, s1029.Analyzer, Analyzer, analysistest.TestData(), upstreamPackage)
-		found := []staticcheck_wants.Finding{}
-		for _, each := range port {
-			// The wants name a file by its full path, and the findings by its path below testdata's src.
-			found = append(found, staticcheck_wants.Finding{
-				File: filepath.Join(analysistest.TestData(), "src", filepath.FromSlash(each.File)), Line: each.Line,
-				Message: each.Message,
-			})
-		}
-		test.Logf("%s expects %d, the port found %d", upstreamPackage, len(wants), len(found))
-		unexpected, untaken := staticcheck_wants.Compare(wants, found)
-		for _, extra := range unexpected {
-			test.Errorf("%s:%d: the port reported %q, which no note on the line expects", extra.File, extra.Line,
-				extra.Message)
-		}
-		for _, missing := range untaken {
-			test.Errorf("the port reported nothing matching %s", missing)
-		}
-	}
+	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), upstreamPackages...)
 }
 
 // Over staticcheck's fixtures and parity's, the second holding every shape the check branches on and the near miss
