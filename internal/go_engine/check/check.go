@@ -189,9 +189,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// Dependents hands each dispatcher the rules of this run that require it on a package, so it calls only their
 	// listeners, never those of a rule the run left out that registered on it all the same. Failed and Tolerant let a
 	// dispatcher run past a listener's requirement failing on a package, so only that listener's rule fails there, as
-	// it did walking by itself, never every rule on the dispatcher.
+	// it did walking by itself, never every rule on the dispatcher. ForDependents keeps a dispatcher's requirement
+	// for its listeners only where a rule of this run requires it too, so what only a left-out rule reads never runs.
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile,
-		Dependents: rule.Dependents, Failed: rule.Failed, Tolerant: dispatch.IsDispatcher}
+		Dependents: rule.Dependents, Failed: rule.Failed, Tolerant: dispatch.IsDispatcher,
+		ForDependents: dispatch.ListenerRequirement}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}

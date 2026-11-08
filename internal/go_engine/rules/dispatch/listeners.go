@@ -22,7 +22,8 @@ import (
 type listeners struct {
 	// analyzer is the dispatcher's own analyzer, which every rule analyzer built on the dispatcher requires. It
 	// requires what the walk reads, staticcheck's generated pass, which every context's IsGenerated reads, and every
-	// registered listener's Requires, and its result is a Result.
+	// registered listener's Requires after them, and its result is a Result. The engine's checker keeps a listener's
+	// requirement on a package only where the run holds a rule requiring it there (see ListenerRequirement).
 	analyzer *analysis.Analyzer
 	// walkRequires is what the walk itself reads, the analyzer's requirements before any listener's joined them. One
 	// of them failing on a package fails the dispatcher there, since there is no walk without it.
@@ -80,6 +81,24 @@ func newListeners(
 // reads it off the analyzer itself, a test's fresh dispatcher included, with no registry of dispatchers to keep.
 func IsDispatcher(analyzer *analysis.Analyzer) bool {
 	return analyzer.ResultType == reflect.TypeFor[Result]()
+}
+
+// ListenerRequirement reports whether analyzer is a dispatcher's and requires required for its listeners alone,
+// beyond what its walk reads, for the engine's checker under checker.Options.ForDependents. The checker keeps such a
+// requirement on a package only where an analyzer requiring the dispatcher there requires it too, and every rule
+// analyzer requires what its listener does (see ruleAnalyzer), so an analyzer that only the listeners of rules the run
+// left out require never runs: staticcheck's purity on every dependency, with every rule reading it turned off.
+//
+// It reads the analyzer itself, as IsDispatcher does. The walk's requirements are a dispatcher's first, through
+// staticcheck's generated pass, which newListeners puts last among them, and register only appends after them, never
+// adding generated again, so what follows generated is exactly the listeners'. A dispatcher without generated, which
+// newListeners never makes, keeps every requirement, as a driver without the option does.
+func ListenerRequirement(analyzer *analysis.Analyzer, required *analysis.Analyzer) bool {
+	if !IsDispatcher(analyzer) {
+		return false
+	}
+	walked := slices.Index(analyzer.Requires, generated.Analyzer)
+	return walked >= 0 && slices.Contains(analyzer.Requires[walked+1:], required)
 }
 
 // Analyzer is the dispatcher's own analyzer, which every rule analyzer built on the dispatcher requires.
@@ -156,9 +175,9 @@ func (listeners *listeners) ruleAnalyzer(
 }
 
 // register adds the rule named name, run by analyzer, to the rules the dispatcher calls, hearing kinds, and what its
-// listener requires to what the dispatcher requires. A name registered twice panics: the outcome is keyed by name,
-// so the two rules' findings would land under one, and registration runs as the registry is built, where a panic
-// stops every test before any rule runs.
+// listener requires to what the dispatcher requires, after what is there, which ListenerRequirement reads. A name
+// registered twice panics: the outcome is keyed by name, so the two rules' findings would land under one, and
+// registration runs as the registry is built, where a panic stops every test before any rule runs.
 func (listeners *listeners) register(
 	name string,
 	analyzer *analysis.Analyzer,

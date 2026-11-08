@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are eight.
+// The changes are nine.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -124,6 +124,23 @@
 // under Failed what failed and how, so a dispatcher starts every listener
 // but those whose own requirements failed. A failed vertical prerequisite
 // still fails it, and every other action fails as upstream's does.
+//
+// The ninth is Options.ForDependents. A dispatcher requires every one
+// of its listeners' Requires, and every listener is registered whether
+// or not the run enables its rule, so an analyzer only a left-out
+// rule's listener reads ran on every package, staticcheck's purity and
+// nilness facts on every dependency whenever any IR rule was on. Each
+// rule's own analyzer requires what its listener does, so here an edge
+// that ForDependents names is kept only where an action requiring the
+// dispatcher on that package requires the same analyzer too. The rest
+// are dropped before the graph is scheduled, and an action no kept edge
+// reaches is in no group and never runs, nor counts as a reader.
+// Measured on cohere's tree at deeafbf4 with SA4017, SA4018, SA4023 and
+// S1011 off, cold, three interleaved runs each, the same records in
+// every run, at a load average of 18 to 22:
+//
+//	before: 23.2 to 24.1s user (mean 23.6), 4.7 to 5.6s wall
+//	after:  22.5 to 23.2s user (mean 22.9), 4.7 to 5.3s wall
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -245,6 +262,16 @@ type Options struct {
 	// action fails with a failed prerequisite, as upstream's does.
 	Failed   *analysis.Analyzer
 	Tolerant func(*analysis.Analyzer) bool
+
+	// cohere: ForDependents, when set, reports whether analyzer requires
+	// required only on behalf of the analyzers that require it, as a
+	// dispatcher requires each listener's Requires for the rule that reads
+	// them. Such an edge, between two actions on one package, is kept only
+	// when an action that requires the first on that package requires the
+	// second too; every other one is dropped before the graph is
+	// scheduled, and an action no kept edge reaches never runs. Unset,
+	// every requirement is an edge, as upstream's is.
+	ForDependents func(analyzer *analysis.Analyzer, required *analysis.Analyzer) bool
 
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
@@ -432,6 +459,28 @@ func Analyze(analyzers []*analysis.Analyzer, pkgs []*packages.Package, opts *Opt
 			root := mkAction(a, pkg)
 			root.IsRoot = true
 			roots = append(roots, root)
+		}
+	}
+
+	// cohere: Options.ForDependents, which drops the edges an analyzer
+	// holds only for dependents that are not in this graph, and then the
+	// actions only those edges reached, so none of them is counted below
+	// as a reader of what it required, which it would never release.
+	if opts.ForDependents != nil {
+		all := make([]*Action, 0, len(actions))
+		for _, act := range actions {
+			all = append(all, act)
+		}
+		keepForDependents(all, opts.ForDependents)
+		reached := make(map[*Action]bool, len(actions))
+		forEach(roots, func(act *Action) error {
+			reached[act] = true
+			return nil
+		})
+		for k, act := range actions {
+			if !reached[act] {
+				delete(actions, k)
+			}
 		}
 	}
 
@@ -749,6 +798,49 @@ func (act *Action) releaseSyntax() {
 	}
 	act.Package.Syntax = nil
 	act.Package.TypesInfo = nil
+}
+
+// cohere: keepForDependents drops, from each of all that holds one, every
+// edge forDependents names whose prerequisite no action requiring it on
+// its package requires as well. Every decision reads the edges as Analyze
+// made them, before any is dropped, so it is the same in any order.
+func keepForDependents(all []*Action, forDependents func(analyzer, required *analysis.Analyzer) bool) {
+	requirers := make(map[*Action][]*Action)
+	for _, act := range all {
+		for _, dep := range act.Deps {
+			if dep.Package == act.Package {
+				requirers[dep] = append(requirers[dep], act)
+			}
+		}
+	}
+	kept := make(map[*Action][]*Action)
+	for _, act := range all {
+		deps := make([]*Action, 0, len(act.Deps))
+		for _, dep := range act.Deps {
+			if dep.Package != act.Package || !forDependents(act.Analyzer, dep.Analyzer) ||
+				requiredByAny(requirers[act], dep) {
+				deps = append(deps, dep)
+			}
+		}
+		if len(deps) < len(act.Deps) {
+			kept[act] = deps
+		}
+	}
+	for act, deps := range kept {
+		act.Deps = deps
+	}
+}
+
+// cohere: requiredByAny reports whether any of acts requires dep.
+func requiredByAny(acts []*Action, dep *Action) bool {
+	for _, act := range acts {
+		for _, required := range act.Deps {
+			if required == dep {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // cohere: tolerant is whether act runs past a failed prerequisite on its
