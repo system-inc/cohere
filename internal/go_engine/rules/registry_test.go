@@ -620,10 +620,20 @@ var sharedReaders = []string{
 // name in the original's place (#pn1xvnd), so House never lists it. One entry a line, and this comment names none, so
 // each port's branch adds its own line and the ports land one after another without touching each other's lines.
 var portedPasses = []string{
+	"dot_import",
+	"duplicate_import",
+	"duration_unit_suffix",
+	"error_variable_name",
+	"http_status_literal",
+	"inconsistent_receiver_name",
+	"invisible_character",
+	"misplaced_error_result",
 	"nil_ness",
+	"receiver_name",
 	"unused_code",
 	"unused_write",
 	"vet",
+	"yoda_condition",
 }
 
 // TestEveryRulePackageIsInHouse holds the registry to the rule packages on disk: each directory under rules/, but
