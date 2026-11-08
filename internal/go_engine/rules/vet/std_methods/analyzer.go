@@ -4,6 +4,8 @@
 // wrong signature is no compile error: the check just fails, sometimes mysteriously. A method whose first parameter
 // is not the interface's signal type, a `Scan` taking no `fmt.ScanState`, is taken to mean something else and left
 // alone, as are `WriteTo` with more than one parameter, and `Is`, `As` and `Unwrap` on a type that is not an error.
+// It sits on the engine's syntax dispatcher, hearing each function declaration and interface type on the walk the
+// dispatcher makes once for every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/stdmethods/stdmethods.go, whose
 // table of canonical signatures it keeps entry for entry, whose logic it keeps, and whose messages it reports word for
@@ -18,32 +20,53 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name: "stdmethods",
-	Doc: "check signature of methods of well-known interfaces\n\n" +
-		"Sometimes a type may be intended to satisfy an interface but may fail to\n" +
-		"do so because of a mistake in its method signature.\n" +
-		"For example, the result of this WriteTo method should be (int64, error),\n" +
-		"not error, to satisfy io.WriterTo:\n\n" +
-		"\ttype myWriterTo struct{...}\n" +
-		"\tfunc (myWriterTo) WriteTo(w io.Writer) error { ... }\n\n" +
-		"This check ensures that each method whose name matches one of several\n" +
-		"well-known interface methods from the standard library has the correct\n" +
-		"signature for that interface.\n\n" +
-		"Checked method names include:\n\n" +
-		"\tFormat GobEncode GobDecode MarshalJSON MarshalXML\n" +
-		"\tPeek ReadByte ReadFrom ReadRune Scan Seek\n" +
-		"\tUnmarshalJSON UnreadByte UnreadRune WriteByte\n" +
-		"\tWriteTo",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/stdmethods",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// name is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
+// read the same as before the port took the original's place.
+const name = "stdmethods"
+
+// doc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const doc = "check signature of methods of well-known interfaces\n\n" +
+	"Sometimes a type may be intended to satisfy an interface but may fail to\n" +
+	"do so because of a mistake in its method signature.\n" +
+	"For example, the result of this WriteTo method should be (int64, error),\n" +
+	"not error, to satisfy io.WriterTo:\n\n" +
+	"\ttype myWriterTo struct{...}\n" +
+	"\tfunc (myWriterTo) WriteTo(w io.Writer) error { ... }\n\n" +
+	"This check ensures that each method whose name matches one of several\n" +
+	"well-known interface methods from the standard library has the correct\n" +
+	"signature for that interface.\n\n" +
+	"Checked method names include:\n\n" +
+	"\tFormat GobEncode GobDecode MarshalJSON MarshalXML\n" +
+	"\tPeek ReadByte ReadFrom ReadRune Scan Seek\n" +
+	"\tUnmarshalJSON UnreadByte UnreadRune WriteByte\n" +
+	"\tWriteTo"
+
+// url is the original's address.
+const url = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/stdmethods"
+
+// Listener is what the port hears of each package from the dispatcher: every function declaration and interface type
+// together, in the one preorder the original's Preorder visits them, so the findings come in the original's order,
+// where two walks would visit one kind, then the other.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.InterfaceType)(nil)},
+	Node:  checkDeclaration,
+}
+
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+name, name, doc, &Listener)
+	analyzer.URL = url
+	return analyzer
 }
 
 // signalPrefix opens a parameter type in canonicalMethods that signals the canonical meaning is intended.
@@ -92,44 +115,33 @@ func predeclaredErrorInterface() *types.Interface {
 	return underlying
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("std_methods: inspect's result is missing")
-	}
-	// Preorder visits function declarations and interface types together, in the one order the original's Preorder
-	// visits them, so the findings come in the original's order; two typed walks would visit one kind, then the other.
-	for cursor := range inspected.Root().Preorder((*ast.FuncDecl)(nil), (*ast.InterfaceType)(nil)) {
-		switch node := cursor.Node().(type) {
-		case *ast.FuncDecl:
-			// A function declaration without a receiver is a plain function, whose name implements no interface.
-			if node.Recv != nil {
-				judgeMethod(pass, node.Name)
+// checkDeclaration judges the method a function declaration with a receiver declares, and each method an interface
+// type declares.
+func checkDeclaration(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch node := node.(type) {
+	case *ast.FuncDecl:
+		// A function declaration without a receiver is a plain function, whose name implements no interface.
+		if node.Recv != nil {
+			judgeMethod(context, node.Name)
+		}
+	case *ast.InterfaceType:
+		// An embedded interface or a type union in a constraint is a field without names, and declares no method.
+		for _, field := range node.Methods.List {
+			for _, name := range field.Names {
+				judgeMethod(context, name)
 			}
-		case *ast.InterfaceType:
-			// An embedded interface or a type union in a constraint is a field without names, and declares no method.
-			for _, field := range node.Methods.List {
-				for _, name := range field.Names {
-					judgeMethod(pass, name)
-				}
-			}
-		default:
-			// Invariant: Preorder filtered by node types hands over only nodes of those types.
-			panic("std_methods: Preorder handed over a node that is neither a function declaration nor an interface")
 		}
 	}
-	return nil, nil
 }
 
 // judgeMethod reports the method name declares when canonicalMethods lists its name and it signals the canonical
 // meaning but its signature does not match. x/tools' canonicalMethod.
-func judgeMethod(pass *analysis.Pass, name *ast.Ident) {
+func judgeMethod(context *rule.Context, name *ast.Ident) {
 	expected, canonical := canonicalMethods[name.Name]
 	if !canonical {
 		return
 	}
-	method, isFunction := pass.TypesInfo.Defs[name].(*types.Func)
+	method, isFunction := context.TypesInfo.Defs[name].(*types.Func)
 	if !isFunction {
 		// Invariant: the checker records the *types.Func every method declaration and interface method defines.
 		panic("std_methods: a method's name defines no function")
@@ -164,7 +176,7 @@ func judgeMethod(pass *analysis.Pass, name *ast.Ident) {
 				return
 			}
 		}
-		pass.ReportRangef(name, "method Unwrap() should have signature Unwrap() error or Unwrap() []error")
+		context.ReportRangef(name, "method Unwrap() should have signature Unwrap() error or Unwrap() []error")
 		return
 	}
 
@@ -185,7 +197,7 @@ func judgeMethod(pass *analysis.Pass, name *ast.Ident) {
 		}
 		// The signature as declared, parameter names and all, after the method's name in place of `func`.
 		actualSignature := name.Name + strings.TrimPrefix(typeString(signature), "func")
-		pass.ReportRangef(name, "method %s should have signature %s", actualSignature, expectedSignature)
+		context.ReportRangef(name, "method %s should have signature %s", actualSignature, expectedSignature)
 	}
 }
 
