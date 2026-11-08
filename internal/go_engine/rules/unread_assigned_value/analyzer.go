@@ -10,12 +10,10 @@
 // phis. So Check judges one function at a time and finds what the original finds. The message writes the assigned
 // expression as the original's fmt verb writes an ast.Expr, a name for an identifier.
 //
-// It is a plain analyzer and not a staticcheck_ir.FunctionCheckAnalyzer only because it asks which tool generated a
-// file, to leave alone what goyacc writes, and rule.Context carries only whether a file was generated. run builds the
-// context with staticcheck_report.PassContext and the generator lookup from staticcheck's generated pass, keyed by a
-// file's name as parsed, as code.Generator reads it, and hands both to Check for every function. When the engine's
-// dispatcher gives the context the results of the passes a check requires, Check reads the generator there and this
-// shape goes.
+// It asks which tool generated a file, to leave alone what goyacc writes, and rule.Context carries only whether a file
+// was generated, so its listener requires staticcheck's generated pass and reads the pass's map of generators through
+// the context, keyed by a file's name as parsed, as code.Generator reads it, handing Check the lookup for every
+// function.
 //
 // The original stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
 // nowhere they hold.
@@ -32,49 +30,47 @@ import (
 	"honnef.co/go/tools/go/ir/irutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// buildir pass for the functions and its generated pass for which tool generated each file.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4006",
-	Doc: "Flags a value assigned to a variable that is never read: staticcheck's SA4006, ported onto its " +
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own with
+// the generator lookup of the package. It requires staticcheck's generated pass, whose map of generators it reads.
+var Listener = rule.Listener{
+	Requires: []*analysis.Analyzer{generated.Analyzer},
+	Function: func(context *rule.Context, function *ir.Function) {
+		Check(context, function, generatorLookup(context))
+	},
+}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4006",
+	"SA4006",
+	"Flags a value assigned to a variable that is never read: staticcheck's SA4006, ported onto its "+
 		"intermediate representation.",
-	Requires: []*analysis.Analyzer{staticcheck_ir.Analyzer, generated.Analyzer},
-	Run:      run,
+	&Listener,
+)
+
+// generatorLookup is the tool that generated the file holding a position, and whether one did, read from the
+// generated pass's map, which keys a file by its name as parsed, never as a `//line` directive renames it.
+func generatorLookup(context *rule.Context) func(position token.Pos) (generated.Generator, bool) {
+	generators, isGenerators := context.ResultOf(generated.Analyzer).(map[string]generated.Generator)
+	if !isGenerators {
+		// Invariant: the listener requires the generated pass, and the dispatcher hands over its result, of the type
+		// it declares.
+		panic("unread_assigned_value: the generated pass's result is missing")
+	}
+	return func(position token.Pos) (generated.Generator, bool) {
+		generator, isGenerated := generators[context.Fset.PositionFor(position, false).Filename]
+		return generator, isGenerated
+	}
 }
 
 // messageFormat is the original's message, word for word, around the expression assigned to.
 const messageFormat = "this value of %s is never used"
-
-// run builds the pass's context and the generator lookup, and judges every source function of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	generators, isGenerators := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
-	if !isGenerators {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unread_assigned_value: the generated pass's result is missing")
-	}
-	generatorOf := func(position token.Pos) (generated.Generator, bool) {
-		// The generated pass keys a file by its name as parsed, never as a `//line` directive renames it.
-		generator, isGenerated := generators[context.Fset.PositionFor(position, false).Filename]
-		return generator, isGenerated
-	}
-	functions, readError := staticcheck_ir.Functions(pass)
-	if readError != nil {
-		return nil, readError
-	}
-	for _, function := range functions {
-		Check(context, function, generatorOf)
-	}
-	return nil, nil
-}
 
 // Check judges one function: each assignment and each increment or decrement in its syntax whose value, as the
 // function's representation holds it, nothing reads but phis that nothing reads either. An example function, and a
