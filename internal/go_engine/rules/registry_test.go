@@ -704,6 +704,7 @@ var portedPasses = []string{
 	"duplicate_import",
 	"duration_unit_suffix",
 	"error_variable_name",
+	"extreme_comparison",
 	"http_status_literal",
 	"identical_operands",
 	"inconsistent_receiver_name",
