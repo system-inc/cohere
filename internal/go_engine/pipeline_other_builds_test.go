@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
@@ -192,6 +193,59 @@ func TestOtherBuildsHitTheirOwnCacheWarm(test *testing.T) {
 	}
 	if withoutCache(coldStream) != withoutCache(warmStream) {
 		test.Errorf("the warm run's stream differs from the cold run's:\ncold\n%s\nwarm\n%s", coldStream, warmStream)
+	}
+}
+
+// Under `--other-builds` each extra build's keys read the digests of the files the host's keys hashed, so a run hashes
+// every file of the host's build once, and of each extra build only the files its load holds that the host's does
+// not. The fixture gains a package importing os, so windows reaches standard-library packages the host's build never
+// does, and has files of its own to hash.
+//
+// Not parallel: it reads cache.FilesHashed, which every test in the process that keys a package moves.
+func TestOtherBuildsHashOnlyTheFilesTheHostsDidNot(test *testing.T) {
+	root := copyFixture(test, filepath.Join("testdata", "other-builds"))
+	reach := filepath.Join(root, "internal", "reach")
+	if makeError := os.MkdirAll(reach, 0o755); makeError != nil {
+		test.Fatal(makeError)
+	}
+	reachFile := "// Package reach reaches os, whose files differ by platform.\npackage reach\n\nimport \"os\"\n\n" +
+		"// Name is the program's name.\nfunc Name() string { return os.Args[0] }\n"
+	if writeError := os.WriteFile(filepath.Join(reach, "reach.go"), []byte(reachFile), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	before := cache.FilesHashed()
+	engine, _ := runOverWith(test, root, exitFindings, "--other-builds")
+	hashed := cache.FilesHashed() - before
+	if len(engine.buildRuns) != 3 {
+		test.Fatalf("the merge was handed %d runs, want 3", len(engine.buildRuns))
+	}
+	hostFiles := map[string]bool{}
+	ownFiles := 0
+	for file := range engine.buildRuns[0].files.Paths() {
+		hostFiles[file] = true
+	}
+	want := int64(len(hostFiles))
+	for _, extra := range engine.buildRuns[1:] {
+		shared, own := 0, 0
+		for file := range extra.files.Paths() {
+			if hostFiles[file] {
+				shared++
+				continue
+			}
+			own++
+		}
+		if shared == 0 {
+			test.Fatalf("%s keyed no file the host's did, so there was nothing to read rather than hash", extra.build)
+		}
+		ownFiles += own
+		want += int64(own)
+	}
+	if ownFiles == 0 {
+		test.Fatal("no extra build keyed a file the host's did not, so nothing tells hashing those from not")
+	}
+	if hashed != want {
+		test.Errorf("want the host's %d files and each extra build's own hashed, %d in all, got %d hashed",
+			len(hostFiles), want, hashed)
 	}
 }
 

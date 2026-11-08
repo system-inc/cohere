@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/format"
@@ -103,7 +104,7 @@ func (engine *pipeline) run() int {
 	// reads the types.
 	wraps := engine.wrapsLongLines()
 	if needsTypes || wraps {
-		engine.session = engine.cacheSession(engine.described.workspace.Environment())
+		engine.session = engine.cacheSession(engine.described.workspace.Environment(), cache.FileDigests{})
 	}
 	engine.runFix(wraps)
 	var loaded *load.Loaded

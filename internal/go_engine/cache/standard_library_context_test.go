@@ -492,7 +492,8 @@ func TestStandardLibraryKeysHashNoFileKeysHashed(test *testing.T) {
 
 	goroot, graph := newStandardTree(test)
 	want := keyStandard(test, graph, standardContextAt(goroot))
-	keyed, keysError := Keys([]*packages.Package{graph[httpId]}, Context{FormatVersion: "cache tests"}, nil)
+	keyed, keysError := Keys([]*packages.Package{graph[httpId]}, Context{FormatVersion: "cache tests"}, nil,
+		FileDigests{})
 	if keysError != nil {
 		test.Fatalf("keying the tree: %v", keysError)
 	}

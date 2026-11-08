@@ -82,7 +82,7 @@ func TestARestoreReadsTheSameHitsAsOneAtATime(test *testing.T) {
 	warm := loadAt(test, root)
 	keyContext := caching.Context
 	keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+load.LoaderSource)
-	keyed, keysError := cache.Keys(warm.Packages, keyContext, nil)
+	keyed, keysError := cache.Keys(warm.Packages, keyContext, nil, cache.FileDigests{})
 	if keysError != nil {
 		test.Fatalf("computing the keys: %v", keysError)
 	}

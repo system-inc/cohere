@@ -19,14 +19,17 @@ import (
 )
 
 // Caching is the per-package findings cache a run reads and writes: the store, what every key shares but the
-// loader, which the load names, the inputs a rule reads outside its pass, or nil for none, and the standard library's
-// entries the binary carries, or nil for none. Under `--no-cache` it has no store, and the session reads the binary's
-// entries alone: it keys only the standard library, restores only from the table, and writes nothing.
+// loader, which the load names, the inputs a rule reads outside its pass, or nil for none, the standard library's
+// entries the binary carries, or nil for none, and the digests of files the run already hashed, which the keys read
+// rather than hash again (see cache.Keys), the zero value none. Under `--no-cache` it has no store, and the session
+// reads the binary's entries alone: it keys only the standard library, restores only from the table, and writes
+// nothing.
 type Caching struct {
 	Store           *cache.Store
 	Context         cache.Context
 	ExtraInputs     func(*packages.Package) ([]string, error)
 	StandardLibrary *StandardLibraryCaching
+	Files           cache.FileDigests
 }
 
 // StandardLibraryCaching is the standard library's entries as a run reads them from the binary: the table, and what
@@ -114,6 +117,9 @@ type CacheSession struct {
 	// own is each package's own digest (cache.Keyed), which its second key starts from.
 	own map[*packages.Package]cache.Key
 
+	// files are the digests of every file the last Restore keyed (cache.Keyed's Files), for Files.
+	files cache.FileDigests
+
 	// stored is where each hit's entry is: under its key, or the key an alias led to.
 	stored map[*packages.Package]cache.Key
 
@@ -193,10 +199,11 @@ func (session *CacheSession) Restore(
 	analyzed []*packages.Package,
 ) map[*packages.Package]*load.Restored {
 	session.opened = true
-	// Every map starts empty, the keys too, since the engine restores a second load when the long-line wrap wrote a
-	// file, and keys this restore could not compute must not leave the first load's in their place, which the lint
-	// phase would save entries under, for packages it never analyzed.
-	session.keys, session.own = nil, nil
+	// Every map starts empty, the keys and the files' digests too, since the engine restores a second load when the
+	// long-line wrap wrote a file, and keys this restore could not compute must not leave the first load's in their
+	// place, which the lint phase would save entries under, for packages it never analyzed, nor digests of the bytes
+	// the wrap replaced, which an extra build would read.
+	session.keys, session.own, session.files = nil, nil, cache.FileDigests{}
 	session.hits = map[*packages.Package]*restoredPackage{}
 	session.stored = map[*packages.Package]cache.Key{}
 	session.secondKeyHits = map[*packages.Package]bool{}
@@ -219,12 +226,13 @@ func (session *CacheSession) Restore(
 	if session.caching.Store != nil {
 		keyContext := session.caching.Context
 		keyContext.Build = append(append([]string{}, keyContext.Build...), "loader="+loader)
-		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs)
+		keyed, keysError := cache.Keys(reachable, keyContext, session.caching.ExtraInputs, session.caching.Files)
 		if keysError != nil {
 			session.problem(fmt.Sprintf("computing the keys: %v", keysError))
 			return nil
 		}
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
+		session.files = keyed.Files
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)
@@ -238,6 +246,12 @@ func (session *CacheSession) Restore(
 		restoring[hit] = restored.types
 	}
 	return restoring
+}
+
+// Files are the digests of every file the last Restore keyed, those its Caching gave it included, and none before a
+// Restore, after one whose keys failed, or for a session without a store, which keys only the standard library.
+func (session *CacheSession) Files() cache.FileDigests {
+	return session.files
 }
 
 // HasStore reports whether the session reads and writes a store, which a session under `--no-cache`, reading the
