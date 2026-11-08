@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/system-inc/cohere/internal/release/go_cache"
+	"github.com/system-inc/cohere/go_cache"
 )
 
 // The Go build cache holds itself under a cap (#jc6ca7r).
@@ -29,7 +28,7 @@ import (
 // the machine, cohere-dev starts a trim in the background. It measures the cache, and only when it is over
 // the cap does it take every token in the pool, so no build that goes through cohere-dev is running, and
 // trim the least recently used entries down to three quarters of the cap, sparing only the last
-// cacheTrimSpare, which covers a build outside the pool that just wrote. Then it gives the tokens back.
+// cacheTrimSpare, the shortest go_cache takes. Then it gives the tokens back.
 // It waits for the pool to be empty holding nothing, and takes every token in one step only then, so it
 // never keeps a token idle while another runs: taken one at a time with a wait for each, it held half the
 // pool idle for minutes behind a land gate (2026-10-05 15:55). The trim itself takes seconds. A pool that
@@ -46,9 +45,14 @@ const defaultCacheGigabytes = 40
 // cacheTrimInterval is how often the machine's cache is looked at, at most.
 const cacheTrimInterval = 10 * time.Minute
 
-// cacheTrimSpare is how recently written an entry may be and never be trimmed, while the pool is held:
-// what a build outside the pool has just written and may be about to read.
-const cacheTrimSpare = 10 * time.Minute
+// cacheTrimSpare is how recently used an entry may be and never be trimmed, while the pool is held:
+// go_cache's floor, Go's one-hour lag in marking an entry used. Holding the pool keeps out only the builds
+// that go through it, and a build outside it (a plain go test, gopls, a Loom build on this cache) may be
+// reading an entry it wrote or touched within the hour, so a shorter spare could remove one from under it.
+// At the floor every entry written or touched in the last hour stays. One that build looked up within the
+// hour without touching it still may go, since Go left its time older; go_cache.MinimumSpare says why the
+// floor is not a guarantee.
+const cacheTrimSpare = go_cache.MinimumSpare
 
 // cacheTrimPatience is how long the trim waits for an empty pool before it leaves this look to the next.
 const cacheTrimPatience = 5 * time.Minute
@@ -163,13 +167,14 @@ func trimCache() int {
 		return 2
 	}
 	// Measured first, removing nothing, so a cache under its cap costs no one a token.
-	measured, trimError := go_cache.Trim(cache, go_cache.Limit{Cap: math.MaxInt64}, time.Now())
-	if trimError != nil {
-		recordCacheLook(directory, trimError.Error())
+	listed, listError := go_cache.List(cache)
+	if listError != nil {
+		recordCacheLook(directory, listError.Error())
 		return 1
 	}
-	if measured.Before <= capBytes {
-		recordCacheLook(directory, fmt.Sprintf("%s under the cap, nothing trimmed", gigabytes(measured.Before)))
+	measured := go_cache.Total(listed)
+	if measured <= capBytes {
+		recordCacheLook(directory, fmt.Sprintf("%s under the cap, nothing trimmed", gigabytes(measured)))
 		return 0
 	}
 
@@ -182,12 +187,12 @@ func trimCache() int {
 		directory,
 		shape.tokens,
 		fmt.Sprintf("trimming the Go build cache, %s over the %s cap",
-			gigabytes(measured.Before), gigabytes(capBytes)),
+			gigabytes(measured), gigabytes(capBytes)),
 		cacheTrimPatience,
 	)
 	if errors.Is(holdThePoolError, errorPoolNeverEmpty) {
 		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: the pool was never empty for %s, "+
-			"and the next look tries again", gigabytes(measured.Before), gigabytes(capBytes), cacheTrimPatience))
+			"and the next look tries again", gigabytes(measured), gigabytes(capBytes), cacheTrimPatience))
 		return 0
 	}
 	if holdThePoolError != nil {
@@ -199,7 +204,7 @@ func trimCache() int {
 		release()
 		recordCacheLook(directory, fmt.Sprintf(
 			"%s over the %s cap, not trimmed: %s",
-			gigabytes(measured.Before),
+			gigabytes(measured),
 			gigabytes(capBytes),
 			quietLine,
 		))
@@ -219,7 +224,7 @@ func trimCache() int {
 	recordCacheLook(
 		directory,
 		fmt.Sprintf(
-			"trimmed from %s to %s, %d entries removed, %s written in the last %s kept; "+
+			"trimmed from %s to %s, %d entries removed, %s used in the last %s kept; "+
 				"the pool was held %s",
 			gigabytes(trimmed.Before),
 			gigabytes(trimmed.After),
