@@ -119,7 +119,10 @@ func checkDiscoveredProjects(
 			found.NeverDescended, len(found.NestedRepositories)+found.Submodules)
 	}
 	// Said by the one project's run at its end, or here before several projects' sections: see ignore_account.go.
-	discoveredIgnores = ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root)
+	discoveredIgnores = append(
+		ignoreAccountsOf(ignoreEntries, found.IgnoreMatched, found.Root),
+		defaultIgnoreAccounts(found.DefaultMatched)...,
+	)
 	if found.isTheLocatedProject(location, locateError) {
 		// The project runs here, and its build lists the directories discovery just did.
 		discoveredListings = found.Listings
@@ -173,6 +176,9 @@ type projectRun struct {
 	exitCode      int
 	runError      error
 	elapsed       time.Duration
+	// summary is what the project's run handed back for the root's one line, nil when it handed none or was not
+	// asked to (combined_footer.go).
+	summary *projectSummary
 }
 
 // runProjects checks every discovered project, each in its own run of this binary, all at once, and
@@ -207,6 +213,9 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 
 	runs := make([]projectRun, len(found.Projects))
 	labels := runLabels(found.Projects)
+	// The default view ends on one line for every project, so each hands its summary back instead of printing a
+	// footer. --phases keeps each project's own, since phase times don't sum across projects side by side.
+	oneLine := activeOutput.Mode == outputHuman && !activeOutput.Phases
 	var group sync.WaitGroup
 	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
@@ -240,13 +249,17 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		if activeOpen != nil {
 			openPath = filepath.Join(yieldDirectory, fmt.Sprintf("open-%d.json", index))
 		}
+		summaryPath := ""
+		if oneLine {
+			summaryPath = filepath.Join(yieldDirectory, fmt.Sprintf("summary-%d.json", index))
+		}
 		group.Add(1)
 		go func() {
 			defer group.Done()
 			running <- struct{}{}
 			defer func() { <-running }()
 			runs[index] = runProject(executable, found.Root, project, labels[index], projectArguments, yieldFile,
-				openPath, children, activeOutput.Mode == outputJson)
+				openPath, summaryPath, children, activeOutput.Mode == outputJson)
 		}()
 	}
 	group.Wait()
@@ -324,9 +337,12 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	facts.UnusedIgnores = unusedIgnoreCount(discoveredIgnores)
 	facts.CoverageUnknown = len(found.SwiftCoverage.FailedQueries)
 	facts.EngineBuilds = builtEngines()
-	if activeOutput.Mode != outputJson {
+	switch {
+	case oneLine:
+		fmt.Fprintln(out, combinedFooter(runs, facts, facts.Total, activeOutput.Style))
+	case activeOutput.Mode != outputJson:
 		fmt.Fprintln(out, overallFooter(facts, activeOutput.Style))
-	} else {
+	default:
 		// A build this run made before its projects ran, as a coverage query does, is a record of its own.
 		fmt.Fprint(out, engineBuildLines(facts.EngineBuilds))
 	}
@@ -395,6 +411,7 @@ func runProject(
 	arguments []string,
 	yieldFile string,
 	openPath string,
+	summaryPath string,
 	children *projectChildren,
 	separateStandardError bool,
 ) projectRun {
@@ -417,6 +434,10 @@ func runProject(
 	if openPath != "" {
 		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
 	}
+	child.Env = withoutVariable(child.Env, projectSummaryVariable)
+	if summaryPath != "" {
+		child.Env = append(child.Env, projectSummaryVariable+"="+summaryPath)
+	}
 	var output bytes.Buffer
 	var standardError bytes.Buffer
 	child.Stdout = &output
@@ -436,6 +457,9 @@ func runProject(
 	}
 	if openPath != "" {
 		run.open = readOpenReport(openPath)
+	}
+	if summaryPath != "" {
+		run.summary = readProjectSummary(summaryPath)
 	}
 	var exited *exec.ExitError
 	switch {

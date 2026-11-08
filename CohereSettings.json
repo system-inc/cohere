@@ -1,3 +1,11 @@
 {
-    "ignorePatterns": ["TypeScript/**", "internal/format/prettier/bundles/**"]
+    "ignorePatterns": [
+        "TypeScript/**",
+        "internal/format/prettier/bundles/**",
+        {
+            "pattern": "third_party/**",
+            "reason": "Somebody else's code, vendored whole and kept as its authors released it, so the copy's diff against its release is only what its README.cohere.md names.",
+            "kind": "thirdParty"
+        }
+    ]
 }

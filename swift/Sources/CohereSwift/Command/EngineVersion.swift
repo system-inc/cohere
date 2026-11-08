@@ -46,8 +46,8 @@ public enum EngineVersion {
      */
     public static let toolchainVariable = "COHERE_SWIFT_VERSION_OUTPUT"
 
-    /* This process's answer, kept after the first question: the toolchain does not change under a running engine. */
-    private static let knownToolchain = Mutex<String?>(nil)
+    /* This process's `swift --version` output, kept after the first question: the toolchain does not change under a running engine. */
+    private static let knownVersionOutput = Mutex<String?>(nil)
 
     /*
      The toolchain, as `swift --version` names it: `swiftlang-6.4.0.34.1`. Asked at run time, because it is also the
@@ -58,11 +58,29 @@ public enum EngineVersion {
         runner: ProcessRunner = ProcessRunner(),
         environment: [String: String] = ProcessInfo.processInfo.environment,
     ) -> String {
-        knownToolchain.withLock { known in
+        let output = versionOutput(runner: runner, environment: environment)
+        if let named = toolchainNamed(in: output) {
+            return named
+        }
+        return output.hasPrefix("unknown (")
+            ? output : "unknown (swift --version said: \(output.split(separator: "\n").first ?? ""))"
+    }
+
+    /*
+     Everything `swift --version` printed, the caller's given answer when it names a toolchain, else this process's
+     own question's: what a cache keyed on the whole toolchain keys on (`SDKIndexSeed`). Asked once per process, as
+     `toolchain` is, and the same answer it reads.
+     */
+    public static func versionOutput(
+        runner: ProcessRunner = ProcessRunner(),
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+    ) -> String {
+        knownVersionOutput.withLock { known in
             if let known {
                 return known
             }
-            let answer = toolchainGiven(environment) ?? askToolchain(runner: runner)
+            let given = environment[toolchainVariable].flatMap { toolchainNamed(in: $0) == nil ? nil : $0 }
+            let answer = given ?? askVersionOutput(runner: runner)
             known = answer
             return answer
         }
@@ -78,14 +96,17 @@ public enum EngineVersion {
         versionOutput.range(of: #"swiftlang-[0-9.]+"#, options: .regularExpression).map { String(versionOutput[$0]) }
     }
 
-    private static func askToolchain(runner: ProcessRunner) -> String {
+    /*
+     What `swift --version` printed on standard output, as the launcher reads it (`dispatch.SwiftVersionOutput`), so an
+     engine run alone and one the front door started read one toolchain: the driver's own version line goes to standard
+     error, and keyed in, it made the two compute different SDK index seeds (#f6pqraj). Standard error joins only an
+     answer whose standard output names no toolchain, so the words for an unknown one say what it printed.
+     */
+    private static func askVersionOutput(runner: ProcessRunner) -> String {
         do {
             let result = try runner.run("swift", ["--version"], in: URL(fileURLWithPath: "/"))
-            let text = String(decoding: result.standardOutput, as: UTF8.self) + result.standardError
-            if let named = toolchainNamed(in: text) {
-                return named
-            }
-            return "unknown (swift --version said: \(text.split(separator: "\n").first ?? ""))"
+            let printed = String(decoding: result.standardOutput, as: UTF8.self)
+            return toolchainNamed(in: printed) == nil ? printed + result.standardError : printed
         }
         catch {
             return "unknown (\(error))"

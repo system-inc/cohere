@@ -73,6 +73,8 @@ import Synchronization
         var isSystem: Bool
         var written: Date
         var importedModules: [String]
+        /* The units the imported modules' own index is in, by name: how a check reaches a module's index from its importer's. */
+        var importedUnits: [String] = []
         /* The records holding the unit's own file's occurrences. */
         var ownRecords: [String]
         /* Every record the unit names: for a system module, the records declaring what it exports. */
@@ -119,8 +121,8 @@ import Synchronization
 
     /* One dependency of a unit, of the three kinds `units` reads. */
     private enum Dependency {
-        /* A module the unit's file imports, empty when the store names none. */
-        case module(String)
+        /* A module the unit's file imports, empty when the store names none, and the unit that module's own index is in. */
+        case module(String, unit: String)
         /* A record the unit names, and the file it describes. */
         case record(name: String, file: String)
         /* A file the compile read without recording it. */
@@ -557,15 +559,19 @@ import Synchronization
         for (name, read) in zip(names, readings.withLock { $0 }) {
             guard let (reading, mainFile, written) = read else { continue }
             var imported: [String] = []
+            var importedUnits: [String] = []
             var own: [String] = []
             var all: [String] = []
             var recordFiles: [String: String] = [:]
             var files: [String] = []
             for dependency in reading.dependencies {
                 switch dependency {
-                    case .module(let module):
+                    case .module(let module, let unit):
                         if !module.isEmpty {
                             imported.append(module)
+                        }
+                        if !unit.isEmpty {
+                            importedUnits.append(unit)
                         }
                     case .record(let record, let file):
                         all.append(record)
@@ -587,6 +593,7 @@ import Synchronization
                     isSystem: reading.isSystem,
                     written: written,
                     importedModules: imported,
+                    importedUnits: importedUnits,
                     ownRecords: own,
                     allRecords: all,
                     recordFiles: recordFiles,
@@ -657,7 +664,12 @@ import Synchronization
         unsafe Self.forEach(in: reader, dependenciesApply) { dependency in
             switch unsafe dependencyKind(dependency) {
                 case Self.unitDependency:
-                    dependencies.append(.module(unsafe Self.text(dependencyModuleName(dependency))))
+                    dependencies.append(
+                        unsafe .module(
+                            Self.text(dependencyModuleName(dependency)),
+                            unit: Self.text(dependencyName(dependency)),
+                        )
+                    )
                 case Self.recordDependency:
                     dependencies.append(
                         unsafe .record(

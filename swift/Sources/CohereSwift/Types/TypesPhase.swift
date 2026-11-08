@@ -229,6 +229,10 @@ struct TypesPhase {
         var indexSeconds = 0.0
         var prepareSeconds = 0.0
         var checkSeconds = 0.0
+        /* Whether prepare covered only the edited modules' own dependencies, and the interfaces the check emitted itself, by target. */
+        var preparedEditedOnly = false
+        var interfacesEmitted: [String] = []
+        var emitSeconds = 0.0
         var toolsBuilt: [BuildServerClient.ToolBuilt] = []
         /* The build-tool plugins SwiftPM compiled this run so it could run them, by name. */
         var pluginsCompiled: [String] = []
@@ -242,7 +246,16 @@ struct TypesPhase {
          */
         func words(scratchPath: URL) -> String {
             var words =
-                "checked without building: the build server prepared the dependencies in \(Self.seconds(prepareSeconds)), and \(jobs) frontend jobs checked \(files) files of \(modules) modules with -emit-sib in \(Self.seconds(checkSeconds))"
+                "checked without building: the build server prepared the dependencies in \(Self.seconds(prepareSeconds))"
+            if preparedEditedOnly {
+                words += ", only the edited modules' own"
+                if !interfacesEmitted.isEmpty {
+                    words +=
+                        ", and the check emitted the \(interfacesEmitted.count == 1 ? "interface" : "interfaces") of \(interfacesEmitted.joined(separator: ", ")) itself in \(Self.seconds(emitSeconds))"
+                }
+            }
+            words +=
+                ", and \(jobs) frontend jobs checked \(files) files of \(modules) modules with -emit-sib in \(Self.seconds(checkSeconds))"
             if rerunFiles > 0 {
                 words += ", \(rerunFiles) of them again alone after their batch failed"
             }
@@ -333,23 +346,55 @@ struct TypesPhase {
                 workingDirectory: session.root,
                 runner: runner,
             )
-            let independent = (scope?.independent ?? []).intersection(recorded)
+            /*
+             The root's session prepares only the edited modules' own dependencies when the scope holds Swift edits
+             alone, and the check emits the interfaces the scoped modules import (`InterfaceEmit`). A local package's
+             session, or a scope with a C-family edit, prepares everything as before: a header reaches modules only the
+             build server can name. Without a ledger to say which `Products` copies are older than their sources, or
+             when a module this check reads is one the ledger holds no current copy of, prepare emits everything too,
+             and nothing is checked before it is done. The ledger is read and kept under its lock.
+             */
+            let interfacesLock = sessionIndex == 0 ? InterfaceEmit.Ledger.Lock(scratchPath: session.scratchPath) : nil
+            defer { withExtendedLifetime(interfacesLock) {} }
+            let stored = interfacesLock == nil ? nil : InterfaceEmit.Ledger.stored(scratchPath: session.scratchPath)
+            let ledger = stored.flatMap { stored in
+                Self.readsStale(stored, scope: scope, checking: checkedCandidates(recorded: recorded)) ? nil : stored
+            }
+            let emittedBefore = (ledger?.targets ?? []).sorted().map {
+                InterfaceEmit.Ledger.moduleDirectory(scratchPath: session.scratchPath, target: $0)
+            }
+            var narrowed = ledger != nil && scope?.cFamilyEdits.isEmpty == true
+            let independent =
+                sessionIndex == 0 && ledger == nil ? [] : (scope?.independent ?? []).intersection(recorded)
             let alreadyChecked = checkedTargets
+            let held = Set(ledger?.targets ?? [])
+            let interfaces = InterfaceEmit(swiftc: swiftc, workingDirectory: session.root, runner: runner)
+            /* The emits a narrowed prepare leaves the check, planned while prepare runs. */
+            let emits = PlannedEmits()
+            let planGroup = DispatchGroup()
+            defer { planGroup.wait() }
             let early = EarlyCheck()
+            /* The check alongside prepare runs on, past the session's end, beside the emits and the other checks. */
+            let earlyGroup = DispatchGroup()
+            defer { earlyGroup.wait() }
             var alongside: (@Sendable (BuildServerClient.Description) -> Void)?
             if !independent.isEmpty {
                 alongside = { @Sendable (known: BuildServerClient.Description) -> Void in
                     let first = Self.ownedModules(of: known, targetByFile: targetByFile, excluding: alreadyChecked)
                         .filter { independent.contains($0.name) }
-                    let start = Date()
-                    let outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>
-                    do throws(FrontendCheck.Failure) {
-                        outcome = .success(try frontend.check(first))
+                        .map { Self.searchingFirst(emittedBefore, in: $0) }
+                    /* On a queue of its own, which always gets a thread, as the build server's alongside work does. */
+                    DispatchQueue(label: "cohere-swift.types.early-check").async(group: earlyGroup) {
+                        let start = Date()
+                        let outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>
+                        do throws(FrontendCheck.Failure) {
+                            outcome = .success(try frontend.check(first))
+                        }
+                        catch {
+                            outcome = .failure(error)
+                        }
+                        early.keep(outcome: outcome, seconds: Date().timeIntervalSince(start))
                     }
-                    catch {
-                        outcome = .failure(error)
-                    }
-                    early.keep(modules: first, outcome: outcome, seconds: Date().timeIntervalSince(start))
                 }
             }
             let description: BuildServerClient.Description
@@ -362,6 +407,63 @@ struct TypesPhase {
                         sdk: platform?.sdk,
                         resolutionAllowed: resolutionAllowed,
                     ),
+                    prepare: { known in
+                        guard narrowed, let scope else { return nil }
+                        /* An explicit module build reads no search path, so the check's own interfaces cannot reach it. */
+                        let owned = Self.ownedModules(of: known, targetByFile: targetByFile, excluding: alreadyChecked)
+                        guard !owned.contains(where: { InterfaceEmit.buildsModulesExplicitly($0.arguments) }) else {
+                            narrowed = false
+                            return nil
+                        }
+                        let checkingNow = Set(
+                            owned.filter { scope.targets.contains($0.name) || !recorded.contains($0.name) }.map(\.name)
+                        )
+                        /* A scoped module a checked one imports that this session cannot emit is prepared instead. */
+                        let ownedNames = Set(owned.map(\.name))
+                        let importedScoped = scope.targets.filter { target in
+                            checkingNow.contains {
+                                scope.imports[$0, default: []].contains(Self.moduleName(of: target))
+                            }
+                        }
+                        guard importedScoped.isSubset(of: ownedNames) else {
+                            narrowed = false
+                            return nil
+                        }
+                        let order = Self.interfacesToEmit(
+                            owned: Set(owned.map(\.name)),
+                            checking: checkingNow,
+                            scope: scope,
+                            held: held,
+                        )
+                        let directories = held.union(order).sorted().map {
+                            InterfaceEmit.Ledger.moduleDirectory(scratchPath: session.scratchPath, target: $0)
+                        }
+                        let options = known.options
+                        DispatchQueue(label: "cohere-swift.types.interface-plan").async(group: planGroup) {
+                            let planned = Swift.Result { () throws(FrontendCheck.Failure) -> [InterfaceEmit.Planned] in
+                                var planned: [InterfaceEmit.Planned] = []
+                                for target in order {
+                                    guard let module = owned.first(where: { $0.name == target }) else { continue }
+                                    let arguments = InterfaceEmit.testableArguments(of: module, options: options)
+                                    planned.append(
+                                        try interfaces.planned(
+                                            moduleName: FrontendCheck.Module(arguments: arguments)?.name
+                                                ?? Self.moduleName(of: target),
+                                            arguments: arguments,
+                                            into: InterfaceEmit.Ledger.moduleDirectory(
+                                                scratchPath: session.scratchPath,
+                                                target: target,
+                                            ),
+                                            searchPaths: directories,
+                                        )
+                                    )
+                                }
+                                return planned
+                            }
+                            emits.keep(targets: order, directories: directories, planned: planned)
+                        }
+                        return Self.preparing(known.targets, owning: scope.independent, targetByFile: targetByFile)
+                    },
                     alongside: alongside,
                 )
             }
@@ -375,34 +477,92 @@ struct TypesPhase {
             if sessionIndex == 0 {
                 scope = scope?.widened(by: description)
             }
+            /* Prepare emitted every module again, so no copy in `Products` is older than its sources. */
+            if sessionIndex == 0, !narrowed {
+                do {
+                    try InterfaceEmit.Ledger(targets: []).store(scratchPath: session.scratchPath)
+                }
+                catch {
+                    InterfaceEmit.Ledger.forget(scratchPath: session.scratchPath)
+                }
+            }
             run.prepareSeconds += Date().timeIntervalSince(prepareStart)
+            run.preparedEditedOnly = run.preparedEditedOnly || narrowed
             run.toolsBuilt += description.prepared?.toolsBuilt ?? []
             run.pluginsCompiled += Self.pluginsCompiled(scratchPath: session.scratchPath, since: prepareStart)
             if session.scratchPath != scratchPath {
                 ScratchPrune.markUsed(session.scratchPath)
             }
 
-            let ownedModules = Self.ownedModules(
+            let described = Self.ownedModules(
                 of: description,
                 targetByFile: targetByFile,
                 excluding: alreadyChecked,
             )
-            checkedTargets.formUnion(ownedModules.map(\.name))
-            let modules = ownedModules.filter {
-                (scope?.targets.contains($0.name) ?? true) || !recorded.contains($0.name)
+            checkedTargets.formUnion(described.map(\.name))
+            let checking = Set(
+                described.filter { (scope?.targets.contains($0.name) ?? true) || !recorded.contains($0.name) }.map(
+                    \.name
+                )
+            )
+            let checkStart = Date()
+            /* The folders of every interface the check emitted that `Products` holds an older copy of, searched first. */
+            var emittedAll: [URL] = []
+
+            /*
+             The interfaces a narrowed prepare leaves the check (`interfacesToEmit`), planned while prepare ran and run now
+             that it is done. Every module checked after reads them, and the ledger's earlier ones, before anything in
+             `Products`.
+             */
+            if narrowed {
+                let emitStart = Date()
+                planGroup.wait()
+                do throws(FrontendCheck.Failure) {
+                    for planned in try emits.planned?.get() ?? [] {
+                        try interfaces.run(planned)
+                    }
+                }
+                catch {
+                    /* What the ledger said can no longer be trusted, so the next check prepares everything. */
+                    InterfaceEmit.Ledger.forget(scratchPath: session.scratchPath)
+                    throw TypesFailure(description: "\(error)")
+                }
+                do {
+                    let current = held.union(emits.targets)
+                    let left = Set(ledger?.stale ?? []).union(
+                        scope.map { $0.targets.intersection(described.map(\.name)) } ?? []
+                    )
+                    try InterfaceEmit.Ledger(targets: current.sorted(), stale: left.subtracting(current).sorted())
+                        .store(
+                            scratchPath: session.scratchPath
+                        )
+                }
+                catch {
+                    InterfaceEmit.Ledger.forget(scratchPath: session.scratchPath)
+                    throw TypesFailure(
+                        description: "the check could not keep the list of the interfaces it emitted: \(error)"
+                    )
+                }
+                run.interfacesEmitted += emits.targets
+                run.emitSeconds += Date().timeIntervalSince(emitStart)
+                emittedAll = emits.directories
             }
-            run.targetDirectories += ownedModules.filter { !modules.contains($0) }.map {
+            let ownedModules = described.map { Self.searchingFirst(emittedAll, in: $0) }
+            let modules = ownedModules.filter { checking.contains($0.name) }
+            run.targetDirectories += ownedModules.filter { !checking.contains($0.name) }.map {
                 ($0.name, FrontendCheck.moduleDirectory(in: diagnosticsRoot, module: $0.name))
             }
             run.modulesKept += ownedModules.count - modules.count
-            let checkStart = Date()
-            let checkedEarly = early.modules
+            /* The modules the check alongside prepare took, which it may still be checking. */
+            let checkedEarly = alongside == nil ? [] : checking.intersection(independent)
             var outcomes: [FrontendCheck.Outcome] = []
             do {
+                let late = try frontend.check(modules.filter { !checkedEarly.contains($0.name) })
+                earlyGroup.wait()
                 if let earlier = early.outcome {
                     outcomes.append(try earlier.get())
                 }
-                outcomes.append(try frontend.check(modules.filter { !checkedEarly.contains($0) }))
+                outcomes.append(late)
             }
             catch {
                 throw TypesFailure(description: "\(error)")
@@ -653,26 +813,103 @@ struct TypesPhase {
         }
     }
 
+    /* The module with these folders searched before any other, so it reads the interfaces the check emitted there. */
+    static func searchingFirst(_ directories: [URL], in module: FrontendCheck.Module) -> FrontendCheck.Module {
+        guard !directories.isEmpty else { return module }
+        return FrontendCheck.Module(
+            name: module.name,
+            arguments: InterfaceEmit.searchingFirst(directories, in: module.arguments),
+        )
+    }
+
+    /*
+     The build server's targets a narrowed prepare asks for: each one compiling a file of these owned targets, whose
+     prepare is their dependencies' and never their own module. An executable's two variants both compile its files.
+     */
+    static func preparing(
+        _ targets: [BuildServerClient.Target],
+        owning owners: Set<String>,
+        targetByFile: [String: String],
+    ) -> Set<String> {
+        Set(
+            targets.filter { target in
+                target.sources.contains { source in
+                    targetByFile[source.url.resolvingSymlinksInPath().path].map(owners.contains) ?? false
+                }
+            }
+            .map(\.displayName)
+        )
+    }
+
+    /*
+     Whether a module this check could read is one a narrowed prepare left stale with no current copy: one the ledger
+     lists as stale, outside the scope, that a module the check takes imports. Such a check prepares everything.
+     */
+    static func readsStale(_ ledger: InterfaceEmit.Ledger, scope: Scope?, checking: Set<String>) -> Bool {
+        guard let scope else { return false }
+        let stale = Set(ledger.stale).subtracting(scope.targets).map(moduleName(of:))
+        return checking.union(scope.targets).contains { !scope.imports[$0, default: []].isDisjoint(with: stale) }
+    }
+
+    /* The owned targets the last check left no records for, which this check takes whatever the scope. */
+    private func checkedCandidates(recorded: Set<String>) -> Set<String> {
+        Set(files.map(\.targetName)).subtracting(recorded)
+    }
+
+    /*
+     The interfaces to emit after a narrowed prepare, in the order they can be: each scoped module a checked module
+     imports, and each scoped one the ledger holds, so its copy in the check's folder stays its current interface.
+     */
+    static func interfacesToEmit(
+        owned: Set<String>,
+        checking: Set<String>,
+        scope: Scope,
+        held: Set<String>,
+    ) -> [String] {
+        let imported = Set(checking.flatMap { scope.imports[$0, default: []] })
+        return InterfaceEmit.emitOrder(
+            owned.intersection(scope.targets).filter { imported.contains(moduleName(of: $0)) || held.contains($0) },
+            imports: scope.imports,
+        )
+    }
+
+    /* The emits planned while prepare ran, kept for the thread that runs them. */
+    private final class PlannedEmits: Sendable {
+        private struct State {
+            var targets: [String] = []
+            var directories: [URL] = []
+            var planned: Swift.Result<[InterfaceEmit.Planned], FrontendCheck.Failure>?
+        }
+
+        private let state = Mutex(State())
+
+        var targets: [String] { state.withLock { $0.targets } }
+        var directories: [URL] { state.withLock { $0.directories } }
+        var planned: Swift.Result<[InterfaceEmit.Planned], FrontendCheck.Failure>? { state.withLock { $0.planned } }
+
+        func keep(
+            targets: [String],
+            directories: [URL],
+            planned: Swift.Result<[InterfaceEmit.Planned], FrontendCheck.Failure>,
+        ) {
+            state.withLock { $0 = State(targets: targets, directories: directories, planned: planned) }
+        }
+    }
+
     /* The check that ran alongside prepare, kept for the thread that waits for it. */
     private final class EarlyCheck: Sendable {
         private struct State {
-            var modules: [FrontendCheck.Module] = []
             var outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>?
             var seconds = 0.0
         }
 
         private let state = Mutex(State())
 
-        var modules: [FrontendCheck.Module] { state.withLock { $0.modules } }
         var outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>? { state.withLock { $0.outcome } }
         var seconds: Double { state.withLock { $0.seconds } }
 
-        func keep(
-            modules: [FrontendCheck.Module],
-            outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>,
-            seconds: Double,
-        ) {
-            state.withLock { $0 = State(modules: modules, outcome: outcome, seconds: seconds) }
+        func keep(outcome: Swift.Result<FrontendCheck.Outcome, FrontendCheck.Failure>, seconds: Double) {
+            state.withLock { $0 = State(outcome: outcome, seconds: seconds) }
         }
     }
 
@@ -916,6 +1153,9 @@ struct TypesPhase {
             files.map { ($0.url.resolvingSymlinksInPath().path, $0) },
             uniquingKeysWith: { first, _ in first },
         )
+        /* The compile arguments search the check's emitted interfaces, which a run checking alongside may be emitting. */
+        let interfacesLock = InterfaceEmit.Ledger.Lock(scratchPath: scratchPath)
+        defer { withExtendedLifetime(interfacesLock) {} }
         var edited: [(path: String, file: FileSet.OwnedFile)] = []
         var interfaces: [String: String] = [:]
         for path in changes.edited {
@@ -926,6 +1166,19 @@ struct TypesPhase {
             guard interface == before else { return nil }
             edited.append((resolved, file))
             interfaces[resolved] = interface
+        }
+        /*
+         The compile arguments the last check kept search only current interfaces, but a module the ledger lists as
+         stale has none anywhere: an edited module that imports one is checked, and that check prepares everything.
+         */
+        if let stale = InterfaceEmit.Ledger.stored(scratchPath: scratchPath)?.stale, !stale.isEmpty {
+            let staleNames = Set(stale.map(Self.moduleName(of:)))
+            let editedTargets = Set(edited.map(\.file.targetName))
+            for file in files where editedTargets.contains(file.targetName) {
+                guard let tree = tree(of: file), Self.importedModules(of: tree).isDisjoint(with: staleNames) else {
+                    return nil
+                }
+            }
         }
         do {
             var tables = [try CompileCommands.read(layout: .check(scratchPath: scratchPath))]

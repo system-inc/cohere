@@ -9,16 +9,25 @@
 # editing can move a number, and the project's own caches are never read or written. A copy is reused
 # by later invocations at the same commits, and refused if its files no longer match what was extracted.
 #
-# The copy keeps the checkout's repository shape, because cohere reads it: a `.git` file in each submodule
-# makes it a nested repository the format walk skips and discovery treats as linked, and the root's `.git`
-# directory carries the project's own `info/exclude`, which the format walk applies. Without them the copy
-# formatted libraries/structure as part of ahra, 5,269 files where a developer's run formats 3,198
-# (#679s763). git itself never runs on the copy, so the markers hold nothing else.
+# The copy is a repository at its commits, as a checkout is, because cohere reads it. The Go engine lists a
+# workspace's files with `git ls-files --stage`, and the Swift engine reads its inputs at the commit, so on a
+# copy that was only the tree both refused to run, and a benchmark timed a run that checked nothing (#7z52pqf).
+# A `.git` file in each submodule makes it a nested repository the format walk skips and discovery treats as
+# linked, and the root's `.git` directory carries the project's own `info/exclude`, which the format walk
+# applies; without those the copy formatted libraries/structure as part of ahra, 5,269 files where a
+# developer's run formats 3,198 (#679s763). Each repository's index is its commit's tree, a submodule a
+# gitlink at its pin, and its objects are the project's, read through an alternate rather than copied.
 #
 # The engine. The launcher rebuilds whenever a cohere commit lands, which during a working session is
 # every few minutes, so a benchmark run through it can measure two binaries and report one number. The
 # engine the launcher resolves at the start is copied beside the logs and run directly.
 zmodload zsh/datetime
+# This directory, read here at the top of the sourced file, since inside a function $0 is the function's name.
+bench_directory=${0:A:h}
+# What a sourcing script that sets neither leaves empty: no generator, and nothing linked.
+(( ${+generate} )) || generate=
+(( ${+links} )) || links=()
+(( ${+commit} )) || commit=
 
 fail() { print -u2 "$name: $*"; exit 1; }
 load() { sysctl -n vm.loadavg | awk '{print $2}'; }
@@ -34,15 +43,39 @@ wait_for_quiet() {
   until under_ceiling $(load) || (( EPOCHREALTIME > deadline )); do sleep 5; done
 }
 
-# extract writes the tree of <repository> at <commit> into <destination>, then each submodule at the
-# commit that tree records. A submodule commit the local clone does not have stops the benchmark rather
-# than leaving a hole in the program. Each submodule is marked a repository of its own, as a checkout's is.
+# make_repository makes <destination>, which holds <repository>'s tree at <commit>, a repository at that
+# commit. Its objects are <repository>'s, through an alternate; its index is the commit's tree, read rather
+# than built from the files, so a submodule is a gitlink at exactly the commit the parent records; and its
+# HEAD is the commit. The root's git directory is the copy's `.git`. A submodule's is under `.git/modules`,
+# named by a `.git` file with a relative path, as a checkout's is, so a clone of the copy (the first runs'
+# template) is a repository of its own rather than one reaching back into the copy.
+make_repository() {
+  local repository=$1 commit=$2 destination=$3
+  local within=${destination#$copy}
+  within=${within#/}
+  local git_directory=$copy/.git${within:+/modules/$within}
+  if [[ -z $within ]]; then
+    git init --quiet $destination || fail "making $destination a repository"
+  else
+    mkdir -p ${git_directory:h}
+    git init --quiet --separate-git-dir=$git_directory $destination || fail "making $destination a repository"
+    local up=${(j::)${(s:/:)within}/*/../}
+    print "gitdir: $up.git/modules/$within" > $destination/.git
+  fi
+  local objects=$(git -C $repository rev-parse --path-format=absolute --git-common-dir)/objects
+  print $objects > $git_directory/objects/info/alternates
+  git -C $destination read-tree $commit && git -C $destination update-ref --no-deref HEAD $commit ||
+    fail "pointing the repository at $destination at $commit"
+}
+
+# extract writes the tree of <repository> at <commit> into <destination>, makes it a repository at that
+# commit, then does the same for each submodule at the commit that tree records. A submodule commit the
+# local clone does not have stops the benchmark rather than leaving a hole in the program.
 extract() {
   local repository=$1 commit=$2 destination=$3
   mkdir -p $destination
   git -C $repository archive $commit | tar -x -C $destination || fail "extracting $repository at $commit"
-  [[ $destination != $copy ]] &&
-    print "gitdir: none, a benchmark copy of $repository at $commit" > $destination/.git
+  make_repository $repository $commit $destination
   git -C $repository ls-tree -r $commit | awk '$2 == "commit" { print $3 "\t" $4 }' |
     while IFS=$'\t' read -r submodule_commit submodule_path; do
       git -C $repository/$submodule_path cat-file -e "$submodule_commit^{commit}" 2> /dev/null ||
@@ -55,23 +88,38 @@ extract() {
 }
 
 # tree_hash is one hash over every file in the copy, the caches and linked node_modules aside, so a
-# copy that moved by a byte is caught.
+# copy that moved by a byte is caught. The git directory is left out but for the excludes the format walk
+# applies: git rewrites its own index whenever a command refreshes it, which says nothing about the tree.
 tree_hash() {
-  (cd $copy && find . -type f -not -path './.cache/*' -not -path './bench-ready' -print0 | sort -z |
+  (cd $copy && find . -type f -not -path './.cache/*' -not -path './bench-ready' \
+    -not \( -path './.git/*' -not -path './.git/info/exclude' \) -print0 | sort -z |
     xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
 }
 
-# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none.
+# prepare_copy sets project_commit, copy and expected_tree, extracting the copy if this commit has none,
+# linking the ignored inputs the sourcing script named in `links` (link_inputs), and running the project's
+# generator in it when the sourcing script set `generate` (run_generator).
 prepare_copy() {
   project=${project:A}
   [[ -d $project/.git || -f $project/.git ]] || fail "$project is not a git checkout"
-  project_commit=$(git -C $project rev-parse HEAD) || fail "cannot read $project's HEAD"
-  # The layout is in the name, so a copy extracted before the repository markers is never reused.
-  copy=$work/${project:t}-${project_commit[1,12]}-repositories
+  # The commit the sourcing script named in `commit`, or the checkout's own. A named one measures an older
+  # tree on today's machine (#r1kf434); its dependencies are still the checkout's, linked as they stand.
+  project_commit=$(git -C $project rev-parse --verify "${commit:-HEAD}^{commit}") ||
+    fail "$project has no commit ${commit:-HEAD}"
+  # The layout is in the name, so a copy extracted before it was a repository is never reused, and so is the
+  # generator, so a copy made with one is never taken for a copy made without it, or with another.
+  local layout=git
+  [[ -n ${generate:-} ]] && layout=git-generated-$(print -rn -- $generate | shasum -a 256 | cut -c1-12)
+  (( ${#links} > 0 )) && layout+=-linked-$(print -rl -- ${(o)links} | shasum -a 256 | cut -c1-12)
+  copy=$work/${project:t}-${project_commit[1,12]}-$layout
   if [[ -f $copy/bench-ready ]]; then
     print -u2 "reusing the copy at $copy"
     [[ $(tree_hash) == $(< $copy/bench-ready) ]] ||
       fail "the copy at $copy no longer matches what was extracted; remove it and run again"
+    local linked
+    for linked in $links; do
+      [[ -e $copy/$linked ]] || fail "--link $linked: the checkout's ${project:t}/$linked is gone, so the copy is refused"
+    done
   else
     [[ -e $copy ]] && fail "$copy exists but was never finished; remove it and run again"
     print -u2 "extracting ${project:t} at ${project_commit[1,12]} into $copy"
@@ -85,14 +133,84 @@ prepare_copy() {
       local package=${manifest:h}
       [[ -d $project/$package/node_modules ]] && ln -s $project/$package/node_modules $copy/$package/node_modules
     done
+    link_inputs
+    # Each index learns its files' stats once, here, as a checkout's has them, so the first git command a
+    # measured run makes does not hash the whole tree to find out that nothing changed. Then each repository
+    # must show no change against its commit, or the copy is not the commits it is named by.
+    local repositories=($copy) submodule repository
+    [[ -f $copy/bench-submodules ]] &&
+      for submodule in ${(f)"$(< $copy/bench-submodules)"}; do repositories+=($copy/${submodule%% at *}); done
+    for repository in $repositories; do
+      git -C $repository update-index -q --refresh > /dev/null
+      git -C $repository diff --quiet || fail "$repository differs from the commit it was extracted at"
+    done
+    [[ -n ${generate:-} ]] && run_generator $repositories
     tree_hash > $copy/bench-ready
   fi
   expected_tree=$(< $copy/bench-ready)
 }
 
-# pin_engine sets cohere_version, engine_source and engine, a copy of the engine in <logs>. Asking the
-# launcher for its version is what makes it build the engine for the current commit, so the newest engine
-# in its binary cache is that one, and the two versions agreeing proves it.
+# link_inputs links each path in `links`, relative to the project, from the checkout into the copy, as
+# node_modules is linked (#zp3t8vy). An input git ignores that no generator can make without the network, as
+# ahraos-presence's pose models CapturePhone's project.yml lists as sources, would otherwise be missing from
+# every copy, and its project refused. Only the paths the run names are linked, never a guess. One the checkout
+# lacks, or one git tracks (the copy holds it already), refuses the copy. The header names each with a hash of
+# its content, taken every run, so two rounds over different files never read as the same input.
+link_inputs() {
+  local linked target
+  for linked in $links; do
+    target=$project/$linked
+    [[ -e $target ]] || fail "--link $linked: the checkout has no $target, so the copy is refused"
+    git -C $project ls-files --error-unmatch -- $linked > /dev/null 2>&1 &&
+      fail "--link $linked: git tracks it, so the copy holds it already"
+    [[ -e $copy/$linked || -L $copy/$linked ]] && fail "--link $linked: the copy already has a $linked"
+    mkdir -p $copy/${linked:h}
+    ln -s ${target:A} $copy/$linked
+  done
+}
+
+# link_hash prints one hash over the content a linked path holds, a file or every file below a folder, with
+# the folder's relative paths, links followed.
+link_hash() {
+  (cd ${1:h} && find -L ${1:t} -type f -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -c1-16)
+}
+
+# run_generator runs the project's own generator (`generate`) in the copy, after the copy is proven to be its
+# commits and before its tree is hashed, so the hash covers what the generator wrote (#e2pe2xp). A checkout
+# holds what its project's generators wrote, and a copy without it checks less: ahra's lacked the route types
+# Next's dev server writes, so its runs type-checked with 161 errors, held every fix and ran no rule. The copy
+# is then its commits plus what the commits' own generator wrote, both fixed by the commits.
+#
+# The generator may change tracked files, as it does in any checkout (`next typegen` rewrites next-env.d.ts),
+# and every one it changed is kept in bench-generated with the command, and printed in the header, so nothing
+# hides in the hash. It runs where the network is denied but for this machine's own loopback, which a
+# generator may serve itself on (October's `next typegen` listens on 127.0.0.1), and the header says so; a
+# generator that exits nonzero, network refused or not, refuses the copy. A generator that sends telemetry is told not to in the command, as
+# `NEXT_TELEMETRY_DISABLED=1 next typegen`.
+run_generator() {
+  local profile=$work/bench-no-network.sb repository changed
+  # `(local ip "localhost:*")` alone would let a connection out to anywhere from a loopback address, so
+  # binding and accepting are allowed on loopback, and connecting only to it.
+  print -l '(version 1)' '(allow default)' '(deny network*)' '(allow network* (local unix))' \
+    '(allow network-bind (local ip "localhost:*"))' '(allow network-inbound (local ip "localhost:*"))' \
+    '(allow network-outbound (remote ip "localhost:*"))' > $profile
+  print -u2 "generating in the copy, with no network but loopback: $generate"
+  (cd $copy && sandbox-exec -f $profile zsh -c $generate) >&2 ||
+    fail "the generator failed in $copy, so the copy is refused: $generate"
+  print -r -- $generate > $copy/bench-generated
+  for repository in $@; do
+    for changed in ${(f)"$(git -C $repository diff --name-only)"}; do
+      print -r -- ${${repository#$copy}#/}${${repository#$copy}:+/}$changed >> $copy/bench-generated
+    done
+  done
+}
+
+# pin_engine sets cohere_version, engine_source and engine, a copy of the engine in <logs>, and the Swift
+# engine every run uses (pin_swift_engine). Asking the launcher for its version is what makes it build the
+# engine for the current commit, so the newest engine in its binary cache is that one, and the two versions
+# agreeing proves it. They are compared on cohere's own lines and on the Swift engine's provenance line,
+# which the same binary prints the same, and not on the lines that say where the Swift engine came from,
+# which differ by design: the launcher resolved it, and the pinned engine is told it.
 #
 # Another session's launcher can build a newer commit between the two reads, so a mismatch is asked again,
 # three times, before it is refused.
@@ -102,6 +220,7 @@ pin_engine() {
   local launcher=$(whence -p $cohere || print ${cohere:A})
   engine=$logs/cohere-engine
   for attempt in 1 2 3; do
+    unset COHERE_SWIFT_ENGINE
     cohere_version=$(cd $copy && $cohere --version 2>&1) || fail "cohere --version failed: $cohere_version"
     if [[ ${launcher:A:t} == cohere-dispatch ]]; then
       local newest=(${launcher:A:h}/cohere-darwin-*(N.om[1]))
@@ -111,21 +230,88 @@ pin_engine() {
       engine_source=${launcher:A}
     fi
     cp $engine_source $engine
-    [[ $(cd $copy && $engine --version 2>&1) == $cohere_version ]] && return 0
+    pin_swift_engine $logs $launcher
+    [[ $(cd $copy && $engine --version 2>&1 | engine_identity) == $(print -- "$cohere_version" | engine_identity) ]] &&
+      return 0
     print -u2 "the newest engine is not the build the launcher reports, asking again"
     sleep 5
   done
   fail "the engine at $engine_source is not the build the launcher reports; run again once nothing is building"
 }
 
+# engine_identity is a `--version` output without the lines that say where the Swift engine came from.
+engine_identity() { grep -v -e '^  the Swift engine was built' -e '^cohere: running the Swift engine'; }
+
+# pin_swift_engine sets swift_engine, swift_source and swift_commit, and exports COHERE_SWIFT_ENGINE, so every
+# run of a Swift project uses one Swift engine, the one built from the cohere engine's own commit, and no run
+# builds one inside its timing (#ywx8zgd). Copied out of the cohere tree, the engine cannot find the checkout
+# its Swift engine is built from: on a Swift-only project it refused to run at all, and on cohere's root it
+# found the copy and built one there, inside the first timed run.
+#
+# Through the launcher, the Swift engine is the one dispatch.ResolveSwiftEngine names for the checkout the
+# launcher lives in and the engine's full commit, asked through tools/swift_engine, so it is the very file the
+# engine would have resolved. A packaged cohere ships its Swift engine beside it. An engine built from a
+# modified tree has no commit to build a Swift engine from, so none is pinned, the header says so, and a Swift
+# project's run resolves its own.
+pin_swift_engine() {
+  local logs=$1 launcher=$2
+  swift_engine=$logs/cohere-swift
+  swift_source= swift_commit=
+  if [[ ${launcher:A:t} == cohere-dispatch ]]; then
+    local module=${launcher:A:h:h:h:h}
+    [[ -f $module/go.mod ]] || fail "the launcher at ${launcher:A} is not inside a cohere checkout"
+    print -- "$cohere_version" | grep -q '^  note: .*with nothing uncommitted in it' || return 0
+    local commit=$(print -- "$cohere_version" | awk '$1 == "commit:" { print $2; exit }')
+    local contract=$(print -- "$cohere_version" | awk '$1 == "swift" && $2 == "contract:" { print $3; exit }')
+    swift_commit=$(git -C $module rev-parse --verify "$commit^{commit}") ||
+      fail "the engine's commit $commit is not in $module"
+    (cd ${bench_directory:h} && go build -o $logs/swift_engine ./internal/bench_results/tools/swift_engine) ||
+      fail "could not build the Swift engine resolver"
+    swift_source=$($logs/swift_engine $module $swift_commit $contract) ||
+      fail "could not resolve the Swift engine built from $swift_commit"
+  elif [[ -f ${engine_source:h}/cohere-swift ]]; then
+    swift_source=${engine_source:h}/cohere-swift
+    swift_commit="the package's own"
+  else
+    return 0
+  fi
+  cp $swift_source $swift_engine
+  export COHERE_SWIFT_ENGINE=$swift_engine
+}
+
+# swift_engine_named_otherwise prints the first Swift engine a run's <log> says it ran that is not the pinned
+# one, or that it resolved on its own, so a round never measures two builds. Nothing when the run named the
+# pinned engine, or ran no Swift.
+swift_engine_named_otherwise() {
+  local log=$1
+  if [[ -n ${COHERE_SWIFT_ENGINE:-} ]]; then
+    awk -v pinned=$swift_engine '
+      /^cohere: running the Swift engine / && $6 != pinned { print $6; exit }
+      /^  the Swift engine was built from / { print "one it resolved itself"; exit }' $log
+  fi
+}
+
 # print_pinned_header prints the commits, the machine and the engine every report starts with.
 print_pinned_header() {
   print "# project  ${project:t} at $project_commit"
   [[ -f $copy/bench-submodules ]] && sed 's/^/#   submodule /' $copy/bench-submodules
+  local linked
+  for linked in $links; do
+    print "# linked   $linked, content $(link_hash $copy/$linked), from ${project:t}/$linked"
+  done
+  if [[ -f $copy/bench-generated ]]; then
+    print "# generate $(head -1 $copy/bench-generated), with no network but this machine's loopback"
+    tail -n +2 $copy/bench-generated | sed 's/^/#   changed /'
+  fi
   print "# machine  $(sysctl -n hw.model), $(sysctl -n machdep.cpu.brand_string), $(sysctl -n hw.ncpu) cores," \
     "$(( $(sysctl -n hw.memsize) / 1073741824 )) GB, macOS $(sw_vers -productVersion)"
   print "# cohere   $engine_source"
   print -- "$cohere_version" | sed 's/^/#   /'
+  if [[ -n ${COHERE_SWIFT_ENGINE:-} ]]; then
+    print "# swift    $swift_source, built from commit $swift_commit, pinned as $swift_engine"
+  else
+    print "# swift    not pinned: the engine was built from a modified tree, so a Swift project resolves its own"
+  fi
   print "# copy     $copy"
 }
 

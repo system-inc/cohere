@@ -13,6 +13,10 @@ import Foundation
  schemes are named rather than listed. The device platform, never the simulator: a generic simulator build adds
  x86_64, and a binary package with an arm64-only simulator slice (MediaPipe) then fails to link.
 
+ A check writes nothing into the developer's tree but the empty folders xcodebuild makes in the packages it links
+ (`foldersLeftInLinkedPackages`, #8f8vy1n), the one exception beside the build itself, which the types record
+ names on every run that builds. See `removeFoldersMadeInLocalPackages`.
+
  A check runs no project code on the developer's machine. Signing is off (`CODE_SIGNING_ALLOWED=NO`), and
  `ENABLE_USER_SCRIPT_SANDBOXING=YES` holds every run-script phase to the inputs and outputs it declares.
 
@@ -284,16 +288,22 @@ struct XcodeTypesPhase {
         /*
          The build an Xcode root is allowed (ruled on #nkk91tv 2026-11-06): xcodebuild has no prepare or index action,
          and Xcode 27.2 refuses `-dry-run`, so a project is built until Apple ships one. Counted on every run that
-         builds, with how long it took, so the exception is never invisible.
+         builds, with how long it took, so the exception is never invisible, and so is the one write it leaves in the
+         developer's tree, the empty folders it makes in the packages the project links (#8f8vy1n).
          */
         let seconds = TypesPhase.CheckRun.seconds(Date().timeIntervalSince(buildStart))
+        let holding = Self.packagesHoldingFoldersLeft(in: linkedLocalPackages).count
+        let foldersLeft =
+            holding == 0
+            ? ""
+            : "; it leaves the empty .swiftpm/xcode and .swiftpm/configuration xcodebuild makes in each local package the project links, in \(holding == 1 ? "1 package" : "\(holding) packages") here, the one write into the tree a check allows"
         return try read(
             builds: plan.builds,
             unbuilt: plan.unbuilt,
             failures: failures,
             start: start,
             build:
-                "xcodebuild of \(plan.builds.count) targets for \(platforms.isEmpty ? "no platform" : platforms), derived data \(derivedData.path); built in \(seconds), the build an Xcode root is allowed, since xcodebuild has no action that checks without building",
+                "xcodebuild of \(plan.builds.count) targets for \(platforms.isEmpty ? "no platform" : platforms), derived data \(derivedData.path); built in \(seconds), the build an Xcode root is allowed, since xcodebuild has no action that checks without building\(foldersLeft)",
         )
     }
 
@@ -477,33 +487,45 @@ struct XcodeTypesPhase {
         try contents.write(to: file, options: .atomic)
     }
 
-    /*
-     xcodebuild makes an empty `.swiftpm/xcode` inside every local package a build links, whether it resolves or not
-     (measured 2026-11-05, on a path package beside an app). A check writes nothing into the developer's tree, so
-     each of those folders that this build made is removed again (`removeFoldersMade`). The local packages are read
-     after the build, so the ones its package state names for the first time are cleaned as well.
-     */
-    func removeFoldersMadeInLocalPackages(since buildStart: Date) {
-        Self.removeFoldersMade(
-            in: project.projectFile.localPackages + Self.localPackages(stateIn: clonedPackages),
-            since: buildStart,
-        )
+    /* The local packages a build reads: the ones its project file links, and the ones the last build's package state names. */
+    var linkedLocalPackages: [URL] {
+        project.projectFile.localPackages + Self.localPackages(stateIn: clonedPackages)
     }
 
     /*
-     The folders an xcodebuild makes in a package it reads, removed from each of these roots when empty and created
-     since the build started, innermost first: `.swiftpm/xcode`, `.swiftpm/configuration`, then `.swiftpm`. The
-     configuration folder was measured 2026-11-06, made beside `xcode` in a package xcodebuild built as the root. One
-     holding anything, or older than the build, is not ours to judge and stays.
+     The folders xcodebuild makes in a local package a build links, by their path in the package, which a check leaves
+     there when they hold nothing (#8f8vy1n, ruled 2026-11-07). It makes an empty `.swiftpm/xcode` in every one,
+     whether it resolves or not (measured 2026-11-05, on a path package beside an app), and `.swiftpm/configuration`
+     beside it (measured 2026-11-06, in a package xcodebuild built as the root), and no flag or setting stops it.
+     They used to be removed after each build, which left the package's listing as it was and moved its directory's
+     times, and the inputs record names that directory: every build, a `--no-cache` one included, cost each project
+     naming the package its next replay (measured 2026-11-07 on a copy of ahraos-presence, where CapturePhone's builds
+     cost CapturePhone/PhoneCapture and the Tools linking CaptureWire or NumberText theirs). Left there, they move each
+     package's directory once, at the first build, and never after, and git lists no empty folder.
+     */
+    static let foldersLeftInLinkedPackages = [".swiftpm/xcode", ".swiftpm/configuration"]
+
+    /*
+     Every other empty folder this build made inside a linked package's `.swiftpm` is removed again
+     (`removeFoldersMade`). The local packages are read after the build, so the ones its package state names for the
+     first time are cleaned as well.
+     */
+    func removeFoldersMadeInLocalPackages(since buildStart: Date) {
+        Self.removeFoldersMade(in: linkedLocalPackages, since: buildStart)
+    }
+
+    /*
+     The folders an xcodebuild made inside the `.swiftpm` of each of these roots, removed when empty and created since
+     the build started, innermost first and `.swiftpm` itself last, but the ones a check leaves
+     (`foldersLeftInLinkedPackages`). A folder holding anything, a file at any depth or a folder left, or one older
+     than the build, is not ours to judge and stays, so no file is ever deleted from the tree.
      */
     static func removeFoldersMade(in roots: [URL], since buildStart: Date) {
         for root in roots {
             let swiftpm = root.appendingPathComponent(".swiftpm", isDirectory: true)
-            let made = [
-                swiftpm.appendingPathComponent("xcode", isDirectory: true),
-                swiftpm.appendingPathComponent("configuration", isDirectory: true), swiftpm,
-            ]
-            for directory in made {
+            let left = Set(foldersLeftInLinkedPackages.map { root.appendingPathComponent($0).standardizedFileURL.path })
+            for directory in folders(under: swiftpm).reversed() + [swiftpm]
+            where !left.contains(directory.standardizedFileURL.path) {
                 guard let entries = try? FileManager.default.contentsOfDirectory(atPath: directory.path),
                     entries.isEmpty,
                     let created = try? FileManager.default.attributesOfItem(atPath: directory.path)[.creationDate]
@@ -517,6 +539,33 @@ struct XcodeTypesPhase {
                     /* An empty folder left behind holds no file; the run's answer stands. */
                 }
             }
+        }
+    }
+
+    /* Every folder below `directory`, parents before what they hold, never through a link. */
+    static func folders(under directory: URL) -> [URL] {
+        guard
+            let walker = FileManager.default.enumerator(
+                at: directory,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            )
+        else { return [] }
+        var found: [URL] = []
+        for case let entry as URL in walker {
+            let values = try? entry.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            if values?.isDirectory == true && values?.isSymbolicLink != true {
+                found.append(entry)
+            }
+        }
+        return found
+    }
+
+    /* The roots holding a folder a check leaves (`foldersLeftInLinkedPackages`), which the types record counts. */
+    static func packagesHoldingFoldersLeft(in roots: [URL]) -> [URL] {
+        var seen = Set<String>()
+        return roots.filter { root in
+            foldersLeftInLinkedPackages.contains { IgnoreRules.isDirectory(root.appendingPathComponent($0)) }
+                && seen.insert(root.standardizedFileURL.path).inserted
         }
     }
 

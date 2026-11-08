@@ -6,12 +6,17 @@ import (
 	"fmt"
 )
 
-// RunOutput is what one measured run said about itself, read from its `--json` summary line, the contract
+// RunOutput is what one measured run said about itself, read from its `--json` summary lines, the contract
 // cohere versions (command/cohere/json_output.go, schema/CohereOutput.schema.json). The human footer is
 // free to change, and when it moved to one line every reader of it read nothing, so the benchmark reads
 // the contract instead.
+//
+// A root holding several projects prints a summary for each (`.`, `. (Format)`, `swift`), and they run side
+// by side, so the run is all of them: the longest engine time, every finding, and a cache use that holds for
+// every project. Reading only the last one timed a Swift project on ahra and missed a Go engine that never
+// ran on cohere's root (#7z52pqf).
 type RunOutput struct {
-	// EngineSeconds is the engine's own wall clock for the run.
+	// EngineSeconds is the engine's own wall clock for the run: the longest project's.
 	EngineSeconds float64
 	// Findings is every finding the run reported, whichever phase found it: lint findings, type errors,
 	// and files the formatter would change.
@@ -26,25 +31,12 @@ type RunOutput struct {
 // outputSchemaVersion is the `--json` contract version this reader knows.
 const outputSchemaVersion = 1
 
-// ParseRunOutput reads a run's `--json` output: the last line whose kind is summary. Output with no
-// summary line, or one of another contract version, is refused, so an instrument that cannot read a run
-// says so rather than recording zeroes.
+// ParseRunOutput reads a run's `--json` output: every line whose kind is summary, one a project. Output
+// with no summary line, one of another contract version, or a project whose run did less than a
+// developer's (`checkedLess`) is refused, so an instrument that cannot read a run, or a run that skipped
+// its work, says so rather than recording a time.
 func ParseRunOutput(output []byte) (RunOutput, error) {
-	var summary struct {
-		Kind          string  `json:"kind"`
-		SchemaVersion int     `json:"schemaVersion"`
-		Seconds       float64 `json:"seconds"`
-		Cache         struct {
-			Replayed bool `json:"replayed"`
-			Off      bool `json:"off"`
-		} `json:"cache"`
-		TypeErrors   int `json:"typeErrors"`
-		Findings     int `json:"findings"`
-		WouldChange  int `json:"wouldChange"`
-		FilesInScope int `json:"filesInScope"`
-		Cached       int `json:"cached"`
-	}
-	found := false
+	var summaries []runSummary
 	for _, line := range bytes.Split(output, []byte("\n")) {
 		if !bytes.HasPrefix(bytes.TrimSpace(line), []byte("{")) {
 			continue
@@ -55,33 +47,46 @@ func ParseRunOutput(output []byte) (RunOutput, error) {
 		if json.Unmarshal(line, &kind) != nil || kind.Kind != "summary" {
 			continue
 		}
+		var summary runSummary
 		if decodeError := json.Unmarshal(line, &summary); decodeError != nil {
 			return RunOutput{}, fmt.Errorf("reading the summary line: %w", decodeError)
 		}
-		found = true
+		summaries = append(summaries, summary)
 	}
-	if !found {
+	if len(summaries) == 0 {
 		return RunOutput{}, fmt.Errorf("no --json summary line in the run's output")
 	}
-	if summary.SchemaVersion != outputSchemaVersion {
-		return RunOutput{}, fmt.Errorf(
-			"the summary is --json schema %d, and this reader knows %d",
-			summary.SchemaVersion,
-			outputSchemaVersion,
-		)
-	}
-	result := RunOutput{
-		EngineSeconds: summary.Seconds,
-		Findings:      summary.Findings + summary.TypeErrors + summary.WouldChange,
-		Cache:         "none",
+	result := RunOutput{}
+	everyOff, everyReplayed := true, true
+	cached, inScope := 0, 0
+	for _, summary := range summaries {
+		if summary.SchemaVersion != outputSchemaVersion {
+			return RunOutput{}, fmt.Errorf(
+				"the summary of %q is --json schema %d, and this reader knows %d",
+				summary.Label,
+				summary.SchemaVersion,
+				outputSchemaVersion,
+			)
+		}
+		if reason := summary.checkedLess(); reason != "" {
+			return RunOutput{}, fmt.Errorf("the project %q did less than a developer's run: %s", summary.Label, reason)
+		}
+		result.EngineSeconds = max(result.EngineSeconds, summary.Seconds)
+		result.Findings += summary.Findings + summary.TypeErrors + summary.WouldChange
+		everyOff = everyOff && summary.Cache.Off
+		everyReplayed = everyReplayed && summary.Cache.Replayed
+		cached += summary.Cached
+		inScope += summary.FilesInScope
 	}
 	switch {
-	case summary.Cache.Off:
+	case everyOff:
 		result.Cache = "off"
-	case summary.Cache.Replayed:
+	case everyReplayed:
 		result.Cache = "replay"
-	case summary.Cached > 0:
-		result.Cache = fmt.Sprintf("files %d/%d", summary.Cached, summary.FilesInScope)
+	case cached > 0:
+		result.Cache = fmt.Sprintf("files %d/%d", cached, inScope)
+	default:
+		result.Cache = "none"
 	}
 	return result, nil
 }

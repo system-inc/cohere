@@ -15,11 +15,14 @@ import (
 	"github.com/system-inc/cohere/internal/go_rename/workspace"
 )
 
-// Fingerprint records, for every root package and each of its files, every identifier in source order and the
-// declaration it defines and uses, and for a selector the path go/types took to the member. A declaration in a
-// root file is keyed by the ordinal of its declaring identifier in that file, which a rename cannot move, so a
-// use in one package of a declaration in another compares across a rename; anything else by package path,
-// kind, owner, name and file, which no rename here changes.
+// Fingerprint records, for every root package and each of its files rename.FileKey keeps under the root, every
+// identifier in source order and the declaration it defines and uses, and for a selector the path go/types took to
+// the member. A file is keyed as rename.FileKey keys it, so cgo's translation of a source file, whose name in the
+// build cache is a hash a rewrite changes, is keyed by its source. A declaration in a root file is keyed by the
+// ordinal of its declaring identifier in that file, which a rename cannot move, so a use in one package of a
+// declaration in another compares across a rename. One in a file FileKey leaves out, generated outside the root
+// with no source under it, as cgo's _cgo_gotypes.go, is keyed by package path, kind, owner and name: no rename
+// edits such a file. Anything else by package path, kind, owner, name and file, which no rename here changes.
 func Fingerprint(
 	loaded *workspace.Workspace,
 ) (map[string]map[string][]rename.IdentifierRecord, map[string]map[string][]int) {
@@ -29,13 +32,20 @@ func Fingerprint(
 	}
 	ordinals := map[position]string{}
 	seenFiles := map[string]bool{}
+	// leftOut are the files FileKey keeps no key for, by the name they were read under.
+	leftOut := map[string]bool{}
 	for _, rootsPackage := range loaded.Roots {
 		for _, file := range rootsPackage.Syntax {
-			filename := rootsPackage.Fset.PositionFor(file.Pos(), false).Filename
-			if seenFiles[filename] {
+			read := rootsPackage.Fset.PositionFor(file.Pos(), false).Filename
+			if seenFiles[read] {
 				continue
 			}
-			seenFiles[filename] = true
+			seenFiles[read] = true
+			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root, rootsPackage.GoFiles)
+			if !kept {
+				leftOut[read] = true
+				continue
+			}
 			ordinal := 0
 			ast.Inspect(file, func(node ast.Node) bool {
 				if identifier, isIdentifier := node.(*ast.Ident); isIdentifier {
@@ -64,17 +74,23 @@ func Fingerprint(
 			if ordinal, found := ordinals[position{where.Filename, where.Line, where.Column}]; found {
 				return "declared:" + ordinal
 			}
+			if leftOut[where.Filename] {
+				return fmt.Sprintf("generated:%s:%s:%s%s", declared.Pkg().Path(), kindOf(declared), ownerOf(declared),
+					declared.Name())
+			}
 			// Outside the root files, a declaration is named by kind, owner, name and its file's base name, never
 			// by line, column or full path: export data spells them one way (module-relative, column 1) and a
 			// source load, which an overlay reload can turn to, another, for the same declaration. No rename here
-			// moves a declaration outside the root files.
+			// moves a declaration outside the root files. The base name is the one the file's //line directives
+			// give: a cgo package such as runtime/cgo is read from cgo's translation in the build cache by one load
+			// and from its source by another, and the translation names its source file in those directives.
 			return fmt.Sprintf(
 				"other:%s:%s:%s%s@%s",
 				declared.Pkg().Path(),
 				kindOf(declared),
 				ownerOf(declared),
 				declared.Name(),
-				filepath.Base(where.Filename),
+				filepath.Base(loaded.Roots[0].Fset.PositionFor(declared.Pos(), true).Filename),
 			)
 		}
 		return fmt.Sprintf(
@@ -95,7 +111,10 @@ func Fingerprint(
 		byFile := map[string][]rename.IdentifierRecord{}
 		offsetsByFile := map[string][]int{}
 		for _, file := range rootsPackage.Syntax {
-			filename := rootsPackage.Fset.PositionFor(file.Pos(), false).Filename
+			filename, kept := rename.FileKey(rootsPackage.Fset, file, loaded.Root, rootsPackage.GoFiles)
+			if !kept {
+				continue
+			}
 			ast.Inspect(file, func(node ast.Node) bool {
 				identifier, isIdentifier := node.(*ast.Ident)
 				if !isIdentifier {

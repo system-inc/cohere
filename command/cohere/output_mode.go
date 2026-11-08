@@ -190,7 +190,11 @@ func writeRunEnd(report *pipelineReport, out *bufio.Writer) {
 		printInvocation(out, "%s", engineBuildLines(summary.EngineBuilds)+summaryJsonLine(summaryAsJson(summary)))
 	default:
 		writeDiscoveredIgnores(out)
-		printInvocation(out, "%s\n", footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+		// One of several projects hands its summary to the root's one line instead (combined_footer.go).
+		if !handSummaryToRoot(summary) {
+			printInvocation(out, "%s\n",
+				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+		}
 	}
 }
 

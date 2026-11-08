@@ -399,14 +399,19 @@ At an Xcode root (#gg0x95n) the build is xcodebuild, one per native target that 
 through the scheme Xcode makes for it, for the generic device of the platform its `SDKROOT` names: `build`, or
 `build-for-testing` for a test bundle. It writes only into the scratch (`xcode-build` as derived data,
 `xcode-packages` for packages), never into `~/Library/Developer/Xcode/DerivedData`, signs nothing, and holds
-run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Packages resolve into the scratch,
+run-script phases to their declared files (`ENABLE_USER_SCRIPT_SANDBOXING=YES`). Beside the build, the one write a
+check leaves in the developer's tree is the empty `.swiftpm/xcode` and `.swiftpm/configuration` xcodebuild makes in
+each local package the project links, which no flag stops (#8f8vy1n): removed after each build, they moved the
+package directory's times, which the inputs record names, so every build cost each project naming that package its
+next replay. Left there, they move it once. Any other empty folder a build made in a package's `.swiftpm` is
+removed, a folder holding a file stays, and no file is ever deleted. Packages resolve into the scratch,
 under `--no-fix` too (#s8p20fe): a generated bundle is in the scratch already, and under `--no-fix` a committed
 bundle is built through a workspace in the scratch that names it, so its pins land there and the bundle is left as
 it was found. A resolution the repository commits (a committed bundle's own, or one kept in the bundle beside a
 spec that git does not ignore) is preferred, and under `--no-fix` the build is held to it as it stands. A resolve
 that fails is a finding at the spec or the committed project file that says so in xcodebuild's words. Its records
 are judged by the same rules as a package's, and `build` reads
-`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, or that the last build's records were reused
+`xcodebuild of <n> targets for <platforms>, derived data <path>; built in <seconds>, the build an Xcode root is allowed, since xcodebuild has no action that checks without building`, then, when a package it links holds those folders, `; it leaves the empty .swiftpm/xcode and .swiftpm/configuration xcodebuild makes in each local package the project links, in <n> packages here, the one write into the tree a check allows`, or that the last build's records were reused
 because no input changed, then names each build that failed and the step it failed at, and each target not built and why (an `SDKROOT` naming no platform the engine knows). A failure no file of
 ours carries an error for is a finding at the spec or the committed project file, and a build that left no
 record leaves every file it was for in `filesWithoutRecord`, never an empty report.
@@ -437,6 +442,13 @@ through another, and the owned C-family files when one of them or a header chang
 are the last check's, and `build` counts them, as `, 3 modules no edit could change read from the last check's records`.
 A scoped module that imports no other scoped module needs nothing prepare emits again, so it is checked while prepare
 runs, counted as `, 1 module of them alongside prepare, since they import no edited module`.
+When the edits are all to Swift files, prepare covers only the edited modules' own dependencies, and the check emits
+each interface a scoped module imports itself: one `-emit-module` job with the testable variant's arguments and bodies
+skipped, as prepare's, into `<scratch>/check/interfaces/<Target>`, which every module checked after searches first.
+Prepare emitted an owned module twice, its testable variant and its product's, and the check reads only the first.
+`build` says so after prepare's time, as `, only the edited modules' own, and the check emitted the interface of Core
+itself in 6.1s`. The scratch lists those interfaces, whose prepared copies are older than their sources, until a check
+that prepares everything, after a C-family edit or any other, empties the list.
 An edit to anything else, a manifest or a resource, checks everything.
 
 A local package that holds test files of ours is checked in a session of its own, under `<scratch>/local/<package>`,
@@ -468,6 +480,22 @@ macOS host. After the compiler's own words, each error in a script says in a par
 as `swift <name>` runs it, and that a script needing other files to compile belongs in a package with them, since a
 script needing companion files fails exactly so. `build` ends by counting the scripts checked alone with `-emit-sib`,
 by platform, and names each script kept unchecked because this Xcode lacks its SDK, which is in `filesWithoutRecord`.
+
+The scripts' check indexes the SDK modules they import (`-index-system-modules`), which `--unused` and the typed rules
+read. Into an empty store, every `--no-cache` run and every first run, it seeds them first from the toolchain's SDK
+index seed (#f6pqraj): a store of the SDK's units alone, never a project's, under
+`~/Library/Caches/cohere/sdk-index/<key>`, outside every project, cloned in whole. The key is everything the units
+depend on, each part compared: the seed's format, the contract, `swift --version`'s whole output, the SDK's path and
+build version, the target, the index flags, the job's whole argument list without its own file and outputs, and the
+modules the scripts import, since Clang writes an SDK header's record differently in another import context. A
+unit the seed cannot vouch for (its bytes, the bytes of a record it names, or the module file it was indexed from
+not as recorded) is taken out with every unit that imports it, and indexed afresh; a seed that cannot be read, or none, is a miss, and
+the check indexes everything, then makes the key's seed from what it wrote, in a folder of its own renamed into
+place, never changed after. A hit touches its key's folder, and a publish removes every key's folder untouched for
+fourteen days that no reader holds. The types record says so, additive within contract 3, as
+`"sdkIndexSeed": {"key": "<the key's SHA-256>", "hit": true}`, absent when the store was not empty or no seed
+applied; the front door names it under `--verbose` and in `--json`'s summary as `swift.sdkIndexSeed`, never in
+the default line. `COHERE_SDK_INDEX_SEED_ROOT` points the seeds elsewhere, for a bench or a proof.
 
 The Go engine's types record carries two more fields, additive within contract 3, so a front door that does
 not read them yet loses only what they count. The Go engine type-checks every package from source and runs no

@@ -42,6 +42,11 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 // offered callerContext and a local from context.WithCancel cancelContext, while one written twice, one from a call
 // outside the table, one whose name is taken there or in a nested scope, a parameter the body writes, and a ctx that
 // is a string or a type of ours named Context keep the advice and offer nothing.
+//
+// namesake reaches a package named foreign that is not the one lookalike reaches, and has lookalike's Cmd where nothing
+// it reaches fixes Cmd. What each package declares is read once a load and shared, so a memo that told packages apart
+// by name, or gave a package what another reaches, would leave namesake's Cmd alone or flag lookalike's, whichever
+// package the load read first.
 func TestAnalyzer(test *testing.T) {
 	test.Parallel()
 	analysistest.RunWithSuggestedFixes(
@@ -53,6 +58,7 @@ func TestAnalyzer(test *testing.T) {
 		"lookalike",
 		"errorcalls",
 		"contextcalls",
+		"namesake",
 	)
 }
 
@@ -71,7 +77,7 @@ func TestRenameExportsChangesNoFinding(test *testing.T) {
 		test.Fatal("renameExports set to true reads as off")
 	}
 	analysistest.RunWithSuggestedFixes(errorsOnly{test}, analysistest.TestData(), analyzer, "flagged", "allowed",
-		"lookalike", "errorcalls", "contextcalls")
+		"lookalike", "errorcalls", "contextcalls", "namesake")
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

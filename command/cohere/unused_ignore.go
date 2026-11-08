@@ -21,9 +21,10 @@ import (
 const unusedIgnoreRule = "correctness-no-unused-ignore"
 
 // ignoreIsUnused reports whether an entry is a finding: it matched nothing, a file on disk wrote it, which its
-// project can delete, and it does not name generated output, which may not have been written yet.
+// project can delete, and it does not name generated output, which may not have been written yet. One of cohere's
+// defaults never is, since no file wrote it (see defaultIgnores).
 func ignoreIsUnused(account ignoreAccount) bool {
-	return account.Matched == 0 && !configuration.IsSet(account.File) &&
+	return account.Matched == 0 && !account.Default && !configuration.IsSet(account.File) &&
 		account.Kind != string(configuration.IgnoreKindGenerated)
 }
 
