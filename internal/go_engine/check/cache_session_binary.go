@@ -77,7 +77,8 @@ func (session *CacheSession) restoreFromBinary(
 }
 
 // restoreBinaryEntry is one standard-library package's entry from the binary's table decoded whole, with every file
-// its Withheld and its export data name renamed by rename, or an error, which is a miss.
+// its Withheld and its export data name renamed by rename, or an error, which is a miss, as is an entry of another
+// package than restoring.
 func restoreBinaryEntry(
 	known *cacheAnalyzers,
 	restoring *packages.Package,
@@ -92,14 +93,22 @@ func restoreBinaryEntry(
 		}
 		exportData = renamed
 	}
-	restored, decodeError := decodeEntry(known, restoring, entry.Entry, func() ([]byte, error) {
+	tableEntry, decodeError := decodeStandardLibraryEntry(entry.Entry)
+	if decodeError != nil {
+		return nil, decodeError
+	}
+	if tableEntry.PackagePath != restoring.PkgPath {
+		return nil, fmt.Errorf("the binary's table holds %s under the key of %s", tableEntry.PackagePath,
+			restoring.PkgPath)
+	}
+	restored, restoreError := restoredOf(known, restoring, cacheEntryOf(tableEntry), func() ([]byte, error) {
 		if exportData == nil {
 			return nil, fmt.Errorf("the binary's table holds no export data for %s", restoring.ID)
 		}
 		return exportData, nil
 	})
-	if decodeError != nil {
-		return nil, decodeError
+	if restoreError != nil {
+		return nil, restoreError
 	}
 	withheld, renameError := renameWithheldFiles(restored.types.Withheld, rename)
 	if renameError != nil {

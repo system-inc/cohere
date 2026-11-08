@@ -66,7 +66,9 @@ var mainHasRun atomic.Bool
 
 // Main runs the engine over the command line the front door sends, writing records to standardOutput and
 // prose to standardError, and returns the exit code. availableMemoryBytes is the memory the front door's policy
-// read as available when this process started, 0 when it could not, which the memory limit is sized from.
+// read as available when this process started, 0 when it could not, which the memory limit is sized from. A command
+// line that names one of the release's hidden verbs for the standard library's table runs that verb instead (see
+// runStandardLibraryVerb), under the same memory limit.
 func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Writer, standardError io.Writer) int {
 	// A run sets its rule options on the registry's analyzers, which outlive it, so a second run in this process
 	// would be judged by the first's options with no error. The front door starts one engine process per Go root
@@ -77,6 +79,14 @@ func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Wri
 	}
 	// Here rather than in run, so a test running the engine in process never changes its own memory limit.
 	memory := capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes)
+	if isStandardLibraryVerb(arguments) {
+		generator, generatorError := binaryGenerator()
+		if generatorError != nil {
+			return refuse(standardError, generatorError)
+		}
+		return runStandardLibraryVerb(arguments, standardOutput, standardError, rules.All(),
+			embeddedStandardLibrary.table, generator)
+	}
 	return run(arguments, standardOutput, standardError, rules.All(), &memory)
 }
 

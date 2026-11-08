@@ -129,7 +129,7 @@ func TestAStandardLibraryPackageFromTheBinaryIsNeverAnalyzedOrParsed(test *testi
 		test.Fatalf("want every standard-library package written collected, and the module not, got %d of %+v",
 			len(collected), cold.result.Cache)
 	}
-	table, tableError := StandardLibraryTableOf(collected, goRoot)
+	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -197,7 +197,7 @@ func TestAStandardLibraryTableUnderAnotherKeyRestoresNothing(test *testing.T) {
 		Collected: collected,
 	}
 	runWithSession(test, directory, collecting, rules)
-	table, tableError := StandardLibraryTableOf(collected, goRoot)
+	table, tableError := StandardLibraryTableOf(collected, goRoot, nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -263,7 +263,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	key := cache.Key{0x01}
 	written, writeError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
 		key: {PackagePath: "net", Entry: encoded(portable)},
-	}, goRoot)
+	}, goRoot, nil)
 	if writeError != nil {
 		test.Fatalf("writing a portable entry: %v", writeError)
 	}
@@ -271,8 +271,8 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	if !held {
 		test.Fatal("want the entry in the table")
 	}
-	var entry cacheEntry
-	if decodeError := gob.NewDecoder(bytes.NewReader(read.Entry)).Decode(&entry); decodeError != nil {
+	entry, decodeError := decodeStandardLibraryEntry(read.Entry)
+	if decodeError != nil {
 		test.Fatal(decodeError)
 	}
 	marked := "$GOROOT/src/net/cgo_unix.go"
@@ -280,9 +280,9 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 		Errors:       []load.WithheldError{{File: marked, Line: 3, Column: 2, Message: "withheld"}},
 		Declarations: []string{marked + ":7:6"},
 	}
-	if !reflect.DeepEqual(entry.Withheld, want) || len(entry.Analyzers["printf"].Findings) != 0 {
-		test.Errorf("want the withheld files renamed and no finding, got %+v and %+v", entry.Withheld,
-			entry.Analyzers)
+	if !reflect.DeepEqual(entry.Withheld, want) || entry.PackagePath != "net" || len(entry.Analyzers) != 1 ||
+		entry.Analyzers[0].Slot != "printf" || len(entry.Analyzers[0].Analysis.Findings) != 0 {
+		test.Errorf("want net's entry, its withheld files renamed and no finding, got %+v", entry)
 	}
 
 	outside := portable
@@ -293,7 +293,7 @@ func TestAStandardLibraryTableIsWrittenForAnyMachine(test *testing.T) {
 	for name, refused := range map[string]cacheEntry{"outside GOROOT": outside, "with its files' walk": walked} {
 		if _, refusedError := StandardLibraryTableOf(map[cache.Key]StandardLibraryRunEntry{
 			key: {PackagePath: "net", Entry: encoded(refused)},
-		}, goRoot); refusedError == nil {
+		}, goRoot, nil); refusedError == nil {
 			test.Errorf("%s: want the entry refused", name)
 		}
 	}

@@ -46,7 +46,7 @@ func standardLibraryTableOf(
 	if len(collected) == 0 {
 		test.Fatal("want the cached run to collect the standard library's entries")
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"])
+	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
@@ -182,7 +182,7 @@ func TestOnlyTheBinaryEntriesAreReadUnderNoCache(test *testing.T) {
 	if unicodeEntry == nil {
 		test.Fatal("want unicode/utf8 among the collected entries")
 	}
-	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"])
+	table, tableError := check.StandardLibraryTableOf(collected, goEnvironmentIn(test, root, nil)["GOROOT"], nil)
 	if tableError != nil {
 		test.Fatalf("writing the table: %v", tableError)
 	}
