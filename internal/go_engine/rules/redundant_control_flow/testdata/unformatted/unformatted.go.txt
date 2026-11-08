@@ -1,0 +1,22 @@
+package unformatted
+
+// gofmt would rewrite both shapes below, the empty result list to none and the empty statement away, and the guard
+// holds every .go file of the tree to gofmt, so this one is kept as text and written out as Go where the test loads it.
+// The parser gives `()` a results list of no fields, which is not nil, so the original leaves its
+// return alone, and the empty statement before the break is a statement of the clause's body.
+
+func leftAloneEmptyResults() () {
+	return
+}
+
+var leftAloneEmptyResultsLiteral = func() () {
+	return
+}
+
+func reportedAfterEmptyStatement(value int) {
+	switch value {
+	case 1:
+		;
+		break
+	}
+}
