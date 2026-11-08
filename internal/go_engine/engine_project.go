@@ -107,7 +107,7 @@ func describeProject(request invocation) (*describedProject, error) {
 	described.readableOurs = readable
 	// Only the files read are judged, from the bytes just read, every readable file and not only those in scope, so
 	// none is opened again; a file the judging had to open and could not would refuse all.
-	constrained, constraintsError := load.ExcludedByConstraints(root, workspace.Environment(), readable,
+	constrained, goEnvironment, constraintsError := load.ExcludedByConstraints(root, workspace.Environment(), readable,
 		func(file string) ([]byte, bool) {
 			fileContents, isRead := contents[file]
 			return fileContents, isRead
@@ -115,6 +115,7 @@ func describeProject(request invocation) (*describedProject, error) {
 	if constraintsError != nil {
 		return nil, fmt.Errorf("describing %s: %w", root, constraintsError)
 	}
+	described.goEnvironment = goEnvironment
 	constraintReasons := map[string]string{}
 	for _, excluded := range constrained {
 		constraintReasons[excluded.File] = excluded.Reason

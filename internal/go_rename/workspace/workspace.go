@@ -180,24 +180,35 @@ func (workspace *Workspace) Relative(filename string) (string, bool) {
 // Editable reports whether a rename may edit file: under the root, not under TypeScript/, not generated, not a
 // copy of upstream source, not under a skipped prefix, and one the caller's writable allows.
 func (workspace *Workspace) Editable(goPackage *packages.Package, file *ast.File) bool {
+	return workspace.Uneditable(goPackage, file) == ""
+}
+
+// Uneditable is why a rename may not edit file, the first of Editable's rules it fails, or "" when it may, so a pass
+// that counts what it left alone can say why.
+func (workspace *Workspace) Uneditable(goPackage *packages.Package, file *ast.File) string {
 	filename := goPackage.Fset.Position(file.Pos()).Filename
 	relative, inside := workspace.Relative(filename)
-	if !inside || relative == "TypeScript" || strings.HasPrefix(relative, "TypeScript/") || ast.IsGenerated(file) ||
-		declaresCopy(file) {
-		return false
-	}
-	if workspace.writable != nil && !workspace.writable(filename) {
-		return false
+	switch {
+	case !inside:
+		return "outside the root"
+	case relative == "TypeScript" || strings.HasPrefix(relative, "TypeScript/"):
+		return "under TypeScript/"
+	case ast.IsGenerated(file):
+		return "a generated file"
+	case declaresCopy(file):
+		return "a copy of upstream source"
+	case workspace.writable != nil && !workspace.writable(filename):
+		return "a file the caller does not let it write"
 	}
 	for _, skip := range workspace.skips {
 		skip = strings.TrimSuffix(filepath.ToSlash(skip), "/")
 		if relative == skip ||
 			strings.HasPrefix(relative, skip+"/") ||
 			(strings.HasSuffix(skip, ".go") && relative == skip) {
-			return false
+			return "under a skipped path"
 		}
 	}
-	return true
+	return ""
 }
 
 // RenamePackage is pkg as the rename engine sees it, with only its editable files.

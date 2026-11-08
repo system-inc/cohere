@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/system-inc/cohere/internal/bench_results"
+	"github.com/system-inc/cohere/internal/go_engine"
 	"github.com/system-inc/cohere/internal/go_engine/rules"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/registry"
@@ -25,8 +26,9 @@ func SourceInputs(root string) (Inputs, error) {
 		) (*configuration.Configuration, error) {
 			return configuration.LoadFor(name, names)
 		},
-		SetContents: configuration.SourceContents,
-		GoRules:     rules.All(),
+		SetContents:   configuration.SourceContents,
+		GoRules:       rules.All(),
+		GoFixingRules: go_engine.FixingRules(),
 	}
 	var readError error
 	if inputs.SwiftVerdicts, readError = os.ReadFile(

@@ -3,7 +3,9 @@
 # order the passes landed, over the whole tree. Every pass is deterministic: it renames only through the rename
 # engine (a rename is accepted only if every identifier still resolves to the same object), reloads the tree, and
 # fails unless it type-checks with every identifier matching. Running it on a tree that already has the names
-# changes nothing.
+# changes nothing. The last pass, octal_prefix, renames nothing: it writes each legacy octal literal, `0644`, as
+# `0o644`, the literals cohere-go/consistency-require-octal-prefix flags, through the same proof, with every literal
+# of a rewritten file holding the constant value it held before. `--only "$(house_names.sh --count)"` runs it alone.
 #
 # Usage, from the root of a cohere worktree:
 #   tools/go_codemods/house_names.sh [--root <path>] [--only <n>] [--rename-library-exports <package,package>]
@@ -13,10 +15,10 @@
 # the script runs in and run over the Go workspace at that path, another repository with a go.work of its own: every
 # nested repository it holds (a git submodule, such as a vendored cohere) is skipped by every pass, so no pass edits
 # a file another repository owns, and git there says which files the passes changed. --only runs the nth pass alone,
-# counting from 1, and wraps what it changed, so a caller can commit each pass apart. The last pass renames the
-# exports of library packages only where the packages are named: cohere's own two by default over cohere, none over
-# another repository unless --rename-library-exports names them, since an importable package's consumers outside the
-# workspace cannot be renamed with it.
+# counting from 1, and wraps what it changed, so a caller can commit each pass apart. The global word_names pass
+# renames the exports of library packages only where the packages are named: cohere's own two by default over
+# cohere, none over another repository unless --rename-library-exports names them, since an importable package's
+# consumers outside the workspace cannot be renamed with it.
 #
 # Each pass is built from tools/go_codemods in the tree it runs over, so the version of a pass that runs is the one
 # that tree holds: a pass is landed exactly when its source is on main, and no list of approved builds is needed.
@@ -38,7 +40,7 @@
 # The passes, in landing order. A pass is its command's folder under tools/go_codemods/command, or that and its
 # flags separated by spaces and quoted as one word, so a flag's value may hold a comma.
 passes=(test_names error_names context_names receiver_names word_names loop_names 'initialisms -tag-encoded-fields'
-	'word_names -global -tag-encoded-fields -rename-owned-spellings')
+	'word_names -global -tag-encoded-fields -rename-owned-spellings' octal_prefix)
 
 if [[ ! -f go.work || ! -d tools/go_codemods/command ]]; then
 	echo "house_names: run this from the root of a cohere worktree (no go.work or tools/go_codemods here)" >&2
@@ -76,8 +78,11 @@ if [[ $root != "$cohere" && $libraryExportsGiven == 0 ]]; then
 	libraryExports=
 fi
 if [[ -n $libraryExports ]]; then
-	last=$(( ${#passes[@]} - 1 ))
-	passes[last]="${passes[last]} -rename-library-exports $libraryExports"
+	for index in "${!passes[@]}"; do
+		if [[ ${passes[index]} == 'word_names -global '* ]]; then
+			passes[index]="${passes[index]} -rename-library-exports $libraryExports"
+		fi
+	done
 fi
 # A nested repository's files are another repository's: every pass skips each submodule of the root, by its path.
 skips=()

@@ -289,7 +289,7 @@ func TestExcludedByConstraintsNamesWhatTheLoadExcludes(test *testing.T) {
 	test.Parallel()
 
 	root := loadedFixtures(test)
-	excluded, excludedError := ExcludedByConstraints(
+	excluded, _, excludedError := ExcludedByConstraints(
 		filepath.Join(root, "clean"),
 		cleanEnvironment,
 		fixtures.census,

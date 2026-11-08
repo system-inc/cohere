@@ -162,6 +162,8 @@ refused, and the refusal is listed with its reason. The passes:
   written as words. `-global` reaches across packages. A word with several meanings (`pos`) is listed for a
   person, never given its first.
 - `named_renames`, `hand_names`: a person's chosen names, one declaration a line, through the same engines.
+- `octal_prefix`: each literal the octal-prefix rule flags, `0644` written as `0o644`, through the same reload,
+  every literal of a rewritten file proven to keep its constant value.
 - `line_wrap` (120 columns, each file proven to keep its syntax tree and comment words; a bare `cohere` runs the
   same wrap, `internal/line_wrap`, on the long-line rule's findings once the types load sound, never touching a
   comment or taking a file past the long-file limit), `type_split` (one type
@@ -426,6 +428,17 @@ The compiler's repository is stamped rather than written down, because it has al
 the pin was against `microsoft/typescript-go` until that repository was archived, and is now against
 `microsoft/TypeScript`. Both spellings are forty hex characters and resolve in different places, so a
 hardcoded label would have survived the migration while quietly becoming false.
+
+Each released binary carries the Go standard library's analysis results, so a project's first Go run
+reads them instead of computing them (task #p1r7v9v). The table is generated per target at release
+time, by a binary of the build machine's own stamped with the release's version, commit and Go
+toolchain, and compiled in with `go build -overlay` in place of the committed
+`internal/go_engine/standard_library_table/table.bin`, which stays empty, as does a local build's. It
+holds go1.27.0 through go1.27.3, each with `CGO_ENABLED` 1 and 0, about 2.2 MB per target. win32-arm64
+ships none, since no runner here can verify one. `cohere go-engine verify-std-facts` recomputes every
+variant on the target itself: the release job runs it for darwin-arm64 and, under Rosetta, darwin-x64,
+`swift-on-intel` for darwin-x64 natively, `windows` for win32-x64, and `clean-machine` for darwin-arm64,
+linux-x64 and linux-arm64, after its proof that the install needs no Go.
 
 ### Versioning and the changelog
 

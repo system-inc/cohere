@@ -5,10 +5,11 @@
 // word ends and the next begins, so `MAX_RETRIES` shouts a fact the casing carries and `max_retries` marks its word
 // boundary twice. The Go form of `nexus/consistency-no-screaming-snake-case`, widened to every underscore because Go
 // has no file-local casing to argue for one: Effective Go spells every name in MixedCaps. Where the underscore is
-// someone else's grammar it is left alone: the blank identifier, the parts of a test function's name go test and go
-// doc read, a name cgo or the linker sees, a constant named exactly as one of syscall's or golang.org/x/sys's it
-// mirrors, and a name read from an external key spelled exactly as the name is, `os.Getenv("DATABASE_URL")`. A local
-// value's capital first letter would say exported, which a local never is, so it is reported too.
+// someone else's grammar it is left alone: the blank identifier, a test function's name as go test and go doc read
+// it (see testNameIsGo), a name cgo or the linker sees, a constant named exactly as one of syscall's or
+// golang.org/x/sys's it mirrors, and a name read from an external key spelled exactly as the name is,
+// `os.Getenv("DATABASE_URL")`. A local value's capital first letter would say exported, which a local never is, so it
+// is reported too.
 //
 // Both exemptions hold only at the other system's exact spelling (P4 of the text rules' decisions): the shouting form
 // earns its place by being greppable across the boundary, and a name spelled otherwise matches nothing on the other
@@ -43,7 +44,9 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags a name we declare that is in SCREAMING_SNAKE_CASE or has an underscore in it, suggesting its " +
 		"MixedCaps form with exported names kept exported, and a value local to a function that opens with a " +
 		"capital, suggesting its lowerCamel form, because Go marks word boundaries and export with capitals. Not " +
-		"judged: the blank identifier, an example's name, the test, benchmark or fuzz prefix of a test's name, a " +
+		"judged: the blank identifier, the name of a test, benchmark, fuzz test or example in a _test.go file with " +
+		"go test's signature for it, whose underscores separate UpperCamel words or digits (TestParser_Errors, " +
+		"TestTokenizer_310, ExampleClient_Send_withRetries), a " +
 		"name an //export or //go:linkname directive gives out, a constant named exactly as the constant of " +
 		"syscall or golang.org/x/sys it is assigned from or compared against, a name declared from a call whose " +
 		"constant string argument is exactly that name (os.Getenv(\"DATABASE_URL\")), and a name whose " +
@@ -61,12 +64,15 @@ var underscoreInNameMessage = policy.MessageOf(Name, "underscoreInName")
 
 var capitalizedLocalValueMessage = policy.MessageOf(Name, "capitalizedLocalValue")
 
-// testPrefixes open the names go test runs as tests. The prefix is go test's grammar and the rest of the name is ours,
-// so TestParse_line is judged as Parse_line and suggests TestParseLine.
-var testPrefixes = []string{"Test", "Benchmark", "Fuzz"}
+// testWords open the names go test runs, each with the type of the one parameter go test hands it, a pointer to that
+// type of package testing. An example takes none.
+var testWords = []struct {
+	word      string
+	parameter string
+}{{"Test", "T"}, {"Benchmark", "B"}, {"Fuzz", "F"}}
 
-// examplePrefix opens an example's name, which go doc reads whole: ExampleType_Method attaches the example to a method,
-// and Example_suffix names one of several, so every underscore in it is go doc's grammar.
+// examplePrefix opens an example's name, which go doc reads: ExampleType_Method attaches the example to a method, and
+// a last segment in lower case, Example_suffix, names one of several.
 const examplePrefix = "Example"
 
 func run(pass *analysis.Pass) (any, error) {
@@ -92,13 +98,16 @@ func run(pass *analysis.Pass) (any, error) {
 				if object.Parent() == pass.Pkg.Scope() && directed[object.Name()] {
 					return true
 				}
-				judge(pass, declaring, isExported(object), isTestFile && isTopLevelFunction(object),
-					isLocalValue(pass, object))
+				testWord := ""
+				if isTestFile && isTopLevelFunction(object) {
+					testWord = goTestWord(object)
+				}
+				judge(pass, declaring, isExported(object), testWord, isLocalValue(pass, object))
 			case *ast.TypeSwitchStmt:
 				// go/types gives the name a type switch binds, `switch value := subject.(type)`, no object of its own,
 				// only one per case clause, so it is judged here. It is a value local to the switch, so never exported.
 				if identifier := typeSwitchGuard(declaring); identifier != nil {
-					judge(pass, identifier, false, false, true)
+					judge(pass, identifier, false, "", true)
 				}
 			}
 			return true
@@ -182,10 +191,10 @@ func typeSwitchGuard(statement *ast.TypeSwitchStmt) *ast.Ident {
 
 // judge reports identifier when its name has an underscore in it, suggesting the MixedCaps form, or when it names a
 // local value and opens with a capital, suggesting the lowerCamel form. exported decides whether the MixedCaps form
-// opens with a capital, testFunction is whether identifier names a top-level function in a _test.go file, whose test
-// prefix or example name is go's grammar rather than ours, and localValue is whether it names a value declared inside
-// a function.
-func judge(pass *analysis.Pass, identifier *ast.Ident, exported bool, testFunction bool, localValue bool) {
+// opens with a capital, testWord is the word go test runs identifier's function by, empty for any other name (see
+// goTestWord), and localValue is whether it names a value declared inside a function. A test's name spelled in go
+// test's grammar is clean; one that is not keeps its word, go test's, and has the rest judged as ours.
+func judge(pass *analysis.Pass, identifier *ast.Ident, exported bool, testWord string, localValue bool) {
 	// The blank identifier is Go's grammar for no name, not a name.
 	if identifier.Name == "_" {
 		return
@@ -197,16 +206,11 @@ func judge(pass *analysis.Pass, identifier *ast.Ident, exported bool, testFuncti
 		return
 	}
 	prefix := ""
-	if testFunction {
-		if isGoTestName(identifier.Name, examplePrefix) {
+	if testWord != "" {
+		if testNameIsGo(pass, identifier.Name, testWord) {
 			return
 		}
-		for _, testPrefix := range testPrefixes {
-			if isGoTestName(identifier.Name, testPrefix) {
-				prefix = testPrefix
-				break
-			}
-		}
+		prefix = testWord
 	}
 	body := strings.TrimPrefix(identifier.Name, prefix)
 	// What follows a test prefix must open with a capital for go test to still run it, so it is spelled as exported.
@@ -246,6 +250,122 @@ func report(pass *analysis.Pass, identifier *ast.Ident, message policy.MessageHa
 		Category: message.Id,
 		Message:  message.Render(map[string]string{"name": identifier.Name, "suggestion": suggestion}),
 	})
+}
+
+// goTestWord is the word go test runs a top-level function in a _test.go file by, Test, Benchmark, Fuzz or Example,
+// when its name opens with that word as go test reads one (isGoTestName) and its signature is the one go test calls:
+// one parameter of type *testing.T, *testing.B or *testing.F, or none for an example, no results and no type
+// parameters. Any other function is no test, whatever its name, and is empty here.
+func goTestWord(object types.Object) string {
+	function, isFunction := object.(*types.Func)
+	if !isFunction {
+		return ""
+	}
+	signature := function.Signature()
+	if signature.TypeParams().Len() > 0 || signature.Results().Len() > 0 {
+		return ""
+	}
+	for _, each := range testWords {
+		if isGoTestName(function.Name(), each.word) && signature.Params().Len() == 1 &&
+			isTestingPointer(signature.Params().At(0).Type(), each.parameter) {
+			return each.word
+		}
+	}
+	if isGoTestName(function.Name(), examplePrefix) && signature.Params().Len() == 0 {
+		return examplePrefix
+	}
+	return ""
+}
+
+// isTestingPointer is whether parameter is a pointer to the named type of package testing.
+func isTestingPointer(parameter types.Type, name string) bool {
+	pointer, isPointer := parameter.(*types.Pointer)
+	if !isPointer {
+		return false
+	}
+	named, isNamed := pointer.Elem().(*types.Named)
+	return isNamed && named.Obj().Pkg() != nil && named.Obj().Pkg().Path() == "testing" && named.Obj().Name() == name
+}
+
+// testNameIsGo is whether a test's name, run by word, spells its underscores in go test's grammar, whose segments
+// `go test -run` patterns and go doc read: after the word and whatever opens the name, each segment an UpperCamel word
+// or digits, TestTokenizer_Events_310. An example's last segment may be its suffix, a lower-case word, and its method
+// segment may be the exact name of a method or field of the type it names, `ExampleResource_URL`. A segment in
+// capitals alone, `TestFOO_BAR`, one in lower case anywhere else, `Test_parse`, and an empty one are not go's grammar
+// but ours.
+func testNameIsGo(pass *analysis.Pass, name string, word string) bool {
+	segments := strings.Split(strings.TrimPrefix(name, word), "_")
+	later := segments[1:]
+	for index, segment := range later {
+		switch {
+		case segment == "":
+			return false
+		case strings.Trim(segment, "0123456789") == "":
+		case isUpperCamelWord(segment):
+		case word == examplePrefix && index == len(later)-1 && isLowerWord(segment):
+		case word == examplePrefix && index == 0 && isMemberOf(pass, segments[0], segment):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// isUpperCamelWord is whether segment opens with a capital, holds only letters and digits, and has a lower-case letter
+// unless it is one letter: Events, V2 and X. A segment of two letters or more in capitals alone, `FOO`, shouts.
+func isUpperCamelWord(segment string) bool {
+	first, _ := utf8.DecodeRuneInString(segment)
+	if !unicode.IsUpper(first) {
+		return false
+	}
+	letters, lower := 0, false
+	for _, character := range segment {
+		switch {
+		case unicode.IsLetter(character):
+			letters++
+			lower = lower || unicode.IsLower(character)
+		case !unicode.IsDigit(character):
+			return false
+		}
+	}
+	return lower || letters == 1
+}
+
+// isLowerWord is whether segment opens with a lower-case letter and holds only letters and digits, as an example's
+// suffix must for go doc to read it as one.
+func isLowerWord(segment string) bool {
+	first, _ := utf8.DecodeRuneInString(segment)
+	if !unicode.IsLower(first) {
+		return false
+	}
+	return strings.IndexFunc(segment, func(character rune) bool {
+		return !unicode.IsLetter(character) && !unicode.IsDigit(character)
+	}) < 0
+}
+
+// isMemberOf is whether member is the exact name of a method or field of the type named typeName in the package under
+// test: this package, or for an external test package the package it tests. An example names it as go doc reads it,
+// ExampleResource_URL, whatever its case.
+func isMemberOf(pass *analysis.Pass, typeName string, member string) bool {
+	scopes := []*types.Scope{pass.Pkg.Scope()}
+	if tested, isExternal := strings.CutSuffix(pass.Pkg.Path(), "_test"); isExternal {
+		for _, imported := range pass.Pkg.Imports() {
+			if imported.Path() == tested {
+				scopes = append(scopes, imported.Scope())
+			}
+		}
+	}
+	for _, scope := range scopes {
+		named, isTypeName := scope.Lookup(typeName).(*types.TypeName)
+		if !isTypeName {
+			continue
+		}
+		found, _, _ := types.LookupFieldOrMethod(named.Type(), true, named.Pkg(), member)
+		if found != nil && found.Name() == member {
+			return true
+		}
+	}
+	return false
 }
 
 // isGoTestName is go test's own reading of a name with prefix: the prefix alone, or followed by anything but a

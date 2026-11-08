@@ -35,6 +35,11 @@ struct TypesPhase {
         var record: TypesRecord
         /* True when any compiler error was found: lint is then not reached. Warnings do not bail. */
         var hasErrors: Bool
+        /*
+         The names in each file the in-process check answered for, by resolved path, from the same check as its
+         findings, so lint never asks sourcekitd to check that file again (`SymbolProvider.answered`).
+         */
+        var symbols: [String: FileSymbols] = [:]
     }
 
     let package: PackageModel
@@ -1142,7 +1147,8 @@ struct TypesPhase {
      Measured on Presence before this path: a one-file edit cost a 19 to 33s incremental build.
 
      Each file is asked about only when it changed since the last run asked (`BodiesOnlyAnswers`), and a file
-     whose bytes are again the build's is not asked at all (`BuildInputSnapshot.changes(since:)`).
+     whose bytes are again the build's is not asked at all (`BuildInputSnapshot.changes(since:)`). The one check
+     answers for the file's names too, which lint reads, so lint never checks it a second time.
      */
     private func checkBodiesOnly(
         changes: BuildInputSnapshot.Changes,
@@ -1189,6 +1195,23 @@ struct TypesPhase {
             var kept = BodiesOnlyAnswers()
             var replayed = 0
             var answered: [String: [FindingRecord]] = [:]
+            var symbols: [String: FileSymbols] = [:]
+            /*
+             Where this run's checks record the names they found, read back as each file is answered and removed when
+             this path ends: what is kept is the names themselves, under the answer's key, never the store.
+             */
+            let namesStore = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "cohere-swift-names-\(UUID().uuidString)",
+                isDirectory: true,
+            )
+            defer {
+                do {
+                    try FileManager.default.removeItem(at: namesStore)
+                }
+                catch {
+                    /* Nothing was written there, or it is left in the temporary directory, which the system clears. */
+                }
+            }
             for (path, file) in edited.sorted(by: { $0.path < $1.path }) {
                 guard let command = tables.lazy.compactMap({ $0.command(for: file.url) }).first else { return nil }
                 /* Read once: these bytes are both what the key holds and the text sourcekitd checks. */
@@ -1205,23 +1228,29 @@ struct TypesPhase {
                     ),
                 )
                 let answer = try kept.answer(path: path, key: key, replaying: earlier) {
-                    try Self.findings(
-                        in: Sourcekitd.shared(runner: runner).diagnostics(
-                            file: path,
-                            arguments: command.arguments,
-                            text: text,
-                        ),
-                        of: path,
+                    let checked = try Sourcekitd.shared(runner: runner).diagnostics(
+                        file: path,
+                        arguments: command.arguments,
+                        text: text,
+                        indexingInto: namesStore,
+                        unitOutputPath: FrontendCheck.unitOutputPath(module: command.moduleName, file: path),
+                    )
+                    return (
+                        Self.findings(in: checked.diagnostics, of: path),
+                        checked.indexFailure == nil ? names(of: path, in: namesStore) : nil,
                     )
                 }
-                answered[path] = answer.findings
+                answered[path] = answer.answer.findings
+                if let names = answer.answer.names {
+                    symbols[path] = FileSymbols(names)
+                }
                 replayed += answer.replayed ? 1 : 0
             }
             let directories = try checks.flatMap { try recordDirectories(under: $0.scratchPath) }
             guard !directories.isEmpty else { return nil }
             let replayedWords =
                 replayed == 0 ? "" : ", \(replayed) of them answered by an earlier run's check of the same text"
-            let result = try read(
+            var result = try read(
                 targetDirectories: directories,
                 start: start,
                 build:
@@ -1231,12 +1260,25 @@ struct TypesPhase {
             )
             guard result.record.filesWithoutRecord.isEmpty else { return nil }
             kept.store(scratchPath: scratchPath)
+            result.symbols = symbols
             return result
         }
         catch {
             /* Anything this path could not do, a whole check does. */
             return nil
         }
+    }
+
+    /*
+     The names the record sourcekitd just wrote into `store` holds for the file at this resolved path, or nil when the
+     store or the record cannot be read, which leaves the names to lint's own sources.
+     */
+    private func names(of path: String, in store: URL) -> [FileSymbols.Occurrence]? {
+        guard let library = try? IndexStore.toolchainLibraryPath(runner: runner),
+            let opened = try? IndexStore(libraryPath: library, storePath: store),
+            let symbols = IndexStore.symbols(of: [URL(fileURLWithPath: path)], in: [opened]).first ?? nil
+        else { return nil }
+        return symbols.everyOccurrence
     }
 
     /* sourcekitd's diagnostics placed in this file, as the findings a build's record of it would give. */

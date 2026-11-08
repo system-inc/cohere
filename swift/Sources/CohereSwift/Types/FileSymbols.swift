@@ -10,11 +10,12 @@ import Synchronization
  library declarations are spelled `s:S` (a standard substitution: `Sa` Array, `SD` Dictionary, `Sh` Set, `SS`
  String, `Sl` Collection, `ST` Sequence) or `s:s` and a length-prefixed name (`s:s14_ArrayProtocol`).
 
- Both sources fill the same shape: the build's index store for a file the build compiled as it stands, and
- sourcekitd's `source.request.indexsource` for one it did not.
+ Every source fills the same shape: the build's index store for a file the build compiled as it stands, the record
+ sourcekitd wrote beside the types phase's in-process check of an edited file (`BodiesOnlyAnswers`), and
+ sourcekitd's `source.request.indexsource` for a file neither describes.
  */
 public struct FileSymbols: Sendable {
-    public struct Occurrence: Sendable, Equatable {
+    public struct Occurrence: Sendable, Equatable, Codable {
         public var line: Int
         public var column: Int
         public var symbol: String
@@ -49,6 +50,16 @@ public struct FileSymbols: Sendable {
             case elsewhere
             /* The symbol names a standard library type, and the demangler places its declaration in no module. */
             case unplaced
+        }
+
+        /* Kept without its context, which belongs to the run that hands the occurrence out. */
+        enum CodingKeys: String, CodingKey {
+            case line
+            case column
+            case symbol
+            case name
+            case isReference
+            case isImplicit
         }
 
         public static func == (left: Occurrence, right: Occurrence) -> Bool {
@@ -158,6 +169,13 @@ public struct FileSymbols: Sendable {
         byPosition = Dictionary(grouping: occurrences) { Position(line: $0.line, column: $0.column) }
         count = occurrences.count
         self.ownedModules = ownedModules
+    }
+
+    /* Every occurrence, in the order of their places, so the same names are always kept as the same list. */
+    var everyOccurrence: [Occurrence] {
+        byPosition.values.flatMap(\.self).sorted {
+            ($0.line, $0.column, $0.symbol, $0.name) < ($1.line, $1.column, $1.symbol, $1.name)
+        }
     }
 
     /* Whether the declaration was written in a module this package owns. */

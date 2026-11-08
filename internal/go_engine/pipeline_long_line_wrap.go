@@ -20,7 +20,7 @@ import (
 // type-check or lint to miss.
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
-	caching := load.Caching{Held: engine.held}
+	caching := load.Caching{Held: engine.held, GoEnvironment: engine.described.goEnvironment}
 	if engine.session != nil {
 		caching.Restorer = engine.session
 		if engine.session.HasStore() {
@@ -74,6 +74,7 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 		Known:          engine.fix.known,
 		Wrap:           engine.longLineWrap(),
 	})
+	engine.fix.wrapKnown = result.Known
 	engine.addWrapped(result.Changed)
 	for _, changed := range result.Changed {
 		engine.reread(changed.File)
