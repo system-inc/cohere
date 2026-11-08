@@ -47,6 +47,7 @@ const tablePath = "internal/go_engine/rules/vet/std_version/symbols_generated.go
 
 func main() {
 	if generateError := generate(); generateError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "generate_symbols: %v\n", generateError)
 		os.Exit(1)
 	}
@@ -133,9 +134,7 @@ var symbolLine = regexp.MustCompile(`^pkg (\S+).*?, (var|func|type|const|method 
 
 // generatedTable is the table's Go source for the API files in apiDirectory, go1.txt through go1.<pinned>.txt.
 func generatedTable(apiDirectory string, pinned int) ([]byte, error) {
-	// introduced is each package's symbols, by the name the pass looks them up by, and the minor version of the first
-	// file that names each one.
-	introduced := map[string]map[string]int{}
+	introduced := introducedSymbols{}
 	for minor := 0; minor <= pinned; minor++ {
 		base := "go1.txt"
 		if minor > 0 {
@@ -150,7 +149,7 @@ func generatedTable(apiDirectory string, pinned int) ([]byte, error) {
 		if readError != nil {
 			return nil, readError
 		}
-		if parseError := parseApiFile(fileName, content, minor, introduced); parseError != nil {
+		if parseError := introduced.addApiFile(fileName, content, minor); parseError != nil {
 			return nil, parseError
 		}
 	}
@@ -183,9 +182,13 @@ func generatedTable(apiDirectory string, pinned int) ([]byte, error) {
 	return format.Source(source.Bytes())
 }
 
-// parseApiFile adds the symbols of one API file, the one for minor, to introduced, keeping the version of a symbol an
-// earlier file named. x/tools' generate.go's parse.
-func parseApiFile(fileName string, content []byte, minor int, introduced map[string]map[string]int) error {
+// introducedSymbols is each package's symbols, by the name the pass looks them up by, and the minor version of the
+// first API file that names each one.
+type introducedSymbols map[string]map[string]int
+
+// addApiFile adds the symbols of one API file, the one for minor, keeping the version of a symbol an earlier file
+// named. x/tools' generate.go's parse.
+func (introduced introducedSymbols) addApiFile(fileName string, content []byte, minor int) error {
 	for index, line := range strings.Split(string(content), "\n") {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue

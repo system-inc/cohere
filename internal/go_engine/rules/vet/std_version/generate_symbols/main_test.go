@@ -74,11 +74,11 @@ func TestEachApiLineIsNamedAsTheManifestNamesIt(test *testing.T) {
 		"",
 	}, "\n")
 	later := "pkg bytes, func Clone([]uint8) []uint8 //deprecated\npkg bytes, func CutLast([]uint8) bool\n"
-	introduced := map[string]map[string]int{}
-	if parseError := parseApiFile("first.txt", []byte(first), 3, introduced); parseError != nil {
+	introduced := introducedSymbols{}
+	if parseError := introduced.addApiFile("first.txt", []byte(first), 3); parseError != nil {
 		test.Fatal(parseError)
 	}
-	if parseError := parseApiFile("later.txt", []byte(later), 4, introduced); parseError != nil {
+	if parseError := introduced.addApiFile("later.txt", []byte(later), 4); parseError != nil {
 		test.Fatal(parseError)
 	}
 	wanted := map[string]map[string]int{
@@ -102,7 +102,7 @@ func TestEachApiLineIsNamedAsTheManifestNamesIt(test *testing.T) {
 			test.Errorf("%s is %v, and no line names it", path, introduced[path])
 		}
 	}
-	if parseError := parseApiFile("broken.txt", []byte("not an api line\n"), 5, introduced); parseError == nil {
+	if parseError := introduced.addApiFile("broken.txt", []byte("not an api line\n"), 5); parseError == nil {
 		test.Error("a line no API file holds was read without an error")
 	}
 }
