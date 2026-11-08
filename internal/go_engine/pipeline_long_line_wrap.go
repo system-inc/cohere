@@ -12,16 +12,22 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 )
 
-// loadWorkspace loads the workspace's packages, through the findings cache when the run has one. When a phase reads
-// the types it says on stderr that the load failed; a load made for the wrap alone leaves that to the wrap's own held
-// note, since that run asked for no type-check or lint to miss.
+// loadWorkspace loads the workspace's packages, through the findings cache when the run has one, keeping go list's
+// answer in its store when it has a store: under `--no-cache` a session reading the binary's entries restores the
+// standard library and keeps nothing. When a phase reads the types it says on stderr that the load failed; a load
+// made for the wrap alone leaves that to the wrap's own held note, since that run asked for no type-check or lint to
+// miss.
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
 	var loaded *load.Loaded
 	var loadError error
 	if engine.session != nil {
+		caching := load.Caching{Restorer: engine.session}
+		if engine.session.HasStore() {
+			caching.Listings = engine.session
+		}
 		loaded, loadError = load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
-			engine.described.readableOurs, load.Caching{Restorer: engine.session, Listings: engine.session})
+			engine.described.readableOurs, caching)
 	} else {
 		loaded, loadError = load.Packages(workspace.Root, workspace.Patterns(), workspace.Environment(),
 			engine.described.readableOurs)

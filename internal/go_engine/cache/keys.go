@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -35,6 +36,24 @@ type Keyed struct {
 	// Own is each package's own digest: its key but for its dependencies' keys, which the findings cache's second
 	// key joins with what its dependencies' analyses came out as rather than with what went into them.
 	Own map[*packages.Package]Key
+
+	// Files are the digests of every file Keys hashed, which StandardLibraryKeys reads rather than hashing the
+	// standard library's files again in the same run.
+	Files FileDigests
+}
+
+// FileDigests is the sha256 of each file a run has hashed, by path. The zero value holds none.
+type FileDigests struct {
+	byPath map[string]fileDigest
+}
+
+// filesHashed counts the files this process has hashed for a key, which FilesHashed reads.
+var filesHashed atomic.Int64
+
+// FilesHashed is how many files this process has hashed for a key so far, so a test can tell a run that hashes each
+// file once from one that hashes some twice.
+func FilesHashed() int64 {
+	return filesHashed.Load()
 }
 
 // Keys computes every package's key, for the packages given and everything they import, reading each file once.
@@ -56,7 +75,7 @@ func Keys(
 	if reachableError != nil {
 		return nil, reachableError
 	}
-	digests, digestsError := fileDigests(reachable)
+	digests, digestsError := fileDigests(reachable, FileDigests{})
 	if digestsError != nil {
 		return nil, digestsError
 	}
@@ -73,7 +92,7 @@ func Keys(
 			return nil, keyError
 		}
 	}
-	return &Keyed{Keys: computing.keys, Own: computing.own}, nil
+	return &Keyed{Keys: computing.keys, Own: computing.own, Files: FileDigests{byPath: digests}}, nil
 }
 
 // contextDigest is the run's Context hashed once, in the key's order: format version, engine identity, rule set,
@@ -155,22 +174,28 @@ func reachableFrom(given []*packages.Package) ([]*packages.Package, error) {
 	return reachable, nil
 }
 
-// fileDigests hashes every file of the packages that are not keyed by path alone, each once, across the cores:
-// reading and hashing the files is nearly all of Keys' work. A file that cannot be read is an error, since a key
-// without its bytes would say nothing about it.
-func fileDigests(reachable []*packages.Package) (map[string]fileDigest, error) {
+// fileDigests is the digest of every file of the packages that are not keyed by path alone: known's when it holds
+// the file, else hashed, each once, across the cores, since reading and hashing the files is nearly all of Keys'
+// work. A file that cannot be read is an error, since a key without its bytes would say nothing about it.
+func fileDigests(reachable []*packages.Package, known FileDigests) (map[string]fileDigest, error) {
 	seen := map[string]bool{}
 	var files []string
+	byPath := map[string]fileDigest{}
 	for _, reached := range reachable {
 		if pathOnly(reached) {
 			continue
 		}
 		for _, list := range fileLists(reached) {
 			for _, file := range list {
-				if !seen[file] {
-					seen[file] = true
-					files = append(files, file)
+				if seen[file] {
+					continue
 				}
+				seen[file] = true
+				if digest, hashed := known.byPath[file]; hashed {
+					byPath[file] = digest
+					continue
+				}
+				files = append(files, file)
 			}
 		}
 	}
@@ -194,7 +219,6 @@ func fileDigests(reachable []*packages.Package) (map[string]fileDigest, error) {
 	close(indexes)
 	workers.Wait()
 
-	byPath := make(map[string]fileDigest, len(files))
 	for index, file := range files {
 		if readErrors[index] != nil {
 			return nil, readErrors[index]
@@ -214,6 +238,7 @@ func digestOf(file string) (fileDigest, error) {
 		// Ignored: the file was only read, and every byte of it hashed or the copy failed.
 		_ = opened.Close()
 	}()
+	filesHashed.Add(1)
 	digester := sha256.New()
 	if _, copyError := io.Copy(digester, opened); copyError != nil {
 		return fileDigest{}, fmt.Errorf("hashing %s: %w", file, copyError)

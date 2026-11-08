@@ -659,7 +659,8 @@ The Go engine's lint record carries one more field, additive within contract 3 a
 are, so a front door that does not read it yet loses only what it counts:
 `"cache":{"on":true,"hit":412,"missed":3,"written":3,"unstorable":0,"factsDropped":1,"factsSkipped":0,"waves":1}`.
 It is what the engine's per-package findings cache did, by package. Every package the load reached,
-each analyzed package and test variant and each dependency, was either `hit` or `missed`. A hit is
+each analyzed package and test variant and each dependency, was either `hit` or `missed`, or
+restored from the binary (see `standardLibraryFromBinary` below). A hit is
 restored from its entry, and no analyzer runs on it. A package's key holds its dependencies' keys, so
 an edit misses every package above the one edited, though most come out of an analysis as before.
 So the packages whose own inputs moved are analyzed first, and each package above them is then
@@ -683,6 +684,16 @@ own cache. The cache changes no finding and no other field of any record: a run 
 under `--no-cache` write the same stream but for this field and the elapsed times. Under `--no-cache`
 the engine reads and writes no entry, and every count is 0 with `"on":false`. A project with cgo of
 its own is cached the same way, its packages with cgo files keyed on the cgo tool's outputs.
+
+A release binary also carries the Go standard library's entries, computed when the release was
+built and keyed on everything they read: the release, the Go version, the target, cgo, the go flags,
+the analyzers that learn facts with their options, and each file's bytes by its path below `GOROOT`.
+A standard-library package whose key matches is restored from the binary, in a cached run and under
+`--no-cache` alike, since those entries are part of cohere and nothing of the project's tree; any
+mismatch computes it. `"standardLibraryFromBinary":258` counts those packages, which are neither
+`hit` nor `missed`, and is written only when it is not 0, so a build that carries none, as every
+build but a release does, writes the field as it always has. Under `--no-cache` it, and
+`factsSkipped` of what it restored, are the only counts that can be other than 0.
 
 ### `phase`
 

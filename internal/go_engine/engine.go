@@ -82,7 +82,7 @@ func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Wri
 
 // run is Main with the analyzer rules handed in, so a test can run the engine with a rule planted in place of
 // the registry's, such as one that panics. memory is what Main decided about the memory limit, nil in a test,
-// which decides nothing.
+// which decides nothing. It reads the standard library's entries the binary carries.
 func run(
 	arguments []string,
 	standardOutput io.Writer,
@@ -90,10 +90,25 @@ func run(
 	registered []rule.Rule,
 	memory *contract.Memory,
 ) int {
+	return runWithStandardLibrary(arguments, standardOutput, standardError, registered, memory,
+		embeddedStandardLibrary)
+}
+
+// runWithStandardLibrary is run reading builtIn in place of the binary's own standard-library entries, so a test can
+// give a run a table and a stamp of its own, or collect the entries a run saves, without a release build.
+func runWithStandardLibrary(
+	arguments []string,
+	standardOutput io.Writer,
+	standardError io.Writer,
+	registered []rule.Rule,
+	memory *contract.Memory,
+	builtIn builtInStandardLibrary,
+) int {
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		return refuse(standardError, parseError)
 	}
+	request.standardLibrary = builtIn
 	switch request.mode() {
 	case modeVersion:
 		return writeVersion(standardOutput, standardError)
