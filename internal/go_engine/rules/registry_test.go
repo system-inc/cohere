@@ -1100,6 +1100,7 @@ var portedPasses = []string{
 	"type_switch_bound_value",
 	"typed_nil_interface_comparison",
 	"unbuffered_signal_channel",
+	"uncalled_deferred_function",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unencodable_binary_value",
