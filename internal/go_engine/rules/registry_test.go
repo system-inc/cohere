@@ -897,6 +897,7 @@ var sharedReaders = []string{
 var portedPasses = []string{
 	"address_compared_to_nil",
 	"argument_overwritten_before_use",
+	"cyclic_finalizer",
 	"defer_in_infinite_loop",
 	"deprecated_use",
 	"discarded_pure_call",
