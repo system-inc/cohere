@@ -22,3 +22,23 @@ func Testify_helper() {} // want "`Testify_helper` has an underscore in it; spel
 type suite struct{}
 
 func (current suite) Example_method() {} // want "`Example_method` has an underscore in it; spell it `ExampleMethod`"
+
+// A segment in capitals alone shouts, though it follows the word.
+func TestPARSE_LINE(test *testing.T) {} // want "`TestPARSE_LINE` is in screaming snake case; spell it `TestParseLine`"
+
+func TestParse_LINE(test *testing.T) {} // want "`TestParse_LINE` has an underscore in it; spell it `TestParseLine`"
+
+// An empty segment is no word.
+func TestParse__Line(test *testing.T) {} // want "`TestParse__Line` has an underscore in it; spell it `TestParseLine`"
+
+// A test's name with a signature go test does not call is no test's, so the whole name is ours.
+func TestParse_Line() {} // want "`TestParse_Line` has an underscore in it; spell it `TestParseLine`"
+
+func BenchmarkParse_Line(test *testing.T) {} // want "`BenchmarkParse_Line` has an underscore in it; spell it `BenchmarkParseLine`"
+
+func ExampleParse_Line(value int) {} // want "`ExampleParse_Line` has an underscore in it; spell it `ExampleParseLine`"
+
+// An example's lower-case segment is its suffix only last, and a segment in capitals names no method here.
+func ExampleClient_send_Retries() {} // want "`ExampleClient_send_Retries` has an underscore in it; spell it `ExampleClientSendRetries`"
+
+func ExampleClient_URL() {} // want "`ExampleClient_URL` has an underscore in it; spell it `ExampleClientUrl`"

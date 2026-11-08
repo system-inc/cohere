@@ -40,3 +40,9 @@ func MapKeys[KeyType comparable, Value any](table map[KeyType]Value) []KeyType {
 
 // A single all-caps word has no underscore, so it is not this rule's shape.
 const RED = "red"
+
+// Resource has a method named in capitals alone, which an example names exactly as go doc reads it.
+type Resource struct{}
+
+// URL is the resource's address.
+func (current Resource) URL() string { return "" }
