@@ -11,15 +11,17 @@ import (
 )
 
 // RequireIdenticalFacts runs original and port over the fixture packages patterns name, loaded as RequireIdentical
-// loads them, and the facts each exports must be the same multiset: each a Finding at its object's position, its file
-// named as findings name theirs, whose Message is the object's name and the fact as `%v` prints it, as `Println
-// isWrapper(...)`, or for a fact about a package, a Finding with no position whose Message is `package`, the package's
-// path and the fact. A fact is one an importer inherits (see checker.Action.ExportedFacts), so a fact kept within its
-// own package is not compared, and the two sides' fact types differ, since the checker refuses one two analyzers
-// declare, so what counts is how a fact prints. Each side's count is logged, since two sides that export nothing would
-// match and prove nothing, and the test fails if the original exports nothing at all, as it does on a fixture package
-// that did not load clean or one either side did not run on. It loads for the machine's own target, and
-// Target.RequireIdenticalFacts for another.
+// loads them, and the facts each exports on every package the checker ran it on, the fixture packages and every
+// package they import, the standard library's among them, must be the same multiset, since a fact one side exports on
+// a dependency decides what it finds in the packages importing it: each a Finding at its object's position, its file
+// named as findings name theirs, or by its path outside the fixtures, whose Message is the object's name and the fact
+// as `%v` prints it, as `Println isWrapper(...)`, or for a fact about a package, a Finding with no position whose
+// Message is `package`, the package's path and the fact. A fact is one an importer inherits (see
+// checker.Action.ExportedFacts), so a fact kept within its own package is not compared, and the two sides' fact types
+// differ, since the checker refuses one two analyzers declare, so what counts is how a fact prints. Each side's count
+// is logged, since two sides that export nothing would match and prove nothing, and the test fails if the original
+// exports nothing at all, as it does on a fixture package that did not load clean or one either side did not run on,
+// a dependency among them. It loads for the machine's own target, and Target.RequireIdenticalFacts for another.
 func RequireIdenticalFacts(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -47,7 +49,11 @@ func requireIdenticalFacts(
 		if analyzeError != nil {
 			test.Fatalf("analyzing %s: %v", fixtures.described(), analyzeError)
 		}
-		for _, action := range graph.Roots {
+		for action := range graph.All() {
+			// The graph holds the actions of the analyzers the two require as well, whose facts are neither side's.
+			if action.Analyzer != original && action.Analyzer != port {
+				continue
+			}
 			if action.Err != nil {
 				test.Fatalf("running on %s: %v", action.Package.ID, action.Err)
 			}
