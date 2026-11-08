@@ -714,6 +714,7 @@ var portedPasses = []string{
 	"misplaced_error_result",
 	"nil_ness",
 	"receiver_name",
+	"unchanging_loop_condition",
 	"unconditional_loop_exit",
 	"unread_assigned_value",
 	"unused_code",
