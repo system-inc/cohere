@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/system-inc/cohere/memory_limit"
 )
 
 // cohere runs and dies, so the collector mostly buys nothing: memory it frees is handed back to an
@@ -68,8 +71,38 @@ func darwinAvailableMemory(pageSize, free, fileBacked, purgeable uint64) uint64 
 	return pageSize * (free + fileBacked + purgeable)
 }
 
-// linuxCgroupMemory is what a cgroup says about this process's memory, each file's raw bytes, any of
-// them missing outside a container or under the other cgroup version.
+// linuxAvailableMemoryFrom reads /proc/meminfo, and the limit this process runs under with the usage of
+// the cgroup that states it, from system, a Linux root. The limit is the smallest on the path from the
+// process's own cgroup up, not the root's: without a cgroup namespace, as in a Loom unit, the root
+// states none and the unit's limit sits above the process's leaf (memory_limit).
+func linuxAvailableMemoryFrom(system fs.FS) (uint64, error) {
+	meminfo, readError := fs.ReadFile(system, "proc/meminfo")
+	if readError != nil {
+		return 0, readError
+	}
+	limit, limitError := memory_limit.ReadFs(system)
+	if limitError != nil {
+		return 0, fmt.Errorf("reading the cgroup's memory limit: %w", limitError)
+	}
+	var cgroup linuxCgroupMemory
+	if limit.Source != memory_limit.NoLimit {
+		// Ignored: a usage file that can't be read leaves the whole limit as room, as
+		// linuxAvailableMemory reads empty contents.
+		usage, _ := fs.ReadFile(system, limit.UsageFile())
+		maximum := []byte(strconv.FormatUint(limit.Bytes, 10))
+		switch limit.Source {
+		case memory_limit.CgroupV2:
+			cgroup.v2Maximum, cgroup.v2Current = maximum, usage
+		case memory_limit.CgroupV1:
+			cgroup.v1Limit, cgroup.v1Usage = maximum, usage
+		}
+	}
+	return linuxAvailableMemory(meminfo, cgroup)
+}
+
+// linuxCgroupMemory is what a cgroup says about this process's memory, each as a file's text: the
+// limit and the usage of the cgroup that states it, both missing where none does and the other
+// version's pair missing always.
 type linuxCgroupMemory struct {
 	v2Maximum, v2Current []byte // memory.max, memory.current
 	v1Limit, v1Usage     []byte // memory/memory.limit_in_bytes, memory/memory.usage_in_bytes

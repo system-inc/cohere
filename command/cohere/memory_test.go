@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -110,6 +112,36 @@ func TestLinuxAvailableMemoryTakesTheSmallerOfMemAvailableAndTheCgroup(test *tes
 		linuxCgroupMemory{},
 	); linuxAvailableMemoryError == nil {
 		test.Error("a meminfo without MemAvailable read as a number")
+	}
+}
+
+// A Loom unit, with no cgroup namespace: the root states no limit, the unit's cgroup two levels down
+// states 16 GiB and holds 4 GiB, and the command's leaf under it states none. The room is the unit's 12
+// GiB, not the host's 60 GiB available, so a run in a unit collects before the kernel kills it (#mf4x0hb).
+func TestLinuxAvailableMemoryReadsTheLimitOfTheUnitAboveItsLeaf(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	for name, contents := range map[string]string{
+		"proc/meminfo":                                                 "MemAvailable: 62914560 kB\n",
+		"proc/self/cgroup":                                             "0::/loom-serve.service/unit-a/cmd-1\n",
+		"sys/fs/cgroup/cgroup.controllers":                             "cpu memory\n",
+		"sys/fs/cgroup/loom-serve.service/memory.max":                  "max\n",
+		"sys/fs/cgroup/loom-serve.service/memory.current":              "8589934592\n",
+		"sys/fs/cgroup/loom-serve.service/unit-a/memory.max":           "17179869184\n",
+		"sys/fs/cgroup/loom-serve.service/unit-a/memory.current":       "4294967296\n",
+		"sys/fs/cgroup/loom-serve.service/unit-a/cmd-1/memory.current": "1073741824\n",
+	} {
+		file := filepath.Join(root, filepath.FromSlash(name))
+		if makeError := os.MkdirAll(filepath.Dir(file), 0o755); makeError != nil {
+			test.Fatal(makeError)
+		}
+		if writeError := os.WriteFile(file, []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	got, linuxAvailableMemoryError := linuxAvailableMemoryFrom(os.DirFS(root))
+	if want := uint64(12 << 30); linuxAvailableMemoryError != nil || got != want {
+		test.Fatalf("got %d (%v), want the unit's room, %d", got, linuxAvailableMemoryError, want)
 	}
 }
 
