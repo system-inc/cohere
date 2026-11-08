@@ -18,47 +18,34 @@ import (
 	"go/ast"
 	"go/types"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
-
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA5001",
-	Doc: "Flags a Close deferred before the error of the call that made the value is checked: staticcheck's " +
-		"SA5001, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every block of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("early_deferred_close: the inspect pass's result is missing")
-	}
-	inspected.Preorder([]ast.Node{(*ast.BlockStmt)(nil)}, func(node ast.Node) {
+// Listener is what the port hears of each package from the dispatcher: every block, in preorder.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BlockStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		block, isBlock := node.(*ast.BlockStmt)
 		if !isBlock {
-			// Invariant: Preorder hands this function only the blocks it was asked for.
-			panic("early_deferred_close: the inspector handed over a node that is not a block")
+			// Invariant: the dispatcher hands Node only the blocks it was asked for.
+			panic("early_deferred_close: the dispatcher handed over a node that is not a block")
 		}
 		Check(context, block)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA5001",
+	"SA5001",
+	"Flags a Close deferred before the error of the call that made the value is checked: staticcheck's "+
+		"SA5001, ported as a check on syntax.",
+	&Listener,
+)
 
 // Check judges one block: each assignment of a call's results, the last of them an error kept in a variable, followed
 // at once by a defer of Close on a selector rooted at the first variable assigned, is reported.
