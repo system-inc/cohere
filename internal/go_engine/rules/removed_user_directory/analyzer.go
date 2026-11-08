@@ -7,10 +7,10 @@
 // where staticcheck's report puts it, with one related entry at the call that returned the directory. The original
 // walks every source function of a package in one run, but keeps nothing from one function to the next: it judges
 // each call to os.RemoveAll by the one value its argument flattens to. So the port judges one function at a time and
-// finds what the original finds. The original stays the oracle: the parity tests beside this file run both over the
-// same packages, related entries included, and they differ nowhere. The original reports through staticcheck's report
-// with its Related option; the port sets the one related entry itself until the shared report kit (#wtvf02h) carries
-// it.
+// finds what the original finds. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, related entries
+// included, and they differ nowhere. The original reports through staticcheck's report with its Related option; the
+// port sets the one related entry itself until the shared report kit (#wtvf02h) carries it.
 //
 // The related entry names, as an example, the directory the call returns on the machine the check runs on, which the
 // original reads from the process's environment while it runs; so does the port, which is the one thing it reads

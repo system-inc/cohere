@@ -16,8 +16,9 @@
 // next. The original matches the if statement with staticcheck's pattern language, through analysis/code; the port
 // matches the same shape in the syntax directly: an initializer `:=` of two identifiers from one type assertion of an
 // identifier spelled as the first, a condition that is the second identifier, and an else branch, parentheses
-// stripped wherever the pattern strips them. The original stays the oracle: the parity tests beside this file run
-// both over the same packages, related places included, and they differ nowhere.
+// stripped wherever the pattern strips them. The registry runs the port in the original's place, under its name, and
+// the original stays only as the oracle: the parity tests beside this file run both over the same packages, related
+// places included, and they differ nowhere.
 package failed_type_assertion_read
 
 import (

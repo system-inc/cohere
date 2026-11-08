@@ -14,8 +14,9 @@
 // the original makes, shown by continueAfterReturn in testdata/src/differences. The port makes it too, so both report
 // it and the fixture records no difference there; dropping it waits for its own task once the port has taken the
 // original's place, since the parity tests allow a finding the port adds, never one it drops. The original keeps no
-// state from one loop to the next. The registry still runs the original, which stays the oracle: the parity tests
-// beside this file run both over the same packages, and the two differ nowhere they hold.
+// state from one loop to the next. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and the two differ
+// nowhere they hold.
 package defer_in_channel_range_loop
 
 import (

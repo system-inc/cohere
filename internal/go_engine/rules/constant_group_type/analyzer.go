@@ -12,8 +12,9 @@
 // so a literal whose type converts to the first's but whose value does not fit it, `large = 1000` after an int8 or
 // `signed = -1` after a uint, is reported all the same, and the fix writes a declaration that does not compile, as the
 // original's does; testdata/src/differences holds both. The original keeps no state from one declaration
-// to the next. The registry still runs the original, which stays the oracle: the parity tests beside this file run
-// both over the same packages, fixes included, and the two differ nowhere they hold.
+// to the next. The registry runs the port in the original's place, under its name, and the original stays only as the
+// oracle: the parity tests beside this file run both over the same packages, fixes included, and the two differ nowhere
+// they hold.
 package constant_group_type
 
 import (

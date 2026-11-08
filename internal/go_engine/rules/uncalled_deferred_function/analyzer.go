@@ -6,9 +6,9 @@
 // whose message it reports word for word, at the defer's Pos and End, through staticcheck_report.Report, the port of
 // the report.Report the original calls, proven against it beside it. A call returning a value of a named function
 // type counts, since the type's underlying type is a signature, and a call returning several values does not, since
-// its type is a tuple. The original keeps no state from one defer to the next. The registry still runs the original,
-// which stays the oracle: the parity tests beside this file run both over the same packages, and the two differ
-// nowhere they hold.
+// its type is a tuple. The original keeps no state from one defer to the next. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over the same packages, and the two differ nowhere they hold.
 package uncalled_deferred_function
 
 import (

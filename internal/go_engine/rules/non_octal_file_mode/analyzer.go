@@ -8,8 +8,9 @@
 // report.Render is, and passed through staticcheck_report.Fixes; wave 5 ports edit. A literal counts only as a call's
 // argument itself, not through parentheses or inside an expression, and only when the type checker gave it the type
 // os.FileMode or io/fs.FileMode, read with typeutil.IsTypeWithName. The original keeps no state from one call to the
-// next. The registry still runs the original, which stays the oracle: the parity tests beside this file run both over
-// the same packages, fixes included, and the two differ nowhere they hold.
+// next. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
+// the parity tests beside this file run both over the same packages, fixes included, and the two differ nowhere they
+// hold.
 package non_octal_file_mode
 
 import (

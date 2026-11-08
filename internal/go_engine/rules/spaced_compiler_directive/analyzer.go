@@ -6,8 +6,8 @@
 // whose message it reports word for word, over the whole comment, where staticcheck's report puts it. It reads the
 // comments of every file of the package, as the original does, and reports through staticcheck_report.Report where
 // the original reports through report.Report, the port of the one the original calls, proven against it beside it.
-// The registry still runs the original, which stays the oracle: the parity tests beside this file run both over the
-// same packages, and the two differ nowhere they hold.
+// The registry runs the port in the original's place, under its name, and the original stays only as the oracle: the
+// parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package spaced_compiler_directive
 
 import (
