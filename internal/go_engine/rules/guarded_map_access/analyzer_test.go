@@ -3,24 +3,18 @@ package guarded_map_access
 import (
 	"bytes"
 	"cmp"
-	"fmt"
-	"go/ast"
 	"go/format"
 	"go/parser"
 	"go/token"
-	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
-	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/txtar"
 	"honnef.co/go/tools/simple/s1036"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
-	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_wants"
@@ -32,10 +26,16 @@ import (
 // tree laid out by import path as the house's fixtures do.
 const upstream = "CheckUnnecessaryGuard"
 
-// parityPackages is the fixtures written for the comparison: parity, which holds every shape the query branches on
-// and the near miss of each, with a generated file, which neither filters; and shadow, which declares an append of
-// its own at package scope.
-var parityPackages = []string{"parity", "shadow"}
+// upstreamFile is the upstream fixture's one file, beside its golden file.
+const upstreamFile = "LintUnnecessaryGuard.go"
+
+// differences is the differences fixture's one package, which holds no package of its own beneath it.
+const differences = "differences"
+
+// fixtures is every fixture package the tree holds where the original and the port agree, fixes and all:
+// staticcheck's; parity, which holds every shape the query branches on and the near miss of each, with a generated
+// file, which neither filters; and shadow, which declares an append of its own at package scope.
+var fixtures = []string{upstream, "parity", "shadow"}
 
 // The port carries the original's name, so the rule, its settings and every `//cohere:ignore` naming it read the
 // same once the port takes the original's place. The findings tests key each side by the analyzer itself, so they
@@ -84,8 +84,8 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 // the fix replaced.
 func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 	test.Parallel()
-	_, port := diagnosticsOf(test, upstream)
-	path := filepath.Join(analysistest.TestData(), "src", upstream, "LintUnnecessaryGuard.go")
+	_, port := parity.Findings(test, s1036.Analyzer, Analyzer, analysistest.TestData(), upstream)
+	path := filepath.Join(analysistest.TestData(), "src", upstream, upstreamFile)
 	source, readError := os.ReadFile(path)
 	if readError != nil {
 		test.Fatal(readError)
@@ -99,36 +99,33 @@ func TestPortFixesMakeUpstreamGolden(test *testing.T) {
 		test.Fatalf("the golden file holds %d sections, one a fix's message, which this test does not read",
 			len(archive.Files))
 	}
-	edits := []offsetEdit{}
-	for _, diagnostic := range port {
-		for _, fix := range diagnostic.fixes {
-			edits = append(edits, fix.edits...)
-		}
-	}
+	edits := editsIn(port, upstreamFile)
 	test.Logf("the port found %d, with %d edits", len(port), len(edits))
 	if len(edits) == 0 {
 		test.Fatal("the port made no edit to the upstream fixture, so the comparison proves nothing")
 	}
-	formatted, formatError := format.Source(applied(test, source, edits))
+	fixed := applied(test, upstreamFile, source, edits)
+	formatted, formatError := format.Source(fixed)
 	if formatError != nil {
-		test.Fatalf("the port's fixes make source gofmt cannot format: %v", formatError)
+		test.Fatalf("the port's fixes make source gofmt cannot format: %v\n%s", formatError, fixed)
 	}
 	if !bytes.Equal(formatted, archive.Comment) {
 		test.Errorf("the port's fixes make\n%s\nand the golden file is\n%s", formatted, archive.Comment)
 	}
 }
 
-// The original and the port run in one checker over staticcheck's fixture and the parity fixtures, and their
-// findings must be the same multiset of file, line, column and message.
-func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
+// Over staticcheck's fixture and the parity fixtures, the original and the port find the same multiset, each finding
+// the same to its end and its fixes. The fix's text is format.Node of the if's one body statement on both sides, so
+// this is where the two are held byte for byte, a split call with comments among its arguments included.
+func TestPortMatchesOriginal(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdentical(test, s1036.Analyzer, Analyzer, analysistest.TestData(),
-		slices.Concat([]string{upstream}, parityPackages)...)
+	parity.RequireIdentical(test, s1036.Analyzer, Analyzer, analysistest.TestData(), fixtures...)
 }
 
 // The shapes gofmt rewrites, a condition in parentheses, which gofmt strips and the pattern looks through, and
 // doubled parentheses elsewhere, are held the same way. The guard holds every .go file of the tree to gofmt, so the
-// fixture is kept as testdata/unformatted/unformatted.go.txt and written out as Go into a tree of the test's own.
+// fixture is kept as testdata/unformatted/unformatted.go.txt and written out as Go into a tree of the test's own,
+// which the harness loads as it loads testdata.
 func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 	test.Parallel()
 	source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "unformatted", "unformatted.go.txt"))
@@ -146,369 +143,176 @@ func TestPortMatchesOriginalWhereGofmtWouldRewrite(test *testing.T) {
 	parity.RequireIdentical(test, s1036.Analyzer, Analyzer, directory, "unformatted")
 }
 
-// Over every fixture, each finding's end and every suggested fix, its message and each edit's start, end and new
-// text, are the original's, which the parity harness does not compare yet. The fix's text is format.Node of the if's
-// one body statement on both sides, so this is where the two are held byte for byte, a split call with comments
-// among its arguments included. What the differences fixture records the port drops is left out of the original's
-// side, and a finding it records the port moves is compared without its fixes, both held by the tests below.
-func TestPortFixesAndRangesMatchOriginal(test *testing.T) {
+// In the differences fixture, the port's findings are the original's but where a record says the port drops one, a
+// guard the zero value does not cover: an append that spreads its last argument against a literal that holds that
+// argument as one element, and an append of nothing against an empty literal, which is nil where the literal is not.
+// Or where a record says the port moves the fix, of a guard that is another if's else branch, where the original's
+// bare statement, `} else m[k]++`, does not parse, and the port writes the if's body, a block.
+func TestPortDiffersFromOriginalOnlyWhereRecorded(test *testing.T) {
 	test.Parallel()
-	original, port := diagnosticsOf(test, slices.Concat([]string{upstream}, parityPackages, []string{"differences"})...)
-	drops, moves := recordedDifferences(test)
-	original = slices.DeleteFunc(original, func(found diagnostic) bool {
-		return slices.Contains(drops, findingOf(found))
-	})
-	withoutMovedFixes := func(found []diagnostic) []string {
-		all := []string{}
-		for _, each := range found {
-			if slices.Contains(moves, findingOf(each)) {
-				each.fixes = nil
-			}
-			all = append(all, described(each))
-		}
-		return all
-	}
-	originalDescribed := withoutMovedFixes(original)
-	portDescribed := withoutMovedFixes(port)
-	test.Logf("the original found %d, the port %d", len(originalDescribed), len(portDescribed))
-	if len(originalDescribed) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range difference(originalDescribed, portDescribed) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range difference(portDescribed, originalDescribed) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
+	parity.RequireOnlyAdjudicated(test, s1036.Analyzer, Analyzer, analysistest.TestData(), differences)
 }
 
-// The differences fixture holds the ways the port parts from the original, where the original is wrong, and the
-// near shapes where the two agree. It drops a guard the zero value does not cover: an append that spreads its last
-// argument against a literal that holds that argument as one element, and an append of nothing against an empty
-// literal, which is nil where the literal is not, each such finding recorded on its line as `// port drops: <the
-// original's message>`. The parity harness reads `finds:` and `renames:` alone in this base (#dcgn32d brings
-// `drops:` and `moves:`), so this holds the records: the port finds nothing the original does not, and what the
-// original alone finds is exactly what is recorded, line and message, with every record matched.
-func TestPortDropsOnlyWhatIsRecorded(test *testing.T) {
+// Over the differences fixture, each finding the port makes is one the original makes at the same range, and each fix
+// it offers edits the bytes the original's does, so a move rewrites a fix's text and nothing else. Where the text
+// differs, the original's edit, applied alone, makes a file that does not parse. A `moves:` record pairs any two
+// findings on its line with its message, so this is where the moved fix is held to the original's bytes, and where
+// each move is held to a fix the original breaks; what the original alone finds is the drops, which
+// TestPortDiffersFromOriginalOnlyWhereRecorded holds to their records.
+func TestPortMovesOnlyTheTextOfAFix(test *testing.T) {
 	test.Parallel()
-	original, port := parity.Findings(test, s1036.Analyzer, Analyzer, analysistest.TestData(), "differences")
-	test.Logf("the original found %d, the port %d", len(original), len(port))
-	for _, extra := range parity.Difference(port, original) {
-		test.Errorf("the port alone found %s, which the fixture does not record", extra)
-	}
-	drops, _ := recordedDifferences(test)
-	if len(drops) == 0 {
-		test.Fatal("the differences fixture records no drop, so the comparison proves nothing")
-	}
-	originalAlone := []parity.Finding{}
-	for _, found := range parity.Difference(original, port) {
-		// The records name a line, not a column.
-		found.Column = 0
-		originalAlone = append(originalAlone, found)
-	}
-	for _, missed := range parity.Difference(originalAlone, drops) {
-		test.Errorf("the original found %s, and the port did not, a regression", missed)
-	}
-	for _, unmatched := range parity.Difference(drops, originalAlone) {
-		test.Errorf("the fixture records that the port drops %s, and the original does not find it", unmatched)
-	}
-}
-
-// The other way the port parts from the original is the fix of a guard that is another if's else branch, where the
-// original's bare statement, `} else m[k]++`, does not parse, and the port writes the if's body, a block, each such
-// finding recorded on its line as `// port moves: <the message>`. Each record is one finding both sides make at the
-// same range, whose fixes differ; the original's edit, applied alone to the fixture, makes a file that does not
-// parse, and the port's makes one that type-checks. Every other fix of the fixture is the original's, which
-// TestPortFixesAndRangesMatchOriginal holds.
-func TestPortMovesOnlyWhatIsRecorded(test *testing.T) {
-	test.Parallel()
-	original, port := diagnosticsOf(test, "differences")
-	_, moves := recordedDifferences(test)
-	if len(moves) == 0 {
-		test.Fatal("the differences fixture records no move, so the comparison proves nothing")
-	}
-	test.Logf("the fixture records %d moves", len(moves))
-	for _, move := range moves {
-		originalFound, isOriginalFound := soleDiagnosticAt(original, move)
-		portFound, isPortFound := soleDiagnosticAt(port, move)
-		if !isOriginalFound || !isPortFound {
-			test.Errorf("the fixture records that the port moves %s, and the two do not each find it once", move)
+	original, port := parity.Findings(test, s1036.Analyzer, Analyzer, analysistest.TestData(), differences)
+	unpaired := slices.Clone(original)
+	moved := 0
+	for _, portFinding := range port {
+		index := slices.IndexFunc(unpaired, func(originalFinding parity.Finding) bool {
+			return len(parity.Difference(
+				[]parity.Finding{withoutEditText(originalFinding)}, []parity.Finding{withoutEditText(portFinding)},
+			)) == 0
+		})
+		if index < 0 {
+			test.Errorf("the port found %s, and no finding of the original's has its range and edits its bytes",
+				portFinding)
 			continue
 		}
-		if described(originalFound) == described(portFound) {
-			test.Errorf("the fixture records that the port moves %s, and its fix is the original's", move)
+		originalFinding := unpaired[index]
+		unpaired = slices.Delete(unpaired, index, index+1)
+		if len(parity.Difference([]parity.Finding{originalFinding}, []parity.Finding{portFinding})) == 0 {
 			continue
 		}
-		source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "src", "differences", move.File))
+		moved++
+		source, readError := os.ReadFile(
+			filepath.Join(analysistest.TestData(), "src", differences, originalFinding.File),
+		)
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		if _, parseError := parser.ParseFile(token.NewFileSet(), move.File,
-			applied(test, source, editsOf(originalFound)), parser.SkipObjectResolution); parseError == nil {
-			test.Errorf("the original's fix at %s parses, so the record moves nothing", move)
+		fixed := applied(test, originalFinding.File, source,
+			editsIn([]parity.Finding{originalFinding}, originalFinding.File))
+		if _, parseError := parser.ParseFile(token.NewFileSet(), originalFinding.File, fixed,
+			parser.SkipObjectResolution); parseError == nil {
+			test.Errorf("the original's fix of %s parses, so the port's fix there moves it for nothing",
+				originalFinding)
 		}
-		if checkError := typeChecks(move.File, applied(test, source, editsOf(portFound))); checkError != nil {
-			test.Errorf("the port's fix at %s does not type-check: %v", move, checkError)
-		}
+	}
+	test.Logf("the original found %d, the port %d, of which %d moved and the original alone %d", len(original),
+		len(port), moved, len(unpaired))
+	if moved == 0 {
+		test.Fatal("the port moved no fix in the differences fixture, so the comparison proves nothing")
 	}
 }
 
-// Every fix the port suggests in the differences fixture, applied together, makes a file that type-checks, and the
-// original's, applied together, make one that does not, as each recorded move says, so a move that fixed nothing
-// broken, or a port fix that breaks what it touches, fails here.
+// Applied to the differences fixture, the port's fixes make a package that type-checks, and the original's make one
+// that does not, as each recorded move says, so a move that fixed nothing broken, or a port fix that breaks what it
+// touches, fails here. The fixed files are loaded through an overlay over the fixtures on disk, which changes no
+// import, so go list's answer for the tree holds.
 func TestPortMovedFixesCompile(test *testing.T) {
 	test.Parallel()
-	original, port := diagnosticsOf(test, "differences")
-	name := "differences.go"
-	source, readError := os.ReadFile(filepath.Join(analysistest.TestData(), "src", "differences", name))
-	if readError != nil {
-		test.Fatal(readError)
-	}
-	portEdits := []offsetEdit{}
-	for _, found := range port {
-		portEdits = append(portEdits, editsOf(found)...)
-	}
-	originalEdits := []offsetEdit{}
-	for _, found := range original {
-		originalEdits = append(originalEdits, editsOf(found)...)
-	}
-	test.Logf("the port makes %d edits, the original %d", len(portEdits), len(originalEdits))
-	if len(portEdits) == 0 {
+	files := differencesFiles(test)
+	original, port := parity.Findings(test, s1036.Analyzer, Analyzer, analysistest.TestData(), differences)
+	if len(editsIn(port, filepath.Base(files[0]))) == 0 {
 		test.Fatal("the port made no edit to the differences fixture, so the comparison proves nothing")
 	}
-	if checkError := typeChecks(name, applied(test, source, portEdits)); checkError != nil {
-		test.Errorf("the port's fixes make code that does not type-check: %v", checkError)
+	portErrors := fixedErrors(test, files, port)
+	for _, each := range portErrors {
+		test.Errorf("the port's fixes make code that does not type-check: %s", each)
 	}
-	if checkError := typeChecks(name, applied(test, source, originalEdits)); checkError == nil {
+	originalErrors := fixedErrors(test, files, original)
+	test.Logf("the port's fixed fixture has %d errors, the original's %d", len(portErrors), len(originalErrors))
+	if len(originalErrors) == 0 {
 		test.Error("the original's fixes to the differences fixture type-check, so no move fixes anything")
 	}
 }
 
-// recordedDifferences is every `// port drops: <message>` and `// port moves: <message>` record of the differences
-// fixture, each on its comment's line, in its file's base name, with no column, as the parity harness reads its own
-// records. A `// port ` comment that is neither fails, since this fixture records nothing else.
-func recordedDifferences(test *testing.T) (drops []parity.Finding, moves []parity.Finding) {
-	test.Helper()
-	directory := filepath.Join(analysistest.TestData(), "src", "differences")
-	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
-	if globError != nil {
-		test.Fatalf("listing the differences fixture: %v", globError)
+// withoutEditText is finding with every edit's new text left out, the part of a moved fix that stays the original's.
+func withoutEditText(finding parity.Finding) parity.Finding {
+	fixes := finding.Fixes
+	finding.Fixes = nil
+	for _, fix := range fixes {
+		textlessFix := parity.Fix{Message: fix.Message}
+		for _, edit := range fix.Edits {
+			edit.NewText = ""
+			textlessFix.Edits = append(textlessFix.Edits, edit)
+		}
+		finding.Fixes = append(finding.Fixes, textlessFix)
 	}
-	fileSet := token.NewFileSet()
-	for _, name := range names {
-		source, readError := os.ReadFile(name)
+	return finding
+}
+
+// differencesFiles is every .go file of the differences fixture, by absolute path.
+func differencesFiles(test *testing.T) []string {
+	test.Helper()
+	files, globError := filepath.Glob(filepath.Join(analysistest.TestData(), "src", differences, "*.go"))
+	if globError != nil {
+		test.Fatalf("listing %s: %v", differences, globError)
+	}
+	if len(files) == 0 {
+		test.Fatal("the differences fixture holds no file, so the comparison proves nothing")
+	}
+	return files
+}
+
+// fixedErrors is every type error of the differences fixture with the fixes of findings applied to files, loaded
+// through an overlay of the fixed files. The harness loads only what is on disk, so this keeps its own load.
+func fixedErrors(test *testing.T, files []string, findings []parity.Finding) []string {
+	test.Helper()
+	directory := analysistest.TestData()
+	overlay := map[string][]byte{}
+	for _, file := range files {
+		source, readError := os.ReadFile(file)
 		if readError != nil {
 			test.Fatal(readError)
 		}
-		lines := strings.Split(string(source), "\n")
-		file, parseError := parser.ParseFile(fileSet, name, source, parser.ParseComments|parser.SkipObjectResolution)
-		if parseError != nil {
-			test.Fatalf("parsing the differences fixture: %v", parseError)
+		overlay[file] = applied(test, filepath.Base(file), source, editsIn(findings, filepath.Base(file)))
+	}
+	// The fixtures are a tree laid out by import path, loaded as the harness loads one.
+	loaded, loadError := load.PackagesWithOverlay(directory, []string{differences}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil, overlay)
+	if loadError != nil {
+		test.Fatalf("loading the fixed %s: %v", differences, loadError)
+	}
+	if len(loaded.Roots) == 0 {
+		test.Fatalf("loading the fixed %s found no package, so the comparison would prove nothing", differences)
+	}
+	errors := []string{}
+	for _, root := range loaded.Roots {
+		for _, each := range root.Errors {
+			errors = append(errors, each.Error())
 		}
-		for _, group := range file.Comments {
-			for _, comment := range group.List {
-				line := fileSet.Position(comment.Slash).Line
-				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
-					record = strings.TrimSpace(record)
-					at := parity.Finding{File: filepath.Base(name), Line: line}
-					// Each record carries its reason in a comment on the line above it.
-					if line < 2 || !strings.HasPrefix(strings.TrimSpace(lines[line-2]), "//") {
-						test.Fatalf("%s:%d records %q with no reason on the line above", at.File, line, record)
-					}
-					if message, isDrop := strings.CutPrefix(record, "drops: "); isDrop {
-						at.Message = message
-						drops = append(drops, at)
-						continue
-					}
-					if message, isMove := strings.CutPrefix(record, "moves: "); isMove {
-						at.Message = message
-						moves = append(moves, at)
-						continue
-					}
-					test.Fatalf("%s:%d holds a record that is no drop and no move: %q", at.File, line, record)
+	}
+	return errors
+}
+
+// editsIn is every edit of every fix of findings in the file named file, by its base name.
+func editsIn(findings []parity.Finding, file string) []parity.Edit {
+	edits := []parity.Edit{}
+	for _, finding := range findings {
+		for _, fix := range finding.Fixes {
+			for _, edit := range fix.Edits {
+				if edit.File == file {
+					edits = append(edits, edit)
 				}
 			}
 		}
-	}
-	return drops, moves
-}
-
-// findingOf is found as the records name it: its file, line and message, with no column.
-func findingOf(found diagnostic) parity.Finding {
-	return parity.Finding{File: found.file, Line: found.line, Message: found.message}
-}
-
-// soleDiagnosticAt is the one diagnostic of found that at names, and false when there is none or more than one.
-func soleDiagnosticAt(found []diagnostic, at parity.Finding) (diagnostic, bool) {
-	matching := slices.DeleteFunc(slices.Clone(found), func(each diagnostic) bool {
-		return findingOf(each) != at
-	})
-	if len(matching) != 1 {
-		return diagnostic{}, false
-	}
-	return matching[0], true
-}
-
-// editsOf is every edit of every fix found suggests.
-func editsOf(found diagnostic) []offsetEdit {
-	edits := []offsetEdit{}
-	for _, each := range found.fixes {
-		edits = append(edits, each.edits...)
 	}
 	return edits
 }
 
-// applied is source with edits made, from the last to the first, so each edit's offsets still name the bytes they
-// were read against. Edits that overlap fail the test.
-func applied(test *testing.T, source []byte, edits []offsetEdit) []byte {
+// applied is source with edits applied, from the last to the first, so each edit's offsets still name the bytes they
+// were read against. Two edits that overlap fail the test.
+func applied(test *testing.T, file string, source []byte, edits []parity.Edit) []byte {
 	test.Helper()
 	ordered := slices.Clone(edits)
-	slices.SortFunc(ordered, func(first offsetEdit, second offsetEdit) int {
-		return cmp.Compare(second.start, first.start)
+	slices.SortFunc(ordered, func(first parity.Edit, second parity.Edit) int {
+		return cmp.Compare(second.Start, first.Start)
 	})
 	fixed := slices.Clone(source)
-	for index, each := range ordered {
-		if index > 0 && each.end > ordered[index-1].start {
-			test.Fatalf("the edits overlap at offset %d", each.start)
+	for index, edit := range ordered {
+		if index > 0 && edit.End > ordered[index-1].Start {
+			test.Fatalf("the edits to %s overlap at offset %d", file, edit.Start)
 		}
-		fixed = slices.Concat(fixed[:each.start], []byte(each.newText), fixed[each.end:])
+		fixed = slices.Concat(fixed[:edit.Start], []byte(edit.NewText), fixed[edit.End:])
 	}
 	return fixed
-}
-
-// typeChecks parses source as the one file of a package and type-checks it, and is the first error either finds.
-// The differences fixture imports nothing, so the package needs no importer.
-func typeChecks(name string, source []byte) error {
-	fileSet := token.NewFileSet()
-	file, parseError := parser.ParseFile(fileSet, name, source, parser.SkipObjectResolution)
-	if parseError != nil {
-		return parseError
-	}
-	_, checkError := (&types.Config{}).Check("differences", fileSet, []*ast.File{file}, nil)
-	return checkError
-}
-
-// diagnostic is one finding as the fixes test compares it: where it starts and ends, its message and its fixes.
-type diagnostic struct {
-	file      string
-	line      int
-	column    int
-	endLine   int
-	endColumn int
-	message   string
-	fixes     []fix
-}
-
-// fix is one suggested fix, its message and its edits.
-type fix struct {
-	message string
-	edits   []offsetEdit
-}
-
-// offsetEdit is one edit of a fix, by byte offsets in its file, so it applies to the file's bytes.
-type offsetEdit struct {
-	start   int
-	end     int
-	newText string
-}
-
-// described is found as one line, with where it ends and every fix and edit it suggests.
-func described(found diagnostic) string {
-	text := &strings.Builder{}
-	fmt.Fprintf(text, "%s:%d:%d-%d:%d: %s", found.file, found.line, found.column, found.endLine, found.endColumn,
-		found.message)
-	for _, each := range found.fixes {
-		fmt.Fprintf(text, " fix %q", each.message)
-		for _, edit := range each.edits {
-			fmt.Fprintf(text, " [%d,%d) %q", edit.start, edit.end, edit.newText)
-		}
-	}
-	return text.String()
-}
-
-// diagnosticsOf loads the fixture packages patterns name, runs staticcheck's S1036 and the port over them in one
-// checker, as parity.Findings does, and returns each one's findings with their ends and fixes, sorted.
-func diagnosticsOf(test *testing.T, patterns ...string) (original []diagnostic, port []diagnostic) {
-	test.Helper()
-	directory := analysistest.TestData()
-	// The fixtures are a tree laid out by import path, loaded as analysistest loads one.
-	loaded, loadError := load.Packages(directory, patterns, []string{
-		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
-	}, nil)
-	if loadError != nil {
-		test.Fatalf("loading %v: %v", patterns, loadError)
-	}
-	if len(loaded.Roots) == 0 {
-		test.Fatalf("loading %v found no package, so the comparison would prove nothing", patterns)
-	}
-	for _, root := range loaded.Roots {
-		// A fixture that does not type-check is one both sides skip, and would compare nothing.
-		if len(root.Errors) > 0 {
-			test.Fatalf("fixture package %s does not load clean: %v", root.ID, root.Errors)
-		}
-	}
-	graph, analyzeError := checker.Analyze(
-		[]*analysis.Analyzer{s1036.Analyzer, Analyzer}, loaded.Roots, &checker.Options{},
-	)
-	if analyzeError != nil {
-		test.Fatalf("analyzing %v: %v", patterns, analyzeError)
-	}
-	for _, action := range graph.Roots {
-		if action.Err != nil {
-			test.Fatalf("running %s: %v", action, action.Err)
-		}
-		for _, reported := range action.Diagnostics {
-			position := action.Package.Fset.Position(reported.Pos)
-			end := action.Package.Fset.Position(reported.End)
-			found := diagnostic{
-				file:      filepath.Base(position.Filename),
-				line:      position.Line,
-				column:    position.Column,
-				endLine:   end.Line,
-				endColumn: end.Column,
-				message:   reported.Message,
-			}
-			for _, suggested := range reported.SuggestedFixes {
-				each := fix{message: suggested.Message}
-				for _, edit := range suggested.TextEdits {
-					each.edits = append(each.edits, offsetEdit{
-						start:   action.Package.Fset.Position(edit.Pos).Offset,
-						end:     action.Package.Fset.Position(edit.End).Offset,
-						newText: string(edit.NewText),
-					})
-				}
-				found.fixes = append(found.fixes, each)
-			}
-			switch action.Analyzer {
-			case s1036.Analyzer:
-				original = append(original, found)
-			case Analyzer:
-				port = append(port, found)
-			}
-		}
-	}
-	compare := func(first diagnostic, second diagnostic) int {
-		return cmp.Compare(described(first), described(second))
-	}
-	slices.SortFunc(original, compare)
-	slices.SortFunc(port, compare)
-	return original, port
-}
-
-// difference is what of from is not in without, counting repeats, so a finding reported twice by one side and once by
-// the other is a difference.
-func difference(from []string, without []string) []string {
-	remaining := map[string]int{}
-	for _, found := range without {
-		remaining[found]++
-	}
-	missing := []string{}
-	for _, found := range from {
-		if remaining[found] > 0 {
-			remaining[found]--
-			continue
-		}
-		missing = append(missing, found)
-	}
-	return missing
 }

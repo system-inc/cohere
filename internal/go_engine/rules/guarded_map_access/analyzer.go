@@ -34,52 +34,42 @@ import (
 	"go/ast"
 	"go/token"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/edge"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context is built from, though this check filters no generated file, as the original does
-// not.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1036",
-	Doc:      "Flags a needless check that a map holds a key before writing it: staticcheck's S1036, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every if statement, in preorder. The query
+// names no symbol, so code.Matches walks the if statements of every package, as this does, and its root is an Or of
+// if statements alone, so no other kind of node is asked.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+		ifStatement, isIf := node.(*ast.IfStmt)
+		if !isIf {
+			// Invariant: the dispatcher hands Node only the if statements it was asked for.
+			panic("guarded_map_access: the dispatcher handed over a node that is not an if statement")
+		}
+		// An if statement is always inside a function, so the stack holds its parent. The if is another if's else
+		// branch where that parent is an if whose else it is, the one way an if holds an if statement, since its
+		// header's statement is a simple one and its body a block.
+		parent, isParentIf := stack[len(stack)-1].(*ast.IfStmt)
+		Check(context, ifStatement, isParentIf && parent.Else == ifStatement)
+	},
 }
 
-// run builds the pass's context and judges every if statement of the package. The query names no symbol, so
-// code.Matches walks the inspector's if statements in every package, as this does, and its root is an Or of if
-// statements alone, so no other kind of node is asked.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("guarded_map_access: the inspect pass's result is missing")
-	}
-	for cursor := range inspected.Root().Preorder((*ast.IfStmt)(nil)) {
-		ifStatement, isIf := cursor.Node().(*ast.IfStmt)
-		if !isIf {
-			// Invariant: Preorder hands over only the if statements it was asked for.
-			panic("guarded_map_access: the inspector handed over a node that is not an if statement")
-		}
-		Check(context, ifStatement, cursor.ParentEdgeKind() == edge.IfStmt_Else)
-	}
-	return nil, nil
-}
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place. This check filters no generated file, as the original does not.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1036",
+	"S1036",
+	"Flags a needless check that a map holds a key before writing it: staticcheck's S1036, ported.",
+	&Listener,
+)
 
 // Check judges one if statement, and isElseBranch is whether it is another if's else branch, which only the fix
 // reads. An if whose header declares `_, ok := m[k]` and asks ok, whose body is one write of m[k] and whose else is
