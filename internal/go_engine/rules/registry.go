@@ -145,10 +145,27 @@ var duplicatesOfVet = map[string]string{
 	"SA5009": "printf",
 }
 
+// ports is each borrowed check we have ported as ours (#pn1xvnd), keyed by the original's name: a vet pass's name
+// (#z2x1c7g) or a staticcheck check's code (#d8s4rsy), which never collide. A port enters this table only in its own
+// landing, once it matches its original finding for finding, and All then runs it in the original's place: under the
+// original's name and in the original's order, so `cohere-go/<name>`, its settings and every `//cohere:ignore`
+// naming it read the same as before. The originals stay in the tree as the ports' oracles, read only by parity tests,
+// and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
+var ports = map[string]*analysis.Analyzer{}
+
+// portOrOriginal is the analyzer All runs for one borrowed check: its port when table holds one, and the original
+// otherwise.
+func portOrOriginal(original *analysis.Analyzer, table map[string]*analysis.Analyzer) *analysis.Analyzer {
+	if port, ported := table[original.Name]; ported {
+		return port
+	}
+	return original
+}
+
 func All() []rule.Rule {
 	registered := []rule.Rule{}
 	for _, analyzer := range vet.Suite {
-		registered = append(registered, portedRule(analyzer, rule.OriginVet))
+		registered = append(registered, portedRule(portOrOriginal(analyzer, ports), rule.OriginVet))
 	}
 	registered = append(registered, portedRule(nil_ness.Analyzer, rule.OriginTools))
 	registered = append(registered, portedRule(unused_write.Analyzer, rule.OriginTools))
@@ -156,11 +173,11 @@ func All() []rule.Rule {
 		if wrapped.Doc != nil && wrapped.Doc.NonDefault || duplicatesOfVet[wrapped.Analyzer.Name] != "" {
 			continue
 		}
-		registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+		registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
 	}
 	for _, wrapped := range stylecheck.Analyzers {
 		if stylecheckRuledOn[wrapped.Analyzer.Name] {
-			registered = append(registered, portedRule(wrapped.Analyzer, rule.OriginStaticcheck))
+			registered = append(registered, portedRule(portOrOriginal(wrapped.Analyzer, ports), rule.OriginStaticcheck))
 		}
 	}
 	registered = append(registered, rule.Rule{
