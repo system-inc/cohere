@@ -1011,6 +1011,7 @@ var portedPasses = []string{
 	"error_variable_name",
 	"errors_new_of_sprintf",
 	"extreme_comparison",
+	"failed_type_assertion_read",
 	"find_all_zero_limit",
 	"guarded_delete",
 	"guarded_map_access",
