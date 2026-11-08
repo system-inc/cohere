@@ -198,7 +198,13 @@ func TestParseArgumentsRefusesAnUnknownRule(test *testing.T) {
 	if exitCode != exitFailed {
 		test.Errorf("an unknown rule exited %d, want %d", exitCode, exitFailed)
 	}
-	if !strings.Contains(standardError.String(), `no pair is named "nilnes"; the pairs are nilness, unusedwrite`) {
+	// The pairs are named from the table, so a port adding its line there leaves this test alone.
+	names := []string{}
+	for _, each := range pairs {
+		names = append(names, each.pair.Name)
+	}
+	if !strings.Contains(standardError.String(),
+		`no pair is named "nilnes"; the pairs are `+strings.Join(names, ", ")) {
 		test.Errorf("an unknown rule says %q", standardError.String())
 	}
 }

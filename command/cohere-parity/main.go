@@ -30,12 +30,32 @@ import (
 	"golang.org/x/mod/modfile"
 	"golang.org/x/tools/go/analysis/passes/nilness"
 	"golang.org/x/tools/go/analysis/passes/unusedwrite"
+	"honnef.co/go/tools/stylecheck/st1001"
+	"honnef.co/go/tools/stylecheck/st1006"
+	"honnef.co/go/tools/stylecheck/st1008"
+	"honnef.co/go/tools/stylecheck/st1011"
+	"honnef.co/go/tools/stylecheck/st1012"
+	"honnef.co/go/tools/stylecheck/st1013"
+	"honnef.co/go/tools/stylecheck/st1016"
+	"honnef.co/go/tools/stylecheck/st1017"
+	"honnef.co/go/tools/stylecheck/st1018"
+	"honnef.co/go/tools/stylecheck/st1019"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/parity"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dot_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duplicate_import"
+	"github.com/system-inc/cohere/internal/go_engine/rules/duration_unit_suffix"
+	"github.com/system-inc/cohere/internal/go_engine/rules/error_variable_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/http_status_literal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/inconsistent_receiver_name"
+	"github.com/system-inc/cohere/internal/go_engine/rules/invisible_character"
+	"github.com/system-inc/cohere/internal/go_engine/rules/misplaced_error_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/nil_ness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/receiver_name"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
+	"github.com/system-inc/cohere/internal/go_engine/rules/yoda_condition"
 )
 
 // censusPair is a pair as the census runs it, with its port's gains file, relative to cohere's root, or empty for a
@@ -52,6 +72,16 @@ var pairs = []censusPair{
 		gains: "internal/go_engine/rules/nil_ness/testdata/gains.txt",
 	},
 	{pair: parity.Pair{Name: "unusedwrite", Original: unusedwrite.Analyzer, Port: unused_write.Analyzer}},
+	{pair: parity.Pair{Name: "ST1006", Original: st1006.Analyzer, Port: receiver_name.Analyzer}},
+	{pair: parity.Pair{Name: "ST1016", Original: st1016.Analyzer, Port: inconsistent_receiver_name.Analyzer}},
+	{pair: parity.Pair{Name: "ST1008", Original: st1008.Analyzer, Port: misplaced_error_result.Analyzer}},
+	{pair: parity.Pair{Name: "ST1012", Original: st1012.Analyzer, Port: error_variable_name.Analyzer}},
+	{pair: parity.Pair{Name: "ST1011", Original: st1011.Analyzer, Port: duration_unit_suffix.Analyzer}},
+	{pair: parity.Pair{Name: "ST1013", Original: st1013.Analyzer, Port: http_status_literal.Analyzer}},
+	{pair: parity.Pair{Name: "ST1017", Original: st1017.Analyzer, Port: yoda_condition.Analyzer}},
+	{pair: parity.Pair{Name: "ST1001", Original: st1001.Analyzer, Port: dot_import.Analyzer}},
+	{pair: parity.Pair{Name: "ST1019", Original: st1019.Analyzer, Port: duplicate_import.Analyzer}},
+	{pair: parity.Pair{Name: "ST1018", Original: st1018.Analyzer, Port: invisible_character.Analyzer}},
 }
 
 // The exit codes: the two agree, or differ only in gains each recorded; the original found what the port did not, or
