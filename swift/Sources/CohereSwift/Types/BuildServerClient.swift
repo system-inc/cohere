@@ -40,6 +40,8 @@ final class BuildServerClient {
         /* False holds the server to the package's own Package.resolved (`--disable-automatic-resolution`), as `--no-fix` does. */
         var resolutionAllowed: Bool
         var timeouts = Timeouts()
+        /* The environment the server's is made from (`environment(inheriting:workingDirectory:)`): this process's, unless a test hands another. */
+        var inherited = ProcessInfo.processInfo.environment
     }
 
     /*
@@ -199,7 +201,7 @@ final class BuildServerClient {
         process.arguments = arguments
         process.currentDirectoryURL = configuration.packageRoot
         process.environment = Self.environment(
-            inheriting: ProcessInfo.processInfo.environment,
+            inheriting: configuration.inherited,
             workingDirectory: configuration.packageRoot,
         )
         process.standardInput = inputPipe
@@ -226,10 +228,21 @@ final class BuildServerClient {
      door's `COHERE_PROJECT_YIELD` (a fresh file each run) and `COHERE_SWIFT_RESOLVED_BY` (its pid) had. Cohere's own
      variables speak to cohere's processes and SwiftPM reads none of them; `OLDPWD` says only where a shell was
      before, and `PWD` is made the folder the server runs in.
+
+     One variable is added, the same every run: Swift Build's `UseSynchronousBuildDescriptionSerialization`, which it
+     reads from the environment as one of its defaults (#d1ynmrt). Without it, Swift Build reports a build description's
+     identifier before it writes that description to disk, on a queue of the lowest priority
+     (`BuildDescriptionManager.loadBuildDescription` in swift-build), and `workspace/buildTargets` asks for the
+     description by that identifier, from memory and then from disk. When the copy in memory is gone, evicted under
+     memory pressure or by its cost limit, the disk copy is not there yet, so the request fails with "No such file or
+     directory (2)" before anything compiles, or with "Deserialization failed" when the file is half written, and the
+     retries below fail the same way while the write waits. Measured 2026-11-07 with the copy in memory turned off
+     (`BuildDescriptionInMemoryCacheSize` 0): 34 of 36 sessions failed so, and with this variable set, none of 36.
      */
     static func environment(inheriting inherited: [String: String], workingDirectory: URL) -> [String: String] {
         var environment = inherited.filter { !$0.key.hasPrefix("COHERE_") && $0.key != "OLDPWD" }
         environment["PWD"] = workingDirectory.path
+        environment["UseSynchronousBuildDescriptionSerialization"] = "YES"
         return environment
     }
 

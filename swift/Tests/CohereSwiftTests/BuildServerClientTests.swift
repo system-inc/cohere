@@ -55,7 +55,8 @@ struct BuildServerClientTests {
      Two runs of one check hand the server the same environment, so SwiftPM's key for a build-tool plugin's compile,
      which hashes every variable, holds between them: cohere's own variables are left out, the yield file and the
      resolving pid among them, which the front door makes new each run, and so is `OLDPWD`. `PWD` is the folder the
-     server runs in, and everything else passes through as it was.
+     server runs in, Swift Build is told to write each build description before it reports it, and everything else
+     passes through as it was.
      */
     @Test func theServerEnvironmentHoldsBetweenRuns() {
         let root = URL(fileURLWithPath: "/work/Package", isDirectory: true)
@@ -79,9 +80,34 @@ struct BuildServerClientTests {
         #expect(
             first == [
                 "PATH": "/usr/bin", "HOME": "/Users/someone", "DEVELOPER_DIR": "/Applications/Xcode.app",
-                "PWD": "/work/Package",
+                "PWD": "/work/Package", "UseSynchronousBuildDescriptionSerialization": "YES",
             ]
         )
+    }
+
+    /*
+     A build description is on disk before the server reports it (#d1ynmrt). Swift Build's copy in memory is turned off
+     for these sessions, as memory pressure turns it off for a loaded machine's, so `workspace/buildTargets` reads every
+     description from disk; three sessions in a row each list the fixture's targets. Red under: the server's environment
+     without `UseSynchronousBuildDescriptionSerialization`, which failed 34 of 36 such sessions with "No such file or
+     directory (2)".
+     */
+    @Test func aDescriptionReadFromDiskIsThereWhenTheServerNamesIt() throws {
+        let root = try CheckFixture.package()
+        var inherited = ProcessInfo.processInfo.environment
+        inherited["BuildDescriptionInMemoryCacheSize"] = "0"
+        for _ in 0..<3 {
+            var configuration = BuildServerClient.Configuration(
+                packageRoot: root,
+                scratchPath: CheckFixture.scratch(),
+                resolutionAllowed: false,
+            )
+            configuration.inherited = inherited
+            let description = try BuildServerClient.describe(configuration: configuration, prepare: { _ in [] })
+            #expect(
+                Set(description.targets.map(\.displayName)) == ["CCore", "Core", "Feature", "FeatureTests-product"]
+            )
+        }
     }
 
     /* A location is inside the scratch whether or not it exists yet, and whichever spelling of a linked folder each uses. */
