@@ -3,6 +3,7 @@ package drop_unmatched
 
 func shared() {}
 
+// calls holds a drop ruled here, which the findings do not bear out.
 func calls() {
 	shared() // port drops: call to shared
 }

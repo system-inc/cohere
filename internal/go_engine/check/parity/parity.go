@@ -3,7 +3,11 @@
 // a fixture. A finding the original makes and the port misses is a regression, unless it was ruled a false positive
 // with the finding in hand, the reason written above the record that drops it; nothing else can record one. A finding
 // both make that differs in span, fixes or related entries is paired only by a record that it moves, that the port
-// withholds the one fix of the original's it leaves out, or that it omits the one related entry.
+// withholds the one fix of the original's it leaves out, or that it omits the one related entry. Every record gives
+// its reason, on the line above it or in the doc comment of the declaration it is in.
+//
+// A `moves:` record pairs two findings by line and message alone, so it proves nothing of the port's fix there: the
+// port's own tests hold that fix, with a golden file or by applying the edit and checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, RequireIdentical
 // over those and the port's parity fixtures, RequireOnlyAdjudicated over its differences fixture. The census command,
@@ -13,6 +17,7 @@ package parity
 import (
 	"cmp"
 	"fmt"
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -233,9 +238,14 @@ var adjudicatedPattern = regexp.MustCompile(
 // the port leaves out as withheld, and one whose related entry the port leaves out as omitted, each pairing the two
 // sides' findings and nothing more; and every record is matched by a finding on its own line, never another's. A
 // finding the original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or
-// related entry one side alone offers that no record withholds or omits. A
-// `// port ` comment it cannot read fails, and so does a fixture that records nothing. The census has no fixture, so
-// no record covers anything there.
+// related entry one side alone offers that no record withholds or omits. Every record must give its reason, on the
+// line above it or in the doc comment of the declaration it is in, and one with none fails, named by file and line.
+// A `// port ` comment it cannot read fails, and so does a fixture that records nothing. The census has no fixture,
+// so no record covers anything there.
+//
+// A `moves:` record pairs by line and message only, so the port's own tests must hold its fix there, with a golden
+// file or by applying the edit and checking the result. It reads the one package directory fixture names, not the
+// packages nested below it, so a fixture tree with nested packages takes one call for each.
 func RequireOnlyAdjudicated(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -360,7 +370,9 @@ func withoutRelated(finding Finding, message string) (Finding, bool) {
 }
 
 // pairMoved takes out of originalOnly and portOnly each pair a moved record covers: a finding of each side's on the
-// record's line with the record's message, which differ in span or fixes. A record that pairs nothing fails.
+// record's line with the record's message, which differ in span or fixes. A record that pairs nothing fails. It pairs
+// by line and message alone and proves nothing of the port's fix, which the port's own tests hold, with a golden file
+// or by applying the edit and checking the result.
 func pairMoved(
 	test testing.TB,
 	moved []Finding,
@@ -389,8 +401,9 @@ func pairMoved(
 	return remainingOriginal, remainingPort
 }
 
-// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line. It
-// reads comments as the parser finds them, so a `// port ` inside a string is no record.
+// adjudicated reads every `// port ` comment of the .go files in directory, each record on the comment's line, and
+// fails each record that gives no reason (see reasonedLines). It reads comments as the parser finds them, so a
+// `// port ` inside a string is no record. It reads that one directory, not those below it.
 func adjudicated(test testing.TB, directory string) records {
 	test.Helper()
 	names, globError := filepath.Glob(filepath.Join(directory, "*.go"))
@@ -404,12 +417,17 @@ func adjudicated(test testing.TB, directory string) records {
 		if parseError != nil {
 			test.Fatalf("parsing the differences fixture: %v", parseError)
 		}
+		reasoned := reasonedLines(fileSet, file)
 		for _, group := range file.Comments {
 			for _, comment := range group.List {
 				line := fileSet.Position(comment.Slash).Line
 				for _, record := range strings.Split(comment.Text, "// port ")[1:] {
 					match := adjudicatedPattern.FindStringSubmatch(record)
 					at := Finding{File: filepath.Base(name), Line: line}
+					if match != nil && !reasoned(line) {
+						test.Errorf("%s:%d holds a record with no reason: write why on the line above it, or in the "+
+							"doc comment of the declaration it is in", at.File, line)
+					}
 					switch {
 					case match == nil:
 						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, line, record)
@@ -440,6 +458,63 @@ func adjudicated(test testing.TB, directory string) records {
 		}
 	}
 	return recorded
+}
+
+// reasonedLines is, for file, whether a record on a line has its reason, the Square's term for every record: a
+// comment that is no record ending on the line directly above, or the doc comment of the top-level declaration, or
+// of the declaration in a group, that the line is in. Wave 1's fixtures give their reasons as the doc comment of the
+// function the records are in.
+func reasonedLines(fileSet *token.FileSet, file *ast.File) func(line int) bool {
+	reasonEndsOn := map[int]bool{}
+	for _, group := range file.Comments {
+		for _, comment := range group.List {
+			if !strings.Contains(comment.Text, "// port ") {
+				reasonEndsOn[fileSet.Position(comment.End()).Line] = true
+			}
+		}
+	}
+	// documented is the line span of each declaration with a doc comment.
+	type span struct{ first, last int }
+	documented := []span{}
+	add := func(node ast.Node) {
+		documented = append(documented, span{fileSet.Position(node.Pos()).Line, fileSet.Position(node.End()).Line})
+	}
+	for _, declaration := range file.Decls {
+		switch declaration := declaration.(type) {
+		case *ast.FuncDecl:
+			if declaration.Doc != nil {
+				add(declaration)
+			}
+		case *ast.GenDecl:
+			if declaration.Doc != nil {
+				add(declaration)
+				continue
+			}
+			for _, specification := range declaration.Specs {
+				switch specification := specification.(type) {
+				case *ast.ValueSpec:
+					if specification.Doc != nil {
+						add(specification)
+					}
+				case *ast.TypeSpec:
+					if specification.Doc != nil {
+						add(specification)
+					}
+				}
+			}
+		}
+	}
+	return func(line int) bool {
+		if reasonEndsOn[line-1] {
+			return true
+		}
+		for _, each := range documented {
+			if each.first <= line && line <= each.last {
+				return true
+			}
+		}
+		return false
+	}
 }
 
 // asRecorded is findings as the differences fixture's comments record them, by file, line and message alone: the
