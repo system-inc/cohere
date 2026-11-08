@@ -55,25 +55,56 @@ func (engine *pipeline) otherBuilds(loaded *load.Loaded, pass *lintPass) []build
 	return runs
 }
 
-// buildsBeside is the host's build, as the load's go env answer reads it, and the extra builds the census needs
-// beside it, on the host's `GOARCH` (project.BuildsFor), with the targets the toolchain lists. A census that judged no
-// file has no go env answer, and needs no extra build.
+// buildsBeside is the host's build and the extra builds the census needs beside it, as describeProject read them
+// (readBuilds), so the builds the lint phase checks are the ones the project record names a file checked by. A census
+// that judged no file read none, and needs no extra build.
 func (engine *pipeline) buildsBeside() (project.Build, []project.Build, error) {
-	if engine.described.goEnvironment == nil {
+	if engine.described.buildsError != nil {
+		return project.Build{}, nil, engine.described.buildsError
+	}
+	if len(engine.described.builds) == 0 {
 		return project.Build{}, nil, nil
 	}
-	buildContext, goFlags := engine.described.goEnvironment.Target()
+	return engine.described.builds[0], engine.described.builds[1:], nil
+}
+
+// readBuilds is the host's build, as go env's answer reads it, then the extra builds the census needs beside it, on
+// the host's `GOARCH` (project.BuildsFor), with the targets the toolchain lists. Each file no build compiles is left
+// to the types phase, which names it as a gap, and keeps its constraint reason in the project record.
+func readBuilds(workspace project.Workspace, census project.Census, goEnvironment *load.GoEnvironment) (
+	[]project.Build,
+	error,
+) {
+	buildContext, goFlags := goEnvironment.Target()
 	host := project.HostBuild(buildContext, goFlags)
-	ports, portsError := project.ReadPorts(engine.described.workspace.Root, engine.described.workspace.Environment())
+	ports, portsError := project.ReadPorts(workspace.Root, workspace.Environment())
 	if portsError != nil {
-		return project.Build{}, nil, portsError
+		return nil, portsError
 	}
-	// Each unbuilt file is left to the types phase, which names it as a gap.
-	builds, _, buildsError := project.BuildsFor(engine.described.census, host, ports)
+	builds, _, buildsError := project.BuildsFor(census, host, ports)
 	if buildsError != nil {
-		return project.Build{}, nil, buildsError
+		return nil, buildsError
 	}
-	return host, builds[1:], nil
+	return builds, nil
+}
+
+// checkingBuild is the first extra build of builds, the host's first, that compiles file, read from contents, which
+// the project record names it checked by. It reports false when none does: no build was read, or the file is one
+// BuildsFor leaves unbuilt, which keeps its constraint reason and stays a gap.
+func checkingBuild(builds []project.Build, file string, contents []byte) (project.Build, bool, error) {
+	if len(builds) < 2 {
+		return project.Build{}, false, nil
+	}
+	for _, extra := range builds[1:] {
+		compiled, compileError := extra.Compiles(file, contents)
+		if compileError != nil {
+			return project.Build{}, false, compileError
+		}
+		if compiled {
+			return extra, true, nil
+		}
+	}
+	return project.Build{}, false, nil
 }
 
 // extraBuildRun is one extra build's run: the workspace loaded under its environment, as the rename's platformLoad

@@ -54,7 +54,8 @@ type runSummary struct {
 // dependencies read 2.4s with 2 type errors and no rule run, and the reader took it).
 //
 // What a developer's run meets too is no refusal: rules no file offered work, nested repositories' files,
-// Swift no target compiles, and a dependency's cgo. A modified build is the record's to refuse.
+// Swift no target compiles, Go only another platform builds, and a dependency's cgo. A modified build is the
+// record's to refuse.
 func (summary runSummary) checkedLess() string {
 	gaps := summary.Gaps
 	switch {

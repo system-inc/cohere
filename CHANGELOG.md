@@ -48,6 +48,13 @@ changed in cohere outside the sets is written under the same heading.
   projects, and the worst exit wins. A workspace checks every module its `go.work` uses, and a module
   no workspace uses runs on its own, with a note when a workspace above it leaves it out. A Go engine
   that crashes, prints nothing or stops early is reported as nothing checked, never as green.
+- A Go file only another build compiles (another `GOOS`, cgo, a build tag) is never read green over. A plain
+  run checks the machine's own build and names each such file as a gap, `⚠ 21 Go files not checked`, listed
+  with its reason under `--verbose` and in `--json` as `gaps.unchecked`, and the exit is unchanged.
+  `--other-builds` checks every build the project's files name beside the machine's and merges their findings,
+  so only a file no build compiles stays a gap; a Swift run, a TypeScript project and a root with no Go project
+  each refuse it. A run that checked more than one build says `N builds` in its footer, and `--verbose` and
+  `--json` name each.
 - A root that's a Go workspace or a Swift package is format-checked too: when it holds JSON, Markdown,
   YAML or anything else the house formatter reads, outside every TypeScript project's directory, the run
   adds a `Format` project there, the format phase alone, so a misformatted file in it fails the commit gate

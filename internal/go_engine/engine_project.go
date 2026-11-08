@@ -117,6 +117,11 @@ func describeProject(request invocation) (*describedProject, error) {
 		return nil, fmt.Errorf("describing %s: %w", root, constraintsError)
 	}
 	described.goEnvironment = goEnvironment
+	// Only a run whose lint phase is asked for reads them, since that phase is where every extra build is loaded and
+	// checked (runLint): a file said checked by a build is one that build's run checks.
+	if request.switches["other-builds"] && request.requests(contract.PhaseLint) && goEnvironment != nil {
+		described.builds, described.buildsError = readBuilds(workspace, census, goEnvironment)
+	}
 	constraintReasons := map[string]string{}
 	for _, excluded := range constrained {
 		constraintReasons[excluded.File] = excluded.Reason
@@ -126,6 +131,15 @@ func describeProject(request invocation) (*describedProject, error) {
 		// a house rule's, so excluding it here would hide the bugs a generator ships.
 		reason, excluded := constraintReasons[file]
 		if excluded {
+			// Under `--other-builds` a file an extra build compiles is checked by it, and said so; one no build
+			// compiles keeps the constraint's reason, a gap.
+			checkedBy, checked, checkedError := checkingBuild(described.builds, file, contents[file])
+			if checkedError != nil {
+				return nil, fmt.Errorf("describing %s: %w", root, checkedError)
+			}
+			if checked {
+				reason = project.CheckedByBuild(checkedBy)
+			}
 			described.record.Excluded = append(described.record.Excluded,
 				contract.ExcludedFile{File: file, Reason: reason})
 			if insideScope(file, scope) {

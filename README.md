@@ -210,6 +210,7 @@ is an engine check, so it is configurable without being an entry in `cohere --ru
 | `--format-only`         | format only, proposing no fixes and running no other phase (implies `--format`); with `--no-fix`, the commit gate's format check (see [Before you commit](#before-you-commit)) |
 | `--lint`                | run the lint rules only, reporting what they find without fixing it, and without TypeScript's diagnostics                                                                      |
 | `--types`               | report TypeScript's diagnostics only, running no rules and fixing nothing                                                                                                      |
+| `--other-builds`        | in a Go project, also check every build its files name (another `GOOS`, cgo, a build tag) and merge the findings, so only a file no build compiles is left unchecked           |
 | `--open`                | open files with remaining findings in `code`, once in report order; combines with `--types` and `--lint`, preserves the run's exit status                                      |
 | `--unused`              | report code that is never used: unreferenced exports and unreachable statements                                                                                                |
 | `--unused-all`          | list the unused findings already marked `cohere-keep`, not only count them (implies `--unused`)                                                                                |

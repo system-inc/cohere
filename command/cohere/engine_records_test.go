@@ -662,14 +662,14 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 				"  not checked: "+engineRoot+"/Vendor/Kit/Kit.swift (vendored under Vendor/)\n",
 				"  not checked: "+engineRoot+"/Scratch.swift (ignored by git)\n",
 			)
-			wantGap := []uncheckedSwiftFile{
-				{engineRoot + "/Stray/Leftover.swift", declarationsOnlyReason},
-				{engineRoot + "/Stray/odd.swift", "a reason no engine has given yet"},
+			wantGap := []uncheckedEngineFile{
+				{File: engineRoot + "/Stray/Leftover.swift", Reason: declarationsOnlyReason, Language: "Swift"},
+				{File: engineRoot + "/Stray/odd.swift", Reason: "a reason no engine has given yet", Language: "Swift"},
 			}
-			if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
+			if !reflect.DeepEqual(activeSummary.Gaps.Unchecked, wantGap) {
 				test.Errorf(
 					"the gap is %v, want %v: Leftover.swift and odd.swift, and none of the three expected reasons",
-					activeSummary.Gaps.UncheckedSwift,
+					activeSummary.Gaps.Unchecked,
 					wantGap,
 				)
 			}
@@ -688,10 +688,10 @@ func TestSwiftRunLeavesYieldedFilesOutAndCountsTheRestAsAGap(test *testing.T) {
 				"  not checked: "+engineRoot+"/CapturePhone/App/App.swift (no target of this package compiles it)\n",
 				"  not checked: "+engineRoot+"/Tools/Sim/Package.swift (a package manifest)\n",
 			)
-			if len(activeSummary.Gaps.UncheckedSwift) != 3 {
+			if len(activeSummary.Gaps.Unchecked) != 3 {
 				test.Errorf(
 					"yielding nothing listed %v as not checked, want 3 files",
-					activeSummary.Gaps.UncheckedSwift,
+					activeSummary.Gaps.Unchecked,
 				)
 			}
 
@@ -733,8 +733,8 @@ func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
 	if renderRecordsError != nil || exitCode != 0 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
-	if len(activeSummary.Gaps.UncheckedSwift) != 0 {
-		test.Errorf("the clean fixture's gap is %v, want none", activeSummary.Gaps.UncheckedSwift)
+	if len(activeSummary.Gaps.Unchecked) != 0 {
+		test.Errorf("the clean fixture's gap is %v, want none", activeSummary.Gaps.Unchecked)
 	}
 	for _, marker := range uncheckedMarkers(activeSummary) {
 		if strings.Contains(marker, "Swift file") {
@@ -750,7 +750,7 @@ func TestSwiftRunFindsNoGapInTheCleanFixture(test *testing.T) {
 // activeSummary, which it reads back
 func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	excluded := []excludedFile{{"/project/App/Main.swift", "no target of this package compiles it"}}
-	wantGap := []uncheckedSwiftFile{}
+	wantGap := []uncheckedEngineFile{}
 	for index := range excludedNamedLimit + 1 {
 		letter := string(rune('a' + index))
 		excluded = append(excluded,
@@ -759,7 +759,11 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 		)
 		wantGap = append(
 			wantGap,
-			uncheckedSwiftFile{"/project/Stray/S" + letter + ".swift", declarationsOnlyReason},
+			uncheckedEngineFile{
+				File:     "/project/Stray/S" + letter + ".swift",
+				Reason:   declarationsOnlyReason,
+				Language: "Swift",
+			},
 		)
 	}
 	clean := contractFixture(test, "Clean.jsonl")
@@ -787,21 +791,21 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 		"/project/Vendor/Va.swift",
 		"/project/App/Main.swift",
 	)
-	if !reflect.DeepEqual(activeSummary.Gaps.UncheckedSwift, wantGap) {
-		test.Errorf("the gap is %v, want %v", activeSummary.Gaps.UncheckedSwift, wantGap)
+	if !reflect.DeepEqual(activeSummary.Gaps.Unchecked, wantGap) {
+		test.Errorf("the gap is %v, want %v", activeSummary.Gaps.Unchecked, wantGap)
 	}
 	if markers := uncheckedMarkers(activeSummary); !slices.Contains(markers, "⚠ 6 Swift files not checked") {
 		test.Errorf("the footer's markers are %q, want the six files of the gap counted", markers)
 	}
 
-	// The list as `--json` writes it: each file with its reason, under the key the schema names.
+	// The list as `--json` writes it: each file with its reason and its language, under the key the schema names.
 	encoded, encodeError := json.Marshal(summaryAsJson(activeSummary))
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
 	var decoded struct {
 		Gaps struct {
-			UncheckedSwift []map[string]string `json:"uncheckedSwift"`
+			Unchecked []map[string]string `json:"unchecked"`
 		} `json:"gaps"`
 	}
 	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
@@ -809,10 +813,10 @@ func TestSwiftRunNamesEveryFileOfTheGap(test *testing.T) {
 	}
 	wantJson := []map[string]string{}
 	for _, file := range wantGap {
-		wantJson = append(wantJson, map[string]string{"file": file.File, "reason": file.Reason})
+		wantJson = append(wantJson, map[string]string{"file": file.File, "reason": file.Reason, "language": "Swift"})
 	}
-	if !reflect.DeepEqual(decoded.Gaps.UncheckedSwift, wantJson) {
-		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.UncheckedSwift, wantJson, encoded)
+	if !reflect.DeepEqual(decoded.Gaps.Unchecked, wantJson) {
+		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.Unchecked, wantJson, encoded)
 	}
 }
 
@@ -1074,14 +1078,100 @@ func TestEngineRunRendersAGoStreamInGoWords(test *testing.T) {
 		"module described in 96ms",
 		"4 Go files in the module, 3 of them ours\n",
 		"types: 0 diagnostics over 3 files in 240ms\n",
-		"  not checked: /project/internal/schema/schema_generated.go (marked // Code generated)\n",
+		"  not checked: /project/internal/schema/schema_generated.go (ignored by git)\n",
 		" module 96ms",
 	)
 	forbidLines(test, output, "Swift", "swift", "package")
-	// The Go engine's left-out files are no unchecked-Swift gap, whatever their reason: the expected reasons
-	// and the gap's words are Swift's (engineLanguage.ExpectedExclusionReasons).
-	if len(activeSummary.Gaps.UncheckedSwift) != 0 {
-		test.Errorf("a Go run kept the unchecked-Swift gap %v", activeSummary.Gaps.UncheckedSwift)
+	// The fixture leaves out only a file git ignores, which nobody expects checked, so a clean run keeps no gap.
+	// It carried `marked // Code generated`, which the engine stopped giving when a generated file stayed ours,
+	// and every other reason is a gap (TestAGoRunNamesAFileOnlyAnotherPlatformBuilds).
+	if len(activeSummary.Gaps.Unchecked) != 0 {
+		test.Errorf("a clean Go run kept the gap %v", activeSummary.Gaps.Unchecked)
+	}
+}
+
+// TestAGoRunNamesAFileOnlyAnotherPlatformBuilds: the Go engine checks the host's build alone, so a file only another
+// platform builds was never loaded, whatever it holds, and an `_windows.go` file's finding is one no run on a Mac
+// reports. A green run there names each such file as a Go file not checked: an `_windows.go` file, a file
+// `//go:build linux`, and one that imports "C" while cgo is off, in the footer, under `--json` with its reason, and
+// in the account file by file. It stays green with the exit it had, since a gap is never a failure. A file git
+// ignores is one nobody expects checked and stays out of the gap, and so is one a run under `--other-builds` says
+// another build checked, whose reason names the build and whose account line says that build checked it
+// (#72n9mq0).
+// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+// activeSummary, which it reads back
+func TestAGoRunNamesAFileOnlyAnotherPlatformBuilds(test *testing.T) {
+	// The engine's words on a Mac (internal/go_engine/load/excluded.go).
+	const constraintsReason = "excluded by build constraints on darwin/arm64"
+	const cgoReason = `imports "C", and cgo is off for darwin/arm64`
+	stream := contractFixture(test, "GoClean.jsonl")
+	stream[1] = projectRecordAt(test, stream[1], "/project", []excludedFile{
+		{"/project/internal/native/native.go", cgoReason},
+		{"/project/internal/open/open_linux.go", constraintsReason},
+		{"/project/internal/open/open_windows.go", constraintsReason},
+		{"/project/internal/separator/separator_windows.go", "checked by the windows/arm64 build"},
+		{"/project/scratch.go", "ignored by git"},
+	})
+
+	activeSummary = runSummary{}
+	output, exitCode, renderRecordsInError := renderRecordsIn(test, goLanguage("module"), engineModeCheck, stream, 0,
+		nil)
+	if renderRecordsInError != nil || exitCode != 0 {
+		test.Fatalf("a clean Go run with a gap exited %d, err %v, want the 0 it exits without one:\n%s",
+			exitCode, renderRecordsInError, output)
+	}
+	wantGap := []uncheckedEngineFile{
+		{File: "/project/internal/native/native.go", Reason: cgoReason, Language: "Go"},
+		{File: "/project/internal/open/open_linux.go", Reason: constraintsReason, Language: "Go"},
+		{File: "/project/internal/open/open_windows.go", Reason: constraintsReason, Language: "Go"},
+	}
+	if !reflect.DeepEqual(activeSummary.Gaps.Unchecked, wantGap) {
+		test.Errorf("the gap is %v, want %v: every file only another platform builds, and not what git ignores "+
+			"or another build checked",
+			activeSummary.Gaps.Unchecked, wantGap)
+	}
+	for _, file := range wantGap {
+		requireLines(test, output, "  not checked: "+file.File+" ("+file.Reason+")\n")
+	}
+	// The file another build checked was checked, and the account says by which build, never "not checked".
+	requireLines(test, output,
+		"  checked by the windows/arm64 build: /project/internal/separator/separator_windows.go\n")
+	forbidLines(test, output, "not checked: /project/internal/separator/separator_windows.go")
+
+	if activeSummary.failed() {
+		test.Errorf("the gap failed the run: %+v", activeSummary.Gaps)
+	}
+	line := footer(activeSummary, plain, footerOptions{})
+	if !strings.HasPrefix(line, "✓ 💎") || !strings.Contains(line, " • ⚠ 3 Go files not checked") {
+		test.Errorf("the footer is %q, want a green verdict with the three files counted in Go's words", line)
+	}
+	if strings.Contains(line, "Swift") {
+		test.Errorf("the footer counts a Go run's files in Swift's words: %q", line)
+	}
+
+	// The list as `--json` writes it: each file with its reason and its language, under the key the schema names.
+	encoded, encodeError := json.Marshal(summaryAsJson(activeSummary))
+	if encodeError != nil {
+		test.Fatal(encodeError)
+	}
+	var decoded struct {
+		Verdict string `json:"verdict"`
+		Gaps    struct {
+			Unchecked []map[string]string `json:"unchecked"`
+		} `json:"gaps"`
+	}
+	if decodeError := json.Unmarshal(encoded, &decoded); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	wantJson := []map[string]string{}
+	for _, file := range wantGap {
+		wantJson = append(wantJson, map[string]string{"file": file.File, "reason": file.Reason, "language": "Go"})
+	}
+	if !reflect.DeepEqual(decoded.Gaps.Unchecked, wantJson) {
+		test.Errorf("under --json the gap is %v, want %v:\n%s", decoded.Gaps.Unchecked, wantJson, encoded)
+	}
+	if decoded.Verdict != "pass" {
+		test.Errorf("under --json the verdict is %q, want the pass a gap never turns:\n%s", decoded.Verdict, encoded)
 	}
 }
 

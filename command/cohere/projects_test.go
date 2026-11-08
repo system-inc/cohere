@@ -859,17 +859,17 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 			Kind  string `json:"kind"`
 			Label string `json:"label"`
 			Gaps  struct {
-				UncheckedSwift []map[string]string `json:"uncheckedSwift"`
+				Unchecked []map[string]string `json:"unchecked"`
 			} `json:"gaps"`
 		}
 		if json.Unmarshal([]byte(line), &summary) != nil || summary.Kind != "summary" {
 			continue
 		}
-		gaps[summary.Label] = append(gaps[summary.Label], summary.Gaps.UncheckedSwift...)
+		gaps[summary.Label] = append(gaps[summary.Label], summary.Gaps.Unchecked...)
 	}
 	wantGaps := []map[string]string{
-		{"file": alias + "/Stray/Leftover.swift", "reason": declarationsOnlyReason},
-		{"file": alias + "/Stray/odd.swift", "reason": "a reason no engine has given yet"},
+		{"file": alias + "/Stray/Leftover.swift", "reason": declarationsOnlyReason, "language": "Swift"},
+		{"file": alias + "/Stray/odd.swift", "reason": "a reason no engine has given yet", "language": "Swift"},
 	}
 	if !reflect.DeepEqual(gaps[". (Swift)"], wantGaps) || len(gaps["."]) != 0 || len(gaps["CapturePhone"]) != 0 ||
 		len(gaps["Tools/Sim"]) != 0 {

@@ -191,8 +191,11 @@ func (fixture *goReplayFixture) establishHit(arguments ...string) {
 // goReplayFooter is the footer a `--verbose` replay renders of its own, which says it was replayed.
 var goReplayFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`)
 
-// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached.
-var goEveryFileCachedFooter = regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)$`)
+// goEveryFileCachedFooter is the default view's footer when no file was checked and every one was cached, followed
+// by whatever the run did not check, such as the fixture's files only another platform or cgo builds.
+var goEveryFileCachedFooter = regexp.MustCompile(
+	`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s •.*\(\d+ rules • \d+ cached\)(?: • ⚠ [^\n]*)?$`,
+)
 
 // isGoReplay reports a run the cache answered, by what the run itself says: the framing on its first line and the
 // footer saying so under `--verbose`, the summary's `cache.replayed` under `--json`, and in the default view a

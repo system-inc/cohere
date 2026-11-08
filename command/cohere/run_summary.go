@@ -231,12 +231,15 @@ type runGaps struct {
 	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
 	// None was proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
-	// UncheckedSwift is the Swift files a Swift run's engine listed as not checked for a reason other than
-	// git ignoring them, Vendor/ or being a manifest, which today means no target of the package compiles
-	// them and they are no standalone script the run checks alone (#13nbb1s), less those the runs of the Swift
-	// projects below it account for (#ybspptb). A gap, not a failure.
+	// Unchecked is the files an engine's run listed as not checked for a reason other than the ones its language
+	// says nobody expects checked (engineLanguage.ExpectedExclusionReasons). In a Swift run that today means no
+	// target of the package compiles them and they are no standalone script the run checks alone (#13nbb1s), less
+	// those the runs of the Swift projects below it account for (#ybspptb). In a Go run it means a file only another
+	// platform builds, or one that imports "C" while cgo is off, since the engine checks the host's build alone; under
+	// `--other-builds` a file another build checked is expected, and only one no build the run checked compiles stays
+	// (#72n9mq0). A gap, not a failure.
 	// Each is named, never only counted: a gap nobody can find is half a gap.
-	UncheckedSwift []uncheckedSwiftFile `json:"uncheckedSwift,omitempty"`
+	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
 	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
 	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
 	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
@@ -249,11 +252,13 @@ type runGaps struct {
 	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
 }
 
-// uncheckedSwiftFile is one Swift file of a run's gap: the file as the engine names it, and the engine's reason
-// for leaving it out.
-type uncheckedSwiftFile struct {
-	File   string `json:"file"`
-	Reason string `json:"reason"`
+// uncheckedEngineFile is one file of an engine run's gap: the file as the engine names it, the engine's reason for
+// leaving it out, and the language whose engine left it, which the footer's marker names, "Swift files not checked".
+// The format phase's own unchecked files are uncheckedFile (format_only.go), a different fact.
+type uncheckedEngineFile struct {
+	File     string `json:"file"`
+	Reason   string `json:"reason"`
+	Language string `json:"language"`
 }
 
 // withheldCgoFile is one file of a dependency with cgo files whose type errors a Go run withheld: its package,

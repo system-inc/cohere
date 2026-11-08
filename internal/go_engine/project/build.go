@@ -61,6 +61,22 @@ func (target Build) String() string {
 	return label
 }
 
+// CheckedByBuildPrefix begins the reason the project record gives a file the host's build leaves out and another
+// build of the run checks (CheckedByBuild). The front door reads a reason that begins with it as a file checked, and
+// every other constraint reason as a gap.
+const CheckedByBuildPrefix = "checked by the "
+
+// CheckedByBuild is the project record's reason for a file the host's build leaves out and target, an extra build of
+// a run under `--other-builds`, compiles and checks: "checked by the windows/arm64 build".
+func CheckedByBuild(target Build) string {
+	return CheckedByBuildPrefix + target.String() + " build"
+}
+
+// Compiles reports whether the build compiles file, read from contents, as BuildsFor reads it (see compiles).
+func (target Build) Compiles(file string, contents []byte) (bool, error) {
+	return compiles(target, source{file: file, contents: contents, importsC: importsC(file, contents)})
+}
+
 // Environment is the entries a load under the build appends to the workspace's environment: the target, cgo, and
 // `GOFLAGS` as the host's flags with the build's own `-tags`, set whole since one given in the environment replaces
 // the go env file's.

@@ -131,9 +131,9 @@ func TestOutputSchemaMatchesTheTypes(test *testing.T) {
 		"summary.packageCache": {summary.Properties["packageCache"], packageCacheUse{}},
 		"summary.builds":       {*summary.Properties["builds"].Items, checkedBuild{}},
 		"summary.gaps":         {summary.Properties["gaps"], runGaps{}},
-		"summary.gaps.uncheckedSwift": {
-			*summary.Properties["gaps"].Properties["uncheckedSwift"].Items,
-			uncheckedSwiftFile{},
+		"summary.gaps.unchecked": {
+			*summary.Properties["gaps"].Properties["unchecked"].Items,
+			uncheckedEngineFile{},
 		},
 		"summary.gaps.crashes": {*summary.Properties["gaps"].Properties["crashes"].Items, runCrash{}},
 		"summary.swift":        {summary.Properties["swift"], swiftSummary{}},

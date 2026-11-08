@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/system-inc/cohere/internal/go_engine/project"
 	"github.com/system-inc/cohere/internal/release/packaging"
 )
 
@@ -34,9 +36,14 @@ type engineLanguage struct {
 
 	// ExpectedExclusionReasons are the reasons the engine gives, in its own words, for files nobody expects a
 	// run to check. Every other reason a project record gives is the run's gap (engineRun.writeExcluded), so an
-	// engine that rewords one makes the gap louder and never hides it. Nil keeps no gap: only Swift's are
-	// known, and its gap is said as Swift files, in `gaps.uncheckedSwift` and on the footer.
+	// engine that rewords one makes the gap louder and never hides it. The gap is said in the language's name, in
+	// `gaps.unchecked` and on the footer, "⚠ 3 Swift files not checked". Nil keeps no gap.
 	ExpectedExclusionReasons map[string]bool
+
+	// ExpectedExclusionReasonPrefixes begin the reasons nobody expects a run to check that name something of their
+	// own, as Go's "checked by the windows/arm64 build" names the build that checked the file. A reason is matched
+	// whole or by one of these, and every other is the run's gap.
+	ExpectedExclusionReasonPrefixes []string
 
 	// CacheOffDetail is what `--no-cache` kept the run from, said after "cache: off, by --no-cache:" in the
 	// account. An engine keeps no cache table of the TypeScript pipeline's, so each says what is true of its own.
@@ -52,6 +59,24 @@ type engineLanguage struct {
 // reason names it the same way.
 func (language engineLanguage) theEngine() string {
 	return "the " + language.Name + " engine"
+}
+
+// expectsExcluded reports whether a reason the project record gives is one nobody expects the run to check: one of
+// ExpectedExclusionReasons, or one beginning with one of ExpectedExclusionReasonPrefixes.
+func (language engineLanguage) expectsExcluded(reason string) bool {
+	return language.ExpectedExclusionReasons[reason] || language.checkedElsewhere(reason)
+}
+
+// checkedElsewhere reports whether a reason begins with one of ExpectedExclusionReasonPrefixes, which name what
+// checked the file, as "checked by the windows/arm64 build" does: the file was left out of this build's check and
+// checked by another, so the account says so rather than calling it not checked.
+func (language engineLanguage) checkedElsewhere(reason string) bool {
+	for _, prefix := range language.ExpectedExclusionReasonPrefixes {
+		if strings.HasPrefix(reason, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // swiftLanguage is the words a Swift run has always printed. A change here changes every Swift run's
@@ -105,6 +130,21 @@ func goLanguage(container string) engineLanguage {
 		FileNoun:      "Go files",
 		CompilerLabel: "go",
 		VersionLines:  goVersionLines,
+		// The project record's reasons, from the census and the build constraints (internal/go_engine's
+		// describeProject): only what git ignores is a file nobody expects checked. What go never reads (testdata, a
+		// directory starting with `.` or `_`, a nested module, below vendor/) the census never lists, so it has no
+		// reason here. Every other reason is a gap, and so is whatever sentence comes next: a file only another
+		// platform builds, `excluded by build constraints on darwin/arm64`, and one that imports "C" while cgo is off.
+		// Those are files of the project that someone builds, and a run without `--other-builds` checks the host's
+		// build alone, so a run on a Mac never loaded the `_windows.go` file it would otherwise read green over
+		// (#72n9mq0).
+		ExpectedExclusionReasons: map[string]bool{
+			project.IgnoredByGit: true,
+		},
+		// Under `--other-builds` a file only another build compiles is checked by that build, and the record says
+		// which, "checked by the windows/arm64 build" (project.CheckedByBuild), so the reason is matched by how it
+		// begins. One no build compiles keeps its constraint's reason and stays a gap.
+		ExpectedExclusionReasonPrefixes: []string{project.CheckedByBuildPrefix},
 		// A Go run's cache is the run cache's table, which replays a verdict with nothing changed (beginGoRunCache).
 		// The engine loads the packages through the go command, whose build cache is go's
 		// (internal/go_engine/load), so the sentence says which of the two the flag reaches.

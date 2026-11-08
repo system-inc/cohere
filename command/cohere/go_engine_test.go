@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -351,5 +352,77 @@ func TestAGoEngineThatDoesNotFinishChecksNothing(test *testing.T) {
 				test.Errorf("a Go run named Swift:\n%s", out)
 			}
 		})
+	}
+}
+
+// TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds: the real binary at a module whose `_windows.go` file and
+// `//go:build plan9` file each hold a finding the printf rule reports, and whose third file imports "C" with cgo off.
+// The engine checks the host's build alone, so it loads none of the three: the run is green with the exit a clean
+// module has, its footer says "⚠ 3 Go files not checked", the account names each file with the engine's reason, and
+// `--json` lists each under the gaps with its reason. Windows and plan9 are never the host a unix test runs on, so
+// the proof holds on Linux as on a Mac (#72n9mq0).
+func TestARealGoRunNamesTheFilesOnlyAnotherPlatformBuilds(test *testing.T) {
+	test.Parallel()
+	binary := buildCohere(test)
+	root := test.TempDir()
+	finding := "\treturn fmt.Sprintf(\"%d\", \"text\")\n"
+	for name, contents := range map[string]string{
+		goModuleMarker: "module example.com/platforms\n\ngo 1.27\n",
+		"clean.go":     "package platforms\n\n// Answer answers.\nfunc Answer() int {\n\treturn 42\n}\n",
+		"open_windows.go": "package platforms\n\nimport \"fmt\"\n\n// Open is a fixture.\nfunc Open() string {\n" +
+			finding + "}\n",
+		"plan9.go": "//go:build plan9\n\npackage platforms\n\nimport \"fmt\"\n\n// Plan is a fixture.\n" +
+			"func Plan() string {\n" + finding + "}\n",
+		"native.go": "package platforms\n\nimport \"C\"\n\n// Native is a fixture.\nfunc Native() int {\n\treturn 1\n}\n",
+	} {
+		if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
+			test.Fatal(writeError)
+		}
+	}
+	// Cgo off, so the file importing "C" is left out on every host. The child mark is emptied, since a front door
+	// that inherited it would refuse to start the engine at all.
+	environment := []string{"CGO_ENABLED=0", goEngineChildVariable + "="}
+	wantReasons := map[string]string{
+		"native.go":       `imports "C", and cgo is off for `,
+		"open_windows.go": "excluded by build constraints on ",
+		"plan9.go":        "excluded by build constraints on ",
+	}
+
+	output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
+	if exitCode != 0 || strings.Contains(output, "cohere-go/printf") {
+		test.Fatalf("exit %d, want the 0 of a clean module whose only findings are in files no host build reads:\n%s",
+			exitCode, output)
+	}
+	if !strings.Contains(output, "✓ 💎") || !strings.Contains(output, " • ⚠ 3 Go files not checked") {
+		test.Errorf("the footer does not count the three files in Go's words:\n%s", output)
+	}
+	for name, reason := range wantReasons {
+		if !strings.Contains(output, name+" ("+reason) {
+			test.Errorf("the account does not name %s with the reason %q:\n%s", name, reason, output)
+		}
+	}
+
+	output, exitCode = runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache", "--json")
+	if exitCode != 0 {
+		test.Fatalf("under --json the run exited %d, want 0:\n%s", exitCode, output)
+	}
+	var summary struct {
+		Verdict string `json:"verdict"`
+		Gaps    struct {
+			Unchecked []uncheckedEngineFile `json:"unchecked"`
+		} `json:"gaps"`
+	}
+	if decodeError := json.Unmarshal([]byte(summaryJsonOf(test, output)), &summary); decodeError != nil {
+		test.Fatal(decodeError)
+	}
+	if summary.Verdict != "pass" || len(summary.Gaps.Unchecked) != len(wantReasons) {
+		test.Fatalf("under --json the verdict is %q and the gap %v, want a pass naming the three files:\n%s",
+			summary.Verdict, summary.Gaps.Unchecked, output)
+	}
+	for _, file := range summary.Gaps.Unchecked {
+		reason, named := wantReasons[filepath.Base(file.File)]
+		if !named || !strings.HasPrefix(file.Reason, reason) || file.Language != "Go" {
+			test.Errorf("under --json the gap names %+v, want one of %v as a Go file", file, wantReasons)
+		}
 	}
 }

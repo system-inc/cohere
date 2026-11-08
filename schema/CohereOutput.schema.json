@@ -409,24 +409,28 @@
                             "type": "boolean",
                             "description": "Lint fixes were held because an input the program was told to load is missing: a generated file, or an import, reference or types entry that resolves to nothing. None was proposed or written, and formatting ran alone. Absent otherwise."
                         },
-                        "uncheckedSwift": {
+                        "unchecked": {
                             "type": "array",
                             "items": {
                                 "type": "object",
                                 "additionalProperties": false,
-                                "required": ["file", "reason"],
+                                "required": ["file", "reason", "language"],
                                 "properties": {
                                     "file": {
                                         "type": "string",
-                                        "description": "The file, as the Swift engine names it."
+                                        "description": "The file, as the engine names it."
                                     },
                                     "reason": {
                                         "type": "string",
-                                        "description": "Why the engine left it out, in the engine's words, such as \"no target of this package compiles it\"."
+                                        "description": "Why the engine left it out, in the engine's words, such as \"no target of this package compiles it\" or \"excluded by build constraints on darwin/arm64\"."
+                                    },
+                                    "language": {
+                                        "type": "string",
+                                        "description": "The language of the engine that left it out, \"Swift\" or \"Go\", which the footer counts it in: \"3 Swift files not checked\"."
                                     }
                                 }
                             },
-                            "description": "Swift files a Swift run's engine listed as not checked for a reason other than git ignoring them, Vendor/ or being a package manifest, which today means no target of the package compiles them and they are no standalone script the run checks alone (a file of declarations only, or a script whose imports name two platforms), less those under a Swift project below it that runs on its own. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
+                            "description": "Files an engine's run listed as not checked for a reason other than the ones nobody expects checked. In a Swift run those are git ignoring them, Vendor/ or being a package manifest, so this today means no target of the package compiles them and they are no standalone script the run checks alone (a file of declarations only, or a script whose imports name two platforms), less those under a Swift project below it that runs on its own. In a Go run the expected reasons are git ignoring them and, under --other-builds, another build having checked the file (\"checked by the windows/arm64 build\"). So without the switch this means a file only another platform builds, or one that imports \"C\" while cgo is off, since the Go engine then checks the host's build alone, and with it only a file no build the run checked compiles. Each is listed, however many share a reason. They fail nothing. Absent when there are none."
                         },
                         "withheldInDependencyCgo": {
                             "type": "array",
