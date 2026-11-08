@@ -993,6 +993,7 @@ var portedPasses = []string{
 	"buffer_string_conversion",
 	"bytes_compare_equality",
 	"cyclic_finalizer",
+	"defer_in_channel_range_loop",
 	"defer_in_infinite_loop",
 	"deprecated_use",
 	"discarded_pure_call",
