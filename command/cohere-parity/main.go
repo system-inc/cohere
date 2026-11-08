@@ -9,8 +9,9 @@
 // It prints the analyzed packages that did not load clean, with their first errors, then, for each pair, each side's
 // count, every finding one side made and the other did not, and the packages each side did not run on, with why: a
 // side's silence on a package it never ran on, or ran on half type-checked, would read as agreement. It exits
-// 1 when the original made any finding the port did not, a regression, which is never an adjudicated difference, and
-// 2 when it could not load or analyze the tree at all.
+// 1 when the original made any finding the port did not, and 2 when it could not load or analyze the tree at all. A
+// tree has no differences fixture, so no `drops:` record covers a finding here: each the original makes alone exits 1
+// until a person adjudicates it with the finding in hand.
 package main
 
 import (
