@@ -23,6 +23,7 @@ use (
 	./TypeScript-shim/vfs/cachedvfs
 	./TypeScript-shim/vfs/osvfs
 	./git_tree
+	./go_listing
 	./mutation_aliasing
 	./product_store_manifest
 	./static_single_assignment
