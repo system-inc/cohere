@@ -881,6 +881,7 @@ var portedPasses = []string{
 	"self_assignment",
 	"shell_command_as_program",
 	"single_argument_append",
+	"swapped_seek_arguments",
 	"typed_nil_interface_comparison",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
