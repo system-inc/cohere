@@ -11,4 +11,4 @@ import "sync"
 func _(ptr *sync.Mutex) {
 	_ = new(sync.Mutex)
 	_ = new(*ptr) // want `call of new copies lock value: sync.Mutex`
-)
+} // x/tools v0.50.0's copy closes this function with `)`, which does not parse; this is the copy's one departure.
