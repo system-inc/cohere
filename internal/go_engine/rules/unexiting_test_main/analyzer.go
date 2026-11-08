@@ -22,118 +22,135 @@ import (
 	"go/ast"
 	"go/types"
 	"go/version"
+	"slices"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA3000",
-	Doc: "Flags a TestMain that runs the tests without calling os.Exit, before Go 1.15: staticcheck's SA3000, " +
-		"ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every function declaration and call, in
+// preorder, and each file as the walk leaves it, where a TestMain the walk was inside has ended.
+var Listener = rule.Listener{
+	Nodes:    []ast.Node{(*ast.FuncDecl)(nil), (*ast.CallExpr)(nil)},
+	Node:     Check,
+	FileExit: checkFileExit,
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA3000",
+	"SA3000",
+	"Flags a TestMain that runs the tests without calling os.Exit, before Go 1.15: staticcheck's SA3000, "+
+		"ported as a check on syntax.",
+	&Listener,
+)
 
 // exitingVersion is the first Go whose test framework calls os.Exit after TestMain returns, so a TestMain that does
 // not is no longer wrong.
 const exitingVersion = "go1.15"
 
-// run builds the pass's context and walks the package's declarations and calls.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unexiting_test_main: the inspect pass's result is missing")
-	}
-	Check(context, inspected)
-	return nil, nil
-}
-
 // message is the original's, word for word.
 const message = "TestMain should call os.Exit to set exit code"
 
-// Check walks every function declaration and call of the package in order, reporting each TestMain of a standard
-// library older than Go 1.15 that calls Run on its *testing.M and never calls os.Exit.
-func Check(context *rule.Context, inspected *inspector.Inspector) {
-	// What the walk has seen: the TestMain it is inside, nil outside one, and that TestMain's parameter, the
-	// *testing.M, and since the last TestMain's end, whether a call to os.Exit was seen, inside a TestMain or not, and
-	// whether a call to Run on the parameter was.
-	var testMain *ast.FuncDecl
-	var parameter types.Object
-	callsExit := false
-	callsRun := false
-	// visit is one step of the walk, entering node when push is set and leaving it otherwise, and whether to walk the
-	// node's children.
-	visit := func(node ast.Node, push bool) bool {
-		if !push {
-			if testMain != nil && node == testMain {
-				if !callsExit && callsRun {
-					staticcheck_report.Report(context, testMain, message)
-				}
-				testMain = nil
-				callsExit = false
-				callsRun = false
-				parameter = nil
-			}
-			return true
-		}
-		switch node := node.(type) {
-		case *ast.FuncDecl:
-			// Declarations do not nest, so this holds only for a TestMain the walk is already inside.
-			if testMain != nil {
-				return true
-			}
-			// Any other function is passed over whole, its calls unseen.
-			if !isTestMain(context, node) {
-				return false
-			}
-			if version.Compare(staticcheck_report.StandardLibraryVersion(context, node), exitingVersion) >= 0 {
-				return false
-			}
-			testMain = node
-			parameter = context.TypesInfo.ObjectOf(node.Type.Params.List[0].Names[0])
-			return true
-		case *ast.CallExpr:
-			// A call's arguments are not walked once the call is judged, so `os.Exit(m.Run())` counts as an exit
-			// alone.
-			if staticcheck_code.IsCallTo(context, node, "os.Exit") {
-				callsExit = true
-				return false
-			}
-			selector, isSelector := node.Fun.(*ast.SelectorExpr)
-			if !isSelector {
-				return true
-			}
-			receiver, isName := selector.X.(*ast.Ident)
-			if !isName || parameter != context.TypesInfo.ObjectOf(receiver) {
-				return true
-			}
-			if selector.Sel.Name == "Run" {
-				callsRun = true
-				return false
-			}
-			return true
-		default:
-			// Invariant: the walk hands this function only the declarations and calls it was asked for.
-			panic("unexiting_test_main: the inspector handed over a node that is neither a declaration nor a call")
-		}
+// walk is what the walk of the package's declarations and calls has seen, kept across it in rule.State as the
+// original keeps it across its one inspector walk: the TestMain it is inside, nil outside one, and that TestMain's
+// parameter, the *testing.M, and since the last TestMain's end, whether a call to os.Exit was seen, inside a TestMain
+// or not, and whether a call to Run on the parameter was. skipped is the last node whose children the original's walk
+// does not enter, nil before any, since the dispatcher hands every node and the port passes over those itself.
+type walk struct {
+	testMain  *ast.FuncDecl
+	parameter types.Object
+	callsExit bool
+	callsRun  bool
+	skipped   ast.Node
+}
+
+// Check is one step of the walk over every function declaration and call of the package in order, reporting each
+// TestMain of a standard library older than Go 1.15 that calls Run on its *testing.M and never calls os.Exit. The
+// original's walk leaves a TestMain before it enters anything after it, so a TestMain no longer among node's
+// ancestors has ended, and is judged before node is; and node is passed over when an ancestor's children are, as the
+// original never enters them.
+func Check(context *rule.Context, node ast.Node, stack []ast.Node) {
+	state := rule.State[walk](context)
+	if state.testMain != nil && !slices.Contains(stack, ast.Node(state.testMain)) {
+		leaveTestMain(context, state)
 	}
-	inspected.Nodes([]ast.Node{(*ast.FuncDecl)(nil), (*ast.CallExpr)(nil)}, visit)
+	if state.skipped != nil && slices.Contains(stack, state.skipped) {
+		return
+	}
+	if !enter(context, state, node) {
+		state.skipped = node
+	}
+}
+
+// checkFileExit judges the TestMain the walk was inside, if any, which ends with its file at the latest.
+func checkFileExit(context *rule.Context, _ *ast.File) {
+	state := rule.State[walk](context)
+	if state.testMain != nil {
+		leaveTestMain(context, state)
+	}
+}
+
+// leaveTestMain is the walk leaving the TestMain it was inside: it is reported if it called Run and never os.Exit,
+// and what the walk has seen starts again.
+func leaveTestMain(context *rule.Context, state *walk) {
+	if !state.callsExit && state.callsRun {
+		staticcheck_report.Report(context, state.testMain, message)
+	}
+	state.testMain = nil
+	state.callsExit = false
+	state.callsRun = false
+	state.parameter = nil
+}
+
+// enter is the walk entering node, and whether to walk the node's children.
+func enter(context *rule.Context, state *walk, node ast.Node) bool {
+	switch node := node.(type) {
+	case *ast.FuncDecl:
+		// Declarations do not nest, so this holds only for a TestMain the walk is already inside.
+		if state.testMain != nil {
+			return true
+		}
+		// Any other function is passed over whole, its calls unseen.
+		if !isTestMain(context, node) {
+			return false
+		}
+		if version.Compare(staticcheck_report.StandardLibraryVersion(context, node), exitingVersion) >= 0 {
+			return false
+		}
+		state.testMain = node
+		state.parameter = context.TypesInfo.ObjectOf(node.Type.Params.List[0].Names[0])
+		return true
+	case *ast.CallExpr:
+		// A call's arguments are not walked once the call is judged, so `os.Exit(m.Run())` counts as an exit
+		// alone.
+		if staticcheck_code.IsCallTo(context, node, "os.Exit") {
+			state.callsExit = true
+			return false
+		}
+		selector, isSelector := node.Fun.(*ast.SelectorExpr)
+		if !isSelector {
+			return true
+		}
+		receiver, isName := selector.X.(*ast.Ident)
+		if !isName || state.parameter != context.TypesInfo.ObjectOf(receiver) {
+			return true
+		}
+		if selector.Sel.Name == "Run" {
+			state.callsRun = true
+			return false
+		}
+		return true
+	default:
+		// Invariant: the dispatcher hands Node only the declarations and calls it was asked for.
+		panic("unexiting_test_main: the dispatcher handed over a node that is neither a declaration nor a call")
+	}
 }
 
 // isTestMain is whether declaration is named TestMain and takes one parameter, named, of type *testing.M. A method so
