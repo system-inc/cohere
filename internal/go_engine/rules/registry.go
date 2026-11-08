@@ -98,6 +98,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/time_format"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unreachable"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unused_result"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
@@ -215,6 +216,7 @@ var ports = map[string]*analysis.Analyzer{
 	"tests":            tests.Analyzer,
 	"timeformat":       time_format.Analyzer,
 	"unmarshal":        unmarshal.Analyzer,
+	"unreachable":      unreachable.Analyzer,
 	"unsafeptr":        unsafe_ptr.Analyzer,
 	"unusedresult":     unused_result.Analyzer,
 	"waitgroup":        wait_group.Analyzer,
