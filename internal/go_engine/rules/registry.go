@@ -95,6 +95,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/testing_goroutine"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/tests"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unmarshal"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/unsafe_ptr"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/wait_group"
 )
 
@@ -207,6 +208,7 @@ var ports = map[string]*analysis.Analyzer{
 	"testinggoroutine": testing_goroutine.Analyzer,
 	"tests":            tests.Analyzer,
 	"unmarshal":        unmarshal.Analyzer,
+	"unsafeptr":        unsafe_ptr.Analyzer,
 	"waitgroup":        wait_group.Analyzer,
 }
 
