@@ -5,6 +5,16 @@ import (
 	"go/types"
 )
 
+// errorInterface is the predeclared error's interface, `interface{ Error() string }`.
+var errorInterface = predeclaredErrorInterface()
+
+// stringerInterface is `interface{ String() string }`, fmt.Stringer's method set.
+var stringerInterface = types.NewInterfaceType([]*types.Func{
+	types.NewFunc(token.NoPos, nil, "String", types.NewSignatureType(
+		nil, nil, nil, nil, types.NewTuple(types.NewVar(token.NoPos, nil, "", types.Typ[types.String])), false,
+	)),
+}, nil).Complete()
+
 // printsItself is whether fmt.Sprint prints a value of candidate through one of its methods, not as a number: fmt's
 // handleMethods, for the %v verb Sprint uses, calls a fmt.Formatter's Format, then an error's Error, then a
 // fmt.Stringer's String, before it formats the value itself. A type parameter has the methods of its constraint.
@@ -17,9 +27,6 @@ func printsItself(candidate types.Type) bool {
 	return types.Implements(candidate, errorInterface) || types.Implements(candidate, stringerInterface)
 }
 
-// errorInterface is the predeclared error's interface, `interface{ Error() string }`.
-var errorInterface = predeclaredErrorInterface()
-
 // predeclaredErrorInterface is the interface the universe's error names.
 func predeclaredErrorInterface() *types.Interface {
 	errorType, isInterface := types.Universe.Lookup("error").Type().Underlying().(*types.Interface)
@@ -29,13 +36,6 @@ func predeclaredErrorInterface() *types.Interface {
 	}
 	return errorType
 }
-
-// stringerInterface is `interface{ String() string }`, fmt.Stringer's method set.
-var stringerInterface = types.NewInterfaceType([]*types.Func{
-	types.NewFunc(token.NoPos, nil, "String", types.NewSignatureType(
-		nil, nil, nil, nil, types.NewTuple(types.NewVar(token.NoPos, nil, "", types.Typ[types.String])), false,
-	)),
-}, nil).Complete()
 
 // formatterInterfaceFor is `interface{ Format(fmt.State, rune) }`, fmt.Formatter's method set, built with the
 // fmt.State that candidate's Format method takes first, and nil where candidate has no Format method taking one. fmt's
