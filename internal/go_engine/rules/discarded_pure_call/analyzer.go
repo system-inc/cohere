@@ -10,12 +10,9 @@
 // function at a time and finds what the original finds.
 //
 // It reads which functions have no side effects from staticcheck's purity pass, honnef.co/go/tools/analysis/facts/
-// purity, whose facts cross from every dependency, straight from the pass as SA1019's port reads the deprecated
-// facts. That pass is borrowed in this wave, and is to be ported with the other fact passes later. It is a plain
-// analyzer and not a staticcheck_ir.FunctionCheckAnalyzer only because rule.Context does not carry that result: run
-// builds the context with staticcheck_report.PassContext and the purity judgment from the pass, and hands both to
-// Check for every function. When the engine's dispatcher gives the context the results of the passes a check
-// requires, Check reads the purity judgment there and this shape goes.
+// purity, whose facts cross from every dependency. That pass is borrowed in this wave, and is to be ported with the
+// other fact passes later. The listener requires it and reads its result through the context, handing Check the
+// purity judgment for every function.
 //
 // Two of the original's judgments look odd and are kept. The benchmark exception spares a function of a test file
 // taking a *testing.B, but not a closure inside one, which is a function of its own taking none, so a discarded pure
@@ -32,52 +29,49 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/facts/purity"
 	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// buildir pass for the functions, its purity pass for which of them have no side effects, and its generated pass,
-// which the context's judgment of generated files reads, though this check filters none.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4017",
-	Doc: "Flags a call to a function without side effects whose results are discarded: staticcheck's SA4017, " +
-		"ported onto its intermediate representation.",
-	Requires: []*analysis.Analyzer{staticcheck_ir.Analyzer, purity.Analyzer, generated.Analyzer},
-	Run:      run,
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own with
+// the purity judgment of the package. It requires staticcheck's purity pass, whose result it reads.
+var Listener = rule.Listener{
+	Requires: []*analysis.Analyzer{purity.Analyzer},
+	Function: func(context *rule.Context, function *ir.Function) {
+		Check(context, function, purityJudgment(context))
+	},
 }
 
-// run builds the pass's context and the purity judgment, and judges every source function of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	pure, isPurity := pass.ResultOf[purity.Analyzer].(purity.Result)
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4017",
+	"SA4017",
+	"Flags a call to a function without side effects whose results are discarded: staticcheck's SA4017, "+
+		"ported onto its intermediate representation.",
+	&Listener,
+)
+
+// purityJudgment is whether a function has no side effects, as staticcheck's purity pass holds it, read from the
+// pass's result.
+func purityJudgment(context *rule.Context) func(function *types.Func) bool {
+	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
 	if !isPurity {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
+		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
+		// declares.
 		panic("discarded_pure_call: the purity pass's result is missing")
 	}
-	isPure := func(function *types.Func) bool {
+	return func(function *types.Func) bool {
 		_, isHeld := pure[function]
 		return isHeld
 	}
-	functions, readError := staticcheck_ir.Functions(pass)
-	if readError != nil {
-		return nil, readError
-	}
-	for _, function := range functions {
-		Check(context, function, isPure)
-	}
-	return nil, nil
 }
 
 // Check judges one function: each call whose results nothing reads, of a named function isPure judges free of side
