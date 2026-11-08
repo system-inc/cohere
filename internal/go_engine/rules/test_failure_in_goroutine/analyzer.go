@@ -26,16 +26,21 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = staticcheck_ir.FunctionCheckAnalyzer(
+// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
+var Listener = rule.Listener{Function: Check}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA2002",
 	"SA2002",
 	"Flags a goroutine that calls testing.T.FailNow, SkipNow or a method built on them, which must be called in the "+
 		"test's own goroutine: staticcheck's SA2002, ported onto its intermediate representation.",
-	Check,
+	&Listener,
 )
 
 // stoppingMethods is the names of the methods of testing's common type, which T, B and F embed, that stop the test's
