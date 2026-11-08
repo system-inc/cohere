@@ -300,7 +300,7 @@ var ports = map[string]port{
 	"nilfunc":          {analyzer: nil_func.Analyzer, listener: &nil_func.Listener},
 	"printf":           {analyzer: printf.Analyzer},
 	"scannererr":       {analyzer: scanner_error.Analyzer},
-	"shift":            {analyzer: shift.Analyzer},
+	"shift":            {analyzer: shift.Analyzer, listener: &shift.Listener},
 	"sigchanyzer":      {analyzer: signal_channel_analyzer.Analyzer},
 	"slog":             {analyzer: slog.Analyzer, listener: &slog.Listener},
 	"sqlrowserr":       {analyzer: sql_rows_err.Analyzer},
