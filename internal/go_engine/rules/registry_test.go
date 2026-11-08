@@ -897,6 +897,7 @@ var portedPasses = []string{
 	"struct_conversion_by_field_copy",
 	"time_since",
 	"time_until",
+	"type_switch_bound_value",
 	"typed_nil_interface_comparison",
 	"unchanging_loop_condition",
 	"unconditional_loop_exit",
