@@ -3,6 +3,7 @@ package parity
 import (
 	"fmt"
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"reflect"
 	"runtime"
@@ -434,6 +435,49 @@ func TestRequireOnlyAdjudicatedTakesNoRecordAsAReason(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "record_above")
 	}), "record_above/record_above.go:10 holds a record with no reason")
+}
+
+// A directive explains nothing, so one on the line above a record is no reason for it: each record here, with a
+// `//go:` or a `//cohere:` directive above it and no doc comment on its function, fails.
+func TestRequireOnlyAdjudicatedTakesNoDirectiveAsAReason(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, original, port, analysistest.TestData(), "reason_directive")
+	}),
+		"reason_directive/reason_directive.go:9 holds a record with no reason",
+		"reason_directive/reason_directive.go:11 holds a record with no reason",
+	)
+}
+
+// Each kind of directive is no reason, a `//line ` one as much as a `//go:` or a `//cohere:` one, and a comment that
+// explains is. The `//line ` directive names the line it is on, so it moves no position.
+func TestReasonedLinesSkipsDirectives(test *testing.T) {
+	test.Parallel()
+	source := strings.Join([]string{
+		"package directives",
+		"",
+		"func calls() {",
+		"\t// A comment that explains.",
+		"\t_ = 0 // port finds: explained",
+		"\t//go:generate echo",
+		"\t_ = 0 // port finds: after go",
+		"\t//cohere:ignore",
+		"\t_ = 0 // port finds: after cohere",
+		"\t//line directives.go:11",
+		"\t_ = 0 // port finds: after line",
+		"}",
+	}, "\n")
+	fileSet := token.NewFileSet()
+	file, parseError := parser.ParseFile(fileSet, "directives.go", source, parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	reasons := reasonedLines(fileSet, file)
+	for line, wanted := range map[int]bool{5: true, 7: false, 9: false, 11: false} {
+		if reasons.above(line) != wanted {
+			test.Errorf("the record on line %d is reasoned from above: %t, want %t", line, !wanted, wanted)
+		}
+	}
 }
 
 // A drop's reason is its own, on the line directly above it, never the doc comment of the function it is in: of two

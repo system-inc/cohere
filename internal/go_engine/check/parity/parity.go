@@ -502,10 +502,15 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 	return recorded
 }
 
+// directivePrefixes open the directives a comment can be, to the go command, the compiler or cohere, as `//go:build
+// never` is. A directive explains nothing, so it is no record's reason.
+var directivePrefixes = []string{"//go:", "//line ", "//cohere:"}
+
 // lineReasons is where a file gives its records' reasons, the Square's term for every record. above is whether a
-// comment that is no record ends on the line directly above line, the one reason a drop takes, and isDocumented whether
-// line is in a declaration with a doc comment, the top-level one or the one in a group, a reason for every record but a
-// drop. Wave 1's fixtures give their reasons as the doc comment of the function the records are in.
+// comment that is neither a record nor a directive ends on the line directly above line, the one reason a drop
+// takes, and isDocumented whether line is in a declaration with a doc comment, the top-level one or the one in a
+// group, a reason for every record but a drop. Wave 1's fixtures give their reasons as the doc comment of the function
+// the records are in.
 type lineReasons struct {
 	above        func(line int) bool
 	isDocumented func(line int) bool
@@ -516,7 +521,10 @@ func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 	reasonEndsOn := map[int]bool{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			if !strings.Contains(comment.Text, "// port ") {
+			isDirective := slices.ContainsFunc(directivePrefixes, func(prefix string) bool {
+				return strings.HasPrefix(comment.Text, prefix)
+			})
+			if !isDirective && !strings.Contains(comment.Text, "// port ") {
 				reasonEndsOn[fileSet.Position(comment.End()).Line] = true
 			}
 		}
