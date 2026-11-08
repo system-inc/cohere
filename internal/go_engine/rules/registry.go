@@ -10,7 +10,6 @@ import (
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
-	"honnef.co/go/tools/unused"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/concurrency_no_buffered_wait_delay"
@@ -67,6 +66,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_no_uncached_run"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_failure_path"
 	"github.com/system-inc/cohere/internal/go_engine/rules/testing_require_parallel"
+	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 )
 
@@ -129,9 +129,9 @@ var stylecheckRuledOn = map[string]bool{
 // with nil whose answer is already known, and a write to a struct or array nothing reads again. Each runs as
 // our port onto staticcheck's intermediate form, under the original's name, so the run builds one program form
 // where x/tools' would build a second for these two alone (#pn1xvnd). Then
-// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 through an
-// analyzer that reports what it finds. staticcheck's QF checks are quick fixes an editor offers, not
-// findings.
+// staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 as our port,
+// which reports what it finds where the original returns its verdict for staticcheck's runner to report
+// (#7hdcn3w). staticcheck's QF checks are quick fixes an editor offers, not findings.
 //
 // An SA or S check staticcheck leaves off by default (its documentation's NonDefault) is left off here
 // too, until it is ruled on: at staticcheck v0.8.1 that is SA9003, an empty if or else branch. And a check
@@ -181,11 +181,11 @@ func All() []rule.Rule {
 		}
 	}
 	registered = append(registered, rule.Rule{
-		Name:         rule.Namespace + unused.Analyzer.Analyzer.Name,
+		Name:         rule.Namespace + unused_code.Analyzer.Name,
 		Origin:       rule.OriginStaticcheck,
-		UpstreamName: unused.Analyzer.Analyzer.Name,
+		UpstreamName: unused_code.Analyzer.Name,
 		TypeAware:    true,
-		Analyzer:     unusedReport,
+		Analyzer:     unused_code.Analyzer,
 	})
 	// The house rules come last, each from its own package, which holds its name, origin and analyzer
 	// together so the registry restates none of them.
