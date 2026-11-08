@@ -49,6 +49,21 @@ type encodedName struct {
 	level int
 }
 
+// claimedNames is the names one struct's fields claim, each at the position of the field that claimed it first.
+// x/tools' namesSeen.
+type claimedNames map[encodedName]token.Pos
+
+// claim records name at position, and is false, when no field claimed it before, and otherwise is the position of
+// the field that did, and true, leaving that claim as it was. x/tools' namesSeen Get, then Set when Get finds
+// nothing, as its checkTagDuplicates calls them.
+func (names claimedNames) claim(name encodedName, position token.Pos) (token.Pos, bool) {
+	claimedAt, isClaimed := names[name]
+	if !isClaimed {
+		names[name] = position
+	}
+	return claimedAt, isClaimed
+}
+
 // duplicateCheckedKeys are the encodings whose names must not repeat across a struct's fields. x/tools'
 // checkTagDups.
 var duplicateCheckedKeys = []string{"json", "xml"}
@@ -72,7 +87,7 @@ func run(pass *analysis.Pass) (any, error) {
 			continue
 		}
 		// Each struct type remembers the names its own fields claim, and no other's.
-		seen := map[encodedName]token.Pos{}
+		seen := claimedNames{}
 		for index := range structure.NumFields() {
 			checkCanonicalFieldTag(pass, structure.Field(index), structure.Tag(index), seen)
 		}
@@ -82,7 +97,7 @@ func run(pass *analysis.Pass) (any, error) {
 
 // checkCanonicalFieldTag judges one field of a struct and its tag: the names it claims against those seen, the tag's
 // syntax, and a json or xml tag on an unexported field.
-func checkCanonicalFieldTag(pass *analysis.Pass, field *types.Var, tag string, seen map[encodedName]token.Pos) {
+func checkCanonicalFieldTag(pass *analysis.Pass, field *types.Var, tag string, seen claimedNames) {
 	for _, key := range duplicateCheckedKeys {
 		checkTagDuplicates(pass, tag, key, field, field, seen, 1)
 	}
@@ -125,7 +140,7 @@ func checkTagDuplicates(
 	key string,
 	nearest *types.Var,
 	field *types.Var,
-	seen map[encodedName]token.Pos,
+	seen claimedNames,
 	level int,
 ) {
 	value := reflect.StructTag(tag).Get(key)
@@ -167,10 +182,8 @@ func checkTagDuplicates(
 		}
 		name = value[:comma]
 	}
-	claimed := encodedName{key: namespace, name: name, level: level}
-	claimedAt, isClaimed := seen[claimed]
+	claimedAt, isClaimed := seen.claim(encodedName{key: namespace, name: name, level: level}, field.Pos())
 	if !isClaimed {
-		seen[claimed] = field.Pos()
 		return
 	}
 	// The other position is named relative to this field's directory, without its column, so the message is
