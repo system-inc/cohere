@@ -69,6 +69,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/unused_write"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/appends"
+	"github.com/system-inc/cohere/internal/go_engine/rules/vet/asm_decl"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/assign"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/atomic"
 	"github.com/system-inc/cohere/internal/go_engine/rules/vet/bools"
@@ -188,6 +189,7 @@ var duplicatesOfVet = map[string]string{
 // and every loop below still walks them, so a check is chosen, left off or ruled on exactly as before it was ported.
 var ports = map[string]*analysis.Analyzer{
 	"appends":          appends.Analyzer,
+	"asmdecl":          asm_decl.Analyzer,
 	"assign":           assign.Analyzer,
 	"atomic":           atomic.Analyzer,
 	"bools":            bools.Analyzer,
