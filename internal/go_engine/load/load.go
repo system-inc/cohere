@@ -139,6 +139,12 @@ func PackagesWithOverlay(
 type Caching struct {
 	Restorer Restorer
 	Listings ListingStore
+
+	// Held is the bytes the run already holds of the workspace's files, read in place of opening each again by every
+	// reader of the load: the in-process lister and the kept listing's fingerprint, which read each file's header, the
+	// parse, and the build constraints of the files no package holds. go list, when the in-process lister doubts, and
+	// the cgo tool still read the disk, which the held bytes are. Nil reads every file from disk.
+	Held Held
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -173,11 +179,11 @@ func loadWorkspace(
 	if environmentError != nil {
 		return nil, environmentError
 	}
-	buildContext, reported, contextError := constraintContext(workspace, fullEnvironment)
+	buildContext, reported, contextError := constraintContext(workspace, fullEnvironment, caching.Held)
 	if contextError != nil {
 		return nil, contextError
 	}
-	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings)
+	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings, caching.Held)
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
@@ -202,7 +208,7 @@ func loadWorkspace(
 		}
 		translationElapsed = time.Since(translationStarted)
 	}
-	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching.Restorer, overlay, compiled)
+	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching, overlay, compiled)
 	if loadError != nil {
 		return nil, loadError
 	}
@@ -245,16 +251,17 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 	return false
 }
 
-// fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, and
-// each package compiled holds the cgo tool's translation of from its outputs, and returns its roots and what the load
-// knows of them before the diagnostics and the counts. The declarations of dependencies that reach their cgo files
-// lose what reaches it only once every package is type-checked. The Restorer is told which loader ran, since a
-// translated package has other files than one checked with package "C" faked.
+// fromSource parses and type-checks the listing's graph from source, each file in overlay from its bytes there, each
+// other file caching holds from its held bytes, and each package compiled holds the cgo tool's translation of from its
+// outputs, and returns its roots and what the load knows of them before the diagnostics and the counts. The
+// declarations of dependencies that reach their cgo files lose what reaches it only once every package is
+// type-checked. caching's Restorer is told which loader ran, since a translated package has other files than one
+// checked with package "C" faked.
 func fromSource(
 	workspace string,
 	listed *listing,
 	buildContext *build.Context,
-	restorer Restorer,
+	caching Caching,
 	overlay map[string][]byte,
 	compiled map[string]*compiledPackage,
 ) ([]*packages.Package, *Loaded, error) {
@@ -265,15 +272,15 @@ func fromSource(
 	}
 	built := newGraph(listed, workspace, compiled)
 	withheld := newWithheldErrors()
-	typeChecker := newLoader(built, sizes, withheld, overlay)
+	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held)
 	reachable := typeChecker.connect()
 	analyzedPackages := analyzedOfGraph(built)
-	if restorer != nil {
+	if caching.Restorer != nil {
 		loaderName := LoaderSource
 		if compiled != nil {
 			loaderName = LoaderCgoTranslated
 		}
-		typeChecker.restored = restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
+		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
 	}
 	typeChecker.load(reachable)
 

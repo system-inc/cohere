@@ -43,6 +43,11 @@ type Options struct {
 	// file whose bytes are the same, and given what this run learns. Nil formats every file.
 	Known *KnownFiles
 
+	// Held is the bytes the run holds of a file, as load.Held gives them, false when it holds none, read in place of the
+	// disk by a run that does not write, so a check opens no file the run already read. A run that writes reads the
+	// disk, so a rewrite never starts from bytes older than the file it replaces. Nil reads every file from disk.
+	Held func(file string) ([]byte, bool)
+
 	// Wrap is the long-line wrap RunWrap asks of each file, under Write only: a check leaves long lines to the lint
 	// phase, which reports them as the rule's findings. It is handed a file's name and gofmt's output, and says what
 	// it would write instead. WrapSource keeps that only when it is the same program as gofmt's output
@@ -209,9 +214,9 @@ func collect(files []string, outcomes []outcome) Result {
 }
 
 // formatFile formats one file, writing the result under options.Write, unless options.Known says what the run made
-// of the same bytes before.
+// of the same bytes before. A check reads the file from options.Held when that holds it.
 func formatFile(file string, options Options) outcome {
-	original, readError := os.ReadFile(file)
+	original, readError := readOriginal(file, options)
 	if readError != nil {
 		return notFormatted(file, fmt.Sprintf("it cannot be read: %v", readError))
 	}
@@ -256,6 +261,17 @@ func formatFile(file string, options Options) outcome {
 		changed.Written = true
 	}
 	return outcome{changed: changed}
+}
+
+// readOriginal is the bytes formatFile formats: the run's held bytes of file under a check, when it holds them, and
+// the disk's otherwise. A run that writes always reads the disk, the bytes its rewrite replaces.
+func readOriginal(file string, options Options) ([]byte, error) {
+	if !options.Write && options.Held != nil {
+		if contents, held := options.Held(file); held {
+			return contents, nil
+		}
+	}
+	return os.ReadFile(file)
 }
 
 // wrapFile wraps one file gofmt formatted and writes the wrap WrapSource keeps, unless options.Known holds the same

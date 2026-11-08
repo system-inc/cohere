@@ -88,9 +88,10 @@ type listing struct {
 }
 
 // list lists the patterns in workspace under environment, the whole environment, as `go list -deps -json -e` lists
-// them: read in this process when the lister can answer exactly, and by go list itself when it has any doubt.
-func list(workspace string, environment []string, patterns []string) (*listing, error) {
-	listed, doubt := listInProcess(workspace, environment, patterns)
+// them: read in this process when the lister can answer exactly, each file held holds read from its held bytes, and by
+// go list itself, which reads the disk, when it has any doubt.
+func list(workspace string, environment []string, patterns []string, held Held) (*listing, error) {
+	listed, doubt := listInProcess(workspace, environment, patterns, held)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil
