@@ -72,6 +72,11 @@ changed in cohere outside the sets is written under the same heading.
 
 ### Changed
 
+- The footer's checked count is the files a phase examined, never the files in scope. A Swift project whose
+  files had no compiler record, with lint not run, read
+  `1 type error (13 checked) • ⚠ 13 files nothing checked`, and now reads no checked count beside the gap, which
+  stays on the line even when a phase did not run. A replay's cached count is what the recorded run checked or
+  cached, not every file in scope.
 - A repository with several projects ends its default run on one footer line, the way a single project does:
   the run's time and every project's rules, checked, cached and cohered files summed. Each project's gap is on
   the line with its name, as in `⚠ 👑 lint did not run (CapturePhone)`, and a project that didn't finish or

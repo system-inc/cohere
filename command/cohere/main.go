@@ -814,9 +814,10 @@ func run() error {
 	}
 
 	findings := 0
-	// What the footer says, filled in as the phases finish. Lint replaces the counts with its own; a run
-	// lint does not reach still accounts for every file in scope.
-	activeSummary.FilesInScope, activeSummary.FilesChecked = len(projectFiles), len(projectFiles)
+	// What the footer says, filled in as the phases finish. Checked is what a phase examined, so it starts at none:
+	// the type check sets it to the files it reports on (finishScopedTypeCheck), and lint replaces the counts with
+	// its own (#1hva1ya).
+	activeSummary.FilesInScope, activeSummary.FilesChecked = len(projectFiles), 0
 	activeSummary.Gaps.NothingToCheck = graph != nil && len(projectFiles) == 0
 
 	// A generated file the program asks for and nobody has generated yet (#wxsqavy) leads the output, and
