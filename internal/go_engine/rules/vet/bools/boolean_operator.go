@@ -6,6 +6,8 @@ import (
 	"go/token"
 
 	"golang.org/x/tools/go/analysis"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
 // booleanOperator is `||` or `&&`, as the pass judges a chain of it.
@@ -27,13 +29,13 @@ var andOperator = booleanOperator{name: "and", token: token.LAND, suspectEqualit
 
 // checkRedundant reports an operand repeated in operands, `e || e` or `e && e`, at each repeat after the first in
 // operands' order. The operands are free of side effects, so the repeat can only evaluate to what the first did.
-func (operator booleanOperator) checkRedundant(pass *analysis.Pass, operands []ast.Expr) {
+func (operator booleanOperator) checkRedundant(context *rule.Context, operands []ast.Expr) {
 	// written holds each operand's source, as printed, seen so far.
 	written := map[string]bool{}
 	for _, operand := range operands {
-		source := formatted(pass.Fset, operand)
+		source := formatted(context.Fset, operand)
 		if written[source] {
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos:     operand.Pos(),
 				End:     operand.End(),
 				Message: fmt.Sprintf("redundant %s: %s %s %s", operator.name, source, operator.token, source),
@@ -47,7 +49,7 @@ func (operator booleanOperator) checkRedundant(pass *analysis.Pass, operands []a
 // checkSuspect reports one value tested against two constants with the operator's suspect equality,
 // `x != c1 || x != c2` or `x == c1 && x == c2`: always true or always false when the constants differ, and
 // redundant, which checkRedundant reports, when they are the same. The operands are free of side effects.
-func (operator booleanOperator) checkSuspect(pass *analysis.Pass, operands []ast.Expr) {
+func (operator booleanOperator) checkSuspect(context *rule.Context, operands []ast.Expr) {
 	// comparisons maps the source of each value tested to the source of the first comparison testing it.
 	comparisons := map[string]string{}
 	for _, operand := range operands {
@@ -60,15 +62,15 @@ func (operator booleanOperator) checkSuspect(pass *analysis.Pass, operands []ast
 		// catches a repeated left side, the way most code is written.
 		var tested ast.Expr
 		switch {
-		case pass.TypesInfo.Types[comparison.Y].Value != nil:
+		case context.TypesInfo.Types[comparison.Y].Value != nil:
 			tested = comparison.X
-		case pass.TypesInfo.Types[comparison.X].Value != nil:
+		case context.TypesInfo.Types[comparison.X].Value != nil:
 			tested = comparison.Y
 		default:
 			continue
 		}
-		testedSource := formatted(pass.Fset, tested)
-		comparisonSource := formatted(pass.Fset, operand)
+		testedSource := formatted(context.Fset, tested)
+		comparisonSource := formatted(context.Fset, operand)
 		first, testedBefore := comparisons[testedSource]
 		if !testedBefore {
 			comparisons[testedSource] = comparisonSource
@@ -76,7 +78,7 @@ func (operator booleanOperator) checkSuspect(pass *analysis.Pass, operands []ast
 		}
 		// The same comparison twice is redundant, and checkRedundant reports it.
 		if comparisonSource != first {
-			pass.Report(analysis.Diagnostic{
+			context.Report(analysis.Diagnostic{
 				Pos:     operand.Pos(),
 				End:     operand.End(),
 				Message: fmt.Sprintf("suspect %s: %s %s %s", operator.name, comparisonSource, operator.token, first),
@@ -87,7 +89,7 @@ func (operator booleanOperator) checkSuspect(pass *analysis.Pass, operands []ast
 
 // split is every operand of the chain of the operator that expression heads, looking through parentheses, from the
 // last to the first, given `a || (b || c) || d`, {d, c, b, a}, and every operator of the chain it walked, expression
-// among them, which run marks expanded so it does not judge an inner operator again.
+// among them, which checkChain marks expanded so it does not judge an inner operator again.
 func (operator booleanOperator) split(expression ast.Expr) ([]ast.Expr, []*ast.BinaryExpr) {
 	operands := []ast.Expr{}
 	operators := []*ast.BinaryExpr{}

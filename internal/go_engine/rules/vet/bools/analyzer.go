@@ -2,6 +2,8 @@
 // `e || e`, or one value tested against two constants with the equality that makes the chain always true or always
 // false, `x != 1 || x != 2` and `x == 1 && x == 2`. An operand with side effects, a call or a receive, may change
 // what the operands after it read, so the chain is judged in runs of side-effect-free operands, each run on its own.
+// It sits on the engine's syntax dispatcher, hearing each binary expression on the walk the dispatcher makes once for
+// every syntax rule.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/bools/bools.go, whose logic it
 // keeps and whose messages it reports word for word, at the same position. The registry runs the port in the
@@ -17,54 +19,78 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
+
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Analyzer runs the port under the original's name, documentation and address, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same as before the port took the original's place.
-var Analyzer = &analysis.Analyzer{
-	Name:     "bools",
-	Doc:      "check for common mistakes involving boolean operators",
-	URL:      "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/bools",
-	Requires: []*analysis.Analyzer{inspect.Analyzer},
-	Run:      run,
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
+const passName = "bools"
+
+// passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
+const passDoc = "check for common mistakes involving boolean operators"
+
+// passUrl is the original's address.
+const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/bools"
+
+// Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder, as the
+// original's Preorder visits them, so a chain's outermost operator comes before the operators inside it, of which it
+// judges each chain of `||` or `&&` once.
+var Listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node:  checkChain,
 }
 
-func run(pass *analysis.Pass) (any, error) {
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("bools: inspect's result is missing")
-	}
+// Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax
+// dispatcher's walk found for Listener.
+var Analyzer = newAnalyzer(dispatch.SharedSyntax())
+
+// newAnalyzer registers Listener on dispatcher and gives the analyzer it returns the original's address, which
+// RuleAnalyzer leaves unset.
+func newAnalyzer(dispatcher *dispatch.Syntax) *analysis.Analyzer {
+	analyzer := dispatcher.RuleAnalyzer(rule.Namespace+passName, passName, passDoc, &Listener)
+	analyzer.URL = passUrl
+	return analyzer
+}
+
+// packageState is what the port keeps over the package's walk, held in its context's state.
+type packageState struct {
 	// expanded holds each `||` and `&&` already judged as part of the chain around it, so a chain is judged once,
-	// from its outermost operator.
-	expanded := map[*ast.BinaryExpr]bool{}
-	// All visits each binary expression in preorder, as the original's Preorder does, and hands it over typed, so a
-	// chain's outermost operator comes before the operators inside it.
-	for binary := range inspector.All[*ast.BinaryExpr](inspected) {
-		if expanded[binary] {
-			continue
-		}
-		var operator booleanOperator
-		switch binary.Op {
-		case token.LOR:
-			operator = orOperator
-		case token.LAND:
-			operator = andOperator
-		default:
-			continue
-		}
-		operands, operators := operator.split(binary)
-		for _, inner := range operators {
-			expanded[inner] = true
-		}
-		for _, set := range commutativeSets(pass.TypesInfo, operands) {
-			operator.checkRedundant(pass, set)
-			operator.checkSuspect(pass, set)
-		}
+	// from its outermost operator. It spans the package, as the original's does.
+	expanded map[*ast.BinaryExpr]bool
+}
+
+// checkChain judges node when it heads a chain of `||` or `&&` not already judged as part of the chain around it.
+func checkChain(context *rule.Context, node ast.Node, _ []ast.Node) {
+	binary, isBinary := node.(*ast.BinaryExpr)
+	if !isBinary {
+		return
 	}
-	return nil, nil
+	state := rule.State[packageState](context)
+	if state.expanded == nil {
+		state.expanded = map[*ast.BinaryExpr]bool{}
+	}
+	if state.expanded[binary] {
+		return
+	}
+	var operator booleanOperator
+	switch binary.Op {
+	case token.LOR:
+		operator = orOperator
+	case token.LAND:
+		operator = andOperator
+	default:
+		return
+	}
+	operands, operators := operator.split(binary)
+	for _, inner := range operators {
+		state.expanded[inner] = true
+	}
+	for _, set := range commutativeSets(context.TypesInfo, operands) {
+		operator.checkRedundant(context, set)
+		operator.checkSuspect(context, set)
+	}
 }
 
 // commutativeSets is every run of side-effect-free operands, split at each operand with side effects, which belongs
