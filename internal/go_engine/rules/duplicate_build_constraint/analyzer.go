@@ -21,39 +21,29 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/go/ast/astutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads.
-var Analyzer = &analysis.Analyzer{
-	Name: "SA4019",
-	Doc: "Flags two `+build` lines in one file holding the same terms, which constrain the build no more than " +
+// Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it.
+var Listener = rule.Listener{FileEnter: CheckFile}
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"SA4019",
+	"SA4019",
+	"Flags two `+build` lines in one file holding the same terms, which constrain the build no more than "+
 		"one does: staticcheck's SA4019, ported as a check on syntax.",
-	Requires: []*analysis.Analyzer{generated.Analyzer},
-	Run:      run,
-}
+	&Listener,
+)
 
 // constraintPrefix opens a constraint line of the preamble, its one space included, as the original matches it.
 const constraintPrefix = "+build "
-
-// run builds the pass's context and judges every file of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	for _, file := range context.Files {
-		CheckFile(context, file)
-	}
-	return nil, nil
-}
 
 // CheckFile judges one file: every pair of its constraint lines holding the same terms is reported, the earlier line
 // named first.
