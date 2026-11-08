@@ -3,7 +3,12 @@ package asm_decl
 import (
 	"cmp"
 	"fmt"
+	"go/ast"
 	"go/build"
+	"go/parser"
+	"go/token"
+	"go/types"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -118,6 +123,183 @@ func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
 			test.Errorf("the port judged %s, whose architecture it cannot tell: %s", found.file, described(found))
 		}
 	}
+}
+
+// differencesDirectory is the differences fixture, which no load reads: its declarations crash the original, which
+// would take the checker and the test binary down, so the test runs each side on a pass built by hand.
+var differencesDirectory = filepath.Join(analysistest.TestData(), "src", "differences")
+
+// The original lays out every bodiless declaration's frame before it reads a line of assembly, and crashes in
+// go/types' sizes on one holding a type parameter by value (go/types/gcsizes.go:54), which go/types type-checks: a
+// method of a generic type taking a T, a [2]T or a struct of T, or returning a T. The port judges nothing of such a
+// function, since without its frame nothing true can be said of its assembly, and goes on judging the rest of the
+// package. The original runs on a hand-built pass under a recover, which pins its crash, and the port runs alone on
+// another over the same files, where it must report exactly the `port finds:` records of differences_amd64.s: none
+// in the functions it cannot measure, and every finding of the measured ones beside and after them.
+func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
+	test.Parallel()
+	checked := checkedByHand(test, filepath.Join(differencesDirectory, "differences.go"), "")
+	assemblyFilename := filepath.Join(differencesDirectory, "differences_amd64.s")
+	crashed := originalCrashes(test, checked, assemblyFilename)
+	if crashed == nil {
+		test.Fatal("the original did not crash, so the fixture no longer pins what it was written for")
+	}
+	test.Logf("the original crashed: %v", crashed)
+
+	port := runByHand(test, Analyzer, checked, assemblyFilename)
+	recorded := portFindsRecords(test, assemblyFilename)
+	test.Logf("the port found %d, and differences_amd64.s records %d", len(port), len(recorded))
+	if len(recorded) == 0 {
+		test.Fatal("differences_amd64.s records no finding, so the comparison proves nothing")
+	}
+	for _, missing := range difference(recorded, port) {
+		test.Errorf("differences_amd64.s records %s, and the port did not find it", described(missing))
+	}
+	for _, extra := range difference(port, recorded) {
+		test.Errorf("the port found %s, which differences_amd64.s does not record", described(extra))
+	}
+}
+
+// Each shape the port leaves unjudged crashes the original on its own, and each shape that holds a type parameter
+// only behind a word does not, so the port's skip is exactly as wide as the original's crash.
+func TestPortLeavesUnjudgedExactlyTheFramesTheOriginalCrashesOn(test *testing.T) {
+	test.Parallel()
+	cases := []struct {
+		declaration string
+		crashes     bool
+	}{
+		{"func (box[T]) value(x T)", true},
+		{"func (box[T]) array(x [2]T)", true},
+		{"func (box[T]) empty(x [0]T)", true},
+		{"func (box[T]) wrapped(x pair[T])", true},
+		{"func (box[T]) inline(x struct{ first T })", true},
+		{"func (box[T]) result() T", true},
+		{"func (box[T]) variadic(x ...T)", false},
+		{"func (box[T]) pointer(x *T)", false},
+		{"func (box[T]) slice(x []T)", false},
+		{"func (box[T]) mapped(x map[string]T)", false},
+		{"func (box[T]) function(x func(T) T)", false},
+		{"func (box[T]) channel(x chan T)", false},
+		{"func (box[T]) arrayOfPointers(x [2]*T)", false},
+	}
+	assemblyFilename := filepath.Join(differencesDirectory, "differences_amd64.s")
+	for _, shape := range cases {
+		test.Run(shape.declaration, func(subtest *testing.T) {
+			subtest.Parallel()
+			source := "package shape\n\ntype box[T any] struct{}\n\ntype pair[T any] struct{ first T }\n\n" +
+				shape.declaration + "\n"
+			checked := checkedByHand(subtest, "shape.go", source)
+			crashed := originalCrashes(subtest, checked, assemblyFilename)
+			if (crashed != nil) != shape.crashes {
+				subtest.Fatalf("the original crashing is %v, not the %v the case is written for: %v",
+					crashed != nil, shape.crashes, crashed)
+			}
+			declaration, isFunction := checked.file.Decls[len(checked.file.Decls)-1].(*ast.FuncDecl)
+			if !isFunction {
+				subtest.Fatal("the shape's last declaration is not its function")
+			}
+			pass := &analysis.Pass{TypesInfo: checked.information}
+			if frameIsMeasurable(pass, declaration) == shape.crashes {
+				subtest.Errorf("the port measuring the frame is %v, where the original crashing is %v",
+					!shape.crashes, shape.crashes)
+			}
+		})
+	}
+}
+
+// originalCrashes runs x/tools' asmdecl by hand over checked and the assembly file named assemblyFilename, and
+// returns what it panicked with, or nil when it did not.
+func originalCrashes(test *testing.T, checked handChecked, assemblyFilename string) (recovered any) {
+	test.Helper()
+	defer func() {
+		recovered = recover()
+	}()
+	runByHand(test, asmdecl.Analyzer, checked, assemblyFilename)
+	return nil
+}
+
+// handChecked is one Go file type-checked by hand, as a package of its own.
+type handChecked struct {
+	fileSet      *token.FileSet
+	file         *ast.File
+	typesPackage *types.Package
+	information  *types.Info
+}
+
+// checkedByHand parses source as the file named filename, or reads the file when source is empty, and type-checks
+// it as a package at the path its package clause names.
+func checkedByHand(test *testing.T, filename string, source string) handChecked {
+	test.Helper()
+	fileSet := token.NewFileSet()
+	var content any
+	if source != "" {
+		content = source
+	}
+	file, parseError := parser.ParseFile(fileSet, filename, content, parser.ParseComments)
+	if parseError != nil {
+		test.Fatal(parseError)
+	}
+	information := &types.Info{
+		Types: map[ast.Expr]types.TypeAndValue{},
+		Defs:  map[*ast.Ident]types.Object{},
+		Uses:  map[*ast.Ident]types.Object{},
+	}
+	configuration := types.Config{}
+	checked, checkError := configuration.Check(file.Name.Name, fileSet, []*ast.File{file}, information)
+	if checkError != nil {
+		test.Fatal(checkError)
+	}
+	return handChecked{fileSet: fileSet, file: file, typesPackage: checked, information: information}
+}
+
+// runByHand runs analyzer's Run on a pass over the Go file checked holds and the assembly file named
+// assemblyFilename, and returns what it reports.
+func runByHand(test *testing.T, analyzer *analysis.Analyzer, checked handChecked, assemblyFilename string) []finding {
+	test.Helper()
+	found := []finding{}
+	pass := &analysis.Pass{
+		Analyzer:   analyzer,
+		Fset:       checked.fileSet,
+		Files:      []*ast.File{checked.file},
+		OtherFiles: []string{assemblyFilename},
+		Pkg:        checked.typesPackage,
+		TypesInfo:  checked.information,
+		TypesSizes: types.SizesFor("gc", "amd64"),
+		ResultOf:   map[*analysis.Analyzer]any{},
+		ReadFile:   os.ReadFile,
+		Report: func(diagnostic analysis.Diagnostic) {
+			position := checked.fileSet.Position(diagnostic.Pos)
+			found = append(found, finding{
+				file: filepath.Base(position.Filename), line: position.Line, column: position.Column,
+				message: diagnostic.Message,
+			})
+		},
+	}
+	if _, runError := analyzer.Run(pass); runError != nil {
+		test.Fatalf("running %s: %v", analyzer.Name, runError)
+	}
+	return found
+}
+
+// portFindsRecords is every `// port finds: <message>` record in the assembly file named filename, each a finding
+// at the start of its line, as the pass places every finding.
+func portFindsRecords(test *testing.T, filename string) []finding {
+	test.Helper()
+	content, readError := os.ReadFile(filename)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	const marker = "// port finds: "
+	recorded := []finding{}
+	for index, line := range strings.Split(string(content), "\n") {
+		records := strings.Split(line, marker)
+		for _, message := range records[1:] {
+			recorded = append(recorded, finding{
+				file: filepath.Base(filename), line: index + 1, column: 1, message: strings.TrimSpace(message),
+			})
+		}
+	}
+	return recorded
 }
 
 // onTarget makes test run as on a machine building for target, `GOOS/GOARCH`: go/build's default context, which

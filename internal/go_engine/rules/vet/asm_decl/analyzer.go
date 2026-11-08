@@ -13,9 +13,12 @@
 // `// +build` line, or else from go/build's default context, the `GOARCH` the process runs under, so it judges the
 // same files the same way on whatever target the load is for, and it requires no other analyzer. The two differ in
 // one way no finding shows: where the original logs that it cannot tell a file's architecture, the port is silent,
-// since a rule speaks only through its findings, and both then judge none of that file. The registry runs the port in
-// the original's place, and the original stays the oracle: the parity tests beside this file run both over the same
-// packages on every architecture the pass judges. The two agree everywhere, so there is no differences fixture.
+// since a rule speaks only through its findings, and both then judge none of that file. And they differ in one way
+// the original never reaches: a declaration with a parameter or a result whose size depends on a type parameter, a
+// method of a generic type taking a T or a [2]T, has a frame go/types cannot measure, and the original crashes
+// laying it out, where the port judges nothing of that function and goes on with the rest. The registry runs the port
+// in the original's place, and the original stays the oracle: the parity tests beside this file run both over the
+// same packages on every architecture the pass judges, and the differences fixture pins the original's crash.
 package asm_decl
 
 import (
@@ -51,11 +54,24 @@ func run(pass *analysis.Pass) (any, error) {
 	// Every declaration without a body, by its name, in the order the files declare them, so a later one of the same
 	// name, a method's, takes the place of an earlier one as in the original.
 	frames := make(map[string]map[string]*argumentFrame)
+	// The declarations whose frame has no size, by name: go/types' sizes cannot measure a type parameter, and asserts
+	// they are never asked to (go/types/gcsizes.go:54), which is where the original crashes laying such a frame out.
+	// The port judges nothing of such a function, neither its frame nor a missing declaration, since a run of cohere
+	// must never crash on code that type-checks, and without the frame there is nothing true to say of its assembly.
+	unmeasured := make(map[string]bool)
 	for _, file := range pass.Files {
 		for _, declaration := range file.Decls {
-			if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Body == nil {
-				frames[function.Name.Name] = argumentFramesOf(pass, function)
+			function, isFunction := declaration.(*ast.FuncDecl)
+			if !isFunction || function.Body != nil {
+				continue
 			}
+			if !frameIsMeasurable(pass, function) {
+				delete(frames, function.Name.Name)
+				unmeasured[function.Name.Name] = true
+				continue
+			}
+			delete(unmeasured, function.Name.Name)
+			frames[function.Name.Name] = argumentFramesOf(pass, function)
 		}
 	}
 
@@ -66,7 +82,7 @@ func run(pass *analysis.Pass) (any, error) {
 			// as the original keeps it, ending the pass with the error.
 			return nil, readError
 		}
-		newAssemblyFile(pass, file, filename, frames).judge(string(content))
+		newAssemblyFile(pass, file, filename, frames, unmeasured).judge(string(content))
 	}
 	return nil, nil
 }

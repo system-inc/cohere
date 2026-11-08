@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 	"strconv"
 
 	"golang.org/x/tools/go/analysis"
@@ -91,13 +92,7 @@ func addFields(pass *analysis.Pass, frame *argumentFrame, fields []*ast.Field, a
 	next := offset
 	namesBefore := 0
 	for _, field := range fields {
-		fieldType := pass.TypesInfo.Types[field.Type].Type
-		// go/types records no type for a variadic parameter's `...T` (golang.org/issue/28277), which is a []T.
-		if fieldType == nil {
-			if ellipsis, isEllipsis := field.Type.(*ast.Ellipsis); isEllipsis {
-				fieldType = types.NewSlice(pass.TypesInfo.Types[ellipsis.Elt].Type)
-			}
-		}
+		fieldType := typeOfField(pass, field)
 		alignment := int(frame.architecture.sizes.Alignof(fieldType))
 		size := int(frame.architecture.sizes.Sizeof(fieldType))
 		next += -next & (alignment - 1)
@@ -140,6 +135,55 @@ func addFields(pass *analysis.Pass, frame *argumentFrame, fields []*ast.Field, a
 		}
 	}
 	return next
+}
+
+// typeOfField is the type of a parameter or result field. x/tools' asmdecl asmParseDecl's addParams, its reading of
+// a field's type.
+func typeOfField(pass *analysis.Pass, field *ast.Field) types.Type {
+	fieldType := pass.TypesInfo.Types[field.Type].Type
+	// go/types records no type for a variadic parameter's `...T` (golang.org/issue/28277), which is a []T.
+	if fieldType == nil {
+		if ellipsis, isEllipsis := field.Type.(*ast.Ellipsis); isEllipsis {
+			return types.NewSlice(pass.TypesInfo.Types[ellipsis.Elt].Type)
+		}
+	}
+	return fieldType
+}
+
+// frameIsMeasurable is whether go/types' sizes can lay out declaration's frame: whether no parameter or result is a
+// value whose size depends on a type parameter. The port's own, guarding the crash the original has there.
+func frameIsMeasurable(pass *analysis.Pass, declaration *ast.FuncDecl) bool {
+	fields := slices.Clone(declaration.Type.Params.List)
+	if declaration.Type.Results != nil {
+		fields = append(fields, declaration.Type.Results.List...)
+	}
+	for _, field := range fields {
+		if !isMeasurable(typeOfField(pass, field)) {
+			return false
+		}
+	}
+	return true
+}
+
+// isMeasurable is whether go/types' sizes can measure valueType. They measure an array by its element and a struct
+// by its fields, and assert that what they reach is no type parameter (go/types/gcsizes.go:54), so a pointer, slice,
+// map, channel or function of one measures as a word or three, while a type parameter, or an array or struct holding
+// one by value, does not measure at all.
+func isMeasurable(valueType types.Type) bool {
+	if _, isTypeParameter := valueType.(*types.TypeParam); isTypeParameter {
+		return false
+	}
+	switch underlying := valueType.Underlying().(type) {
+	case *types.Array:
+		return isMeasurable(underlying.Elem())
+	case *types.Struct:
+		for fieldIndex := range underlying.NumFields() {
+			if !isMeasurable(underlying.Field(fieldIndex).Type()) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // kindForType is the kind of a value of type valueType that is size bytes. x/tools' asmdecl asmKindForType.

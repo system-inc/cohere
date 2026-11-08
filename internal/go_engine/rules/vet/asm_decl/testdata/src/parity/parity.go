@@ -66,6 +66,8 @@ func (receiver) method(x int)
 // A generic function cannot be declared without a body, which go/types refuses ("generic function is missing
 // function body"), so it cannot be a fixture. A method of a generic type can, since go/types refuses only a
 // declaration with type parameters of its own, and the pass lays out no receiver, so the method's frame is its
-// parameters'. A parameter whose type is a type parameter cannot be a fixture either: go/types' gc sizes assert that
-// no type parameter is measured, and the original and the port both panic laying its frame out.
+// parameters'. One holding a type parameter by value has a frame go/types cannot measure, where the original crashes,
+// so it is in the differences fixture; one holding it behind a pointer, a slice, a map, a function or a channel
+// measures as words, and both judge it the same.
 func (box[T]) generic(x int64, s string)
+func (box[T]) measured(p *T, l []T, m map[string]T, f func(T) T, c chan T)

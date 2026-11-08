@@ -426,6 +426,16 @@ TEXT ·generic(SB),0,$0-24
 	MOVQ	box+0(FP), AX
 	RET
 
+TEXT ·measured(SB),0,$0-56
+	MOVQ	p+0(FP), AX
+	MOVW	p+0(FP), R1
+	MOVQ	l_len+16(FP), AX
+	MOVW	l_cap+12(FP), R1
+	MOVQ	m+32(FP), AX
+	MOVQ	f+44(FP), AX
+	MOVQ	c+48(FP), AX
+	RET
+
 TEXT ·undeclared(SB),0,$0-8
 	MOVQ	x+0(FP), AX
 	MOVQ	8(SP), AX

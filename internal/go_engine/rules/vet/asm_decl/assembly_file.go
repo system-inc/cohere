@@ -43,6 +43,8 @@ type assemblyFile struct {
 	file *token.File
 	// frames is every Go declaration without a body, by its name, then by architecture's name.
 	frames map[string]map[string]*argumentFrame
+	// unmeasured is the names of the declarations whose frame go/types cannot measure, whose functions are not judged.
+	unmeasured map[string]bool
 	// architectureName is the file's architecture, and judged its description: from the file's name, a build line,
 	// or go/build's default, empty and nil until one says.
 	architectureName string
@@ -68,12 +70,16 @@ type assemblyFile struct {
 	returnLines []int
 }
 
-// newAssemblyFile starts judging the assembly file named filename, read into file, against frames. Its architecture
-// is the one its name ends in, `_amd64.s`, when it ends in one.
+// newAssemblyFile starts judging the assembly file named filename, read into file, against frames, leaving the
+// functions unmeasured names unjudged. Its architecture is the one its name ends in, `_amd64.s`, when it ends in one.
 func newAssemblyFile(
-	pass *analysis.Pass, file *token.File, filename string, frames map[string]map[string]*argumentFrame,
+	pass *analysis.Pass,
+	file *token.File,
+	filename string,
+	frames map[string]map[string]*argumentFrame,
+	unmeasured map[string]bool,
 ) *assemblyFile {
-	walk := &assemblyFile{pass: pass, file: file, frames: frames}
+	walk := &assemblyFile{pass: pass, file: file, frames: frames, unmeasured: unmeasured}
 	for _, judged := range architectures {
 		if strings.HasSuffix(filename, "_"+judged.name+".s") {
 			walk.architectureName = judged.name
@@ -200,6 +206,14 @@ func (walk *assemblyFile) startFunction(lineNumber int, text []string) bool {
 		}
 	}
 	walk.functionName, walk.abi = withoutABISelector(walk.functionName)
+	if walk.unmeasured[walk.functionName] {
+		// A declaration whose frame go/types cannot measure, where the original crashes. Nothing of the function is
+		// judged, as nothing of another package's is.
+		walk.frame = nil
+		walk.functionName = ""
+		walk.abi = ""
+		return true
+	}
 	flags := text[3]
 	walk.frame = walk.frames[walk.functionName][walk.architectureName]
 	if walk.frame != nil {
