@@ -264,7 +264,6 @@ func (state *deadState) callsBuiltinPanic(statement *ast.ExprStmt) bool {
 	}
 	// The parser's resolution is what the original reads, and, the pass reading no type information, the only
 	// record of a local or same-file declaration of the name.
-	//cohere:ignore SA1019 the port reads no type information, and the parser's resolution is the original's judgment
 	return name.Obj == nil && !state.panicDeclared
 }
 

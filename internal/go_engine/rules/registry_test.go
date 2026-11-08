@@ -204,7 +204,8 @@ var portedVet = []string{
 
 // TestExactlyThePortedVetPassesRunTheirPorts holds every vet pass portedVet names to a registered rule running a port,
 // not vet's original, and every other vet pass to the original itself, so the registry's table can neither lose a port
-// nor gain one unannounced. Each name in portedVet is a pass vet runs, so the list cannot name a port that pins nothing.
+// nor gain one unannounced. Each name in portedVet is a pass vet runs, so the list cannot name a port that pins
+// nothing.
 func TestExactlyThePortedVetPassesRunTheirPorts(test *testing.T) {
 	test.Parallel()
 	vetPasses := map[string]bool{}
