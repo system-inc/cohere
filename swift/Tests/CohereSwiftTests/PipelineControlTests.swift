@@ -355,17 +355,39 @@ struct PipelineControlTests {
 
     /*
      `--no-fix` writes nothing into the tree, and SwiftPM keeps a package's pins nowhere but beside its manifest, so
-     a package whose Package.resolved is missing (ahraos-macos gitignores its own) fails before the compiler runs.
-     The run must say that and why, not blame the build layout (#s8p20fe).
+     a package whose Package.resolved is missing (ahraos-macos gitignores its own, ahraos-presence's
+     CapturePhone/PhoneCapture never had one) fails before the compiler runs. The run must say that and why, not
+     blame the build layout (#s8p20fe), and it is a named gap in a run that finishes, never a run that ends with
+     nothing said of its files (#4txsasr): a finding at the manifest in the check's words, every file of ours
+     without a record, lint still run over every file, and an incomplete summary.
      */
-    @Test func aBuildThatFailsBeforeCompilingSaysSo() async throws {
-        await #expect {
-            _ = try await Self.run(source: Self.cleanSource, manifest: Self.unresolvableManifest)
-        } throws: { error in
-            String(describing: error).contains("failed before compiling anything")
-                && String(describing: error).hasSuffix(
-                    "so a check cannot resolve this package: commit its Package.resolved, or run without --no-fix once"
-                )
-        }
+    @Test func aBuildThatFailsBeforeCompilingIsANamedGap() async throws {
+        let run = try await Self.run(source: Self.cleanSource, manifest: Self.unresolvableManifest)
+
+        let findings = run.of("finding")
+        #expect(findings.count == 1, "\(findings)")
+        let finding = try #require(findings.first)
+        #expect((finding["file"] as? String)?.hasSuffix("/Package.swift") == true, "\(finding)")
+        #expect(finding["messageId"] as? String == "buildFailed")
+        let message = finding["message"] as? String ?? ""
+        #expect(message.contains("failed before compiling anything"), "\(message)")
+        #expect(
+            message.hasSuffix(
+                "so a check cannot resolve this package: commit its Package.resolved, or run without --no-fix once"
+            ),
+            "\(message)",
+        )
+        let types = try #require(run.of("types").first)
+        #expect((types["build"] as? String)?.hasPrefix("not checked: the check of ") == true, "\(types)")
+        let withoutRecord = types["filesWithoutRecord"] as? [String] ?? []
+        #expect(withoutRecord.count == 1 && withoutRecord.first?.hasSuffix("/Sources/Control/Control.swift") == true)
+        #expect(run.phase("types") == "ran")
+        #expect(
+            run.phase("lint") == "ran",
+            "a check that never started is no type error in any file, so lint judges them",
+        )
+        #expect(run.of("lint").first?["rulesRun"] as? Int ?? 0 > 0)
+        #expect(run.of("summary").first?["complete"] as? Bool == false)
+        #expect(run.of("summary").first?["exitCode"] as? Int == 1)
     }
 }

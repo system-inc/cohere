@@ -436,6 +436,13 @@ steps, all into the scratch:
   every C-family file of the graph in the same `clang -fsyntax-only` pass. A file a unit newer than it already
   describes is not indexed again.
 
+A build server that fails before the compiler runs, a package `--no-fix` cannot resolve among them (SwiftPM keeps a
+package's pins only beside its Package.swift, so a package that names a remote dependency and has no
+Package.resolved cannot be resolved without writing into the tree), is a named gap in a run that finishes
+(#4txsasr): one `buildFailed` finding at the package's Package.swift in the check's words, `build` reading
+`not checked: <those words>`, and every file of ours in `filesWithoutRecord`. The finding is no type error in any
+file, so lint still runs over every file, and each file the typed rules cannot judge says the failed check is why.
+
 After an edit, when only files changed since the last successful check, the check looks again only at what the
 edit could change: the targets holding an edited file, every owned target that imports one of them, directly or
 through another, and the owned C-family files when one of them or a header changed. Every other target's records

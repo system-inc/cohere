@@ -802,6 +802,15 @@ public struct Pipeline {
                 complete = false
             }
             typeErrors = types.findings.filter { $0.severity == .error }.count
+            /*
+             A check that never started found no type error in any file, so lint is not kept from judging them
+             (#4txsasr): the rules that need no build judge every file, and each file the typed rules cannot judge
+             says the failed check is why, as under `--lint`.
+             */
+            if let notStarted = types.notStarted {
+                typeErrors -= 1
+                lintBuildFailure = notStarted
+            }
         }
 
         if typeErrors > 0 && options.runLint {
