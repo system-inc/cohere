@@ -1,0 +1,82 @@
+package parity
+
+// Every place a statement can stand, for the fix that removes a whole self-assignment, each beside its neighbours
+// and comments on the same line, so the file is laid out by hand and is not gofmt's: gofmt would put each statement
+// on a line of its own, and those are the easy case.
+
+func statements(value int, other int, channel chan int, boxed interface{}) {
+	value = value // a trailing comment
+	/* a leading comment */ value = value
+	/* a comment
+	   over two lines */ value = value /* and one after */
+	value = value; other = 1
+	other = 1; value = value
+	other = 1; value = value; other = 2
+	other = 1 /* between */; value = value /* after */; other = 2
+	value,
+		other = value,
+		other
+	items := []int{1}
+	items[ 0 ] = items[0] // printed the same, though written differently
+
+	{ value = value }
+	{ value = value /* inside */ }
+	{ /* before */ value = value /* after */ }
+	{ other = 1; value = value }
+	{ value = value; other = 1 }
+	func() { value = value }()
+
+	if value = value; value > 0 {
+	}
+	if value = value; value > 0 { other = 1 }
+	if /* before */ value = value /* after */; value > 0 {
+	}
+	if other > 0 {
+	} else if value = value; value > 0 {
+	}
+	if other > 0 { value = value } else { value = value }
+
+	for value = value; value < 3; value++ {
+	}
+	for value = value; ; {
+		break
+	}
+	for value = value
+	value < 3; value++ {
+	}
+	for ; value < 3; value = value {
+		other++
+	}
+	for value < 3 { value = value; other++ }
+	for other = 0; other < 3; other, value = other+1, value {
+	}
+
+	switch value = value; value {
+	case 1: value = value
+	case 2:
+		value = value
+	case 3: value = value; other = 1
+	case 4: other = 1; value = value
+	default: /* before */ value = value /* after */
+	}
+	switch value = value; boxed.(type) {
+	}
+	switch value = value; typed := boxed.(type) {
+	default:
+		_ = typed
+	}
+
+	select {
+	case other = <-channel: value = value
+	case channel <- 1:
+		value = value
+	default: value = value /* after */
+	}
+
+labelled:
+	value = value
+	if other > 3 {
+		goto labelled
+	}
+	_, _ = value, other
+}
