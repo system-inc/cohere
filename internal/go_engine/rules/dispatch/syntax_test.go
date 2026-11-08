@@ -86,6 +86,66 @@ func TestTheSyntaxWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T)
 	}
 }
 
+// A listener that appends to the stack it is handed changes no other listener's: the next listener at the same node,
+// and every listener below it, the first child included, still hears its true ancestors. The walk keeps the node
+// visited in the slot just past the stack it hands, as the parent of everything below, so a stack handed with room
+// past its end would let the append overwrite that parent.
+func TestASyntaxListenerAppendingToItsStackLeavesTheWalksAlone(test *testing.T) {
+	test.Parallel()
+	appends := 0
+	planted := &ast.BadStmt{}
+	dispatcher := NewSyntax()
+	appending := dispatcher.RuleAnalyzer(rule.Namespace+"appending", "appending", "appends to every stack",
+		&rule.Listener{
+			Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.Ident)(nil)},
+			Node: func(_ *rule.Context, _ ast.Node, stack []ast.Node) {
+				grown := append(stack, planted, planted)
+				appends += len(grown)
+			},
+		})
+	heard := []string{}
+	recording := dispatcher.RuleAnalyzer(rule.Namespace+"recording", "recording", "records each declaration",
+		&rule.Listener{
+			Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.Ident)(nil)},
+			Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
+				heard = append(heard, nodeHeard(context.Fset, node, stack))
+			},
+		})
+	probe, files := filesProbe()
+	for _, action := range analyzeFixture(test, "walked", appending, recording, probe).Roots {
+		if action.Err != nil {
+			test.Fatalf("running %s: %v", action, action.Err)
+		}
+	}
+
+	expected := []string{}
+	for _, file := range files.files {
+		stack := []ast.Node{}
+		ast.Inspect(file, func(node ast.Node) bool {
+			if node == nil {
+				stack = stack[:len(stack)-1]
+				return true
+			}
+			switch node.(type) {
+			case *ast.FuncDecl, *ast.Ident:
+				expected = append(expected, nodeHeard(files.fileSet, node, stack))
+			}
+			stack = append(stack, node)
+			return true
+		})
+	}
+	if appends == 0 || !slices.ContainsFunc(expected, func(line string) bool {
+		return strings.Contains(line, "under *ast.FuncDecl")
+	}) {
+		test.Fatalf("the fixture has no identifier right under a function declaration, or nothing appended (%d), "+
+			"so the walk's parents were never at risk", appends)
+	}
+	if !slices.Equal(heard, expected) {
+		test.Errorf("after a listener appended to its stack, the next heard\n%s\nwhere the ancestors are\n%s",
+			strings.Join(heard, "\n"), strings.Join(expected, "\n"))
+	}
+}
+
 // nodeHeard is one node as the walk test records it: its kind, its line, its parent's kind and how many ancestors it
 // has, so a stack that held the node itself, or lost an ancestor, reads differently.
 func nodeHeard(fileSet *token.FileSet, node ast.Node, stack []ast.Node) string {
