@@ -850,6 +850,7 @@ var portedPasses = []string{
 	"error_variable_name",
 	"errors_new_of_sprintf",
 	"extreme_comparison",
+	"guarded_delete",
 	"http_status_literal",
 	"identical_operands",
 	"impossible_target_comparison",
