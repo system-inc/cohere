@@ -715,6 +715,7 @@ var portedPasses = []string{
 	"nil_ness",
 	"receiver_name",
 	"unconditional_loop_exit",
+	"unread_assigned_value",
 	"unused_code",
 	"unused_write",
 	"vet",
