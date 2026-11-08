@@ -707,6 +707,7 @@ var portedPasses = []string{
 	"http_status_literal",
 	"identical_operands",
 	"inconsistent_receiver_name",
+	"ineffective_copy",
 	"invisible_character",
 	"misplaced_error_result",
 	"nil_ness",
