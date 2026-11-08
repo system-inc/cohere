@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -537,19 +538,16 @@ func sourceSnapshot(test *testing.T) string {
 	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 		copySnapshotFile(test, filepath.Join(moduleRoot, name), filepath.Join(snapshot, name))
 	}
-	// Every directory holding source go builds: the module's own, the modules go.work names beside it, and
-	// third_party, whose vendored copies go.mod replaces dependencies with (#j3bfnyt). A module left out is
-	// one the snapshot's go.work or go.mod names and cannot find.
-	for _, directory := range []string{
-		"command",
-		"internal",
-		"policy",
-		"TypeScript-shim",
-		"static_single_assignment",
-		"mutation_aliasing",
-		"unicode_properties",
-		"third_party",
-	} {
+	// Every directory holding source go builds: the module's own, third_party, whose vendored copies go.mod
+	// replaces dependencies with (#j3bfnyt), and every module go.work names, read from go.work itself so a
+	// module added there is never one the snapshot names and cannot find (#wy3dbnz).
+	directories := []string{"command", "internal", "policy", "unicode_properties", "third_party"}
+	for _, directory := range goWorkModuleDirectories(test, filepath.Join(moduleRoot, "go.work")) {
+		if !slices.Contains(directories, directory) {
+			directories = append(directories, directory)
+		}
+	}
+	for _, directory := range directories {
 		source := filepath.Join(moduleRoot, directory)
 		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, pathError error) error {
 			if pathError != nil {
@@ -582,6 +580,39 @@ func sourceSnapshot(test *testing.T) string {
 		test.Fatal(symlinkError)
 	}
 	return snapshot
+}
+
+// goWorkModuleDirectories is the top directory of every module go.work's use block names beside the
+// root, the root itself and TypeScript left out: the root's source is copied by name, and TypeScript is
+// linked, not copied. A use line is read as go.work's own grammar has it, one path to a line inside the
+// block, a // comment ignored.
+func goWorkModuleDirectories(test *testing.T, goWork string) []string {
+	test.Helper()
+	contents, readError := os.ReadFile(goWork)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	var directories []string
+	inside := false
+	for line := range strings.Lines(string(contents)) {
+		trimmed, _, _ := strings.Cut(strings.TrimSpace(line), "//")
+		trimmed = strings.TrimSpace(trimmed)
+		switch {
+		case trimmed == "use (":
+			inside = true
+		case inside && trimmed == ")":
+			inside = false
+		case inside && trimmed != "":
+			top, _, _ := strings.Cut(strings.TrimPrefix(trimmed, "./"), "/")
+			if top != "." && top != "" && top != "TypeScript" && !slices.Contains(directories, top) {
+				directories = append(directories, top)
+			}
+		}
+	}
+	if len(directories) == 0 {
+		test.Fatalf("%s names no module beside the root in a use block, so the snapshot would miss them", goWork)
+	}
+	return directories
 }
 
 func copySnapshotFile(test *testing.T, source string, destination string) {
