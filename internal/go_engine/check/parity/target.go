@@ -48,6 +48,18 @@ func (target Target) RequireIdentical(
 	requireIdentical(test, target, original, port, testdata, nil, patterns...)
 }
 
+// RequireIdenticalFacts is the package's RequireIdenticalFacts with the fixtures loaded for target.
+func (target Target) RequireIdenticalFacts(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	patterns ...string,
+) {
+	test.Helper()
+	requireIdenticalFacts(test, target, original, port, testdata, patterns...)
+}
+
 // RequireOnlyAdjudicated is the package's RequireOnlyAdjudicated with the fixtures loaded for target.
 func (target Target) RequireOnlyAdjudicated(
 	test testing.TB,
