@@ -1,0 +1,34 @@
+Package differences: the one shape where the port and the original disagree, an excluded Go file that does not
+parse, after which the original checks no excluded file, Go or other, and the port checks every one. A finding only
+the port makes is recorded on its line after the original's testing hack, a spaced `// ERROR` comment, which ends
+what either side reads of the line. It is an archive because one file does not parse, and cohere's gofmt guard reads
+every Go file under testdata.
+-- src/differences/differences.go --
+// Package differences holds the excluded files around one that does not parse.
+package differences
+-- src/differences/before.go --
+// An excluded file named before the broken one, which both sides check.
+
+//go:build never
+
+package differences
+
+// +build late
+-- src/differences/broken.go --
+//go:build never
+
+package differences
+
+func {
+-- src/differences/checked_after.go --
+// An excluded file named after the broken one, which only the port checks.
+
+//go:build never
+
+package differences
+
+// +build late // ERROR // port finds: misplaced +build comment
+-- src/differences/excluded.s --
+//go:build never
+// +build late // ERROR // port finds: misplaced +build comment
+#include "textflag.h"
