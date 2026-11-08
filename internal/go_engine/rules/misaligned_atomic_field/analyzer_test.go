@@ -23,7 +23,7 @@ import (
 
 // platform is a target the fixtures are loaded for, whose sizes the check reads.
 type platform struct {
-	// architecture is the platform's GOARCH.
+	// architecture is the platform's `GOARCH`.
 	architecture string
 	// judged is whether the platform's pointers are 4 bytes, the only platforms the check judges.
 	judged bool
