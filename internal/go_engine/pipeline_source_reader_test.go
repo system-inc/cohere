@@ -95,7 +95,7 @@ func runRecorded(test *testing.T, root string, registered []rule.Rule, extra ...
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
 	arguments := append([]string{"--contract", fmt.Sprint(contract.Version), "--root", root}, extra...)
-	if exitCode := run(arguments, &standardOutput, &standardError, registered); exitCode == exitRefused {
+	if exitCode := run(arguments, &standardOutput, &standardError, registered, nil); exitCode == exitRefused {
 		test.Fatalf("the engine refused the run; stderr:\n%s", standardError.String())
 	}
 	return standardOutput.String(), standardError.String()

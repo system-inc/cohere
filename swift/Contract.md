@@ -520,6 +520,15 @@ the project's and its dependencies' with cgo files alike, and how long that took
 translates nothing, which runs no cgo tool, it is `{"packages":0,"milliseconds":0}`, written and never
 left out, so a front door can always say whether a run built anything.
 
+The Go engine's types record also carries `memory`, additive within contract 3: the memory limit its process
+held its heap under and where it came from, as
+`{"limitBytes":8589934592,"capBytes":8589934592,"source":"Cap","availableBytes":44023414784}`. The limit is the
+smaller of the engine's cap and half the memory available when the run started. `source` is `Cap` or
+`Available`, whichever was smaller; `Environment` when the user's `GOGC` or `GOMEMLIMIT` decided, with
+`environment` naming them and `limitBytes` the limit they left, `0` for none; or `Unreadable` when available
+memory could not be read, and the cap was set as a bound alone. The front door prints it in the account
+`--verbose` prints. It is left out of a run the engine was not started for as a process of its own.
+
 **Only compiler errors cut lint off.** In TypeScript every diagnostic the checker reports is an
 error, so "any type diagnostic bails" and "any type error bails" were the same rule. In Swift they
 are not. A warning (`variable was never mutated`) is a finding and fails the run, but the code

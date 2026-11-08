@@ -156,6 +156,9 @@ type engineTypesRecord struct {
 	// with the toolchain's SDK index seed, its key and whether the run's store was seeded from it, absent when no
 	// seed applied. A Go engine sends none.
 	SdkIndexSeed *sdkIndexSeedUse `json:"sdkIndexSeed"`
+	// Memory is the Go engine's, additive within contract 3: the memory limit its process ran under and where it
+	// came from, printed in the account `--verbose` prints. A Swift engine sends none.
+	Memory *engineMemory `json:"memory"`
 }
 
 type engineLintRecord struct {
@@ -801,6 +804,11 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 				"  types: no toolchain seed %s held the SDK's index units, so they were indexed afresh\n", seed.Key)
 		}
 		activeSummary.Swift = &swiftSummary{SdkIndexSeed: seed}
+	}
+
+	// The invocation's, as the types line is: the limit this run's engine held its heap under, and why.
+	if record.Memory != nil {
+		printInvocation(accountOutput(run.out), "  memory: %s\n", record.Memory.line())
 	}
 
 	// Said, so a run that withheld what no cgo tool could settle never reads like one with nothing to withhold:

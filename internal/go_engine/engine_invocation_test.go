@@ -154,12 +154,12 @@ func TestMainRefusesASecondRun(test *testing.T) {
 	versionArguments := append(slices.Clone(contractArguments), "--version")
 	var firstOutput bytes.Buffer
 	var firstError bytes.Buffer
-	if exitCode := Main(versionArguments, &firstOutput, &firstError); exitCode != exitClean {
+	if exitCode := Main(versionArguments, 0, &firstOutput, &firstError); exitCode != exitClean {
 		test.Fatalf("the first run exited %d, want %d; stderr: %s", exitCode, exitClean, firstError.String())
 	}
 	var secondOutput bytes.Buffer
 	var secondError bytes.Buffer
-	if exitCode := Main(versionArguments, &secondOutput, &secondError); exitCode != exitRefused {
+	if exitCode := Main(versionArguments, 0, &secondOutput, &secondError); exitCode != exitRefused {
 		test.Fatalf("the second run exited %d, want %d", exitCode, exitRefused)
 	}
 	if secondOutput.Len() != 0 || !strings.Contains(secondError.String(), "second engine run in one process") {
