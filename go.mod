@@ -27,6 +27,10 @@ replace (
 	// it, shared with Adamic the same way (#kr2yp54).
 	github.com/system-inc/cohere/mutation_aliasing => ./mutation_aliasing
 
+	// git's own arithmetic over a repository's tree: its objects' ids and the listings `git ls-tree -z` and
+	// `git ls-files --stage -z` print, shared with Loom and Adamic the same way (#4mrck67).
+	github.com/system-inc/cohere/git_tree => ./git_tree
+
 	// staticcheck v0.8.1 as released, but for upstream's fa9ae6d1a5 in unused/: U1000 shares one object path
 	// encoder per package, where the release walks the package afresh for every object it records. That walk was
 	// most of U1000's CPU at cohere's root, 4.3 to 4.5 core-seconds, and with the fix it is 0.5 to 0.7, findings
@@ -51,6 +55,7 @@ require (
 	github.com/microsoft/TypeScript/tsc/shim/vfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/TypeScript/tsc/shim/vfs/osvfs v0.0.0
+	github.com/system-inc/cohere/git_tree v0.0.0
 	github.com/system-inc/cohere/mutation_aliasing v0.0.0
 	github.com/system-inc/cohere/static_single_assignment v0.0.0
 
