@@ -6,7 +6,7 @@
 // message and fix it reports word for word, over the same range, the whole call. The original matches its one query,
 // `(CallExpr fn@(Or (Symbol "fmt.Sprint") (Symbol "fmt.Sprintf")) [lit@(BasicLit "STRING" _)])`, through staticcheck's
 // pattern language, walked over the calls its type index records of the two functions; the port asks the same of
-// each call the inspector holds, reading pattern/match.go for what each construct of the query matches, and reports
+// each call the dispatcher hands it, reading pattern/match.go for what each construct of the query matches, and reports
 // through staticcheck_report.Report where the original reports through report.Report. The registry still runs the
 // original, which stays the oracle: the parity tests beside this file run both over the same packages, and the two
 // differ nowhere they hold.
@@ -19,52 +19,40 @@ import (
 	"go/types"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Analyzer runs the port as a plain analyzer under the original's name, so the rule, its settings and every
-// `//cohere:ignore` naming it read the same once the port takes the original's place. It requires staticcheck's
-// generated pass, which the context's judgment of generated files reads, since this check filters them.
-var Analyzer = &analysis.Analyzer{
-	Name:     "S1039",
-	Doc:      "Flags fmt.Sprint or fmt.Sprintf given one string literal: staticcheck's S1039, ported.",
-	Requires: []*analysis.Analyzer{inspect.Analyzer, generated.Analyzer},
-	Run:      run,
-}
-
-// run builds the pass's context and judges every call of the package.
-func run(pass *analysis.Pass) (any, error) {
-	context, contextError := staticcheck_report.PassContext(pass)
-	if contextError != nil {
-		return nil, contextError
-	}
-	inspected, isInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !isInspector {
-		// Invariant: the driver hands every analyzer the results of what it requires, of the types they declare.
-		panic("unnecessary_sprint: the inspect pass's result is missing")
-	}
+// Listener is what the port hears of each package from the dispatcher: every call, in preorder.
+var Listener = rule.Listener{
 	// The original's root is a call of a Symbol, so code.Matches walks the type index's calls of fmt.Sprint and of
-	// fmt.Sprintf instead of the inspector. Those are the calls whose callee, through parentheses and a selector,
-	// resolves to either function, which are the calls the gate in Check lets through, so the port walks the
-	// inspector's calls and asks the same of each. Where the index answers otherwise, inside fmt itself, Check says
-	// why.
-	inspected.Preorder([]ast.Node{(*ast.CallExpr)(nil)}, func(node ast.Node) {
+	// fmt.Sprintf instead of the syntax. Those are the calls whose callee, through parentheses and a selector,
+	// resolves to either function, which are the calls the gate in Check lets through, so the port hears every call
+	// of the dispatcher's walk and asks the same of each. Where the index answers otherwise, inside fmt itself, Check
+	// says why.
+	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall {
-			// Invariant: Preorder hands this function only the calls it was asked for.
-			panic("unnecessary_sprint: the inspector handed over a node that is not a call")
+			// Invariant: the dispatcher hands Node only the calls it was asked for.
+			panic("unnecessary_sprint: the dispatcher handed over a node that is not a call")
 		}
 		Check(context, call)
-	})
-	return nil, nil
+	},
 }
+
+// Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
+// name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
+// original's place.
+var Analyzer = dispatch.RuleAnalyzer(
+	rule.Namespace+"S1039",
+	"S1039",
+	"Flags fmt.Sprint or fmt.Sprintf given one string literal: staticcheck's S1039, ported.",
+	&Listener,
+)
 
 // Check judges one call: fmt.Sprint given one string literal, or fmt.Sprintf given one with no percent sign in it,
 // returns the literal's own value, and the fix replaces the call by the literal.
