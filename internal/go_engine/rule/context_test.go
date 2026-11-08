@@ -83,6 +83,30 @@ func TestContextOptionReadsTheRulesOwnFlag(test *testing.T) {
 	}
 }
 
+// State is made on first use and the same on every use after, each context has its own, and reading it as a second
+// type panics naming both.
+func TestStateIsTheContextsOwn(test *testing.T) {
+	test.Parallel()
+	newContext := func() *Context {
+		return NewContext(Namespace+"planted", plantedPass(), nil, &flag.FlagSet{}, generatedNone,
+			func(string, analysis.Diagnostic) {
+				test.Error("a context that reports nothing handed the sink a finding")
+			})
+	}
+	first, second := newContext(), newContext()
+	*State[[]string](first) = append(*State[[]string](first), "gathered")
+	if gathered := *State[[]string](first); len(gathered) != 1 {
+		test.Errorf("the state read back as %q, where what was gathered was expected", gathered)
+	}
+	if gathered := *State[[]string](second); len(gathered) != 0 {
+		test.Errorf("a second context's state holds %q, gathered on the first", gathered)
+	}
+	recovered := panicOf(func() { State[int](first) })
+	if !strings.Contains(recovered, "reads its state as *int, where it was made as *[]string") {
+		test.Errorf("reading the state as a second type panicked with %q", recovered)
+	}
+}
+
 // panicOf is what call panicked with, spelled, or empty when it returned.
 func panicOf(call func()) (recovered string) {
 	defer func() {

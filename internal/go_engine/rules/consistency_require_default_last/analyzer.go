@@ -14,48 +14,46 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/policy"
 )
 
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-require-default-last"
 
-// Analyzer runs the rule over one package.
-var Analyzer = &analysis.Analyzer{
-	Name: "consistency_require_default_last",
-	Doc: "Flags a default clause that is not the last clause of its switch, type switch or select, since Go picks " +
-		"the default only when nothing else matches and a reader looks for that fallback at the bottom. A default " +
-		"that falls through into the next clause, or that the clause before falls through into, is left alone, " +
-		"since there its place is the program's meaning.",
-	Run: run,
+// listener hears every switch, type switch and select of the syntax dispatcher's walk.
+var listener = rule.Listener{
+	Nodes: []ast.Node{(*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil), (*ast.SelectStmt)(nil)},
+	Node:  judgeStatement,
 }
 
+// Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
+var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_default_last", "Flags a default clause that is not "+
+	"the last clause of its switch, type switch or select, since Go picks the default only when nothing else matches "+
+	"and a reader looks for that fallback at the bottom. A default that falls through into the next clause, or that "+
+	"the clause before falls through into, is left alone, since there its place is the program's meaning.", &listener)
+
 // Rule is this rule's entry in the Go engine's registry. It reads only the order of clauses in the syntax tree.
-var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
+var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer, Listener: &listener}
 
 var defaultNotLastMessage = policy.MessageOf(Name, "defaultNotLast")
 
-func run(pass *analysis.Pass) (any, error) {
-	for _, file := range pass.Files {
-		ast.Inspect(file, func(node ast.Node) bool {
-			switch statement := node.(type) {
-			case *ast.SwitchStmt:
-				judgeSwitch(pass, statement.Body, "switch")
-			case *ast.TypeSwitchStmt:
-				judgeSwitch(pass, statement.Body, "type switch")
-			case *ast.SelectStmt:
-				judgeSelect(pass, statement.Body)
-			}
-			// Nested statements are reached by the walk going on, so each is judged on its own clauses.
-			return true
-		})
+// judgeStatement judges node's own clauses. Nested statements are reached by the walk going on, so each is judged on
+// its own clauses.
+func judgeStatement(context *rule.Context, node ast.Node, _ []ast.Node) {
+	switch statement := node.(type) {
+	case *ast.SwitchStmt:
+		judgeSwitch(context, statement.Body, "switch")
+	case *ast.TypeSwitchStmt:
+		judgeSwitch(context, statement.Body, "type switch")
+	case *ast.SelectStmt:
+		judgeSelect(context, statement.Body)
 	}
-	return nil, nil
 }
 
 // judgeSwitch flags the default clause of an expression or type switch whose body is body when it is not the last
 // clause. kind names the statement in the message.
-func judgeSwitch(pass *analysis.Pass, body *ast.BlockStmt, kind string) {
+func judgeSwitch(context *rule.Context, body *ast.BlockStmt, kind string) {
 	clauses := body.List
 	for index, statement := range clauses {
 		// The parser puts only case clauses in a switch's body, so anything else is skipped rather than guessed at.
@@ -69,12 +67,12 @@ func judgeSwitch(pass *analysis.Pass, body *ast.BlockStmt, kind string) {
 		if fallsThrough(clause) || index > 0 && fallsThrough(clauses[index-1]) {
 			continue
 		}
-		report(pass, clause.Case, clause.Colon, kind)
+		report(context, clause.Case, clause.Colon, kind)
 	}
 }
 
 // judgeSelect flags the default clause of a select whose body is body when it is not the last clause.
-func judgeSelect(pass *analysis.Pass, body *ast.BlockStmt) {
+func judgeSelect(context *rule.Context, body *ast.BlockStmt) {
 	clauses := body.List
 	for index, statement := range clauses {
 		// The parser puts only communication clauses in a select's body, so anything else is skipped.
@@ -83,7 +81,7 @@ func judgeSelect(pass *analysis.Pass, body *ast.BlockStmt) {
 		if !isClause || clause.Comm != nil || index == len(clauses)-1 {
 			continue
 		}
-		report(pass, clause.Case, clause.Colon, "select")
+		report(context, clause.Case, clause.Colon, "select")
 	}
 }
 
@@ -107,8 +105,8 @@ func fallsThrough(statement ast.Stmt) bool {
 
 // report flags the default clause that opens at keyword with its colon at colon, so the finding covers `default:`
 // and not the clause's body. kind names the statement it belongs to.
-func report(pass *analysis.Pass, keyword token.Pos, colon token.Pos, kind string) {
-	pass.Report(analysis.Diagnostic{
+func report(context *rule.Context, keyword token.Pos, colon token.Pos, kind string) {
+	context.Report(analysis.Diagnostic{
 		Pos:      keyword,
 		End:      colon + 1,
 		Category: defaultNotLastMessage.Id,
