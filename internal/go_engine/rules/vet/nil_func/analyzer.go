@@ -21,8 +21,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore` naming it
-// read the same as before the port took the original's place.
+// passName is the original's name, which the port takes, so the rule, its settings and every `//cohere:ignore`
+// naming it read the same as before the port took the original's place.
 const passName = "nilfunc"
 
 // passDoc is the original's documentation, word for word, so the rule is described in `go vet`'s own words.
