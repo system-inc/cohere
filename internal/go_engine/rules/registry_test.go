@@ -723,6 +723,7 @@ var portedPasses = []string{
 	"misplaced_error_result",
 	"nan_comparison",
 	"negative_length_comparison",
+	"negative_zero_float",
 	"nil_ness",
 	"receiver_name",
 	"repeated_if_else_condition",
