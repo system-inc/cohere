@@ -34,7 +34,8 @@ type Listener struct {
 	// Nodes are the kinds Node is called for, each written as a typed nil, `(*ast.CallExpr)(nil)`.
 	Nodes []ast.Node
 	// Node is called for each node of a kind Nodes lists, in preorder, with the node's ancestors as stack, outermost
-	// first, the node itself left out. The walk reuses stack, so a check that keeps it copies it.
+	// first, the node itself left out. The walk reuses stack, so a check that keeps it copies it. During the call,
+	// Context.Cursor is the node's inspector cursor.
 	Node func(context *Context, node ast.Node, stack []ast.Node)
 	// FileEnter is called as the syntax walk enters each file.
 	FileEnter func(context *Context, file *ast.File)

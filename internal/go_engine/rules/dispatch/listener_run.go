@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -78,13 +79,17 @@ func (run *listenerRun) fileEnter(file *ast.File) {
 	run.registered.listener.FileEnter(run.context, file)
 }
 
-// node calls the listener's Node on node, a kind the listener lists, with its ancestors.
-func (run *listenerRun) node(node ast.Node, stack []ast.Node) {
+// node calls the listener's Node on node, a kind the listener lists, with its ancestors, its context handing the
+// listener cursor, node's own, for the length of the call. A Node that panics leaves the cursor held, which is
+// harmless: the run has crashed, and nothing calls it on the package again.
+func (run *listenerRun) node(cursor inspector.Cursor, node ast.Node, stack []ast.Node) {
 	if run.crash != nil {
 		return
 	}
 	defer run.recoverCrash()
+	run.context.EnterNode(cursor)
 	run.registered.listener.Node(run.context, node, stack)
+	run.context.LeaveNode()
 }
 
 // fileExit calls the listener's FileExit as the walk leaves file.
