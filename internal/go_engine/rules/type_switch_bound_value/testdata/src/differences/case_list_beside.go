@@ -9,10 +9,9 @@ import (
 // The original replaces both, so the case is `[16]byte`, and the body's eight bytes are given sixteen.
 func besideCaseList(x interface{}) {
 	// The port's fix leaves `x.([8]byte)` in the case's type, where the original's writes `x`, and its related
-	// entries leave that assertion out, since the binding can't eliminate it.
+	// entries leave that assertion out, since the binding can't eliminate it, where the original's say it could.
 	switch x.(type) { // port moves: assigning the result of this type assertion to a variable (switch x := x.(type)) could eliminate type assertions in switch cases
-	// The original's related entry on the case type's assertion says it could be eliminated, and it can't.
-	case [unsafe.Sizeof(x.([8]byte))]byte: // port omits: could eliminate this type assertion
+	case [unsafe.Sizeof(x.([8]byte))]byte:
 		var eight [8]byte = x.([8]byte)
 		fmt.Println(eight)
 	}
