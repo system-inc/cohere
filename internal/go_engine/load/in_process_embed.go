@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"golang.org/x/mod/module"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // resolveEmbedPatterns is the files a package's `//go:embed` patterns match, relative to its directory,
@@ -58,7 +60,7 @@ func embeddedMatch(directory string, file string, all bool) ([]string, string) {
 		return nil, statError.Error()
 	}
 	for each := file; len(each) > len(directory)+1; each = filepath.Dir(each) {
-		if goModAt(each) {
+		if listed_directories.GoModAt(each) {
 			return nil, fmt.Sprintf("%s is in another module", relative)
 		}
 		if each != file {
@@ -102,7 +104,7 @@ func embeddedDirectory(directory string, matched string, all bool) ([]string, st
 			return nil
 		}
 		if entry.IsDir() {
-			if goModAt(walked) {
+			if listed_directories.GoModAt(walked) {
 				return filepath.SkipDir
 			}
 			return nil

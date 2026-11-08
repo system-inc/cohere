@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
 // listedPackage is what `go list -deps -json` says of one package, the fields the loader reads.
@@ -62,7 +64,9 @@ type listedModule struct {
 	Directory string `json:"Dir"`
 	GoMod     string
 	GoVersion string
-	Replace   *listedModule
+	// Main is whether the module is a main module, one the go command was run in rather than a dependency.
+	Main    bool
+	Replace *listedModule
 }
 
 // listedFields are the fields asked of go list, so it computes nothing else.
@@ -130,6 +134,25 @@ func runList(directory string, environment []string, patterns []string) (*listin
 	if len(result.packages) == 0 {
 		return nil, fmt.Errorf("go list found no packages for %s in %s", strings.Join(patterns, " "), directory)
 	}
+	// What go list read in its process, read again in this one, so a test that loads packages has its result keyed on
+	// them (#cmpsz8p).
+	workspace, absolutePathError := filepath.Abs(directory)
+	if absolutePathError != nil {
+		return nil, absolutePathError
+	}
+	reads := make([]listed_directories.Package, 0, len(result.packages))
+	for _, listed := range result.packages {
+		each := listed_directories.Package{
+			ImportPath: listed.ImportPath,
+			Directory:  listed.Directory,
+			Root:       !listed.DepOnly,
+		}
+		if listed.Module != nil && listed.Module.Main {
+			each.MainModule, each.MainGoMod = true, listed.Module.GoMod
+		}
+		reads = append(reads, each)
+	}
+	listed_directories.Open(workspace, patterns, reads)
 	return result, nil
 }
 
