@@ -2,9 +2,8 @@ package staticcheck_call
 
 import (
 	"fmt"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"go/constant"
-
-	"honnef.co/go/tools/go/ir"
 )
 
 // RepeatZeroTimes is the rule that marks the call's argument at index argument, a count of how many times the
@@ -19,7 +18,7 @@ import (
 func RepeatZeroTimes(name string, argument int) Rule {
 	return func(call *Call) {
 		count := call.Arguments[argument]
-		extracted, isConstant := count.Value.(*ir.Const)
+		extracted, isConstant := count.Value.(*intermediate_representation.Constant)
 		if !isConstant || extracted.Value == nil || extracted.Value.Kind() != constant.Int {
 			return
 		}

@@ -147,13 +147,6 @@ func switched(choice int) {
 	}
 }
 
-// An array written whole and then by element.
-func wholeThenElement() {
-	values := [2]int{}
-	values = [2]int{3, 4}
-	values[1] = 5
-}
-
 // A struct reassigned from a literal.
 func reassigned() int {
 	value := pair{}
@@ -184,18 +177,6 @@ func stringField() byte {
 	return value.text[0]
 }
 
-// A single element written at a parameter's index.
-func parameterIndex(index int) {
-	var values [4]int
-	values[index] = 1
-}
-
-// A single element written at a computed index.
-func computedIndexAlone(index int) {
-	var values [4]int
-	values[index+1] = 1
-}
-
 // A pointer to a literal with every field given, one written again.
 func pointerLiteralRewritten() int {
 	value := &pair{left: 1, right: 2}
@@ -207,18 +188,6 @@ func pointerLiteralRewritten() int {
 func pointerPositionalLiteral() int {
 	value := &pair{1, 2}
 	return value.right
-}
-
-// A pointer to a partial array literal, keyed.
-func pointerPartialArrayLiteral() int {
-	values := &[3]int{2: 7}
-	return len(values)
-}
-
-// A partial array literal into a variable, then an element written.
-func partialArrayThenElement() {
-	values := [3]int{1: 5}
-	values[2] = 1
 }
 
 // A struct literal into a variable, then a field written.

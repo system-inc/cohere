@@ -1,5 +1,5 @@
 // Package infinite_recursion is staticcheck's SA5007, a function that calls itself on every path to its end, so it
-// recurses until the stack runs out, ported onto staticcheck's intermediate representation as a rule.FunctionCheck.
+// recurses until the stack runs out, ported onto the engine's own intermediate representation (#tey4xje).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa5007/sa5007.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call's syntax, where staticcheck's report
@@ -14,14 +14,16 @@ package infinite_recursion
 
 import (
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -39,14 +41,14 @@ const message = "infinite recursive call"
 
 // Check judges one function: each call, deferred call included, whose static callee is the function itself, from a
 // block every way out of the function passes through, so no path returns or panics without recursing first.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			site, isCallSite := instruction.(ir.CallInstruction)
+		for _, instruction := range block.Instructions {
+			site, isCallSite := instruction.(intermediate_representation.CallInstruction)
 			if !isCallSite || site.Common().StaticCallee() != function {
 				continue
 			}
-			if _, isGo := site.(*ir.Go); isGo {
+			if _, isGo := site.(*intermediate_representation.Go); isGo {
 				// A goroutine that starts itself grows a new stack each time, never one stack without end.
 				continue
 			}
@@ -65,7 +67,10 @@ func Check(context *rule.Context, function *ir.Function) {
 
 // dominatesEveryExit is whether every block of function with no successor, every way out of it, is reached only
 // through block. A function with no such block, one that only loops, holds it of every block, as the original does.
-func dominatesEveryExit(block *ir.BasicBlock, function *ir.Function) bool {
+func dominatesEveryExit(
+	block *intermediate_representation.BasicBlock,
+	function *intermediate_representation.Function,
+) bool {
 	for exit := range function.Exits() {
 		if !block.Dominates(exit) {
 			return false

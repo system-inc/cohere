@@ -25,7 +25,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -34,7 +36,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1029",
 	"SA1029",
 	"Flags a key given to context.WithValue that is of a built in type, an empty anonymous struct, or a type that "+
-		"cannot be compared: staticcheck's SA1029, ported onto staticcheck's intermediate representation.",
+		"cannot be compared: staticcheck's SA1029, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 

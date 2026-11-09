@@ -7,34 +7,21 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 )
 
 // Listener is what one rule hears of a package from the engine's dispatchers, which walk each package once for every
 // rule rather than once per rule. A rule declares the callbacks it needs and the kinds each is called for, and is
-// called for nothing else. A listener hears one walk, never two: staticcheck's intermediate representation's, the
-// engine's own intermediate representation's (IntermediateRepresentation), or the syntax's, and its PackageExit
-// follows that walk. A check keeps no state between packages, never recovers, since the
-// dispatcher recovers per check per package, and never names its rule, since Context.Report stamps the name it was
-// registered under.
+// called for nothing else. A listener hears one walk, never both: the engine's own intermediate representation's
+// (IntermediateRepresentation) or the syntax's, and its PackageExit follows that walk. A check keeps no state between
+// packages, never recovers, since the dispatcher recovers per check per package, and never names its rule, since
+// Context.Report stamps the name it was registered under.
 type Listener struct {
 	// Requires are the analyzers whose results the check reads through Context.ResultOf. One failing on a package
 	// fails this rule there and no other on its dispatcher, as it did when the rule walked by itself.
 	Requires []*analysis.Analyzer
 
-	// Function is called once for each function of the package's intermediate representation, in the order
-	// staticcheck_ir.Functions reads them, before any of the function's instructions.
-	Function FunctionCheck
-	// Instructions are the kinds Instruction is called for, each written as a typed nil, `(*ir.Call)(nil)`.
-	Instructions []ir.Instruction
-	// Instruction is called for each instruction of a kind Instructions lists, in block order, after Function.
-	Instruction func(context *Context, instruction ir.Instruction)
-	// FunctionExit is called once the function's instructions have all been heard.
-	FunctionExit func(context *Context, function *ir.Function)
-
 	// IntermediateRepresentation is what the listener hears of the walk over the engine's own intermediate
-	// representation, and nil for a listener of another walk. A reader moves from staticcheck's walk to this one by
-	// moving its Function, Instructions, Instruction and FunctionExit here, over our types (#g0rwdw1).
+	// representation, and nil for a listener of the syntax walk.
 	IntermediateRepresentation *IntermediateRepresentationListener
 
 	// Nodes are the kinds Node is called for, each written as a typed nil, `(*ast.CallExpr)(nil)`.
@@ -59,17 +46,9 @@ func (listener *Listener) IsSyntax() bool {
 }
 
 // IsIntermediateRepresentation is whether the listener hears the walk over the engine's own intermediate
-// representation, declaring IntermediateRepresentation. A listener that hears neither this walk nor the syntax's
-// hears staticcheck's intermediate representation's.
+// representation, declaring IntermediateRepresentation.
 func (listener *Listener) IsIntermediateRepresentation() bool {
 	return listener.IntermediateRepresentation != nil
-}
-
-// isStaticcheckIr is whether the listener declares anything of the walk over staticcheck's intermediate
-// representation: Function, Instructions, Instruction or FunctionExit.
-func (listener *Listener) isStaticcheckIr() bool {
-	return listener.Function != nil || len(listener.Instructions) > 0 || listener.Instruction != nil ||
-		listener.FunctionExit != nil
 }
 
 // Validate refuses a listener that would listen for what it does not declare, or declare what nothing calls: one
@@ -79,9 +58,6 @@ func (listener *Listener) isStaticcheckIr() bool {
 // listed twice.
 func (listener *Listener) Validate() error {
 	declared := []string{}
-	if listener.isStaticcheckIr() {
-		declared = append(declared, "staticcheck's intermediate representation's walk")
-	}
 	if listener.IsIntermediateRepresentation() {
 		declared = append(declared, "the engine's own intermediate representation's walk")
 	}
@@ -97,10 +73,6 @@ func (listener *Listener) Validate() error {
 	if len(declared) > 1 {
 		return fmt.Errorf("declares both %s and %s, where a listener hears one; register a listener for each",
 			declared[0], declared[1])
-	}
-	if instructionsError := validateKinds("instruction", "Instructions", "Instruction", listener.Instructions,
-		listener.Instruction != nil); instructionsError != nil {
-		return instructionsError
 	}
 	if listener.IsIntermediateRepresentation() {
 		return listener.IntermediateRepresentation.validate()

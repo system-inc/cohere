@@ -8,8 +8,9 @@
 // `(RangeStmt (Ident "_") val@(Object _) _ x [(AssignStmt [lhs] "=" [(CallExpr (Builtin "append") [lhs val])])])`,
 // a loop over indexes appending `x[idx]`, and a loop over indexes that first defines `val := x[idx]` and appends val;
 // the port asks the same of each range statement directly, reading pattern/match.go for what each construct of the
-// query matches, then filters the matches as the original does, by staticcheck's purity facts and the two slices'
-// types, and reports through staticcheck_report.Report where the original reports through report.Report.
+// query matches, then filters the matches as the original does, by the purity facts, function_purity's port of
+// staticcheck's, and the two slices' types, and reports through staticcheck_report.Report where the original reports
+// through report.Report.
 //
 // It parts from the original in two places, where the original is wrong. An append that spreads its element,
 // `x = append(x, v...)`, appends what each element holds, not the element, and the pattern language ignores a call's
@@ -27,24 +28,24 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
-	"honnef.co/go/tools/analysis/facts/purity"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/function_purity"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function of the intermediate
-// representation, whose syntax it walks when the function is where syntax starts, so each range statement is judged
-// once. It listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which say which calls
-// in the loop's slices may have side effects and are built from the representation, so only on a package without
-// errors, as the original runs: the syntax walk runs on every package, and so must everything a syntax listener
-// requires.
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, whose syntax it walks when the function is where syntax starts, so each range
+// statement is judged once. It listens to that walk, not the syntax's, because it reads function_purity's facts,
+// which say which calls in the loop's slices may have side effects and are built from our representation, so only on
+// a package without errors, as the original runs: the syntax walk runs on every package, and so must everything a
+// syntax listener requires.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{purity.Analyzer},
-	Function: judgeFunction,
+	Requires:                   []*analysis.Analyzer{function_purity.Analyzer},
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: judgeFunction},
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
@@ -63,15 +64,16 @@ var Analyzer = dispatch.RuleAnalyzer(
 // builds too, or a function literal of the package's initializer, whose parent, the initializer itself, has no syntax.
 // Every other function is a literal inside one of those and is judged in its walk. A range statement is written only
 // inside a function's body, so these walks reach every one the original's walk over the files reaches, each once.
-func judgeFunction(context *rule.Context, function *ir.Function) {
+func judgeFunction(context *rule.Context, function *intermediate_representation.Function) {
 	syntax := function.Syntax()
 	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
 		return
 	}
-	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
 	if !isPurity {
-		// Invariant: the listener requires purity, whose result is always a purity.Result, so anything else is a
-		// mistake in building the rule, which the dispatcher's recover makes this rule's crash on the package.
+		// Invariant: the listener requires function_purity, whose result is always a function_purity.Result, so
+		// anything else is a mistake in building the rule, which the dispatcher's recover makes this rule's crash on
+		// the package.
 		panic("single_append_concatenation: the purity pass's result is missing")
 	}
 	// The purity pass's result is never nil, so the original's MayHaveSideEffects always reads it, and a function is

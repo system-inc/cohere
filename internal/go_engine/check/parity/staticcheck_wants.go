@@ -130,7 +130,7 @@ func requireStaticcheckWants(
 // it did not run on fails the test, since silence there would read as agreement.
 func portActions(test testing.TB, port *analysis.Analyzer, roots []*packages.Package) []*checker.Action {
 	test.Helper()
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{port}, roots, &checker.Options{})
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{port}, roots, engineOptions())
 	if analyzeError != nil {
 		test.Fatalf("analyzing %d packages: %v", len(roots), analyzeError)
 	}

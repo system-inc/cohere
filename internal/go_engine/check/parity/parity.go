@@ -16,8 +16,9 @@
 // checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
-// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, or
-// RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
+// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, each on
+// `parity.Renaming(...)` where the port meets a want there in other words, adjudicated, or RequireStaticcheckWants
+// over staticcheck's, RequireIdentical over those and the port's parity fixtures,
 // RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireIdenticalFacts over them for a pair that exports facts, RequireOnlyAdjudicated over its differences fixture,
 // RequireStaticcheckGolden over staticcheck's golden files for a port that offers fixes, RequirePortWhereOriginalPanics
@@ -49,6 +50,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 )
 
@@ -104,7 +106,7 @@ func analyze(pairs []Pair, roots []*packages.Package) ([]Outcome, error) {
 		sideOf[pair.Original] = &outcomes[index].Original
 		sideOf[pair.Port] = &outcomes[index].Port
 	}
-	graph, analyzeError := checker.Analyze(analyzers, roots, &checker.Options{})
+	graph, analyzeError := checker.Analyze(analyzers, roots, engineOptions())
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
 	}
@@ -410,10 +412,10 @@ func RequireOnlyAdjudicated(
 }
 
 // Record is a record of a differences fixture's given beside the call, to RequireOnlyAdjudicated or
-// RequirePortWhereOriginalPanics, for a file that cannot carry it as a comment: File, the file as findings name it, by
-// its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the line it is on; Text, the record as a
-// comment writes it after `// port `, as `withholds: Format the number as a decimal`; and Reason, why, as the comment
-// above a record says it.
+// RequirePortWhereOriginalPanics, or a rename given to Renaming, for a file that cannot carry it as a comment: File,
+// the file as findings name it, by its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the line it
+// is on; Text, the record as a comment writes it after `// port `, as `withholds: Format the number as a decimal`; and
+// Reason, why, as the comment above a record says it.
 type Record struct {
 	File   string
 	Line   int
@@ -1096,4 +1098,13 @@ func asRecorded(findings []Finding) []Finding {
 		recorded = append(recorded, Finding{File: finding.File, Line: finding.Line, Message: finding.Message})
 	}
 	return recorded
+}
+
+// engineOptions is the checker's options for every run of the harness: those every run of the engine's rules sets
+// (see check.DispatchOptions), so a port runs in its tests as it runs in the engine. A dispatched rule's listener
+// is called only where its rule runs, and a port that reads the engine's own representation's expression map has it
+// only where its listener declares so: one that reads the map without declaring it finds nothing here, as it would in
+// the engine, never more here than there.
+func engineOptions() *checker.Options {
+	return check.DispatchOptions()
 }

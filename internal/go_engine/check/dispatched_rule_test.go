@@ -14,7 +14,6 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/deprecated"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
@@ -138,31 +137,6 @@ func TestADispatchedRuleTheRunLeavesOutIsNeverCalled(test *testing.T) {
 				})
 			return rule.Rule{Name: enabledName, Origin: rule.OriginHouse, Listener: enabledListener,
 				Analyzer: dispatcher.RuleAnalyzer(enabledName, "enabled_syntax", "reports every declaration",
-					enabledListener)}
-		}},
-		{"intermediate representation", func(enabledName string, leftOutCalls *atomic.Int64) rule.Rule {
-			dispatcher := dispatch.NewIr()
-			enabledListener := &rule.Listener{
-				Function: func(context *rule.Context, function *ir.Function) {
-					// The package initializer is synthetic and declared by no one.
-					if function.Synthetic != "" {
-						return
-					}
-					context.Report(analysis.Diagnostic{Pos: function.Pos(), Message: "declares " + function.Name()})
-				},
-			}
-			dispatcher.RuleAnalyzer(rule.Namespace+"test-left-out-ir", "left_out_ir", "counts its calls",
-				&rule.Listener{
-					Function:     func(*rule.Context, *ir.Function) { leftOutCalls.Add(1) },
-					Instructions: []ir.Instruction{(*ir.Call)(nil), (*ir.Return)(nil)},
-					Instruction:  func(*rule.Context, ir.Instruction) { leftOutCalls.Add(1) },
-					FunctionExit: func(*rule.Context, *ir.Function) { leftOutCalls.Add(1) },
-					PackageExit: func(*rule.Context) {
-						leftOutCalls.Add(1)
-					},
-				})
-			return rule.Rule{Name: enabledName, Origin: rule.OriginHouse, Listener: enabledListener,
-				Analyzer: dispatcher.RuleAnalyzer(enabledName, "enabled_ir", "reports every source function",
 					enabledListener)}
 		}},
 		{"own intermediate representation", func(enabledName string, leftOutCalls *atomic.Int64) rule.Rule {
@@ -296,32 +270,6 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
 					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_syntax", "requires nothing",
 						besideListener)}
-		}},
-		{"intermediate representation", func(
-			failingName string, besideName string, callsOnBase *atomic.Int64,
-		) (rule.Rule, rule.Rule) {
-			dispatcher := dispatch.NewIr()
-			listener := func(requires []*analysis.Analyzer) *rule.Listener {
-				return &rule.Listener{
-					Requires: requires,
-					Function: func(context *rule.Context, function *ir.Function) {
-						// The package initializer is synthetic and declared by no one.
-						if function.Synthetic != "" {
-							return
-						}
-						if len(requires) > 0 {
-							readsItsRequirement(context, callsOnBase)
-						}
-						reportDeclared(context, function.Pos(), function.Name())
-					},
-				}
-			}
-			failingListener, besideListener := listener([]*analysis.Analyzer{failsOnBase}), listener(nil)
-			return rule.Rule{Name: failingName, Origin: rule.OriginHouse, Listener: failingListener,
-					Analyzer: dispatcher.RuleAnalyzer(failingName, "failing_ir", "requires fails_on_base",
-						failingListener)},
-				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
-					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_ir", "requires nothing", besideListener)}
 		}},
 		{"own intermediate representation", func(
 			failingName string, besideName string, callsOnBase *atomic.Int64,
@@ -537,33 +485,6 @@ func TestAnAnalyzerOnlyALeftOutListenerRequiresNeverRuns(test *testing.T) {
 						"reports every declaration", declaring)},
 				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
 					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_syntax",
-						"reports reading the planted analyzer", reading)}
-		}},
-		{"intermediate representation", func(planted *analysis.Analyzer) (rule.Rule, rule.Rule) {
-			dispatcher := dispatch.NewIr()
-			dispatcher.RuleAnalyzer(rule.Namespace+"test-planted-left-out", "planted_left_out_ir",
-				"requires the planted analyzer", &rule.Listener{
-					Requires: []*analysis.Analyzer{planted},
-					Function: func(context *rule.Context, _ *ir.Function) { reportRead(context, planted) },
-				})
-			declaring := &rule.Listener{
-				Function: func(context *rule.Context, function *ir.Function) {
-					// The package initializer is synthetic and declared by no one.
-					if function.Synthetic == "" {
-						reportDeclared(context, function.Pos(), function.Name())
-					}
-				},
-			}
-			reading := &rule.Listener{
-				Requires: []*analysis.Analyzer{planted},
-				Function: func(context *rule.Context, _ *ir.Function) { reportRead(context, planted) },
-			}
-			declaringName, readingName := rule.Namespace+"test-planted-declaring", rule.Namespace+"test-planted-reading"
-			return rule.Rule{Name: declaringName, Origin: rule.OriginHouse, Listener: declaring,
-					Analyzer: dispatcher.RuleAnalyzer(declaringName, "planted_declaring_ir",
-						"reports every source function", declaring)},
-				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
-					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_ir",
 						"reports reading the planted analyzer", reading)}
 		}},
 		{"own intermediate representation", func(planted *analysis.Analyzer) (rule.Rule, rule.Rule) {

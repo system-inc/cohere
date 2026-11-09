@@ -5,11 +5,11 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/duplicate_functions"
 	"github.com/system-inc/cohere/internal/go_engine/copied"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 )
 
 // PackageFunctions is one package's functions as the hash read them, the Analyzer's result, which the engine's
@@ -29,19 +29,20 @@ type Unread struct {
 	Reason duplicate_functions.NotReadReason
 }
 
-// Analyzer hashes every source function of a package, reading the intermediate representation buildir already built
-// for staticcheck's checks. It is no rule: it reports nothing, and the engine runs it only under `--duplicates`.
+// Analyzer hashes every source function of a package, reading the engine's own intermediate representation, the one
+// build_intermediate_representation builds for the rules on it. It is no rule: it reports nothing, and the engine runs
+// it only under `--duplicates`.
 var Analyzer = &analysis.Analyzer{
 	Name: "canonical_function_hash",
 	Doc: "hashes every source function of the package canonically, for the duplicates report: equal digests mean " +
 		"the functions compute the same thing",
-	Requires:   []*analysis.Analyzer{staticcheck_ir.Analyzer},
+	Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
 	ResultType: reflect.TypeFor[*PackageFunctions](),
 	Run:        run,
 }
 
 func run(pass *analysis.Pass) (any, error) {
-	functions, readError := staticcheck_ir.Functions(pass)
+	built, readError := build_intermediate_representation.ResultOf(pass)
 	if readError != nil {
 		return nil, readError
 	}
@@ -54,13 +55,13 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	hasher := newPackageHasher()
 	result := &PackageFunctions{}
-	for _, function := range functions {
+	for function := range built.SourceFunctionsReadBy(pass) {
 		// A wrapper, a thunk or the package's init is the compiler's, not a function anyone wrote.
 		if function.Synthetic != "" {
 			continue
 		}
 		position := pass.Fset.PositionFor(function.Pos(), false)
-		name := function.RelString(pass.Pkg)
+		name := function.RelativeString(pass.Pkg)
 		unread := Unread{File: position.Filename, Line: position.Line, Name: name}
 		switch {
 		case generated[position.Filename]:
@@ -96,7 +97,7 @@ func run(pass *analysis.Pass) (any, error) {
 // leaves a later function reading that closure by its name
 func hashFunction(
 	hasher *packageHasher,
-	function *ir.Function,
+	function *intermediate_representation.Function,
 ) (digest duplicate_functions.Digest, unsupported string) {
 	defer func() {
 		recovered := recover()

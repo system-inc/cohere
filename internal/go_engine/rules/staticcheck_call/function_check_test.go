@@ -14,9 +14,10 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
@@ -35,16 +36,21 @@ func markEverything(name string) Rule {
 	}
 }
 
-// functionCheckAnalyzer runs check as a plain analyzer named name over every function staticcheck_ir.Functions reads,
-// with the context staticcheck_report.PassContext builds around pass.Report, so the test runs the check outside the
-// engine's dispatcher and reads its findings straight off the analyzer.
-func functionCheckAnalyzer(name string, doc string, check rule.FunctionCheck) *analysis.Analyzer {
+// functionCheckAnalyzer runs check as a plain analyzer named name over every source function of the package in the
+// engine's own intermediate representation, with the context staticcheck_report.PassContext builds around
+// pass.Report, so the test runs the check outside the engine's dispatcher and reads its findings straight off the
+// analyzer.
+func functionCheckAnalyzer(
+	name string,
+	doc string,
+	check func(context *rule.Context, function *intermediate_representation.Function),
+) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     name,
 		Doc:      doc,
-		Requires: []*analysis.Analyzer{staticcheck_ir.Analyzer, generated.Analyzer},
+		Requires: []*analysis.Analyzer{build_intermediate_representation.Analyzer, generated.Analyzer},
 		Run: func(pass *analysis.Pass) (any, error) {
-			functions, readError := staticcheck_ir.Functions(pass)
+			built, readError := build_intermediate_representation.ResultOf(pass)
 			if readError != nil {
 				return nil, readError
 			}
@@ -52,7 +58,7 @@ func functionCheckAnalyzer(name string, doc string, check rule.FunctionCheck) *a
 			if contextError != nil {
 				return nil, contextError
 			}
-			for _, function := range functions {
+			for function := range built.SourceFunctions(nil, "") {
 				check(context, function)
 			}
 			return nil, nil

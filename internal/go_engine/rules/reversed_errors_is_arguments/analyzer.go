@@ -10,8 +10,7 @@
 package reversed_errors_is_arguments
 
 import (
-	"honnef.co/go/tools/go/ir"
-
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
@@ -23,7 +22,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -32,7 +33,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1032",
 	"SA1032",
 	"Flags errors.Is given a global error of another package first and the error it judges second: "+
-		"staticcheck's SA1032, ported onto staticcheck's intermediate representation.",
+		"staticcheck's SA1032, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -57,21 +58,21 @@ func checkOrder(call *staticcheck_call.Call) {
 
 // loadedGlobal is the global argument is read from, when its value is a load of a global, and nil otherwise. A
 // global kept in a local before the call is a load all the same, but one that meets another value in a phi is not.
-func loadedGlobal(argument *staticcheck_call.Argument) *ir.Global {
-	load, isLoad := argument.Value.(*ir.Load)
+func loadedGlobal(argument *staticcheck_call.Argument) *intermediate_representation.Global {
+	load, isLoad := argument.Value.(*intermediate_representation.Load)
 	if !isLoad {
 		return nil
 	}
-	global, _ := load.X.(*ir.Global)
+	global, _ := load.X.(*intermediate_representation.Global)
 	return global
 }
 
 // isOfAnotherPackage is whether global is a global of a package other than the one call is in. A global of no
 // package, if the builder ever makes one, is not.
-func isOfAnotherPackage(call *staticcheck_call.Call, global *ir.Global) bool {
+func isOfAnotherPackage(call *staticcheck_call.Call, global *intermediate_representation.Global) bool {
 	if global == nil {
 		return false
 	}
-	globalPackage := global.Package().Pkg
+	globalPackage := global.Package.Types
 	return globalPackage != nil && globalPackage.Path() != call.Context.Package.Path()
 }

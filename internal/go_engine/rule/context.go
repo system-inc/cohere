@@ -10,15 +10,7 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/go/ir"
 )
-
-// FunctionCheck is a check that judges one function of staticcheck's intermediate representation at a time, a
-// Listener's Function. The engine's dispatcher walks a package's functions once and calls every registered check on
-// each, in registry order, so a check keeps nothing from one package to the next, reads everything outside the
-// function through context, and never recovers: the dispatcher recovers per check per package and records a crash
-// under the check's rule name.
-type FunctionCheck func(context *Context, function *ir.Function)
 
 // Context is what a check reads beyond what it is called with, and where it reports. Each rule has its own over each
 // package, the same for every call on that package.

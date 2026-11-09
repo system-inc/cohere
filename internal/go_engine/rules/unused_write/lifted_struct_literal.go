@@ -7,9 +7,9 @@ import (
 	"maps"
 
 	"golang.org/x/tools/go/cfg"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -32,7 +32,7 @@ import (
 // Only a literal whose pointer an assignment or a declaration gives straight to a variable, or that a whole struct is
 // stored straight through, `*&T{...} = x`, is judged. Any other use of `&T{...}` that staticcheck lifts is a load
 // straight through it, `*&T{...}` or a value method called on it, which the original counts as a use.
-func liftedStructLiteralWrites(context *rule.Context, function *ir.Function) []write {
+func liftedStructLiteralWrites(context *rule.Context, function *intermediate_representation.Function) []write {
 	body := functionBody(function.Source())
 	if body == nil {
 		return nil
@@ -81,9 +81,9 @@ func liftedStructLiteralWrites(context *rule.Context, function *ir.Function) []w
 	}
 	writes := []write{}
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
+		for _, instruction := range block.Instructions {
 			// Where staticcheck kept the allocation, the literal's value has the store into it as a use.
-			value, isComposite := instruction.(*ir.CompositeValue)
+			value, isComposite := instruction.(*intermediate_representation.CompositeValue)
 			if !isComposite || len(*value.Referrers()) > 0 {
 				continue
 			}

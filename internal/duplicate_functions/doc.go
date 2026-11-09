@@ -3,7 +3,7 @@
 // functions whose digests are equal into one idea written more than once.
 //
 // Each engine owns how it reads a function: TypeScript lowers it to the high-level intermediate representation
-// (internal/lint/ecmascript/canonical_function_hash), Go reads staticcheck's intermediate representation
+// (internal/lint/ecmascript/canonical_function_hash), Go reads the engine's own intermediate representation
 // (internal/go_engine/canonical_function_hash). Both build the Report here, and the front door prints it, so a
 // duplicate reads the same whichever engine found it.
 //

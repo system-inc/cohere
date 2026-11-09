@@ -20,7 +20,6 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -154,7 +153,6 @@ func timingKinds(registered []rule.Rule) timing.Kinds {
 		visit(registeredRule.Analyzer)
 	}
 	builds := map[string]bool{
-		staticcheck_ir.Analyzer.Name:                    true,
 		build_intermediate_representation.Analyzer.Name: true,
 	}
 	return func(analyzer string) (string, contract.SharedKind) {

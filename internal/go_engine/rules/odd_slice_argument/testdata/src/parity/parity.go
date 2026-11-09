@@ -1,7 +1,7 @@
 // Package parity holds the length checks SA5012 marks and the calls it judges, flagged and left alone, for the port
 // and the original to judge side by side, the marks compared as facts: every shape of the check, checks that do not
-// mark, chains of passing a slice on, methods, a function of another package, and every way a slice's length is
-// known or is not.
+// mark, a capacity's among them, chains of passing a slice on, methods, a function of another package, and every way
+// a slice's length is known or is not.
 package parity
 
 import "parity/pairs"
@@ -65,6 +65,12 @@ func notALength(count int, values ...int) {
 	}
 }
 
+func aCapacity(values ...int) {
+	if cap(values)%2 != 0 {
+		panic("odd")
+	}
+}
+
 func (logger) pairs(message string, values ...any) {
 	if len(values)%2 != 0 {
 		panic("odd")
@@ -108,6 +114,7 @@ func calls(values []int, words []string, array [5]int, item logger) {
 	returning(1, 2, 3)
 	byThree(1, 2)
 	notALength(1, 1, 2, 3)
+	aCapacity(1, 2, 3)
 	forward(1, 2, 3)
 	forwardTwice(1, 2, 3)
 	forwardSometimes(true, 1, 2, 3)

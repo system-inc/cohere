@@ -8,8 +8,8 @@ import (
 
 // IntermediateRepresentationListener is what a Listener hears of the walk over the engine's own intermediate
 // representation (internal/go_engine/intermediate_representation), built by the rules'
-// build_intermediate_representation pass: the callbacks a listener of staticcheck's walk declares on Listener itself,
-// over our Function and instruction types. The Listener's PackageExit follows this walk.
+// build_intermediate_representation pass: a callback for each function, for each instruction of the kinds listed, and
+// for each function's exit. The Listener's PackageExit follows this walk.
 type IntermediateRepresentationListener struct {
 	// Function is called once for each source function of the package, in the order buildir's SrcFuncs lists them,
 	// before any of the function's instructions. The function is built by then.
@@ -29,7 +29,7 @@ type IntermediateRepresentationListener struct {
 }
 
 // validate refuses a walk declared with none of its callbacks, and kinds and their callback that don't go together,
-// as Listener.Validate refuses them on staticcheck's walk.
+// as Listener.Validate refuses them on the syntax walk.
 func (listener *IntermediateRepresentationListener) validate() error {
 	if listener.Function == nil && len(listener.Instructions) == 0 && listener.Instruction == nil &&
 		listener.FunctionExit == nil {

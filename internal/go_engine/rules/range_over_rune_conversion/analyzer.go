@@ -1,6 +1,6 @@
 // Package range_over_rune_conversion is staticcheck's SA6003, a range over a string converted to a slice of runes
 // that drops the index, where ranging over the string itself yields the same runes without allocating the slice,
-// ported onto staticcheck's intermediate representation as a rule.FunctionCheck.
+// ported onto the engine's own intermediate representation (#tf4cb8g).
 //
 // The original runs staticcheck's sharedcheck.CheckRangeStringRunes, from honnef.co/go/tools@v0.8.1
 // internal/sharedcheck/lint.go, the very function S1029 runs as well, and so does the port: it is ported once, as
@@ -12,15 +12,19 @@
 package range_over_rune_conversion
 
 import (
-	"honnef.co/go/tools/go/ir"
-
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 )
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function:                Check,
+		ReadsValueForExpression: true,
+	},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -29,11 +33,11 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6003",
 	"SA6003",
 	"Flags ranging over a string converted to a slice of runes when the index goes unused: staticcheck's SA6003, "+
-		"ported onto its intermediate representation.",
+		"ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
 // Check judges one function, as staticcheck_code.RangeStringRunes does for SA6003 and S1029 alike.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	staticcheck_code.RangeStringRunes(context, function)
 }

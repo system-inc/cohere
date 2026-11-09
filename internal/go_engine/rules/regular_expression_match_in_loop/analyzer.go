@@ -3,19 +3,18 @@
 // house's translation of the callcheck framework the original rides.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa6000/sa6000.go, whose rules it keeps
-// and whose message it reports word for word over the same range, the call. It finds loops with irutil.FindLoops, as
-// the original does. The registry runs the port in the original's place, under its name, and the original stays only as
-// the oracle: the parity tests beside this file run both over staticcheck's own fixture and the house's. The two differ
-// nowhere: staticcheck_call departs from callcheck only where it would panic, on calls the regexp functions are never
-// part of, as testdata/src/differences records.
+// and whose message it reports word for word over the same range, the call. It finds loops with FindLoops, irutil's
+// translated onto our representation, as the original finds them with irutil's. The registry runs the port in the
+// original's place, under its name, and the original stays only as the oracle: the parity tests beside this file run
+// both over staticcheck's own fixture and the house's. The two differ nowhere: staticcheck_call departs from
+// callcheck only where it would panic, on calls the regexp functions are never part of, as testdata/src/differences
+// records.
 package regular_expression_match_in_loop
 
 import (
 	"fmt"
 
-	"honnef.co/go/tools/go/ir"
-	"honnef.co/go/tools/go/ir/irutil"
-
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
@@ -29,7 +28,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -38,7 +39,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA6000",
 	"SA6000",
 	"Flags regexp.Match, MatchReader or MatchString given a constant pattern inside a loop: staticcheck's SA6000, "+
-		"ported onto staticcheck's intermediate representation.",
+		"ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -58,8 +59,8 @@ func checkMatch(name string) staticcheck_call.Rule {
 }
 
 // isInLoop is whether block belongs to a loop of the function it is in.
-func isInLoop(block *ir.BasicBlock) bool {
-	for _, loop := range irutil.FindLoops(block.Parent()) {
+func isInLoop(block *intermediate_representation.BasicBlock) bool {
+	for _, loop := range intermediate_representation.FindLoops(block.Parent()) {
 		if loop.Has(block) {
 			return true
 		}

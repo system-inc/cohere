@@ -1,6 +1,6 @@
 // Package unchanging_loop_condition is staticcheck's SA4008, a three-clause for loop whose condition reads the variable
 // its init declares and whose post statement changes something else, so the condition reads one value on every pass,
-// ported onto staticcheck's intermediate representation as a rule.FunctionCheck.
+// ported onto the engine's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4008/sa4008.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the loop's condition, where staticcheck's
@@ -19,14 +19,19 @@ import (
 	"go/ast"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own. Check reads the value of each loop's condition from the
+// function's expression map, so the listener says so, and the package records that map wherever the rule runs.
+var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+	Function:                Check,
+	ReadsValueForExpression: true,
+}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -34,8 +39,8 @@ var Listener = rule.Listener{Function: Check}
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4008",
 	"SA4008",
-	"Flags a for loop whose condition's variable never changes: staticcheck's SA4008, ported onto its intermediate "+
-		"representation.",
+	"Flags a for loop whose condition's variable never changes: staticcheck's SA4008, ported onto the engine's own "+
+		"intermediate representation.",
 	&Listener,
 )
 
@@ -47,7 +52,7 @@ const message = "variable in loop condition never changes"
 // value the condition reads is the same on every pass. A variable that changes from pass to pass is a phi at the loop's
 // head, and one that lives in memory, its address taken or captured, is loaded afresh on every pass; any other value,
 // a constant, a parameter, the result of a call, is the one the init gave it.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	source := function.Source()
 	if source == nil {
 		// A function with no syntax, a wrapper or a synthesized init, holds no loop to judge.
@@ -83,12 +88,12 @@ func Check(context *rule.Context, function *ir.Function) {
 		}
 		// The enclosing function of a function literal holds no value for the literal's expressions, so a loop
 		// inside one is judged only by the literal itself.
-		value, isAddress := function.ValueForExpr(condition.X)
+		value, isAddress := function.ValueForExpression(condition.X)
 		if value == nil || isAddress {
 			return true
 		}
 		switch value.(type) {
-		case *ir.Phi, *ir.Load:
+		case *intermediate_representation.Phi, *intermediate_representation.Load:
 			return true
 		}
 		context.Report(analysis.Diagnostic{Pos: condition.Pos(), End: condition.End(), Message: message})

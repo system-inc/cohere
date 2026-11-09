@@ -46,23 +46,23 @@ var initialized = func() int {
 
 // x/tools loads the array as the range begins, although the Go specification evaluates no range expression when
 // only the index is used and the length is constant, and that load keeps the writes alive. staticcheck builds no
-// such load, so the writes, which nothing reads, are reported: the port is right. The index in the message is the
-// form's own register, as the original's would be.
+// such load, so the writes, which nothing reads, are reported: the port is right. The port names the index as
+// written.
 func rangeByIndex() {
 	var values [3]int
 	for index := range values {
-		values[index] = index // port finds: unused write to array index t4 + 1:int
+		values[index] = index // port finds: unused write to array index index
 	}
 }
 
 func position() int { return 1 }
 
-// The original names an index the function computes by its registers, and the two forms number their registers
-// differently, so both report this write with messages that differ in the registers' names alone. That is an artifact
-// of the single assignment form, not a difference in what is found, adjudicated in the port's favour: the finding is
-// the same, and its text cannot be.
+// The original names an index the function computes by its single assignment form's registers, and the port names it
+// as written, printed with gofmt's spacing, so both report this write in other words. That is a difference in the
+// text, not in what is found, adjudicated in the port's favour: the finding is the same, and the port's text names
+// what the source writes.
 func computedCallIndex(count int) {
 	total := count * 3
 	var values [8]int
-	values[position()*2+total] = 1 // port renames: unused write to array index t3 + t0 => unused write to array index t4 + t1
+	values[position()*2+total] = 1 // port renames: unused write to array index t3 + t0 => unused write to array index position()*2 + total
 }

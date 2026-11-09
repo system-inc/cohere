@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
@@ -17,7 +16,7 @@ import (
 )
 
 // The walk over the engine's own intermediate representation calls each listener for what it declares and nothing
-// else, in order, as Ir's does: for each function in the order SourceFunctions reads them, every listener's Function,
+// else, in order: for each function in the order SourceFunctions reads them, every listener's Function,
 // in the order they were registered, then each instruction of a listed kind in block order, then FunctionExit; and
 // PackageExit once, after every function. The expected log is built from a probe that reads the same functions in
 // the same checker.
@@ -100,12 +99,13 @@ func TestTheOwnWalkCallsEachListenerForWhatItDeclaresInOrder(test *testing.T) {
 }
 
 // A listener of the engine's own walk that panics is a crash under its own rule on the package, spelled as the engine
-// spells an analyzer's panic, with none of its findings there, and the listener beside it still reports every
-// function, as on Ir's walk.
+// spells an analyzer's panic, with none of its findings there, the one it reported before panicking included, and it
+// is called no more on that package, its PackageExit included. The listener beside it still reports every function.
 func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
 	test.Parallel()
 	dispatcher := NewIntermediateRepresentation()
 	crashingCalls := 0
+	crashingExited := false
 	crashing := dispatcher.RuleAnalyzer(rule.Namespace+"crashing", "crashing",
 		"reports, then panics on the second function", &rule.Listener{
 			IntermediateRepresentation: &rule.IntermediateRepresentationListener{
@@ -117,6 +117,9 @@ func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
 					}
 				},
 			},
+			PackageExit: func(*rule.Context) {
+				crashingExited = true
+			},
 		})
 	reported := 0
 	steady := dispatcher.RuleAnalyzer(rule.Namespace+"steady", "steady", "reports every function",
@@ -126,7 +129,25 @@ func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
 				context.Report(analysis.Diagnostic{Pos: context.Files[0].Name.Pos(), Message: function.Name()})
 			},
 		}})
-	graph := analyzeFixture(test, "dispatched", crashing, steady)
+	var outcomes Result
+	resultProbe := &analysis.Analyzer{
+		Name:     "result_probe",
+		Doc:      "reads the dispatcher's result",
+		Requires: []*analysis.Analyzer{dispatcher.Analyzer()},
+		Run: func(pass *analysis.Pass) (any, error) {
+			result, isResult := pass.ResultOf[dispatcher.Analyzer()].(Result)
+			if !isResult {
+				return nil, fmt.Errorf("the dispatcher's result is %T", pass.ResultOf[dispatcher.Analyzer()])
+			}
+			outcomes = result
+			return nil, nil
+		},
+	}
+	graph := analyzeFixture(test, "dispatched", crashing, steady, resultProbe)
+	if outcome := outcomes[rule.Namespace+"crashing"]; outcome.Crash == nil || len(outcome.Diagnostics) != 0 {
+		test.Errorf("the dispatcher's outcome for the panicking rule holds the crash %v and %d findings, where the "+
+			"crash alone was expected", outcome.Crash, len(outcome.Diagnostics))
+	}
 	for _, action := range graph.Roots {
 		switch action.Analyzer {
 		case crashing:
@@ -143,9 +164,9 @@ func TestAPanickingOwnListenerCrashesItsOwnRuleAlone(test *testing.T) {
 			}
 		}
 	}
-	if crashingCalls != 2 {
-		test.Errorf("the panicking listener was called %d times, where it should stop at its panic, the second call",
-			crashingCalls)
+	if crashingCalls != 2 || crashingExited {
+		test.Errorf("the panicking listener was called %d times and exited the package %t, where it should stop at "+
+			"its panic, the second call", crashingCalls, crashingExited)
 	}
 }
 
@@ -202,11 +223,11 @@ func TestAReaderOfTheExpressionMapFindsItUnderTheEnginesDependents(test *testing
 	}
 }
 
-// Each dispatcher refuses, as it is built, a listener of a walk it doesn't make, so a reader family moving its
-// listener lands on exactly one of them.
+// Each dispatcher refuses, as it is built, a listener of a walk it doesn't make, so a listener lands on exactly one of
+// them, and one that declares neither walk lands on none.
 func TestEachDispatcherRefusesAnotherWalksListener(test *testing.T) {
 	test.Parallel()
-	staticcheckListener := &rule.Listener{Function: func(*rule.Context, *ir.Function) {
+	noWalkListener := &rule.Listener{PackageExit: func(*rule.Context) {
 		// Never called: registering refuses it first.
 	}}
 	ownListener := &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
@@ -221,11 +242,10 @@ func TestEachDispatcherRefusesAnotherWalksListener(test *testing.T) {
 		name     string
 		register func()
 	}{
-		{"the engine's own on Ir", func() { NewIr().RuleAnalyzer("own", "own", "", ownListener) }},
-		{"syntax on Ir", func() { NewIr().RuleAnalyzer("syntax", "syntax", "", syntaxListener) }},
-		{"staticcheck's on IntermediateRepresentation", func() {
-			NewIntermediateRepresentation().RuleAnalyzer("staticcheck", "staticcheck", "", staticcheckListener)
+		{"neither walk's on IntermediateRepresentation", func() {
+			NewIntermediateRepresentation().RuleAnalyzer("neither", "neither", "", noWalkListener)
 		}},
+		{"neither walk's on Syntax", func() { NewSyntax().RuleAnalyzer("neither", "neither", "", noWalkListener) }},
 		{"syntax on IntermediateRepresentation", func() {
 			NewIntermediateRepresentation().RuleAnalyzer("syntax", "syntax", "", syntaxListener)
 		}},

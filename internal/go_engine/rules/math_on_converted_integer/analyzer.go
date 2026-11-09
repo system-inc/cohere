@@ -14,10 +14,9 @@ import (
 	"fmt"
 	"go/types"
 
-	"honnef.co/go/tools/go/ir"
-	"honnef.co/go/tools/go/ir/irutil"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_call"
@@ -33,7 +32,9 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 })
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -42,7 +43,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4015",
 	"SA4015",
 	"Flags math.Ceil, Floor, Trunc, IsNaN or IsInf given an integer converted to a float: staticcheck's SA4015, "+
-		"ported onto staticcheck's intermediate representation.",
+		"ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -51,15 +52,15 @@ var Analyzer = dispatch.RuleAnalyzer(
 func checkConvertedInteger(call *staticcheck_call.Call) {
 	if isConvertedFromInteger(call.Arguments[0].Value) {
 		call.Invalid(fmt.Sprintf("calling %s on a converted integer is pointless",
-			irutil.CallName(call.Instruction.Common())))
+			intermediate_representation.CallName(call.Instruction.Common())))
 	}
 }
 
 // isConvertedFromInteger is whether value is a conversion from a type every term of whose type set is an integer:
 // an integer type, or a type parameter constrained to integers alone. A constant converted while the program is
 // compiled is no conversion here, and a type set with no terms, such as any's, holds no integer.
-func isConvertedFromInteger(value ir.Value) bool {
-	conversion, isConversion := value.(*ir.Convert)
+func isConvertedFromInteger(value intermediate_representation.Value) bool {
+	conversion, isConversion := value.(*intermediate_representation.Convert)
 	if !isConversion {
 		return false
 	}

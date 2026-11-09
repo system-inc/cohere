@@ -681,7 +681,12 @@ project, and the front door records nothing for either.
     },
     "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 2500, "packages": 3, "calls": 640 }],
     "shared": [
-        { "name": "buildir", "kind": "intermediateRepresentation", "cpuMicroseconds": 8000, "packages": 40 },
+        {
+            "name": "build_intermediate_representation",
+            "kind": "intermediateRepresentation",
+            "cpuMicroseconds": 8000,
+            "packages": 40
+        },
         { "name": "syntax_dispatcher", "kind": "dispatcher", "cpuMicroseconds": 1500, "packages": 3 }
     ],
     "measuredCalls": 2300,
@@ -702,9 +707,9 @@ out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces 
   `packages` is how many its analyzer ran on, dependencies analyzed for facts included, and `calls` how many times a
   dispatcher called its listener, 0 for a rule that walks on its own.
 - `shared` holds the analyzers no single rule owns, most expensive first, each with its `kind`:
-  `intermediateRepresentation` for staticcheck's `buildir` and the engine's own build, each its own row while both
-  run; `dispatcher` for a dispatcher's walk less its calls into the listeners, which are billed to their rules; and
-  `analyzer` for any other several rules read, such as `inspect`. A kind the front door does not know is refused.
+  `intermediateRepresentation` for the engine's intermediate representation build; `dispatcher` for a dispatcher's
+  walk less its calls into the listeners, which are billed to their rules; and `analyzer` for any other several rules
+  read, such as `inspect`. A kind the front door does not know is refused.
 - `load` is the load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.
   `listChildrenCpuMicroseconds` is the CPU of the go commands the listing ran, which no thread of this process spent.
 - `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the

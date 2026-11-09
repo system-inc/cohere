@@ -1,8 +1,8 @@
 // Package differences holds the cases where the port and the original could plausibly disagree, and records no
-// difference, since there is none: both read the same intermediate representation and judge each operation by its
-// own operands, through the same irutil.Flatten. These are operands that reach the call across loops and branches,
-// through a phi or none, where a flattening that stopped short or went too far would show here as a finding one side
-// makes and the other does not.
+// difference, since there is none: each judges each operation by its own operands, the original on go/ir through
+// irutil.Flatten and the port on the engine's own representation through its translation. These are operands that
+// reach the call across loops and branches, through a phi or none, where a flattening that stopped short or went too
+// far would show here as a finding one side makes and the other does not.
 package differences
 
 import "math"

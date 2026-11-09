@@ -9,12 +9,12 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 )
 
-// IntermediateRepresentation is Ir's walk over the engine's own intermediate representation, beside Ir's over
-// staticcheck's, so a reader family moves from one to the other by moving its listener's callbacks (#g0rwdw1). It
-// calls the listeners registered on it that a package's pass starts (see start) over one walk of the package's source
-// functions, in the order buildir's SrcFuncs lists them: for each function every listener's Function, then each
-// instruction, in block order, to every listener whose Instructions list its kind, then every FunctionExit; and once
-// the functions are walked, every PackageExit. Listeners are called in the order they were registered.
+// IntermediateRepresentation is the walk over the engine's own intermediate representation, which every reader that
+// walked staticcheck's has moved onto (#g0rwdw1, #kk4864m). It calls the listeners registered on it that a package's
+// pass starts (see start) over one walk of the package's source functions, in the order buildir's SrcFuncs lists
+// them: for each function every listener's Function, then each instruction, in block order, to every listener whose
+// Instructions list its kind, then every FunctionExit; and once the functions are walked, every PackageExit.
+// Listeners are called in the order they were registered.
 //
 // The package is built whole as the walk starts, and a pass that starts no listener reads none of it, so builds none.
 type IntermediateRepresentation struct {
@@ -23,7 +23,7 @@ type IntermediateRepresentation struct {
 
 // NewIntermediateRepresentation is a dispatcher over the engine's own intermediate representation with no rule
 // registered on it. Its analyzer requires build_intermediate_representation, and runs only where that does, on a
-// package without errors, as Ir runs only where buildir does.
+// package without errors.
 func NewIntermediateRepresentation() *IntermediateRepresentation {
 	dispatcher := &IntermediateRepresentation{}
 	dispatcher.listeners = newListeners(
@@ -49,8 +49,8 @@ func (dispatcher *IntermediateRepresentation) RuleAnalyzer(
 	listener *rule.Listener,
 ) *analysis.Analyzer {
 	if !listener.IsIntermediateRepresentation() {
-		// Invariant: the shared RuleAnalyzer hands only a listener declaring IntermediateRepresentation here, so any
-		// other is a mistake in building the registry, never in a package.
+		// Invariant: the shared RuleAnalyzer hands every listener that is not syntax here, and a listener of neither
+		// walk is one Validate refuses, so any here is a mistake in building the registry, never in a package.
 		panic("rule " + ruleName + " registers a listener that does not hear the engine's own intermediate " +
 			"representation on the dispatcher over it, which would never call it")
 	}
@@ -85,20 +85,20 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 	// Under --timing each function's build is billed to the representation's build, not to this walk.
 	for function := range built.SourceFunctions(started.timing, started.dispatcher) {
 		for _, run := range started.runs {
-			run.ownFunction(function)
+			run.function(function)
 		}
 		// With no started listener hearing an instruction, the blocks are not walked at all.
 		if len(started.byKind) > 0 {
 			for _, block := range function.Blocks {
 				for _, instruction := range block.Instructions {
 					for _, run := range started.byKind[reflect.TypeOf(instruction)] {
-						run.ownInstruction(instruction)
+						run.instruction(instruction)
 					}
 				}
 			}
 		}
 		for _, run := range started.runs {
-			run.ownFunctionExit(function)
+			run.functionExit(function)
 		}
 	}
 	return finish(started), nil

@@ -14,7 +14,6 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/buildssa"
 	"golang.org/x/tools/go/analysis/suite/vet"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
@@ -218,7 +217,8 @@ func TestEveryRegisteredRuleValidatesAndHasItsOwnName(test *testing.T) {
 		{Name: "cohere-go/U1000", Origin: rule.OriginStaticcheck, UpstreamName: "U1000", Analyzer: planted,
 			Listener: &rule.Listener{FileEnter: plantedFileEnter, PackageExit: plantedPackageExit}},
 		{Name: "cohere-go/SA4006", Origin: rule.OriginStaticcheck, UpstreamName: "SA4006", Analyzer: planted,
-			Listener: &rule.Listener{FileEnter: plantedFileEnter, FunctionExit: plantedFunctionExit}},
+			Listener: &rule.Listener{FileEnter: plantedFileEnter,
+				IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: plantedFunction}}},
 		{Name: "cohere-go/nilness", Origin: rule.OriginTools, UpstreamName: "nilness", Analyzer: planted,
 			Listener: &rule.Listener{Requires: []*analysis.Analyzer{planted}}},
 		{Name: "cohere-go/unusedwrite", Origin: rule.OriginTools, UpstreamName: "unusedwrite", Analyzer: planted,
@@ -247,8 +247,8 @@ func plantedFileEnter(*rule.Context, *ast.File) {
 	// Never called: the registry reads only whether a callback is set.
 }
 
-// plantedFunctionExit is an IR callback for a planted listener, which the registry only validates.
-func plantedFunctionExit(*rule.Context, *ir.Function) {
+// plantedFunction is an IR callback for a planted listener, which the registry only validates.
+func plantedFunction(*rule.Context, *intermediate_representation.Function) {
 	// Never called: the registry reads only whether a callback is set.
 }
 
@@ -631,8 +631,8 @@ func TestAPortRunsInItsOriginalsPlace(test *testing.T) {
 }
 
 // TestNilnessAndUnusedwriteFollowVetsSuite holds the two x/tools passes vet leaves out to the registry,
-// after vet's suite, as tools rules under the originals' names, each running our port onto staticcheck's
-// intermediate form through the IR dispatcher.
+// after vet's suite, as tools rules under the originals' names, each running our port onto the engine's own
+// intermediate representation through its dispatcher.
 func TestNilnessAndUnusedwriteFollowVetsSuite(test *testing.T) {
 	test.Parallel()
 	expected := []struct {
@@ -664,7 +664,7 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 	test.Parallel()
 	first, second := All(), All()
 	analyzerOf := map[string]*analysis.Analyzer{}
-	dispatcherOf := map[bool]*analysis.Analyzer{}
+	dispatcherOf := map[string]*analysis.Analyzer{}
 	for _, registered := range slices.Concat(first, second) {
 		if registered.Listener == nil {
 			continue
@@ -678,11 +678,11 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 			test.Errorf("%s does not require the shared dispatcher of its walk, so another dispatcher would walk for "+
 				"it", registered.Name)
 		}
-		syntax := registered.Listener.IsSyntax()
-		if earlier, seen := dispatcherOf[syntax]; seen && earlier != shared {
+		walk := listenerWalk(registered.Listener)
+		if earlier, seen := dispatcherOf[walk]; seen && earlier != shared {
 			test.Errorf("%s's walk is shared by two dispatchers", registered.Name)
 		}
-		dispatcherOf[syntax] = shared
+		dispatcherOf[walk] = shared
 		if earlier, seen := analyzerOf[registered.Name]; seen && earlier != registered.Analyzer {
 			test.Errorf("two calls to All hand out two analyzers for %s, so options set on one miss the other",
 				registered.Name)
@@ -690,37 +690,44 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 		analyzerOf[registered.Name] = registered.Analyzer
 	}
 	if len(dispatcherOf) != 2 {
-		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
-			"and the syntax's were expected", len(dispatcherOf))
+		test.Errorf("the registry's dispatched rules hear %d walks, where the engine's own intermediate "+
+			"representation's and the syntax's were expected", len(dispatcherOf))
 	}
 }
 
-// heldTwice is a test-only rule whose listener is registered on the shared dispatchers of both intermediate
-// representations' walks, as a family's move that forgot to take its listener off staticcheck's would leave it: on
-// Ir while it declared only staticcheck's walk, then on IntermediateRepresentation once it declared ours too. It is
-// registered as the package initializes, before any test reads the shared dispatchers, and its callbacks do nothing,
-// so a dispatcher that ever started it would find nothing.
+// listenerWalk names the walk listener hears, for a test that keys dispatchers by it: the engine's own intermediate
+// representation and the syntax are two walks, each with its own shared dispatcher.
+func listenerWalk(listener *rule.Listener) string {
+	if listener.IsSyntax() {
+		return "syntax"
+	}
+	return "the engine's own intermediate representation"
+}
+
+// heldTwice is a test-only rule whose listener is registered on the shared dispatchers of both walks, as a listener
+// changed after it registered would leave it: on IntermediateRepresentation while it declared only that walk, then on
+// Syntax once it declared the syntax's too. It is registered as the package initializes, before any test reads the
+// shared dispatchers, and its callbacks do nothing, so a dispatcher that ever started it would find nothing.
 var heldTwice = func() rule.Rule {
-	listener := &rule.Listener{Function: func(*rule.Context, *ir.Function) {
-		// Never judges anything: the listener exists to be held by two dispatchers.
-	}}
-	analyzer := dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-ir", "test_held_twice_ir",
-		"a test-only rule on staticcheck's walk", listener)
-	listener.IntermediateRepresentation = &rule.IntermediateRepresentationListener{
+	listener := &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(*rule.Context, *intermediate_representation.Function) {
 			// Never judges anything: the listener exists to be held by two dispatchers.
 		},
+	}}
+	analyzer := dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-own", "test_held_twice_own",
+		"a test-only rule on the engine's own walk", listener)
+	listener.FileEnter = func(*rule.Context, *ast.File) {
+		// Never judges anything: the listener exists to be held by two dispatchers.
 	}
-	dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-own", "test_held_twice_own",
-		"the same test-only rule on the engine's own walk", listener)
+	dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-syntax", "test_held_twice_syntax",
+		"the same test-only rule on the syntax walk", listener)
 	return rule.Rule{Name: rule.Namespace + "test-held-twice", Origin: rule.OriginHouse, Analyzer: analyzer,
 		Listener: listener}
 }()
 
 // TestEveryDispatchedRuleIsHeldByOneDispatcher holds every rule with a listener to exactly one shared dispatcher, the
-// one its walk goes to: a reader family moves from staticcheck's intermediate representation to the engine's own by
-// moving its listener, and one left registered on both would be walked twice, over two representations, while its
-// analyzer read one outcome and the other went unread. The check also runs over heldTwice, a test-only rule whose
+// one its walk goes to: one left registered on both would be walked twice, while its analyzer read one outcome and
+// the other went unread. The check also runs over heldTwice, a test-only rule whose
 // listener is on both, to prove it can fail.
 func TestEveryDispatchedRuleIsHeldByOneDispatcher(test *testing.T) {
 	test.Parallel()
@@ -729,9 +736,9 @@ func TestEveryDispatchedRuleIsHeldByOneDispatcher(test *testing.T) {
 	}
 	planted := heldByOneProblems([]rule.Rule{heldTwice})
 	if len(planted) != 1 ||
-		!strings.Contains(planted[0], `held by ["dispatch_ir" "dispatch_intermediate_representation"]`) {
-		test.Errorf("the rule held by both intermediate representations' dispatchers read as %q, where one problem "+
-			"naming both was expected", planted)
+		!strings.Contains(planted[0], `held by ["dispatch_intermediate_representation" "dispatch_syntax"]`) {
+		test.Errorf("the rule held by both walks' dispatchers read as %q, where one problem naming both was expected",
+			planted)
 	}
 }
 
@@ -877,6 +884,96 @@ func TestNoRuleRequiresXToolsSingleAssignmentForm(test *testing.T) {
 		test.Errorf("the walk saw %d analyzers over %d rules, so it never reached what they require", len(seen),
 			len(registry))
 	}
+}
+
+// TestNoRuleRequiresStaticchecksIntermediateRepresentation holds the run to the engine's own intermediate
+// representation alone (#kk4864m): no registered rule, nor anything it requires, needs staticcheck's buildir, which
+// built a second program form beside ours on every package. The check also runs over planted rules, to prove it can
+// fail and that it blames the rule that brings buildir in, not every rule sharing its dispatcher.
+func TestNoRuleRequiresStaticchecksIntermediateRepresentation(test *testing.T) {
+	test.Parallel()
+	for _, problem := range buildirProblems(registry) {
+		test.Error(problem)
+	}
+
+	run := func(pass *analysis.Pass) (any, error) {
+		return nil, nil
+	}
+	plantedBuildir := &analysis.Analyzer{Name: "buildir", Doc: "planted stands in for staticcheck's buildir", Run: run}
+	plantedRead := &analysis.Analyzer{Name: "planted_read", Doc: "planted reads buildir's result", Run: run,
+		Requires: []*analysis.Analyzer{plantedBuildir}}
+	plantedRequiring := &analysis.Analyzer{Name: "planted_requiring", Doc: "planted requires buildir", Run: run,
+		Requires: []*analysis.Analyzer{plantedRead}}
+	plantedClean := &analysis.Analyzer{Name: "planted_clean", Doc: "planted requires nothing", Run: run}
+	// Two syntax rules on a dispatcher of their own: the first's listener requires buildir, which the dispatcher then
+	// requires too, and the second's does not, so only the first is to blame.
+	syntax := dispatch.NewSyntax()
+	readingListener := &rule.Listener{FileEnter: plantedFileEnter, Requires: []*analysis.Analyzer{plantedRead}}
+	cleanListener := &rule.Listener{FileEnter: plantedFileEnter}
+	planted := buildirProblems([]rule.Rule{
+		{Name: "cohere-go/planted-requiring", Analyzer: plantedRequiring},
+		{Name: "cohere-go/planted-reading", Listener: readingListener, Analyzer: syntax.RuleAnalyzer(
+			"cohere-go/planted-reading", "planted_reading", "planted listener reads buildir", readingListener)},
+		{Name: "cohere-go/planted-sharing", Listener: cleanListener, Analyzer: syntax.RuleAnalyzer(
+			"cohere-go/planted-sharing", "planted_sharing", "planted listener shares the dispatcher", cleanListener)},
+		{Name: "cohere-go/planted-clean", Analyzer: plantedClean},
+	})
+	expected := []string{
+		"cohere-go/planted-requiring requires buildir through planted_requiring -> planted_read -> buildir",
+		"cohere-go/planted-reading requires buildir through planted_reading -> planted_read -> buildir",
+	}
+	if len(planted) != len(expected) {
+		test.Fatalf("the planted rules have %d problems, expected %d: %q", len(planted), len(expected), planted)
+	}
+	for index, saying := range expected {
+		if !strings.Contains(planted[index], saying) {
+			test.Errorf("planted problem %d is %q, expected it to say %q", index, planted[index], saying)
+		}
+	}
+}
+
+// buildirProblems is, for each of registered that requires staticcheck's buildir, the path its requirements take to
+// it.
+func buildirProblems(registered []rule.Rule) []string {
+	problems := []string{}
+	for _, checked := range registered {
+		if path := pathToBuildir(checked.Analyzer); path != nil {
+			problems = append(problems, fmt.Sprintf("%s requires buildir through %s", checked.Name,
+				strings.Join(path, " -> ")))
+		}
+	}
+	return problems
+}
+
+// pathToBuildir is the names of the analyzers from start to staticcheck's buildir along its requirements, both ends
+// included, or nil when none reaches it. Of a dispatcher's requirements it follows only its walk's own: what a
+// listener requires, the dispatcher requires after them (dispatch.ListenerRequirement), and the listener's rule's own
+// analyzer requires it too, so the path that blames the rule is the one through its own analyzer, and the checker runs
+// it only where that rule runs.
+func pathToBuildir(start *analysis.Analyzer) []string {
+	visited := map[*analysis.Analyzer]bool{}
+	var walk func(analyzer *analysis.Analyzer) []string
+	walk = func(analyzer *analysis.Analyzer) []string {
+		if visited[analyzer] {
+			return nil
+		}
+		visited[analyzer] = true
+		// By name, the name staticcheck gives it, since its package is internal to staticcheck's module and cohere
+		// cannot import it to compare the analyzer itself.
+		if analyzer.Name == "buildir" {
+			return []string{analyzer.Name}
+		}
+		for _, required := range analyzer.Requires {
+			if dispatch.ListenerRequirement(analyzer, required) {
+				continue
+			}
+			if rest := walk(required); rest != nil {
+				return append([]string{analyzer.Name}, rest...)
+			}
+		}
+		return nil
+	}
+	return walk(start)
 }
 
 // TestStaticcheckFollowsTheToolsPasses holds the registry, after the x/tools passes, to every default SA
@@ -1137,25 +1234,28 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // sharedReaders is the packages under rules/ that several rules read through and that hold no rule of their own: marker
 // reads the reasoned marker comments, inert_value judges a value that cannot carry syntax, marker_type judges a sum
 // type's variant whose methods only mark it, served finds the types a file serves for the two rules that count them,
-// positions is the line table rules read a node's position from without the FileSet's lock, staticcheck_ir hands the
-// ported passes the functions of staticcheck's intermediate representation, and the four kits the ports of
-// staticcheck's checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they
-// call, staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures,
-// and dispatch walks a package once for every rule with a listener and builds each such rule's analyzer, holding no
-// rule itself.
+// positions is the line table rules read a node's position from without the FileSet's lock, function_purity judges
+// which functions are pure for the rules asking which calls have side effects, return_nil_ness judges whether each
+// function's results may be nil for the rule asking what a call returns, build_intermediate_representation builds the
+// engine's own intermediate representation for the rules that read it, and the four kits the ports of staticcheck's
+// checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call,
+// staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and
+// dispatch walks a package once for every rule with a listener and builds each such rule's analyzer, holding no rule
+// itself.
 // One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would rewrite
 // every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
 var sharedReaders = []string{
 	"build_intermediate_representation",
 	"dispatch",
+	"function_purity",
 	"inert_value",
 	"marker",
 	"marker_type",
 	"positions",
+	"return_nil_ness",
 	"served",
 	"staticcheck_call",
 	"staticcheck_code",
-	"staticcheck_ir",
 	"staticcheck_report",
 	"staticcheck_wants",
 }

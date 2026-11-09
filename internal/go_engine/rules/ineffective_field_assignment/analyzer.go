@@ -1,6 +1,5 @@
 // Package ineffective_field_assignment is staticcheck's SA4005, a write to a field of a method's value receiver that
-// nothing reads afterwards, lost when the method returns, ported onto staticcheck's intermediate representation as a
-// rule.FunctionCheck.
+// nothing reads afterwards, lost when the method returns, ported onto the engine's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4005/sa4005.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the store's syntax, where staticcheck's report
@@ -26,15 +25,15 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
-	"honnef.co/go/tools/go/ir/irutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own.
+var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -43,7 +42,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4005",
 	"SA4005",
 	"Flags an assignment to a field of a value receiver that is never observed: staticcheck's SA4005, ported onto "+
-		"its intermediate representation.",
+		"the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -57,7 +56,7 @@ type namedType interface {
 //
 // It considers only the receiver and its first level fields, not other parameters nor nested fields, and only writes
 // to a field never read after the write: it does not flag `a.x = 1; a.x = 2; _ = a.x`.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	receiver := function.Signature.Recv()
 	if receiver == nil {
 		return
@@ -72,15 +71,15 @@ func Check(context *rule.Context, function *ir.Function) {
 	}
 	// The receiver parameter's one reader is the store that copies it into a local of its own. Another reader, or a
 	// local that escapes to the heap, could see the fields some other way.
-	referrers := *function.Params[0].Referrers()
+	referrers := *function.Parameters[0].Referrers()
 	if len(referrers) != 1 {
 		return
 	}
-	copied, isStore := referrers[0].(*ir.Store)
+	copied, isStore := referrers[0].(*intermediate_representation.Store)
 	if !isStore {
 		return
 	}
-	local, isAllocation := copied.Addr.(*ir.Alloc)
+	local, isAllocation := copied.Address.(*intermediate_representation.Allocation)
 	if !isAllocation || local.Heap {
 		return
 	}
@@ -90,7 +89,10 @@ func Check(context *rule.Context, function *ir.Function) {
 	}
 	for field := range structure.NumFields() {
 		for _, write := range writes[field] {
-			if slices.ContainsFunc(reads[field], func(read ir.Instruction) bool { return sees(read, write) }) {
+			isSeen := slices.ContainsFunc(reads[field], func(read intermediate_representation.Instruction) bool {
+				return sees(read, write)
+			})
+			if isSeen {
 				continue
 			}
 			source := write.Source()
@@ -114,28 +116,28 @@ func Check(context *rule.Context, function *ir.Function) {
 // heap. A load of local whole reads every field. It is false when the function stores into local whole again, since
 // what a partial literal writes to the fields it leaves out is not decided here, or uses local any other way.
 func accessesOf(
-	local *ir.Alloc,
-	copied *ir.Store,
+	local *intermediate_representation.Allocation,
+	copied *intermediate_representation.Store,
 	structure *types.Struct,
-) (map[int][]ir.Instruction, map[int][]ir.Instruction, bool) {
-	reads := map[int][]ir.Instruction{}
-	writes := map[int][]ir.Instruction{}
+) (map[int][]intermediate_representation.Instruction, map[int][]intermediate_representation.Instruction, bool) {
+	reads := map[int][]intermediate_representation.Instruction{}
+	writes := map[int][]intermediate_representation.Instruction{}
 	for _, referrer := range *local.Referrers() {
 		switch referrer := referrer.(type) {
-		case *ir.FieldAddr:
+		case *intermediate_representation.FieldAddress:
 			for _, access := range *referrer.Referrers() {
 				switch access.(type) {
-				case *ir.Store:
+				case *intermediate_representation.Store:
 					writes[referrer.Field] = append(writes[referrer.Field], access)
-				case *ir.Load:
+				case *intermediate_representation.Load:
 					reads[referrer.Field] = append(reads[referrer.Field], access)
 				}
 			}
-		case *ir.Store:
+		case *intermediate_representation.Store:
 			if referrer != copied {
 				return nil, nil, false
 			}
-		case *ir.Load:
+		case *intermediate_representation.Load:
 			for field := range structure.NumFields() {
 				reads[field] = append(reads[field], referrer)
 			}
@@ -148,15 +150,15 @@ func accessesOf(
 
 // sees is whether read can observe write: later in the same block, or in a block reachable from the write's. A read
 // earlier in the write's own block counts for nothing even when a loop brings control back to it, as in the original.
-func sees(read ir.Instruction, write ir.Instruction) bool {
+func sees(read intermediate_representation.Instruction, write intermediate_representation.Instruction) bool {
 	if read.Block() == write.Block() {
 		return offset(read) > offset(write)
 	}
-	return irutil.Reachable(write.Block(), read.Block())
+	return intermediate_representation.Reachable(write.Block(), read.Block())
 }
 
 // offset is the index of instruction in its block's instructions, or -1 should it not be there, where the original
 // panics; an instruction is always among its block's.
-func offset(instruction ir.Instruction) int {
-	return slices.Index(instruction.Block().Instrs, instruction)
+func offset(instruction intermediate_representation.Instruction) int {
+	return slices.Index(instruction.Block().Instructions, instruction)
 }

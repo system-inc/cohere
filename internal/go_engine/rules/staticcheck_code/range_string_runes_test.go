@@ -15,20 +15,25 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/load"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// rangeStringRunesAnalyzer runs the port over every function of a package, as SA6003's and S1029's ports will, a
-// plain analyzer over staticcheck_ir.Functions with the context staticcheck_report.PassContext builds around
-// pass.Report, so the test reads the port's findings straight off it, outside the engine's dispatcher.
+// rangeStringRunesAnalyzer runs the port over every source function of a package in the engine's own intermediate
+// representation, as SA6003's and S1029's ports do, a plain analyzer over the representation's SourceFunctions with
+// the context staticcheck_report.PassContext builds around pass.Report, so the test reads the port's findings straight
+// off it, outside the engine's dispatcher. It requires ExpressionReader, since the port reads ValueForExpression.
 var rangeStringRunesAnalyzer = &analysis.Analyzer{
-	Name:     "RangeStringRunes",
-	Doc:      "runs staticcheck_code.RangeStringRunes over every function, to compare with staticcheck's",
-	Requires: []*analysis.Analyzer{staticcheck_ir.Analyzer, generated.Analyzer},
+	Name: "RangeStringRunes",
+	Doc:  "runs staticcheck_code.RangeStringRunes over every function, to compare with staticcheck's",
+	Requires: []*analysis.Analyzer{
+		build_intermediate_representation.Analyzer,
+		build_intermediate_representation.ExpressionReader,
+		generated.Analyzer,
+	},
 	Run: func(pass *analysis.Pass) (any, error) {
-		functions, readError := staticcheck_ir.Functions(pass)
+		built, readError := build_intermediate_representation.ResultOf(pass)
 		if readError != nil {
 			return nil, readError
 		}
@@ -36,7 +41,7 @@ var rangeStringRunesAnalyzer = &analysis.Analyzer{
 		if contextError != nil {
 			return nil, contextError
 		}
-		for _, function := range functions {
+		for function := range built.SourceFunctions(nil, "") {
 			staticcheck_code.RangeStringRunes(context, function)
 		}
 		return nil, nil

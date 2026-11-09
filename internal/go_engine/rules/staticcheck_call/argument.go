@@ -2,13 +2,13 @@
 
 package staticcheck_call
 
-import "honnef.co/go/tools/go/ir"
+import "github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 
 // Argument is one argument of a Call.
 type Argument struct {
 	// Value is the argument, as it was before any conversion to an interface the parameter's type made. The
 	// original wraps it in a struct of this one field; nothing reads the wrapper but to unwrap it.
-	Value ir.Value
+	Value intermediate_representation.Value
 
 	// invalids are the messages the Rule marked the argument with.
 	invalids []string

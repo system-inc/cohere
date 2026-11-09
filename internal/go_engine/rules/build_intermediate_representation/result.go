@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -17,8 +18,9 @@ import (
 // the one it is reading finds that function's blocks, where a package built one function at a time, as each is
 // read, would hand it a callee nobody had read yet, with none (staticcheck's SA2002 missed 3 of 21 findings that
 // way, #dz6qbwm). Inside the workspace building per function bought nothing, since the readers walk every function.
-// A callee in another package is created from types alone and has no blocks, as buildir left it. Building one
-// function at a time stays for the facts, which don't read through this result (#w7zmvat).
+// A callee in another package is created from types alone and has no blocks, as buildir left it. The fact passes
+// read through this result too, on every package, as staticcheck's did through buildir; computing a dependency's
+// facts one function at a time, only where asked, is #w7zmvat's second unit, which builds outside this result.
 type Result struct {
 	// irPackage is the pass's package, unbuilt until the first read of the result builds all of it.
 	irPackage *intermediate_representation.Package
@@ -77,6 +79,14 @@ func (result *Result) SourceFunctions(
 			}
 		}
 	}
+}
+
+// SourceFunctionsReadBy is SourceFunctions read by pass's own analyzer, one that is no dispatcher, with the run's
+// collector taken from pass under `--timing`, so the build it does is billed to Analyzer's row as a dispatcher's is.
+func (result *Result) SourceFunctionsReadBy(pass *analysis.Pass) iter.Seq[*intermediate_representation.Function] {
+	// Absent on a run that did not ask for --timing, where the nil collector measures nothing.
+	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
+	return result.SourceFunctions(collector, pass.Analyzer.Name)
 }
 
 // yieldAnonymous yields function's anonymous functions, each followed by its own, depth first, and reports whether
