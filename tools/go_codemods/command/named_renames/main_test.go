@@ -250,3 +250,96 @@ func failures(first built, second listed) (error, error) { return first.err, sec
 		test.Fatal("a line whose fourth field is no number was read")
 	}
 }
+
+// A field whose name a source-reading test in another package spells as a literal is refused, accepted once the
+// -reviewed-literals file clears that file's literal, and refused again when a second such test holds it unreviewed;
+// the refusal then names only the unreviewed file.
+func TestReviewedLiteralsClearOnlyTheirFile(test *testing.T) {
+	test.Parallel()
+	files := map[string]string{
+		"go.work": "go 1.27\n\nuse .\n",
+		"go.mod":  "module fixture\n\ngo 1.27\n",
+		"single/single.go": `package single
+
+type record struct{ src string }
+
+func Read() string { return record{src: "input"}.src }
+`,
+		"reader/reader.go": "package reader\n",
+		"reader/reader_test.go": `package reader
+
+import (
+	"go/parser"
+	"go/token"
+	"testing"
+)
+
+func TestRead(test *testing.T) {
+	if _, parseError := parser.ParseDir(token.NewFileSet(), "src", nil, 0); parseError != nil {
+		test.Fatal(parseError)
+	}
+}
+`,
+	}
+	chosen := []chosenRename{{File: "single/single.go", OldName: "src", NewName: "source"}}
+	plan := func(options global_rename.Options) *global_rename.Result {
+		loaded, loadError := workspace.Load(writeFixture(test, files), nil)
+		if loadError != nil {
+			test.Fatal(loadError)
+		}
+		proposals, unmatched := findProposals(loaded, chosen)
+		if len(proposals) != 1 || len(unmatched) != 0 {
+			test.Fatalf("proposed %d, unmatched %q; want the field", len(proposals), unmatched)
+		}
+		return global_rename.Plan(loaded, proposals, options)
+	}
+
+	unreviewed, optionsError := planOptions(nil, "")
+	if optionsError != nil {
+		test.Fatal(optionsError)
+	}
+	if result := plan(unreviewed); len(result.Rejections) != 1 || result.Rejections[0].Class != "string literal" {
+		test.Fatalf("unreviewed, refused %v; want the field refused for its string literal", result.Rejections)
+	}
+
+	directory := test.TempDir()
+	reviewedPath := filepath.Join(directory, "reviewed.tsv")
+	if writeError := os.WriteFile(
+		reviewedPath,
+		[]byte("# reviewed\n\nsrc\treader/reader_test.go\tthe directory the test parses, not a field\n"),
+		0o644,
+	); writeError != nil {
+		test.Fatal(writeError)
+	}
+	reviewed, optionsError := planOptions(nil, reviewedPath)
+	if optionsError != nil {
+		test.Fatal(optionsError)
+	}
+	if result := plan(reviewed); len(result.Rejections) != 0 || len(result.Accepted) != 1 {
+		test.Fatalf(
+			"reviewed, accepted %d and refused %v; want the field accepted",
+			len(result.Accepted),
+			result.Rejections,
+		)
+	}
+
+	files["other/other.go"] = "package other\n"
+	files["other/other_test.go"] = strings.ReplaceAll(files["reader/reader_test.go"], "package reader", "package other")
+	result := plan(reviewed)
+	if len(result.Rejections) != 1 ||
+		!strings.Contains(result.Rejections[0].Reason, "other/other_test.go") ||
+		strings.Contains(result.Rejections[0].Reason, "reader/reader_test.go") {
+		test.Fatalf(
+			"with a second file unreviewed, refused %v; want the field refused for other_test.go only",
+			result.Rejections,
+		)
+	}
+
+	malformed := filepath.Join(directory, "malformed.tsv")
+	if writeError := os.WriteFile(malformed, []byte("src\treader/reader_test.go\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	if _, readError := planOptions(nil, malformed); readError == nil {
+		test.Fatal("a line without a reason was read")
+	}
+}

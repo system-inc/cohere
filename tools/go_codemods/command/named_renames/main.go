@@ -4,7 +4,8 @@
 // relative to the root, and its old name, then the new name, tab-separated; a line starting with # is a comment.
 // An optional fourth field, the line the declaration is on, picks one of two declarations of the name in the
 // file (two structs each with a field `err`). A line that names no declaration, or two, proposes nothing and is
-// reported. Every proposal goes through the
+// reported. The -reviewed-literals file clears string literals a person read and judged unable to name a renamed
+// declaration, a literal and its file a line, with the reason. Every proposal goes through the
 // global rename engine, which refuses any rename that could change what the program means, and the rewrite is
 // reloaded in memory and every identifier's resolution compared before anything is written.
 package main
@@ -72,6 +73,11 @@ func runCommandLine() int {
 		"pinned-library",
 		"path=reason: a library package whose exports may be renamed, since every outside consumer reads it at a pin (repeatable)",
 	)
+	reviewedLiteralsPath := flag.String(
+		"reviewed-literals",
+		"",
+		"literals judged unable to name a renamed declaration: literal, file from the root, reason, tab-separated",
+	)
 	flag.Parse()
 	if *renamesPath == "" {
 		fmt.Fprintln(streams.Errors, "namedrenames: -renames is required")
@@ -82,7 +88,55 @@ func runCommandLine() int {
 		fmt.Fprintf(streams.Errors, "namedrenames: %v\n", readError)
 		return 1
 	}
-	return run(*root, skips, chosen, *dryRun, global_rename.Options{PinnedLibraries: pinned})
+	options, optionsError := planOptions(pinned, *reviewedLiteralsPath)
+	if optionsError != nil {
+		fmt.Fprintf(streams.Errors, "namedrenames: %v\n", optionsError)
+		return 1
+	}
+	return run(*root, skips, chosen, *dryRun, options)
+}
+
+// planOptions are the engine's options the flags give: the pinned libraries, and the reviewed literals read from
+// their file when one is named.
+func planOptions(pinned pinnedFlags, reviewedLiteralsPath string) (global_rename.Options, error) {
+	options := global_rename.Options{PinnedLibraries: pinned}
+	if reviewedLiteralsPath == "" {
+		return options, nil
+	}
+	reviewed, readError := readReviewedLiterals(reviewedLiteralsPath)
+	if readError != nil {
+		return options, readError
+	}
+	options.ReviewedLiterals = reviewed
+	return options, nil
+}
+
+// readReviewedLiterals reads the reviewed literals file into the engine's shape, by literal, then by file, the
+// reason, refusing a line that is not three tab-separated fields.
+func readReviewedLiterals(path string) (map[string]map[string]string, error) {
+	file, openError := os.Open(path)
+	if openError != nil {
+		return nil, openError
+	}
+	// Ignored: the file was only read, so a failed close loses nothing.
+	defer file.Close()
+	reviewed := map[string]map[string]string{}
+	scanner := bufio.NewScanner(file)
+	for lineNumber := 1; scanner.Scan(); lineNumber++ {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) != 3 || fields[0] == "" || fields[1] == "" || fields[2] == "" {
+			return nil, fmt.Errorf("%s:%d: want literal, file and reason, tab-separated", path, lineNumber)
+		}
+		if reviewed[fields[0]] == nil {
+			reviewed[fields[0]] = map[string]string{}
+		}
+		reviewed[fields[0]][fields[1]] = fields[2]
+	}
+	return reviewed, scanner.Err()
 }
 
 // chosenRename is one line of the renames file.

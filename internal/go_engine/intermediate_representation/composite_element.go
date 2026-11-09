@@ -1,0 +1,33 @@
+package intermediate_representation
+
+import (
+	"go/ast"
+	"go/types"
+)
+
+type compositeElement struct {
+	cv          *CompositeValue
+	index       int
+	elementType types.Type
+}
+
+func (element *compositeElement) load(function *Function, source ast.Node) Value {
+	// Invariant: compLit makes a compositeElement only as the target of a store, through assign or the store
+	// buffer, neither of which loads from it.
+	panic("not implemented")
+}
+
+func (element *compositeElement) store(function *Function, value Value, source ast.Node) {
+	converted := emitConv(function, value, element.elementType, source)
+	element.cv.Values[element.index] = converted
+}
+
+func (element *compositeElement) address(function *Function) Value {
+	// Invariant: compLit makes a compositeElement only as the target of a store, through assign or the store
+	// buffer, and assign takes the address only of an *address location.
+	panic("not implemented")
+}
+
+func (element *compositeElement) typ() types.Type {
+	return element.elementType
+}
