@@ -37,6 +37,10 @@ type Target struct {
 
 // On is the target environment names, each variable written `NAME=value`, as `On("GOOS=linux", "GOARCH=386",
 // "CGO_ENABLED=0")` names a 32-bit Linux one, with cgo off as it is by default for a target other than the machine's.
+// The `GOOS` and `GOARCH` it names are set in build.Default for each call's load and run, and put back in a deferred
+// release, so a call that fails never leaves them behind. build.Default stays a global to everything outside the
+// harness's calls: test code in a port's package that reads it outside one races a call that sets it, so it runs in
+// parallel with none of them (see Target).
 func On(environment ...string) Target {
 	return Target{environment: slices.Clone(environment)}
 }
@@ -158,8 +162,12 @@ var defaultContext sync.RWMutex
 // check may read it. So a call reads build.Default only as its own target set it or as the process began, and no call
 // sets it while another reads it. A variable named with no value, a variable named twice, since which value counts
 // would be the order's accident, and an empty `GOOS` or `GOARCH`, a target build.Default cannot judge by, each fail
-// the test before anything is held. A call holds it once, at its start, since a call that held it again beneath
-// would wait behind a call waiting to write.
+// the test before anything is held. sync.RWMutex is not reentrant, so a call holds it once, at its start, and nothing
+// it runs while holding it calls the harness again: a hold taken beneath one to write waits forever, and one beneath
+// one to read waits forever behind a call waiting to write. So every Require function and Findings holds it in its
+// own require or findings function, which no other holds beneath it, findingsOver and loadFixtures hold nothing,
+// Analyze holds it and analyze, what the harness runs within a hold, does not, and RequireNeitherFinds's judged runs
+// after its hold lets go.
 func (target Target) held(test testing.TB) (release func()) {
 	test.Helper()
 	named := map[string]string{}

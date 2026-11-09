@@ -83,3 +83,18 @@ func TestRequireNeitherFindsLoadsForTheTargetNamed(test *testing.T) {
 		"the port found targeted/narrow.go:6:2: call to shared, where neither may find anything",
 	)
 }
+
+// judged runs after the call lets go of go/build's default context, so a callback that calls the harness itself, here
+// on the machine's own target inside a call on amd64's, which holds the context to write, runs rather than waiting on
+// its own call forever.
+func TestRequireNeitherFindsLetsJudgedCallTheHarness(test *testing.T) {
+	test.Parallel()
+	callingTheHarness := func(judging testing.TB, loaded []*packages.Package) int {
+		Findings(judging, original, port, analysistest.TestData(), "same")
+		return goFiles(judging, loaded)
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		onAmd64.RequireNeitherFinds(recording, calling(sharedMessages), calling(sharedMessages),
+			analysistest.TestData(), callingTheHarness, "targeted")
+	}))
+}

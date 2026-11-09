@@ -2,6 +2,7 @@ package parity
 
 import (
 	"cmp"
+	"fmt"
 	"go/build"
 	"reflect"
 	"testing"
@@ -183,4 +184,30 @@ func TestTargetRefusesATargetTheDefaultContextCannotTake(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		On("GOOS=linux", "GOARCH=").Findings(recording, original, port, analysistest.TestData(), "same")
 	}), "the target's GOARCH is empty, and go/build's default context judges by no empty target")
+}
+
+// Calls on a target that sets go/build's default context run beside plain calls, each holding it once, so none waits
+// forever on a hold another took, and each passes as it does alone. A load by hand here would read build.Default
+// outside the harness, racing the target's calls, as the Target doc warns.
+func TestTargetCallsRunBesidePlainCalls(test *testing.T) {
+	test.Parallel()
+	calls := map[string]func(recording testing.TB){
+		"on 386": func(recording testing.TB) {
+			on386.RequireIdentical(recording, original, port, analysistest.TestData(), "targeted")
+		},
+		"plain": func(recording testing.TB) {
+			RequireIdentical(recording, original, port, analysistest.TestData(), "same")
+		},
+		"upstream": func(recording testing.TB) {
+			RequireUpstreamWants(recording, port, analysistest.TestData(), "wants")
+		},
+	}
+	for round := range 3 {
+		for name, call := range calls {
+			test.Run(fmt.Sprintf("%s %d", name, round), func(subtest *testing.T) {
+				subtest.Parallel()
+				requireFailures(subtest, failuresOf(subtest, call))
+			})
+		}
+	}
 }

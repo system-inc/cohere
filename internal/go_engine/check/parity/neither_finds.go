@@ -19,8 +19,9 @@ import (
 // judged is the port's own, since only the port's test knows what its check would judge, and it may judge the packages
 // further, failing the test itself where they do not hold what the run is meant to leave alone, or counting that, as
 // the writes framepointer's own judgment finds in the runtime's assembly, so the form holds what the run had to judge
-// above zero and the port says what that is. It runs within the call, under the call's target. It loads for the
-// machine's own target, and Target.RequireNeitherFinds for another.
+// above zero and the port says what that is. It runs after the load and run let go of go/build's default context, so
+// it may call the harness itself, and reads build.Default as any test outside the harness does (see Target). It loads
+// for the machine's own target, and Target.RequireNeitherFinds for another.
 func RequireNeitherFinds(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -44,14 +45,19 @@ func requireNeitherFinds(
 	patterns ...string,
 ) {
 	test.Helper()
-	defer target.held(test)()
-	loads := loadFixtures(test, target, testdata, patterns, nil)
-	roots := []*packages.Package{}
-	for _, fixtures := range loads {
-		roots = append(roots, fixtures.roots...)
-	}
+	// The load and run hold go/build's default context, and judged runs after they let go of it, so a callback that
+	// calls the harness itself takes its own hold rather than waiting on this call's forever.
+	roots, originalFindings, portFindings := func() ([]*packages.Package, []Finding, []Finding) {
+		defer target.held(test)()
+		loads := loadFixtures(test, target, testdata, patterns, nil)
+		roots := []*packages.Package{}
+		for _, fixtures := range loads {
+			roots = append(roots, fixtures.roots...)
+		}
+		originalFindings, portFindings := findingsOver(test, original, port, loads)
+		return roots, originalFindings, portFindings
+	}()
 	counted := judged(test, roots)
-	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	test.Logf("over %d judged, the original found %d, the port %d", counted, len(originalFindings),
 		len(portFindings))
 	if counted <= 0 {
