@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -54,12 +55,22 @@ import (
 // it, so a static library named libfoo.a is never handed to this parser.
 func TypeScriptParsable(fileName string) bool {
 	treatedAs := source_name.TreatedAs(fileName)
-	for _, extension := range []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"} {
+	for _, extension := range typeScriptParsableExtensions {
 		if strings.HasSuffix(treatedAs, extension) {
 			return true
 		}
 	}
 	return false
+}
+
+// typeScriptParsableExtensions are the endings TypeScriptParsable says yes to, once a name is read through
+// source_name.TreatedAs: TypeScript's own script extensions. A declaration file ends in one of them.
+var typeScriptParsableExtensions = []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
+
+// TypeScriptParsableExtensions is a copy of the endings TypeScriptParsable says yes to, for a list that has to
+// name every file the fix engine acts on, as the editor's save list does (editors/vscode/cohere-save.json).
+func TypeScriptParsableExtensions() []string {
+	return slices.Clone(typeScriptParsableExtensions)
 }
 
 func Parses(fileName string, text string) (bool, string) {

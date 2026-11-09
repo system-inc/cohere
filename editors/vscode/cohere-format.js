@@ -26,13 +26,13 @@ const installCommand = 'pnpm add -D @system-inc/cohere';
 // cohere's default is.
 const saveArguments = ['--fix', '--format'];
 
-// What a save hands cohere: the file types it formats through stdin, and the start of its refusal for a
-// project with no stdin path. Kept as JSON so cohere's own test reads the same list (see its about).
+// What a save hands cohere: the file types it fixes or formats through stdin, and the start of its refusal
+// for a project with no stdin path. Kept as JSON so cohere's own test reads the same list (see its about).
 const saveSettings = require('./cohere-save.json');
 
 /*
- * The documents a save formats: files whose extension is one cohere formats through stdin, which is how
- * cohere decides too, by the name's extension. Any other file never reaches cohere, so saving a Go file,
+ * The documents a save formats: files whose extension is one cohere fixes or formats through stdin, which
+ * is how cohere decides too, by the name's extension. Any other file never reaches cohere, so saving a Go file,
  * which cohere has no stdin path for yet (#qtna8m4), runs nothing and says nothing.
  */
 const saveDocumentSelector = {

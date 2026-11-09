@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/format/native"
 )
 
@@ -148,10 +149,14 @@ func TestStdinNeedsFix(test *testing.T) {
 
 // TestTheEditorSavesWhatStdinFormats holds the VS Code extension's list (editors/vscode/cohere-save.json) to
 // this binary, so the two cannot drift. The extension registers its formatter for the extensions listed,
-// and they must be exactly the ones the stdin mode formats: it decides by the file name's extension, through
-// native's printers, and a file type left off would never format on save while one added that cohere does
-// not format would be handed to it for nothing. Go is not among them until #qtna8m4 gives it a stdin path,
-// and this test is widened then to read Go's.
+// and they must be exactly the ones the stdin mode acts on, both decided by the file name's extension: fixes
+// for a name edit.TypeScriptParsable claims (runStdin's stdinProposals) and formatting for one native has a
+// printer for. A file type left off would never be fixed or formatted on save, and one added that cohere
+// does nothing with would be handed to it for nothing. Go is not among them until #qtna8m4 gives it a stdin
+// path, and this test is widened then to read Go's.
+//
+// The two sets differ today: .mts and .cts are TypeScript's but have no printer, so a save fixes them and
+// leaves their formatting as typed. That gap is the formatter's to close, not the save's.
 //
 // The refusal is the start of what the front door says when the project a file is in has no stdin path,
 // which the extension takes as a decline rather than an error, so it must begin the sentence every engine
@@ -172,9 +177,12 @@ func TestTheEditorSavesWhatStdinFormats(test *testing.T) {
 		test.Fatal(unmarshalError)
 	}
 
-	if formatted := native.Extensions(); !slices.Equal(save.Extensions, formatted) {
-		test.Errorf("editors/vscode/cohere-save.json lists %q, and --stdin-filepath formats %q",
-			save.Extensions, formatted)
+	accepted := slices.Concat(edit.TypeScriptParsableExtensions(), native.Extensions())
+	slices.Sort(accepted)
+	accepted = slices.Compact(accepted)
+	if !slices.Equal(save.Extensions, accepted) {
+		test.Errorf("editors/vscode/cohere-save.json lists %q, and --stdin-filepath fixes or formats %q",
+			save.Extensions, accepted)
 	}
 
 	if save.Refusal == "" {
