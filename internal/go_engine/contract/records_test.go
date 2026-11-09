@@ -337,6 +337,26 @@ func populatedRecords() []Record {
 			Directories: []string{"/project"},
 			Absent:      []string{"/go.work"},
 		},
+		TimingRecord{
+			Unavailable:            "this platform has no per-thread CPU clock",
+			ProcessCpuMicroseconds: 80000,
+			Load: LoadTiming{
+				ListCpuMicroseconds:         2000,
+				ListChildrenCpuMicroseconds: 150000,
+				ParseCpuMicroseconds:        4000,
+				ParsedFiles:                 24,
+				TypeCheckCpuMicroseconds:    12000,
+				TypeCheckedPackages:         3,
+				ExportDataCpuMicroseconds:   6000,
+				ExportDataPackages:          37,
+			},
+			Rules: []RuleTiming{{Name: "cohere-go/printf", CpuMicroseconds: 2500, Packages: 3, Calls: 640}},
+			Shared: []SharedTiming{
+				{Name: "buildir", Kind: SharedIntermediateRepresentation, CpuMicroseconds: 8000, Packages: 40},
+			},
+			MeasuredCalls:            2300,
+			MeasuringCpuMicroseconds: 230,
+		},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
 	}
 }
@@ -427,6 +447,7 @@ func TestFixtureRecordsReencodeToTheSameJson(test *testing.T) {
 		KindPhase:      func() Record { return &PhaseRecord{} },
 		KindRule:       func() Record { return &RuleRecord{} },
 		KindInputs:     func() Record { return &InputsRecord{} },
+		KindTiming:     func() Record { return &TimingRecord{} },
 		KindSummary:    func() Record { return &SummaryRecord{} },
 	}
 	fixtures, globError := filepath.Glob(contractFixtures)
