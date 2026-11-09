@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/tools/go/packages"
+
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
@@ -37,10 +39,13 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		return
 	}
 	if loadError != nil {
+		engine.abandonSpeculation()
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0, "the load failed: "+oneLine(loadError))
 		return
 	}
 	if count := len(loaded.Diagnostics); count > 0 {
+		// Whatever the rules beside the load found is dropped unread, as main never ran them.
+		engine.abandonSpeculation()
 		detail := fmt.Sprintf("types bailed: %d type errors, so lint findings against wrong semantics would be noise",
 			count)
 		if !engine.request.requests(contract.PhaseTypes) {
@@ -51,12 +56,19 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		return
 	}
 
+	started := time.Now()
 	pass := earlier
+	if pass == nil && engine.speculation != nil {
+		ran := engine.speculativePass()
+		pass = &ran
+	}
 	if pass == nil {
 		ran := engine.lint(loaded)
 		pass = &ran
+		// The pass ran here, so its own time is this phase's; one beside the load is counted only from here, so the
+		// phases still follow one another as they read.
+		started = time.Now()
 	}
-	started := time.Now()
 	if pass.checkError != nil {
 		engine.note("the rules could not run: %v", pass.checkError)
 		engine.phase(contract.PhaseLint, contract.OutcomeNotReached, 0,
@@ -166,21 +178,25 @@ type lintPass struct {
 // lint runs the rules the settings leave on over loaded, through the findings cache when the run has one and has not
 // renamed, keeps the findings in scope, and applies the //cohere:ignore comments to them.
 func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
+	return engine.lintPackages(loaded.Packages, check.Options{Withheld: loaded.Withheld})
+}
+
+// lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once
+// it has returned, or the Ready and Abandon of a pass beside it.
+func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check.Options) lintPass {
 	started := time.Now()
 	enabled, turnedOff := engine.enabledRules()
 	session := engine.session
 	if engine.renamed {
 		session = nil
 	}
-	result, checkError := check.Run(loaded.Packages, enabled, check.Options{
-		SingleThreaded: engine.request.switches["single-threaded"],
-		Cache:          session,
-		Withheld:       loaded.Withheld,
-		// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
-		// and what follows reads the files' contents the project description holds, and the types.
-		ReleaseAnalyzed: true,
-		ReadFile:        engine.sourceReader(nil),
-	})
+	options.SingleThreaded = engine.request.switches["single-threaded"]
+	options.Cache = session
+	// The lint pass is the load's last reader of the packages' syntax: a rename loads the tree again to plan over,
+	// and what follows reads the files' contents the project description holds, and the types.
+	options.ReleaseAnalyzed = true
+	options.ReadFile = engine.sourceReader(nil)
+	result, checkError := check.Run(analyzed, enabled, options)
 	if checkError != nil {
 		return lintPass{checkError: checkError, elapsed: time.Since(started)}
 	}

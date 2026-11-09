@@ -3,6 +3,7 @@ package checker
 import (
 	"cmp"
 	"fmt"
+	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -40,7 +41,8 @@ type packageGroup struct {
 	priority int
 
 	// unfinished is how many distinct actions on other packages, which the group's actions inherit facts from, are
-	// still to finish. The group is ready at 0.
+	// still to finish, and one more while the package is not yet final for analysis (Options.Ready). The group is
+	// ready at 0.
 	unfinished int
 
 	// unexecuted is how many of the group's actions are still to finish once it is granted. Its slot is given back
@@ -82,7 +84,7 @@ type scheduler struct {
 	lock sync.Mutex
 
 	// wake is broadcast whenever an action finishes, which may ready actions, ready a group, give a slot back, or
-	// end the graph.
+	// end the graph, and whenever a package becomes final or the graph is abandoned.
 	wake *sync.Cond
 
 	// ready are the groups waiting for a slot.
@@ -96,6 +98,11 @@ type scheduler struct {
 	executing int
 	running   int
 	remaining int
+
+	// awaiting counts the groups whose package is not yet final for analysis (Options.Ready), and abandoned is set
+	// once Options.Abandon closes, after which no group is granted and no action starts.
+	awaiting  int
+	abandoned bool
 
 	// stuck is the panic's message once a worker has found groups that nothing will make ready, for the caller's
 	// goroutine to raise when every worker has stopped.
@@ -124,10 +131,15 @@ type scheduler struct {
 // ready action on the package with the longest weighted path to the end of the graph (packageGroup.priority), so
 // the chain the rest waits on runs first.
 //
+// Under Options.Ready a group also waits for its package to be final, as one more thing unfinished, counted down by a
+// goroutine of its own that waits on the package's channel, never by a worker. Its cost is read from the sizes of the
+// files the load will parse for it (listedCost), since they are parsed only later, by the load beside the graph, so
+// the priorities are those of a graph run after the load.
+//
 // A worker never waits inside an action: every action it inherits facts from finished before its group was granted,
 // and every horizontal prerequisite before it was queued, so exec on those returns at once. So the pool cannot
-// deadlock. A group still ungranted when nothing is queued and nothing runs waits on an action that never finishes,
-// which only an import cycle makes and the load never does, and the scheduler panics naming it.
+// deadlock. A group still ungranted when nothing is queued, nothing runs and every package is final waits on an action
+// that never finishes, which only an import cycle makes and the load never does, and the scheduler panics naming it.
 func schedule(groups []*syntaxReaders, options *Options) {
 	scheduler := &scheduler{options: options, slots: slotsPerProcessor * runtime.GOMAXPROCS(0),
 		workers: runtime.GOMAXPROCS(0), waiting: map[*Action][]*packageGroup{}}
@@ -142,9 +154,21 @@ func schedule(groups []*syntaxReaders, options *Options) {
 		scheduler.workers = options.workers
 	}
 	scheduler.wake = sync.NewCond(&scheduler.lock)
+	// finals are the channels of the groups whose package is not yet final, by the group's index in groups.
+	finals := map[int]<-chan struct{}{}
 	for _, shared := range groups {
 		// Every group holds at least the action that made it.
-		group := &packageGroup{analyzedPackage: shared.actions[0].Package, cost: packageCost(shared.actions[0].Package)}
+		group := &packageGroup{analyzedPackage: shared.actions[0].Package}
+		var final <-chan struct{}
+		if options.Ready != nil {
+			final = options.Ready(group.analyzedPackage)
+		}
+		if final == nil {
+			group.cost = packageCost(group.analyzedPackage)
+		} else {
+			finals[len(scheduler.groups)] = final
+			group.cost = listedCost(group.analyzedPackage, options.Restored)
+		}
 		scheduled := make(map[*Action]*scheduledAction, len(shared.actions))
 		for order, action := range shared.actions {
 			scheduled[action] = &scheduledAction{action: action, group: group, order: order}
@@ -169,6 +193,9 @@ func schedule(groups []*syntaxReaders, options *Options) {
 			}
 		}
 		group.unfinished = len(inherited)
+		if _, waits := finals[len(scheduler.groups)]; waits {
+			group.unfinished++
+		}
 		if group.unfinished == 0 {
 			scheduler.ready = append(scheduler.ready, group)
 		}
@@ -176,6 +203,15 @@ func schedule(groups []*syntaxReaders, options *Options) {
 	}
 	scheduler.prioritize()
 	scheduler.remaining = len(scheduler.groups)
+	scheduler.awaiting = len(finals)
+	for index, final := range finals {
+		go scheduler.await(index, final)
+	}
+	if options.Abandon != nil {
+		ran := make(chan struct{})
+		defer close(ran)
+		go scheduler.watchAbandon(options.Abandon, ran)
+	}
 	scheduler.run()
 }
 
@@ -211,12 +247,53 @@ func (scheduler *scheduler) prioritize() {
 	}
 }
 
+// await counts the package of the group at index as final once final closes.
+func (scheduler *scheduler) await(index int, final <-chan struct{}) {
+	<-final
+	scheduler.lock.Lock()
+	scheduler.awaiting--
+	scheduler.groups[index].unfinished--
+	if scheduler.groups[index].unfinished == 0 {
+		scheduler.ready = append(scheduler.ready, scheduler.groups[index])
+	}
+	scheduler.lock.Unlock()
+	scheduler.wake.Broadcast()
+}
+
+// watchAbandon marks the graph abandoned once abandon closes, unless the graph has ended first.
+func (scheduler *scheduler) watchAbandon(abandon <-chan struct{}, ran <-chan struct{}) {
+	select {
+	case <-abandon:
+		scheduler.lock.Lock()
+		scheduler.abandoned = true
+		scheduler.lock.Unlock()
+		scheduler.wake.Broadcast()
+	case <-ran:
+	}
+}
+
 // packageCost is the bytes of analyzedPackage's parsed files, 0 when it has none.
 func packageCost(analyzedPackage *packages.Package) int {
 	cost := 0
 	for _, file := range analyzedPackage.Syntax {
 		if tokenFile := analyzedPackage.Fset.File(file.Pos()); tokenFile != nil {
 			cost += tokenFile.Size()
+		}
+	}
+	return cost
+}
+
+// listedCost is packageCost for a package the load has not parsed yet, read from the sizes of the files it will parse
+// for it, which are the bytes packageCost reads once they are: 0 for a package restored (Options.Restored), which the
+// load never parses, and nothing for a file that cannot be read.
+func listedCost(analyzedPackage *packages.Package, restored func(*packages.Package) bool) int {
+	if restored != nil && restored(analyzedPackage) {
+		return 0
+	}
+	cost := 0
+	for _, file := range analyzedPackage.CompiledGoFiles {
+		if information, statError := os.Stat(file); statError == nil {
+			cost += int(information.Size())
 		}
 	}
 	return cost
@@ -246,6 +323,16 @@ func (scheduler *scheduler) run() {
 func (scheduler *scheduler) work() {
 	scheduler.lock.Lock()
 	for {
+		if scheduler.abandoned {
+			// What has started finishes, since an action is never stopped part way; nothing more starts.
+			if scheduler.executing == 0 {
+				scheduler.wake.Broadcast()
+				scheduler.lock.Unlock()
+				return
+			}
+			scheduler.wake.Wait()
+			continue
+		}
 		scheduler.admit()
 		if scheduler.stuck != "" || scheduler.remaining == 0 && scheduler.running == 0 {
 			scheduler.lock.Unlock()
@@ -262,10 +349,11 @@ func (scheduler *scheduler) work() {
 			scheduler.wake.Broadcast()
 			continue
 		}
-		if scheduler.executing == 0 {
-			// Invariant: a group waits only on actions on the packages its package imports, and an action only on
-			// the actions on its own package that it requires, so with nothing queued and nothing executing, and
-			// every free slot granted, a group still to run waits on an import cycle, which the load never makes.
+		if scheduler.executing == 0 && scheduler.awaiting == 0 {
+			// Invariant: a group waits only on actions on the packages its package imports, and on its package being
+			// final, and an action only on the actions on its own package that it requires, so with nothing queued,
+			// nothing executing, every package final and every free slot granted, a group still to run waits on an
+			// import cycle, which the load never makes.
 			scheduler.stuck = scheduler.describeStuck()
 			scheduler.wake.Broadcast()
 			scheduler.lock.Unlock()

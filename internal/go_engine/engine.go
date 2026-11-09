@@ -114,6 +114,20 @@ func runWithStandardLibrary(
 	memory *contract.Memory,
 	builtIn builtInStandardLibrary,
 ) int {
+	return runOverlapping(arguments, standardOutput, standardError, registered, memory, builtIn, true)
+}
+
+// runOverlapping is runWithStandardLibrary, with overlaps saying whether a run whose findings cache has no store may
+// lint beside its load, which only a test turns off, to hold a run that does to the records of one that does not.
+func runOverlapping(
+	arguments []string,
+	standardOutput io.Writer,
+	standardError io.Writer,
+	registered []rule.Rule,
+	memory *contract.Memory,
+	builtIn builtInStandardLibrary,
+	overlaps bool,
+) int {
 	request, parseError := parseInvocation(arguments)
 	if parseError != nil {
 		return refuse(standardError, parseError)
@@ -139,6 +153,7 @@ func runWithStandardLibrary(
 		return refuse(standardError, describeError)
 	}
 	engine := newPipeline(request, described, ruleSettings, registered, standardOutput, standardError, memory)
+	engine.overlaps = overlaps
 	return engine.run()
 }
 

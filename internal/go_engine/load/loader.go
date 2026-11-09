@@ -47,6 +47,13 @@ type loader struct {
 	// restored are the packages the findings cache holds, whose types come from their export data (see Restorer).
 	restored map[*packages.Package]*Restored
 
+	// analyzed are the packages to analyze (analyzedOfGraph), and testFunctions each analyzed test variant's refused
+	// test functions, judged as it is checked, while its syntax is surely there: an analysis beside the load lets an
+	// analyzed package's syntax go once it has finished with it, which may be before the load ends.
+	analyzed          map[*packages.Package]bool
+	testFunctionsLock sync.Mutex
+	testFunctions     map[*packages.Package][]Diagnostic
+
 	// filesParsed counts the files parsed, and fromExportData the packages whose types were read from export data.
 	filesParsed    atomic.Int64
 	fromExportData atomic.Int64
@@ -469,6 +476,12 @@ func (loader *loader) check(current *node, syntax []*ast.File, parseErrors []err
 	for _, imported := range loaded.Imports {
 		loaded.IllTyped = loaded.IllTyped || imported.IllTyped
 	}
+	if loaded.ForTest != "" && loader.analyzed[loaded] {
+		refused := testFunctionDiagnostics(loaded)
+		loader.testFunctionsLock.Lock()
+		loader.testFunctions[loaded] = refused
+		loader.testFunctionsLock.Unlock()
+	}
 }
 
 // appendError adds one parse or type error to a package's Errors, in go/packages' words.
@@ -548,13 +561,15 @@ func newLoader(
 	held Held,
 ) *loader {
 	return &loader{
-		graph:    built,
-		fileSet:  token.NewFileSet(),
-		sizes:    sizes,
-		slots:    make(chan struct{}, runtime.GOMAXPROCS(0)),
-		parsed:   map[string]*parsedFile{},
-		withheld: withheld,
-		overlay:  overlay,
-		held:     held,
+		graph:         built,
+		fileSet:       token.NewFileSet(),
+		sizes:         sizes,
+		slots:         make(chan struct{}, runtime.GOMAXPROCS(0)),
+		parsed:        map[string]*parsedFile{},
+		withheld:      withheld,
+		overlay:       overlay,
+		held:          held,
+		analyzed:      map[*packages.Package]bool{},
+		testFunctions: map[*packages.Package][]Diagnostic{},
 	}
 }

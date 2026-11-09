@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are nine.
+// The changes are ten.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -141,6 +141,12 @@
 //
 //	before: 23.2 to 24.1s user (mean 23.6), 4.7 to 5.6s wall
 //	after:  22.5 to 23.2s user (mean 22.9), 4.7 to 5.3s wall
+//
+// The tenth is readiness, the seam a run beside the load goes through.
+// Options.Ready says when each package is final for analysis, and the
+// scheduler starts no action on it before then; Options.Abandon stops
+// the graph from starting anything more, for a load whose end says the
+// rules must not run at all.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -272,6 +278,17 @@ type Options struct {
 	// scheduled, and an action no kept edge reaches never runs. Unset,
 	// every requirement is an edge, as upstream's is.
 	ForDependents func(analyzer *analysis.Analyzer, required *analysis.Analyzer) bool
+
+	// cohere: Ready, when set, says when a package is final for
+	// analysis: no action on it starts before the channel Ready returns
+	// for it is closed, a nil channel being a package ready at once, so
+	// the graph can run beside the load that type-checks it (see
+	// schedule). Abandon, once closed, grants no package that has not
+	// been granted and starts no action that has not started, and
+	// Analyze returns as soon as those running finish, with the rest
+	// never run.
+	Ready   func(*packages.Package) <-chan struct{}
+	Abandon <-chan struct{}
 
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once

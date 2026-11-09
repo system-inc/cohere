@@ -8,6 +8,7 @@ package check
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"go/token"
 	"slices"
@@ -49,7 +50,18 @@ type Options struct {
 	// is given, reads exactly what the syntax was parsed from and never reads the disk again. The checker still
 	// refuses a file the pass was not given.
 	ReadFile func(filename string) ([]byte, error)
+
+	// Ready and Abandon run the rules beside the load rather than after it, on a run whose cache has no store, which
+	// restores only the standard library from the binary, decided before the load checks anything: Ready is
+	// load.Overlap's, so no rule starts on a package before the load has made it final, and Abandon, closed, starts
+	// nothing more and has Run return ErrAbandoned once what started has finished, for a load whose end says the rules
+	// must not run at all (see checker.Options).
+	Ready   func(*packages.Package) <-chan struct{}
+	Abandon <-chan struct{}
 }
+
+// ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
+var ErrAbandoned = errors.New("the rules were abandoned before they finished")
 
 // Finding is one diagnostic of one rule. Positions are of the file as the engine read it, not as a `//line`
 // directive renames it, so they agree with the edits' offsets and with the suppression comments in that file.
@@ -186,6 +198,10 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		return nil, wrapError
 	}
 	record := &walkRecord{files: map[*packages.Package][]storedFile{}}
+	if options.Ready != nil && options.Cache != nil && options.Cache.HasStore() {
+		return nil, errors.New("running the rules beside the load: the findings cache's store restores packages the " +
+			"load never checks and analyzes in waves, so a run with it waits for the load")
+	}
 	// Dependents hands each dispatcher the rules of this run that require it on a package, so it calls only their
 	// listeners, never those of a rule the run left out that registered on it all the same. Failed and Tolerant let a
 	// dispatcher run past a listener's requirement failing on a package, so only that listener's rule fails there, as
@@ -193,7 +209,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// for its listeners only where a rule of this run requires it too, so what only a left-out rule reads never runs.
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile,
 		Dependents: rule.Dependents, Failed: rule.Failed, Tolerant: dispatch.IsDispatcher,
-		ForDependents: dispatch.ListenerRequirement}
+		ForDependents: dispatch.ListenerRequirement, Ready: options.Ready, Abandon: options.Abandon}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
@@ -224,6 +240,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	graph, analyzeError := checker.Analyze(analyzers, roots, checkerOptions)
 	if analyzeError != nil {
 		return nil, fmt.Errorf("analyzing %d packages: %w", len(roots), analyzeError)
+	}
+	if abandoned(options.Abandon) {
+		return nil, ErrAbandoned
 	}
 	graphs = append(graphs, graph)
 	type rootKey struct {
@@ -317,6 +336,16 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	}
 	result.Elapsed = time.Since(started)
 	return result, nil
+}
+
+// abandoned is whether abandon is closed, never for a nil one.
+func abandoned(abandon <-chan struct{}) bool {
+	select {
+	case <-abandon:
+		return true
+	default:
+		return false
+	}
 }
 
 // actionFindings is what action found, as newFinding makes it.

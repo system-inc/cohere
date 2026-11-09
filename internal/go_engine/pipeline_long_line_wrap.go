@@ -27,6 +27,9 @@ func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 			caching.Listings = engine.session
 		}
 	}
+	if engine.lintOverlaps() {
+		caching.Begin = engine.beginSpeculativeLint
+	}
 	loaded, loadError := load.PackagesCached(workspace.Root, workspace.Patterns(), workspace.Environment(),
 		engine.described.readableOurs, caching)
 	if loadError != nil && typesRead {

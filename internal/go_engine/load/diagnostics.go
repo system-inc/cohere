@@ -44,28 +44,18 @@ type Diagnostic struct {
 // the analyzed test variants, each once, sorted. The same error is often reported by both p and
 // "p [p.test]", and go list names the first wrongly signed test function on go test's main as well, with the
 // position in its message, so a diagnostic is one per file, position and message whatever its kind; the
-// signature check goes first so its kind is the one kept.
-func diagnostics(workspace string, roots []*packages.Package, analyzedPackages []*packages.Package) []Diagnostic {
+// signature check goes first so its kind is the one kept. testFunctions is each analyzed test variant's refused
+// test functions, judged as it was type-checked (testFunctionDiagnostics), since by the load's end an analysis
+// beside it may have let the variant's syntax go.
+func diagnostics(
+	workspace string,
+	roots []*packages.Package,
+	analyzedPackages []*packages.Package,
+	testFunctions map[*packages.Package][]Diagnostic,
+) []Diagnostic {
 	var found []Diagnostic
 	for _, analyzedPackage := range analyzedPackages {
-		if analyzedPackage.ForTest == "" {
-			continue
-		}
-		var testFiles []*ast.File
-		for _, file := range analyzedPackage.Syntax {
-			if strings.HasSuffix(analyzedPackage.Fset.Position(file.FileStart).Filename, "_test.go") {
-				testFiles = append(testFiles, file)
-			}
-		}
-		for _, problem := range test_functions.Problems(analyzedPackage.Fset, testFiles) {
-			found = append(found, Diagnostic{
-				Kind:    KindType,
-				File:    problem.Position.Filename,
-				Line:    problem.Position.Line,
-				Column:  problem.Position.Column,
-				Message: problem.Message,
-			})
-		}
+		found = append(found, testFunctions[analyzedPackage]...)
 	}
 	packages.Visit(roots, nil, func(visited *packages.Package) {
 		for _, packageError := range visited.Errors {
@@ -96,6 +86,28 @@ func diagnostics(workspace string, roots []*packages.Package, analyzedPackages [
 		)
 	})
 	return unique
+}
+
+// testFunctionDiagnostics is every test function go test would refuse in a test variant's test files, read from its
+// syntax.
+func testFunctionDiagnostics(testVariant *packages.Package) []Diagnostic {
+	var testFiles []*ast.File
+	for _, file := range testVariant.Syntax {
+		if strings.HasSuffix(testVariant.Fset.Position(file.FileStart).Filename, "_test.go") {
+			testFiles = append(testFiles, file)
+		}
+	}
+	var found []Diagnostic
+	for _, problem := range test_functions.Problems(testVariant.Fset, testFiles) {
+		found = append(found, Diagnostic{
+			Kind:    KindType,
+			File:    problem.Position.Filename,
+			Line:    problem.Position.Line,
+			Column:  problem.Position.Column,
+			Message: problem.Message,
+		})
+	}
+	return found
 }
 
 // diagnosticOf is one go/packages error as a diagnostic. Its Pos is "file:line:col", "file:line", "file",

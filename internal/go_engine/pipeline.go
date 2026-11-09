@@ -68,6 +68,12 @@ type pipeline struct {
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.
 	buildRuns []buildRun
+
+	// overlaps is whether a run whose findings cache has no store may start the lint phase's rules beside the load,
+	// which only a test turns off, to hold a run that does to one that does not; speculation is that pass once started
+	// (see pipeline_speculative_lint.go).
+	overlaps    bool
+	speculation *speculativeLint
 }
 
 func newPipeline(
@@ -87,6 +93,7 @@ func newPipeline(
 		writer:        contract.NewWriter(standardOutput),
 		standardError: standardError,
 		memory:        memory,
+		overlaps:      true,
 	}
 }
 
