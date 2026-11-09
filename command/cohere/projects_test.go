@@ -916,3 +916,35 @@ func TestTheCoveredPackagesQueryKeepsANoCacheRunsPromise(test *testing.T) {
 		})
 	}
 }
+
+// TestASwiftProjectRunsUntimedAtARootThatTimesTheRest: `--timing` at a discovered root reaches every project's run but
+// a Swift one's, whose engine refuses it, and the run says which Swift projects ran without it, so one command line at
+// cohere's own root times its Go and is never refused over Swift (#3apgjer). A run not typed `--timing`, or typed
+// `--timing=false`, says nothing, and nor does a root with no Swift project.
+func TestASwiftProjectRunsUntimedAtARootThatTimesTheRest(test *testing.T) {
+	test.Parallel()
+	given := []string{"--no-fix", "--timing", "--json"}
+	if kept := withoutSwitches(given, swiftUntimedSwitches); !slices.Equal(kept, []string{"--no-fix", "--json"}) {
+		test.Errorf("a Swift project's run is handed %q, want every flag but --timing", kept)
+	}
+	found := discovery{Projects: []discoveredProject{
+		{Directory: ".", Engine: engineGo},
+		{Directory: ".", Engine: engineSwift},
+		{Directory: "tools", Engine: engineSwift},
+	}}
+	labels := []string{".", ". (Swift)", "tools"}
+	want := "--timing measures the TypeScript and Go projects only, since the Swift engine does not implement it " +
+		"yet, so . (Swift), tools ran without it"
+	if note := timingSkipsSwiftNote(found, labels, given); note != want {
+		test.Errorf("the note is %q, want %q", note, want)
+	}
+	for _, quiet := range [][]string{{"--no-fix"}, {"--no-fix", "--timing=false"}, {"--timing", "--timing=false"}} {
+		if note := timingSkipsSwiftNote(found, labels, quiet); note != "" {
+			test.Errorf("%q says %q, want nothing, since it did not ask for timing", quiet, note)
+		}
+	}
+	noSwift := discovery{Projects: []discoveredProject{{Directory: ".", Engine: engineGo}}}
+	if note := timingSkipsSwiftNote(noSwift, []string{"."}, given); note != "" {
+		test.Errorf("a root with no Swift project says %q, want nothing", note)
+	}
+}

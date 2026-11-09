@@ -201,13 +201,55 @@ func refuseGoOnlySwitchesWithoutGo(found discovery, given map[string]bool, value
 	return refuseGoOnlySwitches(given, value)
 }
 
-// withoutGoOnlySwitches is arguments less each of goOnlySwitches, as `--name` or `--name=value`, one dash or two. Every
-// argument is a flag here (see childArguments), and a boolean flag takes no separate value.
+// withoutGoOnlySwitches is arguments less each of goOnlySwitches.
 func withoutGoOnlySwitches(arguments []string) []string {
+	return withoutSwitches(arguments, goOnlySwitches)
+}
+
+// swiftUntimedSwitches are the switches a Swift project's run at a discovered root is run without: `--timing`, which
+// the Swift engine does not implement and refuses, so one command line at a root holding Swift beside TypeScript or
+// Go times those and says the Swift project ran untimed (timingSkipsSwiftNote), rather than refusing every project's
+// run over one engine's gap (#3apgjer).
+var swiftUntimedSwitches = []string{"timing"}
+
+// timingSkipsSwiftNote is what a run at a discovered root says when it was typed `--timing` and holds a Swift project,
+// which runs without it: the labels of those projects, or empty when there is nothing to say.
+func timingSkipsSwiftNote(found discovery, labels []string, arguments []string) string {
+	if !switchOn(arguments, "timing") {
+		return ""
+	}
+	var untimed []string
+	for index, project := range found.Projects {
+		if project.Engine == engineSwift {
+			untimed = append(untimed, labels[index])
+		}
+	}
+	if len(untimed) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("--timing measures the TypeScript and Go projects only, since the Swift engine does not "+
+		"implement it yet, so %s ran without it", strings.Join(untimed, ", "))
+}
+
+// switchOn reports whether arguments turn the switch name on, as `--name` or `--name=true`, one dash or two.
+func switchOn(arguments []string, name string) bool {
+	on := false
+	for _, argument := range arguments {
+		spelled, value, valued := strings.Cut(strings.TrimLeft(argument, "-"), "=")
+		if strings.HasPrefix(argument, "-") && spelled == name {
+			on = !valued || value == "true"
+		}
+	}
+	return on
+}
+
+// withoutSwitches is arguments less each of names, as `--name` or `--name=value`, one dash or two. Every argument is a
+// flag here (see childArguments), and a boolean flag takes no separate value.
+func withoutSwitches(arguments []string, names []string) []string {
 	kept := make([]string, 0, len(arguments))
 	for _, argument := range arguments {
 		name, _, _ := strings.Cut(strings.TrimLeft(argument, "-"), "=")
-		if strings.HasPrefix(argument, "-") && slices.Contains(goOnlySwitches, name) {
+		if strings.HasPrefix(argument, "-") && slices.Contains(names, name) {
 			continue
 		}
 		kept = append(kept, argument)
@@ -268,6 +310,10 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 	// The default view ends on one line for every project, so each hands its summary back instead of printing a
 	// footer. --phases keeps each project's own, since phase times don't sum across projects side by side.
 	oneLine := activeOutput.Mode == outputHuman && !activeOutput.Phases
+	// On standard error, where a run says what it was refused, so every view, `--json` included, says it.
+	if note := timingSkipsSwiftNote(found, labels, arguments); note != "" {
+		fmt.Fprintf(streams.Errors, "cohere: %s\n", note)
+	}
 	var group sync.WaitGroup
 	running := make(chan struct{}, projectRunsAtOnce())
 	for index, project := range found.Projects {
@@ -294,6 +340,9 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		projectArguments := arguments
 		if project.Engine != engineGo {
 			projectArguments = withoutGoOnlySwitches(arguments)
+		}
+		if project.Engine == engineSwift {
+			projectArguments = withoutSwitches(projectArguments, swiftUntimedSwitches)
 		}
 		// TypeScript runs alone: the cache it turns off is cohere's table in the directory, which a Swift run
 		// never reads or writes, so a Swift run in the same directory keeps its own cache.

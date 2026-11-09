@@ -161,7 +161,10 @@
                         "exportDataPackages"
                     ],
                     "properties": {
-                        "listCpuMicroseconds": { "type": "integer", "description": "This process's own CPU listing the packages." },
+                        "listCpuMicroseconds": {
+                            "type": "integer",
+                            "description": "This process's own CPU listing the packages."
+                        },
                         "listChildrenCpuMicroseconds": {
                             "type": "integer",
                             "description": "The CPU of the go commands the listing ran, its children's, which processCpuMicroseconds does not hold."
@@ -169,9 +172,17 @@
                         "parseCpuMicroseconds": { "type": "integer" },
                         "parsedFiles": { "type": "integer", "minimum": 0 },
                         "typeCheckCpuMicroseconds": { "type": "integer" },
-                        "typeCheckedPackages": { "type": "integer", "minimum": 0, "description": "Packages type-checked from source." },
+                        "typeCheckedPackages": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Packages type-checked from source."
+                        },
                         "exportDataCpuMicroseconds": { "type": "integer" },
-                        "exportDataPackages": { "type": "integer", "minimum": 0, "description": "Packages whose types were read from export data in place of their source." }
+                        "exportDataPackages": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Packages whose types were read from export data in place of their source."
+                        }
                     }
                 },
                 "rules": {
@@ -184,8 +195,16 @@
                         "properties": {
                             "name": { "type": "string" },
                             "cpuMicroseconds": { "type": "integer" },
-                            "packages": { "type": "integer", "minimum": 0, "description": "Packages the rule's analyzer ran on, dependencies analyzed for facts included." },
-                            "calls": { "type": "integer", "minimum": 0, "description": "Calls a dispatcher made into the rule's listener, 0 for a rule that walks on its own." }
+                            "packages": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Packages the rule's analyzer ran on, dependencies analyzed for facts included."
+                            },
+                            "calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Calls a dispatcher made into the rule's listener, 0 for a rule that walks on its own."
+                            }
                         }
                     }
                 },
@@ -197,7 +216,10 @@
                         "additionalProperties": false,
                         "required": ["name", "kind", "cpuMicroseconds", "packages"],
                         "properties": {
-                            "name": { "type": "string", "description": "The analyzer's name, buildir for staticcheck's intermediate representation build." },
+                            "name": {
+                                "type": "string",
+                                "description": "The analyzer's name, buildir for staticcheck's intermediate representation build."
+                            },
                             "kind": {
                                 "enum": ["intermediateRepresentation", "dispatcher", "analyzer"],
                                 "description": "An intermediate representation build, staticcheck's or the engine's own; a dispatcher's walk less its calls into the listeners, which are billed to their rules; or another analyzer several rules read."
@@ -207,8 +229,15 @@
                         }
                     }
                 },
-                "measuredCalls": { "type": "integer", "minimum": 0, "description": "Pieces of work measured, each costing two reads of the clock." },
-                "measuringCpuMicroseconds": { "type": "integer", "description": "What those reads cost, already taken out of the rows." }
+                "measuredCalls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Pieces of work measured, each costing two reads of the clock."
+                },
+                "measuringCpuMicroseconds": {
+                    "type": "integer",
+                    "description": "What those reads cost, already taken out of the rows."
+                }
             }
         },
         "summary": {
