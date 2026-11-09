@@ -8,7 +8,7 @@ import (
 
 const varFile = "/repository/source/Thing.ts"
 
-func TestNoVariableFires(test *testing.T) {
+func TestNoVarDeclarationsFires(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -41,14 +41,14 @@ func TestNoVariableFires(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(
 				test,
-				rule_testing.Run(test, NoVariable, varFile, testCase.sourceText),
+				rule_testing.Run(test, NoVarDeclarations, varFile, testCase.sourceText),
 				"unexpectedVar",
 			)
 		})
 	}
 }
 
-func TestNoVariableStaysSilent(test *testing.T) {
+func TestNoVarDeclarationsStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -92,7 +92,7 @@ func TestNoVariableStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoVariable, varFile, testCase.sourceText))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoVarDeclarations, varFile, testCase.sourceText))
 		})
 	}
 }
