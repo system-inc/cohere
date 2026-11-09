@@ -353,7 +353,7 @@ func atomicUpdateRoots(sourceFile *ast.Node) []*ast.Node {
 		if node == nil {
 			return false
 		}
-		if control_flow_graph.IsRoot(node) && canSuspend(node) {
+		if control_flow_graph.IsRoot(node) && control_flow_graph.CanSuspend(node) {
 			roots = append(roots, node)
 		}
 		node.ForEachChild(visit)
@@ -362,35 +362,6 @@ func atomicUpdateRoots(sourceFile *ast.Node) []*ast.Node {
 	sourceFile.ForEachChild(visit)
 
 	return roots
-}
-
-// canSuspend reports whether a code path root is an async function or a generator.
-//
-// Both halves matter and upstream tests both: `scope.block.async || scope.block.generator`. An async
-// generator is both and is judged once, which the corpus exercises directly at
-// `let foo; async function* x() { foo = (yield foo) + await bar; }`.
-func canSuspend(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-	default:
-		return false
-	}
-	if node.ModifierFlags()&ast.ModifierFlagsAsync != 0 {
-		return true
-	}
-	// An arrow function cannot be a generator, so only the function-like kinds carry an asterisk.
-	// `AsteriskToken` is on the concrete node rather than on `ast.Node`, so each kind is asked
-	// separately rather than through one accessor.
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		return node.AsFunctionDeclaration().AsteriskToken != nil
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().AsteriskToken != nil
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().AsteriskToken != nil
-	}
-	return false
 }
 
 // analyzeRootNonAtomicUpdates runs the forward outdated-read dataflow over one suspending root.

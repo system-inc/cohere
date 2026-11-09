@@ -792,7 +792,7 @@ func loopFuncIsAsyncOrGenerator(node *ast.Node) bool {
 	}
 	// An arrow function cannot be a generator, and `AsteriskToken` lives on the concrete node
 	// rather than on `ast.Node`, so each kind is asked separately. Same shape as
-	// `require_atomic_updates.go`'s `canSuspend`, which settled this first.
+	// `control_flow_graph.CanSuspend`, which settled this first.
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
 		return node.AsFunctionDeclaration().AsteriskToken != nil
