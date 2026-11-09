@@ -141,3 +141,24 @@ func TestRulesAndSharedEncodeAsEmptyListsWhenEmpty(test *testing.T) {
 		}
 	}
 }
+
+// Shared adds to an analyzer's row without counting a package, so a lazy build billed once for each function it
+// builds leaves the row's packages the analyzer's own runs. On a nil collector it does nothing.
+func TestSharedAddsCpuWithoutCountingAPackage(test *testing.T) {
+	test.Parallel()
+	collector := newFixedCollector(0)
+	collector.Analyzer("build_intermediate_representation", time.Millisecond)
+	for range 5 {
+		collector.Shared("build_intermediate_representation", 2*time.Millisecond)
+	}
+	expected := []contract.SharedTiming{{Name: "build_intermediate_representation",
+		Kind: contract.SharedIntermediateRepresentation, CpuMicroseconds: 11_000, Packages: 1}}
+	record := collector.Record(func(string) (string, contract.SharedKind) {
+		return "", contract.SharedIntermediateRepresentation
+	})
+	if !slices.Equal(record.Shared, expected) {
+		test.Fatalf("the shared rows are %+v, want %+v", record.Shared, expected)
+	}
+	var unasked *Collector
+	unasked.Shared("build_intermediate_representation", time.Second)
+}

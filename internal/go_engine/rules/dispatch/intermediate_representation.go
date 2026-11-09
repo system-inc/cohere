@@ -82,7 +82,8 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 	if len(started.runs) == 0 {
 		return finish(started), nil
 	}
-	for function := range built.SourceFunctions() {
+	// Under --timing each function's build is billed to the representation's build, not to this walk.
+	for function := range built.SourceFunctions(started.timing, started.dispatcher) {
 		for _, run := range started.runs {
 			run.ownFunction(function)
 		}
