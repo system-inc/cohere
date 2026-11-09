@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are eleven.
+// The changes are twelve.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -162,6 +162,16 @@
 // pass's ResultOf, as Options.Dependents keys its set, so a dispatcher
 // can bill each listener's calls to its rule. Unset, nothing is measured
 // and every pass is upstream's.
+//
+// The twelfth is Options.Resolver, the seam a fact computed on demand
+// goes through (#w7zmvat). The resolver is told of each action that ran to
+// the end without error, as its Run returns and before releaseInputs and
+// releaseSyntax let go of what it read, so it can keep its own reference to
+// a package's syntax, type information and ctrlflow's graphs, and build a
+// dependency's functions only when a reader asks of one, where a pushed fact
+// is learned on every function of every dependency. Options.Resolved keys
+// the resolver in every pass's ResultOf, as Options.Timed keys the
+// collector. Unset, nothing is told and every pass is upstream's.
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
@@ -315,6 +325,15 @@ type Options struct {
 	Timing *timing.Collector
 	Timed  *analysis.Analyzer
 
+	// cohere: Resolver, when set, is told of every action that ran its
+	// analyzer to the end without error, before its inputs and its
+	// package's syntax are released (see releaseInputs and releaseSyntax).
+	// Resolved, when Resolver is set too, keys it in every pass's ResultOf,
+	// a key never run, as Dependents is. Unset, nothing is told and
+	// ResultOf holds no resolver.
+	Resolver Resolver
+	Resolved *analysis.Analyzer
+
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
 	// in place of the default; workers, above 0, is how many actions; and
@@ -323,6 +342,13 @@ type Options struct {
 	slots        int
 	workers      int
 	observeGroup func(pkg *packages.Package, running bool)
+}
+
+// cohere: Resolver is what Options.Resolver is told of: each action that
+// finished without error, its Result and its package's syntax and type
+// information still in place, on the goroutine that ran it.
+type Resolver interface {
+	Finished(act *Action)
 }
 
 // Graph holds the results of a round of analysis, including the graph
@@ -700,6 +726,10 @@ func (act *Action) execOnce() {
 	if act.opts.Timed != nil && act.opts.Timing != nil {
 		inputs[act.opts.Timed] = act.opts.Timing
 	}
+	// cohere: Options.Resolved, the resolver under Options.Resolver.
+	if act.opts.Resolved != nil && act.opts.Resolver != nil {
+		inputs[act.opts.Resolved] = act.opts.Resolver
+	}
 
 	// cohere: a restored package's own facts come from the cache, in
 	// place of a pass, on top of those it inherited (see Options.Restored).
@@ -798,6 +828,12 @@ func (act *Action) execOnce() {
 	// Help detect (disallowed) calls after Run.
 	pass.ExportObjectFact = nil
 	pass.ExportPackageFact = nil
+
+	// cohere: Options.Resolver, told while the deferred releases have yet
+	// to let go of the Result and the package's syntax.
+	if act.Err == nil && act.opts.Resolver != nil {
+		act.opts.Resolver.Finished(act)
+	}
 }
 
 // cohere: releaseInputs lets go of what act read from its prerequisites

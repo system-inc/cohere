@@ -19,6 +19,7 @@ import (
 	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -391,13 +392,16 @@ func abandoned(abandon <-chan struct{}) bool {
 // expression map only where a rule that reads it runs. Failed and Tolerant let a dispatcher run past a listener's
 // requirement failing on a package, so only that listener's rule fails there, as it did walking by itself, never every
 // rule on the dispatcher. ForDependents keeps a dispatcher's requirement for its listeners only where a rule of this
-// run requires it too, so what only a left-out rule reads never runs.
+// run requires it too, so what only a left-out rule reads never runs. Resolver is a new fact resolver, one for the run
+// the options are made for, in which a fact asked on demand, as function_purity's, is computed (#w7zmvat).
 func DispatchOptions() *checker.Options {
 	return &checker.Options{
 		Dependents:    rule.Dependents,
 		Failed:        rule.Failed,
 		Tolerant:      dispatch.IsDispatcher,
 		ForDependents: dispatch.ListenerRequirement,
+		Resolver:      fact_resolver.New(),
+		Resolved:      fact_resolver.Resolved,
 	}
 }
 
