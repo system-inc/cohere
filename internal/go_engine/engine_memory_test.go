@@ -101,3 +101,64 @@ func TestCapMemory(test *testing.T) {
 		})
 	}
 }
+
+func TestLateLimit(test *testing.T) {
+	test.Parallel()
+	const raised = engineMemoryCap + lateMemoryAllowance
+	cases := []struct {
+		name           string
+		source         contract.MemorySource
+		inheritedBytes int64
+		singleThreaded bool
+		want           int64
+		wantRaises     bool
+	}{
+		{
+			name: "the cap under a high ceiling is raised by the allowance", source: contract.MemorySourceCap,
+			inheritedBytes: 32 << 30, want: raised, wantRaises: true,
+		},
+		{
+			name: "the raise stops at the ceiling the policy set", source: contract.MemorySourceCap,
+			inheritedBytes: engineMemoryCap + 512<<20, want: engineMemoryCap + 512<<20, wantRaises: true,
+		},
+		{
+			name: "a ceiling at the cap leaves no room to raise", source: contract.MemorySourceCap,
+			inheritedBytes: engineMemoryCap,
+		},
+		{
+			name: "a single-threaded run is never raised", source: contract.MemorySourceCap, inheritedBytes: 32 << 30,
+			singleThreaded: true,
+		},
+		{
+			name: "the environment's collector is never raised", source: contract.MemorySourceEnvironment,
+			inheritedBytes: 32 << 30,
+		},
+		// The policy's ceiling is above the cap here, which a run never holds under source Available, so it is the
+		// source alone that refuses.
+		{
+			name: "half the memory available is never raised", source: contract.MemorySourceAvailable,
+			inheritedBytes: 32 << 30,
+		},
+		{
+			name: "memory that could not be read is never raised", source: contract.MemorySourceUnreadable,
+			inheritedBytes: math.MaxInt64,
+		},
+	}
+	for _, late := range cases {
+		test.Run(late.name, func(test *testing.T) {
+			test.Parallel()
+			memory := engineMemory{
+				record: contract.Memory{
+					LimitBytes: engineMemoryCap, CapBytes: engineMemoryCap, Source: late.source,
+				},
+				inheritedBytes: late.inheritedBytes,
+			}
+
+			limit, raises := lateLimit(memory, late.singleThreaded)
+
+			if limit != late.want || raises != late.wantRaises {
+				test.Errorf("lateLimit gave %d, %t, want %d, %t", limit, raises, late.want, late.wantRaises)
+			}
+		})
+	}
+}

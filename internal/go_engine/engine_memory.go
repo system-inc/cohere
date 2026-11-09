@@ -115,3 +115,53 @@ func capMemory(
 		AvailableBytes: availableBytes,
 	}
 }
+
+// engineMemory is what Main decided about the process's memory: the types record's account of the limit, and what the
+// late raise reads (lateLimit).
+type engineMemory struct {
+	record contract.Memory
+	// inheritedBytes is the limit the front door's policy set before capMemory lowered it, the ceiling a late raise
+	// never passes. It is math.MaxInt64 when the policy set none.
+	inheritedBytes int64
+}
+
+// lateMemoryAllowance is how far the late raise lifts the limit above the cap: 1 GiB.
+const lateMemoryAllowance int64 = 1 << 30
+
+// lateLimit is the limit the engine raises its memory limit to once the load has ended and no collection is in flight
+// (lateRaise), and whether it raises at all: the cap plus lateMemoryAllowance, never above the limit the front door's
+// policy set, and only when the cap is what the run holds.
+//
+// The raise skips the run's last collection, which is spent on a heap the run is about to drop. Collection is
+// limit-driven under the cap, so a cold run of cohere's own root collects three times (#44n0vap, main d423228b, the
+// engine alone, 8 runs at a load of 28 to 45): once in the load, once at its end, and a last time mid-lint, between
+// half and three quarters of its packages, at 3.2 to 5.9 CPU-s on a live heap of 4.1 to 4.3 GB with only 0.50 to 0.69
+// GB of the run's 15.75 GB left to allocate. The live heap after the second collection, with what is left, fits under
+// the peak the load already reached, so a limit 1 GiB higher from there lets the run finish without the last one.
+// Measured on the same tree, 8 interleaved rounds each at a load of 13 to 40:
+//
+//	the cap alone:              3 collections every run, 37.1 to 38.8s user, 8.56 to 8.76 GB peak
+//	the late raise:             2 collections every run, 33.3 to 36.2s user, 8.49 to 8.71 GB peak
+//
+// The cap is Kirk's 8 GiB (#4thngsd), and the raise goes past it only by the allowance and only late. It bounds itself:
+// a tree that allocates more after the load is still collected, at the raised limit, so the worst case is 1 GiB more
+// peak and a collection moved later, never a heap without a bound.
+//
+// It raises nothing when:
+//   - the environment set `GOGC` or `GOMEMLIMIT` (source Environment), since whoever set it decided the collector;
+//   - the limit is half the memory available (source Available), since that ceiling is what keeps runs side by side
+//     safe, and the raise would pass it;
+//   - available memory could not be read (source Unreadable), where the collector runs at Go's default percent and its
+//     collections are not the limit-driven ones measured;
+//   - the run is single-threaded, whose lint analyzes one package at a time, so where its collections land against
+//     the load's end was never measured.
+func lateLimit(memory engineMemory, singleThreaded bool) (int64, bool) {
+	if memory.record.Source != contract.MemorySourceCap || singleThreaded {
+		return 0, false
+	}
+	limit := min(engineMemoryCap+lateMemoryAllowance, memory.inheritedBytes)
+	if limit <= engineMemoryCap {
+		return 0, false
+	}
+	return limit, true
+}

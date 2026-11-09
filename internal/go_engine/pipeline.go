@@ -41,8 +41,9 @@ type pipeline struct {
 	writer        *contract.Writer
 	standardError io.Writer
 
-	// memory is what Main decided about the process's memory limit, written on the types record, nil in a test.
-	memory *contract.Memory
+	// memory is what Main decided about the process's memory limit, its record written on the types record, nil in a
+	// test.
+	memory *engineMemory
 
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
 	// ends as a broken stream.
@@ -99,7 +100,7 @@ func newPipeline(
 	registered []rule.Rule,
 	standardOutput io.Writer,
 	standardError io.Writer,
-	memory *contract.Memory,
+	memory *engineMemory,
 ) *pipeline {
 	return &pipeline{
 		request:       request,
@@ -191,7 +192,9 @@ func (engine *pipeline) run() int {
 	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a phase
 	// reads the types.
 	if needsTypes || wraps {
+		raise := engine.armLateRaise()
 		loaded, loadError = engine.loadWorkspace(needsTypes)
+		raise.endLoad()
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, the load that proved
@@ -549,7 +552,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 			Packages:     loaded.CgoTranslatedPackages,
 			Milliseconds: int(loaded.CgoTranslationElapsed.Milliseconds()),
 		},
-		Memory: engine.memory,
+		Memory: engine.memoryRecord(),
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
 }
