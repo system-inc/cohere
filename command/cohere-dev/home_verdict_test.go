@@ -52,19 +52,19 @@ func TestHomesRunIsReadFromItsMarkerAndItsJson(test *testing.T) {
 	}
 }
 
-// The witness's window on Home is 09:30 up to 15:00 UTC, whatever the clock's zone.
-func TestTheWitnessWindowIsHomesFromHalfPastNineToThreeUtc(test *testing.T) {
+// The witness's window on Home is 09:00 up to 15:00 UTC, whatever the clock's zone.
+func TestTheWitnessWindowIsHomesFromNineToThreeUtc(test *testing.T) {
 	test.Parallel()
 	mountain := time.FixedZone("MST", -7*60*60)
 	for _, testCase := range []struct {
 		at   time.Time
 		want bool
 	}{
-		{time.Date(2026, 11, 9, 9, 29, 0, 0, time.UTC), false},
-		{time.Date(2026, 11, 9, 9, 30, 0, 0, time.UTC), true},
+		{time.Date(2026, 11, 9, 8, 59, 0, 0, time.UTC), false},
+		{time.Date(2026, 11, 9, 9, 0, 0, 0, time.UTC), true},
 		{time.Date(2026, 11, 9, 14, 59, 0, 0, time.UTC), true},
 		{time.Date(2026, 11, 9, 15, 0, 0, 0, time.UTC), false},
-		{time.Date(2026, 11, 9, 3, 0, 0, 0, mountain), true},
+		{time.Date(2026, 11, 9, 2, 0, 0, 0, mountain), true},
 		{time.Date(2026, 11, 9, 12, 0, 0, 0, mountain), false},
 	} {
 		if got := inWitnessWindow(testCase.at); got != testCase.want {
