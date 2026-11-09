@@ -799,7 +799,8 @@ restored from its entry, and no analyzer runs on it. A package's key holds its d
 an edit misses every package above the one edited, though most come out of an analysis as before.
 So the packages whose own inputs moved are analyzed first, and each package above them is then
 restored by a second key, its own inputs and what the analysis of everything below it came out as
-(its types without positions and the facts it exported), when that key holds an entry; what still
+(its types without positions and the facts it exported), when that key holds an entry and every
+answer of a fact computed on demand that the entry read of another package still holds; what still
 misses is analyzed together, so `waves`, the times the lint phase analyzed packages, is at most 2,
 and 0 when everything hit. A package one of whose findings names a file outside it, as vet's
 structtag names the line of a field embedded from another package, never takes the second key. On
