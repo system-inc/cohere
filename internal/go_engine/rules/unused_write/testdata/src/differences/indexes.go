@@ -39,3 +39,11 @@ func partialArrayThenElement() {
 	values := [3]int{1: 5}
 	values[2] = 1 // port renames: unused write to array index 2:int => unused write to array index 2
 }
+
+// A single element written at an index written across two lines. The port names the index as written, on one line,
+// count + position(), where the original names the call by its register, count + t1.
+func multiLineIndex(count int) {
+	var values [8]int
+	values[count+ // port renames: unused write to array index count + t1 => unused write to array index count + position()
+		position()] = 1
+}

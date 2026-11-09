@@ -30,6 +30,7 @@ import (
 	"go/printer"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/go/types/typeutil"
@@ -431,11 +432,11 @@ func indexPosition(
 
 // indexText is how the message names the index address writes at, as the source writes it: the index expression of
 // `values[index] = x` and the key of a keyed element of an array literal, printed by go/printer, so with gofmt's
-// spacing. A positional element of a literal has no index in its source, and its index is always a constant, so it is
-// named by that constant's value. Nothing else unused_write reports writes through an index address: the array of a
-// variadic call's arguments and a slice literal's backing array are read whole by the Slice that follows, an array
-// literal into a variable is skipped as the original's copy (isLiteralElementOfVariable), and a range loop's address
-// is only loaded. So no index is ever named by a register, which the forms number differently.
+// spacing, on one line. A positional element of a literal has no index in its source, and its index is always a
+// constant, so it is named by that constant's value. Nothing else unused_write reports writes through an index
+// address: the array of a variadic call's arguments and a slice literal's backing array are read whole by the Slice
+// that follows, an array literal into a variable is skipped as the original's copy (isLiteralElementOfVariable), and a
+// range loop's address is only loaded. So no index is ever named by a register, which the forms number differently.
 func indexText(context *rule.Context, address *intermediate_representation.IndexAddress) string {
 	if indexExpression, isIndexExpression := address.Source().(*ast.IndexExpr); isIndexExpression {
 		return sourceText(context, indexExpression.Index)
@@ -446,25 +447,34 @@ func indexText(context *rule.Context, address *intermediate_representation.Index
 				if keyed, isKeyed := element.(*ast.KeyValueExpr); isKeyed && ast.Node(keyed.Value) == address.Source() {
 					return sourceText(context, keyed.Key)
 				}
+				if ast.Node(element) != address.Source() {
+					continue
+				}
+				constant, isConstant := address.Index.(*intermediate_representation.Constant)
+				if !isConstant || constant.Value == nil {
+					// Invariant: the builder gives a positional element of a literal the constant it counts from the
+					// element before it.
+					panic("unused_write: a positional element of an array literal is written at an index that is " +
+						"no constant")
+				}
+				return constant.Value.String()
 			}
 		}
 	}
-	constant, isConstant := address.Index.(*intermediate_representation.Constant)
-	if isConstant && constant.Value != nil {
-		return constant.Value.String()
-	}
-	// Never reached by a write the port reports, as above; should one ever reach it, it names no index rather than a
-	// register.
-	return "?"
+	// Invariant: no write the port reports reaches here. The array of a variadic call's arguments, whose index has no
+	// source, is read whole by the Slice that follows it, a use of every element's write, and a range loop's address,
+	// whose index is a register, is only ever loaded, never a store's.
+	panic("unused_write: a write the port reports is through an index address with no index expression and no " +
+		"element of a literal")
 }
 
-// sourceText is expression printed as the source writes it, with gofmt's spacing.
+// sourceText is expression printed as the source writes it, with gofmt's spacing, and with every run of whitespace
+// in it one space, so an index written across lines reads on one line and a finding's message holds no newline.
 func sourceText(context *rule.Context, expression ast.Expr) string {
 	var text bytes.Buffer
-	if printer.Fprint(&text, context.Fset, expression) != nil {
-		// Never met: printing a parsed expression into a buffer has no write that can fail. Should it, the message
-		// names no index rather than a wrong one.
-		return "?"
+	if printError := printer.Fprint(&text, context.Fset, expression); printError != nil {
+		// Invariant: printing a parsed expression into a buffer has no write that can fail.
+		panic("unused_write: printing an index expression: " + printError.Error())
 	}
-	return text.String()
+	return strings.Join(strings.Fields(text.String()), " ")
 }
