@@ -1,5 +1,5 @@
 {
-    "why": "ab05: a name holding a spelling policy/KeywordTerms.json lists for JavaScript's var keyword (`isVarDeclaration`, `hasVarKeyword`, `topLevelVarScopedDeclarations`) is clean, since the keyword is a word and not short for variable, while a bare `Var`, a spelling run on into a longer word, and another abbreviation or a bare `Var` beside a keyword term are each still reported (#hvyvfr5)",
+    "why": "ab05: a name holding a spelling policy/KeywordTerms.json lists for JavaScript's var keyword (`isVarDeclaration`, `hasVarKeyword`, `topLevelVarScopedDeclarations`) is clean, since the keyword is a word and not short for variable, while a bare `Var`, a spelling run on into a longer word, while a capitalized `Var` running on into a word of its own (`measureVarianceVarDeclaration`) is no segment and leaves the keyword term clean, and another abbreviation or a bare `Var` beside a keyword term are each still reported (#hvyvfr5)",
     "expect": [
         {
             "covers": "noVar",

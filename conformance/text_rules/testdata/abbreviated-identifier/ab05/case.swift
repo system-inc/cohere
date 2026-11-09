@@ -7,6 +7,7 @@ func keywordTermsProbe() -> Int {
     let hoistVarScopedness = 4
     let readVarDeclarationSrc = 5
     let themeVarBeforeVarKeyword = 6
+    let measureVarianceVarDeclaration = 7
     return (isVarDeclaration && hasVarKeyword ? topLevelVarScopedDeclarations : 0) + noVar + themeVar
-        + hoistVarScopedness + readVarDeclarationSrc + themeVarBeforeVarKeyword
+        + hoistVarScopedness + readVarDeclarationSrc + themeVarBeforeVarKeyword + measureVarianceVarDeclaration
 }

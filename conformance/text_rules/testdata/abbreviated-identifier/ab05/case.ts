@@ -7,6 +7,7 @@ export function keywordTerms(): number {
   const hoistVarScopedness = 4
   const readVarDeclarationSrc = 5
   const themeVarBeforeVarKeyword = 6
+  const measureVarianceVarDeclaration = 7
   return (isVarDeclaration && hasVarKeyword ? topLevelVarScopedDeclarations : 0) + noVar + themeVar +
-    hoistVarScopedness + readVarDeclarationSrc + themeVarBeforeVarKeyword
+    hoistVarScopedness + readVarDeclarationSrc + themeVarBeforeVarKeyword + measureVarianceVarDeclaration
 }

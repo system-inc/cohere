@@ -9,9 +9,10 @@ func keywordTerms() int {
 	hoistVarScopedness := 4
 	readVarDeclarationSrc := 5
 	themeVarBeforeVarKeyword := 6
+	measureVarianceVarDeclaration := 7
 	if !isVarDeclaration || !hasVarKeyword {
 		topLevelVarScopedDeclarations = 0
 	}
 	return topLevelVarScopedDeclarations + noVar + themeVar + hoistVarScopedness + readVarDeclarationSrc +
-		themeVarBeforeVarKeyword
+		themeVarBeforeVarKeyword + measureVarianceVarDeclaration
 }
