@@ -85,7 +85,7 @@ func TestNoRuleCrashesOnAbsentOptionalNodes(test *testing.T) {
 		rule.Bind(NoExAssign, rule.Given[rule.NoOptions]{}),
 		rule.Bind(NoSparseArrays, rule.Given[rule.NoOptions]{}),
 		rule.Bind(NoUnsafeFinally, rule.Given[rule.NoOptions]{}),
-		rule.Bind(NoVariable, rule.Given[rule.NoOptions]{}),
+		rule.Bind(NoVarDeclarations, rule.Given[rule.NoOptions]{}),
 		rule.Bind(NoUselessCatch, rule.Given[rule.NoOptions]{}),
 		rule.Bind(PreferSpread, rule.Given[rule.NoOptions]{}),
 		rule.Bind(RequireYield, rule.Given[rule.NoOptions]{}),

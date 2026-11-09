@@ -136,7 +136,7 @@ func init() {
 			Rule:   NoUselessEscape,
 			Decode: rule.DecodeOptionsInto[NoUselessEscapeOptions](),
 		},
-		rule.Registration[rule.NoOptions]{Rule: NoVariable},
+		rule.Registration[rule.NoOptions]{Rule: NoVarDeclarations},
 		rule.Registration[rule.NoOptions]{Rule: NoWith},
 		rule.Registration[rule.NoOptions]{Rule: PreferSpread},
 		rule.Registration[PreserveCaughtErrorOptions]{

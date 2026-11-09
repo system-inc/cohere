@@ -5,8 +5,8 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// messageUnexpectedVariable is upstream's unexpectedVar message: a `var` declaration.
-var messageUnexpectedVariable = rule.Message{
+// messageUnexpectedVarDeclaration is upstream's unexpectedVar message: a `var` declaration.
+var messageUnexpectedVarDeclaration = rule.Message{
 	Id: "unexpectedVar",
 	Description: "This is a `var` declaration, which is function-scoped and hoisted rather than " +
 		"block-scoped. The binding exists from the top of the enclosing function, so it is " +
@@ -17,7 +17,7 @@ var messageUnexpectedVariable = rule.Message{
 		"reassigns it.",
 }
 
-// NoVariable flags a var declaration, wherever one can appear.
+// NoVarDeclarations flags a var declaration, wherever one can appear.
 //
 //	valid:   const value = 1
 //	valid:   let value = 1
@@ -44,15 +44,16 @@ var messageUnexpectedVariable = rule.Message{
 // declaration and never relied on outside its block, and both are questions about the whole enclosing
 // function rather than about this line. Changing scope silently is how a lint fix turns a working
 // program into a broken one.
-var NoVariable = rule.Rule[rule.NoOptions]{
+var NoVarDeclarations = rule.Rule[rule.NoOptions]{
 	Name: "no-var",
 	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
-		// reportIfVar reports when a declaration list declares with `var`.
+		// reportIfFunctionScoped reports when a declaration list declares with `var`, whose
+		// bindings are scoped to the function rather than to the block.
 		//
 		// let and const both carry a flag, and `var` is the absence of both. Reading it as an
 		// absence rather than as a keyword is what makes `using` and `await using` fall through
 		// correctly, since those carry their own flags.
-		reportIfVariable := func(declarationList *ast.Node) {
+		reportIfFunctionScoped := func(declarationList *ast.Node) {
 			if declarationList == nil {
 				return
 			}
@@ -61,7 +62,7 @@ var NoVariable = rule.Rule[rule.NoOptions]{
 			if declarationList.Flags&blockScoped != 0 {
 				return
 			}
-			ruleContext.ReportNode(declarationList, messageUnexpectedVariable)
+			ruleContext.ReportNode(declarationList, messageUnexpectedVarDeclaration)
 		}
 
 		// loopInitializer returns a loop's initializer when it declares bindings rather than
@@ -89,19 +90,19 @@ var NoVariable = rule.Rule[rule.NoOptions]{
 					parent.Parent != nil && ast.IsGlobalScopeAugmentation(parent.Parent) {
 					return
 				}
-				reportIfVariable(node.AsVariableStatement().DeclarationList)
+				reportIfFunctionScoped(node.AsVariableStatement().DeclarationList)
 			},
 
 			ast.KindForStatement: func(node *ast.Node) {
-				reportIfVariable(loopInitializer(node.AsForStatement().Initializer))
+				reportIfFunctionScoped(loopInitializer(node.AsForStatement().Initializer))
 			},
 
 			ast.KindForInStatement: func(node *ast.Node) {
-				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfFunctionScoped(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 
 			ast.KindForOfStatement: func(node *ast.Node) {
-				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfFunctionScoped(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 		}
 	},

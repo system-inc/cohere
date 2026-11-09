@@ -9,7 +9,7 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
-// BlockScopedVariable reports a `var` used outside the block it was declared in.
+// BlockScopedVarDeclarations reports a `var` used outside the block it was declared in.
 //
 //	valid:   function f() { var a = 1; a = 2; }
 //	valid:   function f() { { let a = 1; } }
@@ -46,7 +46,7 @@ import (
 // and each is outside the other declaration's block. That reads like over-reporting and it is
 // upstream's behaviour, measured; a port checking only non-declaration references reports zero here,
 // on a case upstream reports six findings for at three branches.
-var BlockScopedVariable = rule.Rule[rule.NoOptions]{
+var BlockScopedVarDeclarations = rule.Rule[rule.NoOptions]{
 	Name:             "block-scoped-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
@@ -56,29 +56,29 @@ var BlockScopedVariable = rule.Rule[rule.NoOptions]{
 				if ruleContext.TypeChecker == nil {
 					return
 				}
-				checkBlockScopedVariable(ruleContext, file)
+				checkBlockScopedVarDeclarations(ruleContext, file)
 			},
 		}
 	},
 }
 
-// blockScopedVariableFinding is one out-of-scope use paired with the declaration it escapes.
+// blockScopedVarDeclarationsFinding is one out-of-scope use paired with the declaration it escapes.
 //
 // Collected rather than reported as they are found, because the gathering loop is nested
 // declaration-outer and reference-inner, which groups findings by declaration while upstream's come
-// out ordered by where the use is. `blockScopedVariableReport` restores that order.
-type blockScopedVariableFinding struct {
+// out ordered by where the use is. `blockScopedVarDeclarationsReport` restores that order.
+type blockScopedVarDeclarationsFinding struct {
 	reference       *ast.Node
 	declarationName *ast.Node
 }
 
-// checkBlockScopedVariable walks a file once and reports every out-of-scope `var` use.
+// checkBlockScopedVarDeclarations walks a file once and reports every out-of-scope `var` use.
 //
 // One pass over the tree gathers both halves: the `var` declaration names, and every identifier that
 // could be a reference. Asking the checker per identifier is what connects them, and it is asked
 // once per identifier rather than once per (declaration, identifier) pair, so the cost is linear
 // rather than quadratic in a file full of `var`.
-func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
+func checkBlockScopedVarDeclarations(ruleContext rule.Context, file *ast.Node) {
 	var declarations []*ast.Node
 	var identifiers []*ast.Node
 
@@ -90,8 +90,8 @@ func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
 		if node.Kind == ast.KindIdentifier {
 			identifiers = append(identifiers, node)
 		}
-		if node.Kind == ast.KindVariableDeclaration && blockScopedVariableIsVariableDeclaration(node) {
-			blockScopedVariableCollectBindingNames(node.Name(), &declarations)
+		if node.Kind == ast.KindVariableDeclaration && blockScopedVarDeclarationsIsFunctionScoped(node) {
+			blockScopedVarDeclarationsCollectBindingNames(node.Name(), &declarations)
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			walk(child)
@@ -111,7 +111,7 @@ func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
 		}
 	}
 
-	var findings []blockScopedVariableFinding
+	var findings []blockScopedVarDeclarationsFinding
 	for _, declarationName := range declarations {
 		declarationSymbol, resolved := symbols[declarationName]
 		if !resolved {
@@ -119,7 +119,7 @@ func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
 			// conservative direction: reporting on it would be a guess about what it binds to.
 			continue
 		}
-		container := blockScopedVariableContainerOf(declarationName, file)
+		container := blockScopedVarDeclarationsContainerOf(declarationName, file)
 		if container == nil {
 			continue
 		}
@@ -132,17 +132,17 @@ func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
 			if identifier.Pos() >= container.Pos() && identifier.End() <= container.End() {
 				continue
 			}
-			findings = append(findings, blockScopedVariableFinding{
+			findings = append(findings, blockScopedVarDeclarationsFinding{
 				reference:       identifier,
 				declarationName: declarationName,
 			})
 		}
 	}
 
-	blockScopedVariableReport(ruleContext, findings)
+	blockScopedVarDeclarationsReport(ruleContext, findings)
 }
 
-// blockScopedVariableReport emits findings ordered by where the use is, then by the declaration.
+// blockScopedVarDeclarationsReport emits findings ordered by where the use is, then by the declaration.
 //
 // The gathering loop is nested declaration-outer, reference-inner, which groups findings by
 // declaration. Upstream's emission order is the other way round: it reports at the reference, and
@@ -153,8 +153,8 @@ func checkBlockScopedVariable(ruleContext rule.Context, file *ast.Node) {
 // visible: six findings across three uses, and the two orders differ on every one of them while
 // producing the identical multiset. No count-based fixture can see it, and the pairing of a span
 // with its message is exactly what a reader checks first.
-func blockScopedVariableReport(ruleContext rule.Context, findings []blockScopedVariableFinding) {
-	slices.SortStableFunc(findings, func(left, right blockScopedVariableFinding) int {
+func blockScopedVarDeclarationsReport(ruleContext rule.Context, findings []blockScopedVarDeclarationsFinding) {
+	slices.SortStableFunc(findings, func(left, right blockScopedVarDeclarationsFinding) int {
 		if left.reference.Pos() != right.reference.Pos() {
 			return left.reference.Pos() - right.reference.Pos()
 		}
@@ -176,7 +176,8 @@ func blockScopedVariableReport(ruleContext rule.Context, findings []blockScopedV
 	}
 }
 
-// blockScopedVariableIsVariableDeclaration reports whether a declaration was written with `var`.
+// blockScopedVarDeclarationsIsFunctionScoped reports whether a declaration was written with `var`,
+// and so is scoped to its function rather than to its block.
 //
 // `let` and `const` are already block-scoped, so they are not this rule's business, and neither is
 // a `using` declaration. The flag lives on the declaration list rather than on the declaration, so
@@ -193,9 +194,9 @@ func blockScopedVariableReport(ruleContext rule.Context, findings []blockScopedV
 // Kept because it says what the rule is about, and because the subsumption is a property of the
 // checker rather than of this rule: a resolution that ever answered more broadly would turn every
 // `let` in the tree into a finding, and this line is the only thing that would still refuse. The
-// paired fixtures in `TestBlockScopedVariableIgnoresBlockScopedDeclarations` pin the behaviour whichever
-// half is doing the work.
-func blockScopedVariableIsVariableDeclaration(declaration *ast.Node) bool {
+// paired fixtures in `TestBlockScopedVarDeclarationsIgnoresBlockScopedDeclarations` pin the
+// behaviour whichever half is doing the work.
+func blockScopedVarDeclarationsIsFunctionScoped(declaration *ast.Node) bool {
 	list := declaration.Parent
 	if list == nil || list.Kind != ast.KindVariableDeclarationList {
 		return false
@@ -206,14 +207,14 @@ func blockScopedVariableIsVariableDeclaration(declaration *ast.Node) bool {
 	return list.Flags&ast.NodeFlagsBlockScoped == 0
 }
 
-// blockScopedVariableCollectBindingNames appends every identifier a binding name introduces.
+// blockScopedVarDeclarationsCollectBindingNames appends every identifier a binding name introduces.
 //
 // A declaration is usually one name, and can be a destructuring pattern introducing several:
 // `{ var { foo, bar } = baz; } bar;` is one of upstream's own reporting cases, so a port reading
 // only `declaration.Name()` as an identifier goes silent on it.
 //
 // Mutates: into the walk appends every name it finds, so one slice gathers a whole pattern
-func blockScopedVariableCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
+func blockScopedVarDeclarationsCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
 	if name == nil {
 		return
 	}
@@ -223,14 +224,14 @@ func blockScopedVariableCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
 	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
 		name.ForEachChild(func(element *ast.Node) bool {
 			if element.Kind == ast.KindBindingElement {
-				blockScopedVariableCollectBindingNames(element.Name(), into)
+				blockScopedVarDeclarationsCollectBindingNames(element.Name(), into)
 			}
 			return false
 		})
 	}
 }
 
-// blockScopedVariableContainerOf returns the block-like node a declaration name sits directly inside.
+// blockScopedVarDeclarationsContainerOf returns the block-like node a declaration name sits directly inside.
 //
 // Upstream pushes a range onto a stack for each of these seven kinds and reads the top of the stack
 // when it meets a declaration. Walking up from the declaration reaches the same node, and the list
@@ -248,7 +249,7 @@ func blockScopedVariableCollectBindingNames(name *ast.Node, into *[]*ast.Node) {
 // need to be there: a function body is a block statement, so the block arm already stops the walk at
 // the right place, and adding a function arm would change no answer while suggesting the rule is
 // about function scope, which is the thing it is arguing against.
-func blockScopedVariableContainerOf(node *ast.Node, file *ast.Node) *ast.Node {
+func blockScopedVarDeclarationsContainerOf(node *ast.Node, file *ast.Node) *ast.Node {
 	for parent := node.Parent; parent != nil; parent = parent.Parent {
 		switch parent.Kind {
 		case ast.KindBlock,
