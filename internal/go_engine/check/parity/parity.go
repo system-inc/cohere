@@ -263,7 +263,9 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 
 // adjudicatedPattern is one comment in a differences fixture, the text after its `// port ` opening: `finds:` and
 // the message of a finding only the port makes, or `finds at column <column>:` for one that must start at that column,
-// counted in bytes from 1 as go/token counts it; `renames:`, the original's message, `=>` and the port's, for a
+// counted in bytes from 1 as go/token counts it, and `finds at column <column> to <end column>:`, `finds at column
+// <column> to <end line>:<end column>:` or `finds at column <column>, no end:` for one that must also end there, or
+// have no end; `renames:`, the original's message, `=>` and the port's, for a
 // finding both make in words that differ, as where the two forms number their registers differently; or `drops:` and
 // the message of a finding only the original makes, ruled a false positive with the finding in hand; `moves:` and the
 // message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
@@ -277,7 +279,8 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 // each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
-		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|finds at column (\d+): (.+?))\s*$`,
+		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|` +
+		`finds at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?: (.+?))\s*$`,
 )
 
 // fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
@@ -302,9 +305,11 @@ func fixesText(written string) (string, bool) {
 // leaves out as omitted, each pairing the two sides' findings and nothing more; and every record is matched by a
 // finding on its own line, never another's. A `finds:` record matches by line and message, so a finding that moved
 // along its line still meets it, and where it starts matters, as for a finding with no end, whose start is all
-// of its place, the record names the column, `finds at column <column>:`, and is met only there. A finding the
-// original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or related entry
-// one side alone offers that no record withholds or omits.
+// of its place, the record names the column, `finds at column <column>:`, and is met only there, and where its span
+// matters too, its end, `finds at column <column> to <end column>:`, with `<end line>:` before the end column on
+// another line, or `finds at column <column>, no end:`, met only by a finding that ends there or has no end. A
+// finding the original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or
+// related entry one side alone offers that no record withholds or omits.
 // A finding the port alone makes, recorded as found, offers fixes only as the fixture records them: each edit of each
 // fix is a `fixes:` record of where it lands and its new text, on the `finds:` record's line or the line after it, and
 // every `fixes:` record is met by an edit of a finding that record covers, both ways as a multiset by the file and line
@@ -421,11 +426,11 @@ func requireOnlyAdjudicated(
 // whose Message is the fix's message, not the finding's; omitted, from `omits:`, whose Message is the related
 // entry's; fixed, from `fixes:`, each on the line of the `finds:` record it follows; findsNothing, from `finds
 // nothing`, each where it is written with no Message, since it names no finding; and placed, the `finds at column`
-// records of found, each with its Column, which their copies in portAlone and found leave 0.
+// records of found, each with its Column and any end it holds, which their copies in portAlone and found leave 0.
 type records struct {
 	portAlone    []Finding
 	found        []Finding
-	placed       []Finding
+	placed       []placedFind
 	renamed      []Finding
 	dropped      []Finding
 	moved        []Finding
@@ -740,14 +745,21 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 		recorded.fixed = append(recorded.fixed, fix)
 	case match[11] != "":
 		recorded.findsNothing = append(recorded.findsNothing, at)
-	case match[13] != "":
-		at.Message = match[13]
+	case match[16] != "":
+		at.Message = match[16]
 		recorded.portAlone = append(recorded.portAlone, at)
 		recorded.found = append(recorded.found, at)
-		// The pattern holds the column to digits, so only one past an int's range fails to convert, and that one,
-		// read as 0, matches no finding.
-		at.Column = atoiOrZero(match[12])
-		recorded.placed = append(recorded.placed, at)
+		// The pattern holds the column and the end to digits, so only one past an int's range fails to convert, and
+		// that one, read as 0, matches no finding.
+		placed := placedFind{at: at, holdsEnd: match[13] != "" || match[15] != ""}
+		placed.at.Column = atoiOrZero(match[12])
+		if match[15] != "" {
+			placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(match[15])
+		}
+		if match[14] != "" {
+			placed.at.EndLine = atoiOrZero(match[14])
+		}
+		recorded.placed = append(recorded.placed, placed)
 	default:
 		renamed := at
 		renamed.Message = match[2]
@@ -906,26 +918,6 @@ func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 			}
 			return false
 		},
-	}
-}
-
-// requirePlaced fails the test for each record of placed, a `finds at column` record, that no finding of found meets
-// at its file, line, column and message, saying that the fixture records what finds, as "the port alone finds". The
-// record's line and message are matched as any `finds:` record's are, so this holds its column alone.
-func requirePlaced(test testing.TB, finds string, placed []Finding, found []Finding) {
-	test.Helper()
-	startingAt := []Finding{}
-	for _, finding := range found {
-		startingAt = append(startingAt, Finding{
-			File:    finding.File,
-			Line:    finding.Line,
-			Column:  finding.Column,
-			Message: finding.Message,
-		})
-	}
-	for _, unmet := range Difference(placed, startingAt) {
-		test.Errorf("the fixture records that %s %s, and no finding of the port's there starts at column %d", finds,
-			unmet, unmet.Column)
 	}
 }
 

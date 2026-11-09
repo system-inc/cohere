@@ -913,3 +913,44 @@ func TestRequireOnlyAdjudicatedHoldsAColumnGivenBesideTheCall(test *testing.T) {
 			"shared, and no finding of the port's there starts at column 3")
 	}
 }
+
+// A `finds at column` record that names an end is met only by a finding that starts and ends where it says, the end a
+// column on the record's own line or a line and a column: the port's calls found over the whole call pass, and found
+// ending one byte short, or with no end, fail on each record, named with where it says the finding ends.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsEnd(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, endingShort(0)),
+			analysistest.TestData(), "found_spanning")
+	}))
+	for _, shapes := range [][]shape{{endingShort(1)}, nil} {
+		requireFailures(test, failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, shapes...),
+				analysistest.TestData(), "found_spanning")
+		}),
+			"the fixture records that the port alone finds found_spanning/found_spanning.go:9:2-9:10: call to gained, "+
+				"and no finding of the port's there starts at column 2 and ends at line 9, column 10",
+			"the fixture records that the port alone finds found_spanning/found_spanning.go:10:2-10:10: call to "+
+				"gained, and no finding of the port's there starts at column 2 and ends at line 10, column 10",
+		)
+	}
+}
+
+// A `finds at column` record that says its finding has no end is met only by one with none: the port's calls found
+// with no end pass, and found with an end fail, named so.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsNoEnd(test *testing.T) {
+	test.Parallel()
+	noEnd := []Record{
+		{File: "same/same.go", Line: 7, Text: "finds at column 2, no end: call to shared", Reason: "found at the call"},
+		{File: "same/same.go", Line: 8, Text: "finds: call to shared", Reason: "the second call too"},
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages), analysistest.TestData(), "same",
+			noEnd...)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages, endingShort(0)),
+			analysistest.TestData(), "same", noEnd...)
+	}), "the fixture records that the port alone finds same/same.go:7:2: call to shared, and no finding of the "+
+		"port's there starts at column 2 and has no end")
+}
