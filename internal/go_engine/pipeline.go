@@ -16,6 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // detailNotRequested is the one skip detail that means nobody asked for the phase, which is not a gap.
@@ -74,6 +75,10 @@ type pipeline struct {
 	// (see pipeline_speculative_lint.go).
 	overlaps    bool
 	speculation *speculativeLint
+
+	// timing collects what the run's CPU goes to under `--timing`, for the timing record, and is nil otherwise, which
+	// every measurement reads as a run that did not ask (#3apgjer).
+	timing *timing.Collector
 }
 
 func newPipeline(
@@ -94,7 +99,16 @@ func newPipeline(
 		standardError: standardError,
 		memory:        memory,
 		overlaps:      true,
+		timing:        newTiming(request),
 	}
+}
+
+// newTiming is a run's collector under `--timing`, and nil for a run that did not ask.
+func newTiming(request invocation) *timing.Collector {
+	if !request.switches["timing"] {
+		return nil
+	}
+	return timing.New()
 }
 
 // run writes the whole stream, every phase once and in order, and returns the exit code the summary states.

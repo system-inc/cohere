@@ -17,14 +17,16 @@ import (
 // `other-builds` checks, beside the host's build, every other build the census needs (otherBuilds), and the project
 // record names each file only such a build compiles as checked by it (#72n9mq0). The front door forwards it to this
 // engine alone, and off changes nothing.
+//
+// `timing` measures what the run's CPU goes to and writes it as the timing record (pipeline.timing, #3apgjer).
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "other-builds",
+	"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a
 // flag accepted and ignored reads as a run that did what was asked.
-var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "timing", "explain"}
+var notImplementedFlags = []string{"unused", "unused-all", "unused-deep", "explain"}
 
 // valuedFlags are the flags that take a value, as `--name value` or `--name=value`.
 var valuedFlags = []string{"contract", "root", "lint-config"}
