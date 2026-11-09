@@ -15,8 +15,8 @@ import (
 )
 
 // NewProgram returns a new IR Program. go/ir takes a BuilderMode here; ours has none. Its functions
-// are built unlifted, as go/ir's NaiveForm builds them, until lifting lands (#ee33njz), and without
-// debug information, sanity checks, printing or monomorphized generics.
+// are lifted (#ee33njz), as go/ir builds them without NaiveForm, and built without debug information,
+// sanity checks, printing or monomorphized generics.
 //
 // To construct an SSA program:
 //
