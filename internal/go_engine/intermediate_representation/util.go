@@ -12,7 +12,6 @@ import (
 	"go/types"
 	"go/version"
 	"sync"
-	_ "unsafe" // for go:linkname hack
 
 	"honnef.co/go/tools/go/types/typeutil"
 
@@ -433,8 +432,3 @@ func (canonizer *canonizer) instantiateMethod(function *types.Func, targs []type
 	object, _, _ := types.LookupFieldOrMethod(rep, true, function.Pkg(), function.Name())
 	return object.(*types.Func)
 }
-
-// Exposed to irutil using the linkname hack.
-//
-//go:linkname isSyntactic honnef.co/go/tools/go/ir.isSyntactic
-func isSyntactic(goEnginePackage *Package) bool { return goEnginePackage.syntax }
