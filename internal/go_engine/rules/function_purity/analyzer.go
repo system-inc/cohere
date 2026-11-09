@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"go/types"
 	"reflect"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 
@@ -119,8 +120,10 @@ func run(pass *analysis.Pass) (any, error) {
 	if readError != nil {
 		return nil, readError
 	}
+	// Read first, so under `--timing` the package's build is billed to the representation's row, not to this pass.
+	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
 	judging := &judgment{pass: pass, irPackage: built.Package(), seen: map[*intermediate_representation.Function]bool{}}
-	for function := range built.SourceFunctions() {
+	for _, function := range functions {
 		judging.isPure(function)
 	}
 	result := Result{}

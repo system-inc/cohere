@@ -66,7 +66,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, readError
 	}
 	// Collected once, so the three passes walk the same functions in the same order.
-	functions := slices.Collect(built.SourceFunctions())
+	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
 	markLengthChecks(pass, functions)
 	markIndirectLengthChecks(pass, functions)
 	reportOddLengths(pass, context, functions)

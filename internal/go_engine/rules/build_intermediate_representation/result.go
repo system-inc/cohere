@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
@@ -78,6 +79,14 @@ func (result *Result) SourceFunctions(
 			}
 		}
 	}
+}
+
+// SourceFunctionsReadBy is SourceFunctions read by pass's own analyzer, one that is no dispatcher, with the run's
+// collector taken from pass under `--timing`, so the build it does is billed to Analyzer's row as a dispatcher's is.
+func (result *Result) SourceFunctionsReadBy(pass *analysis.Pass) iter.Seq[*intermediate_representation.Function] {
+	// Absent on a run that did not ask for --timing, where the nil collector measures nothing.
+	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
+	return result.SourceFunctions(collector, pass.Analyzer.Name)
 }
 
 // yieldAnonymous yields function's anonymous functions, each followed by its own, depth first, and reports whether
