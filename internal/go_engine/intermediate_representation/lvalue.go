@@ -44,9 +44,9 @@ func (address *address) typ() types.Type {
 }
 
 type compositeElement struct {
-	cv    *CompositeValue
-	index int
-	t     types.Type
+	cv          *CompositeValue
+	index       int
+	elementType types.Type
 }
 
 func (element *compositeElement) load(function *Function, source ast.Node) Value {
@@ -54,7 +54,7 @@ func (element *compositeElement) load(function *Function, source ast.Node) Value
 }
 
 func (element *compositeElement) store(function *Function, value Value, source ast.Node) {
-	value = emitConv(function, value, element.t, source)
+	value = emitConv(function, value, element.elementType, source)
 	element.cv.Values[element.index] = value
 }
 
@@ -63,7 +63,7 @@ func (element *compositeElement) address(function *Function) Value {
 }
 
 func (element *compositeElement) typ() types.Type {
-	return element.t
+	return element.elementType
 }
 
 // An element is an lvalue represented by m[k], the location of an
@@ -71,24 +71,24 @@ func (element *compositeElement) typ() types.Type {
 // since pointers cannot be formed from them, but they do support
 // load() and store().
 type element struct {
-	m, k Value      // map
-	t    types.Type // map element type
+	mapValue, key Value      // map
+	elementType   types.Type // map element type
 }
 
 func (element *element) load(function *Function, source ast.Node) Value {
 	lookup := &MapLookup{
-		X:     element.m,
-		Index: element.k,
+		X:     element.mapValue,
+		Index: element.key,
 	}
-	lookup.setType(element.t)
+	lookup.setType(element.elementType)
 	return function.emit(lookup, source)
 }
 
 func (element *element) store(function *Function, value Value, source ast.Node) {
 	up := &MapUpdate{
-		Map:   element.m,
-		Key:   element.k,
-		Value: emitConv(function, value, element.t, source),
+		Map:   element.mapValue,
+		Key:   element.key,
+		Value: emitConv(function, value, element.elementType, source),
 	}
 	function.emit(up, source)
 }
@@ -98,7 +98,7 @@ func (element *element) address(function *Function) Value {
 }
 
 func (element *element) typ() types.Type {
-	return element.t
+	return element.elementType
 }
 
 // A lazyAddress is an lvalue whose address is the result of an instruction.
@@ -107,8 +107,8 @@ func (element *element) typ() types.Type {
 // A lazyAddress can be used to control when a side effect (nil pointer
 // dereference, index out of bounds) of using a location happens.
 type lazyAddress struct {
-	addr func(function *Function) Value // emit to fn the computation of the address
-	t    types.Type                     // type of the location
+	addr         func(function *Function) Value // emit to fn the computation of the address
+	locationType types.Type                     // type of the location
 }
 
 func (address *lazyAddress) load(function *Function, source ast.Node) Value {
@@ -124,7 +124,7 @@ func (address *lazyAddress) address(function *Function) Value {
 	return address.addr(function)
 }
 
-func (address *lazyAddress) typ() types.Type { return address.t }
+func (address *lazyAddress) typ() types.Type { return address.locationType }
 
 // A blank is a dummy variable whose name is "_".
 // It is not reified: loads are illegal and stores are ignored.

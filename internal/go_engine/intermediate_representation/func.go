@@ -41,8 +41,8 @@ func (function *Function) instructions() iter.Seq[Instruction] {
 // Like TypeOf, but panics instead of returning nil.
 // Only valid during f's create and build phases.
 func (function *Function) typeOf(expr ast.Expr) types.Type {
-	if T := function.info.TypeOf(expr); T != nil {
-		return function.typ(T)
+	if resolvedType := function.info.TypeOf(expr); resolvedType != nil {
+		return function.typ(resolvedType)
 	}
 	panic(fmt.Sprintf("no type for %T @ %s", expr, function.Program.FileSet.Position(expr.Pos())))
 }
@@ -50,8 +50,8 @@ func (function *Function) typeOf(expr ast.Expr) types.Type {
 // typ is the locally instantiated type of T. go/ir substitutes type arguments here when it builds an
 // instantiated body (its InstantiateGenerics mode); ours builds every generic body in generic form, so
 // f.typ(T)==T always.
-func (function *Function) typ(T types.Type) types.Type {
-	return T
+func (function *Function) typ(declaredType types.Type) types.Type {
+	return declaredType
 }
 
 // If id is an Instance, returns info.Instances[id].Type.
@@ -277,14 +277,14 @@ func (function *Function) createSyntacticParameters(recv *ast.FieldList, functyp
 
 	// Parameters.
 	if functype.Params != nil {
-		n := len(function.Parameters) // 1 if has recv, 0 otherwise
+		receiverCount := len(function.Parameters) // 1 if has recv, 0 otherwise
 		for _, field := range functype.Params.List {
 			for _, name := range field.Names {
 				function.addSpilledParameter(identVariable(function, name), name)
 			}
 			// Anonymous parameter?  No need to spill.
 			if field.Names == nil {
-				function.addParamVariable(function.Signature.Params().At(len(function.Parameters)-n), field)
+				function.addParamVariable(function.Signature.Params().At(len(function.Parameters)-receiverCount), field)
 			}
 		}
 	}
@@ -380,18 +380,18 @@ func (function *Function) finishBody() {
 	function.exits = nil
 
 	// Remove from f.Locals any Allocations that escape to the heap.
-	j := 0
+	keptCount := 0
 	for _, local := range function.Locals {
 		if !local.Heap {
-			function.Locals[j] = local
-			j++
+			function.Locals[keptCount] = local
+			keptCount++
 		}
 	}
 	// Nil out f.Locals[j:] to aid GC.
-	for localIndex := j; localIndex < len(function.Locals); localIndex++ {
+	for localIndex := keptCount; localIndex < len(function.Locals); localIndex++ {
 		function.Locals[localIndex] = nil
 	}
-	function.Locals = function.Locals[:j]
+	function.Locals = function.Locals[:keptCount]
 
 	optimizeBlocks(function)
 	buildReferrers(function)
@@ -433,19 +433,19 @@ func (function *Function) done() {
 // removeNilBlocks eliminates nils from f.Blocks and updates each
 // BasicBlock.Index.  Use this after any pass that may delete blocks.
 func (function *Function) removeNilBlocks() {
-	j := 0
+	keptCount := 0
 	for _, block := range function.Blocks {
 		if block != nil {
-			block.Index = j
-			function.Blocks[j] = block
-			j++
+			block.Index = keptCount
+			function.Blocks[keptCount] = block
+			keptCount++
 		}
 	}
 	// Nil out f.Blocks[j:] to aid GC.
-	for blockIndex := j; blockIndex < len(function.Blocks); blockIndex++ {
+	for blockIndex := keptCount; blockIndex < len(function.Blocks); blockIndex++ {
 		function.Blocks[blockIndex] = nil
 	}
-	function.Blocks = function.Blocks[:j]
+	function.Blocks = function.Blocks[:keptCount]
 }
 
 // lookup returns the address of the named variable identified by obj
@@ -577,8 +577,8 @@ func (function *Function) declaredPackage() *Package {
 
 // relPkg returns types.Package fn is printed in relationship to.
 func (function *Function) relativePackage() *types.Package {
-	if p := function.declaredPackage(); p != nil {
-		return p.Types
+	if irPackage := function.declaredPackage(); irPackage != nil {
+		return irPackage.Types
 	}
 	return nil
 }

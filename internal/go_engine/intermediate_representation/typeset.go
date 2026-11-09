@@ -20,7 +20,7 @@ const debug = false
 // In that case, if there are no specific terms, typeset calls yield with (nil, nil).
 // If t is not a type parameter, the implied type set consists of just t.
 // In any case, typeset is guaranteed to call yield at least once.
-func typeset(typ types.Type, yield func(t, u types.Type) bool) {
+func typeset(typ types.Type, yield func(termType, underlyingType types.Type) bool) {
 	switch typ := types.Unalias(typ).(type) {
 	case *types.TypeParam, *types.Interface:
 		terms := termListOf(typ)
@@ -65,14 +65,14 @@ func typeSetIsEmpty(typ types.Type) bool {
 // These act like a core type for some operations: slice expressions, append and copy.
 //
 // See https://go.dev/ref/spec#Core_types for the details on bytestring.
-func isBytestring(T types.Type) bool {
-	U := T.Underlying()
-	if _, ok := U.(*types.Interface); !ok {
+func isBytestring(goType types.Type) bool {
+	underlyingType := goType.Underlying()
+	if _, ok := underlyingType.(*types.Interface); !ok {
 		return false
 	}
 
 	hasBytes, hasString := false, false
-	ok := underIs(U, func(resolvedType types.Type) bool {
+	ok := underIs(underlyingType, func(resolvedType types.Type) bool {
 		switch {
 		case isString(resolvedType):
 			hasString = true
@@ -92,8 +92,8 @@ func isBytestring(T types.Type) bool {
 // If there are no specific terms, underIs returns the result of `predicate`(nil).
 func underIs(typ types.Type, predicate func(types.Type) bool) bool {
 	var ok bool
-	typeset(typ, func(t, u types.Type) bool {
-		ok = predicate(u)
+	typeset(typ, func(termType, underlyingType types.Type) bool {
+		ok = predicate(underlyingType)
 		return ok
 	})
 	return ok
@@ -102,31 +102,31 @@ func underIs(typ types.Type, predicate func(types.Type) bool) bool {
 // indexType returns the element type and index mode of a IndexExpr over a type.
 // It returns an invalid mode if the type is not indexable; this should never occur in a well-typed program.
 func indexType(typ types.Type) (types.Type, indexMode) {
-	switch U := typ.Underlying().(type) {
+	switch underlyingType := typ.Underlying().(type) {
 	case *types.Array:
-		return U.Elem(), ixArrVariable
+		return underlyingType.Elem(), ixArrVariable
 	case *types.Pointer:
-		if array, ok := U.Elem().Underlying().(*types.Array); ok {
+		if array, ok := underlyingType.Elem().Underlying().(*types.Array); ok {
 			return array.Elem(), ixVariable
 		}
 	case *types.Slice:
-		return U.Elem(), ixVariable
+		return underlyingType.Elem(), ixVariable
 	case *types.Map:
-		return U.Elem(), ixMap
+		return underlyingType.Elem(), ixMap
 	case *types.Basic:
 		return tByte, ixValue // must be a string
 	case *types.Interface:
 		var elem types.Type
 		mode := ixInvalid
-		typeset(typ, func(t, _ types.Type) bool {
-			if t == nil {
+		typeset(typ, func(termType, _ types.Type) bool {
+			if termType == nil {
 				return false // empty set
 			}
-			e, indexMode := indexType(t)
+			elementType, indexMode := indexType(termType)
 			if elem == nil {
-				elem, mode = e, indexMode
+				elem, mode = elementType, indexMode
 			}
-			if debug && !types.Identical(elem, e) { // if type checked, just a sanity check
+			if debug && !types.Identical(elem, elementType) { // if type checked, just a sanity check
 				mode = ixInvalid
 				return false
 			}

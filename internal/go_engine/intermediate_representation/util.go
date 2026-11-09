@@ -189,8 +189,8 @@ func anonVariable(typ types.Type) *types.Var {
 var lenResults = types.NewTuple(anonVariable(tInt))
 
 // makeLength returns the len builtin specialized to type func(T)int.
-func makeLength(T types.Type) *Builtin {
-	lenParameters := types.NewTuple(anonVariable(T))
+func makeLength(operandType types.Type) *Builtin {
+	lenParameters := types.NewTuple(anonVariable(operandType))
 	return &Builtin{
 		name: "len",
 		sig:  types.NewSignatureType(nil, nil, nil, lenParameters, lenResults, false),
@@ -340,17 +340,17 @@ func (canonizer *canonizer) List(ts []types.Type) *typeList {
 //
 // For performance, reasons the canonical instance is order-dependent,
 // and may contain deeply nested aliases.
-func (canonizer *canonizer) Type(T types.Type) types.Type {
-	T = types.Unalias(T) // remove the top level alias.
+func (canonizer *canonizer) Type(goType types.Type) types.Type {
+	goType = types.Unalias(goType) // remove the top level alias.
 
 	canonizer.mutex.Lock()
 	defer canonizer.mutex.Unlock()
 
-	if resolvedType, _ := canonizer.types.At(T); resolvedType != nil {
+	if resolvedType, _ := canonizer.types.At(goType); resolvedType != nil {
 		return resolvedType
 	}
-	canonizer.types.Set(T, T)
-	return T
+	canonizer.types.Set(goType, goType)
+	return goType
 }
 
 // A type for representing a canonized list of types.
@@ -360,8 +360,8 @@ func (list *typeList) identical(ts []types.Type) bool {
 	if list == nil {
 		return len(ts) == 0
 	}
-	n := len(*list)
-	if len(ts) != n {
+	length := len(*list)
+	if len(ts) != length {
 		return false
 	}
 	for index, left := range *list {
@@ -388,8 +388,8 @@ func (listMap *typeListMap) rep(ts []types.Type) *typeList {
 		listMap.buckets = make(map[uint32][]*typeList)
 	}
 
-	h := listMap.hash(ts)
-	bucket := listMap.buckets[h]
+	bucketKey := listMap.hash(ts)
+	bucket := listMap.buckets[bucketKey]
 	for _, list := range bucket {
 		if list.identical(ts) {
 			return list
@@ -401,7 +401,7 @@ func (listMap *typeListMap) rep(ts []types.Type) *typeList {
 	copy(cp, ts)
 	rep := &cp
 
-	listMap.buckets[h] = append(bucket, rep)
+	listMap.buckets[bucketKey] = append(bucket, rep)
 	return rep
 }
 
@@ -410,16 +410,16 @@ func (listMap *typeListMap) hash(ts []types.Type) uint32 {
 		return 0
 	}
 	// Some smallish prime far away from typeutil.Hash.
-	n := len(ts)
-	h := uint32(13619) + 2*uint32(n)
-	for index := range n {
-		h += 3 * listMap.hasher.Hash(ts[index])
+	typeCount := len(ts)
+	hash := uint32(13619) + 2*uint32(typeCount)
+	for index := range typeCount {
+		hash += 3 * listMap.hasher.Hash(ts[index])
 	}
-	return h
+	return hash
 }
 
 // instantiateMethod instantiates `function` with targs and returns a canonical representative for this method.
-func (canon *canonizer) instantiateMethod(function *types.Func, targs []types.Type, ctxt *types.Context) *types.Func {
+func (canonizer *canonizer) instantiateMethod(function *types.Func, targs []types.Type, ctxt *types.Context) *types.Func {
 	recv := recvType(function)
 	if pointer, ok := types.Unalias(recv).(*types.Pointer); ok {
 		recv = pointer.Elem()
@@ -429,7 +429,7 @@ func (canon *canonizer) instantiateMethod(function *types.Func, targs []types.Ty
 	if instantiateError != nil {
 		panic(instantiateError)
 	}
-	rep := canon.Type(inst)
+	rep := canonizer.Type(inst)
 	object, _, _ := types.LookupFieldOrMethod(rep, true, function.Pkg(), function.Name())
 	return object.(*types.Func)
 }

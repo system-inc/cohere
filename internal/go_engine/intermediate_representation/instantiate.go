@@ -122,7 +122,7 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 		goversion:      function.goversion, // /
 		build:          build,
 		topLevelOrigin: function,
-		pos:            object.Pos(),
+		position:       object.Pos(),
 		Package:        nil,
 		Program:        function.Program,
 		recvtypeparams: function.recvtypeparams, // share with origin

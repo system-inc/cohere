@@ -81,20 +81,20 @@ func (block *BasicBlock) phis() []Instruction {
 
 // replacePred replaces all occurrences of p in b's predecessor list with q.
 // Ordinarily there should be at most one.
-func (block *BasicBlock) replacePredecessor(p, q *BasicBlock) {
+func (block *BasicBlock) replacePredecessor(oldPredecessor, newPredecessor *BasicBlock) {
 	for index, pred := range block.Predecessors {
-		if pred == p {
-			block.Predecessors[index] = q
+		if pred == oldPredecessor {
+			block.Predecessors[index] = newPredecessor
 		}
 	}
 }
 
 // replaceSucc replaces all occurrences of p in b's successor list with q.
 // Ordinarily there should be at most one.
-func (block *BasicBlock) replaceSuccessor(p, q *BasicBlock) {
+func (block *BasicBlock) replaceSuccessor(oldSuccessor, newSuccessor *BasicBlock) {
 	for index, succ := range block.Successors {
-		if succ == p {
-			block.Successors[index] = q
+		if succ == oldSuccessor {
+			block.Successors[index] = newSuccessor
 		}
 	}
 }
@@ -106,28 +106,28 @@ func (block *BasicBlock) removePredecessor(basicBlock *BasicBlock) {
 	phis := block.phis()
 
 	// We must preserve edge order for φ-nodes.
-	j := 0
+	keptCount := 0
 	for predecessorIndex, pred := range block.Predecessors {
 		if pred != basicBlock {
-			block.Predecessors[j] = block.Predecessors[predecessorIndex]
+			block.Predecessors[keptCount] = block.Predecessors[predecessorIndex]
 			// Strike out φ-edge too.
 			for _, instr := range phis {
 				phi := instr.(*Phi)
-				phi.Edges[j] = phi.Edges[predecessorIndex]
+				phi.Edges[keptCount] = phi.Edges[predecessorIndex]
 			}
-			j++
+			keptCount++
 		}
 	}
 	// Nil out b.Predecessors[j:] and φ-edges[j:] to aid GC.
-	for predecessorIndex := j; predecessorIndex < len(block.Predecessors); predecessorIndex++ {
+	for predecessorIndex := keptCount; predecessorIndex < len(block.Predecessors); predecessorIndex++ {
 		block.Predecessors[predecessorIndex] = nil
 		for _, instr := range phis {
 			instr.(*Phi).Edges[predecessorIndex] = nil
 		}
 	}
-	block.Predecessors = block.Predecessors[:j]
+	block.Predecessors = block.Predecessors[:keptCount]
 	for _, instr := range phis {
 		phi := instr.(*Phi)
-		phi.Edges = phi.Edges[:j]
+		phi.Edges = phi.Edges[:keptCount]
 	}
 }

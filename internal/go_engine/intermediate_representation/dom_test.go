@@ -24,8 +24,8 @@ func f(cond bool) {
 	print(3)
 }
 `
-	p, _ := buildPackage(test, source, nil)
-	functionF := p.Function("f")
+	irPackage, _ := buildPackage(test, source, nil)
+	functionF := irPackage.Function("f")
 
 	if got, want := fmt.Sprint(functionF.DominatorPreorder()), "[0 1 2 3]"; got != want {
 		test.Errorf("DominatorPreorder: got %v, want %s", got, want)

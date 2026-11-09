@@ -10,25 +10,25 @@ package intermediate_representation
 
 func removeInstruction(refs []Instruction, instr Instruction) []Instruction {
 	instructions := refs
-	i := -1
-	for j := range instructions {
-		if instr == instructions[j] {
-			i = j
+	writeIndex := -1
+	for readIndex := range instructions {
+		if instr == instructions[readIndex] {
+			writeIndex = readIndex
 			break
 		}
 	}
-	if i == -1 {
+	if writeIndex == -1 {
 		return instructions
 	}
 	// Don't start copying elements until we find one to delete.
-	for j := i + 1; j < len(instructions); j++ {
-		if instruction := instructions[j]; instruction != instr {
-			instructions[i] = instruction
-			i++
+	for readIndex := writeIndex + 1; readIndex < len(instructions); readIndex++ {
+		if instruction := instructions[readIndex]; instruction != instr {
+			instructions[writeIndex] = instruction
+			writeIndex++
 		}
 	}
-	clear(instructions[i:]) // zero/nil out the obsolete elements, for GC
-	return instructions[:i]
+	clear(instructions[writeIndex:]) // zero/nil out the obsolete elements, for GC
+	return instructions[:writeIndex]
 }
 
 type BlockSet struct {

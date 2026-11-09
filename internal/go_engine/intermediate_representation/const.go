@@ -55,12 +55,12 @@ func NewConstant(value constant.Value, typ types.Type, source ast.Node) *Constan
 			value = constant.MakeString("")
 		}
 	}
-	c := &Constant{
+	irConstant := &Constant{
 		typ:   typ,
 		Value: value,
 	}
-	c.setSource(source)
-	return c
+	irConstant.setSource(source)
+	return irConstant
 }
 
 // intConst returns an 'int' constant that evaluates to `index`.
@@ -85,57 +85,57 @@ func zeroConstant(resolvedType types.Type, source ast.Node) *Constant {
 	return NewConstant(nil, resolvedType, source)
 }
 
-func (vFalse *Constant) RelativeString(from *types.Package) string {
-	var p string
-	if vFalse.Value == nil {
-		switch vFalse.typ.(type) {
+func (irConstant *Constant) RelativeString(from *types.Package) string {
+	var valueText string
+	if irConstant.Value == nil {
+		switch irConstant.typ.(type) {
 		case *types.Array, *types.Struct:
-			p = "{}"
+			valueText = "{}"
 		case *types.Alias:
-			switch vFalse.typ.Underlying().(type) {
+			switch irConstant.typ.Underlying().(type) {
 			case *types.Array, *types.Struct:
-				p = "{}"
+				valueText = "{}"
 			default:
-				p, _ = zeroString(types.Unalias(vFalse.typ), types.RelativeTo(from))
+				valueText, _ = zeroString(types.Unalias(irConstant.typ), types.RelativeTo(from))
 			}
 		default:
-			p, _ = zeroString(vFalse.typ, types.RelativeTo(from))
+			valueText, _ = zeroString(irConstant.typ, types.RelativeTo(from))
 		}
-	} else if vFalse.Value.Kind() == constant.String {
-		value := constant.StringVal(vFalse.Value)
+	} else if irConstant.Value.Kind() == constant.String {
+		value := constant.StringVal(irConstant.Value)
 		const maximum = 20
 		// TODO(adonovan): don't cut a rune in half.
 		if len(value) > maximum {
 			value = value[:maximum-3] + "..." // abbreviate
 		}
-		p = strconv.Quote(value)
+		valueText = strconv.Quote(value)
 	} else {
-		p = vFalse.Value.String()
+		valueText = irConstant.Value.String()
 	}
-	return p + ":" + relativeType(vFalse.Type(), from)
+	return valueText + ":" + relativeType(irConstant.Type(), from)
 }
 
-func (vFalse *Constant) Name() string {
-	return vFalse.RelativeString(nil)
+func (irConstant *Constant) Name() string {
+	return irConstant.RelativeString(nil)
 }
 
-func (vFalse *Constant) String() string {
-	return vFalse.RelativeString(nil)
+func (irConstant *Constant) String() string {
+	return irConstant.RelativeString(nil)
 }
 
-func (vFalse *Constant) Type() types.Type {
-	return vFalse.typ
+func (irConstant *Constant) Type() types.Type {
+	return irConstant.typ
 }
 
-func (vFalse *Constant) Referrers() *[]Instruction {
+func (irConstant *Constant) Referrers() *[]Instruction {
 	return nil
 }
 
-func (vFalse *Constant) Parent() *Function { return nil }
+func (irConstant *Constant) Parent() *Function { return nil }
 
 // IsNil returns true if this constant represents a typed or untyped nil value.
-func (vFalse *Constant) IsNil() bool {
-	return vFalse.Value == nil && nillable(vFalse.typ)
+func (irConstant *Constant) IsNil() bool {
+	return irConstant.Value == nil && nillable(irConstant.typ)
 }
 
 // nillable reports whether *new(T) == nil is legal for type T.
@@ -160,48 +160,48 @@ func nillable(resolvedType types.Type) bool {
 
 // Int64 returns the numeric value of this constant truncated to fit
 // a signed 64-bit integer.
-func (vFalse *Constant) Int64() int64 {
-	switch x := constant.ToInt(vFalse.Value); x.Kind() {
+func (irConstant *Constant) Int64() int64 {
+	switch x := constant.ToInt(irConstant.Value); x.Kind() {
 	case constant.Int:
 		if index, ok := constant.Int64Val(x); ok {
 			return index
 		}
 		return 0
 	case constant.Float:
-		f, _ := constant.Float64Val(x)
-		return int64(f)
+		floatValue, _ := constant.Float64Val(x)
+		return int64(floatValue)
 	}
-	panic(fmt.Sprintf("unexpected constant value: %T", vFalse.Value))
+	panic(fmt.Sprintf("unexpected constant value: %T", irConstant.Value))
 }
 
 // Uint64 returns the numeric value of this constant truncated to fit
 // an unsigned 64-bit integer.
-func (vFalse *Constant) Uint64() uint64 {
-	switch x := constant.ToInt(vFalse.Value); x.Kind() {
+func (irConstant *Constant) Uint64() uint64 {
+	switch x := constant.ToInt(irConstant.Value); x.Kind() {
 	case constant.Int:
-		if u, ok := constant.Uint64Val(x); ok {
-			return u
+		if unsignedValue, ok := constant.Uint64Val(x); ok {
+			return unsignedValue
 		}
 		return 0
 	case constant.Float:
-		f, _ := constant.Float64Val(x)
-		return uint64(f)
+		floatValue, _ := constant.Float64Val(x)
+		return uint64(floatValue)
 	}
-	panic(fmt.Sprintf("unexpected constant value: %T", vFalse.Value))
+	panic(fmt.Sprintf("unexpected constant value: %T", irConstant.Value))
 }
 
 // Float64 returns the numeric value of this constant truncated to fit
 // a float64.
-func (vFalse *Constant) Float64() float64 {
-	x := constant.ToFloat(vFalse.Value) // (c.Value == nil) => x.Kind() == Unknown
-	f, _ := constant.Float64Val(x)
-	return f
+func (irConstant *Constant) Float64() float64 {
+	x := constant.ToFloat(irConstant.Value) // (c.Value == nil) => x.Kind() == Unknown
+	floatValue, _ := constant.Float64Val(x)
+	return floatValue
 }
 
 // Complex128 returns the complex value of this constant truncated to
 // fit a complex128.
-func (vFalse *Constant) Complex128() complex128 {
-	x := constant.ToComplex(vFalse.Value) // (c.Value == nil) => x.Kind() == Unknown
+func (irConstant *Constant) Complex128() complex128 {
+	x := constant.ToComplex(irConstant.Value) // (c.Value == nil) => x.Kind() == Unknown
 	re, _ := constant.Float64Val(constant.Real(x))
 	im, _ := constant.Float64Val(constant.Imag(x))
 	return complex(re, im)

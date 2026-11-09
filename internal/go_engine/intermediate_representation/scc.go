@@ -5,11 +5,11 @@ import (
 )
 
 type sccState struct {
-	fn    *Function
-	index int
-	lows  BlockMap[int]
-	F     []int
-	sccs  []*Scc
+	function *Function
+	index    int
+	lows     BlockMap[int]
+	F        []int
+	sccs     []*Scc
 }
 
 func (state *sccState) scc(block *BasicBlock) {
@@ -41,16 +41,16 @@ func (state *sccState) scc(block *BasicBlock) {
 		scc := &Scc{
 			Index: len(state.sccs),
 		}
-		F := state.F
-		for lows[F[len(F)-1]] >= leaderLow {
-			x := F[len(F)-1]
-			F = F[:len(F)-1]
+		stack := state.F
+		for lows[stack[len(stack)-1]] >= leaderLow {
+			x := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
 
 			lows[x] = math.MaxInt
-			scc.Blocks = append(scc.Blocks, state.fn.Blocks[x])
-			state.fn.Blocks[x].Scc = scc
+			scc.Blocks = append(scc.Blocks, state.function.Blocks[x])
+			state.function.Blocks[x].Scc = scc
 		}
-		state.F = F
+		state.F = stack
 
 		lows[vi] = math.MaxInt
 		scc.Blocks = append(scc.Blocks, block)
@@ -63,18 +63,18 @@ func (state *sccState) scc(block *BasicBlock) {
 
 // buildSccs computes the strongly connected components of fn's control flow graph.
 func buildSccs(function *Function) {
-	n := len(function.Blocks)
+	blockCount := len(function.Blocks)
 
-	if n == 0 {
+	if blockCount == 0 {
 		return
 	}
 
 	state := sccState{
-		fn:    function,
-		index: 0,
+		function: function,
+		index:    0,
 		// The +1 makes space for the sentinel value stored in F.
-		lows: make(BlockMap[int], n+1),
-		F:    []int{n},
+		lows: make(BlockMap[int], blockCount+1),
+		F:    []int{blockCount},
 	}
 
 	// All blocks are reachable from the entry block.

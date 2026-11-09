@@ -20,10 +20,10 @@ import (
 
 func TestEnclosingFunction(test *testing.T) {
 	type testcase struct {
-		desc   string
-		input  string // the input file
-		substr string // first occurrence of this string denotes interval
-		fn     string // name of expected containing function
+		desc         string
+		input        string // the input file
+		substr       string // first occurrence of this string denotes interval
+		functionName string // name of expected containing function
 	}
 	tests := []testcase{
 		// We use distinctive numbers as syntactic landmarks.
@@ -101,8 +101,8 @@ package main
 			if index < 0 {
 				test.Fatalf("%q is not a substring of input", testCase.substr)
 			}
-			filePos := fset.File(file.Package)
-			start, end := filePos.Pos(index), filePos.Pos(index+len(testCase.substr))
+			tokenFile := fset.File(file.Package)
+			start, end := tokenFile.Pos(index), tokenFile.Pos(index+len(testCase.substr))
 
 			path, exact := astutil.PathEnclosingInterval(file, start, end)
 			if !exact {
@@ -115,9 +115,9 @@ package main
 				name = function.String()
 			}
 
-			if name != testCase.fn {
+			if name != testCase.functionName {
 				test.Errorf("EnclosingFunction(%q in %q) got %s, want %s",
-					testCase.substr, testCase.input, name, testCase.fn)
+					testCase.substr, testCase.input, name, testCase.functionName)
 			}
 
 			// While we're here: test HasEnclosingFunction.

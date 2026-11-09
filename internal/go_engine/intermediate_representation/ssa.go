@@ -85,8 +85,8 @@ type Member interface {
 
 // A Type is a Member of a Package representing a package-level named type.
 type Type struct {
-	object *types.TypeName
-	pkg    *Package
+	object    *types.TypeName
+	irPackage *Package
 }
 
 // A NamedConstant is a Member of a Package representing a package-level
@@ -98,9 +98,9 @@ type Type struct {
 // NB: a NamedConstant is not a Value; it contains a constant Value, which
 // it augments with the name and position of its 'const' declaration.
 type NamedConstant struct {
-	object *types.Const
-	Value  *Constant
-	pkg    *Package
+	object    *types.Const
+	Value     *Constant
+	irPackage *Package
 }
 
 // A Value is an IR value that can be referenced by an instruction.
@@ -316,7 +316,7 @@ type Function struct {
 	object    *types.Func // symbol for declared function (nil for FuncLit or synthetic init)
 	method    *selection  // info about provenance of synthetic methods; thunk => non-nil
 	Signature *types.Signature
-	pos       token.Pos
+	position  token.Pos
 	syntax    ast.Node
 
 	// source information
@@ -1463,16 +1463,16 @@ type anInstruction struct {
 	comment string
 }
 
-func (instr *anInstruction) setId(id Id) {
-	instr.id = id
+func (instruction *anInstruction) setId(id Id) {
+	instruction.id = id
 }
 
-func (instr anInstruction) Id() Id {
-	return instr.id
+func (instruction anInstruction) Id() Id {
+	return instruction.id
 }
 
-func (instr anInstruction) Comment() string {
-	return instr.comment
+func (instruction anInstruction) Comment() string {
+	return instruction.comment
 }
 
 // CallCommon is contained by Go, Defer and Call to hold the
@@ -1567,11 +1567,11 @@ func (common *CallCommon) Signature() *types.Signature {
 // StaticCallee returns the callee if this is a trivially static
 // "call"-mode call to a function.
 func (common *CallCommon) StaticCallee() *Function {
-	switch fn := common.Value.(type) {
+	switch callee := common.Value.(type) {
 	case *Function:
-		return fn
+		return callee
 	case *MakeClosure:
-		return fn.Function.(*Function)
+		return callee.Function.(*Function)
 	}
 	return nil
 }
@@ -1579,13 +1579,13 @@ func (common *CallCommon) StaticCallee() *Function {
 // Description returns a description of the mode of this call suitable
 // for a user interface, e.g., "static method call".
 func (common *CallCommon) Description() string {
-	switch fn := common.Value.(type) {
+	switch callee := common.Value.(type) {
 	case *Builtin:
 		return "built-in function call"
 	case *MakeClosure:
 		return "static function closure call"
 	case *Function:
-		if fn.Signature.Recv() != nil {
+		if callee.Signature.Recv() != nil {
 			return "static method call"
 		}
 		return "static function call"
@@ -1605,17 +1605,23 @@ type CallInstruction interface {
 	Value() *Call
 }
 
-func (call *Call) Common() *CallCommon { return &call.Call }
-func (s *Defer) Common() *CallCommon   { return &s.Call }
-func (s *Go) Common() *CallCommon      { return &s.Call }
+func (call *Call) Common() *CallCommon              { return &call.Call }
+func (deferInstruction *Defer) Common() *CallCommon { return &deferInstruction.Call }
+func (goInstruction *Go) Common() *CallCommon       { return &goInstruction.Call }
 
 func (call *Call) setSource(source ast.Node) { call.source = source; call.Call.source = source }
-func (s *Defer) setSource(source ast.Node)   { s.source = source; s.Call.source = source }
-func (s *Go) setSource(source ast.Node)      { s.source = source; s.Call.source = source }
+func (deferInstruction *Defer) setSource(source ast.Node) {
+	deferInstruction.source = source
+	deferInstruction.Call.source = source
+}
+func (goInstruction *Go) setSource(source ast.Node) {
+	goInstruction.source = source
+	goInstruction.Call.source = source
+}
 
-func (call *Call) Value() *Call { return call }
-func (s *Defer) Value() *Call   { return nil }
-func (s *Go) Value() *Call      { return nil }
+func (call *Call) Value() *Call              { return call }
+func (deferInstruction *Defer) Value() *Call { return nil }
+func (goInstruction *Go) Value() *Call       { return nil }
 
 func (builtin *Builtin) Type() types.Type     { return builtin.sig }
 func (builtin *Builtin) Name() string         { return builtin.name }
@@ -1735,30 +1741,30 @@ func (function *Function) TypeParameters() *types.TypeParamList {
 	return consTypeParamLists(function.recvtypeparams, function.typeparams)
 }
 
-func consTypeParamLists(l, r *types.TypeParamList) *types.TypeParamList {
-	if l.Len() == 0 {
-		return r
+func consTypeParamLists(first, second *types.TypeParamList) *types.TypeParamList {
+	if first.Len() == 0 {
+		return second
 	}
-	if r.Len() == 0 {
-		return l
+	if second.Len() == 0 {
+		return first
 	}
 
-	tpars := make([]*types.TypeParam, l.Len()+r.Len())
-	for index := range l.Len() {
-		tpars[index] = l.At(index)
+	tpars := make([]*types.TypeParam, first.Len()+second.Len())
+	for index := range first.Len() {
+		tpars[index] = first.At(index)
 	}
-	for index := range r.Len() {
-		tpars[index+l.Len()] = r.At(index)
+	for index := range second.Len() {
+		tpars[index+first.Len()] = second.At(index)
 	}
 	// This logic unsafely assumes (and asserts) that the layout of the
 	// TypeParamList is identical to that of a slice of TypeParams. This
 	// is a hack while we work on getting a constructor for TypeParamList
 	// approved (see go.dev/issue/79603).
-	t := reflect.TypeFor[types.TypeParamList]()
-	if t.NumField() != 1 {
+	listType := reflect.TypeFor[types.TypeParamList]()
+	if listType.NumField() != 1 {
 		panic("TypeParamList has unexpected fields")
 	}
-	if field := t.Field(0); field.Offset != 0 || field.Type != reflect.TypeFor[[]*types.TypeParam]() {
+	if field := listType.Field(0); field.Offset != 0 || field.Type != reflect.TypeFor[[]*types.TypeParam]() {
 		panic("TypeParamList field is not []*TypeParam")
 	}
 	return (*types.TypeParamList)(unsafe.Pointer(&tpars))
@@ -1804,8 +1810,8 @@ func (function *Function) hasTypeArguments() bool {
 }
 
 // subrtargs returns fn's receiver type parameters substituted with receiver type arguments
-func (function *Function) subrtargs(m *types.Func) []types.Type {
-	return receiverTypeArguments(m)
+func (function *Function) subrtargs(method *types.Func) []types.Type {
+	return receiverTypeArguments(method)
 }
 
 // subtargs returns fn's type parameters substituted with (possibly implied) type arguments
@@ -1815,18 +1821,18 @@ func (function *Function) subtargs(id *ast.Ident) []types.Type {
 
 // targstr returns a comma-separated string of the types in targs
 func targstr(targs []types.Type) string {
-	var sb strings.Builder
+	var text strings.Builder
 	if len(targs) > 0 {
-		sb.WriteString("[")
+		text.WriteString("[")
 		for index := range targs {
 			if index > 0 {
-				sb.WriteString(", ")
+				text.WriteString(", ")
 			}
-			sb.WriteString(targs[index].String())
+			text.WriteString(targs[index].String())
 		}
-		sb.WriteString("]")
+		text.WriteString("]")
 	}
-	return sb.String()
+	return text.String()
 }
 
 // origin is the function that fn is an instantiation of. Returns nil if fn is
@@ -1853,14 +1859,16 @@ func (instruction *anInstruction) Block() *BasicBlock         { return instructi
 func (instruction *anInstruction) setBlock(block *BasicBlock) { instruction.block = block }
 func (instruction *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (t *Type) Name() string                              { return t.object.Name() }
-func (t *Type) Pos() token.Pos                            { return t.object.Pos() }
-func (t *Type) Type() types.Type                          { return t.object.Type() }
-func (t *Type) Token() token.Token                        { return token.TYPE }
-func (t *Type) Object() types.Object                      { return t.object }
-func (t *Type) String() string                            { return t.RelativeString(nil) }
-func (t *Type) Package() *Package                         { return t.pkg }
-func (t *Type) RelativeString(from *types.Package) string { return relativeString(t, t.pkg, from) }
+func (namedType *Type) Name() string         { return namedType.object.Name() }
+func (namedType *Type) Pos() token.Pos       { return namedType.object.Pos() }
+func (namedType *Type) Type() types.Type     { return namedType.object.Type() }
+func (namedType *Type) Token() token.Token   { return token.TYPE }
+func (namedType *Type) Object() types.Object { return namedType.object }
+func (namedType *Type) String() string       { return namedType.RelativeString(nil) }
+func (namedType *Type) Package() *Package    { return namedType.irPackage }
+func (namedType *Type) RelativeString(from *types.Package) string {
+	return relativeString(namedType, namedType.irPackage, from)
+}
 
 func (namedConstant *NamedConstant) Name() string         { return namedConstant.object.Name() }
 func (namedConstant *NamedConstant) Pos() token.Pos       { return namedConstant.object.Pos() }
@@ -1868,12 +1876,12 @@ func (namedConstant *NamedConstant) String() string       { return namedConstant
 func (namedConstant *NamedConstant) Type() types.Type     { return namedConstant.object.Type() }
 func (namedConstant *NamedConstant) Token() token.Token   { return token.CONST }
 func (namedConstant *NamedConstant) Object() types.Object { return namedConstant.object }
-func (namedConstant *NamedConstant) Package() *Package    { return namedConstant.pkg }
+func (namedConstant *NamedConstant) Package() *Package    { return namedConstant.irPackage }
 func (namedConstant *NamedConstant) RelativeString(from *types.Package) string {
-	return relativeString(namedConstant, namedConstant.pkg, from)
+	return relativeString(namedConstant, namedConstant.irPackage, from)
 }
 
-func (function *Function) Pos() token.Pos   { return function.pos }
+func (function *Function) Pos() token.Pos   { return function.position }
 func (function *Function) Source() ast.Node { return function.syntax }
 
 // Function returns the package-level function of the specified name,
@@ -1899,8 +1907,8 @@ func (goEnginePackage *Package) Constant(name string) (namedConstant *NamedConst
 
 // Type returns the package-level type of the specified name,
 // or nil if not found.
-func (goEnginePackage *Package) Type(name string) (t *Type) {
-	t, _ = goEnginePackage.Members[name].(*Type)
+func (goEnginePackage *Package) Type(name string) (namedType *Type) {
+	namedType, _ = goEnginePackage.Members[name].(*Type)
 	return
 }
 
@@ -1922,16 +1930,16 @@ func (common *CallCommon) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-func (s *Go) Operands(rands []*Value) []*Value {
-	return s.Call.Operands(rands)
+func (goInstruction *Go) Operands(rands []*Value) []*Value {
+	return goInstruction.Call.Operands(rands)
 }
 
 func (call *Call) Operands(rands []*Value) []*Value {
 	return call.Call.Operands(rands)
 }
 
-func (s *Defer) Operands(rands []*Value) []*Value {
-	return append(s.Call.Operands(rands), &s.DeferStack)
+func (deferInstruction *Defer) Operands(rands []*Value) []*Value {
+	return append(deferInstruction.Call.Operands(rands), &deferInstruction.DeferStack)
 }
 
 func (changeInterface *ChangeInterface) Operands(rands []*Value) []*Value {
@@ -2043,8 +2051,8 @@ func (next *Next) Operands(rands []*Value) []*Value {
 	return append(rands, &next.Iterator)
 }
 
-func (s *Panic) Operands(rands []*Value) []*Value {
-	return append(rands, &s.X)
+func (panicInstruction *Panic) Operands(rands []*Value) []*Value {
+	return append(rands, &panicInstruction.X)
 }
 
 func (phi *Phi) Operands(rands []*Value) []*Value {
@@ -2118,7 +2126,7 @@ func (value *CompositeValue) Operands(rands []*Value) []*Value {
 // Non-Instruction Values:
 func (builtin *Builtin) Operands(rands []*Value) []*Value       { return rands }
 func (variable *FreeVariable) Operands(rands []*Value) []*Value { return rands }
-func (vFalse *Constant) Operands(rands []*Value) []*Value       { return rands }
+func (irConstant *Constant) Operands(rands []*Value) []*Value   { return rands }
 func (function *Function) Operands(rands []*Value) []*Value     { return rands }
 func (global *Global) Operands(rands []*Value) []*Value         { return rands }
 func (parameter *Parameter) Operands(rands []*Value) []*Value   { return rands }

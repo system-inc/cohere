@@ -167,21 +167,21 @@ func emitCompare(function *Function, op token.Token, x, y Value, source ast.Node
 // isValuePreserving returns true if a conversion from ut_src to
 // ut_dst is value-preserving, i.e. just a change of type.
 // Precondition: neither argument is a named or alias type.
-func isValuePreserving(ut_src, ut_dst types.Type) bool {
+func isValuePreserving(fromUnderlyingType, toUnderlyingType types.Type) bool {
 	// Identical underlying types?
-	if types.IdenticalIgnoreTags(ut_dst, ut_src) {
+	if types.IdenticalIgnoreTags(toUnderlyingType, fromUnderlyingType) {
 		return true
 	}
 
-	switch ut_dst.(type) {
+	switch toUnderlyingType.(type) {
 	case *types.Chan:
 		// Conversion between channel types?
-		_, ok := ut_src.(*types.Chan)
+		_, ok := fromUnderlyingType.(*types.Chan)
 		return ok
 
 	case *types.Pointer:
 		// Conversion between pointers with identical base types?
-		_, ok := ut_src.(*types.Pointer)
+		_, ok := fromUnderlyingType.(*types.Pointer)
 		return ok
 	}
 	return false
@@ -191,45 +191,45 @@ func isValuePreserving(ut_src, ut_dst types.Type) bool {
 // and returns the converted value.  Implicit conversions are required
 // by language assignability rules in assignments, parameter passing,
 // etc.
-func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node) Value {
-	t_src := value.Type()
+func emitConv(function *Function, value Value, toType types.Type, source ast.Node) Value {
+	fromType := value.Type()
 
 	// Identical types?  Conversion is a no-op.
-	if types.Identical(t_src, t_dst) {
+	if types.Identical(fromType, toType) {
 		return value
 	}
 
-	ut_dst := t_dst.Underlying()
-	ut_src := t_src.Underlying()
+	toUnderlyingType := toType.Underlying()
+	fromUnderlyingType := fromType.Underlying()
 
 	// Conversion to, or construction of a value of, an interface type?
-	if isNonTypeParamInterface(t_dst) {
+	if isNonTypeParamInterface(toType) {
 		// Interface name change?
-		if isValuePreserving(ut_src, ut_dst) {
+		if isValuePreserving(fromUnderlyingType, toUnderlyingType) {
 			changeType := &ChangeType{X: value}
-			changeType.setType(t_dst)
+			changeType.setType(toType)
 			return function.emit(changeType, source)
 		}
 
 		// Assignment from one interface type to another?
-		if isNonTypeParamInterface(t_src) {
+		if isNonTypeParamInterface(fromType) {
 			changeInterface := &ChangeInterface{X: value}
-			changeInterface.setType(t_dst)
+			changeInterface.setType(toType)
 			return function.emit(changeInterface, source)
 		}
 
 		// Untyped nil constant?  Return interface-typed nil constant.
-		if ut_src == tUntypedNil {
-			return zeroConstant(t_dst, source)
+		if fromUnderlyingType == tUntypedNil {
+			return zeroConstant(toType, source)
 		}
 
 		// Convert (non-nil) "untyped" literals to their default type.
-		if basic, ok := ut_src.(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
-			value = emitConv(function, value, types.Default(ut_src), source)
+		if basic, ok := fromUnderlyingType.(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
+			value = emitConv(function, value, types.Default(fromUnderlyingType), source)
 		}
 
 		mi := &MakeInterface{X: value}
-		mi.setType(t_dst)
+		mi.setType(toType)
 		return function.emit(mi, source)
 	}
 
@@ -247,18 +247,18 @@ func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node
 	)
 	// classify the conversion case of a source type us to a destination type ud.
 	// us and ud are underlying types (not *Named or *Alias)
-	classify := func(s, d types.Type) conversionCase {
+	classify := func(fromTerm, toTerm types.Type) conversionCase {
 		// Just a change of type, but not value or representation?
-		if isValuePreserving(s, d) {
+		if isValuePreserving(fromTerm, toTerm) {
 			return changeType
 		}
 
 		// Conversion from slice to array or slice to array pointer?
-		if slice, ok := s.(*types.Slice); ok {
+		if slice, ok := fromTerm.(*types.Slice); ok {
 			var array *types.Array
 			var ptr bool
 			// Conversion from slice to array pointer?
-			switch typed := d.(type) {
+			switch typed := toTerm.(type) {
 			case *types.Array:
 				array = typed
 			case *types.Pointer:
@@ -283,23 +283,23 @@ func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node
 
 		// The only remaining case in well-typed code is a representation-
 		// changing conversion of basic types (possibly with []byte/[]rune).
-		if !isBasic(s) && !isBasic(d) {
+		if !isBasic(fromTerm) && !isBasic(toTerm) {
 			panic(fmt.Sprintf(
 				"in %s: cannot convert term %s (%s [within %s]) to type %s [within %s]",
 				function,
 				value,
 				value.Type(),
-				s,
-				t_dst,
-				d,
+				fromTerm,
+				toType,
+				toTerm,
 			))
 		}
 		return convert
 	}
 
 	var classifications conversionCase
-	underIs(ut_src, func(us types.Type) bool {
-		return underIs(ut_dst, func(ud types.Type) bool {
+	underIs(fromUnderlyingType, func(us types.Type) bool {
+		return underIs(toUnderlyingType, func(ud types.Type) bool {
 			if us != nil && ud != nil {
 				classifications |= classify(us, ud)
 			}
@@ -307,24 +307,24 @@ func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node
 		})
 	})
 	if classifications == 0 {
-		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", function, value, value.Type(), t_dst))
+		panic(fmt.Sprintf("in %s: cannot convert %s (%s) to %s", function, value, value.Type(), toType))
 	}
 
 	// Conversion of a compile-time constant value?
-	if c, ok := value.(*Constant); ok {
+	if irConstant, ok := value.(*Constant); ok {
 		// Conversion to a basic type?
-		if isBasic(ut_dst) {
+		if isBasic(toUnderlyingType) {
 			// Conversion of a compile-time constant to
 			// another constant type results in a new
 			// constant of the destination type and
 			// (initially) the same abstract value.
 			// We don't truncate the value yet.
-			return NewConstant(c.Value, t_dst, source)
+			return NewConstant(irConstant.Value, toType, source)
 		}
 		// Can we always convert from zero value without panicking?
 		const mayPanic = sliceToArray | sliceToArrayPtr
-		if c.Value == nil && classifications&mayPanic == 0 {
-			return NewConstant(nil, t_dst, source)
+		if irConstant.Value == nil && classifications&mayPanic == 0 {
+			return NewConstant(nil, toType, source)
 		}
 
 		// We're converting from constant to non-constant type,
@@ -334,30 +334,30 @@ func emitConv(function *Function, value Value, t_dst types.Type, source ast.Node
 	switch classifications {
 	case changeType: // representation-preserving change
 		changeType := &ChangeType{X: value}
-		changeType.setType(t_dst)
+		changeType.setType(toType)
 		return function.emit(changeType, source)
 
 	case sliceToArrayPtr, sliceTo0ArrayPtr: // slice to array pointer
 		pointer := &SliceToArrayPointer{X: value}
-		pointer.setType(t_dst)
+		pointer.setType(toType)
 		return function.emit(pointer, source)
 
 	case sliceToArray: // slice to arrays (not zero-length)
 		array := &SliceToArray{X: value}
-		array.setType(t_dst)
+		array.setType(toType)
 		return function.emit(array, source)
 
 	case sliceTo0Array: // slice to zero-length arrays (constant)
-		return zeroConstant(t_dst, source)
+		return zeroConstant(toType, source)
 
 	case convert: // representation-changing conversion
 		convert := &Convert{X: value}
-		convert.setType(t_dst)
+		convert.setType(toType)
 		return function.emit(convert, source)
 
 	default: // The conversion represents a cross product.
-		convert := &MultiConvert{X: value, from: t_src, to: t_dst}
-		convert.setType(t_dst)
+		convert := &MultiConvert{X: value, from: fromType, to: toType}
+		convert.setType(toType)
 		return function.emit(convert, source)
 	}
 }

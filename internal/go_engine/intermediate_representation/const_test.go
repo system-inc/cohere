@@ -76,8 +76,8 @@ func TestConstString(test *testing.T) {
 		if testCase.constant != nil {
 			value = constant.Make(testCase.constant)
 		}
-		c := intermediate_representation.NewConstant(value, tv.Type, nil)
-		got := strings.ReplaceAll(c.String(), " | ", "|") // Accept both interface{a | b} and interface{a|b}.
+		irConstant := intermediate_representation.NewConstant(value, tv.Type, nil)
+		got := strings.ReplaceAll(irConstant.String(), " | ", "|") // Accept both interface{a | b} and interface{a|b}.
 		if got != testCase.want {
 			test.Errorf(
 				"intermediate_representation.NewConstant(%v, %s).String() = %q, want %q",

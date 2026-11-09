@@ -301,13 +301,13 @@ type C int
 func (C) F() {}
 `,
 	})
-	a := loaded.packages["testdata/a"]
+	packageA := loaded.packages["testdata/a"]
 
 	// Create a from syntax, its direct deps b from types, but not indirect deps c.
 	prog := intermediate_representation.NewProgram(loaded.fset)
-	aSsa := prog.CreatePackage(a, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
-	for _, p := range a.Imports() {
-		prog.CreatePackage(p, nil, nil, true)
+	aSsa := prog.CreatePackage(packageA, loaded.files["testdata/a"], loaded.infos["testdata/a"], false)
+	for _, importedPackage := range packageA.Imports() {
+		prog.CreatePackage(importedPackage, nil, nil, true)
 	}
 
 	// Build SSA for package a.
@@ -351,18 +351,18 @@ func sliceMax(s []int) []int { return s[a():b():c()] }
 
 `
 
-	p, _ := buildPackage(test, input, nil)
+	irPackage, _ := buildPackage(test, input, nil)
 
 	for _, item := range []struct {
-		fn   string
-		want string // sequence of calls within the function.
+		functionName string
+		want         string // sequence of calls within the function.
 	}{
 		{"sliceMax", "[a() b() c()]"},
 		{"slice", "[a() b()]"},
 	} {
-		function := p.Function(item.fn)
+		function := irPackage.Function(item.functionName)
 		want := item.want
-		test.Run(item.fn, func(test *testing.T) {
+		test.Run(item.functionName, func(test *testing.T) {
 			test.Parallel()
 
 			var calls []string
@@ -389,19 +389,19 @@ func TestGenericFunctionSelector(test *testing.T) {
 	for _, path := range []string{"example.com/a", "example.com"} {
 		prog.CreatePackage(loaded.packages[path], loaded.files[path], loaded.infos[path], true)
 	}
-	p := prog.Package(loaded.packages["example.com"])
-	p.Build()
+	mainPackage := prog.Package(loaded.packages["example.com"])
+	mainPackage.Build()
 
-	if p.Types.Name() != "main" {
-		test.Fatalf("Expected the second package is main but got %s", p.Types.Name())
+	if mainPackage.Types.Name() != "main" {
+		test.Fatalf("Expected the second package is main but got %s", mainPackage.Types.Name())
 	}
 
 	var callees []string // callees of the CallInstruction in main().
-	for _, call := range callsOf(p.Function("main")) {
+	for _, call := range callsOf(mainPackage.Function("main")) {
 		if callee := call.StaticCallee(); callee != nil {
 			callees = append(callees, callee.String())
 		} else {
-			test.Errorf("CallInstruction without StaticCallee() in %s", p.Function("main"))
+			test.Errorf("CallInstruction without StaticCallee() in %s", mainPackage.Function("main"))
 		}
 	}
 	sort.Strings(callees) // ignore the order in the code.
@@ -415,7 +415,7 @@ func TestGenericFunctionSelector(test *testing.T) {
 func TestGo117Builtins(test *testing.T) {
 	tests := []struct {
 		name     string
-		src      string
+		source   string
 		importer types.Importer
 	}{
 		{"slice to array pointer", "package p; var s []byte; var _ = (*[4]byte)(s)", nil},
@@ -426,7 +426,7 @@ func TestGo117Builtins(test *testing.T) {
 	for _, tc := range tests {
 		test.Run(tc.name, func(test *testing.T) {
 			test.Parallel()
-			buildPackage(test, tc.src, tc.importer)
+			buildPackage(test, tc.source, tc.importer)
 		})
 	}
 }
@@ -472,7 +472,7 @@ func TestFixedBugs(test *testing.T) {
 func TestBuildPackageGo120(test *testing.T) {
 	tests := []struct {
 		name     string
-		src      string
+		source   string
 		importer types.Importer
 	}{
 		{"slice to array", "package p; var s []byte; var _ = ([4]byte)(s)", nil},
@@ -546,7 +546,7 @@ func TestBuildPackageGo120(test *testing.T) {
 	for _, tc := range tests {
 		test.Run(tc.name, func(test *testing.T) {
 			test.Parallel()
-			buildPackage(test, tc.src, tc.importer)
+			buildPackage(test, tc.source, tc.importer)
 		})
 	}
 }
@@ -574,9 +574,9 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 	return n
 }
 `
-	p, _ := buildPackage(test, input, nil)
+	irPackage, _ := buildPackage(test, input, nil)
 	var marked []string
-	for _, block := range p.Function("f").Blocks {
+	for _, block := range irPackage.Function("f").Blocks {
 		if block.RangeIndexLoop {
 			// The header increments the index and then branches on it against the length.
 			var kinds []string

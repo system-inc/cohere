@@ -91,20 +91,20 @@ func (state *ltState) dfs(block *BasicBlock, index int32, preorder []*BasicBlock
 }
 
 // eval implements the EVAL part of the LT algorithm.
-func (state *ltState) eval(v *BasicBlock) *BasicBlock {
+func (state *ltState) eval(vertex *BasicBlock) *BasicBlock {
 	// TODO(adonovan): opt: do path compression per simple LT.
-	u := v
-	for ; state.ancestor[v.Index] != nil; v = state.ancestor[v.Index] {
-		if state.sdom[v.Index].dom.pre < state.sdom[u.Index].dom.pre {
-			u = v
+	minimumVertex := vertex
+	for ; state.ancestor[vertex.Index] != nil; vertex = state.ancestor[vertex.Index] {
+		if state.sdom[vertex.Index].dom.pre < state.sdom[minimumVertex.Index].dom.pre {
+			minimumVertex = vertex
 		}
 	}
-	return u
+	return minimumVertex
 }
 
 // link implements the LINK part of the LT algorithm.
-func (state *ltState) link(v, w *BasicBlock) {
-	state.ancestor[w.Index] = v
+func (state *ltState) link(parent, vertex *BasicBlock) {
+	state.ancestor[vertex.Index] = parent
 }
 
 // buildDominatorTree computes the dominator tree of f using the LT algorithm.
@@ -122,18 +122,18 @@ func buildDominatorTree(function *Function) {
 		block.dom = domInfo{}
 	}
 
-	n := len(function.Blocks)
+	blockCount := len(function.Blocks)
 	// Allocate space for 5 contiguous [n]*BasicBlock arrays:
 	// sdom, parent, ancestor, preorder, buckets.
-	space := make([]*BasicBlock, 5*n)
+	space := make([]*BasicBlock, 5*blockCount)
 	lt := ltState{
-		sdom:     space[0:n],
-		parent:   space[n : 2*n],
-		ancestor: space[2*n : 3*n],
+		sdom:     space[0:blockCount],
+		parent:   space[blockCount : 2*blockCount],
+		ancestor: space[2*blockCount : 3*blockCount],
 	}
 
 	// Step 1.  Number vertices by depth-first preorder.
-	preorder := space[3*n : 4*n]
+	preorder := space[3*blockCount : 4*blockCount]
 	root := function.Blocks[0]
 	prenum := lt.dfs(root, 0, preorder)
 	recover := function.Recover
@@ -141,39 +141,39 @@ func buildDominatorTree(function *Function) {
 		lt.dfs(recover, prenum, preorder)
 	}
 
-	buckets := space[4*n : 5*n]
+	buckets := space[4*blockCount : 5*blockCount]
 	copy(buckets, preorder)
 
 	// In reverse preorder...
-	for index := int32(n) - 1; index > 0; index-- {
-		w := preorder[index]
+	for index := int32(blockCount) - 1; index > 0; index-- {
+		vertex := preorder[index]
 
 		// Step 3. Implicitly define the immediate dominator of each node.
-		for bucket := buckets[index]; bucket != w; bucket = buckets[bucket.dom.pre] {
-			u := lt.eval(bucket)
-			if lt.sdom[u.Index].dom.pre < index {
-				bucket.dom.idom = u
+		for bucket := buckets[index]; bucket != vertex; bucket = buckets[bucket.dom.pre] {
+			minimumVertex := lt.eval(bucket)
+			if lt.sdom[minimumVertex.Index].dom.pre < index {
+				bucket.dom.idom = minimumVertex
 			} else {
-				bucket.dom.idom = w
+				bucket.dom.idom = vertex
 			}
 		}
 
 		// Step 2. Compute the semidominators of all nodes.
-		lt.sdom[w.Index] = lt.parent[w.Index]
-		for _, predecessor := range w.Predecessors {
-			u := lt.eval(predecessor)
-			if lt.sdom[u.Index].dom.pre < lt.sdom[w.Index].dom.pre {
-				lt.sdom[w.Index] = lt.sdom[u.Index]
+		lt.sdom[vertex.Index] = lt.parent[vertex.Index]
+		for _, predecessor := range vertex.Predecessors {
+			minimumVertex := lt.eval(predecessor)
+			if lt.sdom[minimumVertex.Index].dom.pre < lt.sdom[vertex.Index].dom.pre {
+				lt.sdom[vertex.Index] = lt.sdom[minimumVertex.Index]
 			}
 		}
 
-		lt.link(lt.parent[w.Index], w)
+		lt.link(lt.parent[vertex.Index], vertex)
 
-		if lt.parent[w.Index] == lt.sdom[w.Index] {
-			w.dom.idom = lt.parent[w.Index]
+		if lt.parent[vertex.Index] == lt.sdom[vertex.Index] {
+			vertex.dom.idom = lt.parent[vertex.Index]
 		} else {
-			buckets[index] = buckets[lt.sdom[w.Index].dom.pre]
-			buckets[lt.sdom[w.Index].dom.pre] = w
+			buckets[index] = buckets[lt.sdom[vertex.Index].dom.pre]
+			buckets[lt.sdom[vertex.Index].dom.pre] = vertex
 		}
 	}
 

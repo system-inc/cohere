@@ -60,7 +60,7 @@ func createWrapper(prog *Program, sel *selection, targs []types.Type) *Function 
 		Signature: sig,
 		Synthetic: description,
 		Program:   prog,
-		pos:       object.Pos(),
+		position:  object.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
 		build:     (*builder).buildWrapper,
@@ -84,7 +84,7 @@ func maybeInstance(prog *Program, name string, sig *types.Signature, targs []typ
 }
 
 // buildWrapper builds fn.Body for a method wrapper.
-func (b *builder) buildWrapper(function *Function) {
+func (packageBuilder *builder) buildWrapper(function *Function) {
 	var recv *types.Var // wrapper's receiver or thunk's params[0]
 	var start int       // first regular param
 	if function.method.kind == types.MethodExpr {
@@ -148,7 +148,7 @@ func (b *builder) buildWrapper(function *Function) {
 		if !isPointer(resolvedType) {
 			local = emitLoad(function, local, nil)
 		}
-		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, b)
+		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, packageBuilder)
 		call.Call.Arguments = append(call.Call.Arguments, local)
 	} else {
 		call.Call.Method = function.object
@@ -206,7 +206,7 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 		Signature: changeRecv(sig, nil), // drop receiver
 		Synthetic: description,
 		Program:   prog,
-		pos:       object.Pos(),
+		position:  object.Pos(),
 		typeargs:  targs,
 		// wrappers have no syntax
 		build:     (*builder).buildBound,
@@ -218,14 +218,14 @@ func createBound(prog *Program, object *types.Func, targs []types.Type) *Functio
 }
 
 // buildBound builds fn.Body for a bound method closure.
-func (b *builder) buildBound(function *Function) {
+func (packageBuilder *builder) buildBound(function *Function) {
 	function.startBody()
 	createParameters(function, 0)
 	var call Call
 
 	recv := function.FreeVariables[0]
 	if !types.IsInterface(recvType(function.object)) { // concrete
-		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, b)
+		call.Call.Value = function.Program.objectMethod(function.object, function.typeargs, packageBuilder)
 		call.Call.Arguments = []Value{recv}
 	} else {
 		call.Call.Method = function.object
@@ -299,7 +299,7 @@ func toSelection(sel *types.Selection) *selection {
 // buildInstantiationWrapper builds the body of an instantiation
 // wrapper fn. The body calls the original generic function,
 // bracketed by ChangeType conversions on its arguments and results.
-func (b *builder) buildInstantiationWrapper(function *Function) {
+func (packageBuilder *builder) buildInstantiationWrapper(function *Function) {
 	orig := function.topLevelOrigin
 	sig := function.Signature
 

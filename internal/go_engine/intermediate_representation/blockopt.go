@@ -115,15 +115,15 @@ func jumpThreading(function *Function, block *BasicBlock) bool {
 // fuseBlocks attempts to apply the block fusion optimization to block
 // a, in which a->b becomes ab if len(a.Successors)==len(b.Predecessors)==1.
 // The result is true if the optimization was applied.
-func fuseBlocks(function *Function, a *BasicBlock) bool {
-	if len(a.Successors) != 1 {
+func fuseBlocks(function *Function, block *BasicBlock) bool {
+	if len(block.Successors) != 1 {
 		return false
 	}
-	b := a.Successors[0]
-	if len(b.Predecessors) != 1 {
+	successor := block.Successors[0]
+	if len(successor.Predecessors) != 1 {
 		return false
 	}
-	if _, ok := a.Instructions[len(a.Instructions)-1].(*Panic); ok {
+	if _, ok := block.Instructions[len(block.Instructions)-1].(*Panic); ok {
 		// panics aren't simple jumps, they have side effects.
 		return false
 	}
@@ -131,29 +131,29 @@ func fuseBlocks(function *Function, a *BasicBlock) bool {
 	// Degenerate &&/|| ops may result in a straight-line CFG
 	// containing φ-nodes. (Ideally we'd replace such them with
 	// their sole operand but that requires Referrers, built later.)
-	if b.hasPhi() {
+	if successor.hasPhi() {
 		return false // not sound without further effort
 	}
 
 	// Eliminate jump at end of A, then copy all of B across.
-	a.Instructions = append(a.Instructions[:len(a.Instructions)-1], b.Instructions...)
-	for _, instr := range b.Instructions {
-		instr.setBlock(a)
+	block.Instructions = append(block.Instructions[:len(block.Instructions)-1], successor.Instructions...)
+	for _, instr := range successor.Instructions {
+		instr.setBlock(block)
 	}
 
 	// A inherits B's successors
-	a.Successors = append(a.successorsSpace[:0], b.Successors...)
+	block.Successors = append(block.successorsSpace[:0], successor.Successors...)
 
 	// Fix up Predecessors links of all successors of B.
-	for _, c := range b.Successors {
-		c.replacePredecessor(b, a)
+	for _, inheritedSuccessor := range successor.Successors {
+		inheritedSuccessor.replacePredecessor(successor, block)
 	}
 
 	if debugBlockOpt {
-		fmt.Fprintln(os.Stderr, "fuseBlocks", a, b)
+		fmt.Fprintln(os.Stderr, "fuseBlocks", block, successor)
 	}
 
-	function.Blocks[b.Index] = nil // delete b
+	function.Blocks[successor.Index] = nil // delete b
 	return true
 }
 

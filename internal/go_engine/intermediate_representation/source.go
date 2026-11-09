@@ -35,10 +35,10 @@ func EnclosingFunction(goEnginePackage *Package, path []ast.Node) *Function {
 	}
 
 	// ...then walk down the nested anonymous functions.
-	n := len(path)
+	pathLength := len(path)
 outer:
 	for index := range path {
-		if lit, ok := path[n-1-index].(*ast.FuncLit); ok {
+		if lit, ok := path[pathLength-1-index].(*ast.FuncLit); ok {
 			for _, anon := range function.AnonymousFunctions {
 				if anon.Pos() == lit.Type.Func {
 					function = anon
@@ -71,10 +71,10 @@ func HasEnclosingFunction(goEnginePackage *Package, path []ast.Node) bool {
 // findEnclosingPackageLevelFunction returns the Function
 // corresponding to the package-level function enclosing path.
 func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node) *Function {
-	if n := len(path); n >= 2 { // [... {Gen,Func}Decl File]
-		switch decl := path[n-2].(type) {
+	if pathLength := len(path); pathLength >= 2 { // [... {Gen,Func}Decl File]
+		switch decl := path[pathLength-2].(type) {
 		case *ast.GenDecl:
-			if decl.Tok == token.VAR && n >= 3 {
+			if decl.Tok == token.VAR && pathLength >= 3 {
 				// Package-level 'var' initializer.
 				return goEnginePackage.init
 			}
@@ -106,13 +106,13 @@ func findEnclosingPackageLevelFunction(goEnginePackage *Package, path []ast.Node
 
 // findNamedFunc returns the named function whose FuncDecl.Ident is at
 // position pos.
-func findNamedFunc(goEnginePackage *Package, pos token.Pos) *Function {
+func findNamedFunc(goEnginePackage *Package, position token.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
 	for _, mem := range goEnginePackage.Members {
 		switch mem := mem.(type) {
 		case *Function:
-			if mem.Pos() == pos {
+			if mem.Pos() == position {
 				return mem
 			}
 		case *Type:
@@ -120,7 +120,7 @@ func findNamedFunc(goEnginePackage *Package, pos token.Pos) *Function {
 			for index, length := 0, mset.Len(); index < length; index++ {
 				// Don't call Program.Method: avoid creating wrappers.
 				object := mset.At(index).Obj().(*types.Func)
-				if object.Pos() == pos {
+				if object.Pos() == position {
 					// obj from MethodSet may not be the origin type.
 					function := object.Origin()
 					return goEnginePackage.values[function].(*Function)

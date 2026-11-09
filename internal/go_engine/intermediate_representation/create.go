@@ -47,27 +47,27 @@ func NewProgram(fset *token.FileSet) *Program {
 // interpretation; they will be used during the build phase.
 func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.Node, goversion string) {
 	name := object.Name()
-	switch obj := object.(type) {
+	switch typedObject := object.(type) {
 	case *types.Builtin:
 		if goEnginePackage.Types != types.Unsafe {
-			panic("unexpected builtin object: " + obj.String())
+			panic("unexpected builtin object: " + typedObject.String())
 		}
 
 	case *types.TypeName:
 		if name != "_" {
 			goEnginePackage.Members[name] = &Type{
-				object: obj,
-				pkg:    goEnginePackage,
+				object:    typedObject,
+				irPackage: goEnginePackage,
 			}
 		}
 
 	case *types.Const:
 		constant := &NamedConstant{
-			object: obj,
-			Value:  NewConstant(obj.Val(), obj.Type(), syntax),
-			pkg:    goEnginePackage,
+			object:    typedObject,
+			Value:     NewConstant(typedObject.Val(), typedObject.Type(), syntax),
+			irPackage: goEnginePackage,
 		}
-		goEnginePackage.values[obj] = constant
+		goEnginePackage.values[typedObject] = constant
 		if name != "_" {
 			goEnginePackage.Members[name] = constant
 		}
@@ -76,32 +76,32 @@ func memberFromObject(goEnginePackage *Package, object types.Object, syntax ast.
 		global := &Global{
 			Package: goEnginePackage,
 			name:    name,
-			object:  obj,
-			typ:     types.NewPointer(obj.Type()), // address
+			object:  typedObject,
+			typ:     types.NewPointer(typedObject.Type()), // address
 		}
 		global.source = syntax
-		goEnginePackage.values[obj] = global
+		goEnginePackage.values[typedObject] = global
 		if name != "_" {
 			goEnginePackage.Members[name] = global
 		}
 
 	case *types.Func:
-		sig := obj.Type().(*types.Signature)
+		sig := typedObject.Type().(*types.Signature)
 		if sig.Recv() == nil && name == "init" {
 			goEnginePackage.ninit++
 			name = fmt.Sprintf("init#%d", goEnginePackage.ninit)
 		}
-		function := createFunction(goEnginePackage.Program, obj, name, syntax, goEnginePackage.info, goversion)
+		function := createFunction(goEnginePackage.Program, typedObject, name, syntax, goEnginePackage.info, goversion)
 		function.Package = goEnginePackage
 		goEnginePackage.created = append(goEnginePackage.created, function)
-		goEnginePackage.values[obj] = function
+		goEnginePackage.values[typedObject] = function
 		goEnginePackage.Functions = append(goEnginePackage.Functions, function)
 		if name != "_" && sig.Recv() == nil {
 			goEnginePackage.Members[name] = function // package-level function
 		}
 
 	default: // (incl. *types.Package)
-		panic("unexpected Object type: " + obj.String())
+		panic("unexpected Object type: " + typedObject.String())
 	}
 }
 
@@ -126,7 +126,7 @@ func createFunction(
 		build:          (*builder).buildFromSyntax,
 		info:           info,
 		goversion:      goversion,
-		pos:            object.Pos(),
+		position:       object.Pos(),
 		syntax:         syntax,
 		Package:        nil, // may be set by caller
 		Program:        prog,
@@ -198,7 +198,7 @@ func (prog *Program) CreatePackage(
 	if goPackage == nil {
 		panic("nil pkg") // otherwise pkg.Scope below returns types.Universe!
 	}
-	p := &Package{
+	irPackage := &Package{
 		Program: prog,
 		Members: make(map[string]Member),
 		values:  make(map[types.Object]Member),
@@ -211,42 +211,42 @@ func (prog *Program) CreatePackage(
 	}
 
 	/* synthesized package initializer */
-	p.init = &Function{
+	irPackage.init = &Function{
 		name:      "init",
 		Signature: new(types.Signature),
 		Synthetic: "package initializer",
-		Package:   p,
+		Package:   irPackage,
 		Program:   prog,
 		build:     (*builder).buildPackageInit,
-		info:      p.info,
+		info:      irPackage.info,
 		goversion: "", // See Package.build for details.
 	}
-	p.Members[p.init.name] = p.init
-	p.Functions = append(p.Functions, p.init)
-	p.created = append(p.created, p.init)
+	irPackage.Members[irPackage.init.name] = irPackage.init
+	irPackage.Functions = append(irPackage.Functions, irPackage.init)
+	irPackage.created = append(irPackage.created, irPackage.init)
 
 	// Allocate all package members: vars, funcs, consts and types.
 	if len(files) > 0 {
 		// Go source package.
 		for _, file := range files {
-			goversion := version.Lang(fileGoVersion(p.info, file))
+			goversion := version.Lang(fileGoVersion(irPackage.info, file))
 			for _, decl := range file.Decls {
-				membersFromDecl(p, decl, goversion)
+				membersFromDecl(irPackage, decl, goversion)
 			}
 		}
 	} else {
 		// GC-compiled binary package (or "unsafe")
 		// No code.
 		// No position information.
-		scope := p.Types.Scope()
+		scope := irPackage.Types.Scope()
 		for _, name := range scope.Names() {
 			goObject := scope.Lookup(name)
-			memberFromObject(p, goObject, nil, "")
+			memberFromObject(irPackage, goObject, nil, "")
 			if typeName, ok := goObject.(*types.TypeName); ok {
 				// No Unalias: aliases should not duplicate methods.
 				if named, ok := typeName.Type().(*types.Named); ok {
-					for index, n := 0, named.NumMethods(); index < n; index++ {
-						memberFromObject(p, named.Method(index), nil, "")
+					for index, methodCount := 0, named.NumMethods(); index < methodCount; index++ {
+						memberFromObject(irPackage, named.Method(index), nil, "")
 					}
 				}
 			}
@@ -255,18 +255,18 @@ func (prog *Program) CreatePackage(
 
 	// Add initializer guard variable.
 	initguard := &Global{
-		Package: p,
+		Package: irPackage,
 		name:    "init$guard",
 		typ:     types.NewPointer(tBool),
 	}
-	p.Members[initguard.Name()] = initguard
+	irPackage.Members[initguard.Name()] = initguard
 
 	if importable {
-		prog.imported[p.Types.Path()] = p
+		prog.imported[irPackage.Types.Path()] = irPackage
 	}
-	prog.packages[p.Types] = p
+	prog.packages[irPackage.Types] = irPackage
 
-	return p
+	return irPackage
 }
 
 // AllPackages returns a new slice containing all packages created by
