@@ -33,12 +33,18 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // there must be exactly the fixture's `// port finds:` records, matched by file, line and message as
 // RequireOnlyAdjudicated matches them, each giving its reason as there, and their fixes exactly its `// port fixes:`
 // records, held as there. An original that runs there, or fails other than by panicking, fails, since the fixture
-// then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind fails, since with no finding
-// of the original's there is nothing for it to pair or rename, and so does a fixture that records nothing, a `// port `
-// comment the harness cannot read, and a package the port did not run on. Like RequireOnlyAdjudicated, it reads the
-// one package directory fixture names, and a file that cannot carry a comment, as one copied byte for byte cannot,
-// takes its records beside the call, as given, each held as there, one with no Reason failing. It loads for the
-// machine's own target, and Target.RequirePortWhereOriginalPanics for another.
+// then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind but one fails, since with no
+// finding of the original's there is nothing for it to pair or rename, and so does a fixture that records nothing, a
+// `// port ` comment the harness cannot read, and a package the port did not run on.
+//
+// The one other kind is `// port finds nothing`, for a fixture where the port is right to find nothing at all, its
+// reason given as any record's is: the port must then find nothing there, each finding it makes failing, named whole,
+// and the record beside a `finds:` record, which it contradicts, fails and compares nothing.
+//
+// Like RequireOnlyAdjudicated, it reads the one package directory fixture names, and a file that cannot carry a
+// comment, as one copied byte for byte cannot, takes its records beside the call, as given, each held as there, one
+// with no Reason failing. It loads for the machine's own target, and Target.RequirePortWhereOriginalPanics for
+// another.
 func RequirePortWhereOriginalPanics(
 	test testing.TB,
 	original *analysis.Analyzer,
@@ -110,6 +116,24 @@ func requirePortWhereOriginalPanics(
 	// A renaming adds its port's side to portAlone among the finds, so with one refused the finds cannot be told
 	// from it, and nothing is compared.
 	if refusedAny {
+		return
+	}
+	// A record that the port finds nothing holds the whole fixture, so beside a record of what it finds it contradicts
+	// that record, and nothing is compared.
+	if len(recorded.findsNothing) > 0 {
+		test.Logf("the fixture records that the port finds nothing, and the port made %d", len(portFindings))
+		for _, record := range recorded.findsNothing {
+			if len(recorded.portAlone) > 0 {
+				test.Errorf("%s:%d records that the port finds nothing, beside %d records of what it finds",
+					record.File, record.Line, len(recorded.portAlone))
+			}
+		}
+		if len(recorded.portAlone) > 0 {
+			return
+		}
+		for _, found := range portFindings {
+			test.Errorf("the port found %s, where the fixture records that it finds nothing", found)
+		}
 		return
 	}
 	test.Logf("the fixture records %d findings, the port made %d", len(recorded.portAlone), len(portFindings))

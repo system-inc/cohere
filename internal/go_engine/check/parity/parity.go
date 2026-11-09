@@ -247,12 +247,13 @@ func requireIdentical(
 // entry the original's finding carries there and the port's leaves out; or `fixes:` and the text one edit of a fix
 // writes, on a finding a `finds:` record covers, on that record's line or the line after it (see fixesText), the edit
 // starting on the finding's own line, or `fixes at <file>:<line>:` for one that starts elsewhere, the file named as
-// findings name theirs, below the fixtures' root. Each record's reason is in the comment above it, or for any but a
-// drop in the doc comment of the declaration it is in, and each matches one finding on its own line, a `fixes:` record
-// its `finds:` record's.
+// findings name theirs, below the fixtures' root; or `finds nothing`, with no message, where the original panics on
+// the fixture and the port rightly finds nothing in it at all, which only RequirePortWhereOriginalPanics holds. Each
+// record's reason is in the comment above it, or for any but a drop in the doc comment of the declaration it is in, and
+// each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
-		`fixes(?: at (\S+?):(\d+))?: (.+?))\s*$`,
+		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing))\s*$`,
 )
 
 // fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
@@ -285,8 +286,9 @@ func fixesText(written string) (string, bool) {
 // compared with a lone finding's, so the record holds where it lands as well as what it writes.
 // Every record must give its reason, a drop on the line directly above it and any other there or in the doc comment
 // of the declaration it is in, but in an assembly file, which has no declarations, on the line directly above it
-// alone, and one with none fails, named by file and line. A `// port ` comment it cannot read
-// fails, and so does a fixture that records nothing. The census has no fixture, so no record covers anything there.
+// alone, and one with none fails, named by file and line. A `// port ` comment it cannot read fails, and so does a
+// fixture that records nothing, and a `finds nothing` record, since where the original runs it has nothing to hold.
+// The census has no fixture, so no record covers anything there.
 //
 // A file that cannot carry a comment, as x/tools' fixtures copied byte for byte cannot, takes its records beside the
 // call, as given: each a Record, held as a comment record is, matched by a finding on its own line, met, and one with
@@ -340,6 +342,10 @@ func requireOnlyAdjudicated(
 	recorded := adjudicated(test, recordsFolder(test, loads[0]), loads[0].fileName, given)
 	test.Logf("the original found %d, the port %d, and the records withhold %d fixes and omit %d related entries",
 		len(originalFindings), len(portFindings), len(recorded.withheld), len(recorded.omitted))
+	for _, record := range recorded.findsNothing {
+		test.Errorf("%s:%d records `finds nothing`, which holds only where the original panics: call "+
+			"RequirePortWhereOriginalPanics", record.File, record.Line)
+	}
 	if len(recorded.portAlone)+len(recorded.dropped)+len(recorded.moved)+len(recorded.withheld)+
 		len(recorded.omitted) == 0 {
 		test.Fatalf("the differences fixture %s records nothing, so the comparison proves nothing", fixture)
@@ -379,16 +385,18 @@ func requireOnlyAdjudicated(
 // renamed, the original's side of `renames:`; and dropped, what the original alone finds and the port rightly does
 // not, from `drops:`; moved, a finding both make in other spans or fixes, from `moves:`; withheld, from `withholds:`,
 // whose Message is the fix's message, not the finding's; omitted, from `omits:`, whose Message is the related
-// entry's; and fixed, from `fixes:`, each on the line of the `finds:` record it follows.
+// entry's; fixed, from `fixes:`, each on the line of the `finds:` record it follows; and findsNothing, from `finds
+// nothing`, each where it is written with no Message, since it names no finding.
 type records struct {
-	portAlone []Finding
-	found     []Finding
-	renamed   []Finding
-	dropped   []Finding
-	moved     []Finding
-	withheld  []Finding
-	omitted   []Finding
-	fixed     []recordedFix
+	portAlone    []Finding
+	found        []Finding
+	renamed      []Finding
+	dropped      []Finding
+	moved        []Finding
+	withheld     []Finding
+	omitted      []Finding
+	fixed        []recordedFix
+	findsNothing []Finding
 }
 
 // recordedFix is one edit of a fix on a finding the port alone makes, as a `fixes:` record names it and as the port
@@ -686,6 +694,8 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 			fix.editFile, fix.editLine = match[8], atoiOrZero(match[9])
 		}
 		recorded.fixed = append(recorded.fixed, fix)
+	case match[11] != "":
+		recorded.findsNothing = append(recorded.findsNothing, at)
 	default:
 		renamed := at
 		renamed.Message = match[2]
