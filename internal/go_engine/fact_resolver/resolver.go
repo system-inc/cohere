@@ -139,24 +139,24 @@ func (resolver *Resolver) Package(packageTypes *types.Package) *Package {
 	return resolved
 }
 
-// Owner is the package that declares function, where a fact on function is computed, or nil for a function of no
-// package, as the error interface's Error is, which no package's facts ever held.
+// Owner is the package that declares object, where a fact on object is computed, or nil for an object of no package,
+// as the error interface's Error is, which no package's facts ever held.
 //
 // It panics for a package the resolver never learned. On a cold run every package below one a question comes from was
 // learned first, since ctrlflow ran there first; one never learned is a package the findings cache restored, with no
 // syntax to build and, until #w7zmvat wave 3, no stored facts to read. Answering not pure there would silently drop
 // findings, so the question fails loudly instead, the reading rule's crash on its package.
-func (resolver *Resolver) Owner(function *types.Func) *Package {
-	if function.Pkg() == nil {
+func (resolver *Resolver) Owner(object types.Object) *Package {
+	if object.Pkg() == nil {
 		return nil
 	}
-	owner := resolver.Package(function.Pkg())
+	owner := resolver.Package(object.Pkg())
 	if owner == nil {
 		// Invariant: with no package restored, ctrlflow learns every package below a question before the question is
 		// asked. A package the findings cache restored breaks this until #w7zmvat wave 3 stores its facts, and the
 		// branch wants that loud, never a silent not pure.
 		panic(fmt.Sprintf("fact_resolver: asked about %s of %s, which it never learned: restored package, fact "+
-			"store not built yet (#w7zmvat wave 3)", function.FullName(), function.Pkg().Path()))
+			"store not built yet (#w7zmvat wave 3)", objectName(object), object.Pkg().Path()))
 	}
 	return owner
 }
@@ -172,15 +172,34 @@ func (resolver *Resolver) Counts(kind *Kind) *Counts {
 	return held
 }
 
-// Visible is whether a fact on function reaches a reader in reader, as the checker's inheritFacts carries one from a
-// package to its importer only when exportedFrom passes it: the reader's own function, any method, or an exported
-// function of a package the reader imports directly. An exported function two imports down is filtered out on its way
-// up, so a reader there never holds its fact.
-func Visible(reader *Package, function *types.Func) bool {
-	if function.Pkg() == reader.Types || function.Signature().Recv() != nil {
+// Visible is whether a fact on object reaches a reader in reader, as the checker's inheritFacts carries one from a
+// package to its importer only when exportedFrom passes it there: the reader's own object; a method or a field from
+// anywhere below; an exported function, or any other variable, a parameter among them, of a package the reader
+// imports directly; a type name or a constant from anywhere below. An exported function two imports down is filtered
+// out on its way up, so a reader there never holds its fact.
+func Visible(reader *Package, object types.Object) bool {
+	if object.Pkg() == reader.Types {
 		return true
 	}
-	return function.Exported() && reader.imports[function.Pkg()]
+	switch object := object.(type) {
+	case *types.Func:
+		return object.Signature().Recv() != nil || object.Exported() && reader.imports[object.Pkg()]
+	case *types.Var:
+		return object.IsField() || reader.imports[object.Pkg()]
+	case *types.TypeName, *types.Const:
+		return true
+	default:
+		return false
+	}
+}
+
+// objectName is object as a failure names it: a function's full name, as `(*testing.T).Parallel`, and any other
+// object as go/types prints it.
+func objectName(object types.Object) string {
+	if function, isFunction := object.(*types.Func); isFunction {
+		return function.FullName()
+	}
+	return object.String()
 }
 
 // createLocked is packageTypes's package in the program, created if it was not: from its syntax, with its own no-return

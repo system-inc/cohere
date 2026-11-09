@@ -46,6 +46,16 @@ func (resolved *Package) Unlock() {
 	resolved.lock.Unlock()
 }
 
+// Files is the package's syntax, as the load parsed it, kept past the checker's release.
+func (resolved *Package) Files() []*ast.File {
+	return resolved.files
+}
+
+// Info is the package's type information, kept past the checker's release.
+func (resolved *Package) Info() *types.Info {
+	return resolved.info
+}
+
 // Function is the package's declared function or method whose object is function, built, or nil when function is no
 // declared function of the package, as an instantiated method's object never is.
 func (resolved *Package) Function(function *types.Func) *intermediate_representation.Function {
