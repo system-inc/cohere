@@ -262,10 +262,7 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 }
 
 // adjudicatedPattern is one comment in a differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes, or `finds at column <column>:` for one that must start at that column,
-// counted in bytes from 1 as go/token counts it, and `finds at column <column> to <end column>:`, `finds at column
-// <column> to <end line>:<end column>:` or `finds at column <column>, no end:` for one that must also end there, or
-// have no end; `renames:`, the original's message, `=>` and the port's, for a
+// the message of a finding only the port makes; `renames:`, the original's message, `=>` and the port's, for a
 // finding both make in words that differ, as where the two forms number their registers differently; or `drops:` and
 // the message of a finding only the original makes, ruled a false positive with the finding in hand; `moves:` and the
 // message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
@@ -273,16 +270,25 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 // entry the original's finding carries there and the port's leaves out; or `fixes:` and the text one edit of a fix
 // writes, on a finding a `finds:` record covers, on that record's line or the line after it (see fixesText), the edit
 // starting on the finding's own line, or `fixes at <file>:<line>:` for one that starts elsewhere, the file named as
-// findings name theirs, below the fixtures' root, and either written `fixes with "<message>"`, before any `at`, for an
-// edit whose fix must bear that message, the message a Go string literal; or `finds nothing`, with no message, where
-// the original panics on the fixture and the port rightly finds nothing in it at all, which only
-// RequirePortWhereOriginalPanics holds. Each record's reason is in the comment above it, or for any but a drop in the
-// doc comment of the declaration it is in, and each but `finds nothing` matches one finding on its own line, a
-// `fixes:` record its `finds:` record's.
+// findings name theirs, below the fixtures' root; or `finds nothing`, with no message, where the original panics on
+// the fixture and the port rightly finds nothing in it at all, which only RequirePortWhereOriginalPanics holds.
+//
+// A `finds:` or `moves:` record may place the port's finding: `finds at column <column>:` for one that must start at
+// that column, counted in bytes from 1 as go/token counts it, and `finds at column <column> to <end column>:`, `finds
+// at column <column> to <end line>:<end column>:` or `finds at column <column>, no end:` for one that must also end
+// there, or have no end, each written `moves at column` for the port's side of a move. A `moves:` record may also name
+// the message of a fix the port's side offers, after any place, as `moves with "<message>":`, and a `fixes:` record
+// the message of the fix its edit is of, before any `at`, as `fixes with "<message>":`, each message a Go string
+// literal. The plain `moves:` alternative comes first, and the pattern matches leftmost first, so a move with neither
+// is read there.
+//
+// Each record's reason is in the comment above it, or for any but a drop in the doc comment of the declaration it is
+// in, and each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
 		`fixes(?: with ("(?:[^"\\]|\\.)*"))?(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|` +
-		`finds at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?: (.+?))\s*$`,
+		`finds at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?: (.+?)|` +
+		`moves(?: at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?)?(?: with ("(?:[^"\\]|\\.)*"))?: (.+?))\s*$`,
 )
 
 // fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
@@ -335,7 +341,10 @@ func fixesText(written string) (string, bool) {
 // file, `<name>.go.fixed`, which every fix the port offers in that file, on a finding both make or one it alone makes,
 // applied, must make byte for byte, unformatted (see requireFixedFiles), or else by the port's own tests, with a
 // golden file or by applying the edit and checking the result. A fixed file also pins what a `fixes:` record cannot,
-// each edit's exact span and the source it leaves. It reads the one package directory fixture names, not the packages
+// each edit's exact span and the source it leaves, and beside one a move must prove the original's fix wrong. A
+// `moves:` record that places the port's side, `moves at column <column>:` with any end, or names the message of a fix
+// it offers, `moves with "<message>":`, holds the port's finding to that too (see requireMovesAsRecorded), and one
+// that does neither pairs as before. It reads the one package directory fixture names, not the packages
 // nested below it, so a fixture tree with nested packages takes one call for each. It loads for the machine's own
 // target, and Target.RequireOnlyAdjudicated for another, and reads the records of every Go and assembly file of that
 // directory (see recordFiles), whichever target builds it, so a record in a file the target does not build fails
@@ -397,6 +406,7 @@ func requireOnlyAdjudicated(
 	originalOnly, portOnly = pairLeftOut(test, "omits the related entry", recorded.omitted, withoutRelated,
 		originalOnly, portOnly)
 	originalOnly, portOnly, moved := pairMoved(test, recorded.moved, originalOnly, portOnly)
+	requireMovesAsRecorded(test, moved)
 	requireRecordedFixes(test, recorded, portOnly, editLines(loads))
 	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings, moved)
 	portAlone := asRecorded(portOnly)
@@ -436,7 +446,7 @@ type records struct {
 	placed       []placedFind
 	renamed      []Finding
 	dropped      []Finding
-	moved        []Finding
+	moved        []movedRecord
 	withheld     []Finding
 	omitted      []Finding
 	fixed        []recordedFix
@@ -620,8 +630,20 @@ func withoutRelated(finding Finding, message string) (Finding, bool) {
 	return finding, true
 }
 
-// movedPair is the two findings a `moves:` record pairs, the original's and the port's.
+// movedRecord is a `moves:` record: at, its file, line and message, by which it pairs; where isPlaced, placed, where
+// the port's side of the move sits, as a `finds at column` record places a finding; and where holdsFixMessage,
+// fixMessage, the message of a fix the port's side offers.
+type movedRecord struct {
+	at              Finding
+	placed          placedFind
+	isPlaced        bool
+	fixMessage      string
+	holdsFixMessage bool
+}
+
+// movedPair is the two findings a `moves:` record pairs, the original's and the port's, beside the record.
 type movedPair struct {
+	record   movedRecord
 	original Finding
 	port     Finding
 }
@@ -633,7 +655,7 @@ type movedPair struct {
 // checking the result.
 func pairMoved(
 	test testing.TB,
-	moved []Finding,
+	moved []movedRecord,
 	originalOnly []Finding,
 	portOnly []Finding,
 ) (remainingOriginal []Finding, remainingPort []Finding, pairs []movedPair) {
@@ -646,18 +668,42 @@ func pairMoved(
 		}
 	}
 	for _, record := range moved {
-		originalIndex := slices.IndexFunc(remainingOriginal, onRecordedLine(record))
-		portIndex := slices.IndexFunc(remainingPort, onRecordedLine(record))
+		originalIndex := slices.IndexFunc(remainingOriginal, onRecordedLine(record.at))
+		portIndex := slices.IndexFunc(remainingPort, onRecordedLine(record.at))
 		if originalIndex < 0 || portIndex < 0 {
 			test.Errorf("the fixture records that the port moves %s, and the two do not both find it there in "+
-				"other spans or fixes", record)
+				"other spans or fixes", record.at)
 			continue
 		}
-		pairs = append(pairs, movedPair{original: remainingOriginal[originalIndex], port: remainingPort[portIndex]})
+		pairs = append(pairs, movedPair{
+			record:   record,
+			original: remainingOriginal[originalIndex],
+			port:     remainingPort[portIndex],
+		})
 		remainingOriginal = slices.Delete(remainingOriginal, originalIndex, originalIndex+1)
 		remainingPort = slices.Delete(remainingPort, portIndex, portIndex+1)
 	}
 	return remainingOriginal, remainingPort, pairs
+}
+
+// requireMovesAsRecorded fails the test for each of pairs whose record places the port's finding where it does not
+// sit, as requirePlaced holds a `finds at column` record, or names the message of a fix the port's finding does not
+// offer, each named by the finding's file and line. A record that does neither holds nothing here.
+func requireMovesAsRecorded(test testing.TB, pairs []movedPair) {
+	test.Helper()
+	for _, pair := range pairs {
+		if pair.record.isPlaced && !pair.record.placed.isMetBy(pair.port) {
+			test.Errorf("the fixture records that the port's moved finding at %s:%d %s, and it does not",
+				pair.port.File, pair.port.Line, pair.record.placed.placement())
+		}
+		offers := slices.ContainsFunc(pair.port.Fixes, func(fix Fix) bool {
+			return fix.Message == pair.record.fixMessage
+		})
+		if pair.record.holdsFixMessage && !offers {
+			test.Errorf("the fixture records that the port's moved finding at %s:%d offers a fix %q, and it does not",
+				pair.port.File, pair.port.Line, pair.record.fixMessage)
+		}
+	}
 }
 
 // recordFiles are the files of a differences fixture's folder that can hold its records, by pattern: its Go files, and
@@ -704,6 +750,10 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 					if !isReadable {
 						test.Fatalf("%s:%d holds a comment the harness cannot read: %q", at.File, at.Line, record)
 					}
+					if placesAtZero(match) {
+						test.Fatalf("%s:%d holds a record that places a finding at 0, where lines and columns count "+
+							"from 1: %q", at.File, at.Line, record)
+					}
 					recorded = withRecord(recorded, at, match, text)
 				}
 			}
@@ -714,6 +764,10 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 		if !isReadable {
 			test.Fatalf("%s:%d is given beside the call a record the harness cannot read: %q", record.File,
 				record.Line, record.Text)
+		}
+		if placesAtZero(match) {
+			test.Fatalf("%s:%d holds a record that places a finding at 0, where lines and columns count from 1: %q",
+				record.File, record.Line, record.Text)
 		}
 		// A given record's reason is its own, as a drop's is, so it rules a drop as much as any other.
 		if strings.TrimSpace(record.Reason) == "" {
@@ -733,8 +787,10 @@ func readRecord(written string) (match []string, text string, isReadable bool) {
 	if match == nil {
 		return nil, "", false
 	}
-	if _, unquoteError := strconv.Unquote(match[8]); match[8] != "" && unquoteError != nil {
-		return nil, "", false
+	for _, literal := range []string{match[8], match[22]} {
+		if _, unquoteError := strconv.Unquote(literal); literal != "" && unquoteError != nil {
+			return nil, "", false
+		}
 	}
 	if match[11] == "" {
 		return match, "", true
@@ -757,7 +813,7 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 		recorded.dropped = append(recorded.dropped, at)
 	case match[5] != "":
 		at.Message = match[5]
-		recorded.moved = append(recorded.moved, at)
+		recorded.moved = append(recorded.moved, movedRecord{at: at})
 	case match[6] != "":
 		at.Message = match[6]
 		recorded.withheld = append(recorded.withheld, at)
@@ -783,17 +839,19 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 		at.Message = match[17]
 		recorded.portAlone = append(recorded.portAlone, at)
 		recorded.found = append(recorded.found, at)
-		// The pattern holds the column and the end to digits, so only one past an int's range fails to convert, and
-		// that one, read as 0, matches no finding.
-		placed := placedFind{at: at, holdsEnd: match[14] != "" || match[16] != ""}
-		placed.at.Column = atoiOrZero(match[13])
-		if match[16] != "" {
-			placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(match[16])
+		recorded.placed = append(recorded.placed, placedAt(at, match[13:17]))
+	case match[23] != "":
+		at.Message = match[23]
+		moved := movedRecord{at: at, isPlaced: match[18] != ""}
+		if moved.isPlaced {
+			moved.placed = placedAt(at, match[18:22])
 		}
-		if match[15] != "" {
-			placed.at.EndLine = atoiOrZero(match[15])
+		if match[22] != "" {
+			// Ignored: readRecord refuses a record whose literal does not unquote, so this one does.
+			moved.fixMessage, _ = strconv.Unquote(match[22])
+			moved.holdsFixMessage = true
 		}
-		recorded.placed = append(recorded.placed, placed)
+		recorded.moved = append(recorded.moved, moved)
 	default:
 		renamed := at
 		renamed.Message = match[2]
@@ -830,6 +888,28 @@ func followingFinds(test testing.TB, fixed []recordedFix, found []Finding) []rec
 		following = append(following, record)
 	}
 	return following
+}
+
+// placedAt is the finding at, as a record places it with place, its column, its `, no end` and its end line and end
+// column, each as written or empty, as adjudicatedPattern reads them. The pattern holds each to digits, and
+// placesAtZero refuses one that reads as 0, past an int's range or written so.
+func placedAt(at Finding, place []string) placedFind {
+	placed := placedFind{at: at, holdsEnd: place[1] != "" || place[3] != ""}
+	placed.at.Column = atoiOrZero(place[0])
+	if place[3] != "" {
+		placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(place[3])
+	}
+	if place[2] != "" {
+		placed.at.EndLine = atoiOrZero(place[2])
+	}
+	return placed
+}
+
+// placesAtZero is whether match, a record read, names a column, an end line or an end column of 0, written so or past
+// an int's range, where lines and columns count from 1.
+func placesAtZero(match []string) bool {
+	return slices.ContainsFunc([]string{match[13], match[15], match[16], match[18], match[20], match[21]},
+		func(written string) bool { return written != "" && atoiOrZero(written) == 0 })
 }
 
 // atoiOrZero is digits as an int, or 0 where they overflow one.

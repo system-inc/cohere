@@ -28,6 +28,16 @@ func (record placedFind) placement() string {
 	}
 }
 
+// isMetBy is whether finding sits where record places it: at its file, line, column and message, and at its end where
+// it holds one.
+func (record placedFind) isMetBy(finding Finding) bool {
+	if finding.File != record.at.File || finding.Line != record.at.Line || finding.Column != record.at.Column ||
+		finding.Message != record.at.Message {
+		return false
+	}
+	return !record.holdsEnd || (finding.EndLine == record.at.EndLine && finding.EndColumn == record.at.EndColumn)
+}
+
 // requirePlaced fails the test for each record of placed, a `finds at column` record, that no finding of found meets
 // at its file, line, column and message, and at its end where it holds one, saying that the fixture records what
 // finds, as "the port alone finds". Each finding meets one record, those that hold an end met first, so one that holds
@@ -43,12 +53,7 @@ func requirePlaced(test testing.TB, finds string, placed []placedFind, found []F
 	for _, record := range ordered {
 		met := false
 		for index, finding := range found {
-			if taken[index] || finding.File != record.at.File || finding.Line != record.at.Line ||
-				finding.Column != record.at.Column || finding.Message != record.at.Message {
-				continue
-			}
-			if record.holdsEnd &&
-				(finding.EndLine != record.at.EndLine || finding.EndColumn != record.at.EndColumn) {
+			if taken[index] || !record.isMetBy(finding) {
 				continue
 			}
 			taken[index], met = true, true

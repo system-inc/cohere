@@ -106,7 +106,7 @@ func requirePortWhereOriginalPanics(
 	}{
 		{"renames", recorded.renamed},
 		{"drops", recorded.dropped},
-		{"moves", recorded.moved},
+		{"moves", movedAt(recorded.moved)},
 		{"withholds", recorded.withheld},
 		{"omits", recorded.omitted},
 	} {
@@ -153,4 +153,13 @@ func requirePortWhereOriginalPanics(
 	requirePlaced(test, "the port finds", recorded.placed, portFindings)
 	requireRecordedFixes(test, recorded, portFindings, editLines(loads))
 	requireFixedFiles(test, folder, loads[0].fileName, fixture, portFindings, nil)
+}
+
+// movedAt is each of moved's file, line and message.
+func movedAt(moved []movedRecord) []Finding {
+	at := []Finding{}
+	for _, record := range moved {
+		at = append(at, record.at)
+	}
+	return at
 }
