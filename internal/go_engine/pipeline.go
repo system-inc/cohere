@@ -8,13 +8,18 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/tools/go/analysis"
+
 	"github.com/system-inc/cohere/internal/go_engine/cache"
 	"github.com/system-inc/cohere/internal/go_engine/check"
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/format"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/consistency_no_long_line"
+	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 	"github.com/system-inc/cohere/internal/go_engine/settings"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
@@ -50,8 +55,9 @@ type pipeline struct {
 	// compiler record, a file the formatter could not format, a rule that crashed.
 	incomplete bool
 
-	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, and under
-	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads.
+	// session is the findings cache the load and the lint phase share, nil when the cache sat the run out, under
+	// `--no-cache` unless the binary carries the standard library's entries, which a session without a store reads,
+	// and always under `--timing`, whose every figure must be of work that ran (cacheSession).
 	session *check.CacheSession
 
 	// renamed is set once a rename has written, after which the lint phase runs without the findings cache, whose keys
@@ -111,6 +117,54 @@ func newTiming(request invocation) *timing.Collector {
 	return timing.New()
 }
 
+// timingKinds is the timing record's answer to which analyzer is which rule's, read from registered, the one place
+// that knows: each registered rule's analyzer is its rule's; staticcheck's buildir and the engine's own intermediate
+// representation build are the intermediate representation builds; a dispatcher's analyzer, found among what the
+// rules require and known by its result as the checker knows it (dispatch.IsDispatcher), is a dispatcher's walk; and
+// any other analyzer, inspect or ctrlflow, is one several rules read.
+func timingKinds(registered []rule.Rule) timing.Kinds {
+	rules := make(map[string]string, len(registered))
+	dispatchers := map[string]bool{}
+	visited := map[*analysis.Analyzer]bool{}
+	var visit func(analyzer *analysis.Analyzer)
+	visit = func(analyzer *analysis.Analyzer) {
+		if visited[analyzer] {
+			return
+		}
+		visited[analyzer] = true
+		if dispatch.IsDispatcher(analyzer) {
+			dispatchers[analyzer.Name] = true
+		}
+		for _, required := range analyzer.Requires {
+			visit(required)
+		}
+	}
+	for _, registeredRule := range registered {
+		// A rule without an analyzer never runs (check.Run refuses it), so it has no row to name.
+		if registeredRule.Analyzer == nil {
+			continue
+		}
+		rules[registeredRule.Analyzer.Name] = registeredRule.Name
+		visit(registeredRule.Analyzer)
+	}
+	builds := map[string]bool{
+		staticcheck_ir.Analyzer.Name:                    true,
+		build_intermediate_representation.Analyzer.Name: true,
+	}
+	return func(analyzer string) (string, contract.SharedKind) {
+		if ruleName, isRule := rules[analyzer]; isRule {
+			return ruleName, ""
+		}
+		if builds[analyzer] {
+			return "", contract.SharedIntermediateRepresentation
+		}
+		if dispatchers[analyzer] {
+			return "", contract.SharedDispatcher
+		}
+		return "", contract.SharedAnalyzer
+	}
+}
+
 // run writes the whole stream, every phase once and in order, and returns the exit code the summary states.
 func (engine *pipeline) run() int {
 	engine.write(provenanceRecord())
@@ -149,6 +203,10 @@ func (engine *pipeline) run() int {
 	engine.runTypes(loaded, loadError)
 	engine.runLint(loaded, loadError, linted)
 	engine.phase(contract.PhaseUnused, contract.OutcomeSkipped, 0, detailNotRequested)
+	// The timing record, under `--timing`, once every phase that measures has run, so it holds all they spent.
+	if engine.timing != nil {
+		engine.write(engine.timing.Record(timingKinds(engine.registered)))
+	}
 	// The inputs come last before the summary, once every phase has read what it reads. A run whose load failed, or
 	// that asked for none, writes no inputs, so the front door records nothing to replay for it: what a failed load
 	// read is not known.

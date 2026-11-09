@@ -806,6 +806,7 @@ func (engine *pipeline) askedOver(current *load.Loaded, overlay map[string][]byt
 	result, checkError := check.Run(current.Packages, naming, check.Options{
 		SingleThreaded: engine.request.switches["single-threaded"],
 		ReadFile:       engine.sourceReader(overlay),
+		Timing:         engine.timing,
 	})
 	if checkError != nil {
 		engine.note("the naming rules could not run over the renamed tree, so no further round renames: %v",

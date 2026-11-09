@@ -11,7 +11,7 @@
 // "cohere:", and a test in internal/go_engine/copied holds every other
 // line to upstream's, byte for byte.
 //
-// The changes are ten.
+// The changes are eleven.
 //
 // The first is the release. Upstream's Analyze keeps every action's
 // Result until the whole graph finishes, under its own "TODO(adonovan):
@@ -151,6 +151,18 @@
 // the graph from starting anything more, for a load whose end says the
 // rules must not run at all.
 //
+// The eleventh is Options.Timing, the seam `--timing` measures through
+// (#3apgjer). Upstream records each action's wall time in
+// Action.Duration, which counts what the action waited for as much as
+// what it did, and the dependencies its once.Do ran inline. Here, when
+// Timing is set, the call to the analyzer's Run alone is measured on a
+// thread held for it, by that thread's own CPU clock, and added to the
+// collector under the analyzer's name. A restored action runs nothing,
+// so nothing is added for it. Options.Timed keys the collector in every
+// pass's ResultOf, as Options.Dependents keys its set, so a dispatcher
+// can bill each listener's calls to its rule. Unset, nothing is measured
+// and every pass is upstream's.
+//
 // What else differs, because this module cannot import x/tools'
 // internal packages:
 //   - The init that gives analysistest access to Action.pass sets it in
@@ -219,6 +231,8 @@ import (
 	// import x/tools' internal packages.
 	"github.com/system-inc/cohere/internal/go_engine/check/checker/driverutil"
 	"github.com/system-inc/cohere/internal/go_engine/check/internal"
+	// cohere: the collector Options.Timing measures into.
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // Options specifies options that control the analysis driver.
@@ -292,6 +306,14 @@ type Options struct {
 	// never run.
 	Ready   func(*packages.Package) <-chan struct{}
 	Abandon <-chan struct{}
+
+	// cohere: Timing, when set, is what each action's call to its
+	// analyzer's Run is measured into, its own thread's CPU under the
+	// analyzer's name. Timed, when Timing is set too, keys the collector
+	// in every pass's ResultOf, a key never run, as Dependents is. Unset,
+	// nothing is measured and ResultOf holds no collector.
+	Timing *timing.Collector
+	Timed  *analysis.Analyzer
 
 	// cohere: slots, workers and observeGroup are the scheduler's test
 	// hooks (see schedule). slots, above 0, is how many packages run at once
@@ -674,6 +696,10 @@ func (act *Action) execOnce() {
 	if act.tolerant() {
 		inputs[act.opts.Failed] = tolerated
 	}
+	// cohere: Options.Timed, the collector under Options.Timing.
+	if act.opts.Timed != nil && act.opts.Timing != nil {
+		inputs[act.opts.Timed] = act.opts.Timing
+	}
 
 	// cohere: a restored package's own facts come from the cache, in
 	// place of a pass, on top of those it inherited (see Options.Restored).
@@ -736,7 +762,17 @@ func (act *Action) execOnce() {
 			return nil, fmt.Errorf("analysis skipped due to errors in package")
 		}
 
-		result, err := pass.Analyzer.Run(pass)
+		// cohere: under Options.Timing, this call alone is measured, so
+		// neither the checks around it nor the prerequisites execOnce ran
+		// inline are billed to the analyzer. Unset, it is upstream's call.
+		var result any
+		var err error
+		if act.opts.Timing != nil {
+			cpu := act.opts.Timing.Measure(func() { result, err = pass.Analyzer.Run(pass) })
+			act.opts.Timing.Analyzer(act.Analyzer.Name, cpu)
+		} else {
+			result, err = pass.Analyzer.Run(pass)
+		}
 		if err != nil {
 			return nil, err
 		}

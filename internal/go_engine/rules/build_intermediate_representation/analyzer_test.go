@@ -43,7 +43,7 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			names := []string{}
-			for function := range mustResultOf(pass).SourceFunctions() {
+			for function := range mustResultOf(pass).SourceFunctions(nil, "") {
 				names = append(names, function.RelativeString(nil))
 			}
 			return names, nil
@@ -100,11 +100,11 @@ func TestFunctionsBuildOnlyWhenRead(test *testing.T) {
 				return count
 			}
 			read.unbuiltBefore = unbuilt()
-			for range result.SourceFunctions() {
+			for range result.SourceFunctions(nil, "") {
 				break
 			}
 			read.unbuiltAfter = unbuilt()
-			for function := range result.SourceFunctions() {
+			for function := range result.SourceFunctions(nil, "") {
 				if len(function.Blocks) == 0 {
 					read.emptied = append(read.emptied, function.RelativeString(nil))
 				}
@@ -173,7 +173,7 @@ func TestTheExpressionMapIsRecordedForItsReaders(test *testing.T) {
 // mappedExpressions is how many expressions in the syntax of result's source functions map to a value.
 func mappedExpressions(result *Result) int {
 	count := 0
-	for function := range result.SourceFunctions() {
+	for function := range result.SourceFunctions(nil, "") {
 		syntax := function.Syntax()
 		if syntax == nil || function.Parent() != nil {
 			continue

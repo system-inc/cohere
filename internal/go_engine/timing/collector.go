@@ -88,15 +88,23 @@ func (collector *Collector) Analyzer(name string, cpu time.Duration) {
 	collector.add(func() { collector.analyzers.add(name, cpu, 1) })
 }
 
+// Shared adds cpu to the analyzer named name's row without counting a package, for work the analyzer's result does
+// for it after its action has finished: the engine's own intermediate representation, which builds each function as
+// a dispatcher's walk first reads it, a part of one package's build each time.
+func (collector *Collector) Shared(name string, cpu time.Duration) {
+	collector.add(func() { collector.analyzers.add(name, cpu, 0) })
+}
+
 // Listener adds the CPU of calls into a dispatched rule's listener over one package, under the rule's name.
 func (collector *Collector) Listener(rule string, cpu time.Duration, calls int64) {
 	collector.add(func() { collector.listeners.add(rule, cpu, calls) })
 }
 
-// Nested takes cpu out of the analyzer named name's row, for the work a measurement inside its action billed
-// elsewhere: a dispatcher's calls into its listeners, which are their rules' rows.
-func (collector *Collector) Nested(name string, cpu time.Duration) {
-	collector.add(func() { collector.nested[name] += cpu })
+// Nested takes cpu out of the analyzer named name's row, for the work calls measurements inside its action billed
+// elsewhere: a dispatcher's calls into its listeners, which are their rules' rows. The clock reads of those calls are
+// taken out too, since the action's own measurement holds them and no row is to be inflated by the measuring.
+func (collector *Collector) Nested(name string, cpu time.Duration, calls int64) {
+	collector.add(func() { collector.nested[name] += cpu + time.Duration(calls)*collector.perCall })
 }
 
 // List adds the listing's CPU: this process's own, and its go commands' (children).

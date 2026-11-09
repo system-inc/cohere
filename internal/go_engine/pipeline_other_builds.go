@@ -173,6 +173,7 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		// Nothing reads the build's syntax after its rules: the merge reads only what the run hands it.
 		ReleaseAnalyzed: true,
 		ReadFile:        engine.sourceReader(nil),
+		Timing:          engine.timing,
 	})
 	if checkError != nil {
 		return buildRun{}, fmt.Errorf("running the rules over the build %s: %w", extra, checkError)

@@ -22,6 +22,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // Options says how a run schedules its work.
@@ -58,6 +59,11 @@ type Options struct {
 	// must not run at all (see checker.Options).
 	Ready   func(*packages.Package) <-chan struct{}
 	Abandon <-chan struct{}
+
+	// Timing is the run's collector under `--timing`, which each analyzer's run on each package is measured into, and
+	// each dispatched listener's calls, read by its dispatcher under rule.Timed, or nil for a run that did not ask,
+	// which measures nothing (#3apgjer). The findings are the same either way.
+	Timing *timing.Collector
 }
 
 // ErrAbandoned is Run's error when Options.Abandon closed before every rule had run, so the result would be partial.
@@ -207,9 +213,11 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	// dispatcher run past a listener's requirement failing on a package, so only that listener's rule fails there, as
 	// it did walking by itself, never every rule on the dispatcher. ForDependents keeps a dispatcher's requirement
 	// for its listeners only where a rule of this run requires it too, so what only a left-out rule reads never runs.
+	// Timed hands each dispatcher the run's collector, so it bills each listener's calls to the listener's rule.
 	checkerOptions := &checker.Options{Sequential: options.SingleThreaded, ReadFile: options.ReadFile,
 		Dependents: rule.Dependents, Failed: rule.Failed, Tolerant: dispatch.IsDispatcher,
-		ForDependents: dispatch.ListenerRequirement, Ready: options.Ready, Abandon: options.Abandon}
+		ForDependents: dispatch.ListenerRequirement, Ready: options.Ready, Abandon: options.Abandon,
+		Timing: options.Timing, Timed: rule.Timed}
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
