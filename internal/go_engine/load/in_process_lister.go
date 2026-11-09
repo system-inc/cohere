@@ -17,6 +17,7 @@ import (
 	"golang.org/x/mod/module"
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
@@ -72,6 +73,10 @@ type inProcessLister struct {
 	byPath map[string]*inProcessPackage
 	reads  map[string]*directoryRead
 	doubts []string
+
+	// timing is the run's collector under `--timing`, nil otherwise. The lister's work is on many goroutines, and a
+	// thread clock sees only its own thread, so each goroutine adds what it spent where it runs (measureListing).
+	timing *timing.Collector
 }
 
 // inProcessPackage is one package as the lister read it: what go list would print of it, and the import paths go
@@ -105,10 +110,16 @@ var (
 )
 
 // listInProcess is list without go list: the same listing, in the same order, with the same fields, read in this
-// process (see inProcessLister), each file held holds read from its held bytes. It returns why it could not answer
-// when it could not, and then the listing is nil and go list answers instead.
-func listInProcess(workspace string, environment []string, patterns []string, held Held) (*listing, string) {
-	lister, doubt := newInProcessLister(workspace, environment, held)
+// process (see inProcessLister), each file held holds read from its held bytes, adding its CPU to collector. It returns
+// why it could not answer when it could not, and then the listing is nil and go list answers instead.
+func listInProcess(
+	workspace string,
+	environment []string,
+	patterns []string,
+	held Held,
+	collector *timing.Collector,
+) (*listing, string) {
+	lister, doubt := newInProcessLister(workspace, environment, held, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -163,7 +174,9 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 		direct := lister.directModules(reached)
 		var group sync.WaitGroup
 		for _, current := range pass.ordered {
-			group.Go(func() { current.listed.Deps = lister.deps(current) })
+			group.Go(func() {
+				measureListing(lister.timing, func() { current.listed.Deps = lister.deps(current) })
+			})
 		}
 		group.Wait()
 		for _, current := range pass.ordered {
@@ -191,9 +204,15 @@ func (lister *inProcessLister) list(patterns []string) (*listing, string) {
 
 // newInProcessLister reads the build list, the build context and the go environment, and says why it cannot list
 // at all when something in them is beyond what it carries. Its build context opens a file held holds from its held
-// bytes, and any other on disk, so go/build reads no file the run already holds again.
-func newInProcessLister(workspace string, environment []string, held Held) (*inProcessLister, string) {
-	read, doubt := readGoState(workspace, environment)
+// bytes, and any other on disk, so go/build reads no file the run already holds again. What it and its listing spend
+// is added to collector.
+func newInProcessLister(
+	workspace string,
+	environment []string,
+	held Held,
+	collector *timing.Collector,
+) (*inProcessLister, string) {
+	read, doubt := readGoState(workspace, environment, collector)
 	if doubt != "" {
 		return nil, doubt
 	}
@@ -212,6 +231,7 @@ func newInProcessLister(workspace string, environment []string, held Held) (*inP
 		byPath:        map[string]*inProcessPackage{},
 		visited:       map[string]visitState{},
 		reads:         map[string]*directoryRead{},
+		timing:        collector,
 	}
 	for _, each := range read.modules {
 		if each.Error != nil {
@@ -243,7 +263,7 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 	for index, pattern := range patterns {
 		group.Go(func() {
 			if pattern == "./..." {
-				matches[index], doubts[index] = lister.matchLocal()
+				measureListing(lister.timing, func() { matches[index], doubts[index] = lister.matchLocal() })
 			} else if strings.HasPrefix(pattern, ".") || filepath.IsAbs(pattern) {
 				// A directory pattern below or outside the workspace, `./sub/...` or an absolute path, is matched by
 				// directory, which only matchLocal does and only for the workspace itself. Read as a module import
@@ -254,7 +274,7 @@ func (lister *inProcessLister) match(patterns []string) ([]string, string) {
 				pattern,
 				"/...",
 			); wildcard && !strings.Contains(prefix, "...") {
-				matches[index], doubts[index] = lister.matchModules(prefix)
+				measureListing(lister.timing, func() { matches[index], doubts[index] = lister.matchModules(prefix) })
 			} else {
 				doubts[index] = fmt.Sprintf("the pattern %s is not one the lister matches", pattern)
 			}
@@ -377,35 +397,38 @@ func (lister *inProcessLister) packagesIn(
 func (lister *inProcessLister) prefetchStandardLibrary() {
 	source := filepath.Join(lister.context.GOROOT, "src")
 	lister.prefetching.Go(func() {
-		// Ignored: a directory the walk cannot read is read again, and its error reported, when an import reaches it.
-		_ = filepath.WalkDir(source, func(directory string, entry fs.DirEntry, pathError error) error {
-			if lister.prefetchStopped() {
-				return filepath.SkipAll
-			}
-			if pathError != nil || !entry.IsDir() {
-				return nil
-			}
-			name := entry.Name()
-			if directory != source && (name == "testdata" || name == "cmd" && filepath.Dir(directory) == source ||
-				strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
-				return filepath.SkipDir
-			}
-			// The walk is counted in prefetching until it returns, so this adds to a count above zero, which may
-			// happen while stopPrefetch waits.
-			lister.prefetching.Go(func() {
-				select {
-				case lister.prefetchSlots <- struct{}{}:
-				case <-lister.prefetchDone:
-					return
-				}
-				defer func() { <-lister.prefetchSlots }()
-				// A slot and the end can be ready together, and select takes either, so the end is asked again.
+		// The walk waits for nothing, as each read it starts is on a goroutine of its own, so it is measured whole.
+		measureListing(lister.timing, func() {
+			// Ignored: a directory the walk cannot read is read again, its error reported, once an import reaches it.
+			_ = filepath.WalkDir(source, func(directory string, entry fs.DirEntry, pathError error) error {
 				if lister.prefetchStopped() {
-					return
+					return filepath.SkipAll
 				}
-				lister.readDirectory(directory)
+				if pathError != nil || !entry.IsDir() {
+					return nil
+				}
+				name := entry.Name()
+				if directory != source && (name == "testdata" || name == "cmd" && filepath.Dir(directory) == source ||
+					strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")) {
+					return filepath.SkipDir
+				}
+				// The walk is counted in prefetching until it returns, so this adds to a count above zero, which may
+				// happen while stopPrefetch waits.
+				lister.prefetching.Go(func() {
+					select {
+					case lister.prefetchSlots <- struct{}{}:
+					case <-lister.prefetchDone:
+						return
+					}
+					defer func() { <-lister.prefetchSlots }()
+					// A slot and the end can be ready together, and select takes either, so the end is asked again.
+					if lister.prefetchStopped() {
+						return
+					}
+					lister.readDirectory(directory)
+				})
+				return nil
 			})
-			return nil
 		})
 	})
 }
@@ -455,13 +478,33 @@ func (lister *inProcessLister) load(importPath string) {
 // the import paths go list walks from it: each import, then those cgo and the linker add, which it does not print
 // among Imports.
 func (lister *inProcessLister) read(importPath string) (*listedPackage, []string, string) {
-	listed := &listedPackage{ImportPath: importPath}
-	var walked []string
-	directory, owner, doubt := lister.locate(listed.ImportPath)
+	var directory string
+	var owner *packages.Module
+	var doubt string
+	measureListing(lister.timing, func() { directory, owner, doubt = lister.locate(importPath) })
 	if doubt != "" {
 		return nil, nil, doubt
 	}
+	// The directory's read is measured where it runs (readDirectory) and never around this wait for it, which would
+	// hold a thread for each package waiting at once.
 	read := lister.readDirectory(directory)
+	var listed *listedPackage
+	var walked []string
+	measureListing(lister.timing, func() {
+		listed, walked, doubt = lister.readFrom(importPath, directory, owner, read)
+	})
+	return listed, walked, doubt
+}
+
+// readFrom is read once the package is located in directory, in owner's module, and the directory is read.
+func (lister *inProcessLister) readFrom(
+	importPath string,
+	directory string,
+	owner *packages.Module,
+	read *directoryRead,
+) (*listedPackage, []string, string) {
+	listed := &listedPackage{ImportPath: importPath}
+	var walked []string
 	if read.importError != nil {
 		return nil, nil, fmt.Sprintf("%s: %v", listed.ImportPath, read.importError)
 	}
@@ -661,7 +704,8 @@ func (lister *inProcessLister) readDirectory(directory string) *directoryRead {
 	read.once.Do(func() {
 		lister.slots <- struct{}{}
 		defer func() { <-lister.slots }()
-		read.built, read.importError = lister.context.ImportDir(directory, 0)
+		// Measured once its slot is held, so no measurement holds a thread while it waits for one.
+		measureListing(lister.timing, func() { read.built, read.importError = lister.context.ImportDir(directory, 0) })
 	})
 	return read
 }

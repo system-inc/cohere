@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/tools/go/packages"
 
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 	"github.com/system-inc/cohere/internal/listed_directories"
 )
 
@@ -91,14 +92,21 @@ type listing struct {
 
 // list lists the patterns in workspace under environment, the whole environment, as `go list -deps -json -e` lists
 // them: read in this process when the lister can answer exactly, each file held holds read from its held bytes, and by
-// go list itself, which reads the disk, when it has any doubt.
-func list(workspace string, environment []string, patterns []string, held Held) (*listing, error) {
-	listed, doubt := listInProcess(workspace, environment, patterns, held)
+// go list itself, which reads the disk, when it has any doubt. The go commands either runs add their CPU to collector,
+// and so do the lister's goroutines.
+func list(
+	workspace string,
+	environment []string,
+	patterns []string,
+	held Held,
+	collector *timing.Collector,
+) (*listing, error) {
+	listed, doubt := listInProcess(workspace, environment, patterns, held, collector)
 	if doubt == "" {
 		listed.inProcess = true
 		return listed, nil
 	}
-	listed, listError := listWithGoList(workspace, environment, patterns)
+	listed, listError := listWithGoList(workspace, environment, patterns, collector)
 	if listError != nil {
 		return nil, listError
 	}
@@ -109,8 +117,13 @@ func list(workspace string, environment []string, patterns []string, held Held) 
 // listWithGoList is list by `go list -deps -json -e` alone, the one go command a runner of prebuilt tests answers.
 // go list -deps follows no test's imports, and -test is refused there, so what only the tests import is listed a
 // second time by name, and added after.
-func listWithGoList(workspace string, environment []string, patterns []string) (*listing, error) {
-	listed, listError := runList(workspace, environment, patterns)
+func listWithGoList(
+	workspace string,
+	environment []string,
+	patterns []string,
+	collector *timing.Collector,
+) (*listing, error) {
+	listed, listError := runList(workspace, environment, patterns, collector)
 	if listError != nil {
 		return nil, listError
 	}
@@ -137,7 +150,7 @@ func listWithGoList(workspace string, environment []string, patterns []string) (
 		return result, nil
 	}
 	slices.Sort(testImports)
-	extra, extraError := runList(workspace, environment, testImports)
+	extra, extraError := runList(workspace, environment, testImports, collector)
 	if extraError != nil {
 		return nil, extraError
 	}
@@ -167,8 +180,13 @@ func (listing *listing) add(listed []*listedPackage) {
 	}
 }
 
-// runList runs go list once and reads what it printed, dependencies first.
-func runList(workspace string, environment []string, patterns []string) ([]*listedPackage, error) {
+// runList runs go list once and reads what it printed, dependencies first, adding go list's CPU to collector.
+func runList(
+	workspace string,
+	environment []string,
+	patterns []string,
+	collector *timing.Collector,
+) ([]*listedPackage, error) {
 	// No "--" before the patterns: a runner's stand-in go refuses any flag it does not know, that one too.
 	arguments := append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)
 	command := exec.Command("go", arguments...)
@@ -178,7 +196,9 @@ func runList(workspace string, environment []string, patterns []string) ([]*list
 	command.Env = append(slices.Clone(environment), "PWD="+workspace)
 	var standardError bytes.Buffer
 	command.Stderr = &standardError
-	output, runError := command.Output()
+	var output []byte
+	var runError error
+	measureGoCommands(collector, func() { output, runError = command.Output() })
 	if runError != nil {
 		return nil, fmt.Errorf("listing %s with go list in %s: %w: %s", strings.Join(patterns, " "), workspace,
 			runError, strings.TrimSpace(standardError.String()))

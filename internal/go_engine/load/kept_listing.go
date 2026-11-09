@@ -20,6 +20,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
+
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // listingFormatVersion is hashed into every listing's key, so a listing kept in another shape is never read.
@@ -55,16 +57,18 @@ type keptListing struct {
 // edit below a file's imports, the edit nearly every edit is, moves none of it. When the fingerprint of all of that
 // is the one the kept answer was read from, the answer is go list's own; any difference, or anything that cannot be
 // read, asks go list. It reports whether the answer was kept. Every file held holds is read from its held bytes, by
-// the fingerprint and the lister alike.
+// the fingerprint and the lister alike. The listing adds its CPU to collector; a kept answer's fingerprint adds nothing
+// but what the caller measures on its own goroutine, since a run under `--timing` keeps no listing.
 func cachedList(
 	workspace string,
 	environment []string,
 	patterns []string,
 	listings ListingStore,
 	held Held,
+	collector *timing.Collector,
 ) (*listing, bool, error) {
 	if listings == nil {
-		listed, listError := list(workspace, environment, patterns, held)
+		listed, listError := list(workspace, environment, patterns, held, collector)
 		return listed, false, listError
 	}
 	key, goEnvironment, keyError := listingKey(workspace, environment, patterns)
@@ -80,7 +84,7 @@ func cachedList(
 			}
 		}
 	}
-	listed, listError := list(workspace, environment, patterns, held)
+	listed, listError := list(workspace, environment, patterns, held, collector)
 	if listError != nil {
 		return nil, false, listError
 	}
