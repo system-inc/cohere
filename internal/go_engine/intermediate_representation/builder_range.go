@@ -12,6 +12,8 @@ import (
 	"go/types"
 
 	"honnef.co/go/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 // rangeIndexed emits to fn the header for an integer-indexed loop
@@ -42,7 +44,7 @@ func (packageBuilder *builder) rangeIndexed(
 	// Determine number of iterations.
 	var length Value
 	dt := deref(x.Type())
-	if array, ok := typeutil.CoreType(dt).(*types.Array); ok {
+	if array, ok := core_type.Of(dt).(*types.Array); ok {
 		// For array or *array, the number of iterations is
 		// known statically thanks to the type.  We avoid a
 		// data dependence upon x, permitting later dead-code
@@ -82,7 +84,7 @@ func (packageBuilder *builder) rangeIndexed(
 
 	key = emitLoad(function, index, source)
 	if tv != nil {
-		switch typed := typeutil.CoreType(x.Type()).(type) {
+		switch typed := core_type.Of(x.Type()).(type) {
 		case *types.Array:
 			instr := &Index{
 				X:     x,
@@ -149,7 +151,7 @@ func (packageBuilder *builder) rangeIter(
 	var ak types.Type
 	var av types.Type
 	isString := false
-	if mapping, ok := typeutil.CoreType(x.Type()).(*types.Map); ok {
+	if mapping, ok := core_type.Of(x.Type()).(*types.Map); ok {
 		ak, av = mapping.Key(), mapping.Elem()
 	} else {
 		isString = true
@@ -231,7 +233,7 @@ func (packageBuilder *builder) rangeChannel(
 	emitJump(function, loop, source)
 	function.currentBlock = loop
 
-	channelType, isChannel := typeutil.CoreType(x.Type()).(*types.Chan)
+	channelType, isChannel := core_type.Of(x.Type()).(*types.Chan)
 	if !isChannel {
 		// Invariant: rangeStmt calls rangeChannel only for a channel core type.
 		panic(fmt.Sprintf("rangeChannel over %s, which has no channel core type", x.Type()))
@@ -372,7 +374,7 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 	var value Value
 	var loop *BasicBlock
 	var done *BasicBlock
-	switch rt := typeutil.CoreType(x.Type()).(type) {
+	switch rt := core_type.Of(x.Type()).(type) {
 	case *types.Slice, *types.Array, *types.Pointer: // *array
 		key, value, loop, done = packageBuilder.rangeIndexed(function, x, tv, source)
 
@@ -571,12 +573,12 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	jump := newVariable(fmt.Sprintf("jump$%d", anonIndex+1), tInt)
 	emitLocalVariable(function, jump, nil) // zero value is jReady
 
-	xsig, isSignature := typeutil.CoreType(x.Type()).(*types.Signature)
+	xsig, isSignature := core_type.Of(x.Type()).(*types.Signature)
 	if !isSignature {
 		// Invariant: rangeStmt calls rangeFunc only for a signature core type.
 		panic(fmt.Sprintf("rangeFunc over %s, which has no signature core type", x.Type()))
 	}
-	ysig, isYieldSignature := typeutil.CoreType(xsig.Params().At(0).Type()).(*types.Signature)
+	ysig, isYieldSignature := core_type.Of(xsig.Params().At(0).Type()).(*types.Signature)
 	if !isYieldSignature {
 		// Invariant: go/types accepts ranging over a function only when its one parameter is a yield function.
 		panic(fmt.Sprintf("rangeFunc iterator %s takes %s, not a yield function", x.Type(), xsig.Params().At(0).Type()))

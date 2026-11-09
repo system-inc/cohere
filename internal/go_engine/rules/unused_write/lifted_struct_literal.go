@@ -7,8 +7,8 @@ import (
 	"maps"
 
 	"golang.org/x/tools/go/cfg"
-	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -94,7 +94,7 @@ func liftedStructLiteralWrites(context *rule.Context, function *intermediate_rep
 			if !judged[literal] {
 				continue
 			}
-			structure, isStruct := typeutil.CoreType(value.Type()).(*types.Struct)
+			structure, isStruct := core_type.Of(value.Type()).(*types.Struct)
 			if !isStruct || mayLoadThrough(context, function.Source(), literal) {
 				continue
 			}

@@ -12,7 +12,7 @@ import (
 	"go/types"
 	"slices"
 
-	"honnef.co/go/tools/go/types/typeutil"
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 // stmtList emits to fn code for all statements in list.
@@ -564,7 +564,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 
 		case *ast.SendStmt: // ch<- i
 			channel := packageBuilder.expr(function, comm.Chan)
-			channelType, isChannel := typeutil.CoreType(function.typ(channel.Type())).(*types.Chan)
+			channelType, isChannel := core_type.Of(function.typ(channel.Type())).(*types.Chan)
 			if !isChannel {
 				// Invariant: go/types accepts a send only on an operand whose core type is a channel.
 				panic(fmt.Sprintf("send on %s, which has no channel core type", channel.Type()))
@@ -618,7 +618,7 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
 		if st.Direction == types.RecvOnly {
-			channelType, isChannel := typeutil.CoreType(function.typ(st.Channel.Type())).(*types.Chan)
+			channelType, isChannel := core_type.Of(function.typ(st.Channel.Type())).(*types.Chan)
 			if !isChannel {
 				// Invariant: go/types accepts a receive only from an operand whose core type is a channel.
 				panic(fmt.Sprintf("receive from %s, which has no channel core type", st.Channel.Type()))
@@ -1020,7 +1020,7 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 		packageBuilder.expr(function, typed.X)
 
 	case *ast.SendStmt:
-		channelType, isChannel := typeutil.CoreType(function.typeOf(typed.Chan)).(*types.Chan)
+		channelType, isChannel := core_type.Of(function.typeOf(typed.Chan)).(*types.Chan)
 		if !isChannel {
 			// Invariant: go/types accepts a send only on an operand whose core type is a channel.
 			panic(fmt.Sprintf("send on %s, which has no channel core type", function.typeOf(typed.Chan)))
