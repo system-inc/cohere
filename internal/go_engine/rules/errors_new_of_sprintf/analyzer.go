@@ -24,6 +24,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/edit"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -170,6 +171,7 @@ func isCallOf(context *rule.Context, function ast.Expr, fullName string) bool {
 	if called.Pkg() == context.Package {
 		return false
 	}
-	// FullName spells a method with its receiver, `(T).New`, and a function by its package's path.
-	return called.FullName() == fullName
+	// The full name Matches compares spells a method with its receiver, `(T).New`, and a function by its package's
+	// path.
+	return function_name.Matches(called, fullName)
 }
