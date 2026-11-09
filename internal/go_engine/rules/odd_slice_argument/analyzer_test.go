@@ -16,7 +16,7 @@ import (
 // Its strings.NewReplacer note holds the facts across packages, since the mark comes from the port's run on strings.
 func TestPortMatchesUpstreamWants(test *testing.T) {
 	test.Parallel()
-	parity.RequireStaticcheckWants(test, Analyzer, analysistest.TestData(), "CheckEvenSliceLength")
+	parity.RequireStaticcheckWants(test, pushAnalyzer, analysistest.TestData(), "CheckEvenSliceLength")
 }
 
 // Over staticcheck's fixture and parity's packages, the original and the port find the same findings. parity holds
@@ -34,7 +34,7 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 // every package they import, strings among them, whose mark on NewReplacer's oldnew the NewReplacer finding stands on.
 func TestPortExportsTheOriginalsFacts(test *testing.T) {
 	test.Parallel()
-	parity.RequireIdenticalFacts(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "CheckEvenSliceLength",
+	parity.RequireIdenticalFacts(test, sa5012.Analyzer, pushAnalyzer, analysistest.TestData(), "CheckEvenSliceLength",
 		"parity", "parity/pairs")
 }
 
@@ -45,7 +45,7 @@ func TestPortExportsTheOriginalsFacts(test *testing.T) {
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "differences")
-	parity.RequireIdenticalFacts(test, sa5012.Analyzer, Analyzer, analysistest.TestData(), "differences")
+	parity.RequireIdenticalFacts(test, sa5012.Analyzer, pushAnalyzer, analysistest.TestData(), "differences")
 }
 
 // The one place the two part: a go or defer statement passing an odd slice to a marked parameter, whose call's
