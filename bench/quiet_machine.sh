@@ -105,6 +105,8 @@
 #                        (internal/bench_results, schema 2): the machine, the commits, the modes, every run
 #                        and each mode's numbers, refused when it disagrees with its own runs or the engine
 #                        is dirty; commit it with what `go run ./internal/docs_data/tools/generate` rewrites
+#   --record-to DIR      --record, writing the record to DIR instead of bench/results: a record kept apart
+#                        from the committed ones, as the nightly speed guard keeps its own (bench/nightly.zsh)
 #
 # Exit status: 0 when every measured mode has a quiet number, 3 when some mode has none, 4 when every mode has
 # one and the first run's quiet median is more than 25% over cold's, 1 when it could not measure at all,
@@ -127,6 +129,7 @@ links=()
 commit=
 work=${TMPDIR:-/tmp}/cohere-quiet-machine
 record=false
+record_directory=
 
 while (( $# > 0 )); do
   case $1 in
@@ -144,6 +147,8 @@ while (( $# > 0 )); do
     --link) links+=($2); shift 2 ;;
     --work) work=$2; shift 2 ;;
     --record) record=true; shift ;;
+    # Made absolute here, since the record tool runs from the module root.
+    --record-to) record=true; record_directory=${2:A}; shift 2 ;;
     *) print -u2 "quiet_machine: unknown argument $1 (see the usage at the top of this script)"; exit 1 ;;
   esac
 done
@@ -392,9 +397,12 @@ if [[ $record == true ]]; then
   measuring edit && record_flags+=(-edit $edit)
   (cd ${0:A:h:h} && go run ./internal/bench_results/tools/record -runs $runs_table -engine $engine \
     -project ${project:t} -project-commit $project_commit -idle-floor $idle_floor -settle $settle \
-    -rounds $rounds_taken $record_flags) || fail "could not record the run; its logs are in $logs"
+    -rounds $rounds_taken -out ${record_directory:-bench/results} $record_flags) ||
+    fail "could not record the run; its logs are in $logs"
   # The website's benchmarks page is generated from bench/results, and a record committed alone leaves
-  # docs/data stale, which TestTheRenderedFilesAreCurrent fails (@system_cohere_web_data).
-  print "commit the record with what \`go run ./internal/docs_data/tools/generate\` rewrites in docs/data"
+  # docs/data stale, which TestTheRenderedFilesAreCurrent fails (@system_cohere_web_data). A record kept
+  # elsewhere is never committed, so it has nothing to regenerate.
+  [[ -z $record_directory ]] &&
+    print "commit the record with what \`go run ./internal/docs_data/tools/generate\` rewrites in docs/data"
 fi
 exit $outcome
