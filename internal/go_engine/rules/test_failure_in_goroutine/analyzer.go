@@ -1,6 +1,6 @@
 // Package test_failure_in_goroutine is staticcheck's SA2002, a goroutine that calls a method of testing's T, B or F
 // that stops the test, FailNow, SkipNow or one of the methods built on them, which must be called in the test's own
-// goroutine, ported onto staticcheck's intermediate representation as a rule.FunctionCheck.
+// goroutine, ported onto the engine's own intermediate representation (#tf4cb8g).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa2002/sa2002.go, whose logic it keeps and
 // whose messages it reports word for word, from the start to the end of the go statement, where staticcheck's report
@@ -23,15 +23,17 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -40,7 +42,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA2002",
 	"SA2002",
 	"Flags a goroutine that calls testing.T.FailNow, SkipNow or a method built on them, which must be called in the "+
-		"test's own goroutine: staticcheck's SA2002, ported onto its intermediate representation.",
+		"test's own goroutine: staticcheck's SA2002, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -53,22 +55,28 @@ var stoppingMethods = map[string]bool{
 // Check judges one function: each go statement in it that starts a function with a body, named or literal, whose own
 // instructions call a method that stops the test, reported once per such call, at the go statement, with the call as
 // its related entry. Calls in functions that body calls in turn are not followed, as in the original.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			goStatement, isGo := instruction.(*ir.Go)
+		for _, instruction := range block.Instructions {
+			goStatement, isGo := instruction.(*intermediate_representation.Go)
 			if !isGo {
 				continue
 			}
 			started := startedFunction(goStatement)
+			if started != nil {
+				// Our representation builds a function when it is first read, where staticcheck's built the package
+				// whole before any check ran, so a function declared after this one is unbuilt yet. Building it reads
+				// what staticcheck's held: its body, or none for a function of another package.
+				started.Build()
+			}
 			if started == nil || started.Blocks == nil {
 				// A function called through an interface or a value has no body to read here, nor has one declared
 				// in another package, whose body staticcheck does not build.
 				continue
 			}
 			for _, startedBlock := range started.Blocks {
-				for _, startedInstruction := range startedBlock.Instrs {
-					call, isCall := startedInstruction.(*ir.Call)
+				for _, startedInstruction := range startedBlock.Instructions {
+					call, isCall := startedInstruction.(*intermediate_representation.Call)
 					if !isCall {
 						continue
 					}
@@ -84,13 +92,13 @@ func Check(context *rule.Context, function *ir.Function) {
 }
 
 // startedFunction is the function goStatement starts, when it is a function or a closure of one, and nil otherwise.
-func startedFunction(goStatement *ir.Go) *ir.Function {
+func startedFunction(goStatement *intermediate_representation.Go) *intermediate_representation.Function {
 	switch value := goStatement.Call.Value.(type) {
-	case *ir.Function:
+	case *intermediate_representation.Function:
 		return value
-	case *ir.MakeClosure:
-		// A closure's function is always an *ir.Function; the original asserts as much.
-		closed, isFunction := value.Fn.(*ir.Function)
+	case *intermediate_representation.MakeClosure:
+		// A closure's function is always a *Function; the original asserts as much.
+		closed, isFunction := value.Function.(*intermediate_representation.Function)
 		if !isFunction {
 			return nil
 		}
@@ -101,7 +109,7 @@ func startedFunction(goStatement *ir.Go) *ir.Function {
 
 // stoppingMethodName is the name of the method call statically calls, and whether it is one of testing's common
 // type that stops the test.
-func stoppingMethodName(call *ir.Call) (string, bool) {
+func stoppingMethodName(call *intermediate_representation.Call) (string, bool) {
 	if call.Call.IsInvoke() {
 		return "", false
 	}
@@ -122,7 +130,12 @@ func stoppingMethodName(call *ir.Call) (string, bool) {
 
 // report reports goStatement, whose goroutine stops the test by call to the method name, with call as its related
 // entry, as staticcheck's report with its Related option does.
-func report(context *rule.Context, goStatement *ir.Go, call *ir.Call, name string) {
+func report(
+	context *rule.Context,
+	goStatement *intermediate_representation.Go,
+	call *intermediate_representation.Call,
+	name string,
+) {
 	source := goStatement.Source()
 	if source == nil {
 		// A go statement with no syntax has no place to report; staticcheck's report panics on one.
