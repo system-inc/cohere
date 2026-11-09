@@ -6,7 +6,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"honnef.co/go/tools/go/types/typeutil"
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 // CallCommon is contained by Go, Defer and Call to hold the
@@ -101,7 +101,7 @@ func (common *CallCommon) Signature() *types.Signature {
 		}
 		return signature
 	}
-	signature, isSignature := typeutil.CoreType(common.Value.Type()).(*types.Signature)
+	signature, isSignature := core_type.Of(common.Value.Type()).(*types.Signature)
 	if !isSignature {
 		// Invariant: a call-mode value is the callee of a call go/types accepted, so its core type is a
 		// function signature.

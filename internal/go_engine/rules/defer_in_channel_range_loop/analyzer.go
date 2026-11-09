@@ -24,8 +24,7 @@ import (
 	"go/token"
 	"go/types"
 
-	"honnef.co/go/tools/go/types/typeutil"
-
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -59,7 +58,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 // Check judges one range loop: one over a channel whose body, closures aside, the walk does not judge might end has
 // every defer in its body reported.
 func Check(context *rule.Context, loop *ast.RangeStmt) {
-	if _, isChannel := typeutil.CoreType(context.TypesInfo.TypeOf(loop.X)).(*types.Chan); !isChannel {
+	if _, isChannel := core_type.Of(context.TypesInfo.TypeOf(loop.X)).(*types.Chan); !isChannel {
 		return
 	}
 	defers := []*ast.DeferStmt{}
