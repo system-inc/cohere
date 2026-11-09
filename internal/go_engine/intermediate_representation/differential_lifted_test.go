@@ -232,6 +232,7 @@ func differentialCompareLiftedUnit(test *testing.T, unit differentialUnit,
 		return tally
 	}
 	theirFunctions := differentialTheirSourceFunctions(theirPackage)
+	tally.aliasSpelledInstances = differentialAliasSpelledInstances(theirFunctions)
 	ourFunctions := differentialOurSourceFunctions(ourPackage)
 	if len(theirFunctions) != len(ourFunctions) {
 		tally.differences = append(tally.differences, differentialDifference{cause: "source function count",

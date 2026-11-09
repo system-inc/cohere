@@ -5,6 +5,7 @@ package intermediate_representation
 // finished test set.
 
 import (
+	"go/types"
 	"testing"
 
 	"github.com/system-inc/cohere/static_single_assignment"
@@ -33,6 +34,9 @@ func SkipStoreDefinitionForTest(test testing.TB, program *Program) {
 func DropDebugReferenceForTest(test testing.TB, program *Program) {
 	liftingStoreForTest(test, program, liftingOptions{dropDebugReference: true})
 }
+
+// UnaliasDeeplyForTest is unaliasDeeply, for the tests of the instance names it makes canonical.
+func UnaliasDeeplyForTest(given types.Type) types.Type { return unaliasDeeply(given) }
 
 // HasLiftingOptionsForTest reports whether program has options stored, for the test that the default path has
 // none.

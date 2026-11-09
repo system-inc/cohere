@@ -160,14 +160,18 @@ func (packageBuilder *builder) iterate() {
 	packageBuilder.buildshared.wait()
 }
 
-// buildFunction builds IR code for the body of function fn.  Idempotent.
+// buildFunction builds IR code for the body of function fn.  Idempotent: the build runs under the function's
+// buildOnce, so a function a package build and a lazy Build reach together is built once, and the later caller
+// waits for it.
 func (packageBuilder *builder) buildFunction(function *Function) {
-	if function.build != nil {
-		assert(function.parent == nil, "anonymous functions should not be built by buildFunction()")
+	function.buildOnce.Do(func() {
+		if function.build != nil {
+			assert(function.parent == nil, "anonymous functions should not be built by buildFunction()")
 
-		function.build(packageBuilder, function)
-		function.done()
-	}
+			function.build(packageBuilder, function)
+			function.done()
+		}
+	})
 }
 
 // buildParamsOnly builds fn.Parameters from fn.Signature, but does not build fn.Body.

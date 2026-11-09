@@ -70,7 +70,7 @@ func differentialTheirOperand(places differentialTheirPlaces, value ir.Value) st
 	case *ir.Global:
 		return "global " + value.RelString(nil)
 	case *ir.Function:
-		return "function " + value.RelString(nil)
+		return "function " + differentialTheirFunctionName(value)
 	case *ir.Builtin:
 		return "builtin " + value.Name()
 	}
@@ -95,6 +95,55 @@ func differentialOurOperand(places differentialOurPlaces, value intermediate_rep
 		return "builtin " + value.Name()
 	}
 	return fmt.Sprintf("unplaced %T", value)
+}
+
+// differentialTheirFunctionName is value's name as go/ir prints it, but for an instantiation wrapper of a function:
+// ours names that from its type arguments unaliased (unalias.go), by the decision on #6pt3bt8 that a lazy or
+// concurrent build's names can't follow its build order, while go/ir spells them as whichever call created the
+// wrapper first did. So go/ir's is compared unaliased. A real naming difference still fails: the origin and the
+// unaliased arguments must both agree.
+func differentialTheirFunctionName(value *ir.Function) string {
+	if canonical, isInstance := differentialCanonicalInstanceName(value); isInstance {
+		return canonical
+	}
+	return value.RelString(nil)
+}
+
+// differentialCanonicalInstanceName is the name ours gives the instantiation wrapper value is, and whether value is
+// one: its origin's name and its type arguments unaliased.
+func differentialCanonicalInstanceName(value *ir.Function) (string, bool) {
+	if !strings.HasPrefix(value.Synthetic, "instantiation wrapper of ") || value.Signature.Recv() != nil ||
+		len(value.TypeArgs()) == 0 {
+		return "", false
+	}
+	arguments := make([]string, 0, len(value.TypeArgs()))
+	for _, argument := range value.TypeArgs() {
+		arguments = append(arguments, types.TypeString(intermediate_representation.UnaliasDeeplyForTest(argument), nil))
+	}
+	return value.Origin().RelString(nil) + "[" + strings.Join(arguments, ", ") + "]", true
+}
+
+// differentialAliasSpelledInstances counts the instantiation wrappers functions call whose go/ir name spells a type
+// argument through an alias, the names differentialTheirFunctionName compares unaliased.
+func differentialAliasSpelledInstances(functions []*ir.Function) int {
+	spelled := map[*ir.Function]bool{}
+	for _, function := range functions {
+		for _, block := range function.Blocks {
+			for _, instruction := range block.Instrs {
+				for _, operand := range instruction.Operands(nil) {
+					callee, isFunction := (*operand).(*ir.Function)
+					if !isFunction {
+						continue
+					}
+					if canonical, isInstance := differentialCanonicalInstanceName(callee); isInstance &&
+						canonical != callee.RelString(nil) {
+						spelled[callee] = true
+					}
+				}
+			}
+		}
+	}
+	return len(spelled)
 }
 
 // differentialKind is the name of an instruction's or value's pointer type, go/ir's mapped to ours.
