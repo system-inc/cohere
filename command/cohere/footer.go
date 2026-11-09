@@ -99,6 +99,9 @@ func footer(summary runSummary, style textStyle, options footerOptions) string {
 	if summary.WouldChange > 0 {
 		line += " • " + style.red(counted(summary.WouldChange, "file would change", "files would change"))
 	}
+	if summary.Gaps.nothingChecked() {
+		line += " • " + style.red(nothingCheckedSentence(summary.Gaps.Excluded))
+	}
 
 	if cohered := summary.cohered(); cohered > 0 {
 		line += " • " + grouped(cohered) + " cohered"
@@ -196,7 +199,9 @@ func phaseTimes(graph time.Duration, records []phaseRecord, formatting time.Dura
 func uncheckedMarkers(summary runSummary) []string {
 	gaps := summary.Gaps
 	var markers []string
-	if gaps.NothingToCheck {
+	// A run that excluded every file it had says so among what it found, and fails; this marker is the project
+	// with no file of its language at all.
+	if gaps.NothingToCheck && !gaps.nothingChecked() {
 		markers = append(markers, "⚠ no files to check")
 	}
 	if len(gaps.MissingGenerated) > 0 {
@@ -428,4 +433,24 @@ func counted(count int, singular, pluralNoun string) string {
 		return "1 " + singular
 	}
 	return grouped(count) + " " + pluralNoun
+}
+
+// nothingCheckedSentence is the footer's words for a run that excluded every file it had: how many, and each reason
+// with the rule that decided it, as `no files checked: 1 file excluded, ignored by git (.gitignore:1)`.
+func nothingCheckedSentence(excluded []excludedReason) string {
+	total := 0
+	reasons := make([]string, 0, len(excluded))
+	for _, entry := range excluded {
+		total += entry.Count
+		reason := entry.Reason
+		if len(excluded) > 1 {
+			reason = fmt.Sprintf("%d %s", entry.Count, reason)
+		}
+		if entry.Source != "" {
+			reason += " (" + entry.Source + ")"
+		}
+		reasons = append(reasons, reason)
+	}
+	return "no files checked: " + counted(total, "file excluded", "files excluded") + ", " +
+		strings.Join(reasons, "; ")
 }

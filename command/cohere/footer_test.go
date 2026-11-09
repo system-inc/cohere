@@ -567,3 +567,41 @@ func TestOverallFooterGolden(test *testing.T) {
 		})
 	}
 }
+
+// A run whose every file was excluded fails, and its footer and `--json` say how many files and why, quoting the rule
+// that decided each reason; the warning a project with no file of its language keeps is not said beside it (#08cv2mp).
+func TestARunThatExcludedEveryFileFailsAndSaysWhy(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range []struct {
+		name     string
+		excluded []excludedReason
+		want     string
+	}{
+		{"one reason", []excludedReason{{Reason: "ignored by git", Count: 1, Source: ".gitignore:1"}},
+			"no files checked: 1 file excluded, ignored by git (.gitignore:1)"},
+		{"two reasons", []excludedReason{
+			{Reason: "ignored by git", Count: 2, Source: ".gitignore:12"},
+			{Reason: "outside the named paths", Count: 1},
+		}, "no files checked: 3 files excluded, 2 ignored by git (.gitignore:12); 1 outside the named paths"},
+	} {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			summary := cleanSummary()
+			summary.Gaps.NothingToCheck, summary.FilesInScope, summary.FilesChecked = true, 0, 0
+			summary.Gaps.Excluded = testCase.excluded
+			if !summary.failed() {
+				test.Fatal("a run that excluded every file did not fail")
+			}
+			got := footer(summary, plain, footerOptions{})
+			if !strings.HasPrefix(got, "✗ ☠️") || !strings.Contains(got, " • "+testCase.want) {
+				test.Errorf("the footer is %q, want a failing verdict saying %q", got, testCase.want)
+			}
+			if strings.Contains(got, "⚠ no files to check") {
+				test.Errorf("the footer says the empty project's warning beside the failure: %q", got)
+			}
+			if verdict := summaryAsJson(summary).Verdict; verdict != "fail" {
+				test.Errorf("under --json the verdict is %q, want fail", verdict)
+			}
+		})
+	}
+}
