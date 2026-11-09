@@ -107,8 +107,12 @@ func (lt *ltState) link(v, w *BasicBlock) {
 	lt.ancestor[w.Index] = v
 }
 
-// buildDomTree computes the dominator tree of f using the LT algorithm.
+// buildDominatorTree computes the dominator tree of f using the LT algorithm.
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
+//
+// The core's dominator tree goes here (#0scefye). This is go/ir's own until static_single_assignment's
+// tree, built in go/ir's Successors order, lands on main and is proven equal to it, block for block,
+// Recover's second root included; then this function and the domInfo it fills give way to it.
 func buildDominatorTree(fn *Function) {
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
