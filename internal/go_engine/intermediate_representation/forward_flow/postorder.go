@@ -1,24 +1,20 @@
 package forward_flow
 
-import (
-	"slices"
+import "slices"
 
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
-)
-
-// reversePostorder is function's blocks in reverse postorder of its spanning tree, a topological order when the graph
+// reversePostorder is graph's nodes in reverse postorder of its spanning tree, a topological order when the graph
 // has no cycle.
-func reversePostorder(function *intermediate_representation.Function) []int {
-	order := postorder(function)
+func reversePostorder(graph Graph) []int {
+	order := postorder(graph)
 	slices.Reverse(order)
 	return order
 }
 
-// postorder is function's blocks in postorder of a depth first search that visits every block, in ascending order of
-// index, so a block no root reaches is still ordered and the order is stable. An edge back to a block still on the
-// search's stack is skipped, which breaks each cycle there.
-func postorder(function *intermediate_representation.Function) []int {
-	nodeCount := function.NumNodes()
+// postorder is graph's nodes in postorder of a depth first search that visits every node, in ascending order, so a
+// node no root reaches is still ordered and the order is stable. An edge back to a node still on the search's stack is
+// skipped, which breaks each cycle there.
+func postorder(graph Graph) []int {
+	nodeCount := graph.NumNodes()
 	if nodeCount == 0 {
 		return nil
 	}
@@ -34,7 +30,7 @@ func postorder(function *intermediate_representation.Function) []int {
 		}
 		onStack.add(node)
 
-		for successor := range function.Out(node) {
+		for successor := range graph.Out(node) {
 			if onStack.contains(successor) {
 				continue
 			}

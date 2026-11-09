@@ -1,16 +1,12 @@
 package forward_flow
 
-import (
-	"honnef.co/go/tools/analysis/dfa"
-
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
-)
+import "honnef.co/go/tools/analysis/dfa"
 
 // forwardBuilder is the state of one Forward analysis.
 type forwardBuilder[Lattice dfa.Semilattice[Fact], Fact any] struct {
 	lattice Lattice
 
-	function *intermediate_representation.Function
+	graph Graph
 
 	// transfer is the edge transfer function.
 	transfer func(from int, to int, fact Fact) Fact
@@ -85,7 +81,7 @@ func (builder *forwardBuilder[Lattice, Fact]) propagate() {
 		block.in = in
 
 		outIndex := 0
-		for successor := range builder.function.Out(node) {
+		for successor := range builder.graph.Out(node) {
 			edgeFact := builder.transfer(node, successor, in)
 			if block.dirty || !builder.lattice.Equals(block.out[outIndex], edgeFact) {
 				// The out fact changed, so the successor is visited again.

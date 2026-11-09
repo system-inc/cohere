@@ -1,10 +1,6 @@
 package forward_flow
 
-import (
-	"container/heap"
-
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
-)
+import "container/heap"
 
 // nodeHeap is a heap of nodes ordered by reverse postorder, the order in which a forward analysis converges soonest.
 type nodeHeap struct {
@@ -20,15 +16,15 @@ type nodeHeap struct {
 	currentPriority int
 }
 
-// initialize prepares the heap for function's blocks, each prioritized by its place in reverse postorder.
-func (nodes *nodeHeap) initialize(function *intermediate_representation.Function) {
-	nodeCount := function.NumNodes()
+// initialize prepares the heap for graph's nodes, each prioritized by its place in reverse postorder.
+func (nodes *nodeHeap) initialize(graph Graph) {
+	nodeCount := graph.NumNodes()
 	*nodes = nodeHeap{
 		inQueue:         make([]int64, (nodeCount+63)/64),
 		priority:        make([]int, nodeCount),
 		currentPriority: -1,
 	}
-	for place, node := range reversePostorder(function) {
+	for place, node := range reversePostorder(graph) {
 		nodes.priority[node] = place
 	}
 }

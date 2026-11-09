@@ -17,8 +17,6 @@ import (
 	"slices"
 
 	"honnef.co/go/tools/analysis/dfa"
-
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // Analysis is the outcome of a forward analysis: the fact on entry to each block.
@@ -32,21 +30,21 @@ func (analysis *Analysis[Fact]) In(block int) Fact {
 	return analysis.ins[block]
 }
 
-// Forward runs a forward monotone analysis over function's control flow graph. The entry map gives the fact on entry
-// to a block with no predecessors, Lattice's identity where it gives none. For each edge it calls transfer(from, to,
-// fact), with the blocks' indices and the fact on entry to from, which returns the fact the edge carries to to.
+// Forward runs a forward monotone analysis over graph, a function's control flow graph. The entry map gives the fact on
+// entry to a block with no predecessors, Lattice's identity where it gives none. For each edge it calls transfer(from,
+// to, fact), with the blocks' indices and the fact on entry to from, which returns the fact the edge carries to to.
 func Forward[Lattice dfa.Semilattice[Fact], Fact any](
-	function *intermediate_representation.Function,
+	graph Graph,
 	entry map[int]Fact,
 	transfer func(from int, to int, fact Fact) Fact,
 ) *Analysis[Fact] {
-	nodeCount := function.NumNodes()
+	nodeCount := graph.NumNodes()
 	builder := &forwardBuilder[Lattice, Fact]{
-		function: function,
+		graph:    graph,
 		transfer: transfer,
 		blocks:   make([]blockInformation[Fact], nodeCount),
 	}
-	builder.queue.initialize(function)
+	builder.queue.initialize(graph)
 
 	// Initialize each node.
 	for node := range nodeCount {
@@ -54,7 +52,7 @@ func Forward[Lattice dfa.Semilattice[Fact], Fact any](
 
 		// The edges into each block, which the graph does not list, are gathered from the edges out of every block.
 		outs := 0
-		for successor := range function.Out(node) {
+		for successor := range graph.Out(node) {
 			successorBlock := &builder.blocks[successor]
 			successorBlock.predecessors = append(successorBlock.predecessors, blockEdge{node: node, outIndex: outs})
 			outs++
