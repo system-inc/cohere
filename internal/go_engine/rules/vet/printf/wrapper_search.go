@@ -4,6 +4,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -68,7 +69,15 @@ func findPrintLike(pass *analysis.Pass, kinds wrapperKinds) {
 	//	type myLogger struct{ ... }
 	//	func (myLogger) Logf(format string, args ...any) {...}
 	//	var _ Logger = myLogger{}
-	implementations := methodImplementations(pass)
+	//
+	// Only an interface method's candidate, which has no body, reads what implements it, and those are gathered only
+	// in files of go1.26 or later, so most packages have none. Finding the implementations walks every assignment of
+	// the package through x/tools' satisfy, almost all of the search's cost, so it runs only for a package that has
+	// such a candidate, and the wrappers found are the same either way.
+	var implementations map[*types.Func]map[*types.Func]bool
+	if slices.ContainsFunc(search.candidates, func(candidate *wrapper) bool { return !candidate.body.Valid() }) {
+		implementations = methodImplementations(pass)
+	}
 	// Then scan each candidate's body for the calls it forwards.
 	for _, candidate := range search.candidates {
 		if candidate.body.Valid() {
