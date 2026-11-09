@@ -66,6 +66,8 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, para
 		partial: map[*intermediate_representation.Function]map[types.Object]bool{}}
 	marked := walk.verdict(owner)
 	if walk.orderDependent {
+		// A question answered by the push's walk of the package is a replay; a whole package for the store is not.
+		resolver.Counts(Kind).Fallbacks.Add(1)
 		state.fallBack(resolver, home)
 		return state.recorded[parameter]
 	}
@@ -165,7 +167,6 @@ func parameterOwners(home *fact_resolver.Package) map[*types.Var]parameterOwner 
 // counted, so the differential can require none.
 func (state *marks) fallBack(resolver *fact_resolver.Resolver, home *fact_resolver.Package) {
 	counts := resolver.Counts(Kind)
-	counts.Fallbacks.Add(1)
 	recorded := &packageFacts{resolver: resolver, home: home, recorded: map[types.Object]bool{}}
 	walk := &pushWalk{facts: recorded}
 	functions := sourceFunctions(home)

@@ -223,18 +223,21 @@ type entryDemand struct {
 	readsIncomplete bool
 }
 
-// demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are those the resolver
-// computed whole, for a standard-library package the run collects for the binary's table, and otherwise those held
-// before, the entry's before a reload or the first wave's (held), with every answer the run computed in it. Its reads
+// demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are every answer of its
+// package, computed whole, for a standard-library package (see Caching's Goroot) or one the run collects for the
+// binary's table, when the resolver can compute them all without a reload; otherwise those held before, the entry's
+// before a reload or the first wave's (held), with every answer the run computed in it. Its reads
 // are those held before with every read the run's analysis of it made.
 func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
 	if session.resolver == nil || saved.Types == nil {
 		return held
 	}
 	demanded := entryDemand{}
-	if session.collects(saved) {
+	if session.collects(saved) || session.standard[saved] {
 		if home := session.resolver.Package(saved.Types); home != nil {
-			demanded.answers = sortedAnswers(session.resolver.Whole(home), true)
+			if whole, complete := session.resolver.WholeIfComplete(home); complete {
+				demanded.answers = sortedAnswers(whole, true)
+			}
 		}
 	}
 	if demanded.answers == nil {
@@ -266,6 +269,11 @@ func (session *CacheSession) rewriteEarlier() {
 	var group sync.WaitGroup
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
 	for saved, restored := range session.earlier {
+		if saved.Types != nil && session.resolver.Unsure(saved.Types) {
+			// Ran on a guess after its entry was written; the entry stands as written, and nothing of the guess
+			// joins it.
+			continue
+		}
 		held := entryDemand{answers: restored.answers, reads: restored.reads,
 			readsIncomplete: restored.readsIncomplete}
 		demanded := session.demandOf(saved, held)

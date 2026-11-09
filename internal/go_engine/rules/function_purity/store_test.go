@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/types"
 	"reflect"
+	"slices"
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
@@ -42,6 +43,11 @@ type storeProbe struct {
 	panicked string
 	counts   *fact_resolver.Counts
 	hits     int64
+
+	// reloads are the paths of the packages the question had the run reload, and unsure whether middle, the reader,
+	// was handed a placeholder.
+	reloads []string
+	unsure  bool
 }
 
 // probeThroughStore asks middle's reader of the purity of bottom.Pure, through a resolver over store, with bottom
@@ -92,6 +98,10 @@ func probeThroughStore(test *testing.T, store fact_resolver.Store, restored bool
 	}
 	probed.counts = resolver.Counts(function_purity.Kind)
 	probed.hits = resolver.StoreHits()
+	for _, reloaded := range resolver.Reloads() {
+		probed.reloads = append(probed.reloads, reloaded.Path())
+	}
+	probed.unsure = resolver.Unsure(loaded.Roots[0].Types)
 	return probed
 }
 
@@ -120,8 +130,9 @@ func TestAStoredAnswerIsReadWithoutABuild(test *testing.T) {
 }
 
 // A package the store holds computed whole answers a function it holds no answer of as no fact, though the package is
-// restored and cannot be built: completeness is what makes the absence an answer. The same store without the complete
-// mark answers nothing there, and the question has the run load bottom from source.
+// restored and cannot be built: completeness is what makes the absence an answer, sure, with nothing to reload. The
+// same store without the complete mark answers nothing there: the question has the run load bottom from source, and
+// middle, handed a placeholder, is unsure.
 func TestACompleteEntryAnswersAnAbsentFunctionAsNoFact(test *testing.T) {
 	test.Parallel()
 	complete := fixedStore{path: "demand/hops/bottom", answers: &fact_resolver.Answers{
@@ -129,19 +140,77 @@ func TestACompleteEntryAnswersAnAbsentFunctionAsNoFact(test *testing.T) {
 		Complete: map[string]bool{function_purity.Kind.Name: true},
 	}}
 	probed := probeThroughStore(test, complete, true)
-	if probed.panicked != "" || probed.pure {
-		test.Fatalf("want bottom.Pure answered not pure from the complete entry, got pure %t, panicked %q",
-			probed.pure, probed.panicked)
+	if probed.panicked != "" || probed.pure || len(probed.reloads) > 0 || probed.unsure {
+		test.Fatalf("want bottom.Pure answered not pure from the complete entry, sure, got pure %t, panicked %q, "+
+			"reloads %v, unsure %t", probed.pure, probed.panicked, probed.reloads, probed.unsure)
 	}
 	partial := fixedStore{path: "demand/hops/bottom", answers: &fact_resolver.Answers{
 		Values:   map[string]map[objectpath.Path][]byte{},
 		Complete: map[string]bool{},
 	}}
 	reloaded := probeThroughStore(test, partial, true)
-	const want = "fact_resolver: asked function_purity of demand/hops/bottom.Pure, of demand/hops/bottom, which the " +
-		"run restored and no store answers, so the run loads it from source and runs again"
-	if reloaded.panicked != want {
-		test.Fatalf("want the question over a partial entry to reload bottom, panicking with %q, got %q", want,
-			reloaded.panicked)
+	if reloaded.panicked != "" || !slices.Equal(reloaded.reloads, []string{"demand/hops/bottom"}) ||
+		!reloaded.unsure {
+		test.Fatalf("want the question over a partial entry to reload bottom and leave middle unsure, got panicked "+
+			"%q, reloads %v, unsure %t", reloaded.panicked, reloaded.reloads, reloaded.unsure)
+	}
+}
+
+// A verdict a kind computed from a placeholder stays in the kind's state for the run, so every answer of its package
+// is unsure from then on: top asks middle.Middle twice, which calls bottom.Pure, restored with nothing stored. The
+// first judging is handed a placeholder for bottom.Pure, and the second finds Middle's verdict already kept; both are
+// unsure, so neither is kept for the store, and the next round judges Middle again with bottom from source.
+func TestAVerdictFromAPlaceholderIsNeverKept(test *testing.T) {
+	test.Parallel()
+	directory := analysistest.TestData()
+	loaded, loadError := load.Packages(directory, []string{"demand/hops/top"}, []string{
+		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
+	}, nil)
+	if loadError != nil {
+		test.Fatalf("loading the fixture: %v", loadError)
+	}
+	var middleTypes *types.Package
+	probe := &analysis.Analyzer{
+		Name:       "placeholder_probe",
+		Doc:        "asks the purity of middle.Middle twice",
+		Requires:   []*analysis.Analyzer{function_purity.Analyzer},
+		ResultType: reflect.TypeFor[string](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			asked, isAsked := pass.ResultOf[function_purity.Analyzer].(*function_purity.Result)
+			if !isAsked {
+				return nil, fmt.Errorf("function_purity's result is a %T", pass.ResultOf[function_purity.Analyzer])
+			}
+			middleTypes = pass.Pkg.Imports()[0]
+			middle, isMiddle := middleTypes.Scope().Lookup("Middle").(*types.Func)
+			if !isMiddle {
+				return nil, fmt.Errorf("top's import declares no function Middle")
+			}
+			asked.IsPure(middle)
+			asked.IsPure(middle)
+			return "", nil
+		},
+	}
+	resolver := fact_resolver.New(fixedStore{path: "demand/hops/bottom", answers: &fact_resolver.Answers{
+		Values:   map[string]map[objectpath.Path][]byte{},
+		Complete: map[string]bool{},
+	}})
+	options := check.DispatchOptions()
+	options.Resolver = resolver
+	options.Restored = func(restoring *packages.Package) bool { return restoring.PkgPath == "demand/hops/bottom" }
+	options.Restore = func(*checker.Action) error { return nil }
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{probe}, loaded.Roots, options)
+	if analyzeError != nil {
+		test.Fatalf("analyzing the fixture: %v", analyzeError)
+	}
+	for _, action := range graph.Roots {
+		if action.Err != nil {
+			test.Fatalf("probing %s: %v", action.Package.ID, action.Err)
+		}
+	}
+	if kept := resolver.Recorded(middleTypes)[function_purity.Kind.Name]; len(kept) > 0 {
+		test.Fatalf("want no answer of middle kept for the store, its verdict made from a placeholder, got %v", kept)
+	}
+	if !resolver.Unsure(loaded.Roots[0].Types) || !resolver.Unsure(middleTypes) {
+		test.Fatal("want top and middle both unsure")
 	}
 }

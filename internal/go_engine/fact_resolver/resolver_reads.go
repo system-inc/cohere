@@ -121,8 +121,8 @@ func (resolver *Resolver) Probe(kindName string, owner *types.Package, path obje
 	if probe == nil {
 		return nil, false
 	}
-	resolver.probing.Store(true)
-	defer resolver.probing.Store(false)
+	resolver.probing.Add(1)
+	defer resolver.probing.Add(-1)
 	defer func() {
 		recovered := recover()
 		if recovered == nil {

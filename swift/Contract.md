@@ -834,8 +834,11 @@ A few facts are computed only when a rule asks of a function (#w7zmvat), from th
 package's syntax, which a restored package does not have. Each answer computed is kept in the
 package's entry, under its key, and the binary's entries hold every answer of their package. A
 question of a restored package that nothing holds an answer to is never answered "no fact": the
-run loads that package again from source, never restoring it, and runs again, and the first pass
-is dropped unwritten, until a round needs no package it did not load already. `"reloads":2`
+pass is handed a placeholder and runs on, so it names every package it needs, and the run loads
+those again from source, never restoring them, and runs again; the pass that ran on placeholders
+is dropped unwritten, until a round needs no package it did not load already. A run that writes
+the store keeps every answer of a standard-library package it checks from source, so a question
+of the standard library reloads nothing once it has. `"reloads":2`
 counts the packages so loaded and `"reloadRounds":1` the rounds, each written only when it is not 0.
 Beside them, `"replays":35` counts the questions answered by replaying the order the push walked a
 package in, which a cold run makes too; it is written only when it is not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.

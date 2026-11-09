@@ -31,6 +31,11 @@ type Caching struct {
 	ExtraInputs     func(*packages.Package) ([]string, error)
 	StandardLibrary *StandardLibraryCaching
 	Files           cache.FileDigests
+
+	// Goroot is the run's `GOROOT`, below which a package is the standard library's (cache.StandardPackages), whose
+	// entry the run writes with every answer of the fact kinds computed on demand, computed whole, as the binary's
+	// table holds them, so a question of the standard library never reloads it. Empty, no entry is written so.
+	Goroot string
 }
 
 // StandardLibraryCaching is the standard library's entries as a run reads them from the binary: the table, and what
@@ -180,6 +185,9 @@ type CacheSession struct {
 	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
 	trusted      map[*packages.Package]bool
 	byIdentifier map[string]*packages.Package
+
+	// standard are the standard library's packages among those the load reached (see Caching's Goroot).
+	standard map[*packages.Package]bool
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -265,6 +273,14 @@ func (session *CacheSession) Restore(
 		}
 		session.keys, session.own, hashed = keyed.Keys, keyed.Own, keyed.Files
 		session.files = keyed.Files
+	}
+	session.standard = nil
+	if session.caching.Goroot != "" {
+		standard, standardError := cache.StandardPackages(reachable, session.caching.Goroot)
+		if standardError != nil {
+			session.problem(fmt.Sprintf("judging the standard library: %v", standardError))
+		}
+		session.standard = standard
 	}
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)
@@ -624,7 +640,10 @@ func (session *CacheSession) saveMisses(
 			continue
 		}
 		session.attempted[keyed] = true
-		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) {
+		// A package whose analysis was handed a placeholder ran on a guess (fact_resolver.Unsure), and is analyzed
+		// again by the round that loads what the placeholder stood for.
+		unsure := session.resolver != nil && keyed.Types != nil && session.resolver.Unsure(keyed.Types)
+		if len(keyed.Errors) == 0 && !keyed.IllTyped && finishedClean(actionsOf[keyed]) && !unsure {
 			saving = append(saving, keyed)
 		}
 	}

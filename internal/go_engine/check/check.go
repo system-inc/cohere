@@ -181,9 +181,9 @@ type Result struct {
 	ReportsRestored int
 
 	// Reloads are the IDs of the packages a question of a fact computed on demand reached restored, with no answer
-	// stored, sorted (#w7zmvat wave 3). Each question failed, and its pass with it, so the result is not the run's: the
-	// caller has the session reload them (CacheSession.Reload) and loads and runs again, unless no reload is new, when
-	// the failures stand as the crashes that name them.
+	// stored, sorted (#w7zmvat wave 3). Each question was answered with a placeholder, and its pass ran on, so one run
+	// names every package its passes need; the result is not the run's, and every package handed a placeholder is a
+	// crash in it, never clean. The caller has the session reload them (CacheSession.Reload) and loads and runs again.
 	Reloads []string
 
 	// Replays is how many questions of a fact computed on demand the run answered by replaying the push's walk of a
@@ -384,6 +384,20 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 			cmp.Compare(left.Message, right.Message),
 		)
 	})
+	if session != nil {
+		result.Reloads = session.reloadsOf(session.resolver)
+	}
+	if len(result.Reloads) > 0 {
+		// The pipeline runs again over a load that checks the reloads from source and drops this result, but a caller
+		// that does not must never read it as clean: each package handed a placeholder ran on a guess.
+		for _, analyzedPackage := range analyzed {
+			if analyzedPackage.Types != nil && resolver.Unsure(analyzedPackage.Types) {
+				result.Crashes = append(result.Crashes, Crash{File: firstFile(analyzedPackage), Error: fmt.Sprintf(
+					"the rules on %s were handed placeholders for answers of %s, which the run must load from "+
+						"source, so it runs again", analyzedPackage.ID, strings.Join(result.Reloads, ", "))})
+			}
+		}
+	}
 	slices.SortFunc(result.Crashes, func(left, right Crash) int {
 		return cmp.Or(cmp.Compare(left.File, right.File), cmp.Compare(left.Error, right.Error))
 	})
@@ -391,7 +405,6 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	result.FilesWalked, result.NodesVisited = walk(files)
 	result.Replays = int(resolver.Fallbacks())
 	if session != nil {
-		result.Reloads = session.reloadsOf(session.resolver)
 		session.save(graph, options.Withheld, files)
 		result.Cache = session.counts
 	}

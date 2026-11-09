@@ -73,6 +73,8 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, func
 		stack: map[*intermediate_representation.Function]bool{}}
 	pure := walk.verdict(declared)
 	if walk.orderDependent {
+		// A question answered by the push's walk of the package is a replay; a whole package for the store is not.
+		resolver.Counts(Kind).Fallbacks.Add(1)
 		state.fallBack(resolver, home)
 		return state.pure[function]
 	}

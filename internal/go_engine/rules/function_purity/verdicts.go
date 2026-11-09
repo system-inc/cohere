@@ -19,7 +19,6 @@ type verdicts struct {
 // by the reasoning there; one the push contradicts is counted, so the differential can require none.
 func (state *verdicts) fallBack(resolver *fact_resolver.Resolver, home *fact_resolver.Package) {
 	counts := resolver.Counts(Kind)
-	counts.Fallbacks.Add(1)
 	recorded := &resolverFacts{resolver: resolver, home: home, pure: map[*types.Func]bool{}}
 	walk := &pushWalk{facts: recorded, irPackage: home.IntermediateRepresentation(),
 		seen: map[*intermediate_representation.Function]bool{}}

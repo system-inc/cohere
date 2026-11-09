@@ -27,8 +27,9 @@ import (
 // facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
 // can match, and would only be a miss read the long way. At 6, an analysis holds its report analyzer's result
 // (#jfvhbj7). At 7, an entry holds the answers a standard-library package was computed whole in (#w7zmvat wave 3).
-// At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b).
-const CacheFormatVersion = "go-engine-cache-8"
+// At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b). At 9, a standard-library
+// package's entry holds every answer of its package whenever a run writes it, so an entry of 8 may hold only some.
+const CacheFormatVersion = "go-engine-cache-9"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.

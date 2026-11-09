@@ -18,7 +18,8 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 )
 
-// unansweringStore is a store that answers nothing and reloaded nothing, so a question of a restored package reloads.
+// unansweringStore is a store that answers nothing and loaded every package from source already, so a question of a
+// restored package is a reload that failed, which ends the question in a panic.
 type unansweringStore struct{}
 
 func (unansweringStore) Answers(*types.Package) *fact_resolver.Answers {
@@ -26,13 +27,14 @@ func (unansweringStore) Answers(*types.Package) *fact_resolver.Answers {
 }
 
 func (unansweringStore) Reloaded(*types.Package) bool {
-	return false
+	return true
 }
 
-// A question whose replay of the push's walk ends in a panic midway, here a reload of the restored package outside,
-// leaves the walk with Outer and Inner marked seen and never judged. The next question must not read that walk: it
-// replays again from the first root, reaches outside again, and reloads again. Kept, the walk would skip both as seen
-// and answer Inner with no fact, silently, where the push holds a fact once outside is loaded from source.
+// A question whose replay of the push's walk ends in a panic midway, here a reload of outside that failed, as a probe's
+// abandoned question does too, leaves the walk with Outer and Inner marked seen and never judged. The next question
+// must not read that walk: it replays again from the first root, reaches outside again, and fails again. Kept, the
+// walk would skip both as seen and answer Inner with no fact, silently, where the push holds a fact once outside is
+// loaded from source.
 func TestAQuestionAfterAnAbandonedReplayNeverReadsIt(test *testing.T) {
 	test.Parallel()
 	directory := analysistest.TestData()
@@ -77,7 +79,7 @@ func TestAQuestionAfterAnAbandonedReplayNeverReadsIt(test *testing.T) {
 		}
 	}
 	const reload = "fact_resolver: asked return_nil_ness of replayed/outside.Value, of replayed/outside, which the " +
-		"run restored and no store answers"
+		"run loaded from source to answer it and still never learned"
 	if len(panicked) != 2 {
 		test.Fatalf("want two questions asked, got %d", len(panicked))
 	}

@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"maps"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/tools/go/types/objectpath"
 )
@@ -42,7 +43,11 @@ type answerKey struct {
 // no package declares, have none. Otherwise the answer is the store's when it holds one, the zero Value when the store
 // holds the package computed whole and no answer for object, and else compute's, which runs in the package, learned,
 // and is kept for the store. A package the run restored, with no answer for object in the store, is never answered
-// no fact: the question fails, and the run loads the package from source and runs again (see Reloads).
+// no fact the run keeps: the package is among Reloads, so the run loads it from source and runs again, and the
+// question is answered the zero Value as a placeholder, so the pass that asked runs on and asks everything else it
+// would, and one round collects every package the pass needs. A placeholder is never memoized or stored, and the
+// reader is unsure (see Unsure): an answer computed from one is unsure too, and so is every reader of that answer,
+// so nothing that rests on a placeholder is kept, and the round is dropped.
 //
 // reader is the package whose analysis asks, the asking rule's package or the package a judgment runs in. An answer
 // about another package's object is among reader's reads (see Reads), which its entry keeps, so a later run restoring
@@ -61,7 +66,11 @@ func Ask[Value any](
 	if object.Pkg() == nil || !isOrigin(object) {
 		return zero
 	}
-	answer := answerOf(resolver, kind, object, compute)
+	answer, unsure := answerOf(resolver, kind, object, compute)
+	if unsure {
+		resolver.markUnsure(reader.Types)
+		return answer
+	}
 	if resolver.store != nil && object.Pkg() != reader.Types {
 		resolver.read(reader.Types, kind, object, func() []byte { return encodeAnswer(kind, object, answer) })
 	}
@@ -69,8 +78,14 @@ func Ask[Value any](
 }
 
 // answerOf is Ask's answer about object, an object of a package and its own origin: memoized, the store's, or
-// compute's.
-func answerOf[Value any](resolver *Resolver, kind *Kind, object types.Object, compute func(home *Package) Value) Value {
+// compute's, and whether it is unsure: a placeholder for a package the run must reload, or computed from one, which
+// compute's home was handed while it ran.
+func answerOf[Value any](
+	resolver *Resolver,
+	kind *Kind,
+	object types.Object,
+	compute func(home *Package) Value,
+) (Value, bool) {
 	key := answerKey{kind: kind, object: object}
 	if memoized, held := resolver.answers.Load(key); held {
 		answer, isValue := memoized.(Value)
@@ -78,7 +93,7 @@ func answerOf[Value any](resolver *Resolver, kind *Kind, object types.Object, co
 			// Invariant: a kind asks with one Value type, which is what this function stores below.
 			panic(fmt.Sprintf("fact_resolver: %s's answer about %s is a %T", kind.Name, objectName(object), memoized))
 		}
-		return answer
+		return answer, false
 	}
 	home := resolver.Package(object.Pkg())
 	if resolver.store == nil {
@@ -100,18 +115,26 @@ func answerOf[Value any](resolver *Resolver, kind *Kind, object types.Object, co
 			}
 			resolver.storeHits.Add(1)
 			resolver.answers.Store(key, answer)
-			return answer
+			return answer, false
 		}
 	}
 	if home == nil {
 		resolver.reload(kind, object)
+		var placeholder Value
+		return placeholder, true
 	}
+	// home's computations ask with home as the reader, so a placeholder anywhere below this one marks home unsure.
+	// Once home is unsure, every answer computed in it is: a kind keeps the verdicts it computed in home, and one
+	// made from a placeholder would answer a later question without asking again.
 	answer := compute(home)
+	if resolver.Unsure(home.Types) {
+		return answer, true
+	}
 	if hasPath && resolver.store != nil {
 		resolver.record(kind, object.Pkg(), path, encodeAnswer(kind, object, answer))
 	}
 	resolver.answers.Store(key, answer)
-	return answer
+	return answer, false
 }
 
 // isOrigin reports whether object is its own origin, as a declared function or parameter is, and an instance's never.
@@ -164,13 +187,15 @@ func (resolver *Resolver) record(kind *Kind, packageTypes *types.Package, path o
 	resolver.recorded[packageTypes][kind.Name][path] = encoded
 }
 
-// reload ends the question about object, of kind, in a package the run restored and no store answered: the package is
-// among Reloads, so the run loads it from source and runs again, and the pass that asked fails, so nothing it found is
-// kept or reported. A package the run already loaded from source for this, and still never learned, is a reload that
-// failed, and the pass's failure names it.
+// reload notes that a question about object, of kind, reached a package the run restored and no store answered: the
+// package is among Reloads, so the run loads it from source and runs again, and Ask answers the question with a
+// placeholder. A package the run already loaded from source for this, and still never learned, is a reload that
+// failed: the question ends the pass that asked it, whose failure names the package. A probe's question ends the
+// probe, which never reloads (see Probe).
 func (resolver *Resolver) reload(kind *Kind, object types.Object) {
-	if resolver.probing.Load() {
-		// Invariant: a probe runs only inside Probe, which recovers this one value and answers that it could not.
+	if resolver.probing.Load() > 0 {
+		// Invariant: a probe runs only inside Probe or WholeIfComplete, which recover this one value and answer that
+		// they could not.
 		panic(probeAbandoned{})
 	}
 	if resolver.store.Reloaded(object.Pkg()) {
@@ -180,10 +205,38 @@ func (resolver *Resolver) reload(kind *Kind, object types.Object) {
 			"still never learned, so it has no answer", kind.Name, objectName(object), object.Pkg().Path()))
 	}
 	resolver.reloads.Store(object.Pkg(), true)
-	// Invariant: as above, the pass that asked ends here, and the run drops it once it has loaded the package from
-	// source; nothing between recovers the panic as an answer.
-	panic(fmt.Sprintf("fact_resolver: asked %s of %s, of %s, which the run restored and no store answers, so the "+
-		"run loads it from source and runs again", kind.Name, objectName(object), object.Pkg().Path()))
+}
+
+// markUnsure notes that reader was handed an unsure answer, a placeholder or one computed from a placeholder.
+func (resolver *Resolver) markUnsure(reader *types.Package) {
+	count, _ := resolver.unsure.LoadOrStore(reader, new(atomic.Int64))
+	held, isCount := count.(*atomic.Int64)
+	if !isCount {
+		// Invariant: the map holds only what LoadOrStore stored above.
+		panic(fmt.Sprintf("fact_resolver: %s's unsure count is a %T", reader.Path(), count))
+	}
+	held.Add(1)
+}
+
+// unsureCount is how many unsure answers the package whose types are reader was handed so far.
+func (resolver *Resolver) unsureCount(reader *types.Package) int64 {
+	count, held := resolver.unsure.Load(reader)
+	if !held {
+		return 0
+	}
+	known, isCount := count.(*atomic.Int64)
+	if !isCount {
+		// Invariant: markUnsure stores only counts.
+		panic(fmt.Sprintf("fact_resolver: %s's unsure count is a %T", reader.Path(), count))
+	}
+	return known.Load()
+}
+
+// Unsure reports whether the analysis of the package whose types are packageTypes was handed an unsure answer this
+// run, a placeholder for a package the run must reload or an answer computed from one, so nothing it found or
+// computed may be kept: its pass ran on a guess.
+func (resolver *Resolver) Unsure(packageTypes *types.Package) bool {
+	return resolver.unsureCount(packageTypes) > 0
 }
 
 // Reloads is every package a question reached restored, with no answer in the store, which the run must load from
@@ -237,6 +290,27 @@ func (resolver *Resolver) Whole(home *Package) map[string]map[objectpath.Path][]
 		whole[registered.kind.Name] = answers
 	}
 	return whole
+}
+
+// WholeIfComplete is Whole, and whether it is: false when computing it would have to reach a package the run
+// restored and no store answers, which it never reloads, as a probe never does, or when it rests on an answer the run
+// was unsure of. It runs as the run saves, with no pass running.
+func (resolver *Resolver) WholeIfComplete(home *Package) (whole map[string]map[objectpath.Path][]byte,
+	complete bool) {
+	resolver.probing.Add(1)
+	defer resolver.probing.Add(-1)
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		if _, abandoned := recovered.(probeAbandoned); !abandoned {
+			panic(recovered)
+		}
+		whole, complete = nil, false
+	}()
+	whole = resolver.Whole(home)
+	return whole, !resolver.Unsure(home.Types)
 }
 
 // registeredKind is one kind as it registered: the kind; its whole, each answer encoded as Ask encodes it; probe, its

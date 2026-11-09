@@ -62,7 +62,6 @@ func whole(resolver *fact_resolver.Resolver, home *fact_resolver.Package) map[ty
 	home.Lock()
 	defer home.Unlock()
 	state := stateIn(home)
-	resolver.Counts(Kind).Fallbacks.Add(1)
 	state.replayOf(resolver, home).rest()
 	answers := map[types.Object][]ValueNilness{}
 	for function, results := range state.results {

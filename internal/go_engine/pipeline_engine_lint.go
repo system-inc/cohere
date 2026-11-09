@@ -234,9 +234,10 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 // reloadedPass is pass over loaded, or, when a question of a fact computed on demand reached a package the findings
 // cache restored and no store answered it, the pass over a load that checks each such package from source, so the
 // question is answered as a run without the cache answers it, again for as long as a pass asks of another such package
-// (#w7zmvat wave 3). A pass that asked is no result: the questions failed, and their passes with them. Each round only
-// adds packages to load from source, so it ends; one whose every reload was loaded from source already stands, its
-// crashes naming the reload that failed. The load returned is the one the pass ran over.
+// (#w7zmvat wave 3). A pass that asked is no result: it ran on placeholders, handed for every question it asked of
+// such a package, so one round names them all. Each round only adds packages to load from source, so it ends; one
+// whose every reload was loaded from source already stands, its crashes naming the reload that failed. The load
+// returned is the one the pass ran over.
 func (engine *pipeline) reloadedPass(pass lintPass, loaded *load.Loaded) (lintPass, *load.Loaded) {
 	// Only pass's time outlives the first round, so nothing of the round a reload drops is held while it loads again.
 	elapsed := pass.elapsed
