@@ -117,7 +117,7 @@ func findEnclosingPackageLevelFunction(irPackage *Package, path []ast.Node) *Fun
 func findNamedFunc(irPackage *Package, position token.Pos) *Function {
 	// Look at all package members and method sets of named types.
 	// Not very efficient.
-	for _, mem := range irPackage.Members {
+	for _, mem := range irPackage.Members() {
 		switch mem := mem.(type) {
 		case *Function:
 			if mem.Pos() == position {

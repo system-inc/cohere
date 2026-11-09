@@ -58,7 +58,7 @@ func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, 
 
 	case *types.TypeName:
 		if name != "_" {
-			irPackage.Members[name] = &Type{
+			irPackage.members[name] = &Type{
 				object:    typedObject,
 				irPackage: irPackage,
 			}
@@ -72,7 +72,7 @@ func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, 
 		}
 		irPackage.values[typedObject] = constant
 		if name != "_" {
-			irPackage.Members[name] = constant
+			irPackage.members[name] = constant
 		}
 
 	case *types.Var:
@@ -85,7 +85,7 @@ func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, 
 		global.source = syntax
 		irPackage.values[typedObject] = global
 		if name != "_" {
-			irPackage.Members[name] = global
+			irPackage.members[name] = global
 		}
 
 	case *types.Func:
@@ -105,13 +105,31 @@ func memberFromObject(irPackage *Package, object types.Object, syntax ast.Node, 
 		irPackage.values[typedObject] = function
 		irPackage.Functions = append(irPackage.Functions, function)
 		if name != "_" && sig.Recv() == nil {
-			irPackage.Members[name] = function // package-level function
+			irPackage.members[name] = function // package-level function
 		}
 
 	default: // (incl. *types.Package)
 		// Invariant: a package's scope and the definitions of its package-level declarations hold only constants,
 		// variables, type names and functions, and builtins in package unsafe, each a case above.
 		panic("unexpected Object type: " + typedObject.String())
+	}
+}
+
+// forEachScopeMember calls create with each object a package created from its types has a member for, in go/ir's
+// order: every object of its scope, each named type's methods after it.
+func forEachScopeMember(packageTypes *types.Package, create func(object types.Object)) {
+	scope := packageTypes.Scope()
+	for _, name := range scope.Names() {
+		object := scope.Lookup(name)
+		create(object)
+		if typeName, ok := object.(*types.TypeName); ok {
+			// No Unalias: aliases should not duplicate methods.
+			if named, ok := typeName.Type().(*types.Named); ok {
+				for index, methodCount := 0, named.NumMethods(); index < methodCount; index++ {
+					create(named.Method(index))
+				}
+			}
+		}
 	}
 }
 

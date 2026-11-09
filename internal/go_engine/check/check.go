@@ -439,7 +439,7 @@ func DispatchOptions() *checker.Options {
 		Tolerant:      dispatch.IsDispatcher,
 		ForDependents: dispatch.ListenerRequirement,
 		Resolver:      fact_resolver.New(nil),
-		Resolved:      fact_resolver.Resolved,
+		Resolved:      rule.Resolved,
 	}
 }
 

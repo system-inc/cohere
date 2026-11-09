@@ -3,11 +3,13 @@ package fact_resolver
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"sync"
 	"sync/atomic"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 )
 
 // Package is one package as the resolver holds it: its types and what its functions build from, kept from the moment
@@ -20,12 +22,20 @@ type Package struct {
 	// crosses into it from (see Visible).
 	imports map[*types.Package]bool
 
+	fileSet  *token.FileSet
 	files    []*ast.File
 	info     *types.Info
 	noReturn func(*types.Func) bool
 
-	// irPackage is the package in the resolver's program, nil until a question first reaches it, and then created
-	// with each of its direct imports. Set under the resolver's mutex.
+	// forReaders is whether build_intermediate_representation runs on the package in the graph ctrlflow finished in,
+	// so its functions build in the readers' package (see ReadersPackage), and readsExpressions whether that
+	// package records the expression map. Both are set before the package is stored, and only read after.
+	forReaders       bool
+	readsExpressions bool
+
+	// irPackage is the package its functions build in, nil until a question or the readers first reach it: the
+	// readers' package, for a package forReaders, and otherwise the package in the resolver's program, created with
+	// each of its direct imports. Set under the resolver's mutex.
 	irPackage atomic.Pointer[intermediate_representation.Package]
 
 	// lock is held while a fact kind computes in the package (see Lock).
@@ -60,7 +70,7 @@ func (resolved *Package) Info() *types.Info {
 // declared function of the package, as an instantiated method's object never is.
 func (resolved *Package) Function(function *types.Func) *intermediate_representation.Function {
 	irPackage := resolved.created()
-	declared := resolved.resolver.program.FunctionValue(function)
+	declared := irPackage.Program.FunctionValue(function)
 	if declared == nil || declared.Package != irPackage || declared.Object() != types.Object(function) {
 		return nil
 	}
@@ -68,7 +78,8 @@ func (resolved *Package) Function(function *types.Func) *intermediate_representa
 	return declared
 }
 
-// IntermediateRepresentation is the package in the resolver's program, created with its direct imports if it was not.
+// IntermediateRepresentation is the package its functions build in, the readers' or the one in the resolver's program,
+// created if it was not.
 func (resolved *Package) IntermediateRepresentation() *intermediate_representation.Package {
 	return resolved.created()
 }
@@ -83,8 +94,12 @@ func (resolved *Package) SourceFunctions() []*intermediate_representation.Functi
 	return irPackage.Functions
 }
 
-// created is the package in the resolver's program, created on the first call with every package it imports, each
-// from its syntax where ctrlflow finished on it, as a build of its functions requires.
+// created is the package its functions build in, created on the first call. For a package forReaders it is the
+// readers' package, as build_intermediate_representation creates it, in a program of its own with each import from its
+// types alone: a judgment there reaches a callee in another package only by its object, through Ask. Its creation is
+// billed with whatever created it, the analyzer's run or a question, as the analyzer's own was. Otherwise it is the
+// package in the resolver's program, created with every package it imports, each from its syntax where ctrlflow
+// finished on it, as a build of its functions requires.
 func (resolved *Package) created() *intermediate_representation.Package {
 	if irPackage := resolved.irPackage.Load(); irPackage != nil {
 		return irPackage
@@ -93,6 +108,12 @@ func (resolved *Package) created() *intermediate_representation.Package {
 	resolver.mutex.Lock()
 	defer resolver.mutex.Unlock()
 	if irPackage := resolved.irPackage.Load(); irPackage != nil {
+		return irPackage
+	}
+	if resolved.forReaders {
+		irPackage := build_intermediate_representation.NewPackage(resolved.fileSet, resolved.Types, resolved.files,
+			resolved.info, resolved.noReturn, resolved.readsExpressions)
+		resolved.irPackage.Store(irPackage)
 		return irPackage
 	}
 	var irPackage *intermediate_representation.Package

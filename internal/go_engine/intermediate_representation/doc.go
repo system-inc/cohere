@@ -11,6 +11,10 @@
 //   - A package can carry its own no-return predicate (Package.SetNoReturn), and be created while
 //     others build, so one program can hold a run's packages each built as its own program would
 //     build it, which the fact resolver's does (#w7zmvat).
+//   - A package created from its types alone creates each member, a function, variable, constant or
+//     type, on its first lookup, where go/ir creates every object of its scope in CreatePackage: an
+//     importer's build touches few of them (#npb86tz). Package.Members is a method so that a walk of
+//     them all creates them first.
 //   - Constant composite simplification, which go/ir has switched off and buildir never runs.
 //   - Monomorphized generics. A generic body is built once, in generic form, and a call to an
 //     instance goes through an instantiation wrapper, as go/ir does without InstantiateGenerics.

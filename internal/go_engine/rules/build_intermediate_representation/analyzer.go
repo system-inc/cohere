@@ -11,6 +11,9 @@ package build_intermediate_representation
 
 import (
 	"fmt"
+	"go/ast"
+	"go/token"
+	"go/types"
 	"reflect"
 	"slices"
 
@@ -55,30 +58,70 @@ var ExpressionReader = &analysis.Analyzer{
 	},
 }
 
-// run creates a program for the pass's package alone, as buildir does: one per package, since the analysis API has no
-// place to hang a program every package shares. Each direct import is created from its types alone, so a call into it
-// finds its callee, and the package from its syntax, its expression map on when a reader of the map requires Analyzer
-// on it.
+// Sharer is what the engine's checker hands every pass under rule.Resolved, the run's fact resolver, which builds the
+// functions of a package it judges in the representation the readers walk, so a root's is built once in a run, not
+// once here and once again for the facts the run's entries hold (#wt5vaft). ReadersPackage is the package whose types
+// are packageTypes as NewPackage creates it for the readers, created on the first call, by the resolver's first
+// question there or by this analyzer's run, whichever comes first, or nil for a package the resolver learned no
+// action of this analyzer on, which run then creates alone.
+type Sharer interface {
+	ReadersPackage(packageTypes *types.Package) *intermediate_representation.Package
+}
+
+// run is the pass's package as the readers walk it: the one the run's resolver shares, created as NewPackage creates
+// it, or, under a driver with no resolver, NewPackage's own. Either way its expression map is on when a reader of the
+// map requires Analyzer on it, and a package the resolver created before this ran, for a question that reached it
+// first, was created so too: the resolver read the same set of dependents, from the graph, before any action ran.
 func run(pass *analysis.Pass) (any, error) {
 	graphs, isGraphs := pass.ResultOf[ctrlflow.Analyzer].(*ctrlflow.CFGs)
 	if !isGraphs {
 		return nil, fmt.Errorf("reading %s's result: it is %T, where ctrlflow's graphs were expected",
 			ctrlflow.Analyzer.Name, pass.ResultOf[ctrlflow.Analyzer])
 	}
-	program := intermediate_representation.NewProgram(pass.Fset)
-	program.SetNoReturn(graphs.NoReturn)
-	for _, imported := range pass.Pkg.Imports() {
-		program.CreatePackage(imported, nil, nil, true)
+	dependents, knowsDependents := pass.ResultOf[rule.Dependents].(map[*analysis.Analyzer]bool)
+	readsExpressions := ReadsExpressions(dependents, knowsDependents)
+	if sharer, shares := pass.ResultOf[rule.Resolved].(Sharer); shares {
+		if shared := sharer.ReadersPackage(pass.Pkg); shared != nil {
+			if shared.RecordsExpressions() != readsExpressions {
+				// A reader of the map would find none, or the package would record one nobody reads; the resolver
+				// reads the same dependents this pass holds, so the two never part.
+				return nil, fmt.Errorf("the fact resolver shares %s recording expressions %t, where this pass's "+
+					"dependents ask %t", pass.Pkg.Path(), shared.RecordsExpressions(), readsExpressions)
+			}
+			return &Result{irPackage: shared}, nil
+		}
 	}
-	created := program.CreatePackage(pass.Pkg, pass.Files, pass.TypesInfo, false)
-	created.SetDebugMode(readsExpressions(pass))
-	return &Result{irPackage: created}, nil
+	return &Result{irPackage: NewPackage(pass.Fset, pass.Pkg, pass.Files, pass.TypesInfo, graphs.NoReturn,
+		readsExpressions)}, nil
 }
 
-// readsExpressions is whether an analyzer that reads the expression map requires Analyzer on the pass's package, or
-// true where the driver doesn't say which analyzers do (see ExpressionReader).
-func readsExpressions(pass *analysis.Pass) bool {
-	dependents, knowsDependents := pass.ResultOf[rule.Dependents].(map[*analysis.Analyzer]bool)
+// NewPackage creates packageTypes's package in a program of its own, as buildir does: one per package, since the
+// analysis API has no place to hang a program every package shares. The program's no-return predicate is noReturn,
+// ctrlflow's on the package. Each direct import is created from its types alone, so a call into it finds its callee,
+// and the package from its syntax, files and info, its expression map on when readsExpressions is set. Nothing is
+// built yet.
+func NewPackage(
+	fileSet *token.FileSet,
+	packageTypes *types.Package,
+	files []*ast.File,
+	info *types.Info,
+	noReturn func(*types.Func) bool,
+	readsExpressions bool,
+) *intermediate_representation.Package {
+	program := intermediate_representation.NewProgram(fileSet)
+	program.SetNoReturn(noReturn)
+	for _, imported := range packageTypes.Imports() {
+		program.CreatePackage(imported, nil, nil, true)
+	}
+	created := program.CreatePackage(packageTypes, files, info, false)
+	created.SetDebugMode(readsExpressions)
+	return created
+}
+
+// ReadsExpressions is whether an analyzer that reads the expression map is among dependents, the analyzers that
+// require Analyzer on a package, or true where the driver doesn't say which analyzers do, knowsDependents unset (see
+// ExpressionReader).
+func ReadsExpressions(dependents map[*analysis.Analyzer]bool, knowsDependents bool) bool {
 	if !knowsDependents {
 		return true
 	}

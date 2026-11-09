@@ -11,7 +11,8 @@ package intermediate_representation
 // CreatePackage, either from syntax or from mere type information.
 // Each created package has a complete set of Members (const, var,
 // type, func) that can be accessed through methods like
-// Program.FunctionValue.
+// Program.FunctionValue. One created from type information creates
+// each member as it is first accessed.
 //
 // It is not necessary to call CreatePackage for all dependencies of
 // each syntax package, only for its direct imports. (In future
@@ -170,6 +171,7 @@ func (packageBuilder *builder) buildFunction(function *Function) {
 
 			function.build(packageBuilder, function)
 			function.done()
+			countBuild(function)
 		}
 	})
 }

@@ -9,6 +9,13 @@
 // own no-return predicate, ctrlflow's, as build_intermediate_representation builds a package alone, so a function
 // built here has the blocks it has there.
 //
+// A package build_intermediate_representation runs on in the graph, a root the readers walk, is the exception: its
+// functions build in the package that analyzer's result holds, created once by whichever of the analyzer's run and
+// the resolver's first question there comes first (ReadersPackage), so the run builds a root once, not once for the
+// readers and again for the facts its entry holds (#wt5vaft). A judgment there follows a call into another package
+// only by the callee's object, through Ask, so the callee's own package answers, never the types-only stub the
+// readers' program holds of it.
+//
 // The resolver knows no fact. A fact kind, as function_purity's, keeps its state in each package under its Kind and
 // computes there under the package's lock, asking across a package edge only through Visible, which passes what the
 // checker's inheritFacts would have carried. Locks are taken only downward along imports, so they never wait in a
@@ -33,20 +40,9 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
-
-// Resolved keys, in a pass's ResultOf, the run's *Resolver, which the engine's checker hands every pass when its
-// checker.Options.Resolved is this key and its Options.Resolver is set. It is a key and never runs, as rule.Timed is:
-// no analyzer requires it, so it is in no graph. One that required it would fail on every package, naming it.
-var Resolved = &analysis.Analyzer{
-	Name: "fact_resolver",
-	Doc:  "keys the resolver that computes facts on demand, which the checker hands every pass, and never runs",
-	Run: func(pass *analysis.Pass) (any, error) {
-		return nil, fmt.Errorf("an analyzer on %s requires %s, which is the key of the resolver the checker hands "+
-			"every pass, never an analyzer to run", pass.Pkg.Path(), pass.Analyzer.Name)
-	},
-}
 
 // Resolver is one run's facts on demand: every package ctrlflow finished on, by its types, and the program their
 // functions build in.
@@ -131,14 +127,14 @@ func New(store Store) *Resolver {
 	}
 }
 
-// Of is the resolver the checker hands pass, or an error naming what pass held instead, for a driver that set no
-// checker.Options.Resolver.
+// Of is the resolver the checker hands pass under rule.Resolved, or an error naming what pass held instead, for a
+// driver that set no checker.Options.Resolver.
 func Of(pass *analysis.Pass) (*Resolver, error) {
-	resolver, isResolver := pass.ResultOf[Resolved].(*Resolver)
+	resolver, isResolver := pass.ResultOf[rule.Resolved].(*Resolver)
 	if !isResolver || resolver == nil {
 		return nil, fmt.Errorf("reading the fact resolver on %s: the pass holds %T, where the checker's resolver was "+
-			"expected (checker.Options.Resolver and Resolved, as check.DispatchOptions sets them)", pass.Pkg.Path(),
-			pass.ResultOf[Resolved])
+			"expected (checker.Options.Resolver and rule.Resolved, as check.DispatchOptions sets them)",
+			pass.Pkg.Path(), pass.ResultOf[rule.Resolved])
 	}
 	if collector, timed := pass.ResultOf[rule.Timed].(*timing.Collector); timed && collector != nil {
 		resolver.timing.CompareAndSwap(nil, collector)
@@ -179,7 +175,9 @@ func (resolver *Resolver) measureBuild(build func()) {
 
 // Finished is the checker's word that action ran to the end. ctrlflow's action on a package is when the resolver learns
 // it: its syntax, type information and ctrlflow's graphs are all in place then, and every package it imports was
-// learned before it, since ctrlflow learns facts on each import first.
+// learned before it, since ctrlflow learns facts on each import first. The graph is whole by then too, so the resolver
+// reads there whether build_intermediate_representation runs on the package, and whether its readers ask for the
+// expression map, which a package it shares with them must record from its first build (see ReadersPackage).
 func (resolver *Resolver) Finished(action *checker.Action) {
 	if action.Analyzer != ctrlflow.Analyzer {
 		return
@@ -194,6 +192,7 @@ func (resolver *Resolver) Finished(action *checker.Action) {
 		resolver: resolver,
 		Types:    action.Package.Types,
 		imports:  make(map[*types.Package]bool, len(action.Package.Imports)),
+		fileSet:  action.Package.Fset,
 		files:    action.Package.Syntax,
 		info:     action.Package.TypesInfo,
 		noReturn: graphs.NoReturn,
@@ -201,12 +200,32 @@ func (resolver *Resolver) Finished(action *checker.Action) {
 	for _, imported := range action.Package.Imports {
 		learned.imports[imported.Types] = true
 	}
+	for _, sibling := range action.PackageActions() {
+		if sibling.Analyzer == build_intermediate_representation.Analyzer {
+			learned.forReaders = true
+			learned.readsExpressions = build_intermediate_representation.ReadsExpressions(sibling.Dependents())
+		}
+	}
 	resolver.mutex.Lock()
 	if resolver.program == nil {
 		resolver.program = intermediate_representation.NewProgram(action.Package.Fset)
 	}
 	resolver.mutex.Unlock()
 	resolver.packages.Store(learned.Types, learned)
+}
+
+// ReadersPackage is the package whose types are packageTypes as build_intermediate_representation's result holds it
+// for the readers, which the resolver builds its functions in too, created on the first call, by the analyzer's run
+// or by the first question there, whichever comes first: or nil for a package the resolver learned no such action on,
+// which builds in the resolver's own program, and which the analyzer, if it runs there in a later graph, creates
+// alone. The readers' package records the expression map from its first build when its readers ask for it, as the
+// analyzer creates it, so it is the same whichever creates it.
+func (resolver *Resolver) ReadersPackage(packageTypes *types.Package) *intermediate_representation.Package {
+	learned := resolver.Package(packageTypes)
+	if learned == nil || !learned.forReaders {
+		return nil
+	}
+	return learned.created()
 }
 
 // Package is the package whose types are packageTypes, or nil when ctrlflow never finished on it, which no question
