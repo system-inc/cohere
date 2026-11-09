@@ -19,12 +19,13 @@ import (
 //
 // An identifier referring to a constant or a predeclared identifier gets none, since they are trivial and
 // numerous, and neither does a parenthesized expression.
+//
+// Unlike go/ir's debugRef it holds no object: go/ir's is for its Object method, which ours does not have (#npb86tz).
 type debugReference struct {
 	anInstruction
-	Expression ast.Expr     // the referring expression (never *ast.ParenExpr)
-	object     types.Object // the identity of the source var/func, for an identifier
-	IsAddress  bool         // Expression is addressable and X is the address it denotes
-	X          Value        // the value or address of Expression
+	Expression ast.Expr // the referring expression (never *ast.ParenExpr)
+	IsAddress  bool     // Expression is addressable and X is the address it denotes
+	X          Value    // the value or address of Expression
 }
 
 func (reference *debugReference) Pos() token.Pos { return reference.Expression.Pos() }
@@ -53,14 +54,12 @@ func makeDebugReference(function *Function, expression ast.Expr, value Value, is
 		// Invariant: every caller hands the expression it lowered and the value it lowered it to.
 		panic("a debug reference with no expression or no value")
 	}
-	var object types.Object
 	unparenthesized := ast.Unparen(expression)
 	if id, isIdent := unparenthesized.(*ast.Ident); isIdent {
 		if isBlankIdent(id) {
 			return nil
 		}
-		object = function.objectOf(id)
-		switch object.(type) {
+		switch function.objectOf(id).(type) {
 		case *types.Nil, *types.Const, *types.Builtin:
 			return nil
 		}
@@ -69,6 +68,5 @@ func makeDebugReference(function *Function, expression ast.Expr, value Value, is
 		X:          value,
 		Expression: unparenthesized,
 		IsAddress:  isAddress,
-		object:     object,
 	}
 }
