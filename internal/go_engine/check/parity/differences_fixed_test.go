@@ -47,8 +47,9 @@ func TestRequireOnlyAdjudicatedFailsAFixedFileOneByteOff(test *testing.T) {
 
 // A fix one byte wider than the call, eating the byte after it, still starts on its finding's line and writes the
 // recorded text, so the `fixes:` record is met, as over fixed, which has no fixed file. Here it eats the space before
-// the found call's comment and the newline before the closing brace, which gofmt puts back, so the same fixture's
-// golden file, held formatted by RequireStaticcheckGolden, passes it, and the fixed file fails it, on the first line.
+// the found call's comment and the newline before the closing brace, which gofmt puts back, so the golden file of the
+// same source, differences_golden's, held formatted by RequireStaticcheckGolden, passes it, and the fixed file fails
+// it, on the first line.
 func TestRequireOnlyAdjudicatedFailsAFixOneByteWiderThanTheFixedFile(test *testing.T) {
 	test.Parallel()
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
@@ -57,7 +58,7 @@ func TestRequireOnlyAdjudicatedFailsAFixOneByteWiderThanTheFixedFile(test *testi
 	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireStaticcheckGolden(recording, calling(fixingMessages, writingPast("fixed()", 1)),
-			analysistest.TestData(), "differences_fixed")
+			analysistest.TestData(), "differences_golden")
 	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
 		RequireOnlyAdjudicated(recording, calling(sharedMessages, writingPast("fixed()", 1)),
@@ -100,4 +101,27 @@ func TestRequireOnlyAdjudicatedFailsAMoveWhoseOriginalFixMakesTheFixedFile(test 
 			analysistest.TestData(), "moved_fixed")
 	}), "the original's fixes on its moved finding at moved_fixed/moved_fixed.go:10, applied in place of the port's, "+
 		"make moved_fixed/moved_fixed.go.fixed too, so the move proves no fix of the original's wrong")
+}
+
+// A fixed file whose source is not beside it, as one left behind when its source was renamed, is read by nothing, so
+// it fails, named, though every record of the fixture is met.
+func TestRequireOnlyAdjudicatedFailsAFixedFileWithNoSource(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages, writing("fixed()")),
+			calling(fixingMessages, writing("fixed()")), analysistest.TestData(), "fixed_orphan")
+	}), "fixed_orphan/renamed.go.fixed is a fixed file with no source beside it that holds records, renamed.go, so "+
+		"nothing reads it: rename it for its source, or delete it")
+}
+
+// A fixed file beside a fixture package that a form holding no fixed file loads is read by nothing, so it fails, named,
+// where the same fixture's other files load as before.
+func TestAFormHoldingNoFixedFileFailsOneBesideItsFixture(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		Findings(recording, calling(sharedMessages), calling(sharedMessages), analysistest.TestData(),
+			"differences_fixed")
+	}), "differences_fixed/differences_fixed.go.fixed is a fixed file beside a fixture package this call loads, and "+
+		"it holds no fixed file, so nothing reads it: hold it with RequireOnlyAdjudicated or "+
+		"RequirePortWhereOriginalPanics, or delete it")
 }

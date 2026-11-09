@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -33,7 +34,8 @@ import (
 // An edit offered twice, as a package and its test variant each offer it, is applied once, as RunWithSuggestedFixes's
 // merge coalesces identical edits; two fixes whose edits overlap, as alternatives on one finding do, fail, so a file
 // whose findings offer alternatives takes no fixed file. A failure names the first line the two part on. A file with
-// no fixed file is held by its records alone. fileName names a file as findings name theirs, and fixture names the
+// no fixed file is held by its records alone, and a fixed file with no such source beside it fails (see
+// requireFixedSources). fileName names a file as findings name theirs, and fixture names the
 // fixture in a failure.
 func requireFixedFiles(
 	test testing.TB,
@@ -44,6 +46,7 @@ func requireFixedFiles(
 	moved []movedPair,
 ) {
 	test.Helper()
+	requireFixedSources(test, folder, fileName)
 	for _, pattern := range recordFiles {
 		names, globError := filepath.Glob(filepath.Join(folder, pattern))
 		if globError != nil {
@@ -91,6 +94,30 @@ func requireFixedFiles(
 						fixedFile.name)
 				}
 			}
+		}
+	}
+}
+
+// requireFixedSources fails the test for each `.fixed` file in folder whose source, its name without .fixed, is no
+// file there that can hold records (see recordFiles), named by fileName, since requireFixedFiles reads a fixed file
+// only beside such a file, and one whose source was renamed or never was would be held by nothing.
+func requireFixedSources(test testing.TB, folder string, fileName func(string) string) {
+	test.Helper()
+	fixedFiles, globError := filepath.Glob(filepath.Join(folder, "*.fixed"))
+	if globError != nil {
+		test.Fatalf("listing the fixed files of the differences fixture %s: %v", folder, globError)
+	}
+	for _, fixed := range fixedFiles {
+		source := strings.TrimSuffix(fixed, ".fixed")
+		isRecordFile := slices.ContainsFunc(recordFiles, func(pattern string) bool {
+			// Ignored: the patterns are fixed and well formed, so matching never errs.
+			matches, _ := filepath.Match(pattern, filepath.Base(source))
+			return matches
+		})
+		_, statError := os.Stat(source)
+		if !isRecordFile || statError != nil {
+			test.Errorf("%s is a fixed file with no source beside it that holds records, %s, so nothing reads it: "+
+				"rename it for its source, or delete it", fileName(fixed), path.Base(fileName(source)))
 		}
 	}
 }

@@ -385,7 +385,7 @@ func requireOnlyAdjudicated(
 ) {
 	test.Helper()
 	defer target.held(test)()
-	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
+	loads := loadFixturesHoldingFixed(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	folder := recordsFolder(test, loads[0])
 	recorded := adjudicated(test, folder, loads[0].fileName, given)
