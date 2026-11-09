@@ -21,8 +21,9 @@
 // RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireIdenticalFacts over them for a pair that exports facts, RequireOnlyAdjudicated over its differences fixture,
 // RequireStaticcheckGolden over staticcheck's golden files for a port that offers fixes, RequirePortWhereOriginalPanics
-// over a fixture the original panics on, and RequireNeitherFinds over what both must leave alone, counting what the run
-// handed them there. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a go.mod
+// over a fixture the original panics on, RequireNeitherFinds over what both must leave alone, counting what the run
+// handed them there, and RequireIdenticalLeavingAlone over packages holding files both judge beside files both must
+// leave alone, named. Each takes testdata and patterns, and a pattern naming a folder of testdata that holds a go.mod
 // loads that folder as a module (see fixtureLoad). Each loads for the machine's own target, and a port whose check
 // judges another calls the same on the target it judges, as `parity.On("GOOS=linux", "GOARCH=386",
 // "CGO_ENABLED=0").RequireIdentical(...)`, which sets the `GOOS` and `GOARCH` it names in go/build's default context as
@@ -241,6 +242,13 @@ func requireIdentical(
 	defer target.held(test)()
 	originalFindings, portFindings := findingsOver(test, original, port,
 		loadFixtures(test, target, testdata, patterns, expected))
+	compareIdentical(test, originalFindings, portFindings)
+}
+
+// compareIdentical is RequireIdentical's comparison of the findings each side made: each side's count logged, the test
+// failed when the original found nothing, and every finding one side alone makes named.
+func compareIdentical(test testing.TB, originalFindings []Finding, portFindings []Finding) {
+	test.Helper()
 	test.Logf("the original found %d, the port %d", len(originalFindings), len(portFindings))
 	if len(originalFindings) == 0 {
 		test.Fatalf("the original found nothing in the fixtures, so the comparison proves nothing")

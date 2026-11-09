@@ -100,6 +100,19 @@ func (target Target) RequireIdenticalFacts(
 	requireIdenticalFacts(test, target, original, port, testdata, patterns...)
 }
 
+// RequireIdenticalLeavingAlone is the package's RequireIdenticalLeavingAlone with the fixtures loaded for target.
+func (target Target) RequireIdenticalLeavingAlone(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	alone []string,
+	patterns ...string,
+) {
+	test.Helper()
+	requireIdenticalLeavingAlone(test, target, original, port, testdata, alone, patterns...)
+}
+
 // RequireNeitherFinds is the package's RequireNeitherFinds with the fixtures loaded for target.
 func (target Target) RequireNeitherFinds(
 	test testing.TB,
