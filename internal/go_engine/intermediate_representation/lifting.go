@@ -78,42 +78,50 @@ func liftFunction(function *Function) {
 	if options.unlifted {
 		return
 	}
-	for liftingRound(function, options) {
+	scratch, isScratch := liftingScratchPool.Get().(*liftingScratch)
+	if !isScratch {
+		// The pool's New makes every value it holds, so this is only a pool emptied by a collection.
+		scratch = &liftingScratch{}
 	}
+	for liftingRound(function, options, scratch) {
+	}
+	scratch.release()
+	liftingScratchPool.Put(scratch)
 }
 
 // liftingRound is one of go/ir's lift calls, and reports whether it lifted anything.
 //
 // Mutates: function lifting rewrites its blocks and Locals in place, as go/ir's lift does
-func liftingRound(function *Function, options liftingOptions) bool {
+// Mutates: scratch the round's tables are kept in it, for the next round to reuse
+func liftingRound(function *Function, options liftingOptions, scratch *liftingScratch) bool {
 	usesDefer := false
 	deferStackAllocation, deferStackCall := liftingDeferStackPreamble(function)
 	eliminateDeferStack := deferStackAllocation != nil && !deferStackAllocation.Heap
 
-	work := make([]liftingWork, len(function.Blocks))
-	heads := liftingNumber(function)
-
-	runDefers := make([]int, len(function.Blocks))
-	var scratch liftingLiftableScratch
-	var allocations []*Allocation
-	// localsInBlocks says which of the function's Locals the walk below finds in a block, and is nil when it has
-	// none: a map of Locals alone, most functions holding a handful, where go/ir marks every Allocation it walks.
-	var localsInBlocks map[*Allocation]bool
+	scratch.work = liftingCleared(scratch.work, len(function.Blocks))
+	liftingNumber(function, scratch)
+	scratch.runDefers = liftingCleared(scratch.runDefers, len(function.Blocks))
+	scratch.allocations = scratch.allocations[:0]
+	// Cleared whether or not the function has Locals, so a lookup never finds an earlier round's.
+	clear(scratch.localsInBlocks)
 	if len(function.Locals) > 0 {
-		localsInBlocks = make(map[*Allocation]bool, len(function.Locals))
+		if scratch.localsInBlocks == nil {
+			scratch.localsInBlocks = make(map[*Allocation]bool, len(function.Locals))
+		}
+		scratch.localsHeld = max(scratch.localsHeld, len(function.Locals))
 		for _, local := range function.Locals {
-			localsInBlocks[local] = false
+			scratch.localsInBlocks[local] = false
 		}
 	}
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
 			switch instruction := instruction.(type) {
 			case *Allocation:
-				if _, isLocal := localsInBlocks[instruction]; isLocal {
-					localsInBlocks[instruction] = true
+				if _, isLocal := scratch.localsInBlocks[instruction]; isLocal {
+					scratch.localsInBlocks[instruction] = true
 				}
-				if liftingLiftable(instruction, work, heads, &scratch) {
-					allocations = append(allocations, instruction)
+				if liftingLiftable(instruction, scratch.work, scratch.heads, &scratch.liftable) {
+					scratch.allocations = append(scratch.allocations, instruction)
 				}
 			case *Defer:
 				usesDefer = true
@@ -125,26 +133,26 @@ func liftingRound(function *Function, options liftingOptions) bool {
 					instruction.DeferStack = nil
 				}
 			case *RunDefers:
-				runDefers[block.Index]++
+				scratch.runDefers[block.Index]++
 			}
 		}
 	}
 
 	var lifting *liftingFunction
-	if len(allocations) > 0 {
-		liftingApplyWork(function, work)
-		lifting = liftingPrepare(function, allocations, options)
+	if len(scratch.allocations) > 0 {
+		liftingApplyWork(function, scratch.work)
+		lifting = liftingPrepare(function, scratch.allocations, options, scratch)
 		static_single_assignment.Construct(liftingGraph{}, lifting)
 		if options.verify != nil {
 			incomplete, places := liftingPlacedProblems(lifting)
 			options.verify(function, static_single_assignment.VerifyStaticSingleAssignment(liftingGraph{}, lifting),
 				incomplete, places)
 		}
-		liftingResolve(lifting)
+		liftingResolve(lifting, scratch)
 		// A lifted Allocation leaves Locals with the ones no block holds.
-		for _, allocation := range allocations {
-			if _, isLocal := localsInBlocks[allocation]; isLocal {
-				localsInBlocks[allocation] = false
+		for _, allocation := range scratch.allocations {
+			if _, isLocal := scratch.localsInBlocks[allocation]; isLocal {
+				scratch.localsInBlocks[allocation] = false
 			}
 		}
 	}
@@ -166,21 +174,16 @@ func liftingRound(function *Function, options liftingOptions) bool {
 			head, slots = lifted.newPhis, lifted.slots
 		}
 		holdsCall := deletedCall != nil && deletedCall.Block() == block
-		if len(head) == 0 && slots == nil && !holdsCall && (usesDefer || runDefers[block.Index] == 0) {
+		if len(head) == 0 && slots == nil && !holdsCall && (usesDefer || scratch.runDefers[block.Index] == 0) {
 			continue
 		}
-		instructions := make([]Instruction, 0, len(head)+len(block.Instructions))
-		instructions = append(instructions, liftingInstructions(head)...)
-		for index, instruction := range block.Instructions {
+		liftingRewriteBlock(block, head, func(index int, instruction Instruction) bool {
 			if instruction == nil || instruction == deletedCall || (index < len(slots) && slots[index].deleted) {
-				continue
+				return false
 			}
-			if _, isRunDefers := instruction.(*RunDefers); isRunDefers && !usesDefer {
-				continue
-			}
-			instructions = append(instructions, instruction)
-		}
-		block.Instructions = instructions
+			_, isRunDefers := instruction.(*RunDefers)
+			return !isRunDefers || usesDefer
+		})
 	}
 
 	// Remove the lifted Allocations from Locals, and those no block holds any longer, the block optimization
@@ -188,26 +191,55 @@ func liftingRound(function *Function, options liftingOptions) bool {
 	// its lift keeps a local whose index the round set to -1, the mark of an unliftable Allocation, and an
 	// Allocation in no block keeps its zero index, the mark of a lifted one.
 	function.Locals = slices.DeleteFunc(function.Locals, func(local *Allocation) bool {
-		return !localsInBlocks[local]
+		return !scratch.localsInBlocks[local]
 	})
-	return len(allocations) > 0
+	return len(scratch.allocations) > 0
 }
 
-// liftingInstructions is phis as instructions.
-func liftingInstructions(phis []*Phi) []Instruction {
-	instructions := make([]Instruction, len(phis))
-	for index, phi := range phis {
-		instructions[index] = phi
+// liftingRewriteBlock makes block's instructions head, then each of its instructions keep accepts, in order, keep
+// handed each one's index in the block as it was. It rewrites them in the block's own array when that holds both,
+// and makes a new one only when the phis outnumber what goes and the array's spare capacity (#npb86tz): a round
+// rewrites every block it lifted in, and a new array for each was the largest thing a round made.
+//
+// Mutates: block its instructions are rewritten, in its own array where they fit
+func liftingRewriteBlock(block *BasicBlock, head []*Phi, keep func(index int, instruction Instruction) bool) {
+	// Compacting writes at an index no later than the one it reads, so it never overwrites one still to read.
+	kept := 0
+	for index, instruction := range block.Instructions {
+		if keep(index, instruction) {
+			block.Instructions[kept] = instruction
+			kept++
+		}
 	}
-	return instructions
+	length := len(head) + kept
+	if length > cap(block.Instructions) {
+		instructions := make([]Instruction, length)
+		copy(instructions[len(head):], block.Instructions[:kept])
+		for index, phi := range head {
+			instructions[index] = phi
+		}
+		block.Instructions = instructions
+		return
+	}
+	// The kept instructions move past the phis, copy handling the overlap, and the tail the round dropped is cleared
+	// so the array holds nothing it no longer lists.
+	spanned := block.Instructions[:max(length, len(block.Instructions))]
+	copy(spanned[len(head):length], spanned[:kept])
+	for index, phi := range head {
+		spanned[index] = phi
+	}
+	clear(spanned[length:])
+	block.Instructions = spanned[:length]
 }
 
-// liftingNumber numbers each block's instructions from zero, as liftable reads them, and returns each block's
-// first non-phi index, or -1 for a block of phis alone.
-func liftingNumber(function *Function) []int {
-	heads := make([]int, len(function.Blocks))
+// liftingNumber numbers each block's instructions from zero, as liftable reads them, and sets scratch's heads to
+// each block's first non-phi index, or -1 for a block of phis alone.
+//
+// Mutates: scratch its heads are the round's, in the array the last round's were
+func liftingNumber(function *Function, scratch *liftingScratch) {
+	scratch.heads = liftingCleared(scratch.heads, len(function.Blocks))
 	for _, block := range function.Blocks {
-		heads[block.Index] = -1
+		scratch.heads[block.Index] = -1
 		var number Id
 		for index, instruction := range block.Instructions {
 			if instruction == nil {
@@ -215,12 +247,11 @@ func liftingNumber(function *Function) []int {
 			}
 			instruction.setId(number)
 			number++
-			if _, isPhi := instruction.(*Phi); !isPhi && heads[block.Index] == -1 {
-				heads[block.Index] = index
+			if _, isPhi := instruction.(*Phi); !isPhi && scratch.heads[block.Index] == -1 {
+				scratch.heads[block.Index] = index
 			}
 		}
 	}
-	return heads
 }
 
 // liftingApplyWork makes the changes liftable recorded: each rename, then each insertion.
@@ -247,17 +278,30 @@ func liftingApplyWork(function *Function, work []liftingWork) {
 }
 
 // liftingPrepare is function as the core sees it, with a place on each lifted Allocation, each Store to one and
-// each Load from one.
-func liftingPrepare(function *Function, allocations []*Allocation, options liftingOptions) *liftingFunction {
-	lifting := &liftingFunction{
-		function:     function,
-		declarations: make([]static_single_assignment.DeclarationId, len(allocations)),
-		allocations:  allocations,
+// each Load from one, made in scratch's lifting from scratch's arrays.
+//
+// Mutates: scratch its lifting is the round's, and its arrays hold the round's blocks and slots
+func liftingPrepare(function *Function, allocations []*Allocation, options liftingOptions,
+	scratch *liftingScratch) *liftingFunction {
+	lifting := &scratch.lifting
+	lifting.function = function
+	lifting.allocations = allocations
+	lifting.declarations = liftingCleared(lifting.declarations, len(allocations))
+	lifting.blocks = liftingCleared(lifting.blocks, len(function.Blocks))
+	scratch.blockValues = liftingCleared(scratch.blockValues, len(function.Blocks))
+	instructions := 0
+	for _, block := range function.Blocks {
+		instructions += len(block.Instructions)
 	}
+	scratch.slots = liftingCleared(scratch.slots, instructions)
 	// Each instruction's id is its index in its block for the round, so a lifted cell, Load or debug reference is
 	// found by its block and id rather than through a map (#beapx0q). finishBody numbers them again after lifting.
-	for _, block := range function.Blocks {
-		lifting.blocks = append(lifting.blocks, &liftingBlock{block: block})
+	start := 0
+	for blockIndex, block := range function.Blocks {
+		end := start + len(block.Instructions)
+		scratch.blockValues[blockIndex] = liftingBlock{block: block, vacantSlots: scratch.slots[start:end:end]}
+		lifting.blocks[blockIndex] = &scratch.blockValues[blockIndex]
+		start = end
 		for index, instruction := range block.Instructions {
 			instruction.setId(Id(index))
 		}
@@ -302,21 +346,22 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 			}
 		}
 	}
-	liftingCarvePlaced(lifting, options)
-	lifting.order = liftingReversePostorder(lifting)
+	liftingCarvePlaced(lifting, options, scratch)
+	lifting.order = liftingReversePostorder(lifting, scratch)
 	return lifting
 }
 
 // liftingCarvePlaced sets each block's placed view, every view carved from one backing array for the round, sized
-// by counting the places first: one allocation a round, where a slice grown per block allocates and copies as it
-// goes (#beapx0q).
+// by counting the places first: one array a round, where a slice grown per block allocates and copies as it goes
+// (#beapx0q). The array is scratch's placed, reused when it holds them all (#npb86tz).
 //
 // An index is int32, which holds any index a block can have: a block's instructions are a slice of interfaces, 16
 // bytes each, so a block past math.MaxInt32 of them would hold 32 GiB in that slice alone. The check makes the
 // bound loud should it ever be crossed, rather than wrapping.
 //
 // Mutates: lifting its blocks' placed views are set
-func liftingCarvePlaced(lifting *liftingFunction, options liftingOptions) {
+// Mutates: scratch its placed array holds the round's views
+func liftingCarvePlaced(lifting *liftingFunction, options liftingOptions, scratch *liftingScratch) {
 	inView := func(block *liftingBlock, index int) bool {
 		if !block.slots[index].isPlace {
 			return false
@@ -337,15 +382,16 @@ func liftingCarvePlaced(lifting *liftingFunction, options liftingOptions) {
 			}
 		}
 	}
-	backing := make([]int32, 0, places)
+	// Sized before any view is carved, so no append below moves the array a view is carved from.
+	scratch.placed = liftingCleared(scratch.placed, places)[:0]
 	for _, block := range lifting.blocks {
-		start := len(backing)
+		start := len(scratch.placed)
 		for index := range block.slots {
 			if inView(block, index) {
-				backing = append(backing, int32(index))
+				scratch.placed = append(scratch.placed, int32(index))
 			}
 		}
-		block.placed = backing[start:len(backing):len(backing)]
+		block.placed = scratch.placed[start:len(scratch.placed):len(scratch.placed)]
 	}
 }
 
@@ -380,14 +426,14 @@ func liftingDeclarationOf(cell *liftingSlot) static_single_assignment.Declaratio
 	return static_single_assignment.DeclarationId(cell.place.identifier)
 }
 
-// liftingPlaceAt gives block's instruction at index a place of declaration in role, making the block's slots on
-// its first.
+// liftingPlaceAt gives block's instruction at index a place of declaration in role, taking the block's slots from
+// its vacant ones on its first.
 //
 // Mutates: block its slots are where the core finds each instruction's place
 func liftingPlaceAt(block *liftingBlock, index int, declaration static_single_assignment.DeclarationId,
 	role static_single_assignment.Role) {
 	if block.slots == nil {
-		block.slots = make([]liftingSlot, len(block.block.Instructions))
+		block.slots = block.vacantSlots
 	}
 	// A declaration's own identifier is its number, so the first identifiers are the declarations'.
 	identifier := static_single_assignment.IdentifierId(declaration)
@@ -396,28 +442,30 @@ func liftingPlaceAt(block *liftingBlock, index int, declaration static_single_as
 
 // liftingReversePostorder is the blocks in reverse postorder from the entry over Successors, then the blocks the
 // entry doesn't reach, in index order: Braun's construction needs every predecessor but a back edge's walked
-// before a block.
-func liftingReversePostorder(lifting *liftingFunction) []*liftingBlock {
-	visited := make([]bool, len(lifting.blocks))
-	var postorder []*liftingBlock
+// before a block. It is scratch's order, walked with scratch's visited, each in the array the last round's was.
+//
+// Mutates: scratch its visited and order are the round's
+func liftingReversePostorder(lifting *liftingFunction, scratch *liftingScratch) []*liftingBlock {
+	scratch.visited = liftingCleared(scratch.visited, len(lifting.blocks))
+	scratch.order = scratch.order[:0]
 	var visit func(block *BasicBlock)
 	visit = func(block *BasicBlock) {
-		visited[block.Index] = true
+		scratch.visited[block.Index] = true
 		for _, successor := range block.Successors {
-			if !visited[successor.Index] {
+			if !scratch.visited[successor.Index] {
 				visit(successor)
 			}
 		}
-		postorder = append(postorder, lifting.blocks[block.Index])
+		scratch.order = append(scratch.order, lifting.blocks[block.Index])
 	}
 	visit(lifting.function.Blocks[0])
-	slices.Reverse(postorder)
+	slices.Reverse(scratch.order)
 	for _, block := range lifting.blocks {
-		if !visited[block.block.Index] {
-			postorder = append(postorder, block)
+		if !scratch.visited[block.block.Index] {
+			scratch.order = append(scratch.order, block)
 		}
 	}
-	return postorder
+	return scratch.order
 }
 
 // liftingDefinition is what the core's construction made one identifier: the zero of an Allocation, the operand
@@ -434,11 +482,12 @@ type liftingDefinition struct {
 // block the new phis to prepend.
 //
 // Its tables are dense, by identifier, sized to every identifier the core minted: Mint appends to
-// lifting.declarations, so its length bounds them all (#beapx0q).
+// lifting.declarations, so its length bounds them all (#beapx0q). The definitions are scratch's, reused (#npb86tz).
 //
 // Mutates: lifting its blocks' slots are marked deleted, and their newPhis set
-func liftingResolve(lifting *liftingFunction) {
-	definitions := make([]liftingDefinition, len(lifting.declarations))
+// Mutates: scratch its definitions are the round's
+func liftingResolve(lifting *liftingFunction, scratch *liftingScratch) {
+	scratch.definitions = liftingCleared(scratch.definitions, len(lifting.declarations))
 	for _, block := range lifting.blocks {
 		for index, slot := range block.slots {
 			if !slot.isPlace {
@@ -446,9 +495,9 @@ func liftingResolve(lifting *liftingFunction) {
 			}
 			switch instruction := block.block.Instructions[index].(type) {
 			case *Allocation:
-				definitions[slot.place.identifier].zero = instruction
+				scratch.definitions[slot.place.identifier].zero = instruction
 			case *Store:
-				definitions[slot.place.identifier].store = instruction
+				scratch.definitions[slot.place.identifier].store = instruction
 			}
 		}
 	}
@@ -468,7 +517,7 @@ func liftingResolve(lifting *liftingFunction) {
 			phi.setSource(allocation.source)
 			phi.setType(deref(allocation.Type()))
 			phi.setBlock(block.block)
-			definitions[core.Place.identifier].phi = phi
+			scratch.definitions[core.Place.identifier].phi = phi
 			placed = append(placed, placedPhi{block: block.block, core: core, phi: phi})
 		}
 	}
@@ -484,7 +533,7 @@ func liftingResolve(lifting *liftingFunction) {
 		return value
 	}
 	valueOf = func(identifier static_single_assignment.IdentifierId) Value {
-		definition := &definitions[identifier]
+		definition := &scratch.definitions[identifier]
 		if definition.value != nil {
 			return definition.value
 		}
@@ -500,9 +549,9 @@ func liftingResolve(lifting *liftingFunction) {
 			if allocation == nil {
 				allocation = lifting.allocations[lifting.declarations[identifier]]
 			}
-			definitions[identifier].value = zeroConstant(deref(allocation.Type()), allocation.source)
+			scratch.definitions[identifier].value = zeroConstant(deref(allocation.Type()), allocation.source)
 		}
-		return definitions[identifier].value
+		return scratch.definitions[identifier].value
 	}
 
 	created := make([]*Phi, 0, len(placed))
@@ -575,12 +624,13 @@ func liftingResolve(lifting *liftingFunction) {
 	}
 }
 
-// liftingDeleteAt marks block's instruction at index for the round to drop, making the block's slots on its first.
+// liftingDeleteAt marks block's instruction at index for the round to drop, taking the block's slots from its vacant
+// ones on its first.
 //
 // Mutates: block its slots carry what the round drops
 func liftingDeleteAt(block *liftingBlock, index int) {
 	if block.slots == nil {
-		block.slots = make([]liftingSlot, len(block.block.Instructions))
+		block.slots = block.vacantSlots
 	}
 	block.slots[index].deleted = true
 }

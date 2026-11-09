@@ -28,7 +28,8 @@ type liftingRename struct {
 }
 
 // liftingLiftableScratch is liftable's working memory, kept across one round's Allocations so each reuses the
-// last one's slices rather than making its own (#beapx0q): go/ir reuses its liftableBlockMap the same way.
+// last one's slices rather than making its own (#beapx0q), as go/ir reuses its liftableBlockMap, and across rounds
+// and functions in liftingScratch (#npb86tz).
 type liftingLiftableScratch struct {
 	descriptions        []liftingBlockDescription
 	seen                []bool
