@@ -131,10 +131,11 @@ func TestALandingTestsOnHomeAndRunsHomesSkipsOnTheMac(test *testing.T) {
 			},
 		},
 		{
-			name:   "Home unreachable",
-			home:   func(string) string { return "ssh: connect to host Home: Connection refused\n" },
-			lands:  true,
-			inBody: []string{"go test of the module on the Mac, since Home's run never said what it tested"},
+			name:  "Home unreachable",
+			home:  func(string) string { return "ssh: connect to host Home: Connection refused\n" },
+			lands: true,
+			inBody: []string{"go test of the module on the Mac, since Home's run never said what it tested (ssh: " +
+				"connect to host Home: Connection refused, exit status 255)"},
 		},
 		{
 			name:   "Home answers about another tree",

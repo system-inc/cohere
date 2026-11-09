@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -250,7 +251,8 @@ func runHomeGate(worktree string, commit string, patterns []string, now time.Tim
 	verdict := readTestJson(output)
 	switch {
 	case verdict.commit == "":
-		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)", describeEnd(runError))
+		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)",
+			lastWords(output, describeEnd(runError)))
 	case verdict.commit != commit:
 		return homeVerdict{}, fmt.Sprintf("Home tested %s, not %s", shortCommit(verdict.commit), shortCommit(commit))
 	case verdict.operatingSystem == "" || verdict.architecture == "":
@@ -343,6 +345,19 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		time.Sleep(homeHeldRetryWait)
 	}
 }
+
+// lastWords is the last line of output that says something, its terminal colors taken out, so a fallback names why
+// Home gave no verdict in gap's own words, "refused · ..." among them; fallback when it said nothing.
+func lastWords(output []byte, fallback string) string {
+	lines := strings.Split(strings.TrimSpace(terminalColor.ReplaceAllString(string(output), "")), "\n")
+	if last := strings.TrimSpace(lines[len(lines)-1]); last != "" {
+		return last + ", " + fallback
+	}
+	return fallback
+}
+
+// terminalColor is a terminal's color sequence, which gap writes around its verdict words.
+var terminalColor = regexp.MustCompile("\x1b\\[[0-9;]*m")
 
 func describeEnd(runError error) string {
 	if runError == nil {
