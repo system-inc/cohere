@@ -417,13 +417,13 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 		{"suffix expansion keeps the head", "const rowProps = 1;\n", `Use "rowProperties"`},
 		{"milliseconds at the end", "const maximumAgeMs = 1;\n", `Use "maximumAgeInMilliseconds"`},
 		{"milliseconds in the middle", "const maximumAgeMsHalf = 1;\n", `Use "maximumAgeInMillisecondsHalf"`},
-		{"a word segment in the middle", "const outputDirPath = 1;\n", `Use "outputDirectoryPath"`},
+		{"a word segment in the middle", "const buildEnvName = 1;\n", `Use "buildEnvironmentName"`},
 		{"a word segment at the end", "const originalInitCwd = 1;\n", `Use "originalInitWorkingDirectory"`},
-		{"the longer word wins", "const themeVars = 1;\n", `Use "themeVariables"`},
+		{"the longer word wins", "const themeVarsVar = 1;\n", `abbreviates "Vars". Use "Variables" for variables`},
 		// One occurrence at a time, which is what JavaScript's non-global String.replace does and
 		// what the original means. Expanding every occurrence at once would hand a reader a name
 		// they did not ask for in a position the rule never reported.
-		{"a repeated segment expands once", "const rootDirCacheDir = 1;\n", `Use "rootDirectoryCacheDir"`},
+		{"a repeated segment expands once", "const rootCfgCacheCfg = 1;\n", `Use "rootConfigurationCacheCfg"`},
 		{"a repeated millisecond unit expands once", "const ageMsHalfMs = 1;\n", `Use "ageInMillisecondsHalfMs"`},
 		// Strict code cannot bind `arguments` or `package`, so a binding named for their abbreviation is
 		// told to end in the word rather than to be it. A rest is told the same.
@@ -462,6 +462,52 @@ func TestConsistencyNoAbbreviatedIdentifierNamesTheReplacement(test *testing.T) 
 			"a whole word with two meanings names both",
 			"const pos = 1;\n",
 			`Use "position" or "positive", whichever it means, or a more descriptive name.`,
+		},
+		// An audit of the Go fix's renames found `res`, `ch` and `dir` guessed: `res` read as a response where it
+		// meant a result or MakeMap's reserve, `ch` as a channel where it was a rune, `dir` as a directory where it
+		// was a ChanDir. Each names every meaning.
+		{
+			"a whole res names all four meanings",
+			"const res = 1;\n",
+			`Use "result", "response", "resource" or "reserve", whichever it means, or a more descriptive name.`,
+		},
+		{
+			"a res prefix names all four meanings",
+			"const resBody = 1;\n",
+			`Use "resultBody", "responseBody", "resourceBody" or "reserveBody", whichever it means.`,
+		},
+		{
+			"a res suffix names all four meanings",
+			"const fetchRes = 1;\n",
+			`Use "fetchResult", "fetchResponse", "fetchResource" or "fetchReserve", whichever it means.`,
+		},
+		{
+			"a whole ch names both meanings",
+			"const ch = 1;\n",
+			`Use "channel" or "character", whichever it means, or a more descriptive name.`,
+		},
+		{
+			"a ch segment names both meanings",
+			"const doneCh = 1;\n",
+			`Use "doneChannel" or "doneCharacter", whichever it means.`,
+		},
+		{
+			"a dir segment names both meanings",
+			"const outputDirPath = 1;\n",
+			`Use "outputDirectoryPath" or "outputDirectionPath", whichever it means.`,
+		},
+		// `Var` can mean JavaScript's var keyword, as in `NoVar`, which no word spells out, so it offers no name.
+		{
+			"a var segment asks which it means",
+			"const themeVarName = 1;\n",
+			`Identifier "themeVarName" abbreviates "Var". ` +
+				`Use "Variable" for a variable, or a name saying it means JavaScript's var keyword.`,
+		},
+		{
+			"a vars segment asks which it means",
+			"const themeVars = 1;\n",
+			`Identifier "themeVars" abbreviates "Vars". ` +
+				`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`,
 		},
 		// `sb` fits more words than a list could hold, a scroll region's bottom among them, so it suggests none.
 		{

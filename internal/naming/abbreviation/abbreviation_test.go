@@ -77,6 +77,12 @@ func TestFindNamesTheSpellingsItsAdviceOffers(test *testing.T) {
 		{"timeoutMs", []string{"timeoutInMilliseconds"}},
 		{"pos", []string{"position", "positive"}},
 		{"resultPos", []string{"resultPosition", "resultPositive"}},
+		{"fetchRes", []string{"fetchResult", "fetchResponse", "fetchResource", "fetchReserve"}},
+		{"ch", []string{"channel", "character"}},
+		{"outputDirPath", []string{"outputDirectoryPath", "outputDirectionPath"}},
+		// `Var` can mean JavaScript's var keyword, which no word spells out, so its advice names no name.
+		{"themeVarName", nil},
+		{"themeVars", nil},
 		{"sb", nil},
 		{"sbBottom", nil},
 		{"scrollSbOffset", nil},
@@ -147,8 +153,7 @@ func TestFindRendersAWordWithOneExpansionAsBefore(test *testing.T) {
 		{"db", `Identifier "db" should not be abbreviated. Use "database".`},
 		{"idxStart", `Identifier "idxStart" should not be abbreviated. Use "indexStart".`},
 		{"rowProps", `Identifier "rowProps" should not end with "Props". Use "rowProperties".`},
-		{"outputDirPath", `Identifier "outputDirPath" abbreviates "Dir". Use "outputDirectoryPath".`},
-		{"themeVarsVar", `Identifier "themeVarsVar" abbreviates "Vars". Use "themeVariablesVar".`},
+		{"buildEnvName", `Identifier "buildEnvName" abbreviates "Env". Use "buildEnvironmentName".`},
 		{"args", `Identifier "args" should not be abbreviated. Use "arguments", "commandArguments", ` +
 			`"commandLineArguments", or a more descriptive name.`},
 	}
@@ -164,6 +169,9 @@ func TestFindRendersAWordWithOneExpansionAsBefore(test *testing.T) {
 
 // `pos` means position or positive, and a census found `resultPos` beside `resultNeg`, where it is positive, read
 // back as `resultPosition`. Every form names both meanings now, in the file's order, and asks for whichever it is.
+// `res`, `ch` and `dir` are the same: an audit of the Go fix's renames found each guessed, `res` read as a response
+// where it meant a result or MakeMap's reserve, `ch` as a channel where it was a rune, `dir` as a directory where it
+// was a ChanDir.
 func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 	test.Parallel()
 	listed, loadError := abbreviation.Load([]byte(`{"abbreviations": [
@@ -184,7 +192,19 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 			`Use "positionLabel" or "positiveLabel", whichever it means.`},
 		{"resultPos", abbreviation.Policy, `Identifier "resultPos" abbreviates "Pos". ` +
 			`Use "resultPosition" or "resultPositive", whichever it means.`},
-		// The plain whole form and the suffix form, which no word in policy's file has two meanings in yet.
+		{"res", abbreviation.Policy, `Identifier "res" should not be abbreviated. ` +
+			`Use "result", "response", "resource" or "reserve", whichever it means, or a more descriptive name.`},
+		{"resBody", abbreviation.Policy, `Identifier "resBody" should not be abbreviated. ` +
+			`Use "resultBody", "responseBody", "resourceBody" or "reserveBody", whichever it means.`},
+		{"fetchRes", abbreviation.Policy, `Identifier "fetchRes" should not end with "Res". ` +
+			`Use "fetchResult", "fetchResponse", "fetchResource" or "fetchReserve", whichever it means.`},
+		{"ch", abbreviation.Policy, `Identifier "ch" should not be abbreviated. ` +
+			`Use "channel" or "character", whichever it means, or a more descriptive name.`},
+		{"doneCh", abbreviation.Policy, `Identifier "doneCh" abbreviates "Ch". ` +
+			`Use "doneChannel" or "doneCharacter", whichever it means.`},
+		{"outputDirPath", abbreviation.Policy, `Identifier "outputDirPath" abbreviates "Dir". ` +
+			`Use "outputDirectoryPath" or "outputDirectionPath", whichever it means.`},
+		// The plain whole form, which no word in policy's file has two meanings in yet.
 		{"neg", listed, `Identifier "neg" should not be abbreviated. ` +
 			`Use "negative" or "negation", whichever it means.`},
 		{"resultNeg", listed, `Identifier "resultNeg" should not end with "Neg". ` +
@@ -197,6 +217,31 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			if got := rendered(test, testCase.vocabulary, testCase.name); got != testCase.want+" "+reasoning {
+				test.Errorf("got %q, want %q", got, testCase.want+" "+reasoning)
+			}
+		})
+	}
+}
+
+// `Var` and `Vars` can mean JavaScript's var keyword, as a rule against it is named `NoVar`, and the keyword has no
+// full word to expand to. So they offer no spelling: they say what to write for a variable, and ask for a name saying
+// it means the keyword otherwise. `vars` still precedes `var`, so a name holding both reports the longer word.
+func TestFindAsksWhetherAWordMeansTheKeyword(test *testing.T) {
+	test.Parallel()
+	cases := []struct{ name, want string }{
+		{"NoVar", `Identifier "NoVar" abbreviates "Var". ` +
+			`Use "Variable" for a variable, or a name saying it means JavaScript's var keyword.`},
+		{"themeVarName", `Identifier "themeVarName" abbreviates "Var". ` +
+			`Use "Variable" for a variable, or a name saying it means JavaScript's var keyword.`},
+		{"themeVars", `Identifier "themeVars" abbreviates "Vars". ` +
+			`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`},
+		{"themeVarsVar", `Identifier "themeVarsVar" abbreviates "Vars". ` +
+			`Use "Variables" for variables, or a name saying it means JavaScript's var keyword.`},
+	}
+	for _, testCase := range cases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			if got := rendered(test, abbreviation.Policy, testCase.name); got != testCase.want+" "+reasoning {
 				test.Errorf("got %q, want %q", got, testCase.want+" "+reasoning)
 			}
 		})

@@ -57,7 +57,7 @@ type sizer interface {
 }
 
 // A type parameter, in the suffix form.
-func first[Response any](values []Res) Res { // want `Identifier "Res" should not end with "Res"\. Use "Response"\.`
+func first[Res any](values []Res) Res { // want `Identifier "Res" should not end with "Res"\. Use "Result", "Response", "Resource" or "Reserve", whichever it means\.`
 	return values[0]
 }
 
