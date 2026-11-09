@@ -180,12 +180,9 @@ func (judging *judgment) judge(function *intermediate_representation.Function, o
 // reads that phi's value from before the edge, as a phi means.
 //
 // This is the one step not kept from staticcheck, whose processPhis sets the phis one after another, so such a phi
-// reads the new value of a phi set before it and the old value of one set after. Its answer hangs on the order of the
-// phis, and ours places them by Braun's construction, in an order other than lift.go's: in regexp2's reduceAtomic,
-// whose loop carries atomic and child, go/ir orders them [atomic, child] and atomic reads the old child, never nil,
-// where ours orders them [child, atomic] and a literal port read the child just loaded, which may be nil, losing the
-// fact. Reading all edges first agrees with staticcheck wherever its order read old values, which the fact
-// differential found on every fact of all four trees it runs over, and the literal port did not.
+// reads the new value of a phi set before it and the old value of one set after (see the package's doc). In regexp2's
+// reduceAtomic, whose loop carries atomic and child, go/ir orders them [atomic, child] and atomic reads the old child,
+// never nil, where ours orders them [child, atomic] and a literal port read the child just loaded, which may be nil.
 func (judging *judgment) transferPhis(
 	block *intermediate_representation.BasicBlock,
 	predecessor int,

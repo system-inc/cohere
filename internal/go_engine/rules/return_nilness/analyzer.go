@@ -9,11 +9,19 @@
 // functions whose judging has begun shared by them all, a callee of the same package judged as it is met, a callee
 // already begun, as in a cycle of calls, answering the defaults of its signature, and each function's results judged
 // by a forward data flow analysis over its blocks, forward_flow's port of staticcheck's dense.Forward, on staticcheck's
-// own dfa lattices. The one step it does not keep is how a block's phis are set, all at once rather than one after
-// another, since our phis stand in another order than go/ir's (see transferPhis). A function whose results say more
-// than that each may be nil is marked with a ReturnedNilness fact on its object, which the packages importing it read.
-// Its Result answers the nilness of any function's result from the facts, this package's and its imports', as
-// staticcheck's does. The fact differential beside this file holds the two to the same facts over whole trees.
+// own dfa lattices. A function whose results say more than that each may be nil is marked with a ReturnedNilness fact
+// on its object, which the packages importing it read. Its Result answers the nilness of any function's result from
+// the facts, this package's and its imports', as staticcheck's does.
+//
+// It differs in one place, adjudicated: how a block's phis are set. Staticcheck's processPhis sets them one after
+// another, so a phi whose edge is a sibling phi of the block reads the sibling's new value when the sibling stands
+// first and its old value when it stands after, an answer hanging on the order lift.go places them in. The port reads
+// every edge before it sets any phi (see transferPhis), which is what a phi means and cannot hang on the order, the
+// more so since our phis are placed by Braun's construction, in another order than go/ir's. The differences fixture
+// holds a loop where staticcheck's order reads the new value and loses a fact the port keeps, each side's answer
+// recorded in TestPortDiffersFromOriginalOnlyWhereItIsRight, and holds the port to the same fact in either order. Over
+// the four trees the fact differential runs on, the two export the same facts: root 8387, the standard library 14089,
+// loom 2133 and deeafbf4 7537.
 package return_nilness
 
 import (
