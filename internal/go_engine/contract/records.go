@@ -36,6 +36,8 @@ const (
 	KindRule Kind = "rule"
 	// KindInputs names what a check run read, just before its summary, for the front door's replay.
 	KindInputs Kind = "inputs"
+	// KindDuplicates is the duplicates report under `--duplicates`, after the unused phase's record.
+	KindDuplicates Kind = "duplicates"
 	// KindSummary closes every checking stream.
 	KindSummary Kind = "summary"
 )

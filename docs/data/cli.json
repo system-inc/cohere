@@ -18,6 +18,10 @@
             "usage": "the project root, which every relative path resolves against (default: the directory of the nearest tsconfig.json or Package.swift at or above the working directory)"
         },
         {
+            "name": "duplicates",
+            "usage": "report functions that compute the same thing, written more than once: groups whose canonical IR is one graph, size 11 and up, a report that never fails a build"
+        },
+        {
             "name": "explain",
             "argument": "string",
             "usage": "report what every rule did on one file, and why it did or did not run, writing nothing"

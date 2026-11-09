@@ -549,6 +549,50 @@ regardless. Narrowing what is reported to the scope would hide findings the edit
 front door prints `  types: covered the whole package, not only the N files in scope` when the two
 differ.
 
+### `duplicates`, the Go engine's, only under `--duplicates`
+
+```json
+{
+    "kind": "duplicates",
+    "ran": true,
+    "notRun": "why, written only when ran is false",
+    "floor": 11,
+    "files": 412,
+    "filesIgnored": 0,
+    "functions": 19643,
+    "hashed": 19640,
+    "groups": [
+        {
+            "digest": "…",
+            "size": 136,
+            "members": [
+                { "file": "/…/a.go", "line": 12, "name": "decompress", "size": 136, "digest": "…" },
+                { "file": "/…/b.go", "line": 30, "name": "decompress", "size": 136, "digest": "…", "kept": "port of …" }
+            ]
+        }
+    ],
+    "withheld": 0,
+    "belowFloor": 210,
+    "refused": [
+        { "file": "/…/c.go", "line": 4, "name": "run", "reason": "unsupportedInstruction", "detail": "*ir.Select" }
+    ],
+    "notRead": { "generated": 4 },
+    "crashes": [{ "file": "/…/d.go", "error": "…" }],
+    "deadSuppressions": [{ "file": "/…/b.go", "line": 9 }],
+    "elapsedMilliseconds": 9,
+    "cache": { "unit": "packages", "read": 430, "hashed": 10 }
+}
+```
+
+The duplicates report (#jfvhbj7): functions whose canonical IR is one graph, at size 11 and up. It is the Go
+engine's alone and additive within contract 3; a Swift engine is never given `--duplicates`, which the front door
+answers for it as a report that did not run.
+It is not a `finding`: the summary does not count it and it never moves the exit code. Its fields are
+`internal/duplicate_functions`' `Report`, which the front door prints as it prints a TypeScript run's report.
+Exactly one comes, after the `unused` phase record and before `inputs`, when `--duplicates` was named, and never
+otherwise; a run that asked and ends without one is refused. When the lint phase did not run, `ran` is false and
+`notRun` says why, since the report reads the lint phase's pass.
+
 ### `inputs`, just before `summary`
 
 ```json
@@ -809,6 +853,7 @@ it where a run that did not finish prints green.
 | `--fix-passes <n>`, `--single-threaded`     | As for TypeScript.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `--rules`, `--rules-enabled`, `--version`   | `rule` and `provenance` records.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
+| `--duplicates`                              | The front door's for Swift, never given to the engine, which has no duplicates report: the run checks as it would and prints a duplicates report that did not run, saying why. The Go engine answers it with a `duplicates` record (see that record).                                                                                                                                                                                                                                                                                                                                                                                                |
 | `--timing`, `--explain <file>`              | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `--directory`                               | Resolved by the front door into `--root`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |

@@ -256,6 +256,11 @@ var endToEndCases = []endToEndCase{
 	{name: "suppression", exitCode: 1},
 	{name: "configured", exitCode: 1},
 	{name: "lint-only", fixture: "clean", extra: []string{"--lint"}, exitCode: 0},
+	// The duplicates report (#jfvhbj7): one computation written three times, one copy kept by a suppression with its
+	// reason, and a suppression that keeps nothing, listed and never a finding. The record follows the unused phase's.
+	{name: "duplicates", extra: []string{"--lint", "--duplicates"}, exitCode: 0},
+	// A load with a type error never reaches lint, so the report says it did not run, and why.
+	{name: "duplicates-type-error", fixture: "type-error", extra: []string{"--duplicates"}, exitCode: 1},
 	// A file only windows builds and one only the cohere_extra tag builds: `--other-builds` checks both beside the
 	// host's build and writes the merge of every build's findings, the windows file's else after a return among them,
 	// and the lint record names each build (#72n9mq0).

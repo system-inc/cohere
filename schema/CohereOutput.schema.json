@@ -8,6 +8,9 @@
         { "$ref": "#/$defs/crash" },
         { "$ref": "#/$defs/engineBuild" },
         { "$ref": "#/$defs/ignorePatterns" },
+        { "$ref": "#/$defs/duplicate" },
+        { "$ref": "#/$defs/duplicateRefused" },
+        { "$ref": "#/$defs/duplicateCoverage" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -120,6 +123,156 @@
                     "description": "The rule that crashed. Absent when the whole file was lost."
                 },
                 "cause": { "type": "string", "description": "The panic, as cohere caught it." }
+            }
+        },
+        "duplicate": {
+            "description": "Under --duplicates: two or more functions whose canonical IR is one graph, size 11 and up, one idea written more than once. A report, never a finding: it moves no count of the summary and never its verdict.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "size", "digest", "members"],
+            "properties": {
+                "kind": { "const": "duplicate" },
+                "size": {
+                    "type": "integer",
+                    "minimum": 11,
+                    "description": "The instructions that compute something, the smallest member's, in the engine's own IR."
+                },
+                "digest": { "type": "string", "description": "The canonical hash the members share, in hex." },
+                "members": {
+                    "type": "array",
+                    "minItems": 2,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["path", "line", "name"],
+                        "properties": {
+                            "path": { "type": "string", "description": "The file, as an absolute path." },
+                            "line": { "type": "integer", "minimum": 1 },
+                            "name": { "type": "string" },
+                            "kept": {
+                                "type": "string",
+                                "description": "The reason a suppression gives for keeping this function in its shape. A group is written while one member is not kept."
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "duplicateRefused": {
+            "description": "Under --duplicates: a function the hash could not read faithfully, refused by name rather than guessed past.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "path", "line", "name", "reason"],
+            "properties": {
+                "kind": { "const": "duplicateRefused" },
+                "path": { "type": "string" },
+                "line": { "type": "integer", "minimum": 1 },
+                "name": { "type": "string" },
+                "reason": {
+                    "enum": [
+                        "parameterDefault",
+                        "objectMethodCapture",
+                        "fieldInitializers",
+                        "unresolvedCapture",
+                        "dynamicImport",
+                        "unsupportedNode",
+                        "unsupportedInstruction",
+                        "notHashable"
+                    ]
+                },
+                "detail": {
+                    "type": "string",
+                    "description": "The syntax kind or instruction, where the reason needs one."
+                }
+            }
+        },
+        "duplicateCoverage": {
+            "description": "Under --duplicates, always once, after the report's other lines: what it looked at, what it left out and what it cost, or why it did not run, so its absence is never read as no duplicates.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "kind",
+                "ran",
+                "floor",
+                "files",
+                "filesIgnored",
+                "functions",
+                "hashed",
+                "refused",
+                "notRead",
+                "groups",
+                "withheld",
+                "belowFloor",
+                "deadSuppressions",
+                "crashes",
+                "seconds",
+                "cache"
+            ],
+            "properties": {
+                "kind": { "const": "duplicateCoverage" },
+                "ran": { "type": "boolean" },
+                "notRun": { "type": "string", "description": "Why the report did not run, when it did not." },
+                "floor": { "type": "integer", "description": "The size from which a group is written." },
+                "files": { "type": "integer", "minimum": 0 },
+                "filesIgnored": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Files the settings ignore, left out."
+                },
+                "functions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Every function looked at: hashed, refused and not read."
+                },
+                "hashed": { "type": "integer", "minimum": 0 },
+                "refused": {
+                    "type": "object",
+                    "additionalProperties": { "type": "integer" },
+                    "description": "Refused functions by reason, each listed as a duplicateRefused line."
+                },
+                "notRead": {
+                    "type": "object",
+                    "additionalProperties": { "type": "integer" },
+                    "description": "Functions never read, by reason: bodyless, generated, or copied (a file marked cohere:copied, which every house rule withholds too)."
+                },
+                "groups": { "type": "integer", "minimum": 0, "description": "The duplicate lines written." },
+                "withheld": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Groups at the floor whose every member a suppression keeps."
+                },
+                "belowFloor": { "type": "integer", "minimum": 0 },
+                "deadSuppressions": {
+                    "type": "array",
+                    "description": "Suppressions naming the report's rule that keep no member of a group at the floor. Listed, never findings, while the report is not a gate.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["path", "line"],
+                        "properties": { "path": { "type": "string" }, "line": { "type": "integer", "minimum": 1 } }
+                    }
+                },
+                "crashes": {
+                    "type": "array",
+                    "description": "Files, or packages by their first file, the hash could not read at all.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["path", "error"],
+                        "properties": { "path": { "type": "string" }, "error": { "type": "string" } }
+                    }
+                },
+                "seconds": { "type": "number" },
+                "cache": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["unit", "read", "hashed"],
+                    "properties": {
+                        "unit": { "enum": ["files", "packages"] },
+                        "read": { "type": "integer", "minimum": 0 },
+                        "hashed": { "type": "integer", "minimum": 0 }
+                    }
+                }
             }
         },
         "summary": {

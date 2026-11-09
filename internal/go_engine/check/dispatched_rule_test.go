@@ -675,7 +675,7 @@ func TestTheCacheAsksNoFactsOfAnAnalyzerOnlyALeftOutListenerRequires(test *testi
 		for _, analyzer := range configuration.analyzers {
 			ruleOf[analyzer] = rule.Rule{Name: rule.Namespace + "test-" + analyzer.Name, Analyzer: analyzer}
 		}
-		known, knownError := newCacheAnalyzers(ruleOf, configuration.analyzers)
+		known, knownError := newCacheAnalyzers(ruleOf, configuration.analyzers, nil)
 		if knownError != nil {
 			test.Fatalf("%s: reading the analyzers: %v", configuration.name, knownError)
 		}

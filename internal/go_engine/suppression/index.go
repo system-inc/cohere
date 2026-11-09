@@ -49,8 +49,9 @@ type directive struct {
 	// rules are the rule names as written, resolved against the run's known rules only when applied.
 	rules []string
 
-	// hasReason is whether the text after the rule names holds a word.
+	// hasReason is whether the text after the rule names holds a word, and reason is that text, trimmed.
 	hasReason bool
+	reason    string
 
 	// malformed is a comment that cannot be a directive though it reads as one: it names no rule, or a space
 	// after the slashes makes it prose.
@@ -143,7 +144,34 @@ func parseDirective(text string) (directive, bool) {
 		return directive{malformed: true}, true
 	}
 	parsed.hasReason = strings.ContainsFunc(reason, isWordCharacter)
+	parsed.reason = strings.TrimSpace(reason)
 	return parsed, true
+}
+
+// Keepings are the directives in the file that name ruleName, in full or by its name past the namespace, and give a
+// reason, so withhold for it: for a report that applies one name's directives itself rather than through Apply, as
+// the duplicates report keeps a function in its shape (#jfvhbj7). A directive without a reason, or malformed, keeps
+// nothing, as it withholds nothing in Apply, and the lint phase says what is wrong with it.
+func (index *Index) Keepings(ruleName string) []Keeping {
+	var keepings []Keeping
+	for _, indexed := range index.directives {
+		if indexed.malformed || !indexed.hasReason {
+			continue
+		}
+		if !slices.ContainsFunc(indexed.rules, func(written string) bool {
+			return written == ruleName || ruleNamespace+written == ruleName
+		}) {
+			continue
+		}
+		keepings = append(keepings, Keeping{
+			File:        index.File,
+			Line:        indexed.line,
+			WholeFile:   indexed.wholeFile,
+			CoveredLine: indexed.coveredLine,
+			Reason:      indexed.reason,
+		})
+	}
+	return keepings
 }
 
 // cutKeyword strips a directive keyword from the start of a comment's body. The keyword must end the body or be

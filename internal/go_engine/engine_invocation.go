@@ -17,9 +17,13 @@ import (
 // `other-builds` checks, beside the host's build, every other build the census needs (otherBuilds), and the project
 // record names each file only such a build compiles as checked by it (#72n9mq0). The front door forwards it to this
 // engine alone, and off changes nothing.
+//
+// `duplicates` asks for the duplicates report (#jfvhbj7): the lint pass hashes every function beside the rules, and
+// one duplicates record after the unused phase's says what it grouped. Additive within contract 3, and this engine's
+// alone: the Swift engine refuses it as a flag it does not know.
 var switchNames = []string{
 	"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-	"rules", "rules-enabled", "version", "no-cache", "other-builds",
+	"rules", "rules-enabled", "version", "no-cache", "other-builds", "duplicates",
 }
 
 // notImplementedFlags are the contract's flags this engine does not do yet. Each is refused by name, because a

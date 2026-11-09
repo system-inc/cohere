@@ -22,8 +22,11 @@ type cacheAnalyzers struct {
 	// any action reaches may be asked for these.
 	facts []*analysis.Analyzer
 
-	// rules are the rules' analyzers, which a package Analyze was given is asked for.
+	// rules are the rules' analyzers and the report analyzers, which a package Analyze was given is asked for.
 	rules []*analysis.Analyzer
+
+	// reports are the report analyzers (see Options.Report), whose result an entry holds.
+	reports map[*analysis.Analyzer]bool
 }
 
 // newCacheAnalyzers reads the analyzers an entry holds: every rule's, and every analyzer below them that learns
@@ -32,17 +35,24 @@ type cacheAnalyzers struct {
 // only a left-out rule's listener reads never runs, so an entry could never hold it, and counting it would make every
 // entry fall short of what the run asks. A rule's analyzer is held under the rule's name, which is unique. Any other
 // is held under its name and its fact types, since an analyzer's name alone is not: staticcheck's nilness learns
-// facts, and vet's nilness is a rule. Two analyzers that would still share a slot refuse the cache for the run.
+// facts, and vet's nilness is a rule. Two analyzers that would still share a slot refuse the cache for the run. A
+// report analyzer is asked of a package to analyze as a rule is, under its name, and its entry holds its result.
 func newCacheAnalyzers(
 	ruleOf map[*analysis.Analyzer]rule.Rule,
 	analyzers []*analysis.Analyzer,
+	reports []*analysis.Analyzer,
 ) (*cacheAnalyzers, error) {
+	asked := append(slices.Clone(analyzers), reports...)
 	known := &cacheAnalyzers{
 		slots:     map[*analysis.Analyzer]string{},
 		factTypes: map[*analysis.Analyzer]map[string]reflect.Type{},
-		rules:     analyzers,
+		rules:     asked,
+		reports:   map[*analysis.Analyzer]bool{},
 	}
-	requires := requiredInRun(analyzers)
+	for _, report := range reports {
+		known.reports[report] = true
+	}
+	requires := requiredInRun(asked)
 	seen := map[*analysis.Analyzer]bool{}
 	var visit func(analyzer *analysis.Analyzer) error
 	visit = func(analyzer *analysis.Analyzer) error {
@@ -65,13 +75,13 @@ func newCacheAnalyzers(
 		}
 		return nil
 	}
-	for _, analyzer := range analyzers {
+	for _, analyzer := range asked {
 		if visitError := visit(analyzer); visitError != nil {
 			return nil, visitError
 		}
 	}
 	held := map[string]*analysis.Analyzer{}
-	for _, stored := range append(append([]*analysis.Analyzer{}, analyzers...), known.facts...) {
+	for _, stored := range append(append([]*analysis.Analyzer{}, asked...), known.facts...) {
 		slot := stored.Name + " " + strings.Join(slices.Sorted(maps.Keys(known.factTypes[stored])), " ")
 		if storedRule, isRule := ruleOf[stored]; isRule {
 			slot = storedRule.Name
