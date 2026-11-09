@@ -86,6 +86,7 @@ func (testGraph) EachInstructionPlace(
 func (testGraph) IsContextStore(function *testFunction, block *testBlock, index int) bool {
 	return false
 }
+func (testGraph) ThrowsAtLastInstruction(function *testFunction, block *testBlock) bool { return false }
 func (testGraph) ContextStoreDefines(function *testFunction, block *testBlock, index int, place testPlace) bool {
 	return false
 }

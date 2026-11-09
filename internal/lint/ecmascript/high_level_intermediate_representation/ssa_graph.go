@@ -97,6 +97,12 @@ func (ssaGraph) EachEdge(
 	})
 }
 
+// ThrowsAtLastInstruction is no: this IR's MaybeThrow ends a run of throwable instructions (terminal.go),
+// not one, so its handler takes the block's final answer, the state the body left behind. That is right
+// under neither answer for a run; no lowering builds MaybeThrow yet, and the one that does splits the run
+// or answers here (#js7tdfg).
+func (ssaGraph) ThrowsAtLastInstruction(function *Function, block *BasicBlock) bool { return false }
+
 func (ssaGraph) EndsInReturn(block *BasicBlock) bool {
 	_, returns := block.Terminal.(*Return)
 	return returns

@@ -1,6 +1,9 @@
 package static_single_assignment
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	graph    G
@@ -114,8 +117,12 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	for _, block := range builder.graph.Blocks(builder.function) {
 		blockId := builder.graph.Id(block)
 		builder.walkingBlock = blockId
-		builder.stateAt(blockId)
+		state := builder.stateAt(blockId)
 		builder.visited[blockId] = true
+		state.handlers = state.handlers[:0]
+		if builder.graph.ThrowsAtLastInstruction(builder.function, block) {
+			state.handlers = handlersOf(edgesOf(builder.graph, block, edges), state.handlers)
+		}
 
 		count := builder.graph.InstructionCount(builder.function, block)
 		for index := 0; index < count; index++ {
@@ -123,6 +130,12 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 			// the new one; visiting in the other order would make the increment read itself.
 			builder.walking = walkingUses
 			builder.graph.EachInstructionPlace(builder.function, block, index, visit)
+			// The instruction that may throw ends the block, and a throw never makes its definitions, so
+			// a handler's edge is owed what each binding holds now.
+			if len(state.handlers) > 0 && index == count-1 {
+				builder.walking = walkingBeforeThrow
+				builder.graph.EachInstructionPlace(builder.function, block, index, visit)
+			}
 			// Only a context store reuses its binding's definition. The guard keys on the
 			// declaration, and a `FunctionExpression` assigned to the same declaration would
 			// otherwise reuse the identifier too -- measured as a duplicate definition of a
@@ -162,6 +175,46 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	builder.renameReturns()
 }
 
+// handlersOf is the blocks edges reach by an Exceptional edge and by no Real edge, appended to into, whose
+// array it reuses.
+func handlersOf(edges []edgeTo, into []BlockId) []BlockId {
+	handlers := into
+	for _, edge := range edges {
+		if edge.edge != Exceptional || slices.Contains(handlers, edge.successor) {
+			continue
+		}
+		reachedReally := false
+		for _, other := range edges {
+			if other.edge == Real && other.successor == edge.successor {
+				reachedReally = true
+			}
+		}
+		if !reachedReally {
+			handlers = append(handlers, edge.successor)
+		}
+	}
+	return handlers
+}
+
+// recordBeforeThrow keeps, for the binding a throwing instruction's definition place writes, what it holds
+// before the definition: the block's own answer so far, or its value on entry, which isn't looked up here
+// (beforeDefinition says why). A binding defined twice by the instruction keeps what it held before both.
+func (builder *ssaBuilder[G, F, B, P]) recordBeforeThrow(blockId BlockId, place *P) {
+	state := builder.stateAt(blockId)
+	binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(*place))
+	if _, recorded := state.beforeThrow[binding]; recorded {
+		return
+	}
+	if state.beforeThrow == nil {
+		state.beforeThrow = map[DeclarationId]beforeDefinition{}
+	}
+	if value, defined := state.defs[binding]; defined {
+		state.beforeThrow[binding] = beforeDefinition{value: value}
+		return
+	}
+	state.beforeThrow[binding] = beforeDefinition{onEntry: true}
+}
+
 // namedEarlier is whether one of edges, those of a block before the edge being read, is a real edge to successor.
 // A block's edges are a terminal's handful, so a scan costs less than the set MarkPredecessors keeps.
 func namedEarlier(edges []edgeTo, successor BlockId) bool {
@@ -183,6 +236,10 @@ func (builder *ssaBuilder[G, F, B, P]) visitPlace(place *P, role Role) {
 	case walkingDefinitions:
 		if role == Define {
 			builder.defineInMaybeContext(builder.walkingBlock, place, builder.walkingContextStore)
+		}
+	case walkingBeforeThrow:
+		if role == Define {
+			builder.recordBeforeThrow(builder.walkingBlock, place)
 		}
 	case walkingTerminal:
 		if role == Define {
@@ -269,6 +326,9 @@ func (builder *ssaBuilder[G, F, B, P]) useIn(blockId BlockId, place *P) {
 //     construction.
 //  5. Several predecessors - a real join. Mint the result, record it, then collect operands; a
 //     predecessor whose lookup comes back around to this block must find the result already bound.
+//
+// Cases 2 to 5 are lookupEntry, which valueOnEntry shares, and a predecessor is read through
+// valueFromPredecessor, which is where a throw's edge differs.
 func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) IdentifierId {
 	original := builder.graph.IdentifierOf(place)
 	binding := builder.graph.Declaration(builder.function, original)
@@ -280,6 +340,42 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 	if renamed, defined := state.defs[binding]; defined {
 		return renamed
 	}
+	return builder.lookupEntry(place, blockId, state, state.defs)
+}
+
+// valueOnEntry is what a binding holds on entry to a block the walk has already processed: what valueAt
+// would have answered before the block's own definitions, which defs no longer holds. Its answers are kept
+// in the block's entry, never its defs.
+func (builder *ssaBuilder[G, F, B, P]) valueOnEntry(place P, blockId BlockId) IdentifierId {
+	original := builder.graph.IdentifierOf(place)
+	binding := builder.graph.Declaration(builder.function, original)
+	if builder.unknown[binding] {
+		return original
+	}
+	state := builder.stateAt(blockId)
+	if renamed, defined := state.entry[binding]; defined {
+		return renamed
+	}
+	if state.entry == nil {
+		state.entry = map[DeclarationId]IdentifierId{}
+	}
+	return builder.lookupEntry(place, blockId, state, state.entry)
+}
+
+// lookupEntry is valueAt's cases 2 to 5: the binding isn't defined in the block, so its value is what the
+// predecessors hand it, and the answer is recorded in record, the block's defs or its entry for
+// valueOnEntry, before any recursion that could come back around to it.
+//
+// Mutates: record the binding's answer is recorded in it, the block's own defs or entry
+// Mutates: state an incomplete phi is queued on it when a predecessor is unprocessed
+func (builder *ssaBuilder[G, F, B, P]) lookupEntry(
+	place P,
+	blockId BlockId,
+	state *ssaState[P],
+	record map[DeclarationId]IdentifierId,
+) IdentifierId {
+	original := builder.graph.IdentifierOf(place)
+	binding := builder.graph.Declaration(builder.function, original)
 
 	block, ok := builder.graph.Block(builder.function, blockId)
 	if !ok {
@@ -298,7 +394,7 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 	remaining := builder.remainingPredecessors(blockId, len(predecessors))
 	if remaining > 0 {
 		renamed := builder.graph.Mint(builder.function, original)
-		state.defs[binding] = renamed
+		record[binding] = renamed
 		state.incompletePhis = append(state.incompletePhis, incompletePhi[P]{
 			original: place,
 			renamed:  builder.graph.WithIdentifier(place, renamed),
@@ -308,30 +404,34 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 
 	if len(predecessors) == 1 {
 		renamed := builder.valueFromPredecessor(place, predecessors[0], blockId)
-		state.defs[binding] = renamed
+		record[binding] = renamed
 		return renamed
 	}
 
 	renamed := builder.graph.Mint(builder.function, original)
-	state.defs[binding] = renamed
+	record[binding] = renamed
 	builder.addPhi(blockId, place, builder.graph.WithIdentifier(place, renamed))
 	return renamed
 }
 
-// valueFromPredecessor is the value a binding holds when control arrives at blockId from predecessor.
-//
-// Every lookup across an edge comes through here, and today it is the predecessor's value at its end
-// whatever the edge, which is right for every edge but an exceptional one. An exceptional edge leaves
-// its block from the throwing instruction, before that instruction's definitions happen, so the
-// handler should see the definitions from just before it. That is #2yz9ra9, live in Adamic, whose
-// MayThrow emits such edges, and latent in cohere, which emits none. Its fix lands here: snapshot the
-// block's definitions before its throwing instruction while walking it, and answer an Exceptional
-// edge from the snapshot.
+// valueFromPredecessor is the value a binding holds when control arrives at blockId from predecessor:
+// the predecessor's final answer, except on an edge to one of its handlers, which leaves before its last
+// instruction's definitions (the file comment's "A throw's edge"). A predecessor is looked through only
+// once it is processed, which is when its handlers and beforeThrow are recorded.
 func (builder *ssaBuilder[G, F, B, P]) valueFromPredecessor(
 	place P,
 	predecessor BlockId,
 	blockId BlockId,
 ) IdentifierId {
+	if state, ok := builder.existingState(predecessor); ok && slices.Contains(state.handlers, blockId) {
+		binding := builder.graph.Declaration(builder.function, builder.graph.IdentifierOf(place))
+		if before, defined := state.beforeThrow[binding]; defined {
+			if before.onEntry {
+				return builder.valueOnEntry(place, predecessor)
+			}
+			return before.value
+		}
+	}
 	return builder.valueAt(place, predecessor)
 }
 

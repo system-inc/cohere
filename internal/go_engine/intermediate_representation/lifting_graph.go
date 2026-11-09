@@ -168,6 +168,10 @@ func (liftingGraph) EachInstructionPlace(lifting *liftingFunction, block *liftin
 
 func (liftingGraph) IsContextStore(*liftingFunction, *liftingBlock, int) bool { return false }
 
+// ThrowsAtLastInstruction is no: Go's IR reports no Exceptional edge, a panic being no edge, so no handler
+// is ever read through one (#js7tdfg).
+func (liftingGraph) ThrowsAtLastInstruction(*liftingFunction, *liftingBlock) bool { return false }
+
 func (liftingGraph) ContextStoreDefines(*liftingFunction, *liftingBlock, int, liftingPlace) bool {
 	return false
 }

@@ -54,6 +54,11 @@ const (
 	// Construction counts a block's predecessors to seal it, and a phi takes one operand per predecessor, so a list
 	// that disagrees with the edges is a phi missing a value or holding one no edge brings (#mv39hpt).
 	StaticSingleAssignmentViolationPredecessorsDisagree
+	// StaticSingleAssignmentViolationThrowEdgeSharesContinuation is a block that throws at its last instruction
+	// whose Real and Exceptional edges reach one successor. That successor is one predecessor's worth of phi
+	// operand, which can't carry both the throw's definitions and their absence, so construction gives it the
+	// block's final answer, wrong on the edge that throws (#js7tdfg). An IR refuses it by splitting the block.
+	StaticSingleAssignmentViolationThrowEdgeSharesContinuation
 )
 
 // VerifyStaticSingleAssignment checks that a function is in single static assignment form and returns every violation.
@@ -82,6 +87,9 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 		})
 	}
 	violations = append(violations, predecessorViolations(graph, function, blocks)...)
+	// continuations maps a block that throws to the one block its Real edge goes on to (throwContinuations).
+	continuations, shared := throwContinuations(graph, function, blocks)
+	violations = append(violations, shared...)
 	dominance := ComputeDominance(graph, function)
 
 	// Where each value is defined. A parameter is defined at the entry block.
@@ -120,6 +128,14 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 			return
 		}
 		if isContextStore && !graph.ContextStoreDefines(function, currentBlock, position, *place) {
+			return
+		}
+		// A throwing instruction's definition is made only if it doesn't throw, so it holds from the top
+		// of the block control goes on to, never on the edge to a handler. A handler's use naming it is a
+		// value the throw never made, and this is where it shows. Modelled here on the edges alone, never
+		// by asking the construction it checks.
+		if continuation, throws := continuations[blockId]; throws && position == count-1 {
+			recordDefinition(graph.IdentifierOf(*place), continuation, -1)
 			return
 		}
 		recordDefinition(graph.IdentifierOf(*place), blockId, position)
@@ -212,6 +228,12 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 				if !ok {
 					continue
 				}
+				// A throwing instruction's definition is recorded at the top of its continuation, and the
+				// edge from the throwing block to that continuation is the one edge that carries it.
+				if continuation, throws := continuations[predecessorId]; throws && continuation == blockId &&
+					definedIn[graph.IdentifierOf(operand)] == blockId && definedAt[graph.IdentifierOf(operand)] == -1 {
+					continue
+				}
 				checkUse(graph.IdentifierOf(operand), predecessorId, graph.InstructionCount(function, predecessor),
 					fmt.Sprintf("phi operand for bb%d", predecessorId))
 			}
@@ -224,6 +246,62 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 	}
 
 	return violations
+}
+
+// throwContinuations maps each block that throws at its last instruction to the block that instruction goes
+// on to: a block whose Graph says ThrowsAtLastInstruction, with an Exceptional edge to a block no Real edge of
+// it reaches, and exactly one block its Real edges reach. A block with no Real edge out, or several, has no
+// one continuation, and its definitions are recorded where they are made. It reports, as a violation, each
+// such block whose Real and Exceptional edges reach one successor.
+func throwContinuations[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	blocks []B,
+) (map[BlockId]BlockId, []StaticSingleAssignmentViolation) {
+	var continuations map[BlockId]BlockId
+	var violations []StaticSingleAssignmentViolation
+	scratch := takeEdgeScratch()
+	defer edgeScratchPool.Put(scratch)
+	for _, block := range blocks {
+		if !graph.ThrowsAtLastInstruction(function, block) {
+			continue
+		}
+		edges := edgesOf(graph, block, scratch)
+		for _, edge := range edges {
+			if edge.edge == Exceptional && slices.ContainsFunc(edges, func(other edgeTo) bool {
+				return other.edge == Real && other.successor == edge.successor
+			}) {
+				violations = append(violations, StaticSingleAssignmentViolation{
+					Kind:  StaticSingleAssignmentViolationThrowEdgeSharesContinuation,
+					Block: graph.Id(block),
+					Detail: fmt.Sprintf("bb%d throws at its last instruction and goes on to bb%d by both its Real "+
+						"and its Exceptional edge, so one phi operand would carry the throw and its absence",
+						graph.Id(block), edge.successor),
+				})
+				break
+			}
+		}
+		handlers := handlersOf(edges, nil)
+		if len(handlers) == 0 {
+			continue
+		}
+		var continuation BlockId
+		realCount := 0
+		for _, edge := range edges {
+			if edge.edge == Real && (realCount == 0 || edge.successor != continuation) {
+				continuation = edge.successor
+				realCount++
+			}
+		}
+		if realCount != 1 {
+			continue
+		}
+		if continuations == nil {
+			continuations = map[BlockId]BlockId{}
+		}
+		continuations[graph.Id(block)] = continuation
+	}
+	return continuations, violations
 }
 
 // predecessorViolations is a violation for each block whose predecessors are not, once each, the blocks with a real

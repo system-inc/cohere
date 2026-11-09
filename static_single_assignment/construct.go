@@ -32,6 +32,22 @@
 // when the last predecessor lands. Recording the definition before recursing is also what stops the
 // lookup recursing forever around the cycle.
 //
+// # A throw's edge, which carries less than the block it leaves
+//
+// In an IR whose Graph says ThrowsAtLastInstruction, a block with an Exceptional edge out ends in the
+// instruction that may throw, and its edge to the handler leaves before that instruction's definitions
+// happen. In `local = f()` where f throws and the
+// handler reads local, the handler reads the old value. So a lookup through that edge reads what each
+// binding held just before the last instruction defined it (valueFromPredecessor), never the block's
+// final answer, which is what every other edge carries. It is Adamic's construction, adopted from its
+// internal/flow (#2yz9ra9, #js7tdfg). An IR answering no keeps the final answer on that edge too, and
+// cohere's TypeScript and Go IRs do; ThrowsAtLastInstruction says why.
+//
+// A block both of whose edges reach one successor, a Real and an Exceptional edge to the same block, is
+// one predecessor of it with one phi operand, which can't carry both values; that edge carries the
+// block's final answer, and the verifier reports the block (ThrowEdgeSharesContinuation). No IR emits one
+// (#mv39hpt).
+//
 // # What is deliberately not here
 //
 // Redundant-phi elimination is a separate pass, `EliminateRedundantPhis`, in eliminate.go, which
@@ -118,8 +134,30 @@ type ssaState[P any] struct {
 	defs map[DeclarationId]IdentifierId
 
 	// incompletePhis are phis minted before every predecessor was processed. Their result is already
-	// bound in defs; only the operands are outstanding.
+	// bound in defs, or in entry; only the operands are outstanding.
 	incompletePhis []incompletePhi[P]
+
+	// handlers are the blocks this block reaches by an Exceptional edge alone, no Real edge beside it:
+	// the edges that leave before its last instruction's definitions.
+	handlers []BlockId
+
+	// beforeThrow is, for a block with handlers, what each binding its last instruction defines held
+	// just before that definition: what an edge to a handler carries.
+	beforeThrow map[DeclarationId]beforeDefinition
+
+	// entry is what a binding held on entry to this block, for a binding a handler's edge needs from
+	// before the block defined it. defs can't hold it: by the end of the block, defs holds the block's own
+	// definition. Made on its first need, since few blocks throw.
+	entry map[DeclarationId]IdentifierId
+}
+
+// beforeDefinition is what a binding held just before an instruction defined it: a value the block had
+// already given it, or, when onEntry, whatever it held on entry to the block, looked up only if a handler
+// reads it, since a lookup when it is recorded would walk off the entry for a binding the instruction
+// declares and mark it unknown for the whole function.
+type beforeDefinition struct {
+	value   IdentifierId
+	onEntry bool
 }
 
 // incompletePhi is a phi awaiting operands.
@@ -140,6 +178,9 @@ const (
 	walkingDefinitions
 	// walkingTerminal renames a terminal's places, uses and definitions both.
 	walkingTerminal
+	// walkingBeforeThrow records, for each definition of a throwing instruction, what its binding holds
+	// before it, and renames nothing.
+	walkingBeforeThrow
 )
 
 func newSsaState[P any]() *ssaState[P] {

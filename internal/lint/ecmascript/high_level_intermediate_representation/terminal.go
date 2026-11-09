@@ -282,6 +282,16 @@ type Try struct {
 // So this IR places one MaybeThrow at the end of a run of throwable instructions, and the handler
 // always has an edge. A block ending in MaybeThrow has two successors: Continuation on the normal
 // path, Handler on the exceptional one.
+//
+// # A run of throwable instructions before one MaybeThrow
+//
+// static_single_assignment asks each IR whether a block throws at its last instruction alone
+// (Graph.ThrowsAtLastInstruction, #js7tdfg), and this IR answers no (ssa_graph.go), so a handler takes the
+// block's final answer, the state the run left behind. That is right under neither answer for a run: the
+// handler can be reached after any prefix of it, so its true value is a join over every prefix. No lowering
+// builds MaybeThrow today (ReactiveFunctionGapUnbuiltTerminals). The one that does should put one throwing
+// instruction per block and answer yes; TestSsaOverRealCodebase fails the day one is built, so that choice
+// can't arrive unmade.
 type MaybeThrow struct {
 	Continuation static_single_assignment.BlockId
 	Handler      static_single_assignment.BlockId

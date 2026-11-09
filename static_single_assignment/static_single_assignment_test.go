@@ -109,6 +109,9 @@ func (testGraph) EachEdge(block *testBlock, visit func(ssa.BlockId, ssa.Edge)) {
 	}
 }
 func (testGraph) EndsInReturn(block *testBlock) bool { return block.returns }
+func (testGraph) ThrowsAtLastInstruction(function *testFunction, block *testBlock) bool {
+	return function.throwsAtLastInstruction
+}
 func (testGraph) InstructionCount(function *testFunction, block *testBlock) int {
 	return len(block.instructions)
 }
@@ -389,30 +392,166 @@ func TestContextStoreReusesItsDefinition(test *testing.T) {
 	}
 }
 
-// TestExceptionalEdgeIsAnEdge: MayThrow's handler is reached by an exceptional edge, which is a real
-// predecessor today, so the handler's read resolves through it.
-//
-// It resolves to the block's end: x$2, written by the throwing instruction itself, which never
-// completed when the handler runs. That is #2yz9ra9. Its fix belongs in valueFromPredecessor, where
-// every lookup across an edge now goes, and flips the want below to the write before the throw.
+// TestExceptionalEdgeIsAnEdge: MayThrow's handler is reached by an exceptional edge, which is a predecessor
+// like any other. One graph, asked under both answers to ThrowsAtLastInstruction: where the block throws at
+// its last instruction, as Adamic's do, the edge leaves before that instruction's own definition, so the
+// handler reads x as written before the throw, x$1, never x$2, which the throwing instruction makes only if
+// it doesn't throw (#2yz9ra9, #js7tdfg). Where it doesn't, as cohere's IRs answer, the handler takes the
+// block's final answer, x$2. The continuation, reached by the Real edge, reads x$2 under both.
 func TestExceptionalEdgeIsAnEdge(test *testing.T) {
 	test.Parallel()
+	for _, throwsAtLastInstruction := range []bool{true, false} {
+		function := newTestFunction()
+		function.throwsAtLastInstruction = throwsAtLastInstruction
+		entry, next, handler := function.block(), function.block(), function.block()
+		function.entry = entry.id
+		before := function.define(entry, "x")
+		throwing := function.define(entry, "x")
+		read := function.use(handler, "x")
+		after := function.use(next, "x")
+		entry.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
+
+		construct(test, function)
+
+		if !slices.Equal(handler.predecessors, []ssa.BlockId{entry.id}) {
+			test.Fatalf("the handler's predecessors are %v, want the throwing block", handler.predecessors)
+		}
+		want := throwing.defines[0].id
+		if throwsAtLastInstruction {
+			want = before.defines[0].id
+		}
+		if got := read.uses[0].id; got != want {
+			test.Errorf("throwing at the last instruction %t, the handler reads $%d, want $%d (before $%d, "+
+				"the throw's own $%d)", throwsAtLastInstruction, got, want, before.defines[0].id,
+				throwing.defines[0].id)
+		}
+		if got, want := after.uses[0].id, throwing.defines[0].id; got != want {
+			test.Errorf("throwing at the last instruction %t, the continuation reads $%d, want the throw's "+
+				"write $%d", throwsAtLastInstruction, got, want)
+		}
+	}
+}
+
+// TestVerifierCatchesAThrowEdgeSharingItsContinuation: a block that throws at its last instruction and goes
+// on to one block by both its Real and its Exceptional edge gives that block one operand, which can't carry
+// the throw and its absence, so the verifier reports it, once. Under no, the shape is an ordinary edge pair
+// and nothing is reported.
+func TestVerifierCatchesAThrowEdgeSharingItsContinuation(test *testing.T) {
+	test.Parallel()
+	for _, throwsAtLastInstruction := range []bool{true, false} {
+		function := newTestFunction()
+		function.throwsAtLastInstruction = throwsAtLastInstruction
+		entry, both := function.block(), function.block()
+		function.entry = entry.id
+		function.define(entry, "x")
+		function.use(both, "x")
+		entry.edges = []testEdge{{to: both.id, kind: ssa.Real}, {to: both.id, kind: ssa.Exceptional}}
+		finalize(function)
+		ssa.Construct(testGraph{}, function)
+
+		var shared []ssa.StaticSingleAssignmentViolation
+		for _, violation := range ssa.VerifyStaticSingleAssignment(testGraph{}, function) {
+			if violation.Kind == ssa.StaticSingleAssignmentViolationThrowEdgeSharesContinuation {
+				shared = append(shared, violation)
+			}
+		}
+		if throwsAtLastInstruction && (len(shared) != 1 || shared[0].Block != entry.id) {
+			test.Errorf("a throw sharing its continuation read as %v, want one violation at bb%d", shared, entry.id)
+		}
+		if !throwsAtLastInstruction && len(shared) != 0 {
+			test.Errorf("under no, the edge pair read as %v, want nothing", shared)
+		}
+	}
+}
+
+// TestHandlerReadsWhatTheThrowingBlockWasHanded: the throwing instruction is the block's only write of x,
+// so what the handler is owed is x on entry to the block. That is a phi at the join the block sits after,
+// looked up only when the handler reads it, and the throwing block's own read after its write names the
+// write, not the phi.
+func TestHandlerReadsWhatTheThrowingBlockWasHanded(test *testing.T) {
+	test.Parallel()
 	function := newTestFunction()
-	entry, next, handler := function.block(), function.block(), function.block()
+	function.throwsAtLastInstruction = true
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	next, handler := function.block(), function.block()
 	function.entry = entry.id
-	before := function.define(entry, "x")
-	throwing := function.define(entry, "x")
+	function.define(left, "x")
+	function.define(right, "x")
+	throwing := function.define(join, "x")
 	read := function.use(handler, "x")
-	entry.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
+	after := function.use(next, "x")
+	goTo(entry, left, right)
+	goTo(left, join)
+	goTo(right, join)
+	join.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
 
 	construct(test, function)
 
-	if !slices.Equal(handler.predecessors, []ssa.BlockId{entry.id}) {
-		test.Fatalf("the handler's predecessors are %v, want the throwing block", handler.predecessors)
+	if len(join.phis) != 1 {
+		test.Fatalf("the join has %d phis, want the one the handler's read needs", len(join.phis))
 	}
-	if got, want := read.uses[0].id, throwing.defines[0].id; got != want {
-		test.Errorf("the handler reads $%d, want $%d (the end of the block, #2yz9ra9; $%d once fixed)",
-			got, want, before.defines[0].id)
+	if got, want := read.uses[0].id, join.phis[0].Place.id; got != want {
+		test.Errorf("the handler reads $%d, want x on entry to the throwing block, its phi $%d", got, want)
+	}
+	if got, want := after.uses[0].id, throwing.defines[0].id; got != want {
+		test.Errorf("the continuation reads $%d, want the throwing instruction's write $%d", got, want)
+	}
+}
+
+// TestAThrowsWriteReachesAJoinAfterIt: the throwing block's continuation is a join, also reached straight
+// from the entry, so its phi takes the throw's write on the edge from the throwing block. The verifier
+// holds that write from the top of the continuation, and the phi's operand on that one edge is the edge
+// that carries it, which is clean, as construct's own verification requires.
+func TestAThrowsWriteReachesAJoinAfterIt(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	function.throwsAtLastInstruction = true
+	entry, throwingBlock, join, handler := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	written := function.define(entry, "x")
+	throwing := function.define(throwingBlock, "x")
+	read := function.use(join, "x")
+	goTo(entry, throwingBlock, join)
+	throwingBlock.edges = []testEdge{{to: join.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
+
+	construct(test, function)
+
+	if len(join.phis) != 1 || read.uses[0].id != join.phis[0].Place.id {
+		test.Fatalf("the join's read names $%d and it has %d phis, want its one phi", read.uses[0].id, len(join.phis))
+	}
+	operands := join.phis[0].Operands
+	if operands.At(throwingBlock.id).id != throwing.defines[0].id || operands.At(entry.id).id != written.defines[0].id {
+		test.Errorf("the join's phi takes $%d from the throwing block and $%d from the entry, want $%d and $%d",
+			operands.At(throwingBlock.id).id, operands.At(entry.id).id, throwing.defines[0].id, written.defines[0].id)
+	}
+}
+
+// TestVerifierCatchesAHandlerReadingTheThrowsOwnWrite: the throwing instruction's definition holds from the
+// top of its continuation, so a handler naming it reads a value the throw never made, which the verifier
+// reports, as it reports any use its definition doesn't reach. The continuation's read of it is clean.
+func TestVerifierCatchesAHandlerReadingTheThrowsOwnWrite(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	function.throwsAtLastInstruction = true
+	entry, next, handler := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	throwing := function.define(entry, "x")
+	read := function.use(handler, "x")
+	after := function.use(next, "x")
+	entry.edges = []testEdge{{to: next.id, kind: ssa.Real}, {to: handler.id, kind: ssa.Exceptional}}
+	finalize(function)
+	after.uses[0] = throwing.defines[0]
+	if violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function); len(violations) != 0 {
+		test.Fatalf("the continuation reading the throw's write read as %v, want no violation", violations)
+	}
+
+	read.uses[0] = throwing.defines[0]
+
+	violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
+	if len(violations) != 1 || violations[0].Kind != ssa.StaticSingleAssignmentViolationUseNotDominated ||
+		violations[0].Block != handler.id {
+		test.Errorf("the handler reading the throw's own write read as %v, want one undominated use in bb%d",
+			violations, handler.id)
 	}
 }
 

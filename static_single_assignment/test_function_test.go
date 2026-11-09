@@ -15,6 +15,9 @@ type testFunction struct {
 	variables map[string]ssa.DeclarationId
 	// boundUnderReported makes BlockBound answer zero, as a graph that hands out block ids lazily might.
 	boundUnderReported bool
+	// throwsAtLastInstruction is what the function's Graph answers to ThrowsAtLastInstruction, for every
+	// block: a test of a throw's edge sets it, as Adamic would answer, or leaves it false, as cohere's IRs do.
+	throwsAtLastInstruction bool
 }
 
 func (function *testFunction) block() *testBlock {
