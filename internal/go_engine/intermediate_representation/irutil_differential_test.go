@@ -376,7 +376,8 @@ func TestWalkMatchesIrutil(test *testing.T) {
 			ourFunction := ourFunctions[index]
 			for blockIndex, theirBlock := range theirFunction.Blocks {
 				for _, stopsBelowOdd := range []bool{false, true} {
-					var theirOrder, ourOrder []int
+					var theirOrder []int
+					var ourOrder []int
 					irutil.Walk(theirBlock, func(visited *ir.BasicBlock) bool {
 						theirOrder = append(theirOrder, visited.Index)
 						return !stopsBelowOdd || visited.Index%2 == 0

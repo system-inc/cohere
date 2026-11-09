@@ -22,7 +22,9 @@ func isTrivial(function *Function, seen map[*Function]struct{}) bool {
 	// it would read as trivial. Build is idempotent, so a function already built costs nothing here. buildir builds
 	// every function up front, so irutil never meets this.
 	function.Build()
-	// The function joins seen only when it makes a call, so a function that makes none allocates no map.
+	// The function joins seen only when it makes a call, so a function that makes none allocates no map. visited is
+	// seen once that map exists, shared by every call this function makes and the calls below them, as irutil's is.
+	visited := seen
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
 			switch typed := instruction.(type) {
@@ -41,12 +43,12 @@ func isTrivial(function *Function, seen map[*Function]struct{}) bool {
 					return false
 				}
 			case *Call:
-				if seen == nil {
-					seen = make(map[*Function]struct{})
+				if visited == nil {
+					visited = make(map[*Function]struct{})
 				}
-				seen[function] = struct{}{}
+				visited[function] = struct{}{}
 				callee := typed.Call.StaticCallee()
-				if callee == nil || !isTrivial(callee, seen) {
+				if callee == nil || !isTrivial(callee, visited) {
 					return false
 				}
 			default:
