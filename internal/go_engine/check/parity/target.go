@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 )
 
 // Target is the build target a port's fixtures load for, named by the environment variables that choose it, as
@@ -75,6 +76,19 @@ func (target Target) RequireIdenticalFacts(
 ) {
 	test.Helper()
 	requireIdenticalFacts(test, target, original, port, testdata, patterns...)
+}
+
+// RequireNeitherFinds is the package's RequireNeitherFinds with the fixtures loaded for target.
+func (target Target) RequireNeitherFinds(
+	test testing.TB,
+	original *analysis.Analyzer,
+	port *analysis.Analyzer,
+	testdata string,
+	judged func(test testing.TB, loaded []*packages.Package) int,
+	patterns ...string,
+) {
+	test.Helper()
+	requireNeitherFinds(test, target, original, port, testdata, judged, patterns...)
 }
 
 // RequireOnlyAdjudicated is the package's RequireOnlyAdjudicated with the fixtures loaded for target.
