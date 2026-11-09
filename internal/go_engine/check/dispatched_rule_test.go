@@ -263,7 +263,9 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_syntax", "requires nothing",
 						besideListener)}
 		}},
-		{"intermediate representation", func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule) {
+		{"intermediate representation", func(
+			failingName string, besideName string, callsOnBase *atomic.Int64,
+		) (rule.Rule, rule.Rule) {
 			dispatcher := dispatch.NewIr()
 			listener := func(requires []*analysis.Analyzer) *rule.Listener {
 				return &rule.Listener{
