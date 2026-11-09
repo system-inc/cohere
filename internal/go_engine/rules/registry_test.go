@@ -19,6 +19,7 @@ import (
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/address_compared_to_nil"
 	"github.com/system-inc/cohere/internal/go_engine/rules/argument_overwritten_before_use"
@@ -692,6 +693,69 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
 			"and the syntax's were expected", len(dispatcherOf))
 	}
+}
+
+// heldTwice is a test-only rule whose listener is registered on the shared dispatchers of both intermediate
+// representations' walks, as a family's move that forgot to take its listener off staticcheck's would leave it: on
+// Ir while it declared only staticcheck's walk, then on IntermediateRepresentation once it declared ours too. It is
+// registered as the package initializes, before any test reads the shared dispatchers, and its callbacks do nothing,
+// so a dispatcher that ever started it would find nothing.
+var heldTwice = func() rule.Rule {
+	listener := &rule.Listener{Function: func(*rule.Context, *ir.Function) {
+		// Never judges anything: the listener exists to be held by two dispatchers.
+	}}
+	analyzer := dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-ir", "test_held_twice_ir",
+		"a test-only rule on staticcheck's walk", listener)
+	listener.IntermediateRepresentation = &rule.IntermediateRepresentationListener{
+		Function: func(*rule.Context, *intermediate_representation.Function) {
+			// Never judges anything: the listener exists to be held by two dispatchers.
+		},
+	}
+	dispatch.RuleAnalyzer(rule.Namespace+"test-held-twice-own", "test_held_twice_own",
+		"the same test-only rule on the engine's own walk", listener)
+	return rule.Rule{Name: rule.Namespace + "test-held-twice", Origin: rule.OriginHouse, Analyzer: analyzer,
+		Listener: listener}
+}()
+
+// TestEveryDispatchedRuleIsHeldByOneDispatcher holds every rule with a listener to exactly one shared dispatcher, the
+// one its walk goes to: a reader family moves from staticcheck's intermediate representation to the engine's own by
+// moving its listener, and one left registered on both would be walked twice, over two representations, while its
+// analyzer read one outcome and the other went unread. The check also runs over heldTwice, a test-only rule whose
+// listener is on both, to prove it can fail.
+func TestEveryDispatchedRuleIsHeldByOneDispatcher(test *testing.T) {
+	test.Parallel()
+	for _, problem := range heldByOneProblems(registry) {
+		test.Error(problem)
+	}
+	planted := heldByOneProblems([]rule.Rule{heldTwice})
+	if len(planted) != 1 ||
+		!strings.Contains(planted[0], `held by ["dispatch_ir" "dispatch_intermediate_representation"]`) {
+		test.Errorf("the rule held by both intermediate representations' dispatchers read as %q, where one problem "+
+			"naming both was expected", planted)
+	}
+}
+
+// heldByOneProblems is, for each of registered with a listener not held by exactly the shared dispatcher of its walk,
+// what holds it.
+func heldByOneProblems(registered []rule.Rule) []string {
+	problems := []string{}
+	for _, held := range registered {
+		if held.Listener == nil {
+			continue
+		}
+		holders := dispatch.HeldBy(held.Listener)
+		shared, _ := dispatch.Shared(held.Listener)
+		if len(holders) == 1 && holders[0] == shared {
+			continue
+		}
+		names := []string{}
+		for _, holder := range holders {
+			names = append(names, holder.Name)
+		}
+		problems = append(problems, fmt.Sprintf("%s's listener is held by %q, where only %s, the dispatcher of its "+
+			"walk, was expected", held.Name, names, shared.Name))
+	}
+	return problems
 }
 
 // TestEveryRuleRequiringADispatcherCarriesItsListener holds every registered rule whose analyzer reads a dispatcher's
