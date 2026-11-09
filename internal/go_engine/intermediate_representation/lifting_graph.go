@@ -30,6 +30,9 @@ type liftingSlot struct {
 	place   liftingPlace
 	role    static_single_assignment.Role
 	isPlace bool
+
+	// deleted is whether the round drops the instruction once lifted.
+	deleted bool
 }
 
 // liftingBlock is one block as the core sees it: the block, the phis the core places in it until lifting turns
@@ -38,6 +41,9 @@ type liftingBlock struct {
 	block *BasicBlock
 	phis  []*static_single_assignment.Phi[liftingPlace]
 	slots []liftingSlot
+
+	// newPhis are the *Phi instructions the resolve made of the core's phis here, to prepend.
+	newPhis []*Phi
 }
 
 // liftingFunction is one function as the core sees it for one round of lifting.
@@ -55,8 +61,9 @@ type liftingFunction struct {
 	// declarations' own, and Mint appends.
 	declarations []static_single_assignment.DeclarationId
 
-	// allocations are the lifted Allocations, by declaration.
-	allocations []*Allocation
+	// allocations are the lifted Allocations, by declaration, and declarationOf each one's declaration.
+	allocations   []*Allocation
+	declarationOf map[*Allocation]static_single_assignment.DeclarationId
 }
 
 var _ static_single_assignment.Graph[*liftingFunction, *liftingBlock, liftingPlace] = liftingGraph{}
