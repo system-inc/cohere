@@ -10,7 +10,8 @@ import (
 // The push walks a package's functions in one order with one seen set, and a call into a function of the same package
 // already begun answers the defaults of its signature, though that function may end with more. Which function is
 // still begun when a call reaches it depends on where the push entered the cycle, so here the answer depends on the
-// push's order, and the walk stops and ask computes the whole package the push's way. A call of a function to itself
+// push's order, and the walk stops and ask replays the push's walk until it has judged the function asked of (see
+// replayWalk). A call of a function to itself
 // is not such a call: the function is begun whenever its own body is judged, in any order. Every other call answers
 // as the push does in every order, since the functions a walk reaches without meeting a function begun hold no cycle.
 //
@@ -81,13 +82,15 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 		return results
 	}
 	walk.stack = append(walk.stack, function)
-	returned := (&judgment{callees: walk}).judge(function)
+	recorder := &calleeRecorder{callees: walk, irPackage: walk.irPackage}
+	returned := (&judgment{callees: recorder}).judge(function)
 	walk.stack = walk.stack[:len(walk.stack)-1]
 	if walk.orderDependent {
-		// Judged after the walk stopped, so not judged at all; the fallback judges it.
+		// Judged after the walk stopped, so not judged at all; the replay judges it.
 		return defaultNilnessForSignature(function.Signature)
 	}
 	walk.state.results[declared] = returned
+	walk.state.callees[declared] = recorder.recorded
 	walk.resolver.Counts(Kind).Computed.Add(1)
 	return returned
 }

@@ -86,8 +86,8 @@ type Counts struct {
 	// Computed is how many functions the kind judged, each once.
 	Computed atomic.Int64
 
-	// Fallbacks is how many packages the kind computed whole, the way a pushed fact is learned, because a question's
-	// answer there depended on the order the push walks the package in.
+	// Fallbacks is how many questions the kind answered by replaying the push's walk of a package, the whole package
+	// or only as far as the answer needed, because the answer depended on the order the push walks the package in.
 	Fallbacks atomic.Int64
 
 	// Contradicted is how many verdicts a package's fallback computed otherwise than a verdict the kind's demand walk

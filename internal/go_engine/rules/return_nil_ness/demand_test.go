@@ -31,18 +31,26 @@ import (
 const demandDifferentialVariable = "COHERE_GO_IR_DEMAND_DIFFERENTIAL"
 
 // A cycle of calls is where the push's answer hangs on its order: walked as declared, CycleOuter begins first and
-// CycleInner, calling back into it, gets the defaults and may return nil. Asked of CycleInner first, as the probe asks
-// in the order of names, a walk that answered a begun function with its defaults would judge CycleOuter whole and hold
-// CycleInner never nil; the resolver falls back to the push's walk instead and answers as the push does.
+// CycleInner, calling back into it, gets the defaults and may return nil, and the same for BetaOuter and BetaInner.
+// Asked of an inner one first, as the probe asks in the order of names, a walk that answered a begun function with its
+// defaults would judge the outer one whole and hold the inner one never nil; the resolver replays the push's walk
+// instead and answers as the push does. The replay holds Alpha's verdict already, and must leave Fresh seen as judging
+// Alpha would, or Gamma, reading Fresh through a method value, would read no fact. InnerFirst and OuterFirst, the phis
+// read in either order, stay pinned beside them.
 func TestACycleAnswersInThePushsOrder(test *testing.T) {
 	test.Parallel()
 	probed := probeFixtures(test, "differences")
 	requireVerdicts(test, probed, map[string]return_nil_ness.ValueNilness{
 		"differences.CycleInner 0": {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.MaybeNil},
 		"differences.CycleOuter 0": {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil},
+		"differences.InnerFirst 0": {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil},
+		"differences.OuterFirst 0": {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil},
+		"differences.BetaInner 0":  {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.MaybeNil},
+		"differences.Gamma 0":      {Inner: return_nil_ness.MaybeNil, Outer: return_nil_ness.NeverNil},
 	})
+	// BetaInner, asked before CycleInner, replays the push past both cycles, so CycleInner is held by then.
 	if fallbacks := probed.counts.Fallbacks.Load(); fallbacks != 1 {
-		test.Errorf("over differences the resolver fell back %d times, want 1, for its one cycle", fallbacks)
+		test.Errorf("over differences the resolver replayed %d times, want 1", fallbacks)
 	}
 }
 

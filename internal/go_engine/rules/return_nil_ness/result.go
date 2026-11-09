@@ -63,10 +63,7 @@ func judgeIn(
 ) ([]ValueNilness, bool) {
 	home.Lock()
 	defer home.Unlock()
-	state := fact_resolver.StateOf[verdicts](home, Kind)
-	if state.results == nil {
-		state.results = map[*types.Func][]ValueNilness{}
-	}
+	state := stateIn(home)
 	if results, judged := state.results[function]; judged {
 		return results, interesting(function.Signature(), results)
 	}
@@ -79,7 +76,8 @@ func judgeIn(
 	walk := &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state}
 	results := walk.verdict(declared)
 	if walk.orderDependent {
-		state.fallBack(resolver, home)
+		resolver.Counts(Kind).Fallbacks.Add(1)
+		state.replayOf(resolver, home).until(declared)
 		results = state.results[function]
 	}
 	return results, interesting(function.Signature(), results)
