@@ -209,12 +209,13 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if _, loadError := abbreviation.Load([]byte(testCase.file)); loadError == nil {
+			if _, loadError := abbreviation.Load([]byte(testCase.file), nil); loadError == nil {
 				test.Errorf("the loader accepted it")
 			}
 		})
 	}
-	if _, loadError := abbreviation.Load(policy.AbbreviationsFile()); loadError != nil {
+	_, loadError := abbreviation.Load(policy.AbbreviationsFile(), policy.KeywordTerms.KeywordTerms)
+	if loadError != nil {
 		test.Fatalf("policy's file itself is refused: %v", loadError)
 	}
 }

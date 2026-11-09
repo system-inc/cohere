@@ -177,7 +177,7 @@ func TestFindNamesEveryMeaningOfAWordWithMore(test *testing.T) {
 	listed, loadError := abbreviation.Load([]byte(`{"abbreviations": [
 		{"abbreviation": "neg", "expansions": ["negative", "negation"], "whole": {"style": "plain"}, "suffix": {}},
 		{"abbreviation": "rel", "expansions": ["relative", "relation", "release"], "segment": {}}
-	]}`))
+	]}`), nil)
 	if loadError != nil {
 		test.Fatal(loadError)
 	}
@@ -301,7 +301,7 @@ func TestLoadRefusesABrokenExpansionList(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if _, loadError := abbreviation.Load([]byte(testCase.file)); loadError == nil {
+			if _, loadError := abbreviation.Load([]byte(testCase.file), nil); loadError == nil {
 				test.Errorf("the loader accepted it")
 			}
 		})
@@ -310,7 +310,7 @@ func TestLoadRefusesABrokenExpansionList(test *testing.T) {
 	if _, loadError := abbreviation.Load([]byte(`{"abbreviations": [{"abbreviation": "sb", "advice": "Say.",
 		"whole": {"style": "advice"}, "prefix": {"phase": "late", "style": "advice"},
 		"segment": {"style": "advice"}}]}`,
-	)); loadError != nil {
+	), nil); loadError != nil {
 		test.Errorf("an advice-only entry is refused: %v", loadError)
 	}
 }
@@ -325,7 +325,7 @@ func TestLoadRefusesAnAbbreviationThatIsNotLetters(test *testing.T) {
 			test.Parallel()
 			file := `{"abbreviations": [{"abbreviation": "` + abbreviationText + `", "expansions": ["database"], ` +
 				`"prefix": {"phase": "late"}}]}`
-			if _, loadError := abbreviation.Load([]byte(file)); loadError == nil {
+			if _, loadError := abbreviation.Load([]byte(file), nil); loadError == nil {
 				test.Errorf("the loader accepted %q", abbreviationText)
 			}
 		})

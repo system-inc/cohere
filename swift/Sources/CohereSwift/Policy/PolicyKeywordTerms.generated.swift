@@ -1,0 +1,22 @@
+/*
+ Generated from cohere's policy/KeywordTerms.json by `go run ./policy/tools/generate`. Do not edit it here:
+ edit the file and run that again. While the two differ, a test in each engine fails.
+ */
+enum PolicyKeywordTerms {
+    /* policy/KeywordTerms.json, byte for byte. */
+    static let file = ##"""
+        {
+            "about": "The words a language makes its own keywords, read by nexus/consistency-no-abbreviated-identifier where Abbreviations.json lists the same letters as an abbreviation. A keyword is a word, not an abbreviation, and it has no full word to expand to: JavaScript's `var` is spelled `var`, and its own specification names what it declares VarScopedDeclarations and VarDeclaredNames. So a name that spells out what the keyword does reads clean, and every other use of the letters is still judged as the abbreviation. Each entry is the keyword as its language spells it, the language, and `spellings`, the exact names in which the capitalized keyword means the keyword: each opens with the keyword capitalized and goes on to the next word. A segment of the name is the keyword term when one of the spellings starts there and the name's next character after it starts a new word, an uppercase letter, a digit, a non-letter or the end, so `VarScoped` reads `TopLevelVarScopedDeclarations` as the keyword and not `VarScopedness`, whose word goes on past it. A bare `NoVar` or `themeVar` is still reported, and a name holding the keyword term and another abbreviation reports the other. A keyword's abbreviation entry must give advice rather than a rename, since a rename would rewrite the keyword. Name a thing by what it means first, `functionScopedDeclaration` over `varDeclaration`; a spelling joins the list only where a name truly has to name the keyword. Decided once for every engine, never an allowedSegments entry in a project's settings, and each entry cites where its language spells the keyword. Read by internal/naming/abbreviation through go:embed, and compiled into the Swift engine as PolicyKeywordTerms.",
+            "keywordTerms": [
+                {
+                    "term": "var",
+                    "language": "JavaScript",
+                    "spellings": ["VarDeclaration", "VarDeclarations", "VarDeclared", "VarKeyword", "VarScoped"],
+                    "reason": "JavaScript's `var` is a keyword, and a name about a declaration written with it, or about the keyword itself, has no full word to write: `Variable` would name something else. The spellings are the specification's own (VarScopedDeclarations, VarDeclaredNames), TypeScript's SyntaxKind.VarKeyword, and a declaration written with `var`, singular and plural. Ruled by @system_cohere on 2026-11-08 (#hvyvfr5).",
+                    "citation": "https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations"
+                }
+            ]
+        }
+
+        """##
+}

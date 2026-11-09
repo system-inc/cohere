@@ -93,6 +93,28 @@ func TestAWordWithSeveralMeaningsIsNeverRenamed(test *testing.T) {
 	}
 }
 
+// JavaScript's var keyword is a word, not short for "variable", so a Go name holding one of policy/KeywordTerms.json's
+// spellings for it reads clean, as the TypeScript and Swift rules read it (#hvyvfr5). keywordterms.go declares them
+// beside a bare `Var`, a spelling run on into a longer word, and a keyword term next to another abbreviation or a bare
+// `Var`, each of which still carries a want, and NoVar is the control, so a rule that judged nothing would fail on
+// its wants.
+func TestAKeywordTermReadsAsAWord(test *testing.T) {
+	test.Parallel()
+	results := analysistest.Run(
+		errorsOnly{test},
+		analysistest.TestData(),
+		consistency_no_abbreviated_identifier.Analyzer,
+		"keywordterms",
+	)
+	findings := 0
+	for _, result := range results {
+		findings += len(result.Diagnostics)
+	}
+	if findings != 5 {
+		test.Errorf("%d findings, want the five the fixture's wants name", findings)
+	}
+}
+
 // renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the
 // same fixtures, wants and golden pass with it set.
 func TestRenameExportsChangesNoFinding(test *testing.T) {

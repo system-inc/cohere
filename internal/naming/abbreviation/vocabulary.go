@@ -62,6 +62,48 @@ func (vocabulary *Vocabulary) allowedSegmentHolds(name string, abbreviation stri
 	return false
 }
 
+// everySegmentIsKeywordTerm reports whether each place the word stands as a segment of the name, as the boundary and
+// camel patterns read it, opens one of its keyword term's spellings, so `isVarDeclaration` holds nothing to report
+// and `VarDeclarationForThemeVar` still does. It is asked only once a pattern has matched, so there is a segment.
+//
+// A segment begins at the name's start or after anything but a capital, which is `(^|[^a-zA-Z])` and `[a-z0-9]`
+// together, and ends at the name's end, a capital or a digit.
+func everySegmentIsKeywordTerm(name string, patterns wordSegmentPatterns) bool {
+	for start := strings.Index(name, patterns.word); start >= 0; {
+		after := start + len(patterns.word)
+		beginsWord := start == 0 || !isAsciiUppercase(name[start-1])
+		endsWord := after == len(name) || isAsciiUppercase(name[after]) || (name[after] >= '0' && name[after] <= '9')
+		if beginsWord && endsWord && !opensKeywordTerm(name[start:], patterns.keywordTermSpellings) {
+			return false
+		}
+		next := strings.Index(name[start+1:], patterns.word)
+		if next < 0 {
+			break
+		}
+		start += 1 + next
+	}
+	return true
+}
+
+// opensKeywordTerm reports whether text opens with one of the spellings at a word boundary: the end, or anything but
+// a lowercase letter, so `VarScoped` opens `VarScopedDeclarations` and not `VarScopedness`.
+func opensKeywordTerm(text string, spellings []string) bool {
+	for _, spelling := range spellings {
+		if strings.HasPrefix(text, spelling) && (len(text) == len(spelling) || !isAsciiLowercase(text[len(spelling)])) {
+			return true
+		}
+	}
+	return false
+}
+
+func isAsciiUppercase(character byte) bool {
+	return character >= 'A' && character <= 'Z'
+}
+
+func isAsciiLowercase(character byte) bool {
+	return character >= 'a' && character <= 'z'
+}
+
 // Find answers what the vocabulary reports for a name, if anything, in the phase order the rule has always used:
 // whole word, early prefix, suffix, late prefix, segment.
 //
@@ -130,6 +172,9 @@ func (vocabulary *Vocabulary) Find(name string) (Finding, bool) {
 			continue
 		}
 		if !patterns.boundary.MatchString(name) && !patterns.camel.MatchString(name) {
+			continue
+		}
+		if len(patterns.keywordTermSpellings) > 0 && everySegmentIsKeywordTerm(name, patterns) {
 			continue
 		}
 		advice := entry.Advice

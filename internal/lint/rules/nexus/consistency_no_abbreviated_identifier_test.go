@@ -1575,3 +1575,38 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesIntrinsicAndDependencyNamesAlon
 		})
 	}
 }
+
+// JavaScript's var keyword is a word, not short for "variable", so a name holding one of
+// policy/KeywordTerms.json's spellings for it reads clean (#hvyvfr5). A bare `Var`, a spelling run on
+// into a longer word, and a keyword term next to another abbreviation or a bare `Var` are still
+// reported, and `NoVar`
+// is the control: the rule runs on this file and judges `Var`, so the silence on the rest is the
+// keyword term's.
+func TestConsistencyNoAbbreviatedIdentifierReadsAKeywordTermAsAWord(test *testing.T) {
+	test.Parallel()
+
+	sourceText := "export function isVarDeclaration(kind: string): boolean {\n    return kind === 'var';\n}\n" +
+		"export class VarKeywordFix {}\n" +
+		"export const TopLevelVarScopedDeclarations = 1;\n" +
+		"export const NoVar = 1;\n" +
+		"export const themeVar = 1;\n" +
+		"export const VarScopedness = 1;\n" +
+		"export const VarDeclarationSrc = 1;\n" +
+		"export const themeVarBeforeVarKeyword = 1;\n"
+	result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, sourceText)
+	want := []string{
+		`Identifier "NoVar" abbreviates "Var". Use "Variable" for a variable,`,
+		`Identifier "themeVar" abbreviates "Var". Use "Variable" for a variable,`,
+		`Identifier "VarScopedness" abbreviates "Var". Use "Variable" for a variable,`,
+		`Identifier "VarDeclarationSrc" abbreviates "Src". Use "VarDeclarationSource".`,
+		`Identifier "themeVarBeforeVarKeyword" abbreviates "Var". Use "Variable" for a variable,`,
+	}
+	if len(result.Diagnostics) != len(want) {
+		test.Errorf("%d findings, want %d", len(result.Diagnostics), len(want))
+	}
+	for index, diagnostic := range result.Diagnostics {
+		if index >= len(want) || !strings.HasPrefix(diagnostic.Message.Description, want[index]) {
+			test.Errorf("finding %d is %q", index, diagnostic.Message.Description)
+		}
+	}
+}
