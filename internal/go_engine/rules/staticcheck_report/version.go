@@ -9,14 +9,17 @@ import (
 )
 
 // File is the file of the package's syntax that node is in, and nil for a node in none of them: staticcheck's
-// code.File, which reads the same match from its tokenfile pass.
+// code.File, which reads the same match from its tokenfile pass. A parsed file holds the positions from its FileStart
+// to its FileEnd, both included: the bounds of its token.File, which the file set's own lookup reads. So comparing them
+// gives the file set's answer without its lock, which every call took, and contended for once a package's walk ran on
+// several workers, with a lookup per file besides.
 func File(context *rule.Context, node Positioner) *ast.File {
-	nodeFile := context.Fset.File(node.Pos())
-	if nodeFile == nil {
+	position := node.Pos()
+	if !position.IsValid() {
 		return nil
 	}
 	for _, file := range context.Files {
-		if context.Fset.File(file.Pos()) == nodeFile {
+		if file.FileStart <= position && position <= file.FileEnd {
 			return file
 		}
 	}
