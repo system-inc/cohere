@@ -1,0 +1,9 @@
+conflicted.txt
+intended.txt
+nested/directory/file.txt
+path with space.txt
+shared/prefix/with/a/long/directory/name/alpha.txt
+shared/prefix/with/a/long/directory/name/beta.txt
+shared/prefix/with/a/long/directory/name/gamma.txt
+shared/prefix/with/a/long/directory/other.txt
+top.txt

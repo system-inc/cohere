@@ -390,22 +390,40 @@ struct IgnoreRulesTests {
 
     /*
      A file `git add -f` tracked is listed whatever the ignore files say, as `git check-ignore` has it, read from each
-     index git wrote (`GitIndexTests`): a pre-commit hook on it must check it. Its untracked neighbor, matching the
-     same pattern, is still excluded.
+     index git wrote (`GitIndexTests`): a pre-commit hook on it must check it. Its untracked neighbors, matching the
+     same patterns, are still excluded. The shared fixtures track only `.txt` files, so here every one is ignored,
+     and `nested/` with them.
      */
-    @Test(arguments: ["sha1", "sha256"], [2, 3, 4])
-    func aForceAddedFileIsListedWithNoGitOnPath(objectFormat: String, version: Int) throws {
+    @Test(arguments: [2, 3, 4])
+    func aForceAddedFileIsListedWithNoGitOnPath(version: Int) throws {
+        let tracked = try GitIndexTests.sharedPaths(version: version)
+        var files = Dictionary(uniqueKeysWithValues: tracked.map { ($0, "") })
+        files[".gitignore"] = "*.txt\nnested/\n"
+        files["untracked.txt"] = ""
+        files["nested/directory/untracked.txt"] = ""
+        let fixture = try Fixture(files: files, index: nil)
+        try FileManager.default.copyItem(
+            at: GitIndexTests.sharedIndex(version: version),
+            to: fixture.root.appendingPathComponent(".git/index"),
+        )
+        #expect(try fixture.visible() == (tracked + [".gitignore"]).sorted())
+        #expect(try fixture.rules().indexFallbackReason == nil)
+    }
+
+    /* The same in a sha256 repository, whose object names take 32 bytes, read from its config's object format. */
+    @Test(arguments: [2, 3, 4])
+    func aForceAddedFileIsListedInASha256Repository(version: Int) throws {
         let fixture = try Fixture(
             files: [
                 ".gitignore": "*.swift\nIgnored/\n",
                 "Sources/Alpha/One.swift": "", "Sources/Alpha/Two.swift": "", "Sources/Beta.swift": "",
-                "Ignored/Tracked.swift": "", "Sources/Untracked.swift": "",
+                "Ignored/Tracked.swift": "", "Ignored/Untracked.swift": "", "Sources/Untracked.swift": "",
             ],
-            gitDirectory: objectFormat == "sha256" ? ["config": "[extensions]\n\tobjectFormat = sha256\n"] : [:],
+            gitDirectory: ["config": "[extensions]\n\tobjectFormat = sha256\n"],
             index: nil,
         )
         try FileManager.default.copyItem(
-            at: GitIndexTests.sample("\(objectFormat)-version-\(version).index"),
+            at: GitIndexTests.sample("sha256-version-\(version).index"),
             to: fixture.root.appendingPathComponent(".git/index"),
         )
         #expect(try fixture.visible() == GitIndexTests.sampleTracked.sorted())
@@ -535,6 +553,100 @@ struct IgnoreRulesTests {
             ]
         )
         #expect(try main.visible() == [".gitignore", "Shared.swift"])
+    }
+
+    /*
+     What the file set excludes from a package at `packageDirectory` below the fixture's root, one target `A` compiling
+     `sources` under `Sources/A`, by each file's path relative to the package, as reason and source.
+     */
+    static func exclusions(
+        of fixture: Fixture,
+        packageDirectory: String = "",
+        sources: [String],
+    ) throws -> [String: ProjectRecord.ExcludedFile] {
+        let root = packageDirectory.isEmpty ? fixture.root : fixture.root.appendingPathComponent(packageDirectory)
+        let quoted = sources.map { "\"\($0)\"" }.joined(separator: ",")
+        let describe =
+            #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["#
+            + quoted + "]}]}"
+        let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
+        let package = try PackageModel(root: root, describeJson: Data(describe.utf8), dumpPackageJson: Data(dump.utf8))
+        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        let rootPath = root.resolvingSymlinksInPath().path + "/"
+        return Dictionary(
+            uniqueKeysWithValues: fileSet.excluded.map {
+                (String($0.file.dropFirst($0.file.hasPrefix(rootPath) ? rootPath.count : root.path.count + 1)), $0)
+            }
+        )
+    }
+
+    /*
+     Each file git ignores is excluded with the line that decided (#08cv2mp), counted from 1 past comments and blank
+     lines, so the front door can quote it: the nearest `.gitignore`'s, `info/exclude`'s, the global file's (absolute,
+     outside the work tree), and for a file inside an ignored directory, the directory's. A file a `!` line re-includes
+     is ours, and a reason no rule decided, a package manifest, has no source.
+     */
+    @Test func anIgnoredFileNamesTheLineThatIgnoredIt() throws {
+        let fixture = try Fixture(
+            files: [
+                ".gitignore": "# generated\n\nGenerated.swift\nOutput/\n*.local.swift\n!Kept.local.swift\n",
+                "Sources/A/.gitignore": "Nearer.swift\n", "Package.swift": "",
+                "Sources/A/A.swift": "", "Sources/A/Generated.swift": "", "Sources/A/Nearer.swift": "",
+                "Sources/A/Output/Built.swift": "", "Sources/A/Mine.local.swift": "", "Sources/A/Kept.local.swift": "",
+                "Sources/A/Local.swift": "", "Sources/A/Global.swift": "",
+            ],
+            gitDirectory: ["info/exclude": "# mine\nLocal.swift\n"],
+            home: [".config/git/ignore": "Global.swift\n"],
+        )
+        let exclusions = try Self.exclusions(
+            of: fixture,
+            sources: [
+                "A.swift", "Generated.swift", "Nearer.swift", "Output/Built.swift", "Mine.local.swift",
+                "Kept.local.swift", "Local.swift", "Global.swift",
+            ],
+        )
+        #expect(
+            exclusions.mapValues(\.source) == [
+                "Sources/A/Generated.swift": ".gitignore:3",
+                "Sources/A/Nearer.swift": "Sources/A/.gitignore:1",
+                "Sources/A/Output/Built.swift": ".gitignore:4",
+                "Sources/A/Mine.local.swift": ".gitignore:5",
+                "Sources/A/Local.swift": ".git/info/exclude:2",
+                "Sources/A/Global.swift": fixture.home.path + "/.config/git/ignore:1",
+                "Package.swift": nil,
+            ]
+        )
+        #expect(Set(exclusions.values.map(\.reason)) == ["ignored by git", "a package manifest"])
+    }
+
+    /* A package below the repository's root names the root's `.gitignore` by climbing to it. */
+    @Test func aPackageBelowTheRootClimbsToTheLineThatIgnoredIt() throws {
+        let fixture = try Fixture(files: [
+            ".gitignore": "Generated.swift\n", "Packages/Inner/Package.swift": "",
+            "Packages/Inner/Sources/A/A.swift": "", "Packages/Inner/Sources/A/Generated.swift": "",
+        ])
+        let exclusions = try Self.exclusions(
+            of: fixture,
+            packageDirectory: "Packages/Inner",
+            sources: ["A.swift", "Generated.swift"],
+        )
+        #expect(exclusions["Sources/A/Generated.swift"]?.source == "../../.gitignore:1")
+    }
+
+    /* The record carries `source` only where there is one, so a manifest's entry reads as it did before. */
+    @Test func anExcludedEntryWritesItsSourceOnlyWhenARuleDecided() throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let ignored = ProjectRecord.ExcludedFile(file: "/p/G.swift", reason: "ignored by git", source: ".gitignore:1")
+        let manifest = ProjectRecord.ExcludedFile(file: "/p/Package.swift", reason: "a package manifest")
+        #expect(
+            String(decoding: try encoder.encode(ignored), as: UTF8.self)
+                == #"{"file":"\/p\/G.swift","reason":"ignored by git","source":".gitignore:1"}"#
+        )
+        #expect(
+            String(decoding: try encoder.encode(manifest), as: UTF8.self)
+                == #"{"file":"\/p\/Package.swift","reason":"a package manifest"}"#
+        )
     }
 
     @Test func theNearestGitIsTheRepositoryRoot() throws {

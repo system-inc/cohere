@@ -95,8 +95,18 @@ public struct FileSet: Equatable, Sendable {
                         continue
                     }
                     /* Resolved, as the repository root is: a root reached through a symlink (`/tmp` is `/private/tmp`) would otherwise sit outside the repository and exclude everything. */
-                    if let ignoreRules, !ignoreRules.isVisible(source.resolvingSymlinksInPath().path) {
-                        excluded.append(.init(file: source.path, reason: "ignored by git"))
+                    if let ignoreRules,
+                        case .excluded(let line) = ignoreRules.listing(of: source.resolvingSymlinksInPath().path)
+                    {
+                        excluded.append(
+                            .init(
+                                file: source.path,
+                                reason: "ignored by git",
+                                source: line.map {
+                                    ignoreRules.describe($0, relativeTo: package.root.resolvingSymlinksInPath().path)
+                                },
+                            )
+                        )
                         continue
                     }
                     owned.append(

@@ -5,13 +5,18 @@ import Testing
 @testable import CohereSwift
 
 /*
- git's index, read with no git process. The samples in `Tests/GitIndexSamples` were written by git 2.54 itself, in a
- repository whose `.gitignore` says `*.swift` and `Ignored/`, after `git add .gitignore` and
- `git add -f Sources Ignored/Tracked.swift` and a commit, so each has a `TREE` extension after its entries:
- - `<format>-version-2.index` as the commit left it, in a repository of each object format, sha1 and sha256;
- - `<format>-version-3.index` after `git update-index --skip-worktree Sources/Beta.swift`, the extended flag git
-   needs before it keeps version 3, then `git update-index --index-version 3`;
- - `<format>-version-4.index` after `git update-index --index-version 4` on that;
+ git's index, read with no git process, from bytes real git wrote.
+
+ The shared fixtures in `internal/gitignore/testdata/index` at the repository's root are the ones cohere's Go reader
+ reads too, each `version-N.index` beside the `version-N.paths` it must yield; their README says how git made them.
+ Reading the same bytes keeps the two readers from drifting.
+
+ The samples in `Tests/GitIndexSamples` hold what the shared ones lack, written by git 2.54 in a repository whose
+ `.gitignore` says `*.swift` and `Ignored/`, after `git add .gitignore`, `git add -f Sources Ignored/Tracked.swift`
+ and a commit:
+ - `sha256-version-2.index`, `-3` and `-4`, from a repository made with `git init --object-format=sha256`: version 3
+   after `git update-index --skip-worktree Sources/Beta.swift` and `--index-version 3`, version 4 after
+   `--index-version 4` on that;
  - `sha1-sparse.index` from a clone after `git sparse-checkout init --cone --sparse-index` and
    `git sparse-checkout set Sources`, which collapses `Ignored/` into one directory entry;
  - `sha1-split.index` from a clone after `git update-index --split-index`, whose entries moved to a shared index.
@@ -23,6 +28,13 @@ struct GitIndexTests {
         .deletingLastPathComponent()
         .appendingPathComponent("GitIndexSamples", isDirectory: true)
 
+    static let sharedFixtures = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("internal/gitignore/testdata/index", isDirectory: true)
+
     static let sampleTracked: Set<String> = [
         ".gitignore", "Ignored/Tracked.swift", "Sources/Alpha/One.swift", "Sources/Alpha/Two.swift",
         "Sources/Beta.swift",
@@ -30,6 +42,19 @@ struct GitIndexTests {
 
     static func sample(_ name: String) -> URL {
         samples.appendingPathComponent(name)
+    }
+
+    static func sharedIndex(version: Int) -> URL {
+        sharedFixtures.appendingPathComponent("version-\(version).index")
+    }
+
+    /* The paths a shared fixture must yield, one a line, in the index's order. */
+    static func sharedPaths(version: Int) throws -> [String] {
+        let text = try String(
+            contentsOf: sharedFixtures.appendingPathComponent("version-\(version).paths"),
+            encoding: .utf8,
+        )
+        return text.split(separator: "\n").map(String.init)
     }
 
     /*
@@ -89,8 +114,24 @@ struct GitIndexTests {
         return reason
     }
 
-    @Test(arguments: ["sha1", "sha256"], [2, 3, 4])
-    func everySampleGitWroteReadsAsGitListsIt(objectFormat: String, version: Int) throws {
+    /* Every path the fixture's list names and no other, each once, stages 1 to 3 of a conflict among them. */
+    @Test(arguments: [2, 3, 4])
+    func everySharedFixtureYieldsItsPaths(version: Int) throws {
+        let file = Self.sharedIndex(version: version)
+        #expect(GitIndex.word(Array(try Data(contentsOf: file)), at: 4) == UInt32(version))
+        let paths = try Self.sharedPaths(version: version)
+        #expect(Set(paths).count == paths.count && !paths.isEmpty, "the list is not one path a line")
+        let reading = GitIndex.read(file: file, objectFormat: "sha1")
+        guard case .read(let index) = reading else {
+            Issue.record("fell back: \(String(describing: Self.reason(reading)))")
+            return
+        }
+        #expect(index.trackedFiles == Set(paths))
+    }
+
+    @Test(arguments: [2, 3, 4])
+    func everySha256SampleReadsAsGitListsIt(version: Int) throws {
+        let objectFormat = "sha256"
         let file = Self.sample("\(objectFormat)-version-\(version).index")
         let bytes = try Data(contentsOf: file)
         #expect(
@@ -130,7 +171,7 @@ struct GitIndexTests {
 
     /* Every way an index can be wrong falls back with its reason, and none crashes. */
     @Test func aGarbageIndexFallsBackWithItsReason() throws {
-        let good = try Array(Data(contentsOf: Self.sample("sha1-version-4.index")))
+        let good = try Array(Data(contentsOf: Self.sharedIndex(version: 4)))
         var flipped = good
         flipped[40] ^= 0xFF
         var unsigned = Array("DIRX".utf8) + good[4..<(good.count - 20)]
@@ -163,7 +204,7 @@ struct GitIndexTests {
         }
         /* The sha1 sample read as sha256 takes the wrong bytes for its checksum. */
         #expect(Self.reason(GitIndex.parse(good, hashSize: 32)) == "does not match its checksum")
-        let unknown = GitIndex.read(file: Self.sample("sha1-version-2.index"), objectFormat: "md5")
+        let unknown = GitIndex.read(file: Self.sharedIndex(version: 2), objectFormat: "md5")
         #expect(Self.reason(unknown) == "the repository's object format is md5, which is not sha1 or sha256")
         let missing = Self.samples.appendingPathComponent("absent.index")
         #expect(

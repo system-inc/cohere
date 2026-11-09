@@ -107,14 +107,22 @@ final class IgnoreRules {
 
     /* One line of an ignore file, parsed as git's `parse_path_pattern` parses it. */
     struct Pattern: Equatable, Sendable {
+        /* Where a pattern was written: its ignore file, absolute, and its line, counted from 1 as an editor counts. */
+        struct Source: Equatable, Sendable {
+            var file: String
+            var line: Int
+        }
+
         /* The glob, without its `!`, its trailing `/` or, when anchored, its leading `/`. */
         var glob: [UInt8]
         var negated: Bool
         var directoriesOnly: Bool
         /* No slash before the end: matched against the name alone, at any depth. */
         var matchesNameAnywhere: Bool
+        var source: Source
 
-        init(line: [UInt8]) {
+        init(line: [UInt8], source: Source) {
+            self.source = source
             var glob = line[...]
             negated = glob.first == Byte.exclamation
             if negated {
@@ -142,15 +150,16 @@ final class IgnoreRules {
             return Wildcard(pattern: glob, text: path, slashIsSpecial: true, foldCase: foldCase).matches()
         }
 
-        /* Every pattern in an ignore file's bytes, in file order, as git's `add_patterns_from_buffer` reads them. */
-        static func patterns(in contents: [UInt8]) -> [Pattern] {
+        /* Every pattern in ignore file `file`'s bytes, in order, as git's `add_patterns_from_buffer` reads them. */
+        static func patterns(in contents: [UInt8], file: String) -> [Pattern] {
             var body = contents[...]
             let byteOrderMark: [UInt8] = [0xEF, 0xBB, 0xBF]
             if body.starts(with: byteOrderMark) {
                 body = body.dropFirst(byteOrderMark.count)
             }
             var patterns: [Pattern] = []
-            for rawLine in body.split(separator: Byte.newline, omittingEmptySubsequences: false) {
+            let lines = body.split(separator: Byte.newline, omittingEmptySubsequences: false)
+            for (offset, rawLine) in lines.enumerated() {
                 var line = rawLine
                 if line.last == Byte.carriageReturn {
                     line = line.dropLast()
@@ -158,7 +167,7 @@ final class IgnoreRules {
                 guard !line.isEmpty, line.first != Byte.hash else { continue }
                 let trimmed = trimmingTrailingSpaces(line)
                 if !trimmed.isEmpty {
-                    patterns.append(Pattern(line: Array(trimmed)))
+                    patterns.append(Pattern(line: Array(trimmed), source: Source(file: file, line: offset + 1)))
                 }
             }
             return patterns
@@ -609,12 +618,20 @@ final class IgnoreRules {
 
     /*
      How git treats one entry on the way down, or the end of a path: a file listed, a directory entered for all it
-     holds, a directory entered for its tracked files alone (an excluded one holding some), or neither.
+     holds, a directory entered for its tracked files alone (an excluded one holding some, by the line that excluded
+     it), or neither, by the line that excluded it or the directory above it. A refusal no line decided, of `.git` or
+     another repository, has no source.
      */
-    private enum Admission {
+    private enum Admission: Equatable {
         case admitted
-        case trackedOnly
-        case refused
+        case trackedOnly(excludedBy: Pattern.Source)
+        case refused(excludedBy: Pattern.Source?)
+    }
+
+    /* Whether git lists a path, and when it does not, the ignore file's line that decided, nil when none did. */
+    enum Listing: Equatable {
+        case listed
+        case excluded(by: Pattern.Source?)
     }
 
     /*
@@ -623,13 +640,23 @@ final class IgnoreRules {
      it, an ignored one holding a tracked file among them.
      */
     func isVisible(_ path: String, isDirectory: Bool = false) -> Bool {
-        admission(of: path, isDirectory: isDirectory) != .refused
+        listing(of: path, isDirectory: isDirectory) == .listed
+    }
+
+    /* `isVisible`, with the line that excluded a path git would not list: its own, or its excluded directory's. */
+    func listing(of path: String, isDirectory: Bool = false) -> Listing {
+        switch admission(of: path, isDirectory: isDirectory) {
+            case .admitted, .trackedOnly:
+                .listed
+            case .refused(let source):
+                .excluded(by: source)
+        }
     }
 
     /* The admission of each step from the root down to `path`, ending at the first refused. */
     private func admission(of path: String, isDirectory: Bool) -> Admission {
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        guard path.hasPrefix(prefix) else { return .refused }
+        guard path.hasPrefix(prefix) else { return .refused(excludedBy: nil) }
         let components = path.dropFirst(prefix.count).split(separator: "/").map(String.init)
         var parent = ""
         var admission = Admission.admitted
@@ -640,14 +667,32 @@ final class IgnoreRules {
                 relative: relative,
                 parent: parent,
                 isDirectory: position < components.count - 1 || isDirectory,
-                insideExcludedDirectory: admission == .trackedOnly,
+                inside: admission,
             )
-            if admission == .refused {
-                return .refused
+            if case .refused = admission {
+                return admission
             }
             parent = relative
         }
         return admission
+    }
+
+    /*
+     A pattern's file and line as a run names it (`.gitignore:3`): relative to `directory` (absolute, symlinks
+     resolved) when the file lies in this repository's work tree, climbing with `..` to the root when it must, and
+     absolute otherwise, as the global excludes file and a worktree's shared `info/exclude` are.
+     */
+    func describe(_ source: Pattern.Source, relativeTo directory: String) -> String {
+        let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+        guard source.file.hasPrefix(prefix), directory == rootPath || directory.hasPrefix(prefix) else {
+            return "\(source.file):\(source.line)"
+        }
+        let fileComponents = source.file.split(separator: "/")
+        let directoryComponents = directory.split(separator: "/")
+        let shared = zip(fileComponents, directoryComponents).prefix { $0 == $1 }.count
+        let climb = Array(repeating: "..", count: directoryComponents.count - shared)
+        let relative = (climb + fileComponents[shared...].map(String.init)).joined(separator: "/")
+        return "\(relative):\(source.line)"
     }
 
     /*
@@ -665,12 +710,14 @@ final class IgnoreRules {
         skippingWhere isSkipped: (String) -> Bool = { _ in false },
     ) -> [String] {
         let start = directory == rootPath ? .admitted : admission(of: directory, isDirectory: true)
-        guard start != .refused else { return [] }
+        if case .refused = start {
+            return []
+        }
         let relative = directory == rootPath ? "" : String(directory.dropFirst(rootPath.count + 1))
         var files: [String] = []
         collect(
             relativeDirectory: relative,
-            trackedOnly: start == .trackedOnly,
+            enclosing: start,
             skipping: skipping,
             skippingWhere: isSkipped,
             into: &files,
@@ -680,7 +727,7 @@ final class IgnoreRules {
 
     private func collect(
         relativeDirectory: String,
-        trackedOnly: Bool,
+        enclosing: Admission,
         skipping: Set<String>,
         skippingWhere isSkipped: (String) -> Bool,
         into files: inout [String],
@@ -711,15 +758,15 @@ final class IgnoreRules {
                 relative: relative,
                 parent: relativeDirectory,
                 isDirectory: isDirectory,
-                insideExcludedDirectory: trackedOnly,
+                inside: enclosing,
             )
-            if admission == .refused {
+            if case .refused = admission {
                 continue
             }
             if isDirectory {
                 collect(
                     relativeDirectory: relative,
-                    trackedOnly: admission == .trackedOnly,
+                    enclosing: admission,
                     skipping: skipping,
                     skippingWhere: isSkipped,
                     into: &files,
@@ -733,37 +780,47 @@ final class IgnoreRules {
     }
 
     /*
-     One step down: whether git lists this entry (a file) or enters it (a directory), and for a directory whether for
-     everything or only what is tracked. Inside an excluded directory no pattern is read, since git reads none there:
-     only tracking admits. Elsewhere the patterns are asked first and the index only of what they exclude, which is
-     the few, so the walk pays for tracking only where it decides something.
+     One step down from `enclosing`, its directory's own admission: whether git lists this entry (a file) or enters it
+     (a directory), and for a directory whether for everything or only what is tracked. Inside an excluded directory
+     no pattern is read, since git reads none there: only tracking admits, and what it does not is excluded by the
+     directory's line. Elsewhere the patterns are asked first and the index only of what they exclude, which is the
+     few, so the walk pays for tracking only where it decides something.
      */
     private func admission(
         name: String,
         relative: String,
         parent: String,
         isDirectory: Bool,
-        insideExcludedDirectory: Bool,
+        inside enclosing: Admission,
     ) -> Admission {
         if name == ".git" {
-            return .refused
+            return .refused(excludedBy: nil)
         }
         if isDirectory && FileManager.default.fileExists(atPath: rootPath + "/" + relative + "/.git") {
-            return .refused
+            return .refused(excludedBy: nil)
         }
-        if !insideExcludedDirectory
-            && !isIgnored(relative: relative, parent: parent, name: name, isDirectory: isDirectory)
-        {
+        let excludedBy: Pattern.Source
+        if case .trackedOnly(let directoryLine) = enclosing {
+            excludedBy = directoryLine
+        }
+        else if let line = ignoringLine(relative: relative, parent: parent, name: name, isDirectory: isDirectory) {
+            excludedBy = line
+        }
+        else {
             return .admitted
         }
         if isDirectory {
-            return index.trackedDirectories.contains(relative) ? .trackedOnly : .refused
+            return index.trackedDirectories.contains(relative)
+                ? .trackedOnly(excludedBy: excludedBy) : .refused(excludedBy: excludedBy)
         }
-        return index.trackedFiles.contains(relative) ? .admitted : .refused
+        return index.trackedFiles.contains(relative) ? .admitted : .refused(excludedBy: excludedBy)
     }
 
-    /* The deepest `.gitignore` with a matching line decides, then `info/exclude`, then the global file. */
-    private func isIgnored(relative: String, parent: String, name: String, isDirectory: Bool) -> Bool {
+    /*
+     The line that ignores an entry, nil when none does: the deepest `.gitignore` with a matching line decides, then
+     `info/exclude`, then the global file, and a deciding `!` line re-includes.
+     */
+    private func ignoringLine(relative: String, parent: String, name: String, isDirectory: Bool) -> Pattern.Source? {
         let path = Array(relative.utf8)
         let nameBytes = path[(path.count - name.utf8.count)...]
         var directory: String? = parent
@@ -777,7 +834,7 @@ final class IgnoreRules {
                 isDirectory: isDirectory,
                 foldCase: foldCase,
             ) {
-                return decision
+                return decision.negated ? nil : decision.source
             }
             directory = current.isEmpty ? nil : String(current[..<(current.lastIndex(of: "/") ?? current.startIndex)])
         }
@@ -789,25 +846,24 @@ final class IgnoreRules {
                 isDirectory: isDirectory,
                 foldCase: foldCase,
             ) {
-                return decision
+                return decision.negated ? nil : decision.source
             }
         }
-        return false
+        return nil
     }
 
-    /* The last line in one file matching the path: ignored, or re-included by `!`. Nil when no line matches. */
+    /* The last line in one file matching the path, which ignores it, or with `!` re-includes it. Nil when none does. */
     static func decision(
         _ patterns: [Pattern],
         path: ArraySlice<UInt8>,
         name: ArraySlice<UInt8>,
         isDirectory: Bool,
         foldCase: Bool,
-    ) -> Bool? {
+    ) -> Pattern? {
         guard !patterns.isEmpty else { return nil }
         let path = Array(path)
         let name = Array(name)
-        let last = patterns.last { $0.matches(path: path, name: name, isDirectory: isDirectory, foldCase: foldCase) }
-        return last.map { !$0.negated }
+        return patterns.last { $0.matches(path: path, name: name, isDirectory: isDirectory, foldCase: foldCase) }
     }
 
     private func patterns(ownedBy relativeDirectory: String) -> [Pattern] {
@@ -825,7 +881,7 @@ final class IgnoreRules {
     /* A missing ignore file ignores nothing, as it does for git. */
     static func patterns(inFile path: String) -> [Pattern] {
         guard let contents = FileManager.default.contents(atPath: path) else { return [] }
-        return Pattern.patterns(in: Array(contents))
+        return Pattern.patterns(in: Array(contents), file: path)
     }
 
     /*

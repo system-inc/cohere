@@ -140,7 +140,7 @@ nothing else.
     "filesInScope": 149,
     "scopeDescription": "",
     "targets": [{ "name": "AhraOsCore", "kind": "library", "files": 14, "languageMode": "6" }],
-    "excluded": [{ "file": "/…/Scratch.swift", "reason": "ignored by git" }]
+    "excluded": [{ "file": "/…/Scratch.swift", "reason": "ignored by git", "source": ".gitignore:3" }]
 }
 ```
 
@@ -160,6 +160,15 @@ nothing else.
   `a script whose imports do not settle its platform: it imports AppKit for macOS and UIKit for iOS, so neither SDK was guessed at`.
   Outside a git repository, a `git archive` copy say, "git would list" reads the package's own ignore files as git
   would were its root a repository's, so a script there is checked and every other such file named, as in a checkout.
+- An excluded entry's `source` names the rule that excluded the file, as `path:line` with the line counted from 1:
+  the ignore file's line that decided, or the line that excluded a directory above the file. The path is relative to
+  the project's root (`.gitignore:3`, `Sources/.gitignore:1`, `../.gitignore:2` for a repository whose root is above
+  the package's), or absolute for an ignore file outside the work tree, as the global excludes file and a worktree's
+  shared `info/exclude` are. It is absent where no rule is the cause: a package manifest, a vendored file, a file no
+  target compiles, a file inside another repository. The Swift engine has no `ignorePatterns`, so no Swift source
+  names `CohereSettings.json`. A narrowing excludes no file here; the front door counts what it left out from
+  `filesInScope`. Additive within contract 3 (#08cv2mp): the front door quotes it when every file was excluded,
+  `no files checked: 1 file excluded, ignored by git (.gitignore:3)`, and a reader before it ignores it.
 - `filesInScope` equals `filesOurs` on a whole-package run. A run narrowed by named paths sets it
   lower and describes the request in `scopeDescription`, which the front door prints in the
   parenthesis of `N in scope (…)`.
