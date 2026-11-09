@@ -74,58 +74,78 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 	}
 }
 
-// Analyzer builds nothing as it runs, and the first read of its result builds the whole package, as buildir built it
-// before any check ran: a reader that stops after the first function still leaves every function built, anonymous
-// ones included. Building one function at a time, as each is read, is the intermediate representation package's own
-// laziness, held there (TestBuildingOneFunctionBuildsOnlyIt), and not what a reader of this result gets.
+// Analyzer builds nothing as it runs, and the first read of its result, through either door, builds the whole
+// package, as buildir built it before any check ran: a reader whose first read is Package, or one that stops after the
+// first function SourceFunctions hands it, still finds every function built, anonymous ones included. Building one
+// function at a time, as each is read, is the intermediate representation package's own laziness, held there
+// (TestBuildingOneFunctionBuildsOnlyIt), and not what a reader of this result gets.
 func TestTheReadersResultIsWhole(test *testing.T) {
 	test.Parallel()
+	doors := []struct {
+		name      string
+		firstRead func(result *Result)
+	}{
+		{"SourceFunctions", func(result *Result) {
+			for range result.SourceFunctions() {
+				break
+			}
+		}},
+		{"Package", func(result *Result) {
+			result.Package()
+		}},
+	}
 	type reading struct {
 		functions     int
 		unbuiltBefore int
 		unbuiltAfter  []string
 	}
-	probe := &analysis.Analyzer{
-		Name:       "build_probe",
-		Doc:        "counts the functions built before any read and after reading one",
-		Requires:   []*analysis.Analyzer{Analyzer},
-		ResultType: reflect.TypeFor[reading](),
-		Run: func(pass *analysis.Pass) (any, error) {
-			result := mustResultOf(pass)
-			read := reading{functions: len(result.irPackage.Functions)}
-			for _, function := range result.irPackage.Functions {
-				if len(function.Blocks) == 0 {
-					read.unbuiltBefore++
+	for _, door := range doors {
+		probe := &analysis.Analyzer{
+			Name:       "build_probe_" + strings.ToLower(door.name),
+			Doc:        "counts the functions built before any read and after the first read",
+			Requires:   []*analysis.Analyzer{Analyzer},
+			ResultType: reflect.TypeFor[reading](),
+			Run: func(pass *analysis.Pass) (any, error) {
+				result := mustResultOf(pass)
+				read := reading{functions: len(result.irPackage.Functions)}
+				for _, function := range result.irPackage.Functions {
+					if len(function.Blocks) == 0 {
+						read.unbuiltBefore++
+					}
 				}
-			}
-			for range result.SourceFunctions() {
-				break
-			}
-			// Read off the package itself, not through another walk of the result, which would build what it reached.
-			unbuilt := slices.Clone(result.irPackage.Functions)
-			for _, function := range result.irPackage.Functions {
-				unbuilt = append(unbuilt, function.AnonymousFunctions...)
-			}
-			for _, function := range unbuilt {
-				if len(function.Blocks) == 0 {
-					read.unbuiltAfter = append(read.unbuiltAfter, function.RelativeString(nil))
+				door.firstRead(result)
+				// Read off the package itself, not through either door, which would build what it reached.
+				for _, function := range withAnonymous(result.irPackage.Functions) {
+					if len(function.Blocks) == 0 {
+						read.unbuiltAfter = append(read.unbuiltAfter, function.RelativeString(nil))
+					}
 				}
-			}
-			return read, nil
-		},
+				return read, nil
+			},
+		}
+		read, isReading := rootResults(test, &checker.Options{}, probe)[probe].(reading)
+		if !isReading {
+			test.Fatalf("the probe through %s returned no reading", door.name)
+		}
+		if read.functions < 8 || read.unbuiltBefore != read.functions {
+			test.Errorf("of %d package functions, %d were unbuilt before the result was read through %s, where all "+
+				"were expected", read.functions, read.unbuiltBefore, door.name)
+		}
+		if len(read.unbuiltAfter) != 0 {
+			test.Errorf("after a first read through %s, %q had no blocks, where the whole package was expected built",
+				door.name, read.unbuiltAfter)
+		}
 	}
-	read, isReading := rootResults(test, &checker.Options{}, probe)[probe].(reading)
-	if !isReading {
-		test.Fatal("the probe returned no reading")
+}
+
+// withAnonymous is functions and every anonymous function each holds, however deep.
+func withAnonymous(functions []*intermediate_representation.Function) []*intermediate_representation.Function {
+	every := []*intermediate_representation.Function{}
+	for _, function := range functions {
+		every = append(every, function)
+		every = append(every, withAnonymous(function.AnonymousFunctions)...)
 	}
-	if read.functions < 8 || read.unbuiltBefore != read.functions {
-		test.Errorf("of %d package functions, %d were unbuilt before the result was read, where all were expected",
-			read.functions, read.unbuiltBefore)
-	}
-	if len(read.unbuiltAfter) != 0 {
-		test.Errorf("after one function was read, %q had no blocks, where the whole package was expected built",
-			read.unbuiltAfter)
-	}
+	return every
 }
 
 // A reader that follows StaticCallee from a function into one of the same package declared after it finds the callee
