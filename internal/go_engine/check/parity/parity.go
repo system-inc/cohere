@@ -16,8 +16,9 @@
 // checking what it makes.
 //
 // A port's tests call it in a few lines: RequireUpstreamWants over the original's own fixtures, or
-// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, or
-// RequireStaticcheckWants over staticcheck's, RequireIdentical over those and the port's parity fixtures,
+// RequireUpstreamWantsWithFixes where the original's own test holds its fixes to golden files, each on
+// `parity.Renaming(...)` where the port meets a want there in other words, adjudicated, or RequireStaticcheckWants
+// over staticcheck's, RequireIdentical over those and the port's parity fixtures,
 // RequireIdenticalDespiteLoadErrors over those that fail to type-check on purpose, for a pair that runs despite errors,
 // RequireIdenticalFacts over them for a pair that exports facts, RequireOnlyAdjudicated over its differences fixture,
 // RequireStaticcheckGolden over staticcheck's golden files for a port that offers fixes, RequirePortWhereOriginalPanics
@@ -411,10 +412,10 @@ func RequireOnlyAdjudicated(
 }
 
 // Record is a record of a differences fixture's given beside the call, to RequireOnlyAdjudicated or
-// RequirePortWhereOriginalPanics, for a file that cannot carry it as a comment: File, the file as findings name it, by
-// its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the line it is on; Text, the record as a
-// comment writes it after `// port `, as `withholds: Format the number as a decimal`; and Reason, why, as the comment
-// above a record says it.
+// RequirePortWhereOriginalPanics, or a rename given to Renaming, for a file that cannot carry it as a comment: File,
+// the file as findings name it, by its path below the fixtures' root, as `typeparams/typeparams.go`; Line, the line it
+// is on; Text, the record as a comment writes it after `// port `, as `withholds: Format the number as a decimal`; and
+// Reason, why, as the comment above a record says it.
 type Record struct {
 	File   string
 	Line   int

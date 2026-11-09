@@ -19,7 +19,7 @@ import (
 // reads the `//@ diag(...)` notes staticcheck's fixtures mark theirs with.
 func RequireUpstreamWants(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
 	test.Helper()
-	requireUpstreamWants(test, analysistest.Run, port, testdata, patterns)
+	requireUpstreamWants(test, analysistest.Run, port, testdata, patterns, nil)
 }
 
 // RequireUpstreamWantsWithFixes is RequireUpstreamWants for an original whose own test is
@@ -34,22 +34,31 @@ func RequireUpstreamWants(test testing.TB, port *analysis.Analyzer, testdata str
 // it and replaces nothing.
 func RequireUpstreamWantsWithFixes(test testing.TB, port *analysis.Analyzer, testdata string, patterns ...string) {
 	test.Helper()
-	requireUpstreamWants(test, analysistest.RunWithSuggestedFixes, port, testdata, patterns)
+	requireUpstreamWants(test, analysistest.RunWithSuggestedFixes, port, testdata, patterns, nil)
 }
 
 // requireUpstreamWants runs port over each load of the fixtures patterns name with run, analysistest.Run or one that
-// checks more beside it, from the load's own folder, reporting through errorsOnly.
+// checks more beside it, from the load's own folder, reporting through errorsOnly, with each rename given read (see
+// Renaming).
 func requireUpstreamWants(
 	test testing.TB,
 	run func(analysistest.Testing, string, *analysis.Analyzer, ...string) []*analysistest.Result,
 	port *analysis.Analyzer,
 	testdata string,
 	patterns []string,
+	given []Record,
 ) {
 	test.Helper()
+	renamings := upstreamRenamings(test, given)
 	// Held as the machine's own target's call is, since a check analysistest runs may read build.Default.
 	defer Target{}.held(test)()
 	for _, fixtures := range fixtureLoads(testdata, patterns) {
-		run(errorsOnly{test}, fixtures.directory, port, fixtures.patterns...)
+		run(errorsOnly{test}, fixtures.directory, renamedAt(port, fixtures, renamings), fixtures.patterns...)
+	}
+	for _, renaming := range renamings {
+		if renaming.met.Load() == 0 {
+			test.Errorf("%s:%d is given beside the call the rename %q => %q, and the port finds nothing there in "+
+				"those words", renaming.at.File, renaming.at.Line, renaming.original, renaming.at.Message)
+		}
 	}
 }
