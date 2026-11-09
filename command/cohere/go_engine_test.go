@@ -486,6 +486,7 @@ func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
 		return "cat <<'RECORDS'\n" + records + "\nRECORDS"
 	}
 
+	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
 	test.Run("every file ignored by git", func(test *testing.T) {
 		// A process runs once, so nothing resets the summary between two runs in one test binary.
 		activeSummary = runSummary{}
@@ -505,6 +506,7 @@ func TestAGoRunThatExcludedEveryFileFails(test *testing.T) {
 		}
 	})
 
+	// Not parallel: it drives a check run through engineRun, which sets the package-level activeSummary.
 	test.Run("the control: the file in scope", func(test *testing.T) {
 		activeSummary = runSummary{}
 		out, exitCode, runError := runFakeGoEngine(test, printed(stream(1, "")))
