@@ -125,6 +125,8 @@ func TestSsaOverRealCodebase(test *testing.T) {
 										terminals["Ternary"]++
 									case *Label:
 										terminals["Label"]++
+									case *MaybeThrow:
+										terminals["MaybeThrow"]++
 									}
 								}
 								for _, nested := range lowered.Functions {
@@ -150,5 +152,16 @@ func TestSsaOverRealCodebase(test *testing.T) {
 	sort.Strings(keys)
 	for _, key := range keys {
 		test.Logf("  terminal %-8s %d", key, terminals[key])
+	}
+	// No lowering builds MaybeThrow, and terminal.go's MaybeThrow would end a run of throwable instructions,
+	// which this IR's answer to ThrowsAtLastInstruction, no, only approximates (#js7tdfg). Building one here
+	// forces the choice terminal.go names before it ships silently.
+	if terminals["MaybeThrow"] != 0 {
+		test.Errorf("lowering built %d MaybeThrow terminals over the corpus: decide at terminal.go's MaybeThrow "+
+			"how a run of throwable instructions meets ThrowsAtLastInstruction (one throwing instruction per "+
+			"block, answering yes) before this ships (#js7tdfg)", terminals["MaybeThrow"])
+	}
+	if terminals["Try"] == 0 {
+		test.Error("the corpus lowered no Try, so its MaybeThrow count says nothing about try bodies")
 	}
 }

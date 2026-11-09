@@ -34,17 +34,19 @@
 //
 // # A throw's edge, which carries less than the block it leaves
 //
-// A block with an Exceptional edge out ends in an instruction that may throw, and its edge to the
-// handler leaves before that instruction's definitions happen. In `local = f()` where f throws and the
+// In an IR whose Graph says ThrowsAtLastInstruction, a block with an Exceptional edge out ends in the
+// instruction that may throw, and its edge to the handler leaves before that instruction's definitions
+// happen. In `local = f()` where f throws and the
 // handler reads local, the handler reads the old value. So a lookup through that edge reads what each
 // binding held just before the last instruction defined it (valueFromPredecessor), never the block's
 // final answer, which is what every other edge carries. It is Adamic's construction, adopted from its
-// internal/flow (#2yz9ra9, #js7tdfg), where it is live; cohere's TypeScript IR marks React's MaybeThrow
-// handler Exceptional and so takes it too.
+// internal/flow (#2yz9ra9, #js7tdfg). An IR answering no keeps the final answer on that edge too, and
+// cohere's TypeScript and Go IRs do; ThrowsAtLastInstruction says why.
 //
 // A block both of whose edges reach one successor, a Real and an Exceptional edge to the same block, is
 // one predecessor of it with one phi operand, which can't carry both values; that edge carries the
-// block's final answer, as before. Neither IR emits one (#mv39hpt).
+// block's final answer, and the verifier reports the block (ThrowEdgeSharesContinuation). No IR emits one
+// (#mv39hpt).
 //
 // # What is deliberately not here
 //

@@ -119,6 +119,18 @@ type Graph[F any, B comparable, P any] interface {
 	EachEdge(block B, visit func(successor BlockId, edge Edge))
 	// EndsInReturn reports whether a block's terminal returns from the function.
 	EndsInReturn(block B) bool
+	// ThrowsAtLastInstruction reports whether a block with an Exceptional edge out throws at its last
+	// instruction alone, before that instruction's definitions happen, so a handler reached from it reads
+	// what each binding held just before them (construct.go's "A throw's edge", #js7tdfg). An IR answering
+	// no gives a handler the block's final answer, as every other edge carries. Every IR answers, so none
+	// inherits either semantics silently: Adamic, one throwing instruction per block, yes; cohere's
+	// TypeScript and Go IRs no.
+	//
+	// A run of throwable instructions before one throw edge is right under neither answer: the handler can
+	// be reached after any prefix of the run, so its true value is a join over every prefix. A lowering
+	// that builds one should split the run into one throwing instruction per block and answer yes; until
+	// then, no is a lint engine's approximation.
+	ThrowsAtLastInstruction(function F, block B) bool
 
 	// InstructionCount is how many instructions a block holds.
 	InstructionCount(function F, block B) int

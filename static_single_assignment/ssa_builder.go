@@ -119,7 +119,10 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 		builder.walkingBlock = blockId
 		state := builder.stateAt(blockId)
 		builder.visited[blockId] = true
-		state.handlers = handlersOf(edgesOf(builder.graph, block, edges), state.handlers[:0])
+		state.handlers = state.handlers[:0]
+		if builder.graph.ThrowsAtLastInstruction(builder.function, block) {
+			state.handlers = handlersOf(edgesOf(builder.graph, block, edges), state.handlers)
+		}
 
 		count := builder.graph.InstructionCount(builder.function, block)
 		for index := 0; index < count; index++ {
