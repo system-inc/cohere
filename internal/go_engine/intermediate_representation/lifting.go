@@ -84,20 +84,27 @@ func liftingRound(function *Function, options liftingOptions) bool {
 	eliminateDeferStack := deferStackAllocation != nil && !deferStackAllocation.Heap
 
 	work := make([]liftingWork, len(function.Blocks))
-	for index := range work {
-		work[index].insertInstructions = map[Instruction][]Instruction{}
-	}
 	heads := liftingNumber(function)
 
 	runDefers := make([]int, len(function.Blocks))
 	var scratch liftingLiftableScratch
 	var allocations []*Allocation
-	inBlocks := map[*Allocation]bool{}
+	// localsInBlocks says which of the function's Locals the walk below finds in a block, and is nil when it has
+	// none: a map of Locals alone, most functions holding a handful, where go/ir marks every Allocation it walks.
+	var localsInBlocks map[*Allocation]bool
+	if len(function.Locals) > 0 {
+		localsInBlocks = make(map[*Allocation]bool, len(function.Locals))
+		for _, local := range function.Locals {
+			localsInBlocks[local] = false
+		}
+	}
 	for _, block := range function.Blocks {
 		for _, instruction := range block.Instructions {
 			switch instruction := instruction.(type) {
 			case *Allocation:
-				inBlocks[instruction] = true
+				if _, isLocal := localsInBlocks[instruction]; isLocal {
+					localsInBlocks[instruction] = true
+				}
 				if liftingLiftable(instruction, work, heads, &scratch) {
 					allocations = append(allocations, instruction)
 				}
@@ -171,7 +178,7 @@ func liftingRound(function *Function, options liftingOptions) bool {
 				return true
 			}
 		}
-		return !inBlocks[local]
+		return !localsInBlocks[local]
 	})
 	return len(allocations) > 0
 }

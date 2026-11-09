@@ -48,6 +48,18 @@ func liftingCleared[Element any](buffer []Element, length int) []Element {
 	return cleared
 }
 
+// liftingInsertBefore records instructions to insert in the block at blockIndex before before, making the block's
+// insertion map on its first: most rounds insert nothing, so most blocks never need one (#beapx0q).
+//
+// Mutates: work its entry for the block gains the insertion
+func liftingInsertBefore(work []liftingWork, blockIndex int, before Instruction, instructions ...Instruction) {
+	if work[blockIndex].insertInstructions == nil {
+		work[blockIndex].insertInstructions = map[Instruction][]Instruction{}
+	}
+	work[blockIndex].insertInstructions[before] = append(work[blockIndex].insertInstructions[before],
+		instructions...)
+}
+
 // liftingBlockDescription is what liftable learns of one block for one Allocation.
 type liftingBlockDescription struct {
 	// isUnliftable is whether the block is (partially) unliftable, because it holds an unliftable use or an
@@ -230,8 +242,7 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int, sc
 	split.setType(allocation.typ)
 	split.setSource(allocation.source)
 	split.comment = "split alloc"
-	work[allocation.block.Index].insertInstructions[allocation] = append(
-		work[allocation.block.Index].insertInstructions[allocation], split)
+	liftingInsertBefore(work, allocation.block.Index, allocation, split)
 
 	scratch.predecessorHasStore = liftingCleared(scratch.predecessorHasStore, len(function.Blocks))
 	predecessorHasStore := scratch.predecessorHasStore
@@ -253,8 +264,7 @@ func liftingLiftable(allocation *Allocation, work []liftingWork, heads []int, sc
 			store.comment = "split alloc"
 			liftingAddToOperandsReferrers(load)
 			liftingAddToOperandsReferrers(store)
-			work[in.Index].insertInstructions[before] = append(work[in.Index].insertInstructions[before], load,
-				store)
+			liftingInsertBefore(work, in.Index, before, load, store)
 		}
 
 		if !description.storeInPredecessors {
