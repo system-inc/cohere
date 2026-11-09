@@ -1,7 +1,8 @@
 // Package nil_ness is x/tools' nilness pass, a nil dereference, a nil panic or a comparison with nil whose outcome
-// the function's own control flow already decides, ported onto staticcheck's intermediate representation, which
-// staticcheck's checks already build for every package, so the run no longer builds x/tools' single assignment form
-// for this pass.
+// the function's own control flow already decides, ported onto the engine's own intermediate representation
+// (#h173znj), so the run builds no x/tools single assignment form for this pass. The engine's representation is built
+// as staticcheck's is, proven identical to it, so where the code below says how staticcheck's form is built, the
+// engine's is built the same.
 //
 // It is translated, not copied, from golang.org/x/tools@v0.50.0 go/analysis/passes/nilness/nilness.go, whose logic it
 // keeps and whose messages it reports word for word. Where staticcheck's form is built differently from x/tools', the
@@ -15,7 +16,8 @@
 // comparison before that use sees the variable's known value where x/tools sees memory; it merges the same constant
 // from every edge into that constant, so a variable only ever assigned nil is known nil; it reads the value behind a
 // pointer in the caller of a method with a value receiver, where x/tools reads it in a wrapper out of sight; and
-// buildir's functions include the closures of package-level initializers, which buildssa's leave out.
+// the engine's source functions, as buildir's do, include the closures of package-level initializers, which
+// buildssa's leave out.
 package nil_ness
 
 import (
@@ -24,9 +26,9 @@ import (
 	"go/types"
 	"strings"
 
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
@@ -37,17 +39,18 @@ const Name = "nilness"
 
 // Doc is the rule's documentation.
 const Doc = "Flags a nil dereference, a panic with nil, and a comparison with nil the control flow already " +
-	"decides: x/tools' nilness, ported onto staticcheck's intermediate representation."
+	"decides: x/tools' nilness, ported onto the engine's own intermediate representation."
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own.
+var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.
 var Analyzer = dispatch.RuleAnalyzer(rule.Namespace+Name, Name, Doc, &Listener)
 
 // Check judges one function, visiting its reachable blocks in dominance order with the nilness facts that dominate
 // each.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	// Skip cgo-generated functions annotated with //go:cgo_unsafe_args such as _cgo_cmalloc since they behave in
 	// magical ways not captured by the single assignment form, leading to false positives.
 	if hasCgoUnsafeArguments(function) {
@@ -62,7 +65,7 @@ func Check(context *rule.Context, function *ir.Function) {
 
 // nilnessOf reports whether value is definitely nil, definitely not nil, or unknown given the dominating stack of
 // facts.
-func nilnessOf(stack []fact, value ir.Value) nilState {
+func nilnessOf(stack []fact, value intermediate_representation.Value) nilState {
 	switch value := value.(type) {
 	// Unwrap ChangeInterface and Slice values recursively, to detect if underlying values have any facts recorded or
 	// are otherwise known with regard to nilness.
@@ -71,11 +74,11 @@ func nilnessOf(stack []fact, value ir.Value) nilState {
 	// because this covers cases where the nilness of a value is intrinsic, rather than based on inferred facts, such
 	// as a zero value interface variable. That said, this work alone would only inform us when facts are about
 	// underlying values, rather than outer values, when the analysis is transitive in both directions.
-	case *ir.ChangeInterface:
+	case *intermediate_representation.ChangeInterface:
 		if underlying := nilnessOf(stack, value.X); underlying != unknown {
 			return underlying
 		}
-	case *ir.MakeInterface:
+	case *intermediate_representation.MakeInterface:
 		// A MakeInterface is non-nil unless its operand is a type parameter.
 		parameter, isParameter := types.Unalias(value.X.Type()).(*types.TypeParam)
 		if !isParameter {
@@ -93,11 +96,11 @@ func nilnessOf(stack []fact, value ir.Value) nilState {
 		// If the type parameter can be instantiated as an interface (and thus also as a concrete type), we can't
 		// determine the nilness.
 
-	case *ir.Slice:
+	case *intermediate_representation.Slice:
 		if underlying := nilnessOf(stack, value.X); underlying != unknown {
 			return underlying
 		}
-	case *ir.SliceToArrayPointer:
+	case *intermediate_representation.SliceToArrayPointer:
 		underlying := nilnessOf(stack, value.X)
 		if sliceToArrayPointerLength(value) > 0 {
 			if underlying == isNil {
@@ -118,19 +121,19 @@ func nilnessOf(stack []fact, value ir.Value) nilState {
 
 	// Is value intrinsically nil or non-nil?
 	switch value := value.(type) {
-	case *ir.Alloc,
-		*ir.FieldAddr,
-		*ir.FreeVar,
-		*ir.Function,
-		*ir.Global,
-		*ir.IndexAddr,
-		*ir.MakeChan,
-		*ir.MakeClosure,
-		*ir.MakeMap,
-		*ir.MakeSlice:
+	case *intermediate_representation.Allocation,
+		*intermediate_representation.FieldAddress,
+		*intermediate_representation.FreeVariable,
+		*intermediate_representation.Function,
+		*intermediate_representation.Global,
+		*intermediate_representation.IndexAddress,
+		*intermediate_representation.MakeChannel,
+		*intermediate_representation.MakeClosure,
+		*intermediate_representation.MakeMap,
+		*intermediate_representation.MakeSlice:
 		return isNonNil
 
-	case *ir.Const:
+	case *intermediate_representation.Constant:
 		if isNilConstant(value) {
 			return isNil // nil or zero value of a pointer-like type
 		}
@@ -149,7 +152,7 @@ func nilnessOf(stack []fact, value ir.Value) nilState {
 // isNilConstant is whether candidate is the nil of a type that has one, as x/tools' Const.IsNil decides it.
 // staticcheck's IsNil leaves out unsafe.Pointer, whose zero constant both forms build with no value, and x/tools'
 // counts it.
-func isNilConstant(candidate *ir.Const) bool {
+func isNilConstant(candidate *intermediate_representation.Constant) bool {
 	if candidate.Value != nil {
 		return false
 	}
@@ -162,7 +165,7 @@ func isNilConstant(candidate *ir.Const) bool {
 // sliceToArrayPointerLength is the length of the array conversion points to. The original asserts the pointer to an
 // array and panics on anything else; the conversion always yields one, so the port reads zero instead of crashing
 // should that ever not hold.
-func sliceToArrayPointerLength(conversion *ir.SliceToArrayPointer) int64 {
+func sliceToArrayPointerLength(conversion *intermediate_representation.SliceToArrayPointer) int64 {
 	pointer, isPointer := conversion.Type().(*types.Pointer)
 	if !isPointer {
 		return 0
@@ -176,14 +179,20 @@ func sliceToArrayPointerLength(conversion *ir.SliceToArrayPointer) int64 {
 
 // If block ends with an equality comparison, equality returns the operation and its true (equal) and false (not
 // equal) successors.
-func equality(block *ir.BasicBlock) (*ir.BinOp, *ir.BasicBlock, *ir.BasicBlock) {
-	if branch, isIf := block.Control().(*ir.If); isIf {
-		if comparison, isComparison := branch.Cond.(*ir.BinOp); isComparison {
-			switch comparison.Op {
+func equality(
+	block *intermediate_representation.BasicBlock,
+) (
+	*intermediate_representation.BinaryOperation,
+	*intermediate_representation.BasicBlock,
+	*intermediate_representation.BasicBlock,
+) {
+	if branch, isIf := block.Control().(*intermediate_representation.If); isIf {
+		if comparison, isComparison := branch.Condition.(*intermediate_representation.BinaryOperation); isComparison {
+			switch comparison.Operator {
 			case token.EQL:
-				return comparison, block.Succs[0], block.Succs[1]
+				return comparison, block.Successors[0], block.Successors[1]
 			case token.NEQ:
-				return comparison, block.Succs[1], block.Succs[0]
+				return comparison, block.Successors[1], block.Successors[0]
 			}
 		}
 	}
@@ -203,7 +212,7 @@ func equality(block *ir.BasicBlock) (*ir.BinOp, *ir.BasicBlock, *ir.BasicBlock) 
 func expandFacts(known fact) []fact {
 	expanded := []fact{known}
 	for current := known; ; {
-		change, isChange := current.value.(*ir.ChangeInterface)
+		change, isChange := current.value.(*intermediate_representation.ChangeInterface)
 		if !isChange {
 			return expanded
 		}
@@ -251,12 +260,12 @@ func isTypeParameter(typ types.Type) bool {
 // isRangeIndex reports whether the instruction is a slice indexing operation slice[i] within a "for range slice"
 // loop. The operation could be explicit, such as slice[i] within (or even after) the loop, or it could be implicit,
 // such as "for i, v := range slice {}". (These cannot be reliably distinguished.)
-func isRangeIndex(address *ir.IndexAddr) bool {
+func isRangeIndex(address *intermediate_representation.IndexAddress) bool {
 	// Here we reverse-engineer the lowering of range-over-slice, which staticcheck builds as x/tools does:
 	//
 	//      n = len(x)
 	//      jump loop
-	// loop:                                                "rangeindex.loop"
+	// loop:                                                "rangeindex.loop", RangeIndexLoop
 	//      phi = φ(-1, incr) #rangeindex
 	//      incr = phi + 1
 	//      cond = incr < n
@@ -265,34 +274,34 @@ func isRangeIndex(address *ir.IndexAddr) bool {
 	//      instr = &x[incr]
 	//      ...
 	// done:
-	increment, isIncrement := address.Index.(*ir.BinOp)
-	if !isIncrement || increment.Op != token.ADD {
+	increment, isIncrement := address.Index.(*intermediate_representation.BinaryOperation)
+	if !isIncrement || increment.Operator != token.ADD {
 		return false
 	}
 	loop := increment.Block()
-	if loop.Comment != "rangeindex.loop" {
+	if !loop.RangeIndexLoop {
 		return false
 	}
-	branch, isIf := loop.Control().(*ir.If)
+	branch, isIf := loop.Control().(*intermediate_representation.If)
 	if !isIf {
 		return false
 	}
 	// The original asserts the condition a comparison and panics on anything else; the loop's condition always is
 	// one, so the port declines instead of crashing should that ever not hold.
-	condition, isComparison := branch.Cond.(*ir.BinOp)
-	if !isComparison || condition.X != increment || condition.Op != token.LSS {
+	condition, isComparison := branch.Condition.(*intermediate_representation.BinaryOperation)
+	if !isComparison || condition.X != increment || condition.Operator != token.LSS {
 		return false
 	}
-	call, isCall := condition.Y.(*ir.Call)
+	call, isCall := condition.Y.(*intermediate_representation.Call)
 	if !isCall {
 		return false
 	}
-	builtin, isBuiltin := call.Common().Value.(*ir.Builtin)
-	return isBuiltin && builtin.Name() == "len" && call.Common().Args[0] == address.X
+	builtin, isBuiltin := call.Common().Value.(*intermediate_representation.Builtin)
+	return isBuiltin && builtin.Name() == "len" && call.Common().Arguments[0] == address.X
 }
 
 // hasCgoUnsafeArguments is whether function, or a function it is nested in, is declared with //go:cgo_unsafe_args.
-func hasCgoUnsafeArguments(function *ir.Function) bool {
+func hasCgoUnsafeArguments(function *intermediate_representation.Function) bool {
 	for enclosing := function; enclosing != nil; enclosing = enclosing.Parent() {
 		if declaration, isDeclaration := enclosing.Syntax().(*ast.FuncDecl); isDeclaration && declaration != nil &&
 			declaration.Doc != nil {

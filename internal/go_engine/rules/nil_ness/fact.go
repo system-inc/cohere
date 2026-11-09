@@ -1,10 +1,10 @@
 package nil_ness
 
-import "honnef.co/go/tools/go/ir"
+import "github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 
 // A fact records that a block is dominated by the condition value == nil or value != nil.
 type fact struct {
-	value   ir.Value
+	value   intermediate_representation.Value
 	nilness nilState
 }
 
