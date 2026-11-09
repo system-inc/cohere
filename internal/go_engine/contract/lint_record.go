@@ -70,7 +70,8 @@ type BuildRecord struct {
 // from the entries the binary carries, which nothing analyzed, apart from hit; it is written only when it is not 0,
 // so a build with none writes the record it always has. Reloads counts the packages the run loaded again from source,
 // though the cache held them, because a question of a fact computed on demand reached one restored with no answer
-// stored (#w7zmvat wave 3); it too is written only when it is not 0. On is false under `--no-cache`, and every count 0
+// stored (#w7zmvat wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is written
+// only when it is not 0. On is false under `--no-cache`, and every count 0
 // but FromBinary, which the binary's entries can still give, FactsSkipped of what they restored, and Reloads of them.
 type LintCache struct {
 	On           bool `json:"on"`
@@ -83,6 +84,7 @@ type LintCache struct {
 	FactsSkipped int  `json:"factsSkipped"`
 	Waves        int  `json:"waves"`
 	Reloads      int  `json:"reloads,omitempty"`
+	ReloadRounds int  `json:"reloadRounds,omitempty"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

@@ -80,8 +80,9 @@ type answering struct {
 	byTypes map[*types.Package]*packages.Package
 
 	// reloaded are the IDs of the packages every load of the run so far checked from source to answer a question,
-	// never restored.
+	// never restored, and rounds how many times a pass asked for new ones, each a load and a lint of its own.
 	reloaded map[string]bool
+	rounds   int
 }
 
 // know adds each package of known whose types are set, which the run's questions may reach.
@@ -161,6 +162,9 @@ func (session *CacheSession) Reload(reloads []string) bool {
 			session.answering.reloaded[identifier] = true
 			added = true
 		}
+	}
+	if added {
+		session.answering.rounds++
 	}
 	return added
 }

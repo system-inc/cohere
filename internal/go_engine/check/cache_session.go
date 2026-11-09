@@ -97,8 +97,10 @@ type CacheCounts struct {
 	WriteFailed int
 
 	// Reloads is the packages the run loaded from source, though the cache held them, because a question of a fact
-	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), over every load of the run.
-	Reloads int
+	// computed on demand reached one restored and no store answered it (#w7zmvat wave 3), over every load of the run,
+	// and ReloadRounds how many times the run loaded and linted again to do so.
+	Reloads      int
+	ReloadRounds int
 
 	// Problems are what kept the cache from being read or written: keys that could not be computed, which leaves
 	// every package a miss and none written, an entry that could not be encoded, and the first write that failed.
@@ -569,6 +571,7 @@ func (session *CacheSession) save(
 	session.counts.FromBinary = len(session.fromBinary)
 	session.answering.lock.Lock()
 	session.counts.Reloads = len(session.answering.reloaded)
+	session.counts.ReloadRounds = session.answering.rounds
 	session.answering.lock.Unlock()
 	if session.caching.Store == nil {
 		return

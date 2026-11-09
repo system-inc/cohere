@@ -10,8 +10,9 @@ import "fmt"
 // most two. FromBinary is the standard-library packages restored from the entries a release binary carries, apart
 // from hit, which `--no-cache` reads too, since they are part of cohere; it is absent when 0. Reloads is the packages
 // the run loaded again from source, though the cache held them, to answer a question of a fact computed on demand
-// that no store answered (#w7zmvat wave 3), absent when 0 too. On is false under
-// `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as it was.
+// that no store answered (#w7zmvat wave 3), and ReloadRounds the loads and lints again that took, each absent when 0.
+// On is false under `--no-cache`. Only a Go run has one; a Swift run's lint record carries none, so its output is as
+// it was.
 type packageCacheUse struct {
 	On           bool `json:"on"`
 	Hit          int  `json:"hit"`
@@ -23,6 +24,7 @@ type packageCacheUse struct {
 	FactsSkipped int  `json:"factsSkipped"`
 	Waves        int  `json:"waves"`
 	Reloads      int  `json:"reloads,omitempty"`
+	ReloadRounds int  `json:"reloadRounds,omitempty"`
 }
 
 // line is the cache's clause of the --verbose account, after "lint: ": the three counts every run has, and the ones
@@ -34,10 +36,7 @@ func (cache packageCacheUse) line() string {
 		if cache.FromBinary > 0 {
 			line += ", " + cache.segment()
 		}
-		if cache.Reloads > 0 {
-			line += fmt.Sprintf(", %d reloaded from source", cache.Reloads)
-		}
-		return line
+		return line + cache.reloads()
 	}
 	line := fmt.Sprintf("package cache hit %d, missed %d, wrote %d", cache.Hit, cache.Missed, cache.Written)
 	if cache.FromBinary > 0 {
@@ -52,10 +51,16 @@ func (cache packageCacheUse) line() string {
 	if cache.FactsSkipped > 0 {
 		line += fmt.Sprintf(", %d facts skipped", cache.FactsSkipped)
 	}
-	if cache.Reloads > 0 {
-		line += fmt.Sprintf(", %d reloaded from source", cache.Reloads)
+	return line + cache.reloads()
+}
+
+// reloads is the account's clause of the packages loaded again from source, and the rounds that took, empty when none
+// was.
+func (cache packageCacheUse) reloads() string {
+	if cache.Reloads == 0 {
+		return ""
 	}
-	return line
+	return fmt.Sprintf(", %d reloaded from source in %d rounds", cache.Reloads, cache.ReloadRounds)
 }
 
 // segment is the standard library's packages restored from the binary, as the footer and the account say them, so a

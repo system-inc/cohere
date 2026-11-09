@@ -42,9 +42,9 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	if edited.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the reload\n%s\nunder --no-cache\n%s", edited.withoutCounts, uncached.withoutCounts)
 	}
-	if edited.counts.Reloads != 3 {
-		test.Fatalf("want bottom, os and syscall reloaded to answer the purity of bottom.Double and os.Getpagesize, "+
-			"got %+v", edited.counts)
+	if edited.counts.Reloads != 3 || edited.counts.ReloadRounds != 3 {
+		test.Fatalf("want bottom, os and syscall reloaded, a round each, to answer the purity of bottom.Double and "+
+			"os.Getpagesize, got %+v", edited.counts)
 	}
 
 	again := append(contents, []byte(drop+"\n// Edited again, so top misses and asks again.\n")...)

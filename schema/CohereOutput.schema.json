@@ -534,6 +534,10 @@
                         "reloads": {
                             "type": "integer",
                             "description": "Packages loaded again from source, though the cache held them, because a rule asked of a fact computed on demand that no entry answered, so the lint phase ran again. Absent when zero."
+                        },
+                        "reloadRounds": {
+                            "type": "integer",
+                            "description": "Times the lint phase loaded and ran again for those reloads, each round loading every package the last one needed. Absent when zero."
                         }
                     }
                 },

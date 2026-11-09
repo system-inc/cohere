@@ -834,8 +834,8 @@ package's syntax, which a restored package does not have. Each answer computed i
 package's entry, under its key, and the binary's entries hold every answer of their package. A
 question of a restored package that nothing holds an answer to is never answered "no fact": the
 run loads that package again from source, never restoring it, and runs again, and the first pass
-is dropped unwritten. `"reloads":2` counts the packages so loaded, and is written only when it is
-not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
+is dropped unwritten, until a round needs no package it did not load already. `"reloads":2`
+counts the packages so loaded and `"reloadRounds":1` the rounds, each written only when it is not 0. A package loaded again that still cannot answer is a crash naming it, never a quiet answer.
 
 The Go engine checks a file under every build our own files constrain on, the host's and the fewest others under
 which every file compiles at least once (#72n9mq0), and when it checks more than one it writes `builds`, additive

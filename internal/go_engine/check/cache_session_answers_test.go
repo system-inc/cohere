@@ -100,7 +100,8 @@ func answeredRun(test *testing.T, before bool) *Result {
 func TestAPackageMarkedForReloadIsCheckedFromSource(test *testing.T) {
 	test.Parallel()
 	result := answeredRun(test, true)
-	if len(result.Crashes) > 0 || len(result.Reloads) > 0 || result.Cache.Reloads != 1 {
+	if len(result.Crashes) > 0 || len(result.Reloads) > 0 || result.Cache.Reloads != 1 ||
+		result.Cache.ReloadRounds != 1 {
 		test.Fatalf("want bottom checked from source and nothing more reloaded, got crashes %+v, reloads %v, %+v",
 			result.Crashes, result.Reloads, result.Cache)
 	}
