@@ -664,7 +664,7 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 	test.Parallel()
 	first, second := All(), All()
 	analyzerOf := map[string]*analysis.Analyzer{}
-	dispatcherOf := map[bool]*analysis.Analyzer{}
+	dispatcherOf := map[string]*analysis.Analyzer{}
 	for _, registered := range slices.Concat(first, second) {
 		if registered.Listener == nil {
 			continue
@@ -678,20 +678,33 @@ func TestEveryDispatchedRuleRequiresTheDispatcherHoldingItsListener(test *testin
 			test.Errorf("%s does not require the shared dispatcher of its walk, so another dispatcher would walk for "+
 				"it", registered.Name)
 		}
-		syntax := registered.Listener.IsSyntax()
-		if earlier, seen := dispatcherOf[syntax]; seen && earlier != shared {
+		walk := listenerWalk(registered.Listener)
+		if earlier, seen := dispatcherOf[walk]; seen && earlier != shared {
 			test.Errorf("%s's walk is shared by two dispatchers", registered.Name)
 		}
-		dispatcherOf[syntax] = shared
+		dispatcherOf[walk] = shared
 		if earlier, seen := analyzerOf[registered.Name]; seen && earlier != registered.Analyzer {
 			test.Errorf("two calls to All hand out two analyzers for %s, so options set on one miss the other",
 				registered.Name)
 		}
 		analyzerOf[registered.Name] = registered.Analyzer
 	}
-	if len(dispatcherOf) != 2 {
-		test.Errorf("the registry's dispatched rules hear %d walks, where both the intermediate representation's "+
-			"and the syntax's were expected", len(dispatcherOf))
+	if len(dispatcherOf) != 3 {
+		test.Errorf("the registry's dispatched rules hear %d walks, where staticcheck's intermediate "+
+			"representation's, the engine's own and the syntax's were expected", len(dispatcherOf))
+	}
+}
+
+// listenerWalk names the walk listener hears, for a test that keys dispatchers by it: the engine's own intermediate
+// representation and staticcheck's are two walks, each with its own shared dispatcher.
+func listenerWalk(listener *rule.Listener) string {
+	switch {
+	case listener.IsSyntax():
+		return "syntax"
+	case listener.IsIntermediateRepresentation():
+		return "the engine's own intermediate representation"
+	default:
+		return "staticcheck's intermediate representation"
 	}
 }
 
