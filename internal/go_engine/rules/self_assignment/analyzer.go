@@ -7,10 +7,11 @@
 // report.FilterGenerated leaves them out. It asks staticcheck_code.MayHaveSideEffects where the original asks
 // code.MayHaveSideEffects, judging a function pure when function_purity, the port of staticcheck's purity pass, holds
 // it, and reports through staticcheck_report.Report where the original reports through report.Report, each the port of
-// the one the original calls, proven against it beside it. It renders each side with staticcheck's own report.Render,
-// given a pass that holds only the context's file set, which is all Render reads, so the two sides compare and print as
-// the original's do. The registry runs the port in the original's place, under its name, and the original stays only as
-// the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// the one the original calls, proven against it beside it. It renders each side with staticcheck_report.Render,
+// staticcheck's report.Render translated, the same format.Node over the same file set, so the two sides compare and
+// print as the original's do. The registry runs the port in the original's place, under its name, and the original
+// stays only as the oracle: the parity tests beside this file run both over the same packages, and the two differ
+// nowhere they hold.
 package self_assignment
 
 import (
@@ -21,7 +22,6 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -87,7 +87,6 @@ func Check(context *rule.Context, assignment *ast.AssignStmt, isPure func(functi
 		return
 	}
 	// Render reads nothing of a pass but its file set.
-	renderPass := &analysis.Pass{Fset: context.Fset}
 	for index, left := range assignment.Lhs {
 		right := assignment.Rhs[index]
 		// The sides must be the same kind of node, so `(x) = x` is left alone, though it assigns x to itself.
@@ -98,8 +97,8 @@ func Check(context *rule.Context, assignment *ast.AssignStmt, isPure func(functi
 			staticcheck_code.MayHaveSideEffects(context, right, isPure) {
 			continue
 		}
-		renderedLeft := report.Render(renderPass, left)
-		renderedRight := report.Render(renderPass, right)
+		renderedLeft := staticcheck_report.Render(context, left)
+		renderedRight := staticcheck_report.Render(context, right)
 		if renderedLeft == renderedRight {
 			staticcheck_report.Report(context, assignment,
 				fmt.Sprintf("self-assignment of %s to %s", renderedRight, renderedLeft),

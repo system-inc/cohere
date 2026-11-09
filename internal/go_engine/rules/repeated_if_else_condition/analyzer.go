@@ -7,9 +7,8 @@
 // staticcheck_code.MayHaveSideEffects where the original asks code.MayHaveSideEffects, and reports through
 // staticcheck_report.Report where the original reports through report.Report, each the port of the one the original
 // calls, proven against it beside it. Two conditions are the same when staticcheck's report.Render prints them the
-// same, and the port calls that Render itself, borrowed in this wave, so the two compare conditions by the very same
-// text. It calls it as `report.Render(&analysis.Pass{Fset: context.Fset}, condition)`, a pass holding the file set
-// alone, since Render reads nothing else of a pass; the kit's port of Render takes the context in its place.
+// same, and the port prints them through staticcheck_report.Render, staticcheck's report.Render translated, the same
+// format.Node over the same file set, so the two compare conditions by the very same text.
 //
 // The original keeps one piece of state across the package: the if statements it has already walked as part of a
 // chain, so the else if of a chain is not judged again as a chain of its own. The port keeps the same in the
@@ -20,9 +19,6 @@ package repeated_if_else_condition
 
 import (
 	"go/ast"
-
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -78,10 +74,9 @@ func Check(context *rule.Context, ifStatement *ast.IfStmt, walked map[*ast.IfStm
 		return
 	}
 	// staticcheck's Render reads nothing of a pass but its file set.
-	renderPass := &analysis.Pass{Fset: context.Fset}
 	counts := map[string]int{}
 	for _, condition := range conditions {
-		rendered := report.Render(renderPass, condition)
+		rendered := staticcheck_report.Render(context, condition)
 		counts[rendered]++
 		// The second time a condition is tested is reported, and a third time is not reported again.
 		if counts[rendered] == 2 {
