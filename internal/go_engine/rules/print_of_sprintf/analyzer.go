@@ -104,7 +104,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	if !isCall {
 		return
 	}
-	sprintf, isFunction := packageFunction(context, formatted.Fun, "fmt")
+	sprintf, isFunction := staticcheck_code.PackageFunction(context, formatted.Fun, "fmt")
 	if !isFunction || sprintf.Name() != "Sprintf" {
 		return
 	}
@@ -128,7 +128,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 // given it after their writer. A Println form is reported only when the format is a literal, since one passed in may
 // not end in the newline the formatting form would then have to write.
 func checkFormatPrint(context *rule.Context, call *ast.CallExpr, formatted *ast.CallExpr) {
-	printFunction, isFunction := packageFunction(context, call.Fun, "fmt")
+	printFunction, isFunction := staticcheck_code.PackageFunction(context, call.Fun, "fmt")
 	if !isFunction {
 		return
 	}
@@ -205,7 +205,7 @@ func checkMethodPrint(context *rule.Context, call *ast.CallExpr) {
 
 // checkLogPrint reports one of the log package's printing functions given fmt.Sprintf's result.
 func checkLogPrint(context *rule.Context, call *ast.CallExpr) {
-	printFunction, isFunction := packageFunction(context, call.Fun, "log")
+	printFunction, isFunction := staticcheck_code.PackageFunction(context, call.Fun, "log")
 	if !isFunction {
 		return
 	}
@@ -221,39 +221,6 @@ func checkLogPrint(context *rule.Context, call *ast.CallExpr) {
 	}
 	staticcheck_report.Report(context, call,
 		fmt.Sprintf("should use %s(...) instead of %s(fmt.Sprintf(...))", mapped.name, callName))
-}
-
-// packageFunction is the function of the package at path that callee names, and false for anything else. It resolves
-// a callee as the original's Symbol query does: without parentheses, without one instantiation's type arguments, and
-// then an identifier, a dot import's among them, or a selector's selected name, through the identifiers' uses, since
-// a callee is never a definition. Symbol also names variables, constants and types, but none of the package's that
-// the forms ask for is one, so a function is the only answer that could match.
-func packageFunction(context *rule.Context, callee ast.Expr, path string) (*types.Func, bool) {
-	named := ast.Unparen(callee)
-	switch instantiated := named.(type) {
-	case *ast.IndexExpr:
-		named = ast.Unparen(instantiated.X)
-	case *ast.IndexListExpr:
-		named = ast.Unparen(instantiated.X)
-	}
-	var object types.Object
-	switch named := named.(type) {
-	case *ast.Ident:
-		object = context.TypesInfo.Uses[named]
-	case *ast.SelectorExpr:
-		object = context.TypesInfo.Uses[named.Sel]
-	default:
-		return nil, false
-	}
-	function, isFunction := object.(*types.Func)
-	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != path {
-		return nil, false
-	}
-	// A method's full name is its receiver's and its own, never its package's path and its own.
-	if function.Signature().Recv() != nil {
-		return nil, false
-	}
-	return function, true
 }
 
 // render is node as the original's messages write it, printed by go/format over the package's positions as

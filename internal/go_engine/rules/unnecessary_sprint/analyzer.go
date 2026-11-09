@@ -16,13 +16,13 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 
 	"honnef.co/go/tools/analysis/edit"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
@@ -69,7 +69,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	if !isLiteral || literal.Kind != token.STRING {
 		return
 	}
-	function, isFunction := packageFunction(context, call.Fun, "fmt")
+	function, isFunction := staticcheck_code.PackageFunction(context, call.Fun, "fmt")
 	if !isFunction {
 		return
 	}
@@ -94,37 +94,4 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		staticcheck_report.FilterGenerated(),
 		staticcheck_report.Fixes(edit.Fix("Replace with string literal", edit.ReplaceWithNode(context.Fset, call,
 			literal))))
-}
-
-// packageFunction is the function of the package at path that callee names, and false for anything else. It resolves
-// a callee as the original's Symbol query does: without parentheses, without one instantiation's type arguments, and
-// then an identifier, a dot import's among them, or a selector's selected name, through the identifiers' uses, since
-// a callee is never a definition. Symbol also names variables, constants and types, but fmt.Sprint and fmt.Sprintf
-// are functions, so a function is the only answer that could match, and a method's full name is its receiver's and
-// its own, never its package's path and its own.
-func packageFunction(context *rule.Context, callee ast.Expr, path string) (*types.Func, bool) {
-	named := ast.Unparen(callee)
-	switch instantiated := named.(type) {
-	case *ast.IndexExpr:
-		named = ast.Unparen(instantiated.X)
-	case *ast.IndexListExpr:
-		named = ast.Unparen(instantiated.X)
-	}
-	var object types.Object
-	switch named := named.(type) {
-	case *ast.Ident:
-		object = context.TypesInfo.Uses[named]
-	case *ast.SelectorExpr:
-		object = context.TypesInfo.Uses[named.Sel]
-	default:
-		return nil, false
-	}
-	function, isFunction := object.(*types.Func)
-	if !isFunction || function.Pkg() == nil || function.Pkg().Path() != path {
-		return nil, false
-	}
-	if function.Signature().Recv() != nil {
-		return nil, false
-	}
-	return function, true
 }
