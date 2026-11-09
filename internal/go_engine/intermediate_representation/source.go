@@ -37,24 +37,31 @@ func EnclosingFunction(goEnginePackage *Package, path []ast.Node) *Function {
 
 	// ...then walk down the nested anonymous functions.
 	pathLength := len(path)
-outer:
 	for index := range path {
 		if lit, ok := path[pathLength-1-index].(*ast.FuncLit); ok {
-			for _, anon := range function.AnonymousFunctions {
-				if anon.Pos() == lit.Type.Func {
-					function = anon
-					continue outer
-				}
+			function = anonymousFunctionAt(function, lit)
+			if function == nil {
+				// IR function not found:
+				// - package not yet built, or maybe
+				// - builder skipped FuncLit in dead block
+				//   (in principle; but currently the Builder
+				//   generates even dead FuncLits).
+				return nil
 			}
-			// IR function not found:
-			// - package not yet built, or maybe
-			// - builder skipped FuncLit in dead block
-			//   (in principle; but currently the Builder
-			//   generates even dead FuncLits).
-			return nil
 		}
 	}
 	return function
+}
+
+// anonymousFunctionAt is the anonymous function of function that literal declares, found by the position of its
+// func keyword, or nil when function holds none there.
+func anonymousFunctionAt(function *Function, literal *ast.FuncLit) *Function {
+	for _, anonymous := range function.AnonymousFunctions {
+		if anonymous.Pos() == literal.Type.Func {
+			return anonymous
+		}
+	}
+	return nil
 }
 
 // HasEnclosingFunction returns true if the AST node denoted by path

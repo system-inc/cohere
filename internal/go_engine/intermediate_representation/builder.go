@@ -3281,9 +3281,23 @@ func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 	// within the body of switch/typeswitch/select/for/range.
 	// It is effectively an additional default-nil parameter of stmt().
 	var label *lblock
-	// current is the statement being lowered, which moves on to the statement a label marks.
+	// current is the statement being lowered: each label in front of it is peeled first, outermost first. A named
+	// label becomes the current label, its goto block entered by a jump, and a blank one keeps the label before it,
+	// since a blank label can't be the target of a goto, break or continue and needs no block.
 	current := statement
-start:
+	for {
+		labeled, isLabeled := current.(*ast.LabeledStmt)
+		if !isLabeled {
+			break
+		}
+		if labeled.Label.Name != "_" {
+			label = function.lblockOf(function.label(labeled.Label))
+			label.resolved = true
+			emitJump(function, label._goto, labeled)
+			function.currentBlock = label._goto
+		}
+		current = labeled.Stmt
+	}
 	switch typed := current.(type) {
 	case *ast.EmptyStmt:
 		// ignore.  (Usually removed by gofmt.)
@@ -3302,20 +3316,6 @@ start:
 				}
 			}
 		}
-
-	case *ast.LabeledStmt:
-		if typed.Label.Name == "_" {
-			// Blank labels can't be the target of a goto, break,
-			// or continue statement, so we don't need a new block.
-			current = typed.Stmt
-			goto start
-		}
-		label = function.lblockOf(function.label(typed.Label))
-		label.resolved = true
-		emitJump(function, label._goto, typed)
-		function.currentBlock = label._goto
-		current = typed.Stmt
-		goto start // effectively: tailcall stmt(fn, s.Stmt, label)
 
 	case *ast.ExprStmt:
 		packageBuilder.expr(function, typed.X)
