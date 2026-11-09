@@ -132,6 +132,44 @@ func TestLateRaise(test *testing.T) {
 		}
 	})
 
+	// Not parallel: it counts collections, as its parent does. A load's raise still waiting on its collection when the
+	// next load starts is retired, so that collection completing during the next load lifts nothing.
+	test.Run("a retired raise does nothing when its collection completes", func(test *testing.T) {
+		setter := &limitSetter{}
+		raise := newLateRaise(limit, setter.setMemoryLimit, func() bool { return true })
+		raise.endLoad()
+
+		raise.retire()
+		runtime.GC()
+		waitFor(test, "the sentinel's finalizer", func() bool { return raise.collections.Load() >= 1 })
+
+		if set := setter.limits(); len(set) > 0 {
+			test.Errorf("a retired raise set the limit to %v when its collection completed, want nothing", set)
+		}
+		if raise.armed.Load() {
+			test.Error("a retired raise armed again")
+		}
+	})
+
+	// Not parallel: it counts collections, as its parent does. Retired before its load ends, a raise stops arming, so
+	// no sentinel of its outlives the load that retired it.
+	test.Run("a raise retired before its load's end stops arming", func(test *testing.T) {
+		setter := &limitSetter{}
+		raise := newLateRaise(limit, setter.setMemoryLimit, notCollecting)
+
+		raise.retire()
+		runtime.GC()
+		waitFor(test, "the sentinel's finalizer", func() bool { return raise.collections.Load() >= 1 })
+
+		if raise.armed.Load() {
+			test.Error("a retired raise armed again before its load's end")
+		}
+		raise.endLoad()
+		if set := setter.limits(); len(set) > 0 {
+			test.Errorf("a retired raise set the limit to %v at its load's end, want nothing", set)
+		}
+	})
+
 	// Not parallel: it counts collections, as its parent does.
 	test.Run("no collection is marking once runtime.GC returns", func(test *testing.T) {
 		runtime.GC()

@@ -82,6 +82,8 @@ func Main(arguments []string, availableMemoryBytes uint64, standardOutput io.Wri
 	memory := engineMemory{
 		record:         capMemory(os.LookupEnv, debug.SetMemoryLimit, availableMemoryBytes),
 		inheritedBytes: inheritedBytes,
+		setMemoryLimit: debug.SetMemoryLimit,
+		collecting:     collectorMarking,
 	}
 	if isStandardLibraryVerb(arguments) {
 		generator, generatorError := binaryGenerator()

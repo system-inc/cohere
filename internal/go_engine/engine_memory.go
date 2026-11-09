@@ -123,6 +123,9 @@ type engineMemory struct {
 	// inheritedBytes is the limit the front door's policy set before capMemory lowered it, the ceiling a late raise
 	// never passes. It is math.MaxInt64 when the policy set none.
 	inheritedBytes int64
+	// setMemoryLimit is debug.SetMemoryLimit and collecting collectorMarking outside a test, which watches them.
+	setMemoryLimit func(int64) int64
+	collecting     func() bool
 }
 
 // lateMemoryAllowance is how far the late raise lifts the limit above the cap: 1 GiB.

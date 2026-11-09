@@ -1,10 +1,6 @@
 package go_engine
 
-import (
-	"runtime/debug"
-
-	"github.com/system-inc/cohere/internal/go_engine/contract"
-)
+import "github.com/system-inc/cohere/internal/go_engine/contract"
 
 // memoryRecord is the types record's memory, nil in a test, which decided nothing.
 func (engine *pipeline) memoryRecord() *contract.Memory {
@@ -14,8 +10,9 @@ func (engine *pipeline) memoryRecord() *contract.Memory {
 	return &engine.memory.record
 }
 
-// armLateRaise is the run's late raise, armed before its load, or nil when lateLimit says it raises nothing, as in a
-// test, which decided nothing.
+// armLateRaise is a load's late raise, armed before the load starts, or nil when lateLimit says the run raises
+// nothing, as in a test, which decided nothing. It sets the limit back to the one Main decided first, the cap, since
+// the last load's raise may have lifted it, and every load runs under the cap.
 func (engine *pipeline) armLateRaise() *lateRaise {
 	if engine.memory == nil {
 		return nil
@@ -24,5 +21,6 @@ func (engine *pipeline) armLateRaise() *lateRaise {
 	if !raises {
 		return nil
 	}
-	return newLateRaise(limit, debug.SetMemoryLimit, collectorMarking)
+	engine.memory.setMemoryLimit(engine.memory.record.LimitBytes)
+	return newLateRaise(limit, engine.memory.setMemoryLimit, engine.memory.collecting)
 }

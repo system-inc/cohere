@@ -42,8 +42,9 @@ type pipeline struct {
 	standardError io.Writer
 
 	// memory is what Main decided about the process's memory limit, its record written on the types record, nil in a
-	// test.
-	memory *engineMemory
+	// test; lateRaise is the last load's raise, nil before the first load and in a run that raises nothing.
+	memory    *engineMemory
+	lateRaise *lateRaise
 
 	// writeError is the first record that could not be written. Every write after it is skipped, and the run
 	// ends as a broken stream.
@@ -192,9 +193,7 @@ func (engine *pipeline) run() int {
 	// The load runs after gofmt, so it reads the formatted tree, and again only when the wrap wrote a file and a phase
 	// reads the types.
 	if needsTypes || wraps {
-		raise := engine.armLateRaise()
 		loaded, loadError = engine.loadWorkspace(needsTypes)
-		raise.endLoad()
 	}
 	loaded, loadError = engine.wrapAfterLoad(loaded, loadError, needsTypes)
 	// The rename reads the wrapped tree, and needs a sound load as the wrap does. When it writes, the load that proved

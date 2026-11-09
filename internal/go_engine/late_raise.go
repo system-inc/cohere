@@ -3,11 +3,13 @@ package go_engine
 import (
 	"runtime"
 	"runtime/metrics"
+	"sync"
 	"sync/atomic"
 )
 
-// lateRaise raises the memory limit once, at the first moment after the load's end with no collection in flight: at
-// the load's end itself when none is, or just after the collection in flight then completes. A collection in flight at
+// lateRaise raises the memory limit once, at the first moment after its load's end with no collection in flight: at
+// the load's end itself when none is, or just after the collection in flight then completes. Each load has its own,
+// armed before it starts and retired when the next load starts (pipeline.loadPackages). A collection in flight at
 // the load's end is the second of the three, which the raise must follow rather than lift: measured, one was in flight
 // in 14 of 20 runs, and a raise during it lets that collection run on a higher goal, so the peak grows.
 //
@@ -25,7 +27,11 @@ type lateRaise struct {
 	// collecting is whether a collection is marking now, collectorMarking outside a test.
 	collecting func() bool
 	loadEnded  atomic.Bool
-	raised     atomic.Bool
+	// lock holds raised and retired together, so a raise that has begun has set its limit before retire returns, and
+	// none begins after.
+	lock    sync.Mutex
+	raised  bool
+	retired bool
 	// armed is whether a sentinel is waiting on a collection, and collections how many collections the sentinels have
 	// seen, which a test waits on.
 	armed       atomic.Bool
@@ -52,7 +58,8 @@ func (raise *lateRaise) arm() {
 }
 
 // collected is a sentinel's finalizer: a collection has completed. After the load's end it raises, and before it the
-// raise arms again for the next collection. Once raised nothing is armed again.
+// raise arms again for the next collection. Nothing is armed again once the load has ended, nor once a later load has
+// retired the raise.
 func (raise *lateRaise) collected() {
 	raise.armed.Store(false)
 	raise.collections.Add(1)
@@ -60,12 +67,16 @@ func (raise *lateRaise) collected() {
 		raise.raise()
 		return
 	}
-	raise.arm()
+	raise.lock.Lock()
+	retired := raise.retired
+	raise.lock.Unlock()
+	if !retired {
+		raise.arm()
+	}
 }
 
-// endLoad is the load's end: the raise lands now when no collection is in flight, and otherwise after the one in
-// flight completes (collected). Only the first load's end counts, since a later load (a reload, the wrap's, the
-// rename's) comes after it. It does nothing on a nil raise, a run that raises nothing.
+// endLoad is its load's end: the raise lands now when no collection is in flight, and otherwise after the one in
+// flight completes (collected). Only the first call counts. It does nothing on a nil raise, a run that raises nothing.
 //
 // The load's end is marked before the collector is read, so a collection completing between the two raises in
 // collected and this call's raise finds it done.
@@ -78,11 +89,28 @@ func (raise *lateRaise) endLoad() {
 	}
 }
 
-// raise sets the late limit, once whoever calls it first.
+// raise sets the late limit, once whoever calls it first, and never once the raise is retired.
 func (raise *lateRaise) raise() {
-	if raise.raised.CompareAndSwap(false, true) {
-		raise.setMemoryLimit(raise.limit)
+	raise.lock.Lock()
+	defer raise.lock.Unlock()
+	if raise.raised || raise.retired {
+		return
 	}
+	raise.raised = true
+	raise.setMemoryLimit(raise.limit)
+}
+
+// retire ends the raise before a later load starts: from its return the raise sets nothing, so a sentinel of its that
+// a collection frees during the later load does nothing, and the later load's own raise is the only one that can lift
+// the limit. A raise that had begun has set its limit before retire returns, so the later load's return to the cap is
+// the last word. It does nothing on a nil raise.
+func (raise *lateRaise) retire() {
+	if raise == nil {
+		return
+	}
+	raise.lock.Lock()
+	defer raise.lock.Unlock()
+	raise.retired = true
 }
 
 // collectorMarking is whether a collection is marking now. Each collection stops the world twice, at its start (sweep
