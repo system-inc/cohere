@@ -27,6 +27,15 @@
 // does. Checked over every entry rather than reasoned per word, then measured: dropping all of them left the
 // 82,704-name run byte-identical. They were not moved into the data, because Swift would have copied them and
 // someone would have tried to tune a guard that changes nothing.
+//
+// # Keyword terms
+//
+// A language's keyword can share an abbreviation's letters: JavaScript's `var` is a word, not short for "variable",
+// and it has no full word to expand to. policy/KeywordTerms.json names the exact spellings in which the capitalized
+// keyword means the keyword (`VarDeclaration`, `VarScoped`), and the segment form reads them here, once for the
+// TypeScript and Go engines, while Swift's port reads the same file compiled in (#hvyvfr5). A segment is the keyword
+// term when a listed spelling starts there and ends at a word boundary, and the word is reported only where some
+// segment is not, so `NoVar` and `themeVar` still are.
 package abbreviation
 
 import (
@@ -147,6 +156,9 @@ type wordSegmentPatterns struct {
 	boundary *regexp.Regexp
 	camel    *regexp.Regexp
 	replace  *regexp.Regexp
+	// keywordTermSpellings are the names policy/KeywordTerms.json lists for the word as a language's keyword, or
+	// none where the word is no keyword.
+	keywordTermSpellings []string
 }
 
 // millisecondSegmentPattern matches a millisecond unit written as a camelCase word.
@@ -158,21 +170,21 @@ var millisecondSegmentPattern = regexp.MustCompile(`([a-z])Ms($|[A-Z])`)
 
 // Policy is policy's file, read once. An invalid file panics at startup, which is the loud failure: a vocabulary
 // read wrongly would make every engine quietly judge less than it appears to.
-var Policy = mustLoad(policy.AbbreviationsFile())
+var Policy = mustLoad(policy.AbbreviationsFile(), policy.KeywordTerms.KeywordTerms)
 
-func mustLoad(data []byte) *Vocabulary {
-	loaded, loadError := Load(data)
+func mustLoad(data []byte, keywordTerms []policy.KeywordTerm) *Vocabulary {
+	loaded, loadError := Load(data, keywordTerms)
 	if loadError != nil {
-		// Invariant: the file is embedded and its tests load it, so a refusal here is a broken build, not a state
-		// any run can recover from.
-		panic(fmt.Sprintf("policy/Abbreviations.json: %v", loadError))
+		// Invariant: the files are embedded and their tests load them, so a refusal here is a broken build, not a
+		// state any run can recover from.
+		panic(fmt.Sprintf("policy/Abbreviations.json with policy/KeywordTerms.json: %v", loadError))
 	}
 	return loaded
 }
 
-// Load reads a vocabulary file, refusing an unknown key and any entry the engines would read as something other
-// than meant.
-func Load(data []byte) (*Vocabulary, error) {
+// Load reads a vocabulary file with the keyword terms that speak for its words, refusing an unknown key, any entry
+// the engines would read as something other than meant, and a keyword term no segment entry gives advice for.
+func Load(data []byte, keywordTerms []policy.KeywordTerm) (*Vocabulary, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var file vocabularyFile
@@ -225,6 +237,23 @@ func Load(data []byte) (*Vocabulary, error) {
 				replace:  replace,
 			})
 		}
+	}
+	for _, keywordTerm := range keywordTerms {
+		index := slices.IndexFunc(loaded.Segments, func(entry *Entry) bool {
+			return entry.Abbreviation == keywordTerm.Term
+		})
+		// Only an advice-style segment can carry a keyword term: a rename rewrites the word's first segment, which
+		// may be the keyword term's own, and the keyword has no full word to rename it to.
+		if index < 0 || loaded.Segments[index].Segment.Style != "advice" {
+			return nil, fmt.Errorf(
+				"keyword term %q names no entry whose segment form gives advice, the one form that can carry it",
+				keywordTerm.Term,
+			)
+		}
+		loaded.segmentPatterns[index].keywordTermSpellings = append(
+			loaded.segmentPatterns[index].keywordTermSpellings,
+			keywordTerm.Spellings...,
+		)
 	}
 	for _, allowed := range file.AllowedNames {
 		loaded.AllowedNames[allowed.Name] = true

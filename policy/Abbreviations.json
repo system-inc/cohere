@@ -260,7 +260,7 @@
         {
             "abbreviation": "var",
             "advice": "Use \"Variable\" for a variable, or a name saying it means JavaScript's var keyword.",
-            "reason": "A census of the Go fix's renames found names like `NoVar` meaning JavaScript's var keyword, which is no variable, and the keyword has no full word to expand to, so it asks rather than offering `Variable`.",
+            "reason": "A census of the Go fix's renames found names like `NoVar` meaning JavaScript's var keyword, which is no variable, and the keyword has no full word to expand to, so it asks rather than offering `Variable`. KeywordTerms.json lists the names in which `Var` is the keyword, `isVarDeclaration` among them, and those read clean.",
             "segment": { "style": "advice" }
         },
         {

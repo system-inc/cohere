@@ -17,6 +17,10 @@ import Foundation
  them with no checkout and nothing handed to it at run time (#2cqemcd). A test fails while the compiled-in
  copy and the file differ. A copy that would not load refuses the run with exit 2 (`Pipeline`), never a
  rule that quietly judges nothing.
+
+ The keyword terms (`KeywordTermVocabulary`, cohere's `policy/KeywordTerms.json`) are read with the words, as Go's
+ `abbreviation.Load` reads them (#hvyvfr5): a segment that opens one of a keyword's listed spellings at a word
+ boundary is the keyword, not the abbreviation, so `isVarDeclaration` is clean and `NoVar` is still reported.
  */
 public struct AbbreviationVocabulary: Sendable {
     /* One abbreviated word and the forms it is judged in. */
@@ -31,6 +35,8 @@ public struct AbbreviationVocabulary: Sendable {
         var suffix: (advice: String, matcher: String, replacement: String)?
         /* The segment form's style, when the word is judged as a camelCase word anywhere in a name. */
         var segment: String?
+        /* The names `policy/KeywordTerms.json` lists for the word as a language's keyword, or none where it is no keyword. */
+        var keywordTermSpellings: [[UInt8]] = []
     }
 
     /* What the vocabulary says about one name: the form and word that matched, and the message. */
@@ -66,8 +72,15 @@ public struct AbbreviationVocabulary: Sendable {
 
     /* The compiled-in words. The reason alone, in words: the caller says what failed to load, once, in the sentence a person reads. */
     public static func compiledIn() throws -> AbbreviationVocabulary {
+        let keywordTerms: KeywordTermVocabulary
         do {
-            return try load(data: Data(PolicyAbbreviations.file.utf8))
+            keywordTerms = try KeywordTermVocabulary.compiledIn()
+        }
+        catch {
+            throw LoadFailure(description: "policy/KeywordTerms.json: \(error)")
+        }
+        do {
+            return try load(data: Data(PolicyAbbreviations.file.utf8), keywordTerms: keywordTerms)
         }
         catch let failure as LoadFailure {
             throw failure
@@ -80,9 +93,15 @@ public struct AbbreviationVocabulary: Sendable {
     /*
      Parsed by hand from JSON objects rather than decoded, because an unknown key must be refused, as Go's
      `DisallowUnknownFields` refuses it: a misspelled form would otherwise be an entry that silently never
-     matches.
+     matches. A keyword term is refused where no entry's segment form gives advice for its word, as Go refuses
+     it: a rename rewrites the word's first segment, which may be the keyword's own.
      */
-    static func load(data: Data) throws -> AbbreviationVocabulary {
+    static func load(
+        data: Data,
+        keywordTerms: KeywordTermVocabulary = KeywordTermVocabulary(),
+    ) throws
+        -> AbbreviationVocabulary
+    {
         guard let file = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw LoadFailure(description: "the file is not a JSON object")
         }
@@ -116,6 +135,17 @@ public struct AbbreviationVocabulary: Sendable {
             if entry.segment != nil {
                 vocabulary.segments.append(entry)
             }
+        }
+        for keywordTerm in keywordTerms.keywordTerms {
+            guard let index = vocabulary.segments.firstIndex(where: { $0.abbreviation == keywordTerm.term }),
+                vocabulary.segments[index].segment == "advice"
+            else {
+                throw LoadFailure(
+                    description:
+                        "keyword term \"\(keywordTerm.term)\" names no entry whose segment form gives advice, the one form that can carry it"
+                )
+            }
+            vocabulary.segments[index].keywordTermSpellings += keywordTerm.spellings.map { Array($0.utf8) }
         }
         for allowed in file["allowedNames"] as? [[String: Any]] ?? [] {
             try refuseUnknownKeys(in: allowed, allowed: ["name", "reason"], context: "an allowed name")
@@ -335,6 +365,11 @@ public struct AbbreviationVocabulary: Sendable {
             guard Self.segmentMatches(word, in: bytes), let at = Self.firstSegmentStart(word, in: bytes) else {
                 continue
             }
+            if !entry.keywordTermSpellings.isEmpty
+                && Self.everySegmentIsKeywordTerm(word, spellings: entry.keywordTermSpellings, in: bytes)
+            {
+                continue
+            }
             var advice = entry.advice
             if entry.segment != "advice" {
                 let suggestions = entry.expansions.map { expansion in
@@ -426,6 +461,33 @@ public struct AbbreviationVocabulary: Sendable {
             start += 1
         }
         return false
+    }
+
+    /*
+     Whether each place the word stands as a segment, as `segmentMatches` reads it, opens one of its keyword term's
+     spellings at a word boundary: Go's `everySegmentIsKeywordTerm`. Asked only once a segment has matched.
+     */
+    static func everySegmentIsKeywordTerm(_ word: [UInt8], spellings: [[UInt8]], in bytes: [UInt8]) -> Bool {
+        var start = 0
+        while start + word.count <= bytes.count {
+            if bytes[start..<(start + word.count)].elementsEqual(word), endsWord(bytes, at: start + word.count),
+                start == 0 || !isUppercase(bytes[start - 1]),
+                !spellings.contains(where: { opensKeywordTerm($0, in: bytes, at: start) })
+            {
+                return false
+            }
+            start += 1
+        }
+        return true
+    }
+
+    /* Whether the spelling starts at `start` and ends at the name's end or anything but a lowercase letter, so `VarScoped` opens `VarScopedDeclarations` and not `VarScopedness`. */
+    static func opensKeywordTerm(_ spelling: [UInt8], in bytes: [UInt8], at start: Int) -> Bool {
+        let end = start + spelling.count
+        guard end <= bytes.count, bytes[start..<end].elementsEqual(spelling) else {
+            return false
+        }
+        return end == bytes.count || !isLowercase(bytes[end])
     }
 
     /* Where Go's replacement pattern `Word($|[A-Z0-9])` first matches, which is where the suggestion rewrites. */

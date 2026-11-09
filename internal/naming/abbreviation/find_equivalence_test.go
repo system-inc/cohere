@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/policy"
 )
 
 // Find tests each form as literal text before it runs a pattern, and drops the prefix pattern for a comparison
@@ -124,6 +125,19 @@ func equivalenceCorpus(test *testing.T, vocabulary *Vocabulary) []string {
 			names[word+Capitalize(other)+"Name"] = true
 		}
 	}
+	// Each keyword term's spellings where they read as the keyword, where they run on into a longer word, and beside a
+	// bare use of the letters or another abbreviation.
+	for _, keywordTerm := range policy.KeywordTerms.KeywordTerms {
+		for _, spelling := range keywordTerm.Spellings {
+			for _, name := range []string{
+				spelling, "is" + spelling, spelling + "s", spelling + "ness", spelling + "2", spelling + "Name",
+				"No" + spelling, "Top" + spelling, "TOP" + spelling, spelling + Capitalize(keywordTerm.Term),
+				Capitalize(keywordTerm.Term) + spelling, spelling + "Src", "user" + spelling + "Cmd",
+			} {
+				names[name] = true
+			}
+		}
+	}
 	for name := range vocabulary.AllowedNames {
 		names[name] = true
 	}
@@ -144,10 +158,17 @@ func equivalenceCorpus(test *testing.T, vocabulary *Vocabulary) []string {
 // regexpOnlyFind is Find as it was before #300qvxj, every form tested by its regular expression alone, kept as the
 // reference the shipped Find is held to. The patterns are built here from the vocabulary's tables, as Load built
 // them then, so nothing the shipped Find reads stands in for them.
+//
+// Keyword terms (#hvyvfr5) are read a second way here: rather than walking each segment, every spelling that ends
+// at a word boundary has its keyword rewritten to `Term`, and the segment patterns run on what is left, so a segment
+// survives exactly where it is no keyword term. `Term` opens with a capital and ends in a lowercase letter, as the
+// keyword capitalized does, so no other word's segment is made or lost by the rewrite, and it opens no spelling, so
+// a bare keyword before it is not made into one: `Keyword` would turn `VarVarKeyword` into `VarKeywordKeyword`.
 type regexpOnlyFind struct {
 	vocabulary      *Vocabulary
 	prefixPatterns  map[string]*regexp.Regexp
 	segmentPatterns map[string]wordSegmentPatterns
+	keywordTerms    map[string]*regexp.Regexp
 }
 
 func newRegexpOnlyFind(test *testing.T, vocabulary *Vocabulary) regexpOnlyFind {
@@ -156,6 +177,16 @@ func newRegexpOnlyFind(test *testing.T, vocabulary *Vocabulary) regexpOnlyFind {
 		vocabulary:      vocabulary,
 		prefixPatterns:  map[string]*regexp.Regexp{},
 		segmentPatterns: map[string]wordSegmentPatterns{},
+		keywordTerms:    map[string]*regexp.Regexp{},
+	}
+	for _, keywordTerm := range policy.KeywordTerms.KeywordTerms {
+		alternatives := make([]string, len(keywordTerm.Spellings))
+		for index, spelling := range keywordTerm.Spellings {
+			alternatives[index] = regexp.QuoteMeta(strings.TrimPrefix(spelling, Capitalize(keywordTerm.Term)))
+		}
+		reference.keywordTerms[keywordTerm.Term] = regexp.MustCompile(
+			Capitalize(keywordTerm.Term) + `((?:` + strings.Join(alternatives, "|") + `)(?:$|[^a-z]))`,
+		)
 	}
 	for _, entry := range slices.Concat(vocabulary.EarlyPrefixes, vocabulary.LatePrefixes) {
 		reference.prefixPatterns[entry.Abbreviation] = regexp.MustCompile(`^` + entry.Abbreviation + `[A-Z]`)
@@ -224,7 +255,16 @@ func (reference regexpOnlyFind) find(name string) (Finding, bool) {
 
 	for _, entry := range vocabulary.Segments {
 		patterns := reference.segmentPatterns[entry.Abbreviation]
-		if !patterns.boundary.MatchString(name) && !patterns.camel.MatchString(name) {
+		judged := name
+		if keywordTerm, isKeyword := reference.keywordTerms[entry.Abbreviation]; isKeyword {
+			// The match takes the character after a spelling, which may open the next one, so it runs until
+			// nothing is left to rewrite.
+			for rewritten := keywordTerm.ReplaceAllString(judged, "Term$1"); rewritten != judged; {
+				judged = rewritten
+				rewritten = keywordTerm.ReplaceAllString(judged, "Term$1")
+			}
+		}
+		if !patterns.boundary.MatchString(judged) && !patterns.camel.MatchString(judged) {
 			continue
 		}
 		advice := entry.Advice

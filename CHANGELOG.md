@@ -76,6 +76,13 @@ changed in cohere outside the sets is written under the same heading.
   their reasons. Each holds only where its tree is already skipped, by the Go engine, the format walk and the
   Swift engine, so a file a tsconfig includes under either is still type-checked and linted, and neither is
   ever an unused ignore.
+- `var` is a JavaScript keyword term, not an abbreviation. `policy/KeywordTerms.json` lists the exact names in
+  which a capitalized `Var` means the keyword, `VarDeclaration`, `VarDeclarations`, `VarDeclared`, `VarKeyword`
+  and `VarScoped`, each read only where the name's next word starts after it, so `isVarDeclaration` and
+  `TopLevelVarScopedDeclarations` read clean in every engine, while `NoVar`, `themeVar` and `VarScopedness` are
+  still told to write `Variable` or say they mean the keyword. A name holding a keyword term and another
+  abbreviation still reports the other. The list is decided once for every engine, and is never a project's
+  `allowedSegments` entry.
 
 ### Changed
 

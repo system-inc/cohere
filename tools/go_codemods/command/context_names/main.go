@@ -215,7 +215,7 @@ func definingCall(sites writeSites, variable *types.Var) (*ast.CallExpr, string)
 // parseVocabulary reads policy/Abbreviations.json through the shared vocabulary, into the words a context's
 // name is built from.
 func parseVocabulary(contents []byte) (go_origin_names.Vocabulary, error) {
-	loaded, loadError := abbreviation.Load(contents)
+	loaded, loadError := abbreviation.Load(contents, nil)
 	if loadError != nil {
 		return go_origin_names.Vocabulary{}, loadError
 	}
