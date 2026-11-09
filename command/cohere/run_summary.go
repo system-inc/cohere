@@ -206,6 +206,11 @@ type runGaps struct {
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
 	FormattingNotChecked    bool `json:"formattingNotChecked"`
 	NothingToCheck          bool `json:"nothingToCheck"`
+	// Excluded is why each file of a run that checked nothing was left out, one entry per reason in the order first
+	// met, filled only when NothingToCheck is set. A run whose language's files were all excluded fails, and its
+	// footer names each reason and the rule that decided it: a run that checked nothing never reads as a pass
+	// (#08cv2mp). A project with no file of its language at all has none, and keeps the warning alone.
+	Excluded []excludedReason `json:"excluded,omitempty"`
 	// ModifiedBuild is a binary built from a modified tree, which no commit reproduces.
 	ModifiedBuild bool `json:"modifiedBuild"`
 	// Unread is files the run could not check for any other reason, said as the run said it.
@@ -294,7 +299,35 @@ func (summary runSummary) phasesNotRun() []string {
 
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
-		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0
+		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0 ||
+		summary.Gaps.nothingChecked()
+}
+
+// excludedReason is one reason a run that checked nothing left files out: the words the footer prints, how many
+// files it left out, and the first rule that decided, as `path:line` relative to the project root, empty where no
+// rule did, as for a narrowing.
+type excludedReason struct {
+	Reason string `json:"reason"`
+	Count  int    `json:"count"`
+	Source string `json:"source,omitempty"`
+}
+
+// nothingChecked is whether the run had files of its language and checked none of them, every one excluded, which
+// fails it (#08cv2mp).
+func (gaps runGaps) nothingChecked() bool {
+	return gaps.NothingToCheck && len(gaps.Excluded) > 0
+}
+
+// addExcluded counts files left out for reason, decided by source, under its reason's entry, keeping the first
+// source met for a reason.
+func (gaps *runGaps) addExcluded(reason string, source string, files int) {
+	for index := range gaps.Excluded {
+		if gaps.Excluded[index].Reason == reason {
+			gaps.Excluded[index].Count += files
+			return
+		}
+	}
+	gaps.Excluded = append(gaps.Excluded, excludedReason{Reason: reason, Count: files, Source: source})
 }
 
 // swiftSummary is what only a Swift run says of itself.
