@@ -3,28 +3,24 @@
 // through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa2000/sa2000.go, whose logic it keeps and
-// whose message it reports word for word, over the same range, the call. The original matches the pattern
-// `(GoStmt (CallExpr (FuncLit _ call@(CallExpr (Symbol "(*sync.WaitGroup).Add") _):_) _))` of staticcheck's pattern
-// package; the port tests the same shape by its syntax: a go statement calling a function literal, parenthesized or
-// not, whose first statement is a call to that method. The pattern reads that statement through the layers its match
-// looks through, an expression statement, a label, parentheses, and a block of exactly one statement, and so does
-// the port (firstCall). The method is judged by staticcheck_code.IsSymbol, the port of the pattern's Symbol, so a call
-// through a method expression or a promoted method counts as the pattern counts it. The original first asks whether
-// the package depends on sync at all, code.CouldMatchAny, and walks no further when it does not; any call the pattern
-// matches resolves into sync, so the question changes no finding, and the port, asking nothing, walks every go
-// statement. The message renders the call with staticcheck's report.Render, called with a pass that holds only the
-// file set, which is all it reads; wave 5 ports it. It reports through staticcheck_report.Report with no option, so a
-// generated file is judged like any other. The registry runs the port in the original's place, under its name, and the
-// original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
-// differ nowhere they hold.
+// whose message it reports word for word, over the same range, the call. The original matches the pattern `(GoStmt
+// (CallExpr (FuncLit _ call@(CallExpr (Symbol "(*sync.WaitGroup).Add") _):_) _))` of staticcheck's pattern package; the
+// port tests the same shape by its syntax: a go statement calling a function literal, parenthesized or not, whose first
+// statement is a call to that method. The pattern reads that statement through the layers its match looks through, an
+// expression statement, a label, parentheses, and a block of exactly one statement, and so does the port (firstCall).
+// The method is judged by staticcheck_code.IsSymbol, the port of the pattern's Symbol, so a call through a method
+// expression or a promoted method counts as the pattern counts it. The original first asks whether the package depends
+// on sync at all, code.CouldMatchAny, and walks no further when it does not; any call the pattern matches resolves into
+// sync, so the question changes no finding, and the port, asking nothing, walks every go statement. The message renders
+// the call with staticcheck_report.Render, staticcheck's report.Render translated. It reports through
+// staticcheck_report.Report with no option, so a generated file is judged like any other. The registry runs the port in
+// the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over the same packages, and the two differ nowhere they hold.
 package wait_group_add_in_goroutine
 
 import (
 	"fmt"
 	"go/ast"
-
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -66,7 +62,7 @@ func Check(context *rule.Context, statement *ast.GoStmt) {
 	if call == nil || !staticcheck_code.IsSymbol(context, call.Fun, "(*sync.WaitGroup).Add") {
 		return
 	}
-	rendered := report.Render(&analysis.Pass{Fset: context.Fset}, call)
+	rendered := staticcheck_report.Render(context, call)
 	staticcheck_report.Report(context, call,
 		fmt.Sprintf("should call %s before starting the goroutine to avoid a race", rendered))
 }

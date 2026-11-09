@@ -5,26 +5,23 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4030/sa4030.go, whose message it reports
 // word for word, over the whole call, through staticcheck_report.Report with no option, as the original reports through
 // report.Report: a generated file is reported too. The message writes the call as staticcheck's report.Render writes
-// it, which stays staticcheck's: the port calls it with a pass holding only the file set, all it reads. The original
-// matches the pattern `(CallExpr (Symbol name@(Or ...)) [(IntegerLiteral "1")])` through code.Matches, which for a
-// pattern rooted at a call of a symbol walks the calls staticcheck's type index records for each symbol named, those
-// whose function, through parentheses, a selector and an instantiation, uses the symbol's object, rather than every
-// call. The port walks every call and asks the same of each: staticcheck_code.SymbolIndex, the port of the pattern's
-// Symbol of an Or, takes its function for one of the nineteen, and it has exactly one argument, which
-// staticcheck_code.IntegerLiteral, the port of the pattern's IntegerLiteral, takes for a literal whose constant prints
-// as 1. Every call the pattern accepts is one the index records, since both read the object the type checker recorded
-// for the function's identifier, so the two walks reach the same findings, in another order. The pattern has no field
-// for a call's ellipsis, so neither does the port. The original keeps nothing from one call to the next. The registry
-// runs the port in the original's place, under its name, and the original stays only as the oracle: the parity tests
-// beside this file run both over the same packages, and the two differ nowhere they hold.
+// it, through staticcheck_report.Render, staticcheck's report.Render translated. The original matches the pattern
+// `(CallExpr (Symbol name@(Or ...)) [(IntegerLiteral "1")])` through code.Matches, which for a pattern rooted at a call
+// of a symbol walks the calls staticcheck's type index records for each symbol named, those whose function, through
+// parentheses, a selector and an instantiation, uses the symbol's object, rather than every call. The port walks every
+// call and asks the same of each: staticcheck_code.SymbolIndex, the port of the pattern's Symbol of an Or, takes its
+// function for one of the nineteen, and it has exactly one argument, which staticcheck_code.IntegerLiteral, the port of
+// the pattern's IntegerLiteral, takes for a literal whose constant prints as 1. Every call the pattern accepts is one
+// the index records, since both read the object the type checker recorded for the function's identifier, so the two
+// walks reach the same findings, in another order. The pattern has no field for a call's ellipsis, so neither does the
+// port. The original keeps nothing from one call to the next. The registry runs the port in the original's place, under
+// its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
+// packages, and the two differ nowhere they hold.
 package ineffective_random_integer
 
 import (
 	"fmt"
 	"go/ast"
-
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -102,6 +99,6 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		return
 	}
 	name := boundedFunctions[index]
-	rendered := report.Render(&analysis.Pass{Fset: context.Fset}, call)
+	rendered := staticcheck_report.Render(context, call)
 	staticcheck_report.Report(context, call, fmt.Sprintf(messageFormat, name, rendered))
 }

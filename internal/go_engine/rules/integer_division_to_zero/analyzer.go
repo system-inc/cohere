@@ -3,16 +3,16 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4025/sa4025.go, whose logic it keeps and
 // whose message it reports word for word, across the whole binary expression as the original's does. The original
-// matches the pattern `(BinaryExpr (IntegerLiteral _) "/" (IntegerLiteral _))` through code.Matches; the port walks
-// the binary expressions that pattern's entry node names and tests each by syntax and types, as the pattern's matcher
-// does: both operands, their parentheses looked through, are integer literals by staticcheck_code.IntegerLiteral, the
-// port of the helper that reads the pattern's IntegerLiteral. code.Matches skips a pattern only when the package holds
-// none of the symbols it names, and this one names none, so every package is walked, generated files among them,
-// since the original filters none. The message writes the division as staticcheck's report.Render prints it, called
-// with a pass that holds only the file set, the one part of a pass Render reads, since Render is not ported yet. It
-// reports through staticcheck_report.Report where the original reports through report.Report. The registry runs the
-// port in the original's place, under its name, and the original stays only as the oracle: the parity tests beside this
-// file run both over the same packages, and the two differ nowhere they hold.
+// matches the pattern `(BinaryExpr (IntegerLiteral _) "/" (IntegerLiteral _))` through code.Matches; the port walks the
+// binary expressions that pattern's entry node names and tests each by syntax and types, as the pattern's matcher does:
+// both operands, their parentheses looked through, are integer literals by staticcheck_code.IntegerLiteral, the port of
+// the helper that reads the pattern's IntegerLiteral. code.Matches skips a pattern only when the package holds none of
+// the symbols it names, and this one names none, so every package is walked, generated files among them, since the
+// original filters none. The message writes the division as staticcheck's report.Render prints it, through
+// staticcheck_report.Render, staticcheck's report.Render translated. It reports through staticcheck_report.Report where
+// the original reports through report.Report. The registry runs the port in the original's place, under its name, and
+// the original stays only as the oracle: the parity tests beside this file run both over the same packages, and the two
+// differ nowhere they hold.
 package integer_division_to_zero
 
 import (
@@ -20,9 +20,6 @@ import (
 	"go/ast"
 	"go/constant"
 	"go/token"
-
-	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -77,6 +74,6 @@ func Check(context *rule.Context, expression *ast.BinaryExpr) {
 	if value, isUnsigned := constant.Uint64Val(quotient); !isUnsigned || value != 0 {
 		return
 	}
-	rendered := report.Render(&analysis.Pass{Fset: context.Fset}, expression)
+	rendered := staticcheck_report.Render(context, expression)
 	staticcheck_report.Report(context, expression, fmt.Sprintf("the integer division '%s' results in zero", rendered))
 }
