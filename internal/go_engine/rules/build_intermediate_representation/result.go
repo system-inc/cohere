@@ -17,8 +17,9 @@ import (
 // the one it is reading finds that function's blocks, where a package built one function at a time, as each is
 // read, would hand it a callee nobody had read yet, with none (staticcheck's SA2002 missed 3 of 21 findings that
 // way, #dz6qbwm). Inside the workspace building per function bought nothing, since the readers walk every function.
-// A callee in another package is created from types alone and has no blocks, as buildir left it. Building one
-// function at a time stays for the facts, which don't read through this result (#w7zmvat).
+// A callee in another package is created from types alone and has no blocks, as buildir left it. The fact passes
+// read through this result too, on every package, as staticcheck's did through buildir; computing a dependency's
+// facts one function at a time, only where asked, is #w7zmvat's second unit, which builds outside this result.
 type Result struct {
 	// irPackage is the pass's package, unbuilt until the first read of the result builds all of it.
 	irPackage *intermediate_representation.Package
