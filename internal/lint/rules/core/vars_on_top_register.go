@@ -3,5 +3,5 @@ package core
 import "github.com/system-inc/cohere/internal/lint/rule"
 
 func init() {
-	rule.Register(rule.Registration[rule.NoOptions]{Rule: VariablesOnTop})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: VarDeclarationsOnTop})
 }

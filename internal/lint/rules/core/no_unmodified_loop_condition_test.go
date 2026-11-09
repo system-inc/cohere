@@ -387,7 +387,7 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(test *
 	}
 }
 
-// TestNoUnmodifiedLoopConditionVariableInitializerCountsAsAWrite covers upstream's initializer exception.
+// TestNoUnmodifiedLoopConditionVarDeclarationInitializerCountsAsAWrite covers upstream's initializer exception.
 //
 // `isWriteReference` declines a reference marked as an initializer unless the binding is a `var`.
 // The corpus exercises that only through `for (var foo = 0; foo < 10; ) { } foo = 1;`, where the
@@ -399,7 +399,7 @@ func TestNoUnmodifiedLoopConditionDynamicCheckDoesNotDescendIntoFunctions(test *
 // for the keyword, and the `let` shadows rather than writing the outer binding.
 //
 // Measured against the installed eslint 10.8.1 build, every row.
-func TestNoUnmodifiedLoopConditionVariableInitializerCountsAsAWrite(test *testing.T) {
+func TestNoUnmodifiedLoopConditionVarDeclarationInitializerCountsAsAWrite(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
