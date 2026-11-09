@@ -60,7 +60,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 		return false
 	}
 	walk.stack[function] = true
-	function.Build()
+	walk.resolver.Build(function)
 	pure := judge(walk, function, declared)
 	delete(walk.stack, function)
 	if walk.orderDependent {

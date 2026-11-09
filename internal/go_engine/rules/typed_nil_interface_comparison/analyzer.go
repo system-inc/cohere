@@ -57,7 +57,7 @@ var Listener = rule.Listener{
 				// the type it declares.
 				panic("typed_nil_interface_comparison: return_nil_ness's result is missing")
 			}
-			Check(context, nilnesses, function)
+			Check(context, nilnesses.Asking(context.RuleName()), function)
 		},
 	},
 }

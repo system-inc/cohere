@@ -18,12 +18,23 @@ func init() {
 type Result struct {
 	resolver *fact_resolver.Resolver
 	reader   *fact_resolver.Package
+
+	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
+	asking string
+}
+
+// Asking is the package's purity as the rule or analyzer whose `--timing` row is named asking asks it, so the
+// resolver's work for it is billed to the resolver's rows rather than to that one (fact_resolver.Question).
+func (result *Result) Asking(asking string) *Result {
+	return &Result{resolver: result.resolver, reader: result.reader, asking: asking}
 }
 
 // IsPure is whether function is pure as the push held it for this package: the package's own function judged pure,
 // or another package's whose fact the checker would have carried here (fact_resolver.Visible) and that is pure there.
 func (result *Result) IsPure(function *types.Func) bool {
-	return ask(result.resolver, result.reader, function)
+	var pure bool
+	result.resolver.Question(result.asking, func() { pure = ask(result.resolver, result.reader, function) })
+	return pure
 }
 
 // ask is whether function is pure as a reader in reader holds it, its package's answer through fact_resolver.Ask: the

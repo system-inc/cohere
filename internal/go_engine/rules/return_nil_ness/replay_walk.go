@@ -71,7 +71,7 @@ func (walk *replayWalk) returns(function *intermediate_representation.Function) 
 	if function.Package != walk.irPackage {
 		return defaultNilnessForSignature(function.Signature)
 	}
-	function.Build()
+	walk.resolver.Build(function)
 	if function.Blocks == nil || walk.seen[function] {
 		return defaultNilnessForSignature(function.Signature)
 	}
@@ -114,7 +114,7 @@ func (walk *replayWalk) imported(function *types.Func) ([]ValueNilness, bool) {
 // the push's judgment of function would have.
 func (walk *replayWalk) markSeen(function *types.Func) {
 	for _, callee := range walk.state.callees[function] {
-		callee.Build()
+		walk.resolver.Build(callee)
 		if callee.Blocks == nil || walk.seen[callee] {
 			continue
 		}

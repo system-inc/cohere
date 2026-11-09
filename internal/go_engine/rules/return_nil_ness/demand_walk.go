@@ -71,7 +71,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 	if results, judged := walk.state.results[declared]; judged {
 		return results
 	}
-	function.Build()
+	walk.resolver.Build(function)
 	if walk.begun(function) {
 		walk.orderDependent = walk.orderDependent || function != walk.stack[len(walk.stack)-1]
 		return defaultNilnessForSignature(function.Signature)

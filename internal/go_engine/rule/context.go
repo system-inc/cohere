@@ -104,6 +104,11 @@ func (context *Context) ReportRangef(node analysis.Range, format string, argumen
 	context.Report(analysis.Diagnostic{Pos: node.Pos(), End: node.End(), Message: fmt.Sprintf(format, arguments...)})
 }
 
+// RuleName is the name the check was registered under, its row's name under `--timing`.
+func (context *Context) RuleName() string {
+	return context.ruleName
+}
+
 // ResultOf is the result of analyzer over the package, which the rule's listener must require. Asked for one it does
 // not require, ResultOf panics rather than returning an error, since the read is a mistake in the check, not
 // something a package can cause, and the dispatcher turns the panic into that rule's crash on the package, naming

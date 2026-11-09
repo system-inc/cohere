@@ -52,7 +52,7 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, para
 	if state.fellBack {
 		return state.recorded[parameter]
 	}
-	owner := state.function(home, parameter)
+	owner := state.function(resolver, home, parameter)
 	if owner == nil {
 		// A parameter of no function the package declares, as an instantiation's is, which the push marks only in
 		// the package that calls it, never here.
@@ -71,6 +71,7 @@ func judgeIn(resolver *fact_resolver.Resolver, home *fact_resolver.Package, para
 // function is the function of home that declares parameter, built, or nil for a parameter no source function of home
 // declares. The caller holds home's lock.
 func (state *marks) function(
+	resolver *fact_resolver.Resolver,
 	home *fact_resolver.Package,
 	parameter *types.Var,
 ) *intermediate_representation.Function {
@@ -90,7 +91,7 @@ func (state *marks) function(
 	if enclosing == nil {
 		return nil
 	}
-	enclosing.Build()
+	resolver.Build(enclosing)
 	if owner.literal == nil {
 		return enclosing
 	}

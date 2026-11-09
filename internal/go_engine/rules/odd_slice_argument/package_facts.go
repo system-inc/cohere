@@ -13,13 +13,22 @@ type packageFacts struct {
 	resolver *fact_resolver.Resolver
 	home     *fact_resolver.Package
 	recorded map[types.Object]bool
+
+	// asking is the row under `--timing` whose questions these are, the analyzer's for the analyzed package's own
+	// walk, and empty for a fallback, whose questions are part of the one it falls back in.
+	asking string
 }
 
 func (marks *packageFacts) marked(parameter *types.Var) bool {
 	if parameter.Pkg() == marks.home.Types {
 		return marks.recorded[parameter]
 	}
-	return ask(marks.resolver, marks.home, parameter)
+	if marks.asking == "" {
+		return ask(marks.resolver, marks.home, parameter)
+	}
+	var marked bool
+	marks.resolver.Question(marks.asking, func() { marked = ask(marks.resolver, marks.home, parameter) })
+	return marked
 }
 
 func (marks *packageFacts) mark(parameter types.Object) {

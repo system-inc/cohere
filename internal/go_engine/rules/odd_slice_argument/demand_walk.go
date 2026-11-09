@@ -45,7 +45,7 @@ func (walk *demandWalk) verdict(function *intermediate_representation.Function) 
 		walk.orderDependent = walk.orderDependent || function != walk.stack[len(walk.stack)-1]
 		return partial
 	}
-	function.Build()
+	walk.resolver.Build(function)
 	marked := map[types.Object]bool{}
 	if function.Package != nil {
 		for _, parameter := range directChecks(function) {
@@ -111,7 +111,7 @@ func (walk *demandWalk) marked(
 	if callee.Package != walk.irPackage {
 		return ask(walk.resolver, walk.home, parameter)
 	}
-	callee.Build()
+	walk.resolver.Build(callee)
 	for _, checked := range directChecks(callee) {
 		if checked.Object() == types.Object(parameter) {
 			return true

@@ -19,6 +19,15 @@ func init() {
 type Result struct {
 	resolver *fact_resolver.Resolver
 	reader   *fact_resolver.Package
+
+	// asking is the row under `--timing` whose questions these are, empty until Asking names it.
+	asking string
+}
+
+// Asking is the package's nilness of results as the rule or analyzer whose `--timing` row is named asking asks it,
+// so the resolver's work for it is billed to the resolver's rows rather than to that one (fact_resolver.Question).
+func (judged *Result) Asking(asking string) *Result {
+	return &Result{resolver: judged.resolver, reader: judged.reader, asking: asking}
 }
 
 // Nilness is the nilness of the result at index result of function: {_ NeverNil} for a result that cannot be nil,
@@ -29,7 +38,9 @@ func (judged *Result) Nilness(function *types.Func, result int) ValueNilness {
 	if !typeutil.MaybePointerLike(resultType) {
 		return ValueNilness{Outer: NeverNil}
 	}
-	results, holds := ask(judged.resolver, judged.reader, function)
+	var results []ValueNilness
+	var holds bool
+	judged.resolver.Question(judged.asking, func() { results, holds = ask(judged.resolver, judged.reader, function) })
 	if !holds {
 		return ValueNilness{Inner: MaybeNil, Outer: MaybeNil}
 	}

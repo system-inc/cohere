@@ -64,7 +64,7 @@ func (resolved *Package) Function(function *types.Func) *intermediate_representa
 	if declared == nil || declared.Package != irPackage || declared.Object() != types.Object(function) {
 		return nil
 	}
-	declared.Build()
+	resolved.resolver.Build(declared)
 	return declared
 }
 
@@ -78,7 +78,7 @@ func (resolved *Package) IntermediateRepresentation() *intermediate_representati
 func (resolved *Package) SourceFunctions() []*intermediate_representation.Function {
 	irPackage := resolved.created()
 	for _, function := range irPackage.Functions {
-		function.Build()
+		resolved.resolver.Build(function)
 	}
 	return irPackage.Functions
 }
@@ -95,10 +95,13 @@ func (resolved *Package) created() *intermediate_representation.Package {
 	if irPackage := resolved.irPackage.Load(); irPackage != nil {
 		return irPackage
 	}
-	for _, imported := range resolved.Types.Imports() {
-		resolver.createLocked(imported)
-	}
-	irPackage := resolver.createLocked(resolved.Types)
+	var irPackage *intermediate_representation.Package
+	resolver.measureBuild(func() {
+		for _, imported := range resolved.Types.Imports() {
+			resolver.createLocked(imported)
+		}
+		irPackage = resolver.createLocked(resolved.Types)
+	})
 	resolved.irPackage.Store(irPackage)
 	return irPackage
 }

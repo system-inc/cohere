@@ -32,6 +32,8 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // Resolved keys, in a pass's ResultOf, the run's *Resolver, which the engine's checker hands every pass when its
@@ -74,7 +76,20 @@ type Resolver struct {
 	// under recordedLock.
 	recordedLock sync.Mutex
 	recorded     map[*types.Package]map[string]map[objectpath.Path][]byte
+
+	// timing is the run's collector under `--timing`, taken from the first pass that hands the resolver over, nil for
+	// a run that did not ask (see Question).
+	timing atomic.Pointer[timing.Collector]
 }
+
+// The resolver's two rows under `--timing`, shared rows as the representation's build is: building functions in the
+// resolver's program, and everything else a question does, judging above all. Each CPU-s is billed once: a question's
+// whole cost is taken out of the asking rule's row and added to JudgeRow, and each build inside it is taken out of
+// JudgeRow and added to BuildRow, as SourceFunctions bills the representation's build.
+const (
+	BuildRow = "fact_resolver_build"
+	JudgeRow = "fact_resolver_judge"
+)
 
 // Kind is one fact a resolver computes, as purity is: it keys the fact's state in each package and its counts.
 type Kind struct {
@@ -111,7 +126,41 @@ func Of(pass *analysis.Pass) (*Resolver, error) {
 			"expected (checker.Options.Resolver and Resolved, as check.DispatchOptions sets them)", pass.Pkg.Path(),
 			pass.ResultOf[Resolved])
 	}
+	if collector, timed := pass.ResultOf[rule.Timed].(*timing.Collector); timed && collector != nil {
+		resolver.timing.CompareAndSwap(nil, collector)
+	}
 	return resolver, nil
+}
+
+// Question runs work, a question a rule asks, billed under `--timing` to JudgeRow and taken out of asking's row, the
+// rule's listener row or its analyzer's, so the asking rule's row is its own walk alone. A question asked inside
+// another is part of it and goes through no Question of its own.
+func (resolver *Resolver) Question(asking string, work func()) {
+	collector := resolver.timing.Load()
+	if collector == nil {
+		work()
+		return
+	}
+	cpu := collector.Measure(work)
+	collector.Shared(JudgeRow, cpu)
+	collector.Nested(asking, cpu, 1)
+}
+
+// Build builds function, billed under `--timing` to BuildRow and taken out of JudgeRow, inside whose question it runs.
+func (resolver *Resolver) Build(function *intermediate_representation.Function) {
+	resolver.measureBuild(function.Build)
+}
+
+// measureBuild runs build, work that builds or creates in the resolver's program, billed as Build bills.
+func (resolver *Resolver) measureBuild(build func()) {
+	collector := resolver.timing.Load()
+	if collector == nil {
+		build()
+		return
+	}
+	cpu := collector.Measure(build)
+	collector.Shared(BuildRow, cpu)
+	collector.Nested(JudgeRow, cpu, 1)
 }
 
 // Finished is the checker's word that action ran to the end. ctrlflow's action on a package is when the resolver learns

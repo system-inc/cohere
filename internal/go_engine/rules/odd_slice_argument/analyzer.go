@@ -79,7 +79,12 @@ func run(pass *analysis.Pass) (any, error) {
 	}
 	// Collected once, so the three passes walk the same functions in the same order.
 	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
-	marks := &packageFacts{resolver: resolver, home: reader, recorded: map[types.Object]bool{}}
+	marks := &packageFacts{
+		resolver: resolver,
+		home:     reader,
+		recorded: map[types.Object]bool{},
+		asking:   pass.Analyzer.Name,
+	}
 	walk := &pushWalk{facts: marks}
 	walk.markLengthChecks(functions)
 	walk.markIndirectLengthChecks(functions)

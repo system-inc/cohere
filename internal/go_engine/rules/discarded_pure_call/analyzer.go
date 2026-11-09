@@ -71,7 +71,7 @@ func purityJudgment(context *rule.Context) func(function *types.Func) bool {
 		// declares.
 		panic("discarded_pure_call: the purity pass's result is missing")
 	}
-	return pure.IsPure
+	return pure.Asking(context.RuleName()).IsPure
 }
 
 // Check judges one function: each call whose results nothing reads, of a named function isPure judges free of side
