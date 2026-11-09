@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -97,4 +98,34 @@ func staticcheckIntermediateRepresentationImporters(
 		return nil
 	})
 	return importers, read, walkError
+}
+
+// The walk finds each of staticcheck's import paths, one plant at a time: a module holding one file that imports only
+// that path reads as one importer of it, so dropping any path from staticcheckIntermediateRepresentation leaves its
+// plant unfound and fails here, where the module's own walk, finding nothing today, would stay green.
+func TestTheImportWalkFindsEachOfStaticchecksPaths(test *testing.T) {
+	test.Parallel()
+	for _, importPath := range []string{
+		"honnef.co/go/tools/go/ir",
+		"honnef.co/go/tools/go/ir/irutil",
+		"honnef.co/go/tools/internal/passes/buildir",
+	} {
+		test.Run(importPath, func(test *testing.T) {
+			test.Parallel()
+			root := test.TempDir()
+			planted := "package plant\n\nimport _ " + strconv.Quote(importPath) + "\n"
+			if writeError := os.WriteFile(filepath.Join(root, "plant.go"), []byte(planted), 0o600); writeError != nil {
+				test.Fatal(writeError)
+			}
+			importers, read, readError := staticcheckIntermediateRepresentationImporters(root)
+			if readError != nil {
+				test.Fatal(readError)
+			}
+			want := []staticcheckIntermediateRepresentationImport{{file: "plant.go", importPath: importPath}}
+			if read != 1 || !slices.Equal(importers, want) {
+				test.Fatalf("a module importing only %s read %d files and found %v, want 1 file and %v", importPath,
+					read, importers, want)
+			}
+		})
+	}
 }
