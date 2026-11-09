@@ -14,12 +14,12 @@ import (
 	"honnef.co/go/tools/analysis/facts/generated"
 	"honnef.co/go/tools/analysis/facts/tokenfile"
 	"honnef.co/go/tools/analysis/report"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
+	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
@@ -86,18 +86,21 @@ var gates = []gate{
 var gateVersions = []string{"go1.1", "go1.18", "go1.20", "go1.21", "go1.22", "go1.23", "go1.999"}
 
 // comparingAnalyzer runs both reporters side by side over a package, its result a comparison. It requires what
-// staticcheck's Report reads, the tokenfile and generated passes, and buildir for the intermediate representation.
+// staticcheck's Report reads, the tokenfile and generated passes, and the engine's own intermediate representation,
+// whose functions and instructions the ported checks report at.
 var comparingAnalyzer = &analysis.Analyzer{
-	Name:       "comparereporters",
-	Doc:        "reports at every node through staticcheck's report.Report and the kit's Report, and compares them",
-	Requires:   []*analysis.Analyzer{staticcheck_ir.Analyzer, generated.Analyzer, tokenfile.Analyzer},
+	Name: "comparereporters",
+	Doc:  "reports at every node through staticcheck's report.Report and the kit's Report, and compares them",
+	Requires: []*analysis.Analyzer{
+		build_intermediate_representation.Analyzer, generated.Analyzer, tokenfile.Analyzer,
+	},
 	Run:        compareReporters,
 	ResultType: reflect.TypeFor[*comparison](),
 }
 
 // The kit's Report and staticcheck's report.Report report side by side at every node of three fixtures, every node of
-// the syntax, every function, parameter and instruction of staticcheck's intermediate representation and every object
-// the package defines, under every option and every version gate, and each pair of calls must report the same
+// the syntax, every function, parameter and instruction of the engine's own intermediate representation and every
+// object the package defines, under every option and every version gate, and each pair of calls must report the same
 // diagnostics, its position, end, message, related information and suggested fixes, or panic alike. The kit's File,
 // LanguageVersion, StandardLibraryVersion, DisplayPosition and HasRange must answer as staticcheck's do at each node
 // too, HasRange both true and false. shapes
@@ -218,7 +221,7 @@ func TestPassContextRefusesAPassWithoutTheGeneratedJudgment(test *testing.T) {
 // compareReporters calls both reporters at every node of the pass's package under every option set, and the kit's
 // version helpers beside staticcheck's, recording each pair that differs and the labels it met.
 func compareReporters(pass *analysis.Pass) (any, error) {
-	functions, readError := staticcheck_ir.Functions(pass)
+	built, readError := build_intermediate_representation.ResultOf(pass)
 	if readError != nil {
 		return nil, readError
 	}
@@ -319,13 +322,13 @@ func compareReporters(pass *analysis.Pass) (any, error) {
 			return true
 		})
 	}
-	for _, function := range functions {
+	for function := range built.SourceFunctions() {
 		compareAt(function, "")
-		for _, parameter := range function.Params {
+		for _, parameter := range function.Parameters {
 			compareAt(parameter, "")
 		}
 		for _, block := range function.Blocks {
-			for _, instruction := range block.Instrs {
+			for _, instruction := range block.Instructions {
 				compareAt(instruction, map[bool]string{
 					true:  "an instruction with a source",
 					false: "an instruction with no source",
@@ -429,7 +432,7 @@ func requiredLabels() []string {
 		"ForStmt with a condition", "ForStmt with an initializer alone", "ForStmt bare", "FuncDecl", "FuncLit",
 		"GoStmt of a function literal", "GoStmt of another call", "IfStmt", "RangeStmt", "SelectStmt",
 		"SwitchStmt with a tag", "SwitchStmt with an initializer alone", "SwitchStmt bare", "TypeSwitchStmt",
-		"CallExpr", "SelectorExpr", "an instruction", "an ir.Function",
+		"CallExpr", "SelectorExpr", "an instruction", "a Function",
 	} {
 		labels = append(labels, "ShortRange on "+shape)
 	}
@@ -468,9 +471,9 @@ func shapeOf(node staticcheck_report.Positioner) string {
 		default:
 			return "SwitchStmt bare"
 		}
-	case *ir.Function:
-		return "an ir.Function"
-	case ir.Instruction:
+	case *intermediate_representation.Function:
+		return "a Function"
+	case intermediate_representation.Instruction:
 		return "an instruction"
 	case ast.Node:
 		return reflect.TypeOf(node).Elem().Name()

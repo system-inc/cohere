@@ -9,17 +9,18 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
+	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
-	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_ir"
 )
 
 // SourceFunctions lists the fixture's functions in the order buildir's SrcFuncs lists them, read in one checker beside
-// buildir: the synthetic initializer, the declared functions and methods as declared, then the anonymous functions,
+// buildirsRun: the synthetic initializer, the declared functions and methods as declared, then the anonymous functions,
 // depth first, a closure's closures before the next closure of its parent. The fixture holds every place a source
 // function comes from, so the order is held at each.
 func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
@@ -27,15 +28,14 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 	theirs := &analysis.Analyzer{
 		Name:       "their_order",
 		Doc:        "names buildir's source functions in order",
-		Requires:   []*analysis.Analyzer{staticcheck_ir.Analyzer},
+		Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
-			functions, readError := staticcheck_ir.Functions(pass)
 			names := []string{}
-			for _, function := range functions {
+			for _, function := range buildirsRun(pass) {
 				names = append(names, function.RelString(nil))
 			}
-			return names, readError
+			return names, nil
 		},
 	}
 	ours := &analysis.Analyzer{
@@ -72,6 +72,38 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 		test.Errorf("our source functions read\n%s\nwhere buildir's read\n%s", strings.Join(ourNames, "\n"),
 			strings.Join(theirNames, "\n"))
 	}
+}
+
+// buildirsRun is the source functions staticcheck's buildir pass lists in SrcFuncs for pass's package, built as its run
+// builds them (honnef.co/go/tools@v0.8.1 internal/passes/buildir/buildir.go), which is internal to staticcheck's
+// module, so cohere cannot run the pass itself: a program for the package alone in GlobalDebug mode with ctrlflow's
+// no-return predicate, the package's functions as created, then each one's anonymous functions, depth first. pass's
+// analyzer must require ctrlflow.
+func buildirsRun(pass *analysis.Pass) []*ir.Function {
+	controlFlow, isControlFlow := pass.ResultOf[ctrlflow.Analyzer].(*ctrlflow.CFGs)
+	if !isControlFlow {
+		// Invariant: the probe requires ctrlflow, whose result is always its CFGs.
+		panic(fmt.Sprintf("ctrlflow's result is %T", pass.ResultOf[ctrlflow.Analyzer]))
+	}
+	program := ir.NewProgram(pass.Fset, ir.GlobalDebug)
+	program.SetNoReturn(controlFlow.NoReturn)
+	for _, imported := range pass.Pkg.Imports() {
+		program.CreatePackage(imported, nil, nil, true)
+	}
+	built := program.CreatePackage(pass.Pkg, pass.Files, pass.TypesInfo, false)
+	built.Build()
+	functions := slices.Clone(built.Functions)
+	var addAnonymous func(function *ir.Function)
+	addAnonymous = func(function *ir.Function) {
+		for _, anonymous := range function.AnonFuncs {
+			functions = append(functions, anonymous)
+			addAnonymous(anonymous)
+		}
+	}
+	for _, function := range built.Functions {
+		addAnonymous(function)
+	}
+	return functions
 }
 
 // Analyzer builds nothing as it runs, and the first read of its result, through either door, builds the whole

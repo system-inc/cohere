@@ -1236,11 +1236,12 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // type's variant whose methods only mark it, served finds the types a file serves for the two rules that count them,
 // positions is the line table rules read a node's position from without the FileSet's lock, function_purity judges
 // which functions are pure for the rules asking which calls have side effects, return_nil_ness judges whether each
-// function's results may be nil for the rule asking what a call returns, staticcheck_ir hands the ported passes
-// the functions of staticcheck's intermediate representation, and the four kits the ports of staticcheck's checks share
-// (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call, staticcheck_call, the
-// walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and dispatch walks a package
-// once for every rule with a listener and builds each such rule's analyzer, holding no rule itself.
+// function's results may be nil for the rule asking what a call returns, build_intermediate_representation builds the
+// engine's own intermediate representation for the rules that read it, and the four kits the ports of staticcheck's
+// checks share (#d8s4rsy) are staticcheck_report, where they report, staticcheck_code, the helpers they call,
+// staticcheck_call, the walk of call arguments, and staticcheck_wants, the reader of staticcheck's own fixtures, and
+// dispatch walks a package once for every rule with a listener and builds each such rule's analyzer, holding no rule
+// itself.
 // One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would rewrite
 // every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
 var sharedReaders = []string{
@@ -1255,7 +1256,6 @@ var sharedReaders = []string{
 	"served",
 	"staticcheck_call",
 	"staticcheck_code",
-	"staticcheck_ir",
 	"staticcheck_report",
 	"staticcheck_wants",
 }
