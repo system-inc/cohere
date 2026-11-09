@@ -65,6 +65,7 @@ func TestThePackageCacheLineSaysTheReloads(test *testing.T) {
 			want: "package cache hit 4, missed 2, wrote 2, 1 reloaded from source in 1 rounds"},
 		{cache: packageCacheUse{FromBinary: 258, Reloads: 3, ReloadRounds: 2},
 			want: "package cache off, standard library: 258 from the binary, 3 reloaded from source in 2 rounds"},
+		{cache: packageCacheUse{Replays: 35}, want: "package cache off, 35 answers replayed"},
 		{cache: packageCacheUse{On: true, Hit: 4}, want: "package cache hit 4, missed 0, wrote 0"},
 	} {
 		if got := testCase.cache.line(); got != testCase.want {

@@ -72,7 +72,9 @@ type BuildRecord struct {
 // though the cache held them, because a question of a fact computed on demand reached one restored with no answer
 // stored (#w7zmvat wave 3), and ReloadRounds how many times the run loaded and linted again for them; each is written
 // only when it is not 0. The timing record carries neither: a run under `--timing` reads no cache, so it restores
-// nothing and never reloads. On is false under `--no-cache`, and every count 0
+// nothing and never reloads. Replays, beside them though no cache count, is how many questions of a fact computed
+// on demand the lint phase answered by replaying the push's walk of a package, which a cold run makes too; it is
+// written only when it is not 0. On is false under `--no-cache`, and every count 0
 // but FromBinary, which the binary's entries can still give, FactsSkipped of what they restored, and Reloads of them.
 type LintCache struct {
 	On           bool `json:"on"`
@@ -86,6 +88,7 @@ type LintCache struct {
 	Waves        int  `json:"waves"`
 	Reloads      int  `json:"reloads,omitempty"`
 	ReloadRounds int  `json:"reloadRounds,omitempty"`
+	Replays      int  `json:"replays,omitempty"`
 }
 
 func (LintRecord) kind() Kind { return KindLint }

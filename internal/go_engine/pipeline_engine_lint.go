@@ -153,6 +153,7 @@ func (engine *pipeline) runLint(loaded *load.Loaded, loadError error, earlier *l
 		Waves:        result.Cache.Waves,
 		Reloads:      result.Cache.Reloads,
 		ReloadRounds: result.Cache.ReloadRounds,
+		Replays:      result.Replays,
 	}
 	for _, problem := range result.Cache.Problems {
 		engine.note("the findings cache: %s", problem)

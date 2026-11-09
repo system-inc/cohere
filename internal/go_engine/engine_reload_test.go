@@ -60,3 +60,19 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 		test.Fatalf("want SA4017's finding from the stored answers, got\n%s", stored.stream)
 	}
 }
+
+// A question of a fact computed on demand whose answer hangs on the order the push walks a package in is answered by
+// replaying that walk, which a cold run makes as much as a warm one, so the lint record counts it with the cache and
+// without: here SA4023 asks the nilness of Inner's result, and Inner and Outer call each other.
+func TestAReplayedAnswerIsCountedWithTheCacheAndWithout(test *testing.T) {
+	test.Parallel()
+
+	root := copyFixture(test, filepath.Join("testdata", "replay-answer"))
+	for _, extra := range [][]string{nil, {"--no-cache"}} {
+		ran := runCachedEngine(test, root, extra...)
+		if ran.counts.Replays == 0 || ran.counts.Reloads != 0 {
+			test.Fatalf("want the nilness of Inner answered by a replay and nothing reloaded, with %v, got %+v", extra,
+				ran.counts)
+		}
+	}
+}

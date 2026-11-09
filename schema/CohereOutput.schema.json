@@ -538,6 +538,10 @@
                         "reloadRounds": {
                             "type": "integer",
                             "description": "Times the lint phase loaded and ran again for those reloads, each round loading every package the last one needed. Absent when zero."
+                        },
+                        "replays": {
+                            "type": "integer",
+                            "description": "Questions of a fact computed on demand that the lint phase answered by replaying the push's walk of a package, with the cache or without. Absent when zero."
                         }
                     }
                 },

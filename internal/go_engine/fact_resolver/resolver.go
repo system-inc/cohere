@@ -243,6 +243,19 @@ func (resolver *Resolver) Counts(kind *Kind) *Counts {
 	return held
 }
 
+// Fallbacks is every kind's Fallbacks over the run: the questions answered by replaying the push's walk of a package,
+// which a run with no cache makes as much as a warm one.
+func (resolver *Resolver) Fallbacks() int64 {
+	var fallbacks int64
+	resolver.counts.Range(func(_ any, counts any) bool {
+		if held, isCounts := counts.(*Counts); isCounts {
+			fallbacks += held.Fallbacks.Load()
+		}
+		return true
+	})
+	return fallbacks
+}
+
 // Visible is whether a fact on object reaches a reader in reader, as the checker's inheritFacts carries one from a
 // package to its importer only when exportedFrom passes it there: the reader's own object; a method or a field from
 // anywhere below; an exported function, or any other variable, a parameter among them, of a package the reader

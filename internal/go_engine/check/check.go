@@ -186,6 +186,10 @@ type Result struct {
 	// the failures stand as the crashes that name them.
 	Reloads []string
 
+	// Replays is how many questions of a fact computed on demand the run answered by replaying the push's walk of a
+	// package, every kind's (fact_resolver.Counts' Fallbacks), with the cache or without.
+	Replays int
+
 	Elapsed time.Duration
 }
 
@@ -244,6 +248,9 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	if options.ReleaseAnalyzed {
 		checkerOptions.Finished = record.take
 	}
+	// The run's resolver, which reads and keeps answers in the session's store once the session has restored (below).
+	resolver := fact_resolver.New(nil)
+	checkerOptions.Resolver = resolver
 	session := options.Cache
 	if options.Report != nil && session != nil && session.known != nil && !session.known.reports[options.Report] {
 		// Its entries would hold no report, and a package they restored would come back without one.
@@ -261,7 +268,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 		// It is made once the session has restored, which lets go of the last run's. Under a run beside the load the
 		// packages' types are not final yet, so only each restored package is known, once an action on it restores
 		// it, and no store answers a package the run learns, which has none there.
-		resolver := fact_resolver.New(session)
+		resolver = fact_resolver.New(session)
 		checkerOptions.Resolver, session.resolver = resolver, resolver
 		if options.Ready == nil {
 			packages.Visit(analyzed, nil, func(visited *packages.Package) { session.know(visited) })
@@ -382,6 +389,7 @@ func Run(analyzed []*packages.Package, rules []rule.Rule, options Options) (*Res
 	})
 	slices.Sort(result.CrashedRules)
 	result.FilesWalked, result.NodesVisited = walk(files)
+	result.Replays = int(resolver.Fallbacks())
 	if session != nil {
 		result.Reloads = session.reloadsOf(session.resolver)
 		session.save(graph, options.Withheld, files)
