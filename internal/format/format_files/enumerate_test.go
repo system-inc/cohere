@@ -627,8 +627,9 @@ func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(test *testing.T) {
 }
 
 // TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor pins the list a cache replaying the walk reads
-// (#z661dek): the .gitignore of the root and of every directory entered, present or not, and info/exclude
-// when .git is a directory, present or not. A pruned directory's .gitignore is never read, so not listed.
+// (#z661dek): the .gitignore of the root and of every directory entered, present or not, info/exclude
+// when .git is a directory, present or not, and the index, whose tracked paths are never ignored, present
+// or not. A pruned directory's .gitignore is never read, so not listed.
 func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(test *testing.T) {
 	test.Parallel()
 	root := settingsTree(test, `[]`, `[]`, map[string]string{
@@ -658,7 +659,14 @@ func TestIgnoreFilesNamesEveryFileTheWalkReadOrLookedFor(test *testing.T) {
 	}
 	sort.Strings(got)
 	// nexus/ is the settings tier the fixture writes, a directory the walk enters like any other.
-	want := []string{".git/info/exclude", ".gitignore", "nexus/.gitignore", "with/.gitignore", "without/.gitignore"}
+	want := []string{
+		".git/index",
+		".git/info/exclude",
+		".gitignore",
+		"nexus/.gitignore",
+		"with/.gitignore",
+		"without/.gitignore",
+	}
 	if strings.Join(got, " ") != strings.Join(want, " ") {
 		test.Errorf("IgnoreFiles %v, want %v", got, want)
 	}

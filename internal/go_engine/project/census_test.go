@@ -197,6 +197,41 @@ func TestTakeCensusOfAModuleBelowTheRepositoryRootReadsTheRootsIgnoreFiles(test 
 	}
 }
 
+// A file git tracks is never ignored (gitignore(5): "Files already tracked by Git are not affected"): under a
+// `.gitignore` of `*.go`, value.go added with `git add -f` is ours, and its untracked sibling is ignored by git.
+func TestTakeCensusCountsAForceAddedFileAsOurs(test *testing.T) {
+	test.Parallel()
+	repository := test.TempDir()
+	if writeError := writeFiles(repository, map[string]string{
+		"go.mod":     "module example.com/forced\n\ngo 1.21\n",
+		".gitignore": "*.go\n",
+		"value.go":   "package forced\n",
+		"sibling.go": "package forced\n",
+	}); writeError != nil {
+		test.Fatal(writeError)
+	}
+	for _, arguments := range [][]string{{"init", "-q", "-b", "main"}, {"add", "-f", "value.go"}} {
+		if gitError := runGit(repository, arguments...); gitError != nil {
+			test.Fatal(gitError)
+		}
+	}
+	covered, readError := ReadWorkspace(repository)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	census, censusError := TakeCensus(covered)
+	if censusError != nil {
+		test.Fatal(censusError)
+	}
+	valueFile, siblingFile := filepath.Join(repository, "value.go"), filepath.Join(repository, "sibling.go")
+	if !slices.Equal(census.Ours, []string{valueFile}) {
+		test.Errorf("ours are %q, want only the force-added %s", census.Ours, valueFile)
+	}
+	if !slices.Equal(census.Excluded, []Exclusion{{File: siblingFile, Reason: IgnoredByGit}}) {
+		test.Errorf("excluded are %v, want %s ignored by git", census.Excluded, siblingFile)
+	}
+}
+
 // A lone module is its one directory, and outside any repository nothing is ignored.
 func TestTakeCensusOfALoneModule(test *testing.T) {
 	test.Parallel()

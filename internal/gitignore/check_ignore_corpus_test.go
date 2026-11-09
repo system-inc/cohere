@@ -19,7 +19,8 @@ import (
 // test changes into, and an expectation kept in a heredoc from the directory of the tests that read it.
 //
 // Not asserted, each counted: expectations naming the global excludes file (not read, by design), a
-// tracked file under the index (the matcher has no index, as `--no-index` has none), and the standalone
+// tracked file under the index (the fixture is rebuilt without git, so it has no index, as `--no-index`
+// reads none; the differential holds the tracked case against git itself), and the standalone
 // tests that rewrite the fixture and state plain path lists (exact prefix matching, `**` with directories,
 // whitespace through `ls-files -X`, links, oversized files). Those behaviors are held by this package's own
 // tests and by the differential against git.

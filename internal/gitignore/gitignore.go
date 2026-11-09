@@ -24,6 +24,12 @@
 // 100 MiB (git skips it with a warning), and a line holding a NUL byte. Each is an error naming the file,
 // because skipping one would leave its patterns unapplied without a word.
 //
+// A path git tracks is never ignored (gitignore(5): "Files already tracked by Git are not affected"), so New
+// reads the repository's index too, natively, and Ignored answers false for a tracked path and for a directory
+// holding one, as git check-ignore does. An index this package cannot read faithfully (none yet, a split index,
+// a sparse one, or one that is not what git writes) is not guessed at: the matcher decides by the ignore files
+// alone, as before it read the index, and IndexFallback says why.
+//
 // The matcher only answers. Walking, and pruning what it excludes, belong to the caller: it enters each
 // directory it descends into with Enter, and asks Ignored about each entry it finds there.
 package gitignore
@@ -57,7 +63,8 @@ var ErrNestedRepository = errors.New("is a repository of its own")
 // absolute path. A directory not listed is not empty: it is read from the disk.
 type Listing func(directory string) ([]os.DirEntry, bool)
 
-// New reads a repository's root `.gitignore` and, when `.git` is a directory, its info/exclude.
+// New reads a repository's root `.gitignore`, its info/exclude when `.git` is a directory, and its index when
+// it holds a `.git` of either kind. An index it cannot read is a fallback, said by IndexFallback, never an error.
 func New(repositoryRoot string) (*Matcher, error) {
 	root, absolutePathError := filepath.Abs(repositoryRoot)
 	if absolutePathError != nil {
@@ -71,7 +78,15 @@ func New(repositoryRoot string) (*Matcher, error) {
 	}
 	matcher.files = append(matcher.files, rules)
 
-	if info, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && info.IsDir() {
+	marker := filepath.Join(root, ".git")
+	information, statError := os.Stat(marker)
+	if statError != nil {
+		matcher.indexFallback = fmt.Errorf("%w: %s holds no .git", ErrNoIndex, root)
+		return matcher, nil
+	}
+	matcher.index, matcher.indexFile, matcher.indexFallback = readRepositoryIndex(marker, information.IsDir())
+
+	if information.IsDir() {
 		// info/exclude lives outside the tree, so a symbolic link to it is followed, as git follows it.
 		excludePath := filepath.Join(root, filepath.FromSlash(ExcludeFile))
 		contents, readError := readIgnoreFile(excludePath, true)
