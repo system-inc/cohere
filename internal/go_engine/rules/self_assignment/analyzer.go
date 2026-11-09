@@ -5,12 +5,12 @@
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4018/sa4018.go, whose logic it keeps and
 // whose message it reports word for word, over the whole assignment, and in no generated file, as staticcheck's
 // report.FilterGenerated leaves them out. It asks staticcheck_code.MayHaveSideEffects where the original asks
-// code.MayHaveSideEffects, judging a function pure when staticcheck's purity pass holds it, and reports through
-// staticcheck_report.Report where the original reports through report.Report, each the port of the one the original
-// calls, proven against it beside it. It renders each side with staticcheck's own report.Render, given a pass that
-// holds only the context's file set, which is all Render reads, so the two sides compare and print as the original's
-// do. The registry runs the port in the original's place, under its name, and the original stays only as the oracle:
-// the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
+// code.MayHaveSideEffects, judging a function pure when function_purity, the port of staticcheck's purity pass, holds
+// it, and reports through staticcheck_report.Report where the original reports through report.Report, each the port of
+// the one the original calls, proven against it beside it. It renders each side with staticcheck's own report.Render,
+// given a pass that holds only the context's file set, which is all Render reads, so the two sides compare and print as
+// the original's do. The registry runs the port in the original's place, under its name, and the original stays only as
+// the oracle: the parity tests beside this file run both over the same packages, and the two differ nowhere they hold.
 package self_assignment
 
 import (
@@ -21,23 +21,23 @@ import (
 	"reflect"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/purity"
 	"honnef.co/go/tools/analysis/report"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/function_purity"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
 // representation: every function, whose syntax it walks when the function is a top-level one, so each assignment is
-// judged once. It listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which are built
-// from staticcheck's representation and so only on a package without errors, as the original runs, and the walk over
+// judged once. It listens to that walk, not the syntax's, because it reads function_purity's facts, which are built
+// from our representation and so only on a package without errors, as the original runs, and the walk over
 // ours runs only there too: the syntax walk runs on every package, and so must everything a syntax listener requires.
 var Listener = rule.Listener{
-	Requires:                   []*analysis.Analyzer{purity.Analyzer},
+	Requires:                   []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: judgeFunction},
 }
 
@@ -62,7 +62,7 @@ func judgeFunction(context *rule.Context, function *intermediate_representation.
 	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
 		return
 	}
-	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
 	if !isPurity {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.

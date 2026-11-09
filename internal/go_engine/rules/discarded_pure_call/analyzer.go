@@ -1,6 +1,6 @@
 // Package discarded_pure_call is staticcheck's SA4017, a call to a function without side effects whose results are
 // all discarded, so the call does nothing, ported onto the engine's own intermediate representation with the purity
-// staticcheck's purity pass judges, reporting through the kit every port of staticcheck shares.
+// function_purity judges, reporting through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4017/sa4017.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call's syntax, through
@@ -9,10 +9,10 @@
 // nothing from one function to the next: each call is judged by its own callee and readers. So Check judges one
 // function at a time and finds what the original finds.
 //
-// It reads which functions have no side effects from staticcheck's purity pass, honnef.co/go/tools/analysis/facts/
-// purity, whose facts cross from every dependency. That pass is borrowed in this wave, and is to be ported with the
-// other fact passes later. The listener requires it and reads its result through the context, handing Check the
-// purity judgment for every function.
+// It reads which functions have no side effects from function_purity, staticcheck's purity pass ported onto the
+// engine's own intermediate representation, whose facts cross from every dependency and are the original's, fact for
+// fact (#w7zmvat). The listener requires it and reads its result through the context, handing Check the purity
+// judgment for every function.
 //
 // Two of the original's judgments look odd and are kept. The benchmark exception spares a function of a test file
 // taking a *testing.B, but not a closure inside one, which is a function of its own taking none, so a discarded pure
@@ -29,21 +29,21 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/analysis/facts/purity"
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
+	"github.com/system-inc/cohere/internal/go_engine/rules/function_purity"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
 // representation: every function, each judged on its own with the purity judgment of the package. It requires
-// staticcheck's purity pass, whose result it reads.
+// function_purity, whose result it reads.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{purity.Analyzer},
+	Requires: []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
 			Check(context, function, purityJudgment(context))
@@ -62,10 +62,10 @@ var Analyzer = dispatch.RuleAnalyzer(
 	&Listener,
 )
 
-// purityJudgment is whether a function has no side effects, as staticcheck's purity pass holds it, read from the
-// pass's result.
+// purityJudgment is whether a function has no side effects, as function_purity holds it, read from the pass's
+// result.
 func purityJudgment(context *rule.Context) func(function *types.Func) bool {
-	pure, isPurity := context.ResultOf(purity.Analyzer).(purity.Result)
+	pure, isPurity := context.ResultOf(function_purity.Analyzer).(function_purity.Result)
 	if !isPurity {
 		// Invariant: the listener requires the purity pass, and the dispatcher hands over its result, of the type it
 		// declares.
