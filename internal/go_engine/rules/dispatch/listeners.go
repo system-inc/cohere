@@ -32,6 +32,9 @@ type listeners struct {
 	walkRequires []*analysis.Analyzer
 	// registered is each rule registered on the dispatcher, in the order it was registered.
 	registered []registeredRule
+	// shardBytes is how much source one shard of a split package holds (see shardsOf), defaultShardBytes but in a
+	// test that splits a small fixture.
+	shardBytes int
 }
 
 // registeredRule is one rule a dispatcher calls.
@@ -75,6 +78,7 @@ func newListeners(
 			Run:              run,
 		},
 		walkRequires: walked,
+		shardBytes:   defaultShardBytes,
 	}
 }
 
@@ -245,17 +249,21 @@ type startedRuns struct {
 // Under rule.Failed the pass runs past what failed on the package. A listener any of whose own Requires failed is not
 // started, since it would read a result that is not there, and every other listener starts. A failure in what the
 // walk itself reads ends the pass, since there is no walk without it.
-func (listeners *listeners) start(pass *analysis.Pass) (*startedRuns, error) {
+//
+// shards above 1 splits the package (see shardsOf): whole holds every started listener that is not marked FileLocal,
+// with every rule not started, and each of parts holds a run of every started FileLocal listener, with a file-local
+// context, to hear one shard's files. At 1, whole holds every started listener and parts is empty.
+func (listeners *listeners) start(pass *analysis.Pass, shards int) (*startedRuns, []*startedRuns, error) {
 	// Absent under a driver that runs nothing past a failure, where the pass runs only once everything it requires
 	// finished, and the nil map reads as nothing failed.
 	failed, _ := pass.ResultOf[rule.Failed].(map[*analysis.Analyzer]error)
 	if walkError := listeners.walkFailed(pass, failed); walkError != nil {
-		return nil, walkError
+		return nil, nil, walkError
 	}
 	generatedFiles, isGeneratedFiles := pass.ResultOf[generated.Analyzer].(map[string]generated.Generator)
 	if !isGeneratedFiles {
-		return nil, fmt.Errorf("reading %s's result: it is %T, where staticcheck's map of generated files was "+
-			"expected", generated.Analyzer.Name, pass.ResultOf[generated.Analyzer])
+		return nil, nil, fmt.Errorf("reading %s's result: it is %T, where staticcheck's map of generated files "+
+			"was expected", generated.Analyzer.Name, pass.ResultOf[generated.Analyzer])
 	}
 	isGenerated := func(filename string) bool {
 		// A plain lookup by the name the file was parsed from, which is how staticcheck's pass keys it. A caller asking
@@ -267,24 +275,44 @@ func (listeners *listeners) start(pass *analysis.Pass) (*startedRuns, error) {
 	dependents, knowsDependents := pass.ResultOf[rule.Dependents].(map[*analysis.Analyzer]bool)
 	// Absent on a run that did not ask for --timing, where the nil collector measures nothing.
 	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
-	started := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
-		dispatcher: listeners.analyzer.Name}
+	newStarted := func() *startedRuns {
+		return &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
+			dispatcher: listeners.analyzer.Name}
+	}
+	whole := newStarted()
+	var parts []*startedRuns
+	if shards > 1 {
+		parts = make([]*startedRuns, shards)
+		for index := range parts {
+			parts[index] = newStarted()
+		}
+	}
 	for index := range listeners.registered {
 		registered := &listeners.registered[index]
 		if knowsDependents && !dependents[registered.analyzer] {
 			continue
 		}
 		if crash := requirementsFailed(registered, pass, failed); crash != nil {
-			started.notStarted[registered.name] = Outcome{Crash: crash}
+			whole.notStarted[registered.name] = Outcome{Crash: crash}
 			continue
 		}
-		run := newListenerRun(registered, pass, isGenerated, collector)
-		started.runs = append(started.runs, run)
-		for _, kind := range registered.kinds {
-			started.byKind[kind] = append(started.byKind[kind], run)
+		if len(parts) > 0 && registered.listener.FileLocal {
+			for _, part := range parts {
+				part.add(newListenerRun(registered, pass, isGenerated, collector, true))
+			}
+			continue
 		}
+		whole.add(newListenerRun(registered, pass, isGenerated, collector, false))
 	}
-	return started, nil
+	return whole, parts, nil
+}
+
+// add makes run one of the listeners started, heard for every kind its listener lists.
+func (started *startedRuns) add(run *listenerRun) {
+	started.runs = append(started.runs, run)
+	for _, kind := range run.registered.kinds {
+		started.byKind[kind] = append(started.byKind[kind], run)
+	}
 }
 
 // walkFailed is the error that ends a pass for which something the walk itself reads failed on the package, among
@@ -347,6 +375,30 @@ func finish(started *startedRuns) Result {
 	}
 	for _, run := range started.runs {
 		result[run.registered.name] = run.outcome()
+	}
+	return result
+}
+
+// finishShards is finish over a package split into whole and parts: each file-local rule's outcome is its runs' over
+// every shard, its findings gathered in shard order, or the first shard's crash in that order, since a run cut short on
+// one shard could have reported anything there, as a run cut short on the whole package could.
+func finishShards(whole *startedRuns, parts []*startedRuns) Result {
+	result := finish(whole)
+	crashed := map[string]bool{}
+	for _, part := range parts {
+		for name, outcome := range finish(part) {
+			if crashed[name] {
+				continue
+			}
+			if outcome.Crash != nil {
+				result[name] = outcome
+				crashed[name] = true
+				continue
+			}
+			gathered := result[name]
+			gathered.Diagnostics = append(gathered.Diagnostics, outcome.Diagnostics...)
+			result[name] = gathered
+		}
 	}
 	return result
 }

@@ -2,9 +2,11 @@ package dispatch
 
 import (
 	"reflect"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
 )
@@ -67,10 +69,13 @@ func (dispatcher *IntermediateRepresentation) RuleAnalyzer(
 }
 
 // run walks the package's source functions once, calling every started listener, each with its own context and its
-// own recover, and returns each started rule's outcome.
+// own recover, and returns each started rule's outcome. A package large enough to split (shardsOf) is walked by
+// several runs at once: the listeners marked FileLocal by one run per shard of its files, each hearing the functions
+// declared in its files, every other listener by one run over all of them (#0jnq91n). The package is built whole
+// before any run starts, so a file-local listener reading another file's function finds it built.
 func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, error) {
 	// Started first, which refuses a pass whose representation failed, so that failure is named as one.
-	started, startError := dispatcher.start(pass)
+	whole, parts, startError := dispatcher.start(pass, dispatcher.shardsOf(pass))
 	if startError != nil {
 		return nil, startError
 	}
@@ -79,11 +84,41 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 		return nil, readError
 	}
 	// With no started listener the functions are not read, so the package is not built.
-	if len(started.runs) == 0 {
-		return finish(started), nil
+	if len(whole.runs) == 0 && (len(parts) == 0 || len(parts[0].runs) == 0) {
+		return finishShards(whole, parts), nil
 	}
-	// Under --timing each function's build is billed to the representation's build, not to this walk.
-	for function := range built.SourceFunctions(started.timing, started.dispatcher) {
+	// Under --timing the build is billed to the representation's build, not to this walk.
+	functions := slices.Collect(built.SourceFunctions(whole.timing, whole.dispatcher))
+	if len(parts) == 0 {
+		walkFunctions(whole, functions)
+		return finish(whole), nil
+	}
+	shardOf := shardOfFile(pass, len(parts))
+	shardFunctions := make([][]*intermediate_representation.Function, len(parts))
+	for _, function := range functions {
+		// A function with no position, or one in a file the pass does not hold, such as the synthetic package
+		// initializer, goes to the first shard, so every function is one shard's.
+		shard := 0
+		if function.Pos().IsValid() {
+			shard = shardOf[pass.Fset.File(function.Pos())]
+		}
+		shardFunctions[shard] = append(shardFunctions[shard], function)
+	}
+	walks := []shardWalk{{started: whole, walk: func() { walkFunctions(whole, functions) }}}
+	for index, part := range parts {
+		walks = append(walks, shardWalk{started: part, walk: func() { walkFunctions(part, shardFunctions[index]) }})
+	}
+	walkConcurrently(walks)
+	return finishShards(whole, parts), nil
+}
+
+// walkFunctions calls every one of started's listeners over functions: Function, each instruction in block order to
+// the listeners whose Instructions list its kind, FunctionExit.
+func walkFunctions(started *startedRuns, functions []*intermediate_representation.Function) {
+	if len(started.runs) == 0 {
+		return
+	}
+	for _, function := range functions {
 		for _, run := range started.runs {
 			run.function(function)
 		}
@@ -101,5 +136,4 @@ func (dispatcher *IntermediateRepresentation) run(pass *analysis.Pass) (any, err
 			run.functionExit(function)
 		}
 	}
-	return finish(started), nil
 }

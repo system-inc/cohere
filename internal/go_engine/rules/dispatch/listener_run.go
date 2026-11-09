@@ -43,14 +43,21 @@ type listenerRun struct {
 
 // newListenerRun is registered's listener ready to hear pass's package, with a context of its own whose findings
 // collect on the run, judging generated files by isGenerated, and each call measured into collector when it is set.
+// A fileLocal run hears only some of the package's files, a shard of a large package's, and its context's State
+// panics (see rule.Listener.FileLocal).
 func newListenerRun(
 	registered *registeredRule,
 	pass *analysis.Pass,
 	isGenerated func(string) bool,
 	collector *timing.Collector,
+	fileLocal bool,
 ) *listenerRun {
 	run := &listenerRun{registered: registered, pass: pass, timing: collector}
-	run.context = rule.NewContext(registered.name, pass, registered.listener.Requires, &registered.analyzer.Flags,
+	newContext := rule.NewContext
+	if fileLocal {
+		newContext = rule.NewFileLocalContext
+	}
+	run.context = newContext(registered.name, pass, registered.listener.Requires, &registered.analyzer.Flags,
 		isGenerated, func(_ string, diagnostic analysis.Diagnostic) {
 			run.diagnostics = append(run.diagnostics, diagnostic)
 		})

@@ -58,10 +58,12 @@ func (dispatcher *Syntax) RuleAnalyzer(
 }
 
 // run walks the package's files once, calling every started listener, each with its own context and its own recover,
-// and returns each started rule's outcome.
+// and returns each started rule's outcome. A package large enough to split (shardsOf) is walked by several runs at
+// once: the listeners marked FileLocal by one run per shard of its files, every other listener by one run over all of
+// them, so the package that ends a cold run walks on several cores (#0jnq91n).
 func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 	// Started first, which refuses a pass whose inspector failed, so that failure is named as one.
-	started, startError := dispatcher.start(pass)
+	whole, parts, startError := dispatcher.start(pass, dispatcher.shardsOf(pass))
 	if startError != nil {
 		return nil, startError
 	}
@@ -69,6 +71,39 @@ func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 	if !isInspector {
 		return nil, fmt.Errorf("reading %s's result: it is %T, where an inspector was expected", inspect.Analyzer.Name,
 			pass.ResultOf[inspect.Analyzer])
+	}
+	// The root's children are the package's files, in the order the pass holds them.
+	var files []inspector.Cursor
+	for fileCursor := range walker.Root().Children() {
+		if _, isFile := fileCursor.Node().(*ast.File); !isFile {
+			return nil, fmt.Errorf("walking %s: the inspector's root holds a %T, where only files were expected",
+				pass.Pkg.Path(), fileCursor.Node())
+		}
+		files = append(files, fileCursor)
+	}
+	if len(parts) == 0 {
+		walkFiles(whole, files)
+		return finish(whole), nil
+	}
+	shardOf := shardOfFile(pass, len(parts))
+	shardFiles := make([][]inspector.Cursor, len(parts))
+	for _, fileCursor := range files {
+		// A file the file set does not hold is no shard's, which shardOfFile never leaves, so it goes to the first.
+		shard := shardOf[pass.Fset.File(fileCursor.Node().Pos())]
+		shardFiles[shard] = append(shardFiles[shard], fileCursor)
+	}
+	walks := []shardWalk{{started: whole, walk: func() { walkFiles(whole, files) }}}
+	for index, part := range parts {
+		walks = append(walks, shardWalk{started: part, walk: func() { walkFiles(part, shardFiles[index]) }})
+	}
+	walkConcurrently(walks)
+	return finishShards(whole, parts), nil
+}
+
+// walkFiles walks files, calling every one of started's listeners: FileEnter, each node of a kind it lists, FileExit.
+func walkFiles(started *startedRuns, files []inspector.Cursor) {
+	if len(started.runs) == 0 {
+		return
 	}
 	// The inspector walks each file for every kind a started listener lists, and skips a subtree holding none of them,
 	// so a kind that only an unstarted listener lists is never visited. It reads the kinds as a set, so a kind two
@@ -79,14 +114,13 @@ func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 	}
 	walk := &syntaxWalk{started: started}
 	visit := walk.visit
-	// The root's children are the package's files, in the order the pass holds them.
-	for fileCursor := range walker.Root().Children() {
-		file, isFile := fileCursor.Node().(*ast.File)
-		if !isFile {
-			return nil, fmt.Errorf("walking %s: the inspector's root holds a %T, where only files were expected",
-				pass.Pkg.Path(), fileCursor.Node())
-		}
+	for _, fileCursor := range files {
+		// Checked as files were gathered, so the assertion holds.
+		file, _ := fileCursor.Node().(*ast.File)
+		// Each run's FileState is the file's from here through FileExit (see rule.FileState).
+		tokenFile := started.runs[0].pass.Fset.File(file.Pos())
 		for _, run := range started.runs {
+			run.context.EnterFile(tokenFile)
 			run.fileEnter(file)
 		}
 		// An empty list is every kind to the inspector, so listeners that list none, hearing only FileEnter and
@@ -98,7 +132,7 @@ func (dispatcher *Syntax) run(pass *analysis.Pass) (any, error) {
 		}
 		for _, run := range started.runs {
 			run.fileExit(file)
+			run.context.EnterFile(nil)
 		}
 	}
-	return finish(started), nil
 }
