@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -49,9 +50,10 @@ const homeMarker = "cohere-dev-home: tested "
 // homeBox is the box the gate's tests run on.
 const homeBox = "Home"
 
-// The witness's hands-off window on Home, in UTC, when no land gate may take her (Operations, thread-28ff151a).
+// The witness's hands-off window on Home, in UTC, when no land gate may take her: from 09:00, as Loom's limit for this
+// gate stands (Operations, thread-28ff151a), half an hour before the witness's own 09:30.
 const (
-	witnessWindowOpens  = 9*time.Hour + 30*time.Minute
+	witnessWindowOpens  = 9 * time.Hour
 	witnessWindowCloses = 15 * time.Hour
 )
 
@@ -240,7 +242,7 @@ func runHomeGate(worktree string, commit string, patterns []string, now time.Tim
 		command.Dir = worktree
 		output, runError = command.CombinedOutput()
 	case inWitnessWindow(now):
-		return homeVerdict{}, "it is the witness's window on Home, 09:30 to 15:00 UTC"
+		return homeVerdict{}, "it is the witness's window on Home, 09:00 to 15:00 UTC"
 	default:
 		output, runError = runOnHome(worktree, commit, patterns)
 		if runError != nil && len(output) == 0 {
@@ -250,7 +252,8 @@ func runHomeGate(worktree string, commit string, patterns []string, now time.Tim
 	verdict := readTestJson(output)
 	switch {
 	case verdict.commit == "":
-		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)", describeEnd(runError))
+		return homeVerdict{}, fmt.Sprintf("Home's run never said what it tested (%s)",
+			lastWords(output, describeEnd(runError)))
 	case verdict.commit != commit:
 		return homeVerdict{}, fmt.Sprintf("Home tested %s, not %s", shortCommit(verdict.commit), shortCommit(commit))
 	case verdict.operatingSystem == "" || verdict.architecture == "":
@@ -333,7 +336,10 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 			"--box", homeBox, "--within", homeGapBound, "--", "ssh", homeBox, remote)
 		gap.Dir = ahraDirectory
 		output, runError := gap.CombinedOutput()
-		held := exitCodeOf(runError) == gapRefusedExitCode && strings.Contains(string(output), "is held by")
+		// Gap says "Home holds hand job <id> (<mind>, ...): one job per box" when another job has her, and "is held
+		// by" for another hand's gap (LoomGapCommandLineInterface.ts); any other refusal is not worth asking again.
+		held := exitCodeOf(runError) == gapRefusedExitCode && (strings.Contains(string(output), "holds hand job") ||
+			strings.Contains(string(output), "is held by"))
 		if !held || attempt == homeHeldRetries {
 			return output, runError
 		}
@@ -342,6 +348,19 @@ func runOnHome(worktree string, commit string, patterns []string) ([]byte, error
 		streams.Show(streams.Errors)
 		time.Sleep(homeHeldRetryWait)
 	}
+}
+
+// terminalColor is a terminal's color sequence, which gap writes around its verdict words.
+var terminalColor = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+// lastWords is the last line of output that says something, its terminal colors taken out, so a fallback names why
+// Home gave no verdict in gap's own words, "refused · ..." among them; fallback when it said nothing.
+func lastWords(output []byte, fallback string) string {
+	lines := strings.Split(strings.TrimSpace(terminalColor.ReplaceAllString(string(output), "")), "\n")
+	if last := strings.TrimSpace(lines[len(lines)-1]); last != "" {
+		return last + ", " + fallback
+	}
+	return fallback
 }
 
 func describeEnd(runError error) string {
