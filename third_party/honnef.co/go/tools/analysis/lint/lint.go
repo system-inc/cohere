@@ -198,6 +198,14 @@ func ParseDirectives(files []*ast.File, fset *token.FileSet) []Directive {
 		// OPT(dh): in our old code, we skip all the comment map work if we
 		// couldn't find any directives, benchmark if that's actually
 		// worth doing
+		// cohere: a file with no comment starting //lint: yields no directive, since a directive is such a
+		// comment, so its comment map is skipped, the check the OPT(dh) note above asks to benchmark. Over
+		// cohere's own 5,332 Go files, 14 directives among them, ParseDirectives went from about 0.36 s
+		// and 175,000 allocations to 5 ms and 801. A file with a directive builds its map as released, so
+		// each directive keeps its Node (README.cohere.md, #tcbjtmj).
+		if !hasDirectiveComment(f) {
+			continue
+		}
 		cm := ast.NewCommentMap(fset, f, f.Comments)
 		for node, cgs := range cm {
 			for _, cg := range cgs {
@@ -218,4 +226,18 @@ func ParseDirectives(files []*ast.File, fset *token.FileSet) []Directive {
 		}
 	}
 	return dirs
+}
+
+// cohere: hasDirectiveComment reports whether any comment of f starts //lint:, the same test
+// ParseDirectives puts to each comment its map holds, which are f.Comments. A block comment's text
+// starts /* and a string is no comment, so neither is a directive here or there.
+func hasDirectiveComment(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			if strings.HasPrefix(c.Text, "//lint:") {
+				return true
+			}
+		}
+	}
+	return false
 }
