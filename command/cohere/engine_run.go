@@ -1420,7 +1420,7 @@ func (run *engineRun) countExcludedWhenNothingChecked() {
 		activeSummary.Gaps.addExcluded(excluded.Reason, excluded.Source, 1)
 	}
 	if outOfScope := run.project.FilesOurs - run.project.FilesInScope; outOfScope > 0 {
-		activeSummary.Gaps.addExcluded("outside the named paths", "", outOfScope)
+		activeSummary.Gaps.addExcluded(outsideNamedPaths, "", outOfScope)
 	}
 }
 
