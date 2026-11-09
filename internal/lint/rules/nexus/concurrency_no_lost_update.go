@@ -146,7 +146,7 @@ var ConcurrencyNoLostUpdate = rule.Rule[rule.NoOptions]{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				var visit func(node *ast.Node) bool
 				visit = func(node *ast.Node) bool {
-					if control_flow_graph.IsRoot(node) && concurrencyNoLostUpdateCanSuspend(node) {
+					if control_flow_graph.IsRoot(node) && control_flow_graph.CanSuspend(node) {
 						analyzeConcurrencyNoLostUpdateRoot(ruleContext, node)
 					}
 					node.ForEachChild(visit)
@@ -156,28 +156,6 @@ var ConcurrencyNoLostUpdate = rule.Rule[rule.NoOptions]{
 			},
 		}
 	},
-}
-
-// concurrencyNoLostUpdateCanSuspend reports whether a root is an async function or a generator.
-func concurrencyNoLostUpdateCanSuspend(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-	default:
-		return false
-	}
-	if node.ModifierFlags()&ast.ModifierFlagsAsync != 0 {
-		return true
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		return node.AsFunctionDeclaration().AsteriskToken != nil
-	case ast.KindFunctionExpression:
-		return node.AsFunctionExpression().AsteriskToken != nil
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().AsteriskToken != nil
-	}
-	return false
 }
 
 const (

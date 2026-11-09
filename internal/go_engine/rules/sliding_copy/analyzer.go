@@ -187,7 +187,7 @@ func namesBuiltinCopy(context *rule.Context, loop *ast.ForStmt) bool {
 // bound without its parentheses, and the slice and the counter recalled are compared by spelling, as the pattern
 // compares a node it bound, so the offset must come first in the sum, and `bs[i+offset]` is not the query's shape.
 func slidAssignment(body *ast.BlockStmt, counter *ast.Ident) (slice *ast.Ident, offset *ast.Ident, isSlide bool) {
-	assignment, isAssignment := soleAssignment(body.List)
+	assignment, isAssignment := staticcheck_code.SoleAssignment(body.List)
 	if !isAssignment || assignment.Tok != token.ASSIGN || len(assignment.Lhs) != 1 || len(assignment.Rhs) != 1 {
 		return nil, nil, false
 	}
@@ -213,29 +213,4 @@ func slidAssignment(body *ast.BlockStmt, counter *ast.Ident) (slice *ast.Ident, 
 		return nil, nil, false
 	}
 	return slice, offset, true
-}
-
-// soleAssignment is the assignment a list of one statement holds, looking through labels and blocks of one
-// statement on the way, as match.go looks through them before comparing a statement with the pattern's AssignStmt.
-// A list of any other length, an empty block among them, holds none.
-func soleAssignment(statements []ast.Stmt) (*ast.AssignStmt, bool) {
-	if len(statements) != 1 {
-		return nil, false
-	}
-	statement := statements[0]
-	for {
-		switch wrapped := statement.(type) {
-		case *ast.AssignStmt:
-			return wrapped, true
-		case *ast.LabeledStmt:
-			statement = wrapped.Stmt
-		case *ast.BlockStmt:
-			if len(wrapped.List) != 1 {
-				return nil, false
-			}
-			statement = wrapped.List[0]
-		default:
-			return nil, false
-		}
-	}
 }
