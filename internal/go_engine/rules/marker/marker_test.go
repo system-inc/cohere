@@ -125,19 +125,20 @@ func TestIndexReadsTheFilesOwnLines(test *testing.T) {
 
 // boundaryFiles put comments and nodes at a line's edges: a node ending on its line's last byte before a comment of
 // its own lines, a node starting on its line's first byte under one, a comment ending the file's last line with no
-// newline after it, and one ending it with one.
+// newline after it, and one ending it with one; and a comment with code on both sides of it.
 var boundaryFiles = map[string]string{
 	"edges.go":    "package edges\n\n// Checked: why.\nvar First = 1\nvar Second = 2\n/* Checked: why. */\nvar Third = 3\n",
 	"unended.go":  "package edges\n\nvar Unended = 3 // Checked: why.",
 	"ended.go":    "package edges\n\nvar Ended = 3 // Checked: why.\n",
 	"block.go":    "package edges\n\nvar Block = []int{\n\t1,\n} /* Checked: why.\n */\nvar After = 4",
+	"both.go":     "package edges\n\nvar Both = 1 /* Checked: why. */ + 2\nvar Below = 3\n",
 	"carriage.go": "package edges\r\n\r\n// Checked: why.\r\nvar Carried = 5\r\n",
 }
 
 // boundaryExcused is whether a marker excuses each of the boundary files' variables.
 var boundaryExcused = map[string]bool{
 	"First": true, "Second": false, "Third": true, "Unended": true, "Ended": true, "Block": true, "After": false,
-	"Carried": true,
+	"Carried": true, "Both": false, "Below": false,
 }
 
 // The index reads lines from its file's view of the table, and finds for every node of real files and of the boundary
@@ -197,28 +198,30 @@ func TestIndexFindsWhatAnIndexReadingTheFileSetFinds(test *testing.T) {
 	if compared < 50000 || found < 1000 {
 		test.Fatalf("compared %d nodes, %d with comments, want more than 50,000 and 1,000", compared, found)
 	}
-	// Each boundary shape's marker is found where it speaks.
+	// Each boundary shape's marker is found where it speaks, by an index on the table and by one on a table that does
+	// not hold the file.
 	for _, file := range syntax {
 		name := filepath.Base(fileSet.File(file.FileStart).Name())
 		if _, isBoundary := boundaryFiles[name]; !isBoundary {
 			continue
 		}
-		index := marker.NewIndex(table, file)
-		ast.Inspect(file, func(node ast.Node) bool {
-			declaration, isDeclaration := node.(*ast.GenDecl)
-			if !isDeclaration {
-				return true
-			}
-			specification, isValue := declaration.Specs[0].(*ast.ValueSpec)
-			if !isValue {
+		for _, index := range []*marker.Index{marker.NewIndex(table, file), marker.NewIndex(fromFileSet, file)} {
+			ast.Inspect(file, func(node ast.Node) bool {
+				declaration, isDeclaration := node.(*ast.GenDecl)
+				if !isDeclaration {
+					return true
+				}
+				specification, isValue := declaration.Specs[0].(*ast.ValueSpec)
+				if !isValue {
+					return false
+				}
+				excused := index.ExcuseFor(declaration, checkedMarker) == marker.WithReason
+				if expected := boundaryExcused[specification.Names[0].Name]; excused != expected {
+					test.Errorf("%s: %s excused: %v, expected %v", name, specification.Names[0].Name, excused, expected)
+				}
 				return false
-			}
-			excused := index.ExcuseFor(declaration, checkedMarker) == marker.WithReason
-			if expected := boundaryExcused[specification.Names[0].Name]; excused != expected {
-				test.Errorf("%s: %s excused: %v, expected %v", name, specification.Names[0].Name, excused, expected)
-			}
-			return false
-		})
+			})
+		}
 	}
 }
 

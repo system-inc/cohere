@@ -29,3 +29,12 @@ func (lines Lines) LineNear(position token.Pos, near int) int {
 	}
 	return lineOf(lines.held.lineOffsets, offset)
 }
+
+// LineCount is how many lines the view's file has, or 0 when the table does not hold the file, so has no lines of it
+// to count.
+func (lines Lines) LineCount() int {
+	if lines.held == nil {
+		return 0
+	}
+	return len(lines.held.lineOffsets)
+}

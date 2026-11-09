@@ -200,8 +200,8 @@ func TestAFilesViewReadsEveryPositionAsLineDoes(test *testing.T) {
 }
 
 // A position just past a file's end is the next file's first, on its line 1, and the view of the earlier file reads
-// it so, never as its own last line; the view of a file the table does not hold reads every position as the FileSet
-// does.
+// it so, never as its own last line. A view counts its file's lines; the view of a file the table does not hold
+// counts none and reads every position as the FileSet does.
 func TestAFilesViewLeavesWhatIsNotItsFileToTheTable(test *testing.T) {
 	test.Parallel()
 
@@ -215,7 +215,15 @@ func TestAFilesViewLeavesWhatIsNotItsFileToTheTable(test *testing.T) {
 	if got := table.Lines(syntax[0]).LineNear(next, first.LineCount()); got != 1 {
 		test.Fatalf("the view of %s reads the next file's first position on line %d, want 1", first.Name(), got)
 	}
+	for _, file := range syntax {
+		if want, got := fileSet.File(file.FileStart).LineCount(), table.Lines(file).LineCount(); got != want {
+			test.Fatalf("the view of %s counts %d lines, want %d", fileSet.File(file.FileStart).Name(), got, want)
+		}
+	}
 	outside := positions.New(fileSet, syntax[:1]).Lines(syntax[len(syntax)-1])
+	if got := outside.LineCount(); got != 0 {
+		test.Fatalf("the view of a file the table does not hold counts %d lines, want 0", got)
+	}
 	ast.Inspect(syntax[len(syntax)-1], func(node ast.Node) bool {
 		if node == nil {
 			return true

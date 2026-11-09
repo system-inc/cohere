@@ -66,6 +66,13 @@ func Read(group *ast.CommentGroup, marker string) Excuse {
 	return found
 }
 
+// codeOnLine is where code sits on one line: the earliest place it begins or ends there and the latest, each no
+// position on a line without code.
+type codeOnLine struct {
+	first token.Pos
+	last  token.Pos
+}
+
 // NewIndex indexes file's comment groups, reading each position's line from table. Where code sits on a line is read
 // from where the file's nodes begin and end in the AST, never from the source text.
 func NewIndex(table *positions.Table, file *ast.File) *Index {
@@ -74,15 +81,15 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 		ownLinesEndingOn: map[int]*ast.CommentGroup{},
 		startingOn:       map[int][]*ast.CommentGroup{},
 	}
-	// The earliest and latest place code begins or ends on each line. A token of code that is no node of its own, a
-	// closing brace or a keyword, opens or closes a node on its line, the brace its block's end and the keyword its
-	// statement's start, so these bound the code on a line.
-	firstCode := map[int]token.Pos{}
-	lastCode := map[int]token.Pos{}
 	// The walk reads its lines from the file's own, trying first the line the last node started on: the walk meets
 	// nodes in the order they start, so the next one mostly starts on it too, and a node mostly ends on the line it
 	// starts on.
 	lines := table.Lines(file)
+	// The earliest and latest place code begins or ends on each line, by line. A token of code that is no node of its
+	// own, a closing brace or a keyword, opens or closes a node on its line, the brace its block's end and the keyword
+	// its statement's start, so these bound the code on a line. One slice for the file's lines rather than a map that
+	// grows with them, and longer when a file the table does not hold puts code on a line past it.
+	code := make([]codeOnLine, lines.LineCount()+1)
 	startLine := 0
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch node.(type) {
@@ -100,11 +107,15 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 			if each == 0 {
 				startLine = line
 			}
-			if earliest, seen := firstCode[line]; !seen || position < earliest {
-				firstCode[line] = position
+			if line >= len(code) {
+				code = append(code, make([]codeOnLine, line+1-len(code))...)
 			}
-			if latest, seen := lastCode[line]; !seen || position > latest {
-				lastCode[line] = position
+			// No position is a line without code yet, since every position recorded is a valid one, after it.
+			if code[line].first == token.NoPos || position < code[line].first {
+				code[line].first = position
+			}
+			if position > code[line].last {
+				code[line].last = position
 			}
 		}
 		return true
@@ -115,10 +126,10 @@ func NewIndex(table *positions.Table, file *ast.File) *Index {
 		index.startingOn[startLine] = append(index.startingOn[startLine], group)
 		// A node ending where the comment starts, `work()// note`, is code before it as much as one ending earlier,
 		// and one starting where it ends, `/* note */work()`, is code after it.
-		if earliest, seen := firstCode[startLine]; seen && earliest <= group.Pos() {
+		if startLine < len(code) && code[startLine].first != token.NoPos && code[startLine].first <= group.Pos() {
 			continue
 		}
-		if latest, seen := lastCode[endLine]; seen && latest >= group.End() {
+		if endLine < len(code) && code[endLine].last >= group.End() {
 			continue
 		}
 		index.ownLinesEndingOn[endLine] = group
