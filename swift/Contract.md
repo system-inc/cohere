@@ -638,8 +638,8 @@ The Swift engine's record (`RunInputs.swift` says why each is enough) names:
   Xcode root each package its project links, walked as the build-input snapshot walks them: no directory whose name
   starts with `.` is entered, so neither `.git`, `.build` nor cohere's `.cache` is, and everything else is, ignored by
   git or not, with the hidden files in each walked directory but `.DS_Store`. Beside them, every target's sources,
-  each package's `Package.swift` and `Package.resolved`, the ignore files and git config files the file set
-  consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
+  each package's `Package.swift` and `Package.resolved`, the ignore files, git config files and git index the file
+  set consulted, a `.git` file a worktree points through, the settings file, and the toolchain's files: the `swift`,
   `xcrun` and `xcodebuild` PATH finds (and `xcodegen` at a spec's root), the `swift` xcrun names with
   `swift-frontend`, `swift-build` and `swift-package` beside it, the toolchain's `ToolchainInfo.plist`, its Xcode's
   `version.plist`, and each SDK's `SDKSettings.json`. A remote dependency's checkout lives in the engine's scratch and

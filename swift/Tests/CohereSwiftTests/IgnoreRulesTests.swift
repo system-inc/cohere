@@ -4,9 +4,9 @@ import Testing
 @testable import CohereSwift
 
 /*
- What git would list, read from the ignore files with no git process. Each repository here is a directory
- holding a `.git`, and each run gets a home of its own, so this machine's global ignore file cannot decide
- what a test proves.
+ What git would list, read from the ignore files and the index with no git process. Each repository here is a
+ directory holding a `.git`, and each run gets a home of its own, so this machine's global ignore file cannot decide
+ what a test proves. Each has an index tracking nothing unless a test names what it tracks, or that it has none.
  */
 struct IgnoreRulesTests {
     /* A repository on disk: its root, a home for the global config, and the rules read from both. */
@@ -14,10 +14,12 @@ struct IgnoreRulesTests {
         var root: URL
         var home: URL
 
+        /* `index` is what `.git/index` tracks, written as git writes one (`GitIndexTests.indexBytes`); nil, none. */
         init(
             files: [String: String],
             gitDirectory: [String: String] = [:],
             home homeFiles: [String: String] = [:],
+            index: [String]? = [],
         ) throws {
             let base = FileManager.default.temporaryDirectory.appendingPathComponent(
                 "cohere-swift-ignore-\(UUID().uuidString)",
@@ -33,6 +35,9 @@ struct IgnoreRulesTests {
             try Self.write(files, under: root)
             try Self.write(gitDirectory, under: root.appendingPathComponent(".git", isDirectory: true))
             try Self.write(homeFiles, under: home)
+            if let index {
+                try GitIndexTests.indexBytes(paths: index).write(to: root.appendingPathComponent(".git/index"))
+            }
         }
 
         static func write(_ files: [String: String], under directory: URL) throws {
@@ -46,7 +51,8 @@ struct IgnoreRulesTests {
             }
         }
 
-        var environment: [String: String] { ["HOME": home.path] }
+        /* No `PATH` at all, so no git could be found were one asked for: everything here is read from disk. */
+        var environment: [String: String] { ["HOME": home.path, "PATH": ""] }
 
         func rules() throws -> IgnoreRules {
             let repository = try #require(IgnoreRules.Repository.containing(root))
@@ -380,6 +386,155 @@ struct IgnoreRulesTests {
         let rules = IgnoreRules(repository: repository, environment: main.environment)
         #expect(rules.isVisible(repository.root.appendingPathComponent("Sources/Kept.swift").path))
         #expect(!rules.isVisible(repository.root.appendingPathComponent("Sources/Excluded.swift").path))
+    }
+
+    /*
+     A file `git add -f` tracked is listed whatever the ignore files say, as `git check-ignore` has it, read from each
+     index git wrote (`GitIndexTests`): a pre-commit hook on it must check it. Its untracked neighbor, matching the
+     same pattern, is still excluded.
+     */
+    @Test(arguments: ["sha1", "sha256"], [2, 3, 4])
+    func aForceAddedFileIsListedWithNoGitOnPath(objectFormat: String, version: Int) throws {
+        let fixture = try Fixture(
+            files: [
+                ".gitignore": "*.swift\nIgnored/\n",
+                "Sources/Alpha/One.swift": "", "Sources/Alpha/Two.swift": "", "Sources/Beta.swift": "",
+                "Ignored/Tracked.swift": "", "Sources/Untracked.swift": "",
+            ],
+            gitDirectory: objectFormat == "sha256" ? ["config": "[extensions]\n\tobjectFormat = sha256\n"] : [:],
+            index: nil,
+        )
+        try FileManager.default.copyItem(
+            at: GitIndexTests.sample("\(objectFormat)-version-\(version).index"),
+            to: fixture.root.appendingPathComponent(".git/index"),
+        )
+        #expect(try fixture.visible() == GitIndexTests.sampleTracked.sorted())
+        #expect(try fixture.rules().indexFallbackReason == nil)
+    }
+
+    @Test func aTrackedSourceAnIgnorePatternMatchesIsOurs() throws {
+        let fixture = try Fixture(
+            files: [
+                ".gitignore": "*.swift\n", "Package.swift": "", "Sources/A/A.swift": "",
+                "Sources/A/Untracked.swift": "",
+            ],
+            index: [".gitignore", "Sources/A/A.swift"],
+        )
+        let describe =
+            #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":["A.swift","Untracked.swift"]}]}"#
+        let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
+        let package = try PackageModel(
+            root: fixture.root,
+            describeJson: Data(describe.utf8),
+            dumpPackageJson: Data(dump.utf8),
+        )
+        let fileSet = try FileSet.build(package: package, environment: fixture.environment)
+        #expect(fileSet.owned.map(\.url.lastPathComponent) == ["A.swift"])
+        #expect(fileSet.excluded.map { URL(fileURLWithPath: $0.file).lastPathComponent } == ["Untracked.swift"])
+        #expect(fileSet.note.isEmpty)
+    }
+
+    /*
+     git never walks an excluded directory for untracked files, and still lists the tracked ones in it, so the walk
+     enters such a directory for its tracked files alone: no ignore file inside it is read, so none re-includes.
+     */
+    @Test func aTrackedFileInsideAnIgnoredDirectoryIsListedAndItsUntrackedNeighborIsNot() throws {
+        let fixture = try Fixture(
+            files: [
+                ".gitignore": "Build/\n",
+                "Build/.gitignore": "!Untracked.swift\n",
+                "Build/Tracked.swift": "", "Build/Untracked.swift": "",
+                "Build/Deep/Tracked.swift": "", "Build/Deep/Untracked.swift": "",
+                "Build/Other/Untracked.swift": "",
+                "Kept.swift": "",
+            ],
+            index: [".gitignore", "Build/Tracked.swift", "Build/Deep/Tracked.swift"],
+        )
+        #expect(
+            try fixture.visible() == [".gitignore", "Build/Deep/Tracked.swift", "Build/Tracked.swift", "Kept.swift"]
+        )
+        let rules = try fixture.rules()
+        let root = rules.repository.root
+        #expect(rules.isVisible(root.appendingPathComponent("Build/Deep/Tracked.swift").path))
+        #expect(!rules.isVisible(root.appendingPathComponent("Build/Deep/Untracked.swift").path))
+        #expect(!rules.isVisible(root.appendingPathComponent("Build/Other").path, isDirectory: true))
+        #expect(
+            rules.visibleFiles(under: root.appendingPathComponent("Build/Deep").path)
+                == [root.appendingPathComponent("Build/Deep/Tracked.swift").path]
+        )
+        #expect(!rules.filesConsulted.contains(root.appendingPathComponent("Build/.gitignore").path))
+    }
+
+    /* A repository with no index yet tracks nothing, so the ignore files decide as before, and the note says why. */
+    @Test func aRepositoryWithNoIndexBehavesAsBeforeAndSaysWhy() throws {
+        let files = [".gitignore": "Generated.swift\n", "Kept.swift": "", "Generated.swift": ""]
+        let fixture = try Fixture(files: files, index: nil)
+        #expect(try fixture.visible() == [".gitignore", "Kept.swift"])
+        let indexFile = fixture.root.resolvingSymlinksInPath().appendingPathComponent(".git/index").path
+        #expect(try fixture.rules().indexFallbackReason == "there is no index at \(indexFile)")
+        #expect(try fixture.rules().filesConsulted.contains(indexFile))
+        #expect(try Self.note(of: fixture).hasPrefix("git's index was not read, since there is no index at "))
+    }
+
+    @Test func aGarbageIndexFallsBackWithItsReason() throws {
+        let fixture = try Fixture(
+            files: [".gitignore": "Generated.swift\n", "Kept.swift": "", "Generated.swift": ""],
+            gitDirectory: ["index": "DIRC, and then nothing an index holds"],
+            index: nil,
+        )
+        #expect(try fixture.visible() == [".gitignore", "Kept.swift"])
+        let indexFile = fixture.root.resolvingSymlinksInPath().appendingPathComponent(".git/index").path
+        #expect(try fixture.rules().indexFallbackReason == "the index at \(indexFile) does not match its checksum")
+        #expect(
+            try Self.note(of: fixture)
+                == "git's index was not read, since the index at \(indexFile) does not match its checksum, "
+                + "so a tracked file an ignore pattern matches was taken as ignored by git"
+        )
+    }
+
+    /* The file set's note for a one-target package at the fixture's root. */
+    static func note(of fixture: Fixture) throws -> String {
+        let describe = #"{"name":"Example","targets":[{"name":"A","type":"library","path":"Sources/A","sources":[]}]}"#
+        let dump = #"{"toolsVersion":{"_version":"6.4.0"},"swiftLanguageVersions":null,"targets":[]}"#
+        let package = try PackageModel(
+            root: fixture.root,
+            describeJson: Data(describe.utf8),
+            dumpPackageJson: Data(dump.utf8),
+        )
+        return try FileSet.build(package: package, environment: fixture.environment).note
+    }
+
+    /* A worktree's index is its own, in its own git directory: what the main checkout tracks decides nothing there. */
+    @Test func aWorktreeReadsItsOwnIndex() throws {
+        let main = try Fixture(
+            files: [".gitignore": "*.swift\n", "Shared.swift": ""],
+            gitDirectory: ["worktrees/feature/commondir": "../..\n", "worktrees/feature/HEAD": ""],
+            index: [".gitignore", "Shared.swift"],
+        )
+        let worktree = main.root.deletingLastPathComponent().appendingPathComponent("feature", isDirectory: true)
+        try Fixture.write(
+            [
+                ".git": "gitdir: \(main.root.path)/.git/worktrees/feature\n",
+                ".gitignore": "*.swift\n", "Shared.swift": "", "Sources/Feature.swift": "",
+            ],
+            under: worktree,
+        )
+        try GitIndexTests.indexBytes(paths: [".gitignore", "Sources/Feature.swift"], version: 4)
+            .write(to: main.root.appendingPathComponent(".git/worktrees/feature/index"))
+
+        let repository = try #require(IgnoreRules.Repository.containing(worktree))
+        #expect(
+            repository.gitDirectory?.resolvingSymlinksInPath().path
+                == main.root.appendingPathComponent(".git/worktrees/feature").resolvingSymlinksInPath().path
+        )
+        let rules = IgnoreRules(repository: repository, environment: main.environment)
+        let rootPath = repository.root.path + "/"
+        #expect(
+            rules.visibleFiles(under: repository.root.path).map { String($0.dropFirst(rootPath.count)) }.sorted() == [
+                ".gitignore", "Sources/Feature.swift",
+            ]
+        )
+        #expect(try main.visible() == [".gitignore", "Shared.swift"])
     }
 
     @Test func theNearestGitIsTheRepositoryRoot() throws {

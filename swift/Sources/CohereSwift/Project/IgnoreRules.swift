@@ -5,9 +5,9 @@ import Foundation
 
  Kirk's ruling (#67vevpz): cohere runs no git at all. The file set used to ask `git ls-files` which files
  git does not ignore, and the format phase asked `git rev-parse` where the repository starts. Both answers
- are on disk: the repository starts at the nearest `.git`, and what it ignores is every `.gitignore` from
- its root down, `info/exclude` in its git directory, and the global excludes file. Reading them costs no
- process launch and does not depend on whichever git is first on PATH.
+ are on disk: the repository starts at the nearest `.git`, what it tracks is its index (`GitIndex`), and what
+ it ignores is every `.gitignore` from its root down, `info/exclude` in its git directory, and the global
+ excludes file. Reading them costs no process launch and does not depend on whichever git is first on PATH.
 
  The rules are git's own (`dir.c` and `wildmatch.c`), ported rather than approximated, because a matcher
  that is nearly right drops a file silently, which is the failure the coverage line exists to prevent:
@@ -22,6 +22,10 @@ import Foundation
    a whole segment, leading, in the middle or trailing. (Spelled out rather than shown, because those
    spellings would end and open Swift block comments.)
  - A file inside an excluded directory cannot be re-included: git never looks inside, so neither does this.
+ - A tracked file is never ignored, as `git check-ignore` has it: tracking outranks every pattern. An excluded
+   directory holding one is entered for its tracked files alone, since git lists those and nothing untracked
+   beside them. When the index cannot be read (none yet, a split or sparse one, or one failing a check), the
+   ignore files alone decide, and `indexFallbackReason` says why.
  - A directory holding its own `.git` is another repository and nothing inside it is listed, the boundary
    Go's `format_files.HasOwnRepository` draws with the same check.
  - `core.ignorecase` folds ASCII case, as git does on macOS's default filesystem.
@@ -29,17 +33,13 @@ import Foundation
  Go's `format_files.matchesIgnore` is a deliberate subset (no negation, no anchoring rule), sized for the
  format walk's pruning. This is all of git's rules, because here it replaces git's answer outright.
 
- Two differences from `git ls-files --cached`, by construction, because whether a file is tracked lives in
- git's index, a binary file this does not read:
- - A tracked file that matches an ignore pattern is listed by git, since tracking outranks ignoring, and is
-   excluded here. Measured before this shipped (`git ls-files -ci --exclude-standard`): neither the Presence
-   worktree nor cohere's repository tracks such a Swift file, and the archive copies have no repository.
- - A tracked file deleted from the working tree is still listed by git, and is not here, since it is not on
-   disk. The file set used to name such a file as one no target compiles.
+ One difference from `git ls-files --cached`, by construction: a tracked file deleted from the working tree is
+ still listed by git, and is not here, since this lists what is on disk. The file set used to name such a file as
+ one no target compiles.
  Also not read: the system config file and `include` directives, when looking for `core.excludesFile`.
  */
 final class IgnoreRules {
-    /* The repository holding a directory: the nearest directory above it with a `.git`, and the git directory holding its shared files. */
+    /* The repository holding a directory: the nearest directory above it with a `.git`, and its git directories. */
     struct Repository: Equatable, Sendable {
         /* The directory holding `.git`, symlinks resolved, as `git rev-parse --show-toplevel` prints it. */
         var root: URL
@@ -48,6 +48,12 @@ final class IgnoreRules {
          directory, which the worktree's `commondir` names. Nil when a `.git` file names nothing readable.
          */
         var commonDirectory: URL?
+        /*
+         Where its index lives: `.git` itself, or for a worktree or a submodule the directory its `.git` file names,
+         never the common one, since each worktree has an index of its own. Nil when there is none to read: a `.git`
+         file naming nothing readable, or a directory walked as a repository's root that is not one.
+         */
+        var gitDirectory: URL? = nil
 
         /*
          The repository holding `directory`, or nil when no directory from it up to `/` holds a `.git`. A
@@ -63,6 +69,7 @@ final class IgnoreRules {
                     return Repository(
                         root: URL(fileURLWithPath: candidate, isDirectory: true),
                         commonDirectory: gitDirectory.map(commonDirectory(of:)),
+                        gitDirectory: gitDirectory,
                     )
                 }
                 let parent = (candidate as NSString).deletingLastPathComponent
@@ -504,14 +511,18 @@ final class IgnoreRules {
     /* The repository root as a path, symlinks resolved, every path below it is measured from. */
     private let rootPath: String
     private let foldCase: Bool
+    /* What the index tracks, which no ignore pattern excludes. Empty when it was not read. */
+    private let index: GitIndex
+    /* Why the index was not read, for the file set's note, or nil when it was. */
+    let indexFallbackReason: String?
     /* `info/exclude`, then the global excludes file: consulted after every `.gitignore`, in that order. */
     private let repositoryWidePatterns: [[Pattern]]
     /* Each directory's own `.gitignore`, by its path relative to the root ("" for the root), read once. */
     private var directoryPatterns: [String: [Pattern]] = [:]
     /*
-     Every file this read or looked for to decide what git ignores, there or not: the git config files, `info/exclude`,
-     the global excludes file and each `.gitignore` consulted. The run's inputs record names each (`RunInputs`), since
-     a line added to any of them changes which files are ours.
+     Every file this read or looked for to decide what git ignores, there or not: the git config files, the index,
+     `info/exclude`, the global excludes file and each `.gitignore` consulted. The run's inputs record names each
+     (`RunInputs`), since a line added to any of them, or a file added to the index, changes which files are ours.
      */
     private(set) var filesConsulted: Set<String> = []
     /* Every directory `visibleFiles` listed, absolute, so the inputs record can name each listing the walk read. */
@@ -537,7 +548,7 @@ final class IgnoreRules {
         var consulted = Set(configurationFiles)
         for file in configurationFiles {
             guard let contents = FileManager.default.contents(atPath: file) else { continue }
-            for entry in Self.coreSettings(in: String(decoding: contents, as: UTF8.self)) {
+            for entry in Self.settings(in: String(decoding: contents, as: UTF8.self), section: "core") {
                 settings[entry.key] = entry.value
             }
         }
@@ -568,30 +579,82 @@ final class IgnoreRules {
         consulted.insert(globalExcludes)
         repositoryWide.append(Self.patterns(inFile: globalExcludes))
         repositoryWidePatterns = repositoryWide
+
+        /* The object format is the repository's alone: git honours `extensions` in no other config file. */
+        if let gitDirectory = repository.gitDirectory {
+            let indexFile = gitDirectory.appendingPathComponent("index")
+            consulted.insert(indexFile.path)
+            let objectFormat =
+                repository.commonDirectory
+                .flatMap { FileManager.default.contents(atPath: $0.appendingPathComponent("config").path) }
+                .flatMap { contents in
+                    Self.settings(in: String(decoding: contents, as: UTF8.self), section: "extensions")
+                        .last { $0.key == "objectformat" }?.value
+                } ?? "sha1"
+            switch GitIndex.read(file: indexFile, objectFormat: objectFormat) {
+                case .read(let read):
+                    index = read
+                    indexFallbackReason = nil
+                case .fellBack(let reason):
+                    index = .empty
+                    indexFallbackReason = reason
+            }
+        }
+        else {
+            index = .empty
+            indexFallbackReason = "no git directory was found for \(repository.root.path)"
+        }
         filesConsulted = consulted
     }
 
-    /* Whether git would list `path` (absolute, symlinks resolved): inside this repository, inside no other, under no ignored directory, and not ignored itself. */
+    /*
+     How git treats one entry on the way down, or the end of a path: a file listed, a directory entered for all it
+     holds, a directory entered for its tracked files alone (an excluded one holding some), or neither.
+     */
+    private enum Admission {
+        case admitted
+        case trackedOnly
+        case refused
+    }
+
+    /*
+     Whether git would list `path` (absolute, symlinks resolved): inside this repository, inside no other, and either
+     tracked, or under no ignored directory and not ignored itself. A directory is visible when the walk would enter
+     it, an ignored one holding a tracked file among them.
+     */
     func isVisible(_ path: String, isDirectory: Bool = false) -> Bool {
+        admission(of: path, isDirectory: isDirectory) != .refused
+    }
+
+    /* The admission of each step from the root down to `path`, ending at the first refused. */
+    private func admission(of path: String, isDirectory: Bool) -> Admission {
         let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
-        guard path.hasPrefix(prefix) else { return false }
+        guard path.hasPrefix(prefix) else { return .refused }
         let components = path.dropFirst(prefix.count).split(separator: "/").map(String.init)
         var parent = ""
-        for (index, name) in components.enumerated() {
+        var admission = Admission.admitted
+        for (position, name) in components.enumerated() {
             let relative = parent.isEmpty ? name : parent + "/" + name
-            let entryIsDirectory = index < components.count - 1 || isDirectory
-            if !admits(name: name, relative: relative, parent: parent, isDirectory: entryIsDirectory) {
-                return false
+            admission = self.admission(
+                name: name,
+                relative: relative,
+                parent: parent,
+                isDirectory: position < components.count - 1 || isDirectory,
+                insideExcludedDirectory: admission == .trackedOnly,
+            )
+            if admission == .refused {
+                return .refused
             }
             parent = relative
         }
-        return true
+        return admission
     }
 
     /*
      Every file git would list below `directory` (absolute, symlinks resolved), as absolute paths with
-     symlinks resolved, the way the file set compares them. Pruned as git prunes: an ignored directory and
-     another repository are never entered. A symlink is a file here, as it is to git, never followed.
+     symlinks resolved, the way the file set compares them. Pruned as git prunes: another repository is never
+     entered, nor is an ignored directory, unless it holds a tracked file, and then only its tracked files are
+     listed. A symlink is a file here, as it is to git, never followed.
 
      `skipping` holds directories (absolute, symlinks resolved) the caller knows are not the repository's source
      whatever its ignore files say, such as the engine's own scratch, and they are never entered either.
@@ -601,15 +664,23 @@ final class IgnoreRules {
         skipping: Set<String> = [],
         skippingWhere isSkipped: (String) -> Bool = { _ in false },
     ) -> [String] {
-        guard directory == rootPath || isVisible(directory, isDirectory: true) else { return [] }
+        let start = directory == rootPath ? .admitted : admission(of: directory, isDirectory: true)
+        guard start != .refused else { return [] }
         let relative = directory == rootPath ? "" : String(directory.dropFirst(rootPath.count + 1))
         var files: [String] = []
-        collect(relativeDirectory: relative, skipping: skipping, skippingWhere: isSkipped, into: &files)
+        collect(
+            relativeDirectory: relative,
+            trackedOnly: start == .trackedOnly,
+            skipping: skipping,
+            skippingWhere: isSkipped,
+            into: &files,
+        )
         return files
     }
 
     private func collect(
         relativeDirectory: String,
+        trackedOnly: Bool,
         skipping: Set<String>,
         skippingWhere isSkipped: (String) -> Bool,
         into files: inout [String],
@@ -635,11 +706,24 @@ final class IgnoreRules {
             if isDirectory && (skipping.contains(rootPath + "/" + relative) || isSkipped(rootPath + "/" + relative)) {
                 continue
             }
-            guard admits(name: name, relative: relative, parent: relativeDirectory, isDirectory: isDirectory) else {
+            let admission = self.admission(
+                name: name,
+                relative: relative,
+                parent: relativeDirectory,
+                isDirectory: isDirectory,
+                insideExcludedDirectory: trackedOnly,
+            )
+            if admission == .refused {
                 continue
             }
             if isDirectory {
-                collect(relativeDirectory: relative, skipping: skipping, skippingWhere: isSkipped, into: &files)
+                collect(
+                    relativeDirectory: relative,
+                    trackedOnly: admission == .trackedOnly,
+                    skipping: skipping,
+                    skippingWhere: isSkipped,
+                    into: &files,
+                )
             }
             else {
                 let path = rootPath + "/" + relative
@@ -648,15 +732,34 @@ final class IgnoreRules {
         }
     }
 
-    /* One step down: whether git lists this entry (a file) or enters it (a directory). */
-    private func admits(name: String, relative: String, parent: String, isDirectory: Bool) -> Bool {
+    /*
+     One step down: whether git lists this entry (a file) or enters it (a directory), and for a directory whether for
+     everything or only what is tracked. Inside an excluded directory no pattern is read, since git reads none there:
+     only tracking admits. Elsewhere the patterns are asked first and the index only of what they exclude, which is
+     the few, so the walk pays for tracking only where it decides something.
+     */
+    private func admission(
+        name: String,
+        relative: String,
+        parent: String,
+        isDirectory: Bool,
+        insideExcludedDirectory: Bool,
+    ) -> Admission {
         if name == ".git" {
-            return false
+            return .refused
         }
         if isDirectory && FileManager.default.fileExists(atPath: rootPath + "/" + relative + "/.git") {
-            return false
+            return .refused
         }
-        return !isIgnored(relative: relative, parent: parent, name: name, isDirectory: isDirectory)
+        if !insideExcludedDirectory
+            && !isIgnored(relative: relative, parent: parent, name: name, isDirectory: isDirectory)
+        {
+            return .admitted
+        }
+        if isDirectory {
+            return index.trackedDirectories.contains(relative) ? .trackedOnly : .refused
+        }
+        return index.trackedFiles.contains(relative) ? .admitted : .refused
     }
 
     /* The deepest `.gitignore` with a matching line decides, then `info/exclude`, then the global file. */
@@ -726,12 +829,12 @@ final class IgnoreRules {
     }
 
     /*
-     The `core` section's keys from a git config file, lowercased, in file order. Enough of git's config
-     grammar for the two keys read here: sections, `key = value`, a bare key meaning true, quotes, escapes
+     One section's keys from a git config file, lowercased, in file order: `core` or `extensions`. Enough of git's
+     config grammar for the three keys read here: sections, `key = value`, a bare key meaning true, quotes, escapes
      and trailing comments.
      */
-    static func coreSettings(in contents: String) -> [(key: String, value: String)] {
-        var inCore = false
+    static func settings(in contents: String, section: String) -> [(key: String, value: String)] {
+        var inSection = false
         var settings: [(key: String, value: String)] = []
         for rawLine in contents.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
@@ -740,10 +843,10 @@ final class IgnoreRules {
             }
             if line.hasPrefix("[") {
                 let header = line.dropFirst().prefix { $0 != "]" }
-                inCore = header.trimmingCharacters(in: .whitespaces).lowercased() == "core"
+                inSection = header.trimmingCharacters(in: .whitespaces).lowercased() == section
                 continue
             }
-            guard inCore else { continue }
+            guard inSection else { continue }
             guard let equals = line.firstIndex(of: "=") else {
                 settings.append((key: line.lowercased(), value: "true"))
                 continue
