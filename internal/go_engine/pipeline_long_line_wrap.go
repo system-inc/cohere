@@ -77,6 +77,11 @@ func (engine *pipeline) wrapAfterLoad(loaded *load.Loaded, loadError error, type
 		Known:          engine.fix.known,
 		Wrap:           engine.longLineWrap(),
 	})
+	if len(result.Changed) > 0 {
+		// The pass beside the load is of the bytes the wrap replaced, and reads the held bytes reread writes, so it
+		// stops before the first reread, and the load of the wrapped tree starts its own.
+		engine.abandonSpeculation()
+	}
 	engine.fix.wrapKnown = result.Known
 	engine.addWrapped(result.Changed)
 	for _, changed := range result.Changed {

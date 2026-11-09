@@ -387,7 +387,8 @@ func (engine *pipeline) reread(file string) {
 // and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first.
 // described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
 // the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
-// lock.
+// lock. The rules beside the load (speculativeLint) read it while the main goroutine runs the long-line wrap, which
+// stops them before its first reread.
 func (engine *pipeline) held(file string) ([]byte, bool) {
 	contents, isHeld := engine.described.contents[file]
 	return contents, isHeld

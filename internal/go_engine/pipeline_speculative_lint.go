@@ -15,12 +15,16 @@ import (
 // (speculativePass). It never writes the cache, since it runs only when the run has no store, whose session restores
 // only the standard library from the binary, decided before the load checks anything.
 //
+// A run that fixes keeps the pass while its fixes leave the load standing. The long-line wrap runs beside it and
+// stops it only when it writes a file (wrapAfterLoad), before rereading what it wrote, since the pass reads the held
+// bytes and is of a tree no longer on disk; the load after the write starts a pass of its own. The rename takes the
+// pass as the lint over the first load it decides from (runRename), and a rename that writes lints its proof after.
+//
 // It has two known costs. A run whose load ends with any diagnostic is slower than one that lints after the load,
 // since the rules ran beside the load on every package it made final and all of that work is dropped: measured, a
 // type error in the last package checked took a run from 2.1 to 2.8s of wall at 6.2s of user time to about 4.0s at
-// 20.7s, the records identical. And the gain is only on the cold `--no-fix` path: a run with the findings cache, one
-// that wraps long lines and one that renames keep main's order, the lint after the load (lintOverlaps), and a run
-// without `--no-fix` wraps or renames whenever their rules are on.
+// 20.7s, the records identical. And a run with the findings cache's store keeps main's order, the lint after the
+// load (lintOverlaps), so the gain is only on a run without the store, as `--no-cache` is.
 type speculativeLint struct {
 	// abandon is closed to start no more packages; finished is closed once the pass has returned, after which pass
 	// and panicked are its outcome.
@@ -31,11 +35,11 @@ type speculativeLint struct {
 }
 
 // lintOverlaps is whether this run's lint phase starts beside its load: only on a run that lints without the
-// findings cache's store, and neither wraps long lines nor renames, since each of those may load the tree again, and
-// the lint phase then reads that load, not the first.
+// findings cache's store. A run that wraps long lines or renames overlaps too, since each stops or takes the pass
+// before it writes (see speculativeLint).
 func (engine *pipeline) lintOverlaps() bool {
 	return engine.overlaps && engine.speculation == nil && (engine.session == nil || !engine.session.HasStore()) &&
-		engine.request.requests(contract.PhaseLint) && !engine.wrapsLongLines() && !engine.renamesNames()
+		engine.request.requests(contract.PhaseLint)
 }
 
 // beginSpeculativeLint starts the lint pass over overlap's packages, each once the load has made it final, as the

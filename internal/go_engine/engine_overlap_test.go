@@ -212,8 +212,8 @@ func writeLateFold(root string) error {
 }
 
 // Every end-to-end case writes, under `--no-cache`, exactly what it writes with the lint phase after the load, and
-// what its expected stream holds but for the cache being off: a run that lints beside its load, one that waits for it
-// since it wraps or renames, and one whose rules never run.
+// what its expected stream holds but for the cache being off: a run that lints beside its load, one whose wrap or
+// rename writes and so drops or takes that pass, and one whose rules never run.
 func TestEveryCaseReadsTheSameWithTheLintBesideTheLoad(test *testing.T) {
 	test.Parallel()
 
