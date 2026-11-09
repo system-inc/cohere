@@ -398,10 +398,8 @@ func (f *Function) finishBody() {
 	buildDominatorTree(f)
 	buildSccs(f)
 
-	// Lifting goes here (#ee33njz). go/ir lifts in this spot, then simplifies constant composite values, unless
-	// its NaiveForm mode is set. Ours is always NaiveForm until then: locals stay Allocation, Load and Store, and
-	// what readers see matches go/ir built with NaiveForm. The expression map go/ir builds next from its
-	// debug references comes with lifting too.
+	// Lifting, where go/ir lifts (#ee33njz): through the shared core, in lifting.go.
+	liftFunction(f)
 
 	// clear remaining builder state
 	f.results = nil    // (used by lifting)

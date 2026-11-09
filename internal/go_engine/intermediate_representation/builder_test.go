@@ -576,7 +576,8 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 	var marked []string
 	for _, b := range p.Function("f").Blocks {
 		if b.RangeIndexLoop {
-			// The header increments the index and then branches on it against the length.
+			// Lifted, the header merges the index and n in two phis, increments the index and branches on it
+			// against the length.
 			var kinds []string
 			for _, instr := range b.Instructions {
 				kinds = append(kinds, strings.TrimPrefix(fmt.Sprintf("%T", instr), "*intermediate_representation."))
@@ -585,8 +586,8 @@ func f(s []int, a [3]int, m map[int]int) (n int) {
 		}
 	}
 	want := []string{
-		"Load BinaryOperation Store BinaryOperation If",
-		"Load BinaryOperation Store BinaryOperation If",
+		"Phi Phi BinaryOperation BinaryOperation If",
+		"Phi Phi BinaryOperation BinaryOperation If",
 	}
 	if fmt.Sprint(marked) != fmt.Sprint(want) {
 		t.Errorf("the RangeIndexLoop blocks hold %q, want %q", marked, want)

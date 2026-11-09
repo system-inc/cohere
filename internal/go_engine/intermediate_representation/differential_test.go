@@ -23,12 +23,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -153,7 +151,7 @@ func TestDifferential(test *testing.T) {
 	var tally differentialTally
 	if corpus == "" {
 		for _, unit := range differentialTestdataUnits(test) {
-			tally = differentialMerge(tally, differentialCompareUnit(unit, nil))
+			tally = differentialMerge(tally, differentialCompareUnit(test, unit, nil))
 		}
 		tally = differentialMerge(tally, differentialCompareLoaded(test, differentialStandardPackages))
 	} else {
@@ -180,7 +178,7 @@ func Difference(minuend, subtrahend int) int { return minuend - subtrahend }
 func Sum(left, right int) int { return left + right }
 `)
 	swapped := 0
-	tally := differentialCompareUnit(unit, func(built *intermediate_representation.Package) {
+	tally := differentialCompareUnit(test, unit, func(built *intermediate_representation.Package) {
 		for _, block := range built.Function("Difference").Blocks {
 			for _, instruction := range block.Instructions {
 				if operation, isOperation := instruction.(*intermediate_representation.BinaryOperation); isOperation {
@@ -434,7 +432,7 @@ func differentialCompareLoaded(test *testing.T, patterns []string) differentialT
 		}
 		unit := differentialUnit{path: each.PkgPath, fileSet: each.Fset, types: each.Types, files: each.Syntax,
 			typeInfo: each.TypesInfo}
-		tally = differentialMerge(tally, differentialCompareUnit(unit, nil))
+		tally = differentialMerge(tally, differentialCompareUnit(test, unit, nil))
 		// Let the package's syntax and types go once both IRs are compared.
 		each.Syntax, each.TypesInfo = nil, nil
 	}
@@ -444,7 +442,8 @@ func differentialCompareLoaded(test *testing.T, patterns []string) differentialT
 // differentialCompareUnit builds unit both ways and compares every source function, in buildir's SrcFuncs order:
 // the package's functions, then each one's anonymous functions, recursively. A build that panics is a difference
 // of its own.
-func differentialCompareUnit(unit differentialUnit, mutation differentialOurMutation) (tally differentialTally) {
+func differentialCompareUnit(test *testing.T, unit differentialUnit,
+	mutation differentialOurMutation) (tally differentialTally) {
 	tally.packages = 1
 	var theirPackage *ir.Package
 	theirPanic := differentialBuild(func() {
@@ -459,6 +458,8 @@ func differentialCompareUnit(unit differentialUnit, mutation differentialOurMuta
 	var ourPackage *intermediate_representation.Package
 	ourPanic := differentialBuild(func() {
 		ourProgram := intermediate_representation.NewProgram(unit.fileSet)
+		// Unlifted, since go/ir is built in NaiveForm here; the lifted comparison is TestLiftedDifferential.
+		intermediate_representation.BuildUnliftedForTest(test, ourProgram)
 		ourProgram.SetNoReturn(differentialNoReturn)
 		for _, imported := range unit.types.Imports() {
 			ourProgram.CreatePackage(imported, nil, nil, true)
@@ -701,16 +702,7 @@ func differentialReport(test *testing.T, corpus string, tally differentialTally,
 	if corpusName == "" {
 		corpusName = "ordinary"
 	}
-	var usage syscall.Rusage
-	peak := "unknown"
-	if usageError := syscall.Getrusage(syscall.RUSAGE_SELF, &usage); usageError == nil {
-		// Darwin reports the peak resident set in bytes, Linux in kibibytes.
-		peakBytes := usage.Maxrss
-		if runtime.GOOS == "linux" {
-			peakBytes *= 1024
-		}
-		peak = fmt.Sprintf("%.0f MiB", float64(peakBytes)/(1<<20))
-	}
+	peak := differentialPeakResident()
 	test.Logf("corpus %s: %d packages compared, %d skipped for load errors, %d functions, %d identical "+
 		"(%d instructions), %d differ; %s, peak resident %s", corpusName, tally.packages, len(tally.skipped),
 		tally.functions, tally.identical, tally.instructions, len(tally.differences),
