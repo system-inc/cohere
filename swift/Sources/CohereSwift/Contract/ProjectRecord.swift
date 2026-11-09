@@ -23,10 +23,17 @@ public struct ProjectRecord: Codable, Equatable, Sendable {
     public struct ExcludedFile: Codable, Equatable, Sendable {
         public var file: String
         public var reason: String
+        /*
+         The rule that excluded it, `path:line`, relative to the project's root (`.gitignore:3`, `../.gitignore:1`), or
+         absolute for an ignore file outside the work tree. Nil, and so absent from the record, where no rule is the
+         cause, as for a package manifest. Additive within contract 3 (#08cv2mp), so a reader before it ignores it.
+         */
+        public var source: String?
 
-        public init(file: String, reason: String) {
+        public init(file: String, reason: String, source: String? = nil) {
             self.file = file
             self.reason = reason
+            self.source = source
         }
     }
 

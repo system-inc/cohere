@@ -303,6 +303,17 @@ struct RunInputsTests {
         )
     }
 
+    /* `git add -f` moves only the index, and the file it tracks is ours from then on, whatever the ignore files say. */
+    @Test func aChangedIndexIsNoticed() throws {
+        let project = try Project()
+        defer { project.remove() }
+        let index = project.repository.appendingPathComponent(".git/index")
+        #expect(
+            try Self.moved(in: project) { try GitIndexTests.indexBytes(paths: ["Ignored.swift"]).write(to: index) }
+                .holds(index)
+        )
+    }
+
     /* The path dependency sits outside the package's root, so only its own walk sees a file added to it. */
     @Test func aLocalPackagesSourceIsNoticed() throws {
         let project = try Project()
@@ -442,9 +453,9 @@ struct RunInputsTests {
     }
 
     /*
-     What a walk must not name: a git directory, which moves with every git command (only its `info/exclude` and config
-     are named, as files the ignore rules read), cohere's own cache, which the run writes after its record is taken,
-     and Finder's notes.
+     What a walk must not name: a git directory, which moves with every git command (only its `info/exclude`, config and
+     index are named, as files the ignore rules read), cohere's own cache, which the run writes after its record is
+     taken, and Finder's notes.
      */
     @Test func theWalkLeavesOutWhatMovesOnItsOwn() throws {
         let project = try Project()
@@ -459,7 +470,7 @@ struct RunInputsTests {
             #expect(!path.hasSuffix("/.DS_Store"), "the record named \(path)")
             if path.hasPrefix(gitDirectory) {
                 #expect(
-                    ["info/exclude", "config"].contains(String(path.dropFirst(gitDirectory.count))),
+                    ["info/exclude", "config", "index"].contains(String(path.dropFirst(gitDirectory.count))),
                     "the record named \(path), in the git directory",
                 )
             }
