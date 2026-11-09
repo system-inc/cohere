@@ -239,7 +239,8 @@ func requireIdentical(
 }
 
 // adjudicatedPattern is one comment in a differences fixture, the text after its `// port ` opening: `finds:` and
-// the message of a finding only the port makes; `renames:`, the original's message, `=>` and the port's, for a
+// the message of a finding only the port makes, or `finds at column <column>:` for one that must start at that column,
+// counted in bytes from 1 as go/token counts it; `renames:`, the original's message, `=>` and the port's, for a
 // finding both make in words that differ, as where the two forms number their registers differently; or `drops:` and
 // the message of a finding only the original makes, ruled a false positive with the finding in hand; `moves:` and the
 // message of a finding both make there whose span or fixes differ; `withholds:` and the message of a fix the
@@ -253,7 +254,7 @@ func requireIdentical(
 // each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
 var adjudicatedPattern = regexp.MustCompile(
 	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
-		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing))\s*$`,
+		`fixes(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|finds at column (\d+): (.+?))\s*$`,
 )
 
 // fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
@@ -276,8 +277,11 @@ func fixesText(written string) (string, bool) {
 // dropped, a false positive ruled with the finding in hand; a finding both make in other spans or fixes is recorded as
 // moved, one the original offers a fix on that the port leaves out as withheld, and one whose related entry the port
 // leaves out as omitted, each pairing the two sides' findings and nothing more; and every record is matched by a
-// finding on its own line, never another's. A finding the original makes and the port does not, unrecorded, is a
-// regression and fails, and so does any fix or related entry one side alone offers that no record withholds or omits.
+// finding on its own line, never another's. A `finds:` record matches by line and message, so a finding that moved
+// along its line still meets it, and where it starts matters, as for a finding with no end, whose start is all
+// of its place, the record names the column, `finds at column <column>:`, and is met only there. A finding the
+// original makes and the port does not, unrecorded, is a regression and fails, and so does any fix or related entry
+// one side alone offers that no record withholds or omits.
 // A finding the port alone makes, recorded as found, offers fixes only as the fixture records them: each edit of each
 // fix is a `fixes:` record of where it lands and its new text, on the `finds:` record's line or the line after it, and
 // every `fixes:` record is met by an edit of a finding that record covers, both ways as a multiset by the file and line
@@ -365,6 +369,7 @@ func requireOnlyAdjudicated(
 	for _, unmatched := range Difference(recorded.portAlone, portAlone) {
 		test.Errorf("the fixture records that the port alone finds %s, and it does not", unmatched)
 	}
+	requirePlaced(test, "the port alone finds", recorded.placed, portOnly)
 	// The original's lone findings are matched against the renamings, then what is left against the drops, so a
 	// finding one record covers is never counted against another.
 	originalAlone := asRecorded(originalOnly)
@@ -385,11 +390,13 @@ func requireOnlyAdjudicated(
 // renamed, the original's side of `renames:`; and dropped, what the original alone finds and the port rightly does
 // not, from `drops:`; moved, a finding both make in other spans or fixes, from `moves:`; withheld, from `withholds:`,
 // whose Message is the fix's message, not the finding's; omitted, from `omits:`, whose Message is the related
-// entry's; fixed, from `fixes:`, each on the line of the `finds:` record it follows; and findsNothing, from `finds
-// nothing`, each where it is written with no Message, since it names no finding.
+// entry's; fixed, from `fixes:`, each on the line of the `finds:` record it follows; findsNothing, from `finds
+// nothing`, each where it is written with no Message, since it names no finding; and placed, the `finds at column`
+// records of found, each with its Column, which their copies in portAlone and found leave 0.
 type records struct {
 	portAlone    []Finding
 	found        []Finding
+	placed       []Finding
 	renamed      []Finding
 	dropped      []Finding
 	moved        []Finding
@@ -696,6 +703,14 @@ func withRecord(recorded records, at Finding, match []string, text string) recor
 		recorded.fixed = append(recorded.fixed, fix)
 	case match[11] != "":
 		recorded.findsNothing = append(recorded.findsNothing, at)
+	case match[13] != "":
+		at.Message = match[13]
+		recorded.portAlone = append(recorded.portAlone, at)
+		recorded.found = append(recorded.found, at)
+		// The pattern holds the column to digits, so only one past an int's range fails to convert, and that one,
+		// read as 0, matches no finding.
+		at.Column = atoiOrZero(match[12])
+		recorded.placed = append(recorded.placed, at)
 	default:
 		renamed := at
 		renamed.Message = match[2]
@@ -854,6 +869,26 @@ func reasonedLines(fileSet *token.FileSet, file *ast.File) lineReasons {
 			}
 			return false
 		},
+	}
+}
+
+// requirePlaced fails the test for each record of placed, a `finds at column` record, that no finding of found meets
+// at its file, line, column and message, saying that the fixture records what finds, as "the port alone finds". The
+// record's line and message are matched as any `finds:` record's are, so this holds its column alone.
+func requirePlaced(test testing.TB, finds string, placed []Finding, found []Finding) {
+	test.Helper()
+	startingAt := []Finding{}
+	for _, finding := range found {
+		startingAt = append(startingAt, Finding{
+			File:    finding.File,
+			Line:    finding.Line,
+			Column:  finding.Column,
+			Message: finding.Message,
+		})
+	}
+	for _, unmet := range Difference(placed, startingAt) {
+		test.Errorf("the fixture records that %s %s, and no finding of the port's there starts at column %d", finds,
+			unmet, unmet.Column)
 	}
 }
 

@@ -867,3 +867,49 @@ func TestRequireOnlyAdjudicatedFailsARecordInAssemblyWithNoReasonAbove(test *tes
 	}), "assembled_unreasoned/assembled_unreasoned.s:4 holds a record with no reason: write why on the line directly "+
 		"above it, since a file with no declarations has no doc comment to give it")
 }
+
+// startingLater starts the diagnostic later along its line than the call, by laterBy bytes.
+func startingLater(laterBy token.Pos) shape {
+	return func(call *ast.CallExpr, diagnostic *analysis.Diagnostic) {
+		diagnostic.Pos = call.Pos() + laterBy
+	}
+}
+
+// A `finds:` record that names a column is met only by a finding that starts there, and one that names none by a
+// finding anywhere on its line: the port's calls found at the call pass, and found one byte later fail on each record
+// with a column, named with it, while the record with none is still met.
+func TestRequireOnlyAdjudicatedHoldsAFindsRecordsColumn(test *testing.T) {
+	test.Parallel()
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages), analysistest.TestData(),
+			"found_at_column")
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequireOnlyAdjudicated(recording, calling(sharedMessages), calling(gainedMessages, startingLater(1)),
+			analysistest.TestData(), "found_at_column")
+	}),
+		"the fixture records that the port alone finds found_at_column/found_at_column.go:9:2: call to gained, and "+
+			"no finding of the port's there starts at column 2",
+		"the fixture records that the port alone finds found_at_column/found_at_column.go:10:6: call to gained, and "+
+			"no finding of the port's there starts at column 6",
+	)
+}
+
+// A column given beside the call is held as one written as a comment is.
+func TestRequireOnlyAdjudicatedHoldsAColumnGivenBesideTheCall(test *testing.T) {
+	test.Parallel()
+	for _, column := range []string{"2", "3"} {
+		failures := failuresOf(test, func(recording testing.TB) {
+			RequireOnlyAdjudicated(recording, calling(nil), calling(sharedMessages), analysistest.TestData(), "same",
+				Record{File: "same/same.go", Line: 7, Text: "finds at column " + column + ": call to shared",
+					Reason: "the first call is ruled found, at the call"},
+				Record{File: "same/same.go", Line: 8, Text: "finds: call to shared", Reason: "the second call too"})
+		})
+		if column == "2" {
+			requireFailures(test, failures)
+			continue
+		}
+		requireFailures(test, failures, "the fixture records that the port alone finds same/same.go:7:3: call to "+
+			"shared, and no finding of the port's there starts at column 3")
+	}
+}

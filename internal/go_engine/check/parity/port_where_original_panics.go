@@ -30,12 +30,12 @@ func recovering(original *analysis.Analyzer) *analysis.Analyzer {
 // RequirePortWhereOriginalPanics runs original, behind a recover, and port over the fixture package fixture under
 // testdata's src, or the fixture module of that name (see fixtureLoad), where the original panics, so no comparison
 // can hold it: the original must panic on every package of the fixture, each panic logged, and the port's findings
-// there must be exactly the fixture's `// port finds:` records, matched by file, line and message as
-// RequireOnlyAdjudicated matches them, each giving its reason as there, and their fixes exactly its `// port fixes:`
-// records, held as there. An original that runs there, or fails other than by panicking, fails, since the fixture
-// then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind but one fails, since with no
-// finding of the original's there is nothing for it to pair or rename, and so does a fixture that records nothing, a
-// `// port ` comment the harness cannot read, and a package the port did not run on.
+// there must be exactly the fixture's `// port finds:` records, matched by file, line and message, and column where
+// one names it, as RequireOnlyAdjudicated matches them, each giving its reason as there, and their fixes exactly its
+// `// port fixes:` records, held as there. An original that runs there, or fails other than by panicking, fails,
+// since the fixture then belongs to RequireIdentical or RequireOnlyAdjudicated. A record of any other kind but one
+// fails, since with no finding of the original's there is nothing for it to pair or rename, and so does a fixture that
+// records nothing, a `// port ` comment the harness cannot read, and a package the port did not run on.
 //
 // The one other kind is `// port finds nothing`, for a fixture where the port is right to find nothing at all, its
 // reason given as any record's is: the port must then find nothing there, each finding it makes failing, named whole,
@@ -147,5 +147,6 @@ func requirePortWhereOriginalPanics(
 	for _, unmatched := range Difference(recorded.portAlone, portAlone) {
 		test.Errorf("the fixture records that the port finds %s, and it does not", unmatched)
 	}
+	requirePlaced(test, "the port finds", recorded.placed, portFindings)
 	requireRecordedFixes(test, recorded, portFindings, editLines(loads))
 }

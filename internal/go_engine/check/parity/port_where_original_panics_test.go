@@ -240,3 +240,24 @@ func TestRequireOnlyAdjudicatedRefusesFindsNothing(test *testing.T) {
 	}), "adjudicated/adjudicated.go:11 records `finds nothing`, which holds only where the original panics: call "+
 		"RequirePortWhereOriginalPanics")
 }
+
+// Where the original panics, a `finds:` record's column is held as in RequireOnlyAdjudicated.
+func TestRequirePortWhereOriginalPanicsHoldsAFindsRecordsColumn(test *testing.T) {
+	test.Parallel()
+	placed := Record{
+		File:   "panicking_silent/panicking_silent.go",
+		Line:   8,
+		Text:   "finds at column 2: call to panics",
+		Reason: "the port rightly finds the call the original panics on, at the call",
+	}
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(map[string]string{"panics": "call to panics"}), analysistest.TestData(), "panicking_silent", placed)
+	}))
+	requireFailures(test, failuresOf(test, func(recording testing.TB) {
+		RequirePortWhereOriginalPanics(recording, panicking(originalMessages),
+			calling(map[string]string{"panics": "call to panics"}, startingLater(1)), analysistest.TestData(),
+			"panicking_silent", placed)
+	}), "the fixture records that the port finds panicking_silent/panicking_silent.go:8:2: call to panics, and no "+
+		"finding of the port's there starts at column 2")
+}
