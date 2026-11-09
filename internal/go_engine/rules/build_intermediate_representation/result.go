@@ -8,6 +8,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // Result is one package in our intermediate representation for the readers that walk it, created by Analyzer and
@@ -46,8 +47,24 @@ func ResultOf(pass *analysis.Pass) (*Result, error) {
 // SourceFunctions is every source function of the package, built, in the order buildir's SrcFuncs lists them: the
 // package's functions and methods as declared, the synthetic package initializer first, then each one's anonymous
 // functions, depth first, in the order they were declared in it.
-func (result *Result) SourceFunctions() iter.Seq[*intermediate_representation.Function] {
+//
+// Under `--timing`, collector is the run's and within is the analyzer whose action reads the functions. When this read
+// is the one that builds the package, the build is measured, billed to Analyzer's row, since it is this pass's build
+// done late, and taken out of within's, so a dispatcher's row is its walk alone (#3apgjer). A build another reader
+// reached first is inside that reader's own measurement and billed with it, so each build is billed once. collector
+// is nil otherwise, and the package is built as Package builds it.
+func (result *Result) SourceFunctions(
+	collector *timing.Collector,
+	within string,
+) iter.Seq[*intermediate_representation.Function] {
 	return func(yield func(*intermediate_representation.Function) bool) {
+		if collector != nil {
+			result.buildOnce.Do(func() {
+				cpu := collector.Measure(result.irPackage.Build)
+				collector.Shared(Analyzer.Name, cpu)
+				collector.Nested(within, cpu, 1)
+			})
+		}
 		built := result.Package()
 		for _, function := range built.Functions {
 			if !yield(function) {

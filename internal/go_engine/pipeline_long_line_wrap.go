@@ -20,7 +20,7 @@ import (
 // type-check or lint to miss.
 func (engine *pipeline) loadWorkspace(typesRead bool) (*load.Loaded, error) {
 	workspace := engine.described.workspace
-	caching := load.Caching{Held: engine.held, GoEnvironment: engine.described.goEnvironment}
+	caching := load.Caching{Held: engine.held, GoEnvironment: engine.described.goEnvironment, Timing: engine.timing}
 	if engine.session != nil {
 		caching.Restorer = engine.session
 		if engine.session.HasStore() {

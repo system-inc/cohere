@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"golang.org/x/tools/go/packages"
+
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // Loaded is one load of a workspace.
@@ -159,6 +161,10 @@ type Caching struct {
 	// Restorer whose decisions are all made before the first type check may be given with it, as one without a store
 	// is, restoring the standard library from the binary.
 	Begin func(*Overlap)
+
+	// Timing is the run's collector under `--timing`, which the load adds its phases to: the listing, each file's read
+	// and parse, each package's type check and each read of export data. Nil measures nothing (#3apgjer).
+	Timing *timing.Collector
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -197,17 +203,30 @@ func loadWorkspace(
 	goEnvironment := caching.GoEnvironment
 	if !goEnvironment.answers(workspace, environment) {
 		var environmentError error
-		if goEnvironment, environmentError = readGoEnvironment(
-			workspace,
-			environment,
-			caching.Held,
-		); environmentError != nil {
+		measureListingCommand(caching.Timing, func() {
+			goEnvironment, environmentError = readGoEnvironment(workspace, environment, caching.Held)
+		})
+		if environmentError != nil {
 			return nil, environmentError
 		}
 	}
 	fullEnvironment, reported := goEnvironment.fullEnvironment, goEnvironment.reported
 	buildContext := goEnvironment.contextFor(caching.Held)
-	listed, listingKept, listError := cachedList(workspace, fullEnvironment, patterns, caching.Listings, caching.Held)
+	var listed *listing
+	var listingKept bool
+	var listError error
+	// This goroutine's own share of the listing; every goroutine the listing starts, and every go command it waits
+	// for, is measured where it runs.
+	measureListing(caching.Timing, func() {
+		listed, listingKept, listError = cachedList(
+			workspace,
+			fullEnvironment,
+			patterns,
+			caching.Listings,
+			caching.Held,
+			caching.Timing,
+		)
+	})
 	if listError != nil {
 		return nil, fmt.Errorf("loading %s from %s: %w", strings.Join(patterns, " "), workspace, listError)
 	}
@@ -220,13 +239,21 @@ func loadWorkspace(
 			return nil, fmt.Errorf("loading %s with an overlay: the project has cgo files of its own, which the cgo "+
 				"tool reads from disk", workspace)
 		}
-		compiledEnvironment, environmentError := translatedEnvironment(workspace, environment)
+		var compiledEnvironment []string
+		var environmentError error
+		measureListingCommand(caching.Timing, func() {
+			compiledEnvironment, environmentError = translatedEnvironment(workspace, environment)
+		})
 		if environmentError != nil {
 			return nil, environmentError
 		}
 		translationStarted := time.Now()
 		var compiledError error
-		compiled, compiledError = listCompiled(workspace, compiledEnvironment, listed)
+		// go list -compiled is billed to the listing, the cgo tool's compiles among its children, since it is a go list
+		// the load runs and no other row would show what it cost.
+		measureListingCommand(caching.Timing, func() {
+			compiled, compiledError = listCompiled(workspace, compiledEnvironment, listed)
+		})
 		if compiledError != nil {
 			return nil, compiledError
 		}
@@ -298,7 +325,7 @@ func fromSource(
 	}
 	built := newGraph(listed, workspace, compiled)
 	withheld := newWithheldErrors()
-	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held)
+	typeChecker := newLoader(built, sizes, withheld, overlay, caching.Held, caching.Timing)
 	reachable := typeChecker.connect()
 	analyzedPackages := analyzedOfGraph(built)
 	if caching.Restorer != nil {

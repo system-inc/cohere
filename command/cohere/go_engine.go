@@ -34,8 +34,8 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 
 // goFlags are the flags a Go run takes, as agreed with the engine on #a0cgmh6. `lint-config` is forwarded
 // with its absolute path, and the engine reads that file's `go` block in place of the root's settings. Any
-// flag in neither list is refused by name, among them the unused report, timing, explain, the tsconfig and
-// fix passes, none of which the Go engine implements yet.
+// flag in neither list is refused by name, among them the unused report, explain, the tsconfig and fix
+// passes, none of which the Go engine implements yet.
 //
 // `no-cache` is the front door's as much as the engine's: the run neither replays nor records (see
 // beginGoRunCache), and it is forwarded so a cache the engine keeps of its own is off too.
@@ -43,10 +43,13 @@ func runGoEngineVerb(arguments []string, standardOutput io.Writer, standardError
 // `other-builds` is Go's alone: the engine checks every build the project's files name beside the host's, so a file
 // only another build compiles is checked and no gap (#72n9mq0). The run cache admits it, as its own record, since the
 // key holds every argument and the engine's inputs record names every build's load (#e4b08k7).
+//
+// `timing` asks the engine for its timing record, what the run's CPU went to, which the front door prints as
+// TypeScript's timing table (#3apgjer). The run cache never admits it (see runCacheAdmits).
 var goFlags = engineFlags{
 	PassThroughSwitches: []string{
 		"no-fix", "fix", "types", "lint", "format", "format-all", "format-only", "no-format", "single-threaded",
-		"rules", "rules-enabled", "version", "no-cache", "other-builds", "duplicates",
+		"rules", "rules-enabled", "version", "no-cache", "other-builds", "timing", "duplicates",
 	},
 	FrontDoorFlags: []string{
 		"directory", "lint-config", "verbose", "json", "phases", "coverage", "profile", "open",
@@ -94,6 +97,7 @@ func runGoEngine(location projectLocation, given map[string]bool, positionals []
 	run := newEngineRun(streams.Output, mode, language, location.rootNote(), processStart)
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.requested = engineRequestedPhases(given, flagValue)
+	run.timingRequested = given["timing"] && flagValue("timing") == "true"
 	run.duplicatesRequested = given["duplicates"] && flagValue("duplicates") == "true"
 	run.engineEnvironment = []string{goEngineChildVariable + "=1"}
 	// os.Stderr is read here, after the run cache began, so the engine writes into the recording's tee.

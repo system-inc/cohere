@@ -201,6 +201,7 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 	// and what follows reads the files' contents the project description holds, and the types.
 	options.ReleaseAnalyzed = true
 	options.ReadFile = engine.sourceReader(nil)
+	options.Timing = engine.timing
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}
@@ -247,9 +248,15 @@ func (engine *pipeline) enabledRules() (enabled []rule.Rule, turnedOff []string)
 // cacheSession is the findings cache for the run's enabled rules over a load under environment, made before the load
 // so the load restores what it holds, whose keys read files' digests rather than hashing those files again, and nil
 // when lintCache gives none, as under `--no-cache` in a binary with no standard-library entries, or when what every key
-// shares cannot be read, which the run says on stderr. files must be of the files as they are on disk when the load
-// runs (see extraBuildRun).
+// shares cannot be read, which the run says on stderr, and always under `--timing`. files must be of the files as they
+// are on disk when the load runs (see extraBuildRun).
 func (engine *pipeline) cacheSession(environment []string, files cache.FileDigests) *check.CacheSession {
+	// A run under `--timing` is a measurement, and a package the cache restores, its load's or its rules', runs
+	// nothing, so a table over it would read as measured where it is not. Such a run reads and writes no cache at all,
+	// the binary's standard-library entries included (#3apgjer).
+	if engine.timing != nil {
+		return nil
+	}
 	enabled, _ := engine.enabledRules()
 	caching, cachingError := lintCache(engine.request, engine.described.workspace, environment, enabled)
 	if cachingError != nil {

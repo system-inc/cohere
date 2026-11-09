@@ -11,6 +11,7 @@
         { "$ref": "#/$defs/duplicate" },
         { "$ref": "#/$defs/duplicateRefused" },
         { "$ref": "#/$defs/duplicateCoverage" },
+        { "$ref": "#/$defs/timing" },
         { "$ref": "#/$defs/summary" }
     ],
     "$defs": {
@@ -123,6 +124,123 @@
                     "description": "The rule that crashed. Absent when the whole file was lost."
                 },
                 "cause": { "type": "string", "description": "The panic, as cohere caught it." }
+            }
+        },
+        "timing": {
+            "description": "What a Go run's CPU went to, under --timing: the Go engine's timing record, written through once before the summary. Every CPU figure is microseconds of the kernel's thread clock read on a thread held for the work, so none is wall time, and each has the measuring's own cost taken out. What the rows leave of processCpuMicroseconds is what no row measures, never spread over them. A run that is not Go, or not under --timing, writes none.",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+                "kind",
+                "processCpuMicroseconds",
+                "load",
+                "rules",
+                "shared",
+                "measuredCalls",
+                "measuringCpuMicroseconds"
+            ],
+            "properties": {
+                "kind": { "const": "timing" },
+                "unavailable": {
+                    "type": "string",
+                    "description": "Why no CPU was measured, when the thread clock cannot be read. Every CPU figure is then 0 and means nothing; the counts are still real. Absent when the CPU was measured."
+                },
+                "processCpuMicroseconds": {
+                    "type": "integer",
+                    "description": "The engine process's user and system CPU from its start to the record."
+                },
+                "load": {
+                    "description": "The load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "listCpuMicroseconds",
+                        "listChildrenCpuMicroseconds",
+                        "parseCpuMicroseconds",
+                        "parsedFiles",
+                        "typeCheckCpuMicroseconds",
+                        "typeCheckedPackages",
+                        "exportDataCpuMicroseconds",
+                        "exportDataPackages"
+                    ],
+                    "properties": {
+                        "listCpuMicroseconds": {
+                            "type": "integer",
+                            "description": "This process's own CPU listing the packages."
+                        },
+                        "listChildrenCpuMicroseconds": {
+                            "type": "integer",
+                            "description": "The CPU of the go commands the listing ran, its children's, which processCpuMicroseconds does not hold."
+                        },
+                        "parseCpuMicroseconds": { "type": "integer" },
+                        "parsedFiles": { "type": "integer", "minimum": 0 },
+                        "typeCheckCpuMicroseconds": { "type": "integer" },
+                        "typeCheckedPackages": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Packages type-checked from source."
+                        },
+                        "exportDataCpuMicroseconds": { "type": "integer" },
+                        "exportDataPackages": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Packages whose types were read from export data in place of their source."
+                        }
+                    }
+                },
+                "rules": {
+                    "type": "array",
+                    "description": "One entry for each rule that ran, most expensive first, summed over every package and build. Empty when no rule ran.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "cpuMicroseconds", "packages", "calls"],
+                        "properties": {
+                            "name": { "type": "string" },
+                            "cpuMicroseconds": { "type": "integer" },
+                            "packages": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Packages the rule's analyzer ran on, dependencies analyzed for facts included."
+                            },
+                            "calls": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "description": "Calls a dispatcher made into the rule's listener, 0 for a rule that walks on its own."
+                            }
+                        }
+                    }
+                },
+                "shared": {
+                    "type": "array",
+                    "description": "The analyzers no single rule owns, most expensive first. Empty when none ran.",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "kind", "cpuMicroseconds", "packages"],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The analyzer's name, buildir for staticcheck's intermediate representation build."
+                            },
+                            "kind": {
+                                "enum": ["intermediateRepresentation", "dispatcher", "analyzer"],
+                                "description": "An intermediate representation build, staticcheck's or the engine's own; a dispatcher's walk less its calls into the listeners, which are billed to their rules; or another analyzer several rules read."
+                            },
+                            "cpuMicroseconds": { "type": "integer" },
+                            "packages": { "type": "integer", "minimum": 0 }
+                        }
+                    }
+                },
+                "measuredCalls": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Pieces of work measured, each costing two reads of the clock."
+                },
+                "measuringCpuMicroseconds": {
+                    "type": "integer",
+                    "description": "What those reads cost, already taken out of the rows."
+                }
             }
         },
         "duplicate": {

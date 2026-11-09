@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
+	"github.com/system-inc/cohere/internal/cpu_clock"
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
@@ -124,14 +125,14 @@ func TestNilCollectorIsInert(test *testing.T) {
 // ask, and it kept no record of what the spin spent, so it could not say which of the two was off.
 func spinFor(test *testing.T, cpu time.Duration) time.Duration {
 	test.Helper()
-	start, known := threadCpu()
+	start, known := cpu_clock.Thread()
 	if !known {
 		test.Skip(
 			"this platform has no thread CPU clock, so --timing reports no CPU here and the meter has nothing to test",
 		)
 	}
 	for {
-		if now, _ := threadCpu(); now-start >= cpu {
+		if now, _ := cpu_clock.Thread(); now-start >= cpu {
 			return now - start
 		}
 	}

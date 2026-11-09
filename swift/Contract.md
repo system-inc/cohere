@@ -663,6 +663,84 @@ stale, so whatever the load, or a later cache of the engine's, reads to decide a
 check run whose load failed, or that asked for no load, writes none, nor does a Swift run that could not describe its
 project, and the front door records nothing for either.
 
+### `timing`, after `lint`, only under `--timing`
+
+```json
+{
+    "kind": "timing",
+    "processCpuMicroseconds": 80000,
+    "load": {
+        "listCpuMicroseconds": 2000,
+        "listChildrenCpuMicroseconds": 150000,
+        "parseCpuMicroseconds": 4000,
+        "parsedFiles": 24,
+        "typeCheckCpuMicroseconds": 12000,
+        "typeCheckedPackages": 3,
+        "exportDataCpuMicroseconds": 6000,
+        "exportDataPackages": 37
+    },
+    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 2500, "packages": 3, "calls": 640 }],
+    "shared": [
+        { "name": "buildir", "kind": "intermediateRepresentation", "cpuMicroseconds": 8000, "packages": 40 },
+        { "name": "syntax_dispatcher", "kind": "dispatcher", "cpuMicroseconds": 1500, "packages": 3 }
+    ],
+    "measuredCalls": 2300,
+    "measuringCpuMicroseconds": 230
+}
+```
+
+Additive within contract 3, and the Go engine's alone: under `--timing` it says what the run's CPU went to, so a Go
+rule is timed before it lands as a TypeScript one is (#3apgjer). It is written once, after the lint record and before
+`inputs` and the summary, and never in a run that did not ask, which the front door refuses as a broken stream, as it
+does a second one. The Swift engine refuses `--timing` and writes none.
+
+Every CPU figure is microseconds of the kernel's thread clock, read on a thread held for the work, so a rule that
+waits, sleeps or is descheduled costs nothing and none is wall time. Each figure has the measuring's own cost taken
+out, said once in `measuringCpuMicroseconds` beside `measuredCalls`, the pieces of work measured.
+
+- `rules` holds one entry for each rule that ran, most expensive first, summed over every package and build:
+  `packages` is how many its analyzer ran on, dependencies analyzed for facts included, and `calls` how many times a
+  dispatcher called its listener, 0 for a rule that walks on its own.
+- `shared` holds the analyzers no single rule owns, most expensive first, each with its `kind`:
+  `intermediateRepresentation` for staticcheck's `buildir` and the engine's own build, each its own row while both
+  run; `dispatcher` for a dispatcher's walk less its calls into the listeners, which are billed to their rules; and
+  `analyzer` for any other several rules read, such as `inspect`. A kind the front door does not know is refused.
+- `load` is the load's phases, each summed across the goroutines that ran it, so each runs past the load's wall.
+  `listChildrenCpuMicroseconds` is the CPU of the go commands the listing ran, which no thread of this process spent.
+- `processCpuMicroseconds` is every CPU microsecond the process spent up to the record. The rows (rules, shared, the
+  load's own phases and measuring) are said against it, and what they leave is printed as its own line, what no row
+  measures, never spread over the rows.
+
+`rules` and `shared` are `[]` when empty, never left out, and the front door refuses a record missing either. When
+the thread clock cannot be read, `unavailable` says why, every CPU figure is 0 and means nothing, and the counts are
+still real; the front door then leaves the CPU columns out rather than print zeros:
+
+```json
+{
+    "kind": "timing",
+    "unavailable": "this platform has no per-thread CPU clock",
+    "processCpuMicroseconds": 0,
+    "load": {
+        "listCpuMicroseconds": 0,
+        "listChildrenCpuMicroseconds": 0,
+        "parseCpuMicroseconds": 0,
+        "parsedFiles": 24,
+        "typeCheckCpuMicroseconds": 0,
+        "typeCheckedPackages": 3,
+        "exportDataCpuMicroseconds": 0,
+        "exportDataPackages": 37
+    },
+    "rules": [{ "name": "cohere-go/consistency-no-shouting", "cpuMicroseconds": 0, "packages": 3, "calls": 640 }],
+    "shared": [],
+    "measuredCalls": 0,
+    "measuringCpuMicroseconds": 0
+}
+```
+
+The front door prints the record as TypeScript's timing table under the lint line, and under `--json` writes it
+through as a `timing` line before the summary (schema/CohereOutput.schema.json). A run under `--timing` is a
+measurement, so the run cache never replays it and never records it.
+
 ### `lint`
 
 ```json
@@ -854,7 +932,8 @@ it where a run that did not finish prints green.
 | `--rules`, `--rules-enabled`, `--version`   | `rule` and `provenance` records.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `--unused`, `--unused-all`, `--unused-deep` | The `--unused` report: `unused` and `unusedCoverage` records after lint, never counted as findings (see those records). Today it holds `unused-import` and `unused-declaration`, each with its own `unusedCoverage` record. It reads the index the types phase writes, so on a run without types it reads the last check's and counts every file that check did not see as it stands as not checked. A bail before it (a file that does not parse, a type error) records `unused` as `notReached`. `--unused-all` and `--unused-deep` ask for nothing more yet and run the same report.                                                              |
 | `--duplicates`                              | The front door's for Swift, never given to the engine, which has no duplicates report: the run checks as it would and prints a duplicates report that did not run, saying why. The Go engine answers it with a `duplicates` record (see that record).                                                                                                                                                                                                                                                                                                                                                                                                |
-| `--timing`, `--explain <file>`              | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `--timing`                                  | Go takes it: the Go engine writes one `timing` record after lint (see that record), which the front door prints as TypeScript's timing table. Not implemented for Swift yet: the Swift engine refuses it with exit 2 and names the flag.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `--explain <file>`                          | Not implemented for Swift yet. The engine refuses with exit 2 and names the flag. A flag that is accepted and ignored reads as a run that did what was asked.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `--tsconfig`                                | Meaningless for Swift. The front door refuses it against a Swift root.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `--directory`                               | Resolved by the front door into `--root`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 

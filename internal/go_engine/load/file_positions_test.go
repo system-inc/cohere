@@ -52,7 +52,7 @@ func wideGraph(test *testing.T) (func() *graph, string) {
 	if environmentError != nil {
 		test.Fatal(environmentError)
 	}
-	listed, listError := list(workspace, environment, []string{"./..."}, nil)
+	listed, listError := list(workspace, environment, []string{"./..."}, nil, nil)
 	if listError != nil {
 		test.Fatal(listError)
 	}
@@ -66,7 +66,7 @@ func newWideLoader(test *testing.T, newGraphOf func() *graph) (*loader, []*node)
 	if sizes == nil {
 		test.Fatalf("go/types knows no sizes for %s", runtime.GOARCH)
 	}
-	typeChecker := newLoader(newGraphOf(), sizes, newWithheldErrors(), nil, nil)
+	typeChecker := newLoader(newGraphOf(), sizes, newWithheldErrors(), nil, nil, nil)
 	return typeChecker, typeChecker.connect()
 }
 

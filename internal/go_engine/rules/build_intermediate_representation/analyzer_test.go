@@ -45,7 +45,7 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			names := []string{}
-			for function := range mustResultOf(pass).SourceFunctions() {
+			for function := range mustResultOf(pass).SourceFunctions(nil, "") {
 				names = append(names, function.RelativeString(nil))
 			}
 			return names, nil
@@ -86,7 +86,7 @@ func TestTheReadersResultIsWhole(test *testing.T) {
 		firstRead func(result *Result)
 	}{
 		{"SourceFunctions", func(result *Result) {
-			for range result.SourceFunctions() {
+			for range result.SourceFunctions(nil, "") {
 				break
 			}
 		}},
@@ -160,7 +160,7 @@ func TestALaterCalleeIsBuiltWhenItsCallerIsRead(test *testing.T) {
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			reached := []string{}
-			for function := range mustResultOf(pass).SourceFunctions() {
+			for function := range mustResultOf(pass).SourceFunctions(nil, "") {
 				if function.Name() != "caller" {
 					continue
 				}
@@ -232,7 +232,7 @@ func TestTheExpressionMapIsRecordedForItsReaders(test *testing.T) {
 // mappedExpressions is how many expressions in the syntax of result's source functions map to a value.
 func mappedExpressions(result *Result) int {
 	count := 0
-	for function := range result.SourceFunctions() {
+	for function := range result.SourceFunctions(nil, "") {
 		syntax := function.Syntax()
 		if syntax == nil || function.Parent() != nil {
 			continue

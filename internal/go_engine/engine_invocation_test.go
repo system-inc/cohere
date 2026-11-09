@@ -39,7 +39,6 @@ func TestParseInvocationRefuses(test *testing.T) {
 		},
 		{"a relative path", append(slices.Clone(contractArguments), "inside"), "inside is not an absolute path"},
 		{"unused", append(slices.Clone(contractArguments), "--unused-deep"), "--unused-deep is not implemented"},
-		{"timing", append(slices.Clone(contractArguments), "--timing"), "--timing is not implemented"},
 		{"explain", append(slices.Clone(contractArguments), "--explain=/project/a.go"), "--explain is not implemented"},
 		{
 			"format-only with no-format", append(slices.Clone(contractArguments), "--format-only", "--no-format"),
