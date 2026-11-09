@@ -1,6 +1,6 @@
 // Package leaky_time_tick is staticcheck's SA1015, a call to time.Tick in a function that returns, whose ticker,
-// before Go 1.23, could never be stopped or collected and so leaked, ported onto staticcheck's intermediate
-// representation as a rule.FunctionCheck.
+// before Go 1.23, could never be stopped or collected and so leaked, ported onto the engine's own intermediate
+// representation (#jqbskpv).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa1015/sa1015.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call, where staticcheck's report puts it,
@@ -17,9 +17,7 @@ import (
 	"go/token"
 	"go/version"
 
-	"honnef.co/go/tools/go/ir"
-	"honnef.co/go/tools/go/ir/irutil"
-
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -27,7 +25,9 @@ import (
 )
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -36,7 +36,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA1015",
 	"SA1015",
 	"Flags time.Tick in a function that returns, outside tests and commands, where its ticker leaks before Go "+
-		"1.23: staticcheck's SA1015, ported onto its intermediate representation.",
+		"1.23: staticcheck's SA1015, ported onto the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -46,7 +46,7 @@ const message = "using time.Tick leaks the underlying ticker, consider using it 
 
 // Check judges one function: each call to time.Tick in it, when the function can return, its standard library is
 // older than Go 1.23, and it is in neither a test nor a package that is, or likely implements, a command.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	// From Go 1.23 the collector frees a ticker no one references, stopped or not, so time.Tick no longer leaks.
 	// A function with no position, which staticcheck synthesizes, can call no time.Tick, and the original skips it
 	// before asking its version, which would panic for a function in none of the package's files.
@@ -61,12 +61,12 @@ func Check(context *rule.Context, function *ir.Function) {
 	// ticker, so it leaks nothing. Whether it returns is asked of the function that makes the call, for each call,
 	// as the original asks it.
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			call, isCall := instruction.(*ir.Call)
-			if !isCall || !irutil.IsCallTo(call.Common(), "time.Tick") {
+		for _, instruction := range block.Instructions {
+			call, isCall := instruction.(*intermediate_representation.Call)
+			if !isCall || !intermediate_representation.IsCallTo(call.Common(), "time.Tick") {
 				continue
 			}
-			if !irutil.Terminates(call.Parent()) {
+			if !intermediate_representation.Terminates(call.Parent()) {
 				continue
 			}
 			staticcheck_report.Report(context, call, message)
