@@ -35,8 +35,9 @@ type ssaBuilder[G Graph[F, B, P], F any, B comparable, P any] struct {
 	walkingContextStore bool
 }
 
-// unseenPredecessors marks a block's unsealedPreds entry as not yet touched. It is no count a decrement can reach,
-// so a block decremented past zero still reads as touched, as an entry in the map it replaces did.
+// unseenPredecessors marks a block's unsealedPreds entry as not yet touched. It is no count a decrement can reach.
+// No block is decremented past zero, since run counts each predecessor once, as MarkPredecessors lists it
+// (#mv39hpt), so any negative value would do; this one is the farthest from a count.
 const unseenPredecessors = math.MinInt
 
 // makeDenseState sizes the builder's per-block state to count blocks, every block untouched.
@@ -134,9 +135,13 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 		builder.walking = walkingTerminal
 		builder.graph.EachTerminalPlace(block, visit)
 
-		// Seal each successor that this block was the last unprocessed predecessor of.
-		for _, edge := range edgesOf(builder.graph, block, edges) {
-			if edge.edge == Fallthrough {
+		// Seal each successor that this block was the last unprocessed predecessor of. A block counts once
+		// toward each successor, however many of its edges name it, as MarkPredecessors lists it once: a
+		// terminal naming a block twice would otherwise decrement its count past the predecessors still
+		// unwalked and seal it early, so a loop header's phi would miss its latch's value (#mv39hpt).
+		blockEdges := edgesOf(builder.graph, block, edges)
+		for index, edge := range blockEdges {
+			if edge.edge == Fallthrough || namedEarlier(blockEdges[:index], edge.successor) {
 				continue
 			}
 			successor, ok := builder.graph.Block(builder.function, edge.successor)
@@ -155,6 +160,17 @@ func (builder *ssaBuilder[G, F, B, P]) run() {
 	// The function's return value is a definition like any other and is read by nothing inside the
 	// graph, so it is renamed to whatever reaches the end rather than left pointing at the original.
 	builder.renameReturns()
+}
+
+// namedEarlier is whether one of edges, those of a block before the edge being read, is a real edge to successor.
+// A block's edges are a terminal's handful, so a scan costs less than the set MarkPredecessors keeps.
+func namedEarlier(edges []edgeTo, successor BlockId) bool {
+	for _, earlier := range edges {
+		if earlier.edge != Fallthrough && earlier.successor == successor {
+			return true
+		}
+	}
+	return false
 }
 
 // visitPlace is run's one visitor, doing what b.walking says for the block b.walkingBlock.

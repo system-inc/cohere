@@ -1134,3 +1134,135 @@ func TestCollapsedComponentLeavesATrivialPhiForTheTrivialRule(test *testing.T) {
 		test.Errorf("the read of phiC names $%d, want x's $%d", read.uses[0].id, x.defines[0].id)
 	}
 }
+
+// TestATerminalNamingABlockTwiceSealsItOnce: the entry's terminal names the loop header twice, as a
+// MaybeThrow whose continuation is its handler or a switch with two cases on one block would. The entry is
+// one predecessor of the header, so the header stays unsealed until its latch is walked, and the header's
+// phi takes the latch's write. Counting the entry twice sealed the header before the latch, and the phi
+// read the latch's value before the latch had one (#mv39hpt).
+func TestATerminalNamingABlockTwiceSealsItOnce(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, header, latch, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	function.define(entry, "i")
+	headerRead := function.use(header, "i")
+	write := function.define(latch, "i")
+	function.use(exit, "i")
+	goTo(entry, header, header)
+	goTo(header, latch, exit)
+	goTo(latch, header)
+
+	construct(test, function)
+
+	if got, want := header.predecessors, blockIds(entry, latch); !slices.Equal(got, want) {
+		test.Fatalf("the header's predecessors are %v, want %v, each once", got, want)
+	}
+	if len(header.phis) != 1 {
+		test.Fatalf("the header has %d phis, want 1", len(header.phis))
+	}
+	phi := header.phis[0]
+	if got := phi.Operands.At(latch.id).id; got != write.defines[0].id {
+		test.Errorf("the latch's operand is $%d, want the latch's write $%d", got, write.defines[0].id)
+	}
+	if headerRead.uses[0].id != phi.Place.id {
+		test.Errorf("the header's read names $%d, want its phi $%d", headerRead.uses[0].id, phi.Place.id)
+	}
+}
+
+// TestVerifierCatchesPredecessorsTheEdgesDontGive: a block listing a predecessor twice, or one no edge comes
+// from, is reported, since construction counts the list to seal a block and a phi takes an operand per entry.
+func TestVerifierCatchesPredecessorsTheEdgesDontGive(test *testing.T) {
+	test.Parallel()
+	for _, extra := range []string{"twice", "without an edge"} {
+		function := newTestFunction()
+		entry, middle, join := function.block(), function.block(), function.block()
+		function.entry = entry.id
+		goTo(entry, middle, join)
+		goTo(middle, join)
+		finalize(function)
+		if violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function); len(violations) != 0 {
+			test.Fatalf("before the change, %v", violations)
+		}
+		switch extra {
+		case "twice":
+			join.predecessors = append(join.predecessors, entry.id)
+		case "without an edge":
+			middle.predecessors = append(middle.predecessors, join.id)
+		}
+		violations := ssa.VerifyStaticSingleAssignment(testGraph{}, function)
+		if len(violations) != 1 || violations[0].Kind != ssa.StaticSingleAssignmentViolationPredecessorsDisagree {
+			test.Errorf("a predecessor listed %s read as %v, want one disagreement", extra, violations)
+		}
+	}
+}
+
+// TestAppendingToChildrenLeavesTheNextBlocksChildren: Children's slice shares the tree's array, capped, so a
+// caller's append copies rather than writing over the next block's children there.
+func TestAppendingToChildrenLeavesTheNextBlocksChildren(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, left, right := function.block(), function.block(), function.block()
+	leftChild, rightChild := function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, left, right)
+	goTo(left, leftChild)
+	goTo(right, rightChild)
+	finalize(function)
+	dominance := ssa.ComputeDominance(testGraph{}, function)
+
+	before := map[ssa.BlockId][]ssa.BlockId{}
+	for _, block := range function.blocks {
+		before[block.id] = slices.Clone(dominance.Children(block.id))
+	}
+	parents := 0
+	for _, block := range function.blocks {
+		children := dominance.Children(block.id)
+		if len(children) == 0 {
+			continue
+		}
+		parents++
+		_ = append(children, 999)
+		for _, other := range function.blocks {
+			if got := dominance.Children(other.id); !slices.Equal(got, before[other.id]) {
+				test.Errorf("after appending to bb%d's children, bb%d's are %v, want %v",
+					block.id, other.id, got, before[other.id])
+			}
+		}
+	}
+	if parents < 3 {
+		test.Fatalf("%d blocks have children, want the entry and both arms, so an append has a sibling to reach",
+			parents)
+	}
+}
+
+// TestACollapsedComponentResolvesTheNextComponentsOperand: componentA holds only x and collapses to it, and
+// componentB's outside values are x and componentA's phiA1. The step visits componentA first, since componentB
+// uses it, and reads phiA1 through its collapse as x, so componentB holds one value too and collapses in the
+// same pass. Read as itself, phiA1 would be a second value and componentB would wait for another round, which
+// EliminateRedundantPhis's fixed point gives it, so this runs the step once, alone.
+func TestACollapsedComponentResolvesTheNextComponentsOperand(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, loopA, loopB, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	x := function.define(entry, "x")
+	phiA1, phiA2 := function.value("x"), function.value("x")
+	phiB1, phiB2 := function.value("x"), function.value("x")
+	loopA.phis = []*ssa.Phi[testPlace]{handPhi(phiA1, x.defines[0], phiA2), handPhi(phiA2, x.defines[0], phiA1)}
+	loopB.phis = []*ssa.Phi[testPlace]{handPhi(phiB1, phiA1, phiB2), handPhi(phiB2, x.defines[0], phiB1)}
+	read := &testInstruction{uses: []testPlace{phiB1, phiB2}}
+	exit.instructions = append(exit.instructions, read)
+
+	if !ssa.EliminateRedundantComponentsOnceForTest(testGraph{}, function) {
+		test.Fatal("the step collapsed nothing")
+	}
+
+	if phis := phiIds(function); len(phis) != 0 {
+		test.Errorf("one pass kept the phis %v, want none", phis)
+	}
+	if read.uses[0].id != x.defines[0].id || read.uses[1].id != x.defines[0].id {
+		test.Errorf("the reads of phiB1 and phiB2 name $%d and $%d, want x's $%d",
+			read.uses[0].id, read.uses[1].id, x.defines[0].id)
+	}
+}
