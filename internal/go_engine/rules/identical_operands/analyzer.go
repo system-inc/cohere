@@ -35,7 +35,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder, with its
 // ancestors, whose last is the expression's parent.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BinaryExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		binary, isBinary := node.(*ast.BinaryExpr)
 		if !isBinary {

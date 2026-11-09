@@ -33,7 +33,8 @@ import (
 // code.Match, which asks the type index nothing, and code.IsCallTo names the callee by its object, not through the
 // index, so every package is walked and a package's own calls are judged like any other's.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall {

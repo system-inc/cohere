@@ -27,7 +27,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every for statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.ForStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.ForStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		loop, isLoop := node.(*ast.ForStmt)
 		if !isLoop {

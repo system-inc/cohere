@@ -33,7 +33,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every function declaration and function literal,
 // in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		Check(context, node)
 	},

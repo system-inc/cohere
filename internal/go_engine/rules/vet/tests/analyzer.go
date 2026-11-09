@@ -67,6 +67,7 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/tests"
 // the original reads the package's files. It reads a file's top-level declarations and comments itself, so it lists
 // no node kind.
 var Listener = rule.Listener{
+	FileLocal: true,
 	FileEnter: checkFile,
 }
 

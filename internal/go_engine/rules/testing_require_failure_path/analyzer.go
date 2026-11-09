@@ -25,6 +25,7 @@ const Name = "cohere-go/testing-require-failure-path"
 // listener reads whether each file holds tests as the syntax dispatcher's walk enters it, and hears every function
 // declaration in it.
 var listener = rule.Listener{
+	FileLocal: true,
 	FileEnter: enterFile,
 	Nodes:     []ast.Node{(*ast.FuncDecl)(nil)},
 	Node:      judgeFunction,
@@ -60,7 +61,7 @@ var skippingMethods = map[string]bool{
 	"SkipNow": true,
 }
 
-// fileState is what the rule reads of the file being walked, held in its context's state.
+// fileState is what the rule reads of the file being walked, held in its file state (rule.FileState).
 type fileState struct {
 	// isTest is whether the file is a _test.go file, the only kind whose tests are judged.
 	isTest bool
@@ -69,14 +70,14 @@ type fileState struct {
 // enterFile reads whether file is a _test.go file.
 func enterFile(context *rule.Context, file *ast.File) {
 	// The file's own name, not one a //line directive gives it, since only a _test.go file holds tests.
-	rule.State[fileState](context).isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename,
+	rule.FileState[fileState](context).isTest = strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename,
 		"_test.go")
 }
 
 // judgeFunction reports node when it is a test in a _test.go file that cannot fail on a wrong result.
 func judgeFunction(context *rule.Context, node ast.Node, _ []ast.Node) {
 	function, isFunction := node.(*ast.FuncDecl)
-	if !isFunction || !rule.State[fileState](context).isTest {
+	if !isFunction || !rule.FileState[fileState](context).isTest {
 		return
 	}
 	parameter := testParameter(context, function)

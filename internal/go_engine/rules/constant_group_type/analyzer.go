@@ -33,7 +33,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every general declaration, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.GenDecl)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.GenDecl)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		declaration, isDeclaration := node.(*ast.GenDecl)
 		if !isDeclaration {

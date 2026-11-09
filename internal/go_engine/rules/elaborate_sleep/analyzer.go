@@ -32,7 +32,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every select statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.SelectStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.SelectStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		selectStatement, isSelect := node.(*ast.SelectStmt)
 		if !isSelect {

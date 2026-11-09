@@ -26,7 +26,8 @@ import (
 const Name = "cohere-go/correctness-require-wrapped-error"
 
 // listener hears every call of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_wrapped_error", "Flags an error formatted into "+

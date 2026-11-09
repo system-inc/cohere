@@ -39,7 +39,8 @@ import (
 // and switch tag from the function's expression map, so the listener says so, and the package records that map
 // wherever the rule runs.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{generated.Analyzer},
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{generated.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
 			Check(context, function, generatorLookup(context))

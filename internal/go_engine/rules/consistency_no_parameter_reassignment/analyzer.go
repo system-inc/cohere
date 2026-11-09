@@ -25,6 +25,7 @@ const Name = "cohere-go/consistency-no-parameter-reassignment"
 // listener gathers each function's parameters as the syntax dispatcher's walk meets the function, and judges every
 // assignment, range, increment, decrement and address taken that the walk meets after.
 var listener = rule.Listener{
+	FileLocal: true,
 	FileEnter: enterFile,
 	Nodes: []ast.Node{
 		(*ast.FuncDecl)(nil),
@@ -51,7 +52,7 @@ var parameterReassignedMessage = policy.MessageOf(Name, "parameterReassigned")
 
 var parameterAddressTakenMessage = policy.MessageOf(Name, "parameterAddressTaken")
 
-// fileState is the parameters of the file being walked, held in the rule's context's state.
+// fileState is the parameters of the file being walked, held in the rule's file state (rule.FileState).
 type fileState struct {
 	// parameters is every parameter and receiver of a function declared or written as a literal in the file that the
 	// walk has met so far, by object, so a use resolves to one by identity and never by its spelling. A parameter is
@@ -64,7 +65,7 @@ type fileState struct {
 
 // enterFile starts the file with no parameters met.
 func enterFile(context *rule.Context, _ *ast.File) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	if state.parameters == nil {
 		state.parameters = map[*types.Var]bool{}
 	}
@@ -73,7 +74,7 @@ func enterFile(context *rule.Context, _ *ast.File) {
 
 // judgeNode gathers a function's parameters, and reports an assignment to one or its address taken.
 func judgeNode(context *rule.Context, node ast.Node, _ []ast.Node) {
-	parameters := rule.State[fileState](context).parameters
+	parameters := rule.FileState[fileState](context).parameters
 	switch statement := node.(type) {
 	case *ast.FuncDecl:
 		collectParameters(context, parameters, statement.Recv)

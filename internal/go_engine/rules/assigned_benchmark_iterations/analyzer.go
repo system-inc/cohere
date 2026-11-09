@@ -29,7 +29,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every assignment, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.AssignStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.AssignStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		assignment, isAssignment := node.(*ast.AssignStmt)
 		if !isAssignment {

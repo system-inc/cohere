@@ -38,7 +38,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder, with its ancestors,
 // since where the call stands in its file decides its fix.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		call, isCall := node.(*ast.CallExpr)
 		if !isCall {

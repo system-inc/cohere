@@ -43,7 +43,8 @@ import (
 // representation: every function, each judged on its own with the purity judgment of the package. It requires
 // function_purity, whose result it reads.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{function_purity.Analyzer},
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
 			Check(context, function, purityJudgment(context))

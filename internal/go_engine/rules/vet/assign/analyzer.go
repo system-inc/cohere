@@ -47,8 +47,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/assign
 // original's Preorder visits them, with its cursor, which the fix that removes a whole statement needs for the
 // statement's parent and siblings.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.AssignStmt)(nil)},
-	Node:  checkAssignment,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.AssignStmt)(nil)},
+	Node:      checkAssignment,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

@@ -28,8 +28,9 @@ const Name = "cohere-go/consistency-no-lone-block"
 
 // listener hears every statement list of the syntax dispatcher's walk, a block's or a clause's.
 var listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
-	Node:  judgeHolder,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
+	Node:      judgeHolder,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

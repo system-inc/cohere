@@ -32,6 +32,7 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder.
 var Listener = rule.Listener{
+	FileLocal: true,
 	// The original first asks staticcheck's type index whether the package could hold any of its queries' symbols at
 	// all. The port needs no such filter: the gate in Check fails as cheaply on every call of a package that never
 	// names fmt.Sprintf, and every form wants it. Where the filter answers otherwise than the gate, inside fmt

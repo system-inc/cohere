@@ -36,7 +36,8 @@ import (
 // original walks them from the inspector's root, each with its ancestors, which tell whether it is the operand of an
 // address operator.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CompositeLit)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CompositeLit)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		literal, isLiteral := node.(*ast.CompositeLit)
 		if !isLiteral {

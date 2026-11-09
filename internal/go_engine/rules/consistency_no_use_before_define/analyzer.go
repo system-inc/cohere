@@ -24,7 +24,8 @@ import (
 const Name = "cohere-go/consistency-no-use-before-define"
 
 // listener hears every identifier of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.Ident)(nil)}, Node: judgeIdentifier}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.Ident)(nil)}, Node: judgeIdentifier}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_use_before_define", "Flags a reference to a package-level "+

@@ -29,7 +29,8 @@ import (
 )
 
 // Listener is what the port hears of each package from the dispatcher: every file, as the walk enters it.
-var Listener = rule.Listener{FileEnter: CheckFile}
+var Listener = rule.Listener{
+	FileLocal: true, FileEnter: CheckFile}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the

@@ -29,6 +29,7 @@ const Name = "cohere-go/consistency-no-console"
 // callback, or kept in a variable and called later, writes to standard output just the same, and a check shaped like
 // a call would report that route clean.
 var listener = rule.Listener{
+	FileLocal: true,
 	FileEnter: enterFile,
 	Nodes:     []ast.Node{(*ast.CallExpr)(nil), (*ast.SelectorExpr)(nil), (*ast.Ident)(nil)},
 	Node:      judgeNode,
@@ -67,7 +68,7 @@ var writerFunctions = map[string]bool{"Fprint": true, "Fprintf": true, "Fprintln
 // standardStreams are os's package-level variables for the process's own standard output and error.
 var standardStreams = map[string]bool{"Stdout": true, "Stderr": true}
 
-// fileState is whether the file being walked is judged, held in the rule's context's state.
+// fileState is whether the file being walked is judged, held in the rule's file state (rule.FileState).
 type fileState struct {
 	// judged is whether the file being walked is judged: one outside package main and outside a _test.go file.
 	judged bool
@@ -77,14 +78,14 @@ type fileState struct {
 // output is the program's own, and a test's output is read by the person running it. The file's own name is read, not
 // one a //line directive gives it, since only a real _test.go file is a test's.
 func enterFile(context *rule.Context, file *ast.File) {
-	rule.State[fileState](context).judged = context.Package.Name() != "main" &&
+	rule.FileState[fileState](context).judged = context.Package.Name() != "main" &&
 		!strings.HasSuffix(context.Fset.PositionFor(file.Package, false).Filename, "_test.go")
 }
 
 // judgeNode reports a call, selector or identifier of a judged file that writes to the process's own standard output
 // or error, its ancestors in stack.
 func judgeNode(context *rule.Context, node ast.Node, stack []ast.Node) {
-	if !rule.State[fileState](context).judged {
+	if !rule.FileState[fileState](context).judged {
 		return
 	}
 	switch expression := node.(type) {

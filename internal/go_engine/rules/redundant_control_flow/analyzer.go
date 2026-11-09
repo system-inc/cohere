@@ -23,8 +23,9 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every case clause, function declaration and
 // function literal, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CaseClause)(nil), (*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
-	Node:  func(context *rule.Context, node ast.Node, _ []ast.Node) { Check(context, node) },
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CaseClause)(nil), (*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	Node:      func(context *rule.Context, node ast.Node, _ []ast.Node) { Check(context, node) },
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's

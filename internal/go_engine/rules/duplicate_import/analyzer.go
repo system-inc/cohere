@@ -33,7 +33,8 @@ const Doc = "Importing the same package multiple times"
 
 // Listener is what the port hears of each package from the dispatcher: each file as the walk enters it, whose imports
 // are all the port reads of the syntax.
-var Listener = rule.Listener{FileEnter: checkFile}
+var Listener = rule.Listener{
+	FileLocal: true, FileEnter: checkFile}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.
 var Analyzer = dispatch.RuleAnalyzer(rule.Namespace+Name, Name, Doc, &Listener)

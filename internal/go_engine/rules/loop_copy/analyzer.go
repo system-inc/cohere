@@ -36,7 +36,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every range statement and for statement, in
 // preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.RangeStmt)(nil), (*ast.ForStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.RangeStmt)(nil), (*ast.ForStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		Check(context, node)
 	},

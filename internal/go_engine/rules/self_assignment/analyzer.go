@@ -37,6 +37,7 @@ import (
 // from our representation and so only on a package without errors, as the original runs, and the walk over
 // ours runs only there too: the syntax walk runs on every package, and so must everything a syntax listener requires.
 var Listener = rule.Listener{
+	FileLocal:                  true,
 	Requires:                   []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: judgeFunction},
 }

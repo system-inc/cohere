@@ -44,6 +44,7 @@ import (
 // a package without errors, as the original runs: the syntax walk runs on every package, and so must everything a
 // syntax listener requires.
 var Listener = rule.Listener{
+	FileLocal:                  true,
 	Requires:                   []*analysis.Analyzer{function_purity.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: judgeFunction},
 }

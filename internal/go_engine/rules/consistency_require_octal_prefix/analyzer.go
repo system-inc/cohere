@@ -24,7 +24,8 @@ import (
 const Name = "cohere-go/consistency-require-octal-prefix"
 
 // listener hears every basic literal of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.BasicLit)(nil)}, Node: judgeLiteral}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.BasicLit)(nil)}, Node: judgeLiteral}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_octal_prefix", "Flags an integer literal written in "+

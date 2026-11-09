@@ -130,9 +130,10 @@ var statusConstants = map[int64]string{
 // Listener is what the port hears of each package from the dispatcher: every call, each judged by the function it
 // calls, and staticcheck's configuration, which lists the codes left alone.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{config.Analyzer},
-	Nodes:    []ast.Node{(*ast.CallExpr)(nil)},
-	Node:     checkCall,
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{config.Analyzer},
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      checkCall,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

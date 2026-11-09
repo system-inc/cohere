@@ -47,8 +47,9 @@ const fixMessage = "Un-Yoda-fy"
 // Listener is what the port hears of each package from the dispatcher: every binary expression, of which it judges
 // the equality comparisons.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
-	Node:  checkComparison,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node:      checkComparison,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

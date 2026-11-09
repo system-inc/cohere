@@ -53,8 +53,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/stdmet
 // together, in the one preorder the original's Preorder visits them, so the findings come in the original's order,
 // where two walks would visit one kind, then the other.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.InterfaceType)(nil)},
-	Node:  checkDeclaration,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil), (*ast.InterfaceType)(nil)},
+	Node:      checkDeclaration,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

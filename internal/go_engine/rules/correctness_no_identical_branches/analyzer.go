@@ -72,8 +72,9 @@ const Name = "cohere-go/correctness-no-identical-branches"
 // listener hears every if, switch and type switch of the syntax dispatcher's walk. Nested conditionals are heard as
 // the walk goes on, so each is judged on its own branches.
 var listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.IfStmt)(nil), (*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil)},
-	Node:  judgeConditional,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.IfStmt)(nil), (*ast.SwitchStmt)(nil), (*ast.TypeSwitchStmt)(nil)},
+	Node:      judgeConditional,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

@@ -24,7 +24,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every type switch, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.TypeSwitchStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.TypeSwitchStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		typeSwitch, isTypeSwitch := node.(*ast.TypeSwitchStmt)
 		if !isTypeSwitch {

@@ -26,7 +26,8 @@ import (
 const Name = "cohere-go/consistency-no-lonely-if"
 
 // listener hears every if of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.IfStmt)(nil)}, Node: judgeIf}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.IfStmt)(nil)}, Node: judgeIf}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_lonely_if", "Flags an if that is the only statement in "+
