@@ -1,6 +1,5 @@
 // Package unobserved_append is staticcheck's SA4010, a call to append whose result nothing reads but other appends,
-// extending a slice no one else can see, ported onto staticcheck's intermediate representation as a
-// rule.FunctionCheck.
+// extending a slice no one else can see, ported onto the engine's own intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4010/sa4010.go, whose logic it keeps and
 // whose message it reports word for word, from the start to the end of the call, where staticcheck's report puts it.
@@ -18,14 +17,15 @@ package unobserved_append
 
 import (
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own.
+var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -33,8 +33,8 @@ var Listener = rule.Listener{Function: Check}
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4010",
 	"SA4010",
-	"Flags a call to append whose result is never observed anywhere: staticcheck's SA4010, ported onto its "+
-		"intermediate representation.",
+	"Flags a call to append whose result is never observed anywhere: staticcheck's SA4010, ported onto the "+
+		"engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -44,14 +44,14 @@ const message = "this result of append is never used, except maybe in other appe
 // Check judges one function: each call to append whose result nothing reads but phis and other appends, reported when
 // the slice it extends is one the function made itself and nothing else reads, so no other slice can share the
 // backing array the append writes into.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			call, isCall := instruction.(*ir.Call)
+		for _, instruction := range block.Instructions {
+			call, isCall := instruction.(*intermediate_representation.Call)
 			if !isCall || !isAppend(call) || isObserved(call) {
 				continue
 			}
-			origins, isMadeHere := originsOf(call.Call.Args[0])
+			origins, isMadeHere := originsOf(call.Call.Arguments[0])
 			if !isMadeHere || !isUnshared(call, origins) {
 				continue
 			}
@@ -66,21 +66,21 @@ func Check(context *rule.Context, function *ir.Function) {
 }
 
 // isAppend is whether value is a call of the builtin append.
-func isAppend(value ir.Value) bool {
-	call, isCall := value.(*ir.Call)
+func isAppend(value intermediate_representation.Value) bool {
+	call, isCall := value.(*intermediate_representation.Call)
 	if !isCall || call.Call.IsInvoke() {
 		return false
 	}
-	builtin, isBuiltin := call.Call.Value.(*ir.Builtin)
+	builtin, isBuiltin := call.Call.Value.(*intermediate_representation.Builtin)
 	return isBuiltin && builtin.Name() == "append"
 }
 
 // isObserved is whether anything reads the result of call but a phi or another append, followed through the phis and
 // appends that read it.
-func isObserved(call *ir.Call) bool {
-	visited := map[ir.Instruction]bool{}
-	var readersObserve func(value ir.Value) bool
-	readersObserve = func(value ir.Value) bool {
+func isObserved(call *intermediate_representation.Call) bool {
+	visited := map[intermediate_representation.Instruction]bool{}
+	var readersObserve func(value intermediate_representation.Value) bool
+	readersObserve = func(value intermediate_representation.Value) bool {
 		referrers := value.Referrers()
 		if referrers == nil {
 			return false
@@ -91,11 +91,11 @@ func isObserved(call *ir.Call) bool {
 			}
 			visited[referrer] = true
 			switch referrer := referrer.(type) {
-			case *ir.Phi:
+			case *intermediate_representation.Phi:
 				if readersObserve(referrer) {
 					return true
 				}
-			case ir.Value:
+			case intermediate_representation.Value:
 				if !isAppend(referrer) || readersObserve(referrer) {
 					return true
 				}
@@ -113,11 +113,11 @@ func isObserved(call *ir.Call) bool {
 // function made every one of them itself: a nil constant, a make, an allocation, or a phi, a slicing or another append
 // of such a slice. Anything else, a parameter, a load, the result of a call, may share its backing array with a slice
 // the function cannot see, and the append's write into it may be observed there.
-func originsOf(argument ir.Value) ([]ir.Value, bool) {
-	reached := map[ir.Value]bool{}
-	origins := []ir.Value{}
-	var madeHere func(value ir.Value) bool
-	madeHere = func(value ir.Value) bool {
+func originsOf(argument intermediate_representation.Value) ([]intermediate_representation.Value, bool) {
+	reached := map[intermediate_representation.Value]bool{}
+	origins := []intermediate_representation.Value{}
+	var madeHere func(value intermediate_representation.Value) bool
+	madeHere = func(value intermediate_representation.Value) bool {
 		if reached[value] {
 			// A phi in a loop reaches itself, and is judged where it was first reached.
 			return true
@@ -125,19 +125,21 @@ func originsOf(argument ir.Value) ([]ir.Value, bool) {
 		reached[value] = true
 		origins = append(origins, value)
 		switch value := value.(type) {
-		case *ir.Phi:
+		case *intermediate_representation.Phi:
 			for _, edge := range value.Edges {
 				if !madeHere(edge) {
 					return false
 				}
 			}
 			return true
-		case *ir.Slice:
+		case *intermediate_representation.Slice:
 			return madeHere(value.X)
-		case *ir.Const, *ir.MakeSlice, *ir.Alloc:
+		case *intermediate_representation.Constant,
+			*intermediate_representation.MakeSlice,
+			*intermediate_representation.Allocation:
 			return true
-		case *ir.Call:
-			return isAppend(value) && madeHere(value.Call.Args[0])
+		case *intermediate_representation.Call:
+			return isAppend(value) && madeHere(value.Call.Arguments[0])
 		}
 		return false
 	}
@@ -149,16 +151,16 @@ func originsOf(argument ir.Value) ([]ir.Value, bool) {
 // makes and allocations read the same way. A reader of any other kind, a call, a store, a load through an allocation,
 // could keep or read the backing array the append writes into. Another append is such a reader too, unless it is
 // among the origins.
-func isUnshared(call *ir.Call, origins []ir.Value) bool {
-	judged := map[ir.Instruction]bool{call: true}
+func isUnshared(call *intermediate_representation.Call, origins []intermediate_representation.Value) bool {
+	judged := map[intermediate_representation.Instruction]bool{call: true}
 	for _, origin := range origins {
 		// A constant is no instruction and has no readers to judge.
-		if instruction, isInstruction := origin.(ir.Instruction); isInstruction {
+		if instruction, isInstruction := origin.(intermediate_representation.Instruction); isInstruction {
 			judged[instruction] = true
 		}
 	}
-	var readersUnshared func(value ir.Value) bool
-	readersUnshared = func(value ir.Value) bool {
+	var readersUnshared func(value intermediate_representation.Value) bool
+	readersUnshared = func(value intermediate_representation.Value) bool {
 		referrers := value.Referrers()
 		if referrers == nil {
 			return true
@@ -169,12 +171,16 @@ func isUnshared(call *ir.Call, origins []ir.Value) bool {
 			}
 			judged[referrer] = true
 			switch referrer.(type) {
-			case *ir.Phi, *ir.Slice, *ir.MakeSlice, *ir.Alloc:
+			case *intermediate_representation.Phi,
+				*intermediate_representation.Slice,
+				*intermediate_representation.MakeSlice,
+				*intermediate_representation.Allocation:
 			default:
 				return false
 			}
 			// Each kind the switch lets through is a value, whose own readers are judged the same way.
-			if readerValue, isValue := referrer.(ir.Value); isValue && !readersUnshared(readerValue) {
+			readerValue, isValue := referrer.(intermediate_representation.Value)
+			if isValue && !readersUnshared(readerValue) {
 				return false
 			}
 		}
