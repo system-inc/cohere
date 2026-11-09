@@ -1082,6 +1082,7 @@ func TestNoCheckDuplicatesAVetPass(test *testing.T) {
 // One name a line, in a slice rather than a map, since gofmt aligns a map's values to its longest key and would rewrite
 // every line when a branch adds a longer one; a line of a slice is never rewritten for another's sake.
 var sharedReaders = []string{
+	"build_intermediate_representation",
 	"dispatch",
 	"inert_value",
 	"marker",
