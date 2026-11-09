@@ -1101,12 +1101,10 @@ func asRecorded(findings []Finding) []Finding {
 }
 
 // engineOptions is the checker's options for every run of the harness: those every run of the engine's rules sets
-// (see check.SetDispatchOptions), so a port runs in its tests as it runs in the engine. A dispatched rule's listener
+// (see check.DispatchOptions), so a port runs in its tests as it runs in the engine. A dispatched rule's listener
 // is called only where its rule runs, and a port that reads the engine's own representation's expression map has it
 // only where its listener declares so: one that reads the map without declaring it finds nothing here, as it would in
 // the engine, never more here than there.
 func engineOptions() *checker.Options {
-	options := &checker.Options{}
-	check.SetDispatchOptions(options)
-	return options
+	return check.DispatchOptions()
 }
