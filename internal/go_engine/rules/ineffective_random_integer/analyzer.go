@@ -9,8 +9,8 @@
 // matches the pattern `(CallExpr (Symbol name@(Or ...)) [(IntegerLiteral "1")])` through code.Matches, which for a
 // pattern rooted at a call of a symbol walks the calls staticcheck's type index records for each symbol named, those
 // whose function, through parentheses, a selector and an instantiation, uses the symbol's object, rather than every
-// call. The port walks every call and asks the same of each: staticcheck_code.IsSymbol, the port of the pattern's
-// Symbol, takes its function for one of the nineteen, and it has exactly one argument, which
+// call. The port walks every call and asks the same of each: staticcheck_code.SymbolIndex, the port of the pattern's
+// Symbol of an Or, takes its function for one of the nineteen, and it has exactly one argument, which
 // staticcheck_code.IntegerLiteral, the port of the pattern's IntegerLiteral, takes for a literal whose constant prints
 // as 1. Every call the pattern accepts is one the index records, since both read the object the type checker recorded
 // for the function's identifier, so the two walks reach the same findings, in another order. The pattern has no field
@@ -22,7 +22,6 @@ package ineffective_random_integer
 import (
 	"fmt"
 	"go/ast"
-	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/report"
@@ -98,9 +97,7 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 		return
 	}
 	// The pattern's Or tries each name in turn, and binds the one the function is.
-	index := slices.IndexFunc(boundedFunctions, func(name string) bool {
-		return staticcheck_code.IsSymbol(context, call.Fun, name)
-	})
+	index := staticcheck_code.SymbolIndex(context, call.Fun, boundedFunctions...)
 	if index < 0 {
 		return
 	}
