@@ -115,11 +115,21 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 	var currentBlock B
 	position, count := 0, 0
 	isContextStore := false
+	// continuations maps a block that throws to the one block its Real edge goes on to (throwContinuation).
+	continuations := throwContinuations(graph, function, blocks)
 	recordInstruction := func(place *P, role Role) {
 		if role != Define {
 			return
 		}
 		if isContextStore && !graph.ContextStoreDefines(function, currentBlock, position, *place) {
+			return
+		}
+		// A throwing instruction's definition is made only if it doesn't throw, so it holds from the top
+		// of the block control goes on to, never on the edge to a handler. A handler's use naming it is a
+		// value the throw never made, and this is where it shows. Modelled here on the edges alone, never
+		// by asking the construction it checks.
+		if continuation, throws := continuations[blockId]; throws && position == count-1 {
+			recordDefinition(graph.IdentifierOf(*place), continuation, -1)
 			return
 		}
 		recordDefinition(graph.IdentifierOf(*place), blockId, position)
@@ -212,6 +222,12 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 				if !ok {
 					continue
 				}
+				// A throwing instruction's definition is recorded at the top of its continuation, and the
+				// edge from the throwing block to that continuation is the one edge that carries it.
+				if continuation, throws := continuations[predecessorId]; throws && continuation == blockId &&
+					definedIn[graph.IdentifierOf(operand)] == blockId && definedAt[graph.IdentifierOf(operand)] == -1 {
+					continue
+				}
 				checkUse(graph.IdentifierOf(operand), predecessorId, graph.InstructionCount(function, predecessor),
 					fmt.Sprintf("phi operand for bb%d", predecessorId))
 			}
@@ -224,6 +240,43 @@ func VerifyStaticSingleAssignment[G Graph[F, B, P], F any, B comparable, P any](
 	}
 
 	return violations
+}
+
+// throwContinuations maps each block that may throw to the block its last instruction goes on to: a block
+// with an Exceptional edge to a block no Real edge of it reaches, and exactly one block its Real edges
+// reach. A block with no Real edge out, or several, has no one continuation, and its definitions are
+// recorded where they are made.
+func throwContinuations[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	blocks []B,
+) map[BlockId]BlockId {
+	var continuations map[BlockId]BlockId
+	scratch := takeEdgeScratch()
+	defer edgeScratchPool.Put(scratch)
+	for _, block := range blocks {
+		edges := edgesOf(graph, block, scratch)
+		handlers := handlersOf(edges, nil)
+		if len(handlers) == 0 {
+			continue
+		}
+		var continuation BlockId
+		realCount := 0
+		for _, edge := range edges {
+			if edge.edge == Real && (realCount == 0 || edge.successor != continuation) {
+				continuation = edge.successor
+				realCount++
+			}
+		}
+		if realCount != 1 {
+			continue
+		}
+		if continuations == nil {
+			continuations = map[BlockId]BlockId{}
+		}
+		continuations[graph.Id(block)] = continuation
+	}
+	return continuations
 }
 
 // predecessorViolations is a violation for each block whose predecessors are not, once each, the blocks with a real
