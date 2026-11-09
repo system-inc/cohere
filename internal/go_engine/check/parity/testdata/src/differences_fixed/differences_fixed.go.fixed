@@ -1,6 +1,6 @@
 // Package differences_fixed holds a call only the port finds and one both find, each fixed by the port, beside its
-// fixed file, this file as every fix the port offers in it leaves it, byte for byte, and its golden file, the same
-// text, which a comparison that formats first holds.
+// fixed file, this file as every fix the port offers in it leaves it, byte for byte. differences_golden holds the
+// same source beside a golden file instead.
 package differences_fixed
 
 func shared() {}

@@ -284,12 +284,60 @@ func compareIdentical(test testing.TB, originalFindings []Finding, portFindings 
 //
 // Each record's reason is in the comment above it, or for any but a drop in the doc comment of the declaration it is
 // in, and each but `finds nothing` matches one finding on its own line, a `fixes:` record its `finds:` record's.
+//
+// Every group it captures is named, and read by its name (see recordGroup), so an alternative added anywhere shifts
+// no other's read.
 var adjudicatedPattern = regexp.MustCompile(
-	`^(?:finds: (.+?)|renames: (.+?) => (.+?)|drops: (.+?)|moves: (.+?)|withholds: (.+?)|omits: (.+?)|` +
-		`fixes(?: with ("(?:[^"\\]|\\.)*"))?(?: at (\S+?):(\d+))?: (.+?)|(finds nothing)|` +
-		`finds at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?: (.+?)|` +
-		`moves(?: at column (\d+)(?:(, no end)| to (?:(\d+):)?(\d+))?)?(?: with ("(?:[^"\\]|\\.)*"))?: (.+?))\s*$`,
+	`^(?:finds: (?P<Finds>.+?)|renames: (?P<RenamesFrom>.+?) => (?P<RenamesTo>.+?)|drops: (?P<Drops>.+?)|` +
+		`moves: (?P<Moves>.+?)|withholds: (?P<Withholds>.+?)|omits: (?P<Omits>.+?)|` +
+		`fixes(?: with (?P<FixesMessage>"(?:[^"\\]|\\.)*"))?(?: at (?P<FixesFile>\S+?):(?P<FixesLine>\d+))?: ` +
+		`(?P<FixesText>.+?)|(?P<FindsNothing>finds nothing)|` +
+		`finds at column (?P<FindsColumn>\d+)(?:(?P<FindsNoEnd>, no end)| to (?:(?P<FindsEndLine>\d+):)?` +
+		`(?P<FindsEndColumn>\d+))?: (?P<FindsPlaced>.+?)|` +
+		`moves(?: at column (?P<MovesColumn>\d+)(?:(?P<MovesNoEnd>, no end)| to (?:(?P<MovesEndLine>\d+):)?` +
+		`(?P<MovesEndColumn>\d+))?)?(?: with (?P<MovesFixMessage>"(?:[^"\\]|\\.)*"))?: (?P<MovesPlaced>.+?))\s*$`,
 )
+
+// The index of each group adjudicatedPattern captures, in a match, by the group's name: a record's message for each
+// plain kind; a rename's two messages; a `fixes:` record's message literal, the file and line it names and its text;
+// `finds nothing`; and for a placed `finds:` and a `moves:`, the column, `, no end`, the end line, the end column, the
+// fix message literal a move may name, and the message.
+var (
+	findsGroup           = recordGroup("Finds")
+	renamesFromGroup     = recordGroup("RenamesFrom")
+	renamesToGroup       = recordGroup("RenamesTo")
+	dropsGroup           = recordGroup("Drops")
+	movesGroup           = recordGroup("Moves")
+	withholdsGroup       = recordGroup("Withholds")
+	omitsGroup           = recordGroup("Omits")
+	fixesMessageGroup    = recordGroup("FixesMessage")
+	fixesFileGroup       = recordGroup("FixesFile")
+	fixesLineGroup       = recordGroup("FixesLine")
+	fixesTextGroup       = recordGroup("FixesText")
+	findsNothingGroup    = recordGroup("FindsNothing")
+	findsColumnGroup     = recordGroup("FindsColumn")
+	findsNoEndGroup      = recordGroup("FindsNoEnd")
+	findsEndLineGroup    = recordGroup("FindsEndLine")
+	findsEndColumnGroup  = recordGroup("FindsEndColumn")
+	findsPlacedGroup     = recordGroup("FindsPlaced")
+	movesColumnGroup     = recordGroup("MovesColumn")
+	movesNoEndGroup      = recordGroup("MovesNoEnd")
+	movesEndLineGroup    = recordGroup("MovesEndLine")
+	movesEndColumnGroup  = recordGroup("MovesEndColumn")
+	movesFixMessageGroup = recordGroup("MovesFixMessage")
+	movesPlacedGroup     = recordGroup("MovesPlaced")
+)
+
+// recordGroup is the index of the group of adjudicatedPattern named name.
+func recordGroup(name string) int {
+	index := adjudicatedPattern.SubexpIndex(name)
+	if index < 0 {
+		// Invariant: every name read here is one the pattern beside it names, so a missing one is a mistake in this
+		// file, never in a fixture, and panicking as the package initializes fails every test before any runs.
+		panic("adjudicatedPattern names no group " + name)
+	}
+	return index
+}
 
 // fixesText is the new text a `fixes:` record names: the text as written, or, written as a Go string literal opening
 // with a double quote, the string it spells, so a text that holds a newline, or that writes nothing, is recorded as
@@ -385,7 +433,7 @@ func requireOnlyAdjudicated(
 ) {
 	test.Helper()
 	defer target.held(test)()
-	loads := loadFixtures(test, target, testdata, []string{fixture}, nil)
+	loads := loadFixturesHoldingFixed(test, target, testdata, []string{fixture}, nil)
 	originalFindings, portFindings := findingsOver(test, original, port, loads)
 	folder := recordsFolder(test, loads[0])
 	recorded := adjudicated(test, folder, loads[0].fileName, given)
@@ -735,7 +783,7 @@ func adjudicated(test testing.TB, directory string, fileName func(string) string
 					switch {
 					case !isReadable || reasoned.above(comment.line):
 						// Unreadable, which fails below, or reasoned on the line above, as any record may be.
-					case match[4] != "":
+					case match[dropsGroup] != "":
 						// A drop is ruled with its own finding in hand, so a declaration's doc, which often rules a
 						// whole group of records, rules no drop.
 						test.Errorf("%s:%d holds a drop with no reason: write why on the line directly above it, "+
@@ -787,15 +835,15 @@ func readRecord(written string) (match []string, text string, isReadable bool) {
 	if match == nil {
 		return nil, "", false
 	}
-	for _, literal := range []string{match[8], match[22]} {
+	for _, literal := range []string{match[fixesMessageGroup], match[movesFixMessageGroup]} {
 		if _, unquoteError := strconv.Unquote(literal); literal != "" && unquoteError != nil {
 			return nil, "", false
 		}
 	}
-	if match[11] == "" {
+	if match[fixesTextGroup] == "" {
 		return match, "", true
 	}
-	text, isReadable = fixesText(match[11])
+	text, isReadable = fixesText(match[fixesTextGroup])
 	return match, text, isReadable
 }
 
@@ -804,59 +852,61 @@ func readRecord(written string) (match []string, text string, isReadable bool) {
 // unless the record names where it lands.
 func withRecord(recorded records, at Finding, match []string, text string) records {
 	switch {
-	case match[1] != "":
-		at.Message = match[1]
+	case match[findsGroup] != "":
+		at.Message = match[findsGroup]
 		recorded.portAlone = append(recorded.portAlone, at)
 		recorded.found = append(recorded.found, at)
-	case match[4] != "":
-		at.Message = match[4]
+	case match[dropsGroup] != "":
+		at.Message = match[dropsGroup]
 		recorded.dropped = append(recorded.dropped, at)
-	case match[5] != "":
-		at.Message = match[5]
+	case match[movesGroup] != "":
+		at.Message = match[movesGroup]
 		recorded.moved = append(recorded.moved, movedRecord{at: at})
-	case match[6] != "":
-		at.Message = match[6]
+	case match[withholdsGroup] != "":
+		at.Message = match[withholdsGroup]
 		recorded.withheld = append(recorded.withheld, at)
-	case match[7] != "":
-		at.Message = match[7]
+	case match[omitsGroup] != "":
+		at.Message = match[omitsGroup]
 		recorded.omitted = append(recorded.omitted, at)
-	case match[11] != "":
+	case match[fixesTextGroup] != "":
 		fix := recordedFix{findingFile: at.File, findingLine: at.Line, text: text}
-		if match[8] != "" {
+		if match[fixesMessageGroup] != "" {
 			// Ignored: readRecord refuses a record whose literal does not unquote, so this one does.
-			fix.message, _ = strconv.Unquote(match[8])
+			fix.message, _ = strconv.Unquote(match[fixesMessageGroup])
 			fix.holdsMessage = true
 		}
-		if match[9] != "" {
+		if match[fixesFileGroup] != "" {
 			// The pattern holds the line to digits, so only a line past an int's range fails to convert, and none
 			// that long is a file's.
-			fix.editFile, fix.editLine = match[9], atoiOrZero(match[10])
+			fix.editFile, fix.editLine = match[fixesFileGroup], atoiOrZero(match[fixesLineGroup])
 		}
 		recorded.fixed = append(recorded.fixed, fix)
-	case match[12] != "":
+	case match[findsNothingGroup] != "":
 		recorded.findsNothing = append(recorded.findsNothing, at)
-	case match[17] != "":
-		at.Message = match[17]
+	case match[findsPlacedGroup] != "":
+		at.Message = match[findsPlacedGroup]
 		recorded.portAlone = append(recorded.portAlone, at)
 		recorded.found = append(recorded.found, at)
-		recorded.placed = append(recorded.placed, placedAt(at, match[13:17]))
-	case match[23] != "":
-		at.Message = match[23]
-		moved := movedRecord{at: at, isPlaced: match[18] != ""}
+		recorded.placed = append(recorded.placed, placedAt(at, match[findsColumnGroup], match[findsNoEndGroup],
+			match[findsEndLineGroup], match[findsEndColumnGroup]))
+	case match[movesPlacedGroup] != "":
+		at.Message = match[movesPlacedGroup]
+		moved := movedRecord{at: at, isPlaced: match[movesColumnGroup] != ""}
 		if moved.isPlaced {
-			moved.placed = placedAt(at, match[18:22])
+			moved.placed = placedAt(at, match[movesColumnGroup], match[movesNoEndGroup], match[movesEndLineGroup],
+				match[movesEndColumnGroup])
 		}
-		if match[22] != "" {
+		if match[movesFixMessageGroup] != "" {
 			// Ignored: readRecord refuses a record whose literal does not unquote, so this one does.
-			moved.fixMessage, _ = strconv.Unquote(match[22])
+			moved.fixMessage, _ = strconv.Unquote(match[movesFixMessageGroup])
 			moved.holdsFixMessage = true
 		}
 		recorded.moved = append(recorded.moved, moved)
 	default:
 		renamed := at
-		renamed.Message = match[2]
+		renamed.Message = match[renamesFromGroup]
 		recorded.renamed = append(recorded.renamed, renamed)
-		at.Message = match[3]
+		at.Message = match[renamesToGroup]
 		recorded.portAlone = append(recorded.portAlone, at)
 	}
 	return recorded
@@ -890,17 +940,17 @@ func followingFinds(test testing.TB, fixed []recordedFix, found []Finding) []rec
 	return following
 }
 
-// placedAt is the finding at, as a record places it with place, its column, its `, no end` and its end line and end
-// column, each as written or empty, as adjudicatedPattern reads them. The pattern holds each to digits, and
-// placesAtZero refuses one that reads as 0, past an int's range or written so.
-func placedAt(at Finding, place []string) placedFind {
-	placed := placedFind{at: at, holdsEnd: place[1] != "" || place[3] != ""}
-	placed.at.Column = atoiOrZero(place[0])
-	if place[3] != "" {
-		placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(place[3])
+// placedAt is the finding at, as a record places it: at column, with noEnd its `, no end`, and at endLine and
+// endColumn its end, each as written or empty, as adjudicatedPattern reads them. The pattern holds each to digits,
+// and placesAtZero refuses one that reads as 0, past an int's range or written so.
+func placedAt(at Finding, column string, noEnd string, endLine string, endColumn string) placedFind {
+	placed := placedFind{at: at, holdsEnd: noEnd != "" || endColumn != ""}
+	placed.at.Column = atoiOrZero(column)
+	if endColumn != "" {
+		placed.at.EndLine, placed.at.EndColumn = at.Line, atoiOrZero(endColumn)
 	}
-	if place[2] != "" {
-		placed.at.EndLine = atoiOrZero(place[2])
+	if endLine != "" {
+		placed.at.EndLine = atoiOrZero(endLine)
 	}
 	return placed
 }
@@ -908,7 +958,9 @@ func placedAt(at Finding, place []string) placedFind {
 // placesAtZero is whether match, a record read, names a column, an end line or an end column of 0, written so or past
 // an int's range, where lines and columns count from 1.
 func placesAtZero(match []string) bool {
-	return slices.ContainsFunc([]string{match[13], match[15], match[16], match[18], match[20], match[21]},
+	placing := []string{match[findsColumnGroup], match[findsEndLineGroup], match[findsEndColumnGroup],
+		match[movesColumnGroup], match[movesEndLineGroup], match[movesEndColumnGroup]}
+	return slices.ContainsFunc(placing,
 		func(written string) bool { return written != "" && atoiOrZero(written) == 0 })
 }
 

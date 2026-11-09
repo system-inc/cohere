@@ -135,8 +135,52 @@ func recordsFolder(test testing.TB, fixtures loadedFixtures) string {
 // each module. A load that found nothing fails the test, since silence there would read as agreement, and so do the
 // fixture packages' load errors unless they are exactly expected (see requireLoadErrors). With nothing expected, as
 // every caller but RequireIdenticalDespiteLoadErrors expects, a fixture package that did not load clean fails on its
-// own.
+// own. A `.fixed` file beside a fixture package it loads fails too, named, since only RequireOnlyAdjudicated and
+// RequirePortWhereOriginalPanics hold one (see requireFixedFiles), and those two load through
+// loadFixturesHoldingFixed: under any other form it would be read by nothing, and its fixes held by nothing.
 func loadFixtures(
+	test testing.TB,
+	target Target,
+	testdata string,
+	patterns []string,
+	expected []LoadError,
+) []loadedFixtures {
+	test.Helper()
+	loads := loadFixturesHoldingFixed(test, target, testdata, patterns, expected)
+	for _, fixtures := range loads {
+		for _, fixed := range fixedFilesBeside(test, fixtures) {
+			test.Errorf("%s is a fixed file beside a fixture package this call loads, and it holds no fixed file, so "+
+				"nothing reads it: hold it with RequireOnlyAdjudicated or RequirePortWhereOriginalPanics, or delete it",
+				fixtures.fileName(fixed))
+		}
+	}
+	return loads
+}
+
+// fixedFilesBeside is every `.fixed` file in a folder that holds a root package of fixtures, each once and sorted.
+func fixedFilesBeside(test testing.TB, fixtures loadedFixtures) []string {
+	test.Helper()
+	fixed := []string{}
+	for _, root := range fixtures.roots {
+		for _, file := range slices.Concat(root.GoFiles, root.OtherFiles, root.IgnoredFiles) {
+			names, globError := filepath.Glob(filepath.Join(filepath.Dir(file), "*.fixed"))
+			if globError != nil {
+				test.Fatalf("listing the fixed files beside %s: %v", fixtures.fileName(file), globError)
+			}
+			for _, name := range names {
+				if !slices.Contains(fixed, name) {
+					fixed = append(fixed, name)
+				}
+			}
+		}
+	}
+	slices.Sort(fixed)
+	return fixed
+}
+
+// loadFixturesHoldingFixed is loadFixtures for a form that holds the `.fixed` files beside the fixture package it
+// loads, so it leaves them to that form's requireFixedFiles.
+func loadFixturesHoldingFixed(
 	test testing.TB,
 	target Target,
 	testdata string,

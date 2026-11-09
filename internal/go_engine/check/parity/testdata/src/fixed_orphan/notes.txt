@@ -1,0 +1,1 @@
+Notes beside the fixture, a file that holds no records.
