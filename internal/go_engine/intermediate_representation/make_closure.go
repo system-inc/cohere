@@ -19,9 +19,9 @@ type MakeClosure struct {
 }
 
 func (closure *MakeClosure) Operands(rands []*Value) []*Value {
-	rands = append(rands, &closure.Function)
+	operands := append(rands, &closure.Function)
 	for index := range closure.Bindings {
-		rands = append(rands, &closure.Bindings[index])
+		operands = append(operands, &closure.Bindings[index])
 	}
-	return rands
+	return operands
 }

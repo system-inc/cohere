@@ -41,10 +41,12 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 			// generic method
 			instSig, instantiateError := types.Instantiate(prog.ctxt, object.Signature(), targs, false)
 			if instantiateError != nil {
+				// Invariant: types.Instantiate returns an error only when it validates, and this call does not.
 				panic(instantiateError)
 			}
 			instance, ok := instSig.(*types.Signature)
 			if !ok {
+				// Invariant: types.Instantiate of a *types.Signature returns a *types.Signature.
 				panic("Instantiate of a Signature returned a non-signature")
 			}
 			// Do not canonicalize generic methods, because the receiver is not
@@ -60,14 +62,22 @@ func createInstance(function *Function, rtargs, targs []types.Type) *Function {
 		// function, len(rtargs) == 0 && len(targs) > 0
 		instSig, instantiateError := types.Instantiate(prog.ctxt, function.Signature, targs, false)
 		if instantiateError != nil {
+			// Invariant: types.Instantiate returns an error only when it validates, and this call does not.
 			panic(instantiateError)
 		}
 		instance, ok := instSig.(*types.Signature)
 		if !ok {
+			// Invariant: types.Instantiate of a *types.Signature returns a *types.Signature.
 			panic("Instantiate of a Signature returned a non-signature")
 		}
 		object = function.object // instantiation does not exist yet
-		sig = prog.canon.Type(instance).(*types.Signature)
+		canonical, isSignature := prog.canon.Type(instance).(*types.Signature)
+		if !isSignature {
+			// Invariant: the canonizer returns the type it was given or one identical to it, and only a
+			// *types.Signature is identical to a *types.Signature.
+			panic(fmt.Sprintf("canonical type of signature %s is not a signature", instance))
+		}
+		sig = canonical
 	}
 
 	// Always a wrapper. go/ir builds an instance from the generic body with its type arguments

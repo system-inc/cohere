@@ -38,6 +38,8 @@ func (x *task) addEdge(y *task) {
 	// heuristic done check
 	select {
 	case <-x.done:
+		// Invariant: a builder adds edges to its shared task only while it builds its functions in iterate, which
+		// marks the task done after the last of them.
 		panic("cannot add an edge to a done task")
 	default:
 	}

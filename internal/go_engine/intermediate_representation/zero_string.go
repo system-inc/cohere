@@ -47,6 +47,8 @@ func zeroString(resolvedType types.Type, qual types.Qualifier) (_ string, isVali
 		case typed.Kind() == types.Invalid:
 			return "invalid", false
 		default:
+			// Invariant: every basic kind is boolean, numeric, string, unsafe.Pointer, untyped nil or invalid, and
+			// each of those returned above.
 			panic(fmt.Sprintf("zeroString for unexpected type %v", typed))
 		}
 
@@ -103,9 +105,12 @@ func zeroString(resolvedType types.Type, qual types.Qualifier) (_ string, isVali
 	case *types.Union:
 		// Variables of these types cannot be created, so it makes
 		// no sense to ask for their zero value.
+		// Invariant: a union is only ever a term list inside a constraint interface, never the type of a value,
+		// and zeroString is asked only for the types of values and their components.
 		panic(fmt.Sprintf("invalid type for a variable: %v", typed))
 
 	default:
+		// Invariant: the cases above cover every types.Type that go/types defines.
 		panic(typed) // unreachable.
 	}
 }

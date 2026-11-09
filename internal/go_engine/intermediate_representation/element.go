@@ -33,6 +33,8 @@ func (element *element) store(function *Function, value Value, source ast.Node) 
 }
 
 func (element *element) address(function *Function) Value {
+	// Invariant: go/types rejects every use of a map element that needs its address: &m[k], assigning to a field
+	// or element of one, slicing one, or calling a pointer method on one.
 	panic("map elements are not addressable")
 }
 

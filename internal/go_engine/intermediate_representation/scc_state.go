@@ -12,6 +12,9 @@ type sccState struct {
 	sccs     []*Scc
 }
 
+// scc finds the strongly connected components reachable from block, appending each to state.sccs as it closes.
+//
+// Mutates: block and every block reached from it gain their strongly connected component
 func (state *sccState) scc(block *BasicBlock) {
 	// This is Tarjan's algorithm, with some optimizations from [1] applied.
 	//
@@ -62,6 +65,8 @@ func (state *sccState) scc(block *BasicBlock) {
 }
 
 // buildSccs computes the strongly connected components of fn's control flow graph.
+//
+// Mutates: function gains its strongly connected components, and its blocks theirs
 func buildSccs(function *Function) {
 	blockCount := len(function.Blocks)
 

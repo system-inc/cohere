@@ -28,8 +28,9 @@ type Return struct {
 }
 
 func (ret *Return) Operands(rands []*Value) []*Value {
+	operands := rands
 	for index := range ret.Results {
-		rands = append(rands, &ret.Results[index])
+		operands = append(operands, &ret.Results[index])
 	}
-	return rands
+	return operands
 }

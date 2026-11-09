@@ -19,6 +19,7 @@ import (
 )
 
 func TestEnclosingFunction(test *testing.T) {
+	test.Parallel()
 	type testcase struct {
 		desc         string
 		input        string // the input file
@@ -93,6 +94,7 @@ package main
 	}
 	for _, testCase := range tests {
 		test.Run(testCase.desc, func(test *testing.T) {
+			test.Parallel()
 			goEnginePackage, file := buildPackage(test, testCase.input, nil)
 			fset := goEnginePackage.Program.FileSet
 

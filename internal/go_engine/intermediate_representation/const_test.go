@@ -18,6 +18,7 @@ import (
 )
 
 func TestConstString(test *testing.T) {
+	test.Parallel()
 	const source = `
 	package P
 
@@ -91,7 +92,11 @@ func TestConstString(test *testing.T) {
 
 	// Test tuples
 	function := goPackage.Scope().Lookup("fn")
-	tup := function.Type().(*types.Signature).Results()
+	functionSignature, isSignature := function.Type().(*types.Signature)
+	if !isSignature {
+		test.Fatalf("fn has type %s, not a signature", function.Type())
+	}
+	tup := functionSignature.Results()
 	if got, want := intermediate_representation.NewConstant(
 		nil,
 		tup,
@@ -102,7 +107,11 @@ func TestConstString(test *testing.T) {
 
 	// Test type-param
 	gen := goPackage.Scope().Lookup("gen")
-	tp := gen.Type().(*types.Signature).TypeParams().At(0)
+	genSignature, isSignature := gen.Type().(*types.Signature)
+	if !isSignature {
+		test.Fatalf("gen has type %s, not a signature", gen.Type())
+	}
+	tp := genSignature.TypeParams().At(0)
 	if got, want := intermediate_representation.NewConstant(nil, tp, nil).String(), "0:T"; got != want {
 		test.Errorf("intermediate_representation.NewConstant(%v, %s).String() = %v, want %v", nil, tup, got, want)
 	}

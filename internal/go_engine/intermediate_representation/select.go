@@ -3,7 +3,7 @@ package intermediate_representation
 // The Select instruction tests whether (or blocks until) one
 // of the specified sent or received states is entered.
 //
-// Let n be the number of States for which Direction==RECV and Tᵢ (0 ≤ i < n)
+// Let n be the number of States for which Direction==`RECV` and Tᵢ (0 ≤ i < n)
 // be the element type of each such state's Channel.
 // Select returns an n+2-tuple
 //
@@ -44,8 +44,9 @@ type Select struct {
 }
 
 func (instr *Select) Operands(rands []*Value) []*Value {
+	operands := rands
 	for index := range instr.States {
-		rands = append(rands, &instr.States[index].Channel, &instr.States[index].Send)
+		operands = append(operands, &instr.States[index].Channel, &instr.States[index].Send)
 	}
-	return rands
+	return operands
 }

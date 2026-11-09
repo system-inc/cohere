@@ -9,9 +9,9 @@ type ConstantSwitch struct {
 }
 
 func (constantSwitch *ConstantSwitch) Operands(rands []*Value) []*Value {
-	rands = append(rands, &constantSwitch.Tag)
+	operands := append(rands, &constantSwitch.Tag)
 	for index := range constantSwitch.Conditions {
-		rands = append(rands, &constantSwitch.Conditions[index])
+		operands = append(operands, &constantSwitch.Conditions[index])
 	}
-	return rands
+	return operands
 }

@@ -1,6 +1,7 @@
 package intermediate_representation
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -64,7 +65,9 @@ func (prog *Program) CreatePackage(
 	importable bool,
 ) *Package {
 	if goPackage == nil {
-		panic("nil pkg") // otherwise pkg.Scope below returns types.Universe!
+		// Invariant: callers create a package from a *types.Package go/types made, never nil, which would make
+		// the scope below types.Universe.
+		panic("nil pkg")
 	}
 	irPackage := &Package{
 		Program: prog,
@@ -154,8 +157,8 @@ func (prog *Program) AllPackages() []*Package {
 // considered importable. For example, no import declaration can resolve
 // to the ad-hoc main package created by 'go build foo.go'.
 //
-// TODO(adonovan): rethink this function and the "importable" concept;
-// most packages are importable. This function assumes that all
+// The "importable" concept is a weak one, since most packages are
+// importable. This function assumes that all
 // types.Package.Path values are unique within the ir.Program, which is
 // false---yet this function remains very convenient.
 // Clients should use (*Program).Package instead where possible.
@@ -192,7 +195,7 @@ func (prog *Program) SetNoReturn(predicate func(*types.Func) bool) {
 // construct fake Functions for the root of the callgraph, a fake
 // "reflect" package, etc.
 //
-// TODO(adonovan): think harder about the API here.
+// The shape of this API is provisional.
 func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
 	return &Function{Program: prog, name: name, Signature: sig, Synthetic: provenance}
 }
@@ -230,8 +233,8 @@ func (prog *Program) FunctionValue(object *types.Func) *Function {
 // ConstantValue returns the IR Value denoted by the source-level named
 // constant obj.
 func (prog *Program) ConstantValue(object *types.Const) *Constant {
-	// TODO(adonovan): opt: share (don't reallocate)
-	// Constants for const objects and constant ast.Exprs.
+	// Constants for const objects and constant ast.Exprs are not shared;
+	// each call allocates its own.
 
 	// Universal constant? {true,false,nil}
 	if object.Parent() == types.Universe {
@@ -239,7 +242,12 @@ func (prog *Program) ConstantValue(object *types.Const) *Constant {
 	}
 	// Package-level named constant?
 	if member := prog.packageLevelMember(object); member != nil {
-		return member.(*NamedConstant).Value
+		namedConstant, isNamedConstant := member.(*NamedConstant)
+		if !isNamedConstant {
+			// Invariant: memberFromObject records every package-level *types.Const as a *NamedConstant.
+			panic(fmt.Sprintf("member for constant %s is a %T, not a *NamedConstant", object, member))
+		}
+		return namedConstant.Value
 	}
 	return NewConstant(object.Val(), object.Type(), nil)
 }

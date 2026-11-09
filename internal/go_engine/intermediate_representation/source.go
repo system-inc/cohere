@@ -7,10 +7,11 @@ package intermediate_representation
 // This file defines utilities for working with source positions
 // or source-level named entities ("objects").
 
-// TODO(adonovan): test that {Value,Instruction}.Pos() positions match
+// No test checks that {Value,Instruction}.Pos() positions match
 // the originating syntax, as specified.
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -119,11 +120,25 @@ func findNamedFunc(goEnginePackage *Package, position token.Pos) *Function {
 			mset := goEnginePackage.Program.MethodSets.MethodSet(types.NewPointer(mem.Type()))
 			for index, length := 0, mset.Len(); index < length; index++ {
 				// Don't call Program.Method: avoid creating wrappers.
-				object := mset.At(index).Obj().(*types.Func)
+				object, isFunc := mset.At(index).Obj().(*types.Func)
+				if !isFunc {
+					// Invariant: every entry of a method set is a method selection, whose object is a *types.Func.
+					panic(fmt.Sprintf("method set entry %s is not a function", mset.At(index)))
+				}
 				if object.Pos() == position {
 					// obj from MethodSet may not be the origin type.
 					function := object.Origin()
-					return goEnginePackage.values[function].(*Function)
+					declared, isFunction := goEnginePackage.values[function].(*Function)
+					if !isFunction {
+						// Invariant: a method at a FuncDecl's name in this package was declared here, and
+						// memberFromObject records every declared method in values as its *Function.
+						panic(fmt.Sprintf(
+							"method %s has no function in package %s",
+							function,
+							goEnginePackage.Types.Path(),
+						))
+					}
+					return declared
 				}
 			}
 		}
