@@ -227,8 +227,8 @@ func TestTakeCensusCountsAForceAddedFileAsOurs(test *testing.T) {
 	if !slices.Equal(census.Ours, []string{valueFile}) {
 		test.Errorf("ours are %q, want only the force-added %s", census.Ours, valueFile)
 	}
-	if !slices.Equal(census.Excluded, []Exclusion{{File: siblingFile, Reason: IgnoredByGit}}) {
-		test.Errorf("excluded are %v, want %s ignored by git", census.Excluded, siblingFile)
+	if !slices.Equal(census.Excluded, []Exclusion{{File: siblingFile, Reason: IgnoredByGit, Source: ".gitignore:1"}}) {
+		test.Errorf("excluded are %v, want %s ignored by git, by .gitignore:1", census.Excluded, siblingFile)
 	}
 }
 
