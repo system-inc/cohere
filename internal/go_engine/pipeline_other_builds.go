@@ -135,7 +135,8 @@ func (engine *pipeline) extraBuildRun(extra project.Build, ours map[string]bool)
 		}
 		session = engine.cacheSession(environment, hostFiles)
 	}
-	caching := load.Caching{Held: engine.held, Timing: engine.timing}
+	// As the host's load does (loadWorkspace), a package with no file in scope is loaded and never analyzed.
+	caching := load.Caching{Held: engine.held, Timing: engine.timing, Analyzes: engine.described.hasFileInScope}
 	if session != nil {
 		caching.Restorer = session
 		if session.HasStore() {

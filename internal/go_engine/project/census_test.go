@@ -14,7 +14,8 @@ import (
 // The census of a workspace is every `.go` file go would see in its owned modules, as absolute paths: inner
 // walked as itself, and nothing from testdata, a dot or underscore directory, below vendor, a path an
 // `ignore` directive names, the unowned nested module, or the submodule. A file a `.gitignore` names, at the
-// root or in inner, or one under an ignored directory, is in the workspace and not ours.
+// root or in inner, or one under an ignored directory, is in the workspace and not ours, named with the line that
+// left it out: the directory's own for a file under an ignored directory.
 func TestTakeCensusListsWhatGoSeesAndExcludesWhatGitIgnores(test *testing.T) {
 	test.Parallel()
 	built := readFixture(test)
@@ -37,6 +38,7 @@ func TestTakeCensusListsWhatGoSeesAndExcludesWhatGitIgnores(test *testing.T) {
 	ours := absolute("deep/deep.go", "deep/generated/kept.go", "inner/deeper/deeper.go", "inner/inner.go",
 		"main.go", "tools/tool.go", "vendor/vendored.go")
 	ignored := absolute("build/generated.go", "inner/local.go", "scratch.go")
+	sources := []string{".gitignore:2", "inner/.gitignore:1", ".gitignore:1"}
 	if !slices.Equal(census.Ours, ours) {
 		test.Errorf("ours are %q, want %q", census.Ours, ours)
 	}
@@ -45,8 +47,8 @@ func TestTakeCensusListsWhatGoSeesAndExcludesWhatGitIgnores(test *testing.T) {
 		test.Errorf("the workspace's files are %q, want %q", census.Files, files)
 	}
 	excluded := make([]Exclusion, 0, len(ignored))
-	for _, file := range ignored {
-		excluded = append(excluded, Exclusion{File: file, Reason: IgnoredByGit})
+	for index, file := range ignored {
+		excluded = append(excluded, Exclusion{File: file, Reason: IgnoredByGit, Source: sources[index]})
 	}
 	if !slices.Equal(census.Excluded, excluded) {
 		test.Errorf("excluded are %v, want %v", census.Excluded, excluded)
@@ -172,7 +174,7 @@ func TestTakeCensusSeesTheRootModulesPackagesGoListSees(test *testing.T) {
 }
 
 // A module that is its own root below a repository's root is still governed by that repository's ignore
-// files: nested's scratch.go is named by the root's `.gitignore`.
+// files: nested's scratch.go is named by the root's `.gitignore`, one directory above the module's root.
 func TestTakeCensusOfAModuleBelowTheRepositoryRootReadsTheRootsIgnoreFiles(test *testing.T) {
 	test.Parallel()
 	built := readFixture(test)
@@ -189,8 +191,9 @@ func TestTakeCensusOfAModuleBelowTheRepositoryRootReadsTheRootsIgnoreFiles(test 
 	if !slices.Equal(census.Ours, []string{nestedFile}) {
 		test.Errorf("ours are %q, want only %s", census.Ours, nestedFile)
 	}
-	if !slices.Equal(census.Excluded, []Exclusion{{File: scratchFile, Reason: IgnoredByGit}}) {
-		test.Errorf("excluded are %v, want %s ignored by git", census.Excluded, scratchFile)
+	want := []Exclusion{{File: scratchFile, Reason: IgnoredByGit, Source: "../.gitignore:1"}}
+	if !slices.Equal(census.Excluded, want) {
+		test.Errorf("excluded are %v, want %s ignored by git at ../.gitignore:1", census.Excluded, scratchFile)
 	}
 }
 

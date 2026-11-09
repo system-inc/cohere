@@ -538,7 +538,7 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 	}
 	engine.write(contract.TypesRecord{
 		Diagnostics:         len(loaded.Diagnostics),
-		Files:               loaded.FilesTypeChecked,
+		Files:               engine.filesTypeChecked(loaded),
 		ElapsedMilliseconds: int(loaded.Elapsed.Milliseconds()),
 		FilesWithoutRecord:  withoutRecord,
 		Build: fmt.Sprintf("%s: %d packages, %d in the workspace", build,
@@ -552,6 +552,22 @@ func (engine *pipeline) runTypes(loaded *load.Loaded, loadError error) {
 		Memory: engine.memory,
 	})
 	engine.phase(contract.PhaseTypes, contract.OutcomeRan, loaded.Elapsed, "")
+}
+
+// filesTypeChecked counts the distinct files in scope that the analyzed packages hold. A file the project record names
+// as excluded is type-checked with its package all the same, and never counted, so a run with none in scope reads 0
+// files. It reads GoFiles, the files as written, since a translated cgo package's CompiledGoFiles are generated files
+// in the build cache.
+func (engine *pipeline) filesTypeChecked(loaded *load.Loaded) int {
+	seen := map[string]bool{}
+	for _, analyzedPackage := range loaded.Packages {
+		for _, file := range analyzedPackage.GoFiles {
+			if engine.described.inScopeSet[file] {
+				seen[file] = true
+			}
+		}
+	}
+	return len(seen)
 }
 
 // compilerFinding is one load diagnostic as a finding. go/types has no stable public code for its errors, so

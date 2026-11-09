@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/packages"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/checker"
 )
@@ -177,6 +178,62 @@ func TestACleanModuleAnalyzesEachVariantOnce(test *testing.T) {
 	}
 }
 
+// A package Analyzes turns down is left out of Packages and still loaded: q, which imports p, type-checks against
+// it, and a wrongly signed test function in one turned down is a diagnostic as before, since go test refuses it
+// whoever reads the package.
+func TestAPackageAnalyzesTurnsDownIsLoadedAndNotAnalyzed(test *testing.T) {
+	test.Parallel()
+
+	root := loadedFixtures(test)
+	notSignatureOrP := func(analyzed *packages.Package) bool {
+		return analyzed.PkgPath != "example.com/broken/signature" && analyzed.PkgPath != "example.com/clean/p" &&
+			analyzed.PkgPath != "example.com/clean/p_test"
+	}
+	clean, cleanError := PackagesCached(filepath.Join(root, "clean"), []string{"./...", "example.com/outside"},
+		cleanEnvironment, fixtures.census, Caching{Analyzes: notSignatureOrP})
+	if cleanError != nil {
+		test.Fatal(cleanError)
+	}
+	analyzedIdentifiers := identifiers(clean)
+	slices.Sort(analyzedIdentifiers)
+	want := []string{
+		"example.com/clean/plain", "example.com/clean/q", "example.com/clean/tagged", "example.com/outside",
+	}
+	if !slices.Equal(analyzedIdentifiers, want) {
+		test.Fatalf("want the analyzed packages\n%q\ngot\n%q", want, analyzedIdentifiers)
+	}
+	// Type-checked all the same, p's two variants still count among the workspace's six.
+	if len(clean.Diagnostics) > 0 || clean.PackagesInWorkspace != 6 {
+		test.Errorf("want no diagnostics and 6 packages in the workspace, got %+v and %d", clean.Diagnostics,
+			clean.PackagesInWorkspace)
+	}
+	for _, analyzed := range clean.Packages {
+		if analyzed.PkgPath == "example.com/clean/q" && analyzed.Imports["example.com/clean/p"].Types == nil {
+			test.Errorf("q's import of p came back without its types")
+		}
+	}
+
+	broken, brokenError := PackagesCached(filepath.Join(root, "broken"), []string{"./..."}, []string{"GOWORK=off"}, nil,
+		Caching{Analyzes: notSignatureOrP})
+	if brokenError != nil {
+		test.Fatal(brokenError)
+	}
+	if slices.ContainsFunc(identifiers(broken), func(identifier string) bool {
+		return strings.Contains(identifier, "signature")
+	}) {
+		test.Errorf("want no signature package analyzed, got %q", identifiers(broken))
+	}
+	refused := 0
+	for _, diagnostic := range broken.Diagnostics {
+		if strings.Contains(diagnostic.Message, "wrong signature for") {
+			refused++
+		}
+	}
+	if refused != 2 {
+		test.Errorf("want both wrongly signed test functions refused, got %+v", broken.Diagnostics)
+	}
+}
+
 // diagnosticsAt is the diagnostics in the file named relative to the broken module.
 func diagnosticsAt(root, relative string) []Diagnostic {
 	file := filepath.Join(root, "broken", filepath.FromSlash(relative))
@@ -314,8 +371,7 @@ func TestACensusFileNoPackageHoldsThatWouldBuildIsUnseen(test *testing.T) {
 	}
 }
 
-// The counts are of the whole graph, of the analyzed packages, and of the workspace's files they hold, each
-// file once though "p [p.test]" and the plain p both hold p.go.
+// The counts are of the whole graph and of the analyzed packages.
 func TestTheCountsDescribeTheLoad(test *testing.T) {
 	test.Parallel()
 
@@ -326,10 +382,6 @@ func TestTheCountsDescribeTheLoad(test *testing.T) {
 	// testing alone reaches dozens of standard packages.
 	if fixtures.clean.PackagesLoaded < 20 {
 		test.Errorf("want the whole graph counted, got %d packages", fixtures.clean.PackagesLoaded)
-	}
-	// p.go, p_test.go, external_test.go, q.go, plain.go and tagged.go; outside.go is not the workspace's.
-	if fixtures.clean.FilesTypeChecked != 6 {
-		test.Errorf("want 6 files type-checked, got %d", fixtures.clean.FilesTypeChecked)
 	}
 	if fixtures.clean.Elapsed <= 0 {
 		test.Errorf("want the elapsed time, got %s", fixtures.clean.Elapsed)

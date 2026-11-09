@@ -188,6 +188,19 @@ Excluded files print as coverage notes under the lint line, grouped by reason. U
 reason are named, `  not checked: <file> (<reason>)`; more are counted, `  not checked: <n> files
 (<reason>)`, because 107 vendored files named one per line buried the verdict on the first real run.
 
+An excluded file may carry `source`, additive within contract 3: the rule that decided, as `path:line` with
+the path relative to `root`, so a reader can find the line that left the file out. The Go engine writes it
+for a file git ignores, naming the ignore file's line that decided, `../.gitignore:4` for one above the root.
+It is absent where no line of a file decided, as for a file the build constraints leave out, and an engine
+from before it writes none.
+
+```json
+{
+    "kind": "project",
+    "excluded": [{ "file": "/…/scratch.go", "reason": "ignored by git", "source": ".gitignore:1" }]
+}
+```
+
 ### `unreadable`, between `project` and the first `phase`
 
 ```json
