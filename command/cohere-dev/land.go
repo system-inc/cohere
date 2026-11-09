@@ -499,15 +499,13 @@ func gate(worktree string, commit string) (int, string) {
 			return 2
 		}
 		defer printUncovered(streams.Errors, uncovered)
-		test := exec.Command("go", append([]string{"test"}, patterns...)...)
-		test.Dir, test.Env = worktree, testing
-		test.Stdout, test.Stderr = os.Stdout, os.Stderr
-		// The command writes to the terminal itself, so what this run said first is delivered first.
-		streams.Show(streams.Output)
-		streams.Show(streams.Errors)
-		if runError := test.Run(); runError != nil {
-			return exitCodeOf(runError)
+		// On Home, with what Home could not run on the Mac, or all of it here when Home gives no verdict
+		// (home_verdict.go).
+		testCode, where := runModuleTests(worktree, commit, covered, testing, time.Now())
+		if testCode != 0 {
+			return testCode
 		}
+		ran[1] += " " + where
 		code, checked = checkDocsData(worktree, func() []string { return gateEnvironment(step("the docs data check")) })
 		if checked {
 			ran = append(ran, "the docs data")

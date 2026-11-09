@@ -59,6 +59,9 @@ func newLandFixture(test *testing.T) *landFixture {
 		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
 		homeVariable+"="+home,
 		tokensVariable+"=2",
+		// A fixture's landing never reaches the real Home: its commits are no one's to push to the feed. A test that
+		// means Home stands in for her with a later entry, which wins.
+		homeGateVariable+"=off",
 		"GIT_AUTHOR_NAME=test",
 		"GIT_AUTHOR_EMAIL=test@example.com",
 		"GIT_COMMITTER_NAME=test",
@@ -705,7 +708,8 @@ func TestALandingIsOneMergeCommitOntoMain(test *testing.T) {
 	}
 	body := fixture.git(fixture.repository, "log", "-1", "--format=%b", landing)
 	for _, want := range []string{"a at " + head[:8] + ", onto main at " + before[:8], fixtureSubject("add a.txt"),
-		"and 2 merges of the branch's own", "Gated by cohere-dev land in", ": go vet, go test of the module."} {
+		"and 2 merges of the branch's own", "Gated by cohere-dev land in",
+		": go vet, go test of the module on the Mac, since "} {
 		if !strings.Contains(body, want) {
 			test.Errorf("the landing's body lacks %q:\n%s", want, body)
 		}

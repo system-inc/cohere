@@ -356,7 +356,8 @@ func outsideThePool(environment []string) []string {
 			!strings.HasPrefix(variable, "GOFLAGS=") && !strings.HasPrefix(variable, homeVariable+"=") &&
 			!strings.HasPrefix(variable, landWorktreeVariable+"=") &&
 			!strings.HasPrefix(variable, mainLandVariable+"=") &&
-			!strings.HasPrefix(variable, gateCohereVariable+"=") {
+			!strings.HasPrefix(variable, gateCohereVariable+"=") &&
+			!strings.HasPrefix(variable, homeGateVariable+"=") {
 			kept = append(kept, variable)
 		}
 	}
