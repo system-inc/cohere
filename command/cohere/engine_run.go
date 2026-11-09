@@ -67,6 +67,9 @@ type engineProjectRecord struct {
 	Excluded            []struct {
 		File   string `json:"file"`
 		Reason string `json:"reason"`
+		// Source is the rule that excluded the file, `path:line` relative to the project root, absent where no rule
+		// did: contract 3 carries it as an optional field (#08cv2mp).
+		Source string `json:"source"`
 	} `json:"excluded"`
 }
 
@@ -1088,6 +1091,7 @@ func (run *engineRun) writeExcluded() {
 		}
 	}
 	activeSummary.Gaps.Unchecked = gap
+	run.countExcludedWhenNothingChecked()
 	// A file the engine could not read is printed the way an excluded file is, because to a reader it is
 	// the same fact: a file nothing checked, and why.
 	for _, unreadable := range run.unreadable {
@@ -1392,7 +1396,36 @@ func (run *engineRun) finish(engineExit int, ended string) (int, error) {
 		return 1, fmt.Errorf("%s %s, and its summary said it would exit %d",
 			run.language.theEngine(), ended, *run.summary.ExitCode)
 	}
+	// The engine calls a run whose every file was excluded clean, since it found nothing; the front door fails it,
+	// since it checked nothing (#08cv2mp).
+	if *run.summary.ExitCode == 0 && activeSummary.Gaps.nothingChecked() {
+		return 1, nil
+	}
 	return *run.summary.ExitCode, nil
+}
+
+// countExcludedWhenNothingChecked fills the summary's reasons for a run that checked none of its files: each file
+// the project record excluded, by its reason and the rule that decided it, and the files of ours a narrowing left
+// out of scope. A file the run of a project below this one accounts for is that run's, as writeExcluded leaves it,
+// and a file that was never a source to check, a Swift package's manifest, is no reason (NotSourceReasons).
+// A run that checked something keeps no reasons, and a project with no file of its language has none to keep, so
+// both read as they did (#08cv2mp).
+func (run *engineRun) countExcludedWhenNothingChecked() {
+	if !activeSummary.Gaps.NothingToCheck || run.project == nil {
+		return
+	}
+	for _, excluded := range run.project.Excluded {
+		if len(run.yieldedDirectories) > 0 && yieldsFile(run.yieldedDirectories, resolvedPath(excluded.File)) {
+			continue
+		}
+		if run.language.NotSourceReasons[excluded.Reason] {
+			continue
+		}
+		activeSummary.Gaps.addExcluded(excluded.Reason, excluded.Source, 1)
+	}
+	if outOfScope := run.project.FilesOurs - run.project.FilesInScope; outOfScope > 0 {
+		activeSummary.Gaps.addExcluded(outsideNamedPaths, "", outOfScope)
+	}
 }
 
 // writeUnfinished prints the phase line for a run that stopped early, every phase the engine never

@@ -1,6 +1,10 @@
 package go_engine
 
 import (
+	"slices"
+
+	"golang.org/x/tools/go/packages"
+
 	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/project"
@@ -65,6 +69,26 @@ func (described *describedProject) readable() []string {
 		}
 	}
 	return files
+}
+
+// hasFileInScope reports whether a package to analyze holds a file in scope, under this build or another
+// (constrainedInScope), which is what makes it one the rules analyze. A package with none, every file of it ignored
+// by git or outside the paths, is loaded for what imports it and its facts, and never linted, so a file the project
+// record names as excluded is never walked or counted as checked; its findings were dropped already.
+func (described *describedProject) hasFileInScope(analyzed *packages.Package) bool {
+	return slices.ContainsFunc(analyzed.GoFiles, func(file string) bool {
+		return described.inScopeSet[file] || described.constrainedInScope[file]
+	})
+}
+
+// countedAsWalked reports whether the lint record counts a file the rules were given as walked: one in scope, or one
+// that is not the project's at all, as a cgo file's translation in the build cache, which stands for the file it was
+// translated from. A package with a file in scope can hold files of the project out of it, one git ignores or one
+// outside the paths, which the rules still read as the package's and which the run did not check.
+func (described *describedProject) countedAsWalked(file string) bool {
+	// The census's files are sorted (project.TakeCensus).
+	_, ofProject := slices.BinarySearch(described.census.Files, file)
+	return described.inScopeSet[file] || !ofProject
 }
 
 // scopeWords says what the fix phase formatted, for its record's formatScope.

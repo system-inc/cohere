@@ -189,10 +189,16 @@ type lintPass struct {
 	elapsed    time.Duration
 }
 
-// lint runs the rules the settings leave on over loaded, through the findings cache when the run has one and has not
-// renamed, keeps the findings in scope, and applies the //cohere:ignore comments to them.
+// lint runs the rules the settings leave on over loaded's packages with a file in scope, through the findings cache
+// when the run has one and has not renamed, keeps the findings in scope, and applies the //cohere:ignore comments to
+// them. The run's own loads analyze only those already (loadWorkspace); the rename's cannot, since its plan reads
+// every reference, so a load it proved, which the lint phase reads after it wrote, is narrowed here, and with no
+// findings cache, which a renamed run reads none of.
 func (engine *pipeline) lint(loaded *load.Loaded) lintPass {
-	return engine.lintPackages(loaded.Packages, check.Options{Withheld: loaded.Withheld})
+	analyzed := slices.DeleteFunc(slices.Clone(loaded.Packages), func(each *packages.Package) bool {
+		return !engine.described.hasFileInScope(each)
+	})
+	return engine.lintPackages(analyzed, check.Options{Withheld: loaded.Withheld})
 }
 
 // lintPackages is lint over the packages to analyze, with what the load gives the run in options: its Withheld once
@@ -211,6 +217,7 @@ func (engine *pipeline) lintPackages(analyzed []*packages.Package, options check
 	options.ReleaseAnalyzed = true
 	options.ReadFile = engine.sourceReader(nil)
 	options.Timing = engine.timing
+	options.Counted = engine.described.countedAsWalked
 	if engine.duplicatesRequested() {
 		options.Report = canonical_function_hash.Analyzer
 	}

@@ -188,70 +188,6 @@ func (summary runSummary) filesFormatted() int {
 	return count
 }
 
-// runGaps is every way a run fell short of checking everything. Each is said in the footer even when
-// the run is green.
-type runGaps struct {
-	// ProgramFiles is the program's size when the run was narrowed to fewer of its files, zero otherwise.
-	ProgramFiles int `json:"programFiles"`
-	CrashedFiles int `json:"crashedFiles"`
-	// RuleCrashes is each rule that crashed on a file, leaving its verdict there missing. Like a crashed
-	// file it fails the run: see runCrash.
-	RuleCrashes int `json:"ruleCrashes"`
-	// Crashes is each crash the two counts above count, named: the file, the rule for a rule crash, and the
-	// cause, a panic in a TypeScript run and the engine's own sentence in an engine's. A count with no reason
-	// is a gap nobody can act on, so the list is always as long as the two counts together, and it is the
-	// same record `--json` prints as a `crash` line.
-	Crashes []runCrash `json:"crashes,omitempty"`
-	// RulesSkippingEverything is the rules that declined every file they were offered.
-	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
-	FormattingNotChecked    bool `json:"formattingNotChecked"`
-	NothingToCheck          bool `json:"nothingToCheck"`
-	// ModifiedBuild is a binary built from a modified tree, which no commit reproduces.
-	ModifiedBuild bool `json:"modifiedBuild"`
-	// Unread is files the run could not check for any other reason, said as the run said it.
-	Unread string `json:"unread,omitempty"`
-	// NestedUnread is why the nested repositories could not be read for drift, when they could not. Their
-	// files are never this run's to check, so the run goes on, and says so here (#71njcj8).
-	NestedUnread string `json:"nestedUnread,omitempty"`
-	// PhasesNotRun are the check's phases the run has no record of, so it stopped before them. A run that
-	// formatted and never type-checked or linted says it here, rather than reading as 0 rules that found
-	// nothing (#71njcj8). Set where a run stops: its failed summary, and a project's run that never finished.
-	PhasesNotRun []string `json:"phasesNotRun,omitempty"`
-	// AdamicIgnored is the Adamic `.a` files the program holds that git's ignore rules leave out of the
-	// format walk: checked, and never formatted (#6mhafvb).
-	AdamicIgnored int `json:"adamicIgnored,omitempty"`
-	// NestedUnchecked is the files in the nested repositories the run reads that the formatter could not check,
-	// each named in the account (#zmt3tv5). A gap and never the verdict: the nested repository is read-only here,
-	// and its own run is the one that fails on them.
-	NestedUnchecked int `json:"nestedUnchecked,omitempty"`
-	// MissingGenerated is each generated file the program asks for that does not exist yet, relative to the
-	// project root (#wxsqavy). It fails the run: what the missing file declares was never checked.
-	MissingGenerated []string `json:"missingGenerated,omitempty"`
-	// FixesHeld is a run whose lint fixes were held because an input the program was told to load is missing
-	// (#46ern7e, #4jxsbzr): a generated file, or an import, reference or types entry that resolves to nothing.
-	// None was proposed or written, and formatting ran alone.
-	FixesHeld bool `json:"fixesHeld,omitempty"`
-	// Unchecked is the files an engine's run listed as not checked for a reason other than the ones its language
-	// says nobody expects checked (engineLanguage.ExpectedExclusionReasons). In a Swift run that today means no
-	// target of the package compiles them and they are no standalone script the run checks alone (#13nbb1s), less
-	// those the runs of the Swift projects below it account for (#ybspptb). In a Go run it means a file only another
-	// platform builds, or one that imports "C" while cgo is off, since the engine checks the host's build alone; under
-	// `--other-builds` a file another build checked is expected, and only one no build the run checked compiles stays
-	// (#72n9mq0). A gap, not a failure.
-	// Each is named, never only counted: a gap nobody can find is half a gap.
-	Unchecked []uncheckedEngineFile `json:"unchecked,omitempty"`
-	// WithheldInDependencyCgo is each file of a dependency with cgo files whose type errors a Go run withheld,
-	// since no cgo tool ran and the faked package "C" is what they are about, sorted by file as the engine sends
-	// them. A gap, not a failure: they are a dependency's, not the project's to fix. Each is named, never only
-	// counted, with its package and how many errors it held, so a reader can find what went unsaid.
-	WithheldInDependencyCgo []withheldCgoFile `json:"withheldInDependencyCgo,omitempty"`
-	// WithheldDependencyCgoDeclarations counts the declarations of dependencies with cgo files that every rule
-	// was given without their bodies or initial values, since no cgo tool ran. A gap, not a failure, as the
-	// files above are. Counted and not named because the engine counts them and names none: they are spread
-	// over whole packages, and the count is what says the rules saw less of those dependencies than all of it.
-	WithheldDependencyCgoDeclarations int `json:"withheldDependencyCgoDeclarations,omitempty"`
-}
-
 // uncheckedEngineFile is one file of an engine run's gap: the file as the engine names it, the engine's reason for
 // leaving it out, and the language whose engine left it, which the footer's marker names, "Swift files not checked".
 // The format phase's own unchecked files are uncheckedFile (format_only.go), a different fact.
@@ -294,7 +230,8 @@ func (summary runSummary) phasesNotRun() []string {
 
 func (summary runSummary) failed() bool {
 	return summary.TypeErrors > 0 || summary.Findings > summary.WarningFindings || summary.WouldChange > 0 ||
-		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0
+		summary.Gaps.CrashedFiles > 0 || summary.Gaps.RuleCrashes > 0 || len(summary.Gaps.MissingGenerated) > 0 ||
+		summary.Gaps.nothingChecked()
 }
 
 // swiftSummary is what only a Swift run says of itself.

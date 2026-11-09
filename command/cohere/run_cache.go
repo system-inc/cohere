@@ -615,8 +615,9 @@ func declareLintConfigInputs(path string) {
 // CohereSettings.json a directory resolves its options from, with the files it extends.
 //
 // The git ignore files the walk read or looked for (Enumeration.IgnoreFiles: each entered directory's
-// .gitignore and info/exclude) are recorded present or absent. A content edit to a nested .gitignore moves
-// no directory's modification time, and info/exclude sits in .git/info, a directory the walk never lists.
+// .gitignore, info/exclude, and the repository's index, whose tracked paths are never ignored) are recorded
+// present or absent. A content edit to a nested .gitignore moves no directory's modification time, and
+// info/exclude and the index sit in .git, a directory the walk never lists.
 // The formatter's own identity needs no input: the run's key covers the running binary (see beginRunCache).
 func declareFormatWalk(enumeration format_files.Enumeration) {
 	session := activeRunCache
