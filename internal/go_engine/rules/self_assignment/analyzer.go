@@ -1,5 +1,6 @@
 // Package self_assignment is staticcheck's SA4018, an assignment of a variable or an expression to itself, which does
-// nothing, ported as a check on syntax that reports through the kit every port of staticcheck shares.
+// nothing, ported as a check on syntax, reached through the engine's own intermediate representation, that reports
+// through the kit every port of staticcheck shares.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4018/sa4018.go, whose logic it keeps and
 // whose message it reports word for word, over the whole assignment, and in no generated file, as staticcheck's
@@ -22,22 +23,22 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/purity"
 	"honnef.co/go/tools/analysis/report"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function of the intermediate
-// representation, whose syntax it walks when the function is a top-level one, so each assignment is judged once. It
-// listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which are built from the
-// representation and so only on a package without errors, as the original runs: the syntax walk runs on every
-// package, and so must everything a syntax listener requires.
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, whose syntax it walks when the function is a top-level one, so each assignment is
+// judged once. It listens to that walk, not the syntax's, because it reads staticcheck's purity facts, which are built
+// from staticcheck's representation and so only on a package without errors, as the original runs, and the walk over
+// ours runs only there too: the syntax walk runs on every package, and so must everything a syntax listener requires.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{purity.Analyzer},
-	Function: judgeFunction,
+	Requires:                   []*analysis.Analyzer{purity.Analyzer},
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: judgeFunction},
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
@@ -46,7 +47,8 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4018",
 	"SA4018",
-	"Flags an assignment of a variable to itself: staticcheck's SA4018, ported as a check on syntax.",
+	"Flags an assignment of a variable to itself: staticcheck's SA4018, ported as a check on syntax reached "+
+		"through the engine's own intermediate representation.",
 	&Listener,
 )
 
@@ -55,7 +57,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 // a function literal of the package's initializer, whose parent, the initializer itself, has no syntax. Every other
 // function is a literal inside one of those and is judged in its walk. An assignment is written only inside a
 // function's body, so these walks reach every assignment the original's walk over the files reaches, each once.
-func judgeFunction(context *rule.Context, function *ir.Function) {
+func judgeFunction(context *rule.Context, function *intermediate_representation.Function) {
 	syntax := function.Syntax()
 	if syntax == nil || function.Parent() != nil && function.Parent().Syntax() != nil {
 		return
