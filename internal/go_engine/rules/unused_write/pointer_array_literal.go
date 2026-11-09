@@ -6,9 +6,9 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -27,7 +27,7 @@ import (
 // the index alone of a loop ranging over it, a store of a whole array through it, `*values = x`, an assignment of
 // another pointer to the variable, and a copy of it into another variable, whose uses count as its own. A use the
 // syntax cannot place among those counts as a read, so the check never reports what the original does not.
-func reportLiftedArrayLiterals(context *rule.Context, function *ir.Function) {
+func reportLiftedArrayLiterals(context *rule.Context, function *intermediate_representation.Function) {
 	syntax := function.Source()
 	body := functionBody(syntax)
 	if body == nil {
@@ -62,8 +62,8 @@ func reportLiftedArrayLiterals(context *rule.Context, function *ir.Function) {
 	// A literal staticcheck kept an allocation for is deadWrites' to judge.
 	allocated := map[ast.Node]bool{}
 	for _, block := range function.Blocks {
-		for _, instruction := range block.Instrs {
-			if allocation, isAllocation := instruction.(*ir.Alloc); isAllocation {
+		for _, instruction := range block.Instructions {
+			if allocation, isAllocation := instruction.(*intermediate_representation.Allocation); isAllocation {
 				allocated[allocation.Source()] = true
 			}
 		}
@@ -294,7 +294,10 @@ func arrayLiteralElement(context *rule.Context, literal *ast.CompositeLit) (toke
 // the allocation the literal makes, where staticcheck kept that allocation: x/tools writes the element through its
 // index address. A literal of more elements is judged by none of them, since x/tools' address for each element is a
 // use of the array to every other element's write.
-func arrayLiteralElementWrite(store *ir.Store, allocation *ir.Alloc) (write, bool) {
+func arrayLiteralElementWrite(
+	store *intermediate_representation.Store,
+	allocation *intermediate_representation.Allocation,
+) (write, bool) {
 	literal, value, isLiteral := literalStoredWhole(store)
 	if !isLiteral {
 		return write{}, false
