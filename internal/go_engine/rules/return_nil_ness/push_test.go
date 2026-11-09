@@ -47,7 +47,7 @@ func runPush(pass *analysis.Pass, judged *atomic.Int64) (*pushResult, error) {
 	if readError != nil {
 		return nil, readError
 	}
-	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
+	functions := slices.Collect(built.SourceFunctions())
 	walk := &pushWalk{facts: passFacts{pass: pass}, irPackage: built.Package(),
 		seen: map[*intermediate_representation.Function]bool{}}
 	for _, function := range functions {

@@ -78,7 +78,7 @@ func run(pass *analysis.Pass) (any, error) {
 			"it learns a package from, ran on it first", pass.Pkg.Path())
 	}
 	// Collected once, so the three passes walk the same functions in the same order.
-	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
+	functions := slices.Collect(built.SourceFunctions())
 	marks := &packageFacts{
 		resolver: resolver,
 		home:     reader,

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -32,6 +33,10 @@ import (
 // TS1109, an unterminated string TS1002, and a line of garbage six diagnostics. Clean source and
 // an empty file report none. The guard has been shown to fire, which is the only way to know it is
 // a guard and not a decoration.
+// typeScriptParsableExtensions are the endings TypeScriptParsable says yes to, once a name is read through
+// source_name.TreatedAs: TypeScript's own script extensions. A declaration file ends in one of them.
+var typeScriptParsableExtensions = []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"}
+
 // TypeScriptParsable reports whether the parse guard can say anything about a file at all.
 //
 // The guard is a TypeScript parser, so it answers a question about TypeScript. Pointed at css, json,
@@ -54,12 +59,18 @@ import (
 // it, so a static library named libfoo.a is never handed to this parser.
 func TypeScriptParsable(fileName string) bool {
 	treatedAs := source_name.TreatedAs(fileName)
-	for _, extension := range []string{".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"} {
+	for _, extension := range typeScriptParsableExtensions {
 		if strings.HasSuffix(treatedAs, extension) {
 			return true
 		}
 	}
 	return false
+}
+
+// TypeScriptParsableExtensions is a copy of the endings TypeScriptParsable says yes to, for a list that has to
+// name every file the fix engine acts on, as the editor's save list does (editors/vscode/cohere-save.json).
+func TypeScriptParsableExtensions() []string {
+	return slices.Clone(typeScriptParsableExtensions)
 }
 
 func Parses(fileName string, text string) (bool, string) {

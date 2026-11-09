@@ -33,8 +33,8 @@ import (
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -181,11 +181,11 @@ func literalFieldWrites(
 	if !isLiteral {
 		return nil
 	}
-	pointer, isPointer := typeutil.CoreType(allocation.Type()).(*types.Pointer)
+	pointer, isPointer := core_type.Of(allocation.Type()).(*types.Pointer)
 	if !isPointer {
 		return nil
 	}
-	structure, isStruct := typeutil.CoreType(pointer.Elem()).(*types.Struct)
+	structure, isStruct := core_type.Of(pointer.Elem()).(*types.Struct)
 	if !isStruct {
 		return nil
 	}
@@ -295,7 +295,7 @@ func literalUsesWrittenElement(store *intermediate_representation.Store, candida
 	if !isLiteral || store.Address != candidate.object {
 		return false
 	}
-	switch typeutil.CoreType(value.Type()).(type) {
+	switch core_type.Of(value.Type()).(type) {
 	case *types.Struct:
 		return candidate.field != notAField && value.Bitmap.Bit(candidate.field) == 1
 	case *types.Array:
@@ -383,11 +383,11 @@ func hasStructOrArrayType(value intermediate_representation.Value) bool {
 // fieldOf is the struct field address selects. The original asserts the struct and panics on anything else; a field
 // address always has one, so the port skips the write instead of crashing should that ever not hold.
 func fieldOf(address *intermediate_representation.FieldAddress) (*types.Var, bool) {
-	pointer, isPointer := typeutil.CoreType(address.X.Type()).(*types.Pointer)
+	pointer, isPointer := core_type.Of(address.X.Type()).(*types.Pointer)
 	if !isPointer {
 		return nil, false
 	}
-	structure, isStruct := typeutil.CoreType(pointer.Elem()).(*types.Struct)
+	structure, isStruct := core_type.Of(pointer.Elem()).(*types.Struct)
 	if !isStruct || address.Field >= structure.NumFields() {
 		return nil, false
 	}

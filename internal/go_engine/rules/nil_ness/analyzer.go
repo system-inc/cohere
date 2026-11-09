@@ -28,6 +28,7 @@ import (
 
 	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -249,7 +250,7 @@ func coreType(typ types.Type) types.Type {
 	if _, isInterface := underlying.(*types.Interface); !isInterface {
 		return underlying
 	}
-	return typeutil.CoreType(typ)
+	return core_type.Of(typ)
 }
 
 // isTypeParameter is whether typ is a type parameter.

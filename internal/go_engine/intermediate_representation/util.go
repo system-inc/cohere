@@ -15,6 +15,8 @@ import (
 	"honnef.co/go/tools/go/types/typeutil"
 
 	"golang.org/x/exp/typeparams"
+
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 type unit struct{}
@@ -57,7 +59,7 @@ func isPointer(resolvedType types.Type) bool {
 // (Most pointer manipulation is related to receivers, in which case
 // isPointer is appropriate. tecallers can use isPointer(resolvedType).
 func isPointerCore(resolvedType types.Type) bool {
-	return is[*types.Pointer](typeutil.CoreType(resolvedType))
+	return is[*types.Pointer](core_type.Of(resolvedType))
 }
 
 // is reports whether x holds a T.
@@ -71,7 +73,7 @@ func deref(typ types.Type) types.Type {
 	resolvedType := types.Unalias(typ)
 
 	if parameter, ok := resolvedType.(*types.TypeParam); ok {
-		if ctyp := typeutil.CoreType(parameter); ctyp != nil {
+		if ctyp := core_type.Of(parameter); ctyp != nil {
 			// This can happen, for example, with len(T) where T is a
 			// type parameter whose core type is a pointer to array.
 			resolvedType = ctyp
@@ -96,7 +98,7 @@ func recvType(object *types.Func) types.Type {
 // fieldOf returns the index'th field of the (core type of) a struct type;
 // otherwise returns nil.
 func fieldOf(typ types.Type, index int) *types.Var {
-	if st, ok := typeutil.CoreType(typ).(*types.Struct); ok {
+	if st, ok := core_type.Of(typ).(*types.Struct); ok {
 		if 0 <= index && index < st.NumFields() {
 			return st.Field(index)
 		}

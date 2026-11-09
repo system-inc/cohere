@@ -5,8 +5,8 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -64,11 +64,11 @@ func isBlank(expression ast.Expr) bool {
 // isStringToRunes is whether conversion converts a string to a slice of runes, judged by the core types, so a type
 // parameter constrained to strings or to slices of runes counts as one.
 func isStringToRunes(conversion *intermediate_representation.Convert) bool {
-	source, isBasic := typeutil.CoreType(conversion.X.Type()).(*types.Basic)
+	source, isBasic := core_type.Of(conversion.X.Type()).(*types.Basic)
 	if !isBasic || source.Kind() != types.String {
 		return false
 	}
-	destination, isSlice := typeutil.CoreType(conversion.Type()).(*types.Slice)
+	destination, isSlice := core_type.Of(conversion.Type()).(*types.Slice)
 	if !isSlice {
 		return false
 	}

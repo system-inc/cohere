@@ -10,6 +10,8 @@ import (
 	"honnef.co/go/tools/analysis/lint"
 	"honnef.co/go/tools/go/ast/astutil"
 	"honnef.co/go/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 // read records that by uses every object syntax reads. Among many other things, an identifier's use handles (7.1)
@@ -174,7 +176,7 @@ func (graph *graph) read(syntax ast.Node, by types.Object) {
 func (graph *graph) readCompositeLiteral(literal *ast.CompositeLit, by types.Object) {
 	graph.read(literal.Type, by)
 	// We get the type of the node itself, not of node.Type, to handle nested composite literals of the kind T{{...}}
-	structType, isStruct := typeutil.CoreType(graph.typesInfo.TypeOf(literal)).(*types.Struct)
+	structType, isStruct := core_type.Of(graph.typesInfo.TypeOf(literal)).(*types.Struct)
 	if !isStruct {
 		for _, element := range literal.Elts {
 			graph.read(element, by)
@@ -220,7 +222,7 @@ func (graph *graph) readCompositeLiteral(literal *ast.CompositeLit, by types.Obj
 		for _, step := range path[:len(path)-1] {
 			field := current.Field(step)
 			graph.use(field, by)
-			next, isNextStruct := typeutil.CoreType(field.Type()).(*types.Struct)
+			next, isNextStruct := core_type.Of(field.Type()).(*types.Struct)
 			if !isNextStruct {
 				break
 			}
@@ -274,8 +276,8 @@ func (graph *graph) readCall(call *ast.CallExpr, by types.Object) {
 	source := graph.typesInfo.TypeOf(call.Args[0])
 
 	// The original notes that this should use DereferenceR instead, guarded against infinite recursion.
-	sourceCore := typeutil.CoreType(typeutil.Dereference(source))
-	destinationCore := typeutil.CoreType(typeutil.Dereference(destination))
+	sourceCore := core_type.Of(typeutil.Dereference(source))
+	destinationCore := core_type.Of(typeutil.Dereference(destination))
 	sourceStruct, isSourceStruct := sourceCore.(*types.Struct)
 	destinationStruct, isDestinationStruct := destinationCore.(*types.Struct)
 	if isDestinationStruct && isSourceStruct {

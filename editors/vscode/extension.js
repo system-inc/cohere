@@ -6,7 +6,13 @@
 
 const NodePath = require('node:path');
 const Vscode = require('vscode');
-const { cohereNotFoundMessage, formatWithCohere, installCommand, resolveCohereBinary } = require('./cohere-format.js');
+const {
+    cohereNotFoundMessage,
+    formatWithCohere,
+    installCommand,
+    resolveCohereBinary,
+    saveDocumentSelector,
+} = require('./cohere-format.js');
 
 const copyInstallCommand = 'Copy install command';
 
@@ -50,7 +56,8 @@ function activate(context) {
             }
             if(result.error !== undefined) {
                 // A broken formatter is shown; the buffer saves as typed. A file cohere declines never
-                // reaches here: it comes back unchanged with no error.
+                // reaches here: it comes back unchanged with no error, and so does one in a project cohere
+                // has no stdin path for.
                 Vscode.window.showErrorMessage(
                     `cohere could not format ${NodePath.basename(filePath)}: ${result.error}`,
                 );
@@ -64,7 +71,9 @@ function activate(context) {
         },
     };
 
-    context.subscriptions.push(Vscode.languages.registerDocumentFormattingEditProvider({ scheme: 'file' }, provider));
+    // Registered only for what cohere formats through stdin, so a file it cannot format, a Go file
+    // among them, is never handed to it and its save never shows an error.
+    context.subscriptions.push(Vscode.languages.registerDocumentFormattingEditProvider(saveDocumentSelector, provider));
 }
 
 function deactivate() {}

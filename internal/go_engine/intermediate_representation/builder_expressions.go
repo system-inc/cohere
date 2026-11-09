@@ -12,9 +12,10 @@ import (
 	"go/types"
 
 	"honnef.co/go/tools/analysis/lint"
-	"honnef.co/go/tools/go/types/typeutil"
 
 	"golang.org/x/exp/typeparams"
+
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 )
 
 // cond emits to fn code to evaluate boolean condition `expr` and jump
@@ -143,7 +144,7 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 		return emitCall(function, &call, typed)
 
 	case *ast.IndexExpr:
-		mapt, isMap := typeutil.CoreType(function.typeOf(typed.X)).(*types.Map) // ,ok must be a map.
+		mapt, isMap := core_type.Of(function.typeOf(typed.X)).(*types.Map) // ,ok must be a map.
 		if !isMap {
 			// Invariant: go/types gives a comma-ok form to an index expression only when it looks up a map.
 			panic(fmt.Sprintf("exprN: comma-ok index of %s, not a map", function.typeOf(typed.X)))
@@ -186,7 +187,7 @@ func (packageBuilder *builder) builtin(
 	resultType := function.typ(typ)
 	switch object.Name() {
 	case "make":
-		switch ct := typeutil.CoreType(resultType).(type) {
+		switch ct := core_type.Of(resultType).(type) {
 		case *types.Slice:
 			length := packageBuilder.expr(function, arguments[1])
 			capacity := length
@@ -252,7 +253,7 @@ func (packageBuilder *builder) builtin(
 		//
 		// Technically this shouldn't apply to type parameters because their length/capacity is never constant. We still
 		// choose to treat them as constant so that users of the IR get the practically constant length for free.
-		resolvedType := typeutil.CoreType(deref(function.typeOf(arguments[0])))
+		resolvedType := core_type.Of(deref(function.typeOf(arguments[0])))
 		if at, ok := resolvedType.(*types.Array); ok {
 			packageBuilder.expr(function, arguments[0]) // for effects only
 			return intConstant(at.Len(), arguments[0])
@@ -369,7 +370,7 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 			x = packageBuilder.expr(function, typed.X)
 			et = types.NewPointer(elem)
 		case ixMap:
-			mt, isMap := typeutil.CoreType(xt).(*types.Map)
+			mt, isMap := core_type.Of(xt).(*types.Map)
 			if !isMap {
 				// Invariant: indexType gives ixMap only when every type in the operand's type set is a map with the
 				// same key and element types, so its core type is that map.
@@ -486,7 +487,7 @@ func (packageBuilder *builder) assign(
 
 				// Subtle: emit debug ref for aggregate types only;
 				// slice and map are handled by store ops in compLit.
-				switch typeutil.CoreType(loc.typ()).(type) {
+				switch core_type.Of(loc.typ()).(type) {
 				case *types.Struct, *types.Array:
 					if deferredStores != nil {
 						// Make sure we don't emit DebugRefs before the store has actually occurred
@@ -689,7 +690,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		var maximum Value
 		var x Value
 		xtyp := function.typeOf(typed.X)
-		switch typeutil.CoreType(xtyp).(type) {
+		switch core_type.Of(xtyp).(type) {
 		case *types.Array:
 			// Potentially escaping.
 			x = packageBuilder.addr(function, typed.X, true).address(function)
@@ -905,7 +906,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return function.emit(elementValue, typed)
 
 		case ixMap:
-			ct, isMap := typeutil.CoreType(xt).(*types.Map)
+			ct, isMap := core_type.Of(xt).(*types.Map)
 			if !isMap {
 				// Invariant: indexType gives ixMap only when every type in the operand's type set is a map with the
 				// same key and element types, so its core type is that map.
@@ -1142,7 +1143,7 @@ func (packageBuilder *builder) setCall(function *Function, expr *ast.CallExpr, c
 	packageBuilder.setCallFunc(function, expr, common)
 
 	// Then append the other actual parameters.
-	sig, _ := typeutil.CoreType(function.typeOf(expr.Fun)).(*types.Signature)
+	sig, _ := core_type.Of(function.typeOf(expr.Fun)).(*types.Signature)
 	if sig == nil {
 		// Invariant: setCall is reached only for calls of functions, conversions having returned in expr0, and
 		// go/types records a signature as the core type of every callee, built-ins included.
@@ -1206,7 +1207,7 @@ func (packageBuilder *builder) compLit(
 	deferredStores *storebuf,
 ) {
 	typ := deref(function.typeOf(lit)) // retain the named/alias/param type, if any
-	switch typed := typeutil.CoreType(typ).(type) {
+	switch typed := core_type.Of(typ).(type) {
 	case *types.Struct:
 		lvalue := &address{addr: addr, expression: lit}
 		if len(lit.Elts) == 0 {
@@ -1257,7 +1258,7 @@ func (packageBuilder *builder) compLit(
 						parent = chain
 						chain = &chain.children[embeddedFieldIndex]
 						treeType := chainCoreType.Field(embeddedFieldIndex).Type()
-						embeddedStruct, isStruct := typeutil.CoreType(treeType).(*types.Struct)
+						embeddedStruct, isStruct := core_type.Of(treeType).(*types.Struct)
 						if !isStruct {
 							// Invariant: go/types accepts only a struct's own fields as keys of its literal, never
 							// promoted ones, so the path to a key has no embedded step and this loop does not run.

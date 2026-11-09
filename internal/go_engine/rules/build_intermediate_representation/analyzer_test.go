@@ -45,7 +45,7 @@ func TestSourceFunctionsReadInBuildirsOrder(test *testing.T) {
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			names := []string{}
-			for function := range mustResultOf(pass).SourceFunctions(nil, "") {
+			for function := range mustResultOf(pass).SourceFunctions() {
 				names = append(names, function.RelativeString(nil))
 			}
 			return names, nil
@@ -106,67 +106,46 @@ func buildirsRun(pass *analysis.Pass) []*ir.Function {
 	return functions
 }
 
-// Analyzer builds nothing as it runs, and the first read of its result, through either door, builds the whole
-// package, as buildir built it before any check ran: a reader whose first read is Package, or one that stops after the
-// first function SourceFunctions hands it, still finds every function built, anonymous ones included. Building one
-// function at a time, as each is read, is the intermediate representation package's own laziness, held there
-// (TestBuildingOneFunctionBuildsOnlyIt), and not what a reader of this result gets.
-func TestTheReadersResultIsWhole(test *testing.T) {
+// Analyzer builds the whole package as its own action, before any reader of the package starts, as buildir built it
+// before any check ran (#zrfcwdy): a reader finds every function built, anonymous ones included, before it reads the
+// result at all, so no reader builds the package inside its own action while another waits on that build. Building
+// one function at a time, as each is read, is the intermediate representation package's own laziness, held there
+// (TestBuildingOneFunctionBuildsOnlyIt), and the fact resolver's, and not what a reader of this result gets.
+func TestEveryFunctionIsBuiltBeforeAReaderStarts(test *testing.T) {
 	test.Parallel()
-	doors := []struct {
-		name      string
-		firstRead func(result *Result)
-	}{
-		{"SourceFunctions", func(result *Result) {
-			for range result.SourceFunctions(nil, "") {
-				break
-			}
-		}},
-		{"Package", func(result *Result) {
-			result.Package()
-		}},
-	}
 	type reading struct {
-		functions     int
-		unbuiltBefore int
-		unbuiltAfter  []string
+		functions int
+		unbuilt   []string
 	}
-	for _, door := range doors {
-		probe := &analysis.Analyzer{
-			Name:       "build_probe_" + strings.ToLower(door.name),
-			Doc:        "counts the functions built before any read and after the first read",
-			Requires:   []*analysis.Analyzer{Analyzer},
-			ResultType: reflect.TypeFor[reading](),
-			Run: func(pass *analysis.Pass) (any, error) {
-				result := mustResultOf(pass)
-				read := reading{functions: len(result.irPackage.Functions)}
-				for _, function := range result.irPackage.Functions {
-					if len(function.Blocks) == 0 {
-						read.unbuiltBefore++
-					}
+	probe := &analysis.Analyzer{
+		Name:       "build_probe",
+		Doc:        "names each function that had no blocks as the reader started",
+		Requires:   []*analysis.Analyzer{Analyzer},
+		ResultType: reflect.TypeFor[reading](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			result := mustResultOf(pass)
+			// Read off the package itself, not through Package or SourceFunctions, so a build either did would not
+			// count.
+			every := withAnonymous(result.irPackage.Functions)
+			read := reading{functions: len(every)}
+			for _, function := range every {
+				if len(function.Blocks) == 0 {
+					read.unbuilt = append(read.unbuilt, function.RelativeString(nil))
 				}
-				door.firstRead(result)
-				// Read off the package itself, not through either door, which would build what it reached.
-				for _, function := range withAnonymous(result.irPackage.Functions) {
-					if len(function.Blocks) == 0 {
-						read.unbuiltAfter = append(read.unbuiltAfter, function.RelativeString(nil))
-					}
-				}
-				return read, nil
-			},
-		}
-		read, isReading := rootResults(test, &checker.Options{}, probe)[probe].(reading)
-		if !isReading {
-			test.Fatalf("the probe through %s returned no reading", door.name)
-		}
-		if read.functions < 8 || read.unbuiltBefore != read.functions {
-			test.Errorf("of %d package functions, %d were unbuilt before the result was read through %s, where all "+
-				"were expected", read.functions, read.unbuiltBefore, door.name)
-		}
-		if len(read.unbuiltAfter) != 0 {
-			test.Errorf("after a first read through %s, %q had no blocks, where the whole package was expected built",
-				door.name, read.unbuiltAfter)
-		}
+			}
+			return read, nil
+		},
+	}
+	read, isReading := rootResults(test, &checker.Options{}, probe)[probe].(reading)
+	if !isReading {
+		test.Fatal("the probe returned no reading")
+	}
+	if read.functions < 8 {
+		test.Fatalf("the fixture held %d functions, where at least 8 were expected", read.functions)
+	}
+	if len(read.unbuilt) != 0 {
+		test.Errorf("as the reader started, %q of %d functions had no blocks, where the whole package was expected "+
+			"built by %s's own action", read.unbuilt, read.functions, Analyzer.Name)
 	}
 }
 
@@ -192,7 +171,7 @@ func TestALaterCalleeIsBuiltWhenItsCallerIsRead(test *testing.T) {
 		ResultType: reflect.TypeFor[[]string](),
 		Run: func(pass *analysis.Pass) (any, error) {
 			reached := []string{}
-			for function := range mustResultOf(pass).SourceFunctions(nil, "") {
+			for function := range mustResultOf(pass).SourceFunctions() {
 				if function.Name() != "caller" {
 					continue
 				}
@@ -264,7 +243,7 @@ func TestTheExpressionMapIsRecordedForItsReaders(test *testing.T) {
 // mappedExpressions is how many expressions in the syntax of result's source functions map to a value.
 func mappedExpressions(result *Result) int {
 	count := 0
-	for function := range result.SourceFunctions(nil, "") {
+	for function := range result.SourceFunctions() {
 		syntax := function.Syntax()
 		if syntax == nil || function.Parent() != nil {
 			continue

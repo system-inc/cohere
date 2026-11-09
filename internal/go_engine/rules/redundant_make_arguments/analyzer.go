@@ -25,8 +25,7 @@ import (
 	"go/types"
 	"path/filepath"
 
-	"honnef.co/go/tools/go/types/typeutil"
-
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -98,7 +97,7 @@ func checkChannelSize(context *rule.Context, call *ast.CallExpr) {
 	}
 	// The original asks the core type, so a type parameter whose every type is a channel of one element, its
 	// directions agreeing, is a channel here, and one that holds a slice is not.
-	core := typeutil.CoreType(context.TypesInfo.TypeOf(typeExpression))
+	core := core_type.Of(context.TypesInfo.TypeOf(typeExpression))
 	if core == nil {
 		// The original calls Underlying on the core type unguarded and would panic here, but make type-checks only
 		// on a type with a core type, and the checker passes over a package that does not type-check, so this is

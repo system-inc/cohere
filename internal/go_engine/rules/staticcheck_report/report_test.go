@@ -322,7 +322,7 @@ func compareReporters(pass *analysis.Pass) (any, error) {
 			return true
 		})
 	}
-	for function := range built.SourceFunctions(nil, "") {
+	for function := range built.SourceFunctions() {
 		compareAt(function, "")
 		for _, parameter := range function.Parameters {
 			compareAt(parameter, "")

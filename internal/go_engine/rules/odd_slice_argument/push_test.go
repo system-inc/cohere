@@ -48,7 +48,7 @@ func runPush(pass *analysis.Pass, judged *atomic.Int64) (pushResult, error) {
 	if readError != nil {
 		return nil, readError
 	}
-	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
+	functions := slices.Collect(built.SourceFunctions())
 	marks := passFacts{pass: pass}
 	walk := &pushWalk{facts: marks}
 	walk.markLengthChecks(functions)

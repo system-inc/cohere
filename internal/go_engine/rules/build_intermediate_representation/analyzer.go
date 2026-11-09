@@ -2,8 +2,10 @@
 // one in internal/go_engine/intermediate_representation, for the readers that move onto it from staticcheck's
 // (#g0rwdw1). It stands where staticcheck's buildir stands for go/ir: the program and package are created from the
 // pass's types and syntax with the no-return predicate buildir gives go/ir, and Result lists the source functions in
-// buildir's order. Unlike buildir it builds nothing as it runs: Result builds the whole package on its first read, so
-// a package nobody reads costs only its creation.
+// buildir's order. As buildir does, it builds the whole package as it runs, an action of its own in the run's graph
+// that the checker schedules as soon as ctrlflow finishes there, so every reader of the package starts on it built
+// and none waits inside its own action on another's build (#zrfcwdy). It runs only where a reader requires it, and
+// every reader reads the whole package, so building before any of them asks costs nothing they would not.
 //
 // It is named for what it does, as buildir and x/tools' buildssa are, rather than go_ir: every comment in this tree
 // says go/ir for staticcheck's package, which this replaces.
@@ -24,13 +26,13 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
-// Analyzer creates the pass's package in our intermediate representation, built whole when its result is first read.
+// Analyzer creates the pass's package in our intermediate representation and builds it whole.
 // It requires ctrlflow, as buildir does, for the same no-return predicate, so where both run the two representations
 // end the same calls in the same `Panic`.
 var Analyzer = &analysis.Analyzer{
 	Name: "build_intermediate_representation",
-	Doc: "creates the package in the engine's own intermediate representation, built whole when a reader first " +
-		"reads it, for the readers that later passes are",
+	Doc: "creates and builds the package in the engine's own intermediate representation, for the readers that " +
+		"later passes are",
 	Run:        run,
 	ResultType: reflect.TypeFor[*Result](),
 	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
@@ -68,10 +70,11 @@ type Sharer interface {
 	ReadersPackage(packageTypes *types.Package) *intermediate_representation.Package
 }
 
-// run is the pass's package as the readers walk it: the one the run's resolver shares, created as NewPackage creates
-// it, or, under a driver with no resolver, NewPackage's own. Either way its expression map is on when a reader of the
-// map requires Analyzer on it, and a package the resolver created before this ran, for a question that reached it
-// first, was created so too: the resolver read the same set of dependents, from the graph, before any action ran.
+// run is the pass's package as the readers walk it, built: the one the run's resolver shares, created as NewPackage
+// creates it, or, under a driver with no resolver, NewPackage's own. Either way its expression map is on when a reader
+// of the map requires Analyzer on it, and a package the resolver created before this ran, for a question that reached
+// it first, was created so too: the resolver read the same set of dependents, from the graph, before any action ran.
+// A function the resolver built already is not built again: Package.Build waits on each function's own build.
 func run(pass *analysis.Pass) (any, error) {
 	graphs, isGraphs := pass.ResultOf[ctrlflow.Analyzer].(*ctrlflow.CFGs)
 	if !isGraphs {
@@ -88,11 +91,13 @@ func run(pass *analysis.Pass) (any, error) {
 				return nil, fmt.Errorf("the fact resolver shares %s recording expressions %t, where this pass's "+
 					"dependents ask %t", pass.Pkg.Path(), shared.RecordsExpressions(), readsExpressions)
 			}
+			shared.Build()
 			return &Result{irPackage: shared}, nil
 		}
 	}
-	return &Result{irPackage: NewPackage(pass.Fset, pass.Pkg, pass.Files, pass.TypesInfo, graphs.NoReturn,
-		readsExpressions)}, nil
+	created := NewPackage(pass.Fset, pass.Pkg, pass.Files, pass.TypesInfo, graphs.NoReturn, readsExpressions)
+	created.Build()
+	return &Result{irPackage: created}, nil
 }
 
 // NewPackage creates packageTypes's package in a program of its own, as buildir does: one per package, since the

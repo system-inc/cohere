@@ -399,7 +399,7 @@ func TestWalkMatchesIrutil(test *testing.T) {
 	whole.requireBoth(test, "Walk (visited every block)")
 }
 
-// TestIsTrivialBuildsAnUnreadCallee builds our IR lazily, as the analyzer's SourceFunctions does: only the caller,
+// TestIsTrivialBuildsAnUnreadCallee builds our IR lazily, as the fact resolver does: only the caller,
 // whose callee is declared after it, does real work, and hasn't been read. IsTrivial must build the callee before
 // reading its blocks, since an unbuilt callee has none and would read as trivial, and answer false as irutil does
 // over go/ir, which buildir builds whole.

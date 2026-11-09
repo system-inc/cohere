@@ -6,8 +6,8 @@ import (
 	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/types/typeutil"
 
+	"github.com/system-inc/cohere/internal/go_engine/core_type"
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -99,7 +99,7 @@ func boundArrayLiteral(context *rule.Context, left ast.Expr, value ast.Expr) (*t
 	if !isLiteral {
 		return nil, nil, false
 	}
-	array, isArray := typeutil.CoreType(context.TypesInfo.TypeOf(literal)).(*types.Array)
+	array, isArray := core_type.Of(context.TypesInfo.TypeOf(literal)).(*types.Array)
 	if !isArray || array.Len() != 1 || len(literal.Elts) != 1 {
 		return nil, nil, false
 	}
@@ -131,7 +131,7 @@ func inspectOwnSyntax(context *rule.Context, body *ast.BlockStmt, visit func(nod
 		case *ast.FuncLit:
 			return false
 		case *ast.RangeStmt:
-			if _, isIterator := typeutil.CoreType(context.TypesInfo.TypeOf(syntax.X)).(*types.Signature); isIterator {
+			if _, isIterator := core_type.Of(context.TypesInfo.TypeOf(syntax.X)).(*types.Signature); isIterator {
 				visit(syntax)
 				for _, part := range []ast.Expr{syntax.Key, syntax.Value, syntax.X} {
 					if part != nil {
@@ -302,7 +302,7 @@ func arrayLiteralElementWrite(
 	if !isLiteral {
 		return write{}, false
 	}
-	array, isArray := typeutil.CoreType(value.Type()).(*types.Array)
+	array, isArray := core_type.Of(value.Type()).(*types.Array)
 	if !isArray || array.Len() != 1 || len(literal.Elts) != 1 {
 		return write{}, false
 	}
