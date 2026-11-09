@@ -114,6 +114,9 @@ func recordRunSummary(summary runSummary) {
 // as well. Its verdict is replayed only while every build's inputs are unchanged, since the Go engine's inputs record
 // names what every build's load read (#e4b08k7), and the land gate runs with it (#72n9mq0).
 //
+// `--timing` is never admitted, on any engine, so such a run neither replays nor is recorded. A timing run is a
+// measurement, and a replay would print the last run's CPU as this run's, a table of costs this run never spent.
+//
 // `--no-cache` is refused by name rather than left to the argument shape. Most flags make a run
 // ineligible, but the promise that flag makes, nothing read and nothing written, should not rest on which
 // arguments happen to be admitted next.

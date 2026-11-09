@@ -2,14 +2,21 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"fmt"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/system-inc/cohere/internal/go_engine/contract"
 	"github.com/system-inc/cohere/internal/types/program"
 )
+
+// timingNameWidth is the width of a timing table's name column, TypeScript's and Go's alike, so the two tables line up
+// the same way. Go's widens past it to its longest rule name (printEngineTimings).
+const timingNameWidth = 42
 
 // printTimings renders per-rule cost, most expensive first.
 //
@@ -28,26 +35,19 @@ import (
 func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time.Duration) {
 	sorted := timings.Sorted()
 	if len(sorted) == 0 {
-		// A timing table with no rows is the instrument measuring nothing, which must not print as
-		// though it measured everything and found it fast.
-		fmt.Fprintf(out, "\ntiming: no rules ran, so there is nothing to measure\n")
+		printNothingToMeasure(out)
 		return
 	}
 
 	account := timings.Account
 	if account.Unavailable != "" {
-		// No CPU is not zero CPU. A table of zeros would read as every rule being free, so the CPU
-		// columns are left out and the reason given, and the counts, which were still counted, stay.
-		fmt.Fprintf(
-			out,
-			"\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
-			account.Unavailable,
-		)
-		fmt.Fprintf(out, "  %-42s %8s %8s %8s\n", "rule", "files", "nodes", "found")
+		printTimingUnavailable(out, account.Unavailable)
+		fmt.Fprintf(out, "  %-*s %8s %8s %8s\n", timingNameWidth, "rule", "files", "nodes", "found")
 		for _, timing := range sorted {
 			fmt.Fprintf(
 				out,
-				"  %-42s %8d %8d %8d\n",
+				"  %-*s %8d %8d %8d\n",
+				timingNameWidth,
 				timing.Name,
 				timing.FilesListened,
 				timing.NodesOffered,
@@ -79,16 +79,12 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 		perCall.Nanoseconds(),
 	)
 	printCoverage(out, timings)
-	fmt.Fprintf(out, "  %-42s %9s %9s %9s %8s %8s %8s\n",
-		"rule", "cpu", "setup", "listen", "files", "nodes", "found")
+	fmt.Fprintf(out, "  %-*s %9s %9s %9s %8s %8s %8s\n",
+		timingNameWidth, "rule", "cpu", "setup", "listen", "files", "nodes", "found")
 
 	for _, timing := range sorted {
-		share := ""
-		if ruleCpu > 0 {
-			share = fmt.Sprintf(" %5.1f%%", 100*float64(timing.TotalCpu())/float64(ruleCpu))
-		}
-
-		fmt.Fprintf(out, "  %-42s %9s %9s %9s %8d %8d %8d%s\n",
+		fmt.Fprintf(out, "  %-*s %9s %9s %9s %8d %8d %8d%s\n",
+			timingNameWidth,
 			timing.Name,
 			formatMilliseconds(timing.TotalCpu()),
 			formatMilliseconds(timing.SetupCpu),
@@ -96,12 +92,38 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 			timing.FilesListened,
 			timing.NodesOffered,
 			timing.Findings,
-			share,
+			formatShare(timing.TotalCpu(), ruleCpu),
 		)
 	}
 
 	printSharedFills(out, timings)
 	printTimingNotes(out, sorted)
+}
+
+// printNothingToMeasure says a run measured no rule. A timing table with no rows is the instrument measuring
+// nothing, which must not print as though it measured everything and found it fast.
+func printNothingToMeasure(out *bufio.Writer) {
+	fmt.Fprintf(out, "\ntiming: no rules ran, so there is nothing to measure\n")
+}
+
+// printTimingUnavailable heads a table whose CPU was not measured, saying why. No CPU is not zero CPU. A table of
+// zeros would read as every rule being free, so the CPU columns are left out and the reason given, and the counts,
+// which were still counted, stay.
+func printTimingUnavailable(out *bufio.Writer, reason string) {
+	fmt.Fprintf(
+		out,
+		"\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
+		reason,
+	)
+}
+
+// formatShare is a row's share of a total, as the last column prints it, or empty when the total is none, since a
+// share of nothing is no number at all.
+func formatShare(part time.Duration, total time.Duration) string {
+	if total <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" %5.1f%%", 100*float64(part)/float64(total))
 }
 
 // printSharedFills reports work that several rules share, which belongs to none of them.
@@ -311,6 +333,169 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 		100*float64(account.WalkCpu)/float64(workersCpu),
 		formatMilliseconds(account.OtherCpu),
 	)
+}
+
+// staticcheckIntermediateRepresentation is the analyzer name of staticcheck's intermediate representation build,
+// which the Go engine runs beside its own while both are in use.
+const staticcheckIntermediateRepresentation = "buildir"
+
+// printEngineTimings renders a Go run's timing record (#3apgjer) in printTimings' shape, so a Go rule is timed
+// before it lands as a TypeScript one is: the unit first, then a row per rule, most expensive first with its share
+// of the rules' total, then the shared work no single rule owns, the load's phases, what the rows cover of the
+// process's CPU, and what measuring cost.
+//
+// Every figure is the kernel's thread clock read on a thread held for the work (contract.TimingRecord), so a rule
+// that waits costs nothing, and the first line says so. The shared rows are the intermediate representation builds,
+// each its own row, the helpers several rules read, and each dispatcher's walk less its calls into the listeners,
+// which are billed to their rules. Without them the first rule to need a build would look like it cost the build.
+//
+// What no row measures is said as its own figure against the process's CPU and never spread over the rows, for the
+// reason printCoverage gives: a share column that sums to 100 percent reads as a run fully explained.
+func printEngineTimings(out *bufio.Writer, record *contract.TimingRecord) {
+	if len(record.Rules) == 0 {
+		printNothingToMeasure(out)
+		return
+	}
+	// Sorted here though the engine sorts them too, so the table is most expensive first whatever order a record
+	// arrives in.
+	rules := slices.Clone(record.Rules)
+	slices.SortStableFunc(rules, func(left, right contract.RuleTiming) int {
+		return cmp.Or(cmp.Compare(right.CpuMicroseconds, left.CpuMicroseconds), strings.Compare(left.Name, right.Name))
+	})
+	shared := slices.Clone(record.Shared)
+	slices.SortStableFunc(shared, func(left, right contract.SharedTiming) int {
+		return cmp.Or(cmp.Compare(right.CpuMicroseconds, left.CpuMicroseconds), strings.Compare(left.Name, right.Name))
+	})
+
+	// Go's rule names carry their namespace, so the column widens to the longest name rather than letting one push its
+	// row out of line with the rest.
+	nameWidth := timingNameWidth
+	for _, row := range rules {
+		nameWidth = max(nameWidth, len(row.Name))
+	}
+
+	if record.Unavailable != "" {
+		printTimingUnavailable(out, record.Unavailable)
+		fmt.Fprintf(out, "  %-*s %9s %9s\n", nameWidth, "rule", "packages", "calls")
+		for _, row := range rules {
+			fmt.Fprintf(out, "  %-*s %9d %9d\n", nameWidth, row.Name, row.Packages, row.Calls)
+		}
+		for _, row := range shared {
+			fmt.Fprintf(out, "  shared: %s, over %s\n",
+				sharedTimingLabel(row), counted(row.Packages, "package", "packages"))
+		}
+		// The list has no count of its own, so it has no line here.
+		fmt.Fprintf(out, "  load: parsed %s, type-checked %s from source, read %s from export data\n",
+			counted(record.Load.ParsedFiles, "file", "files"),
+			counted(record.Load.TypeCheckedPackages, "package", "packages"),
+			counted(record.Load.ExportDataPackages, "package", "packages"))
+		return
+	}
+
+	var ruleCpu time.Duration
+	for _, row := range rules {
+		ruleCpu += microseconds(row.CpuMicroseconds)
+	}
+	// The unit is in the first line, for the reason printTimings gives (#8qyzmxw).
+	fmt.Fprintf(out, "\ntiming: rule CPU, from each analyzer's own thread clock, not wall time: "+
+		"%s, %s of rule CPU summed across goroutines\n",
+		counted(len(rules), "rule", "rules"), formatMilliseconds(ruleCpu))
+	fmt.Fprintf(out, "  (a rule that waits, sleeps or is descheduled costs nothing here. Compare rules to each other: "+
+		"the measurement makes a --timing run slower than a real one.)\n")
+	fmt.Fprintf(out, "  %-*s %9s %9s %9s\n", nameWidth, "rule", "cpu", "packages", "calls")
+	for _, row := range rules {
+		fmt.Fprintf(out, "  %-*s %9s %9d %9d%s\n",
+			nameWidth,
+			row.Name,
+			formatMilliseconds(microseconds(row.CpuMicroseconds)),
+			row.Packages,
+			row.Calls,
+			formatShare(microseconds(row.CpuMicroseconds), ruleCpu),
+		)
+	}
+
+	var sharedCpu time.Duration
+	for _, row := range shared {
+		sharedCpu += microseconds(row.CpuMicroseconds)
+		fmt.Fprintf(out, "  shared: %s, cost %s of CPU over %s\n",
+			sharedTimingLabel(row),
+			formatMilliseconds(microseconds(row.CpuMicroseconds)),
+			counted(row.Packages, "package", "packages"))
+	}
+
+	// The go commands' CPU is their own processes', which the process's CPU below does not hold, so it is said beside
+	// the list's and left out of what the rows sum to.
+	load := record.Load
+	loadCpu := microseconds(load.ListCpuMicroseconds + load.ParseCpuMicroseconds + load.TypeCheckCpuMicroseconds +
+		load.ExportDataCpuMicroseconds)
+	fmt.Fprintf(out,
+		"  load, each phase summed across the goroutines that ran it, so the sums run past the load's wall:\n")
+	fmt.Fprintf(out, "    list: %s of CPU, and %s more in the go commands it ran, as the process's children's\n",
+		formatMilliseconds(microseconds(load.ListCpuMicroseconds)),
+		formatMilliseconds(microseconds(load.ListChildrenCpuMicroseconds)))
+	fmt.Fprintf(out, "    parse: %s over %s\n",
+		formatMilliseconds(microseconds(load.ParseCpuMicroseconds)), counted(load.ParsedFiles, "file", "files"))
+	fmt.Fprintf(out, "    type-check: %s over %s\n",
+		formatMilliseconds(microseconds(load.TypeCheckCpuMicroseconds)),
+		counted(load.TypeCheckedPackages, "package", "packages"))
+	fmt.Fprintf(out, "    export data: %s over %s\n",
+		formatMilliseconds(microseconds(load.ExportDataCpuMicroseconds)),
+		counted(load.ExportDataPackages, "package", "packages"))
+
+	measuring := microseconds(record.MeasuringCpuMicroseconds)
+	printEngineTimingCoverage(out, microseconds(record.ProcessCpuMicroseconds), ruleCpu, sharedCpu, loadCpu, measuring)
+	fmt.Fprintf(out, "  measuring: %s cost %s, already taken out of the rows above\n",
+		counted(int(record.MeasuredCalls), "measured call", "measured calls"), formatMilliseconds(measuring))
+}
+
+// printEngineTimingCoverage says what the rows sum to against every CPU microsecond the process spent, and names the
+// rest as what no row measures. A process whose CPU could not be read states no share, since a share of an unknown
+// is a guess. Rows that sum past the process are said to, because then some work sits in two rows.
+func printEngineTimingCoverage(
+	out *bufio.Writer,
+	processCpu time.Duration,
+	ruleCpu time.Duration,
+	sharedCpu time.Duration,
+	loadCpu time.Duration,
+	measuring time.Duration,
+) {
+	rows := ruleCpu + sharedCpu + loadCpu + measuring
+	parts := fmt.Sprintf("rules %s, shared %s, load %s, measuring %s", formatMilliseconds(ruleCpu),
+		formatMilliseconds(sharedCpu), formatMilliseconds(loadCpu), formatMilliseconds(measuring))
+	switch {
+	case processCpu <= 0:
+		fmt.Fprintf(out, "  coverage: the rows sum to %s (%s), and the process's CPU could not be read, "+
+			"so what share of it they cover is not said\n", formatMilliseconds(rows), parts)
+	case rows > processCpu:
+		fmt.Fprintf(out, "  coverage: the rows sum to %s (%s), %s past the process's %s of CPU, "+
+			"so some work is counted in two rows\n",
+			formatMilliseconds(rows), parts, formatMilliseconds(rows-processCpu), formatMilliseconds(processCpu))
+	default:
+		fmt.Fprintf(out, "  coverage: the rows sum to %s of the process's %s of CPU, %.1f%% (%s). The other %s is "+
+			"what no row measures: the garbage collector's threads, the runtime, the rest of the run\n",
+			formatMilliseconds(rows), formatMilliseconds(processCpu), 100*float64(rows)/float64(processCpu), parts,
+			formatMilliseconds(processCpu-rows))
+	}
+}
+
+// sharedTimingLabel names a shared row and says what kind of work it is. The intermediate representation builds are
+// named apart, staticcheck's and the engine's own, so a reader sees which of the two a cost belongs to.
+func sharedTimingLabel(row contract.SharedTiming) string {
+	switch row.Kind {
+	case contract.SharedIntermediateRepresentation:
+		if row.Name == staticcheckIntermediateRepresentation {
+			return row.Name + ", staticcheck's intermediate representation build"
+		}
+		return row.Name + ", the engine's intermediate representation build"
+	case contract.SharedDispatcher:
+		return row.Name + ", a dispatcher's walk less its listeners, which are billed to their rules"
+	}
+	return row.Name + ", an analyzer several rules read"
+}
+
+// microseconds is a count of microseconds, as the timing record states every CPU figure, as a duration.
+func microseconds(count int64) time.Duration {
+	return time.Duration(count) * time.Microsecond
 }
 
 // printGraphTiming says what the graph phase was made of, under the line that says how long it took.

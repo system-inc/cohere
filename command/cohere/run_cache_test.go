@@ -207,6 +207,8 @@ func TestRunCacheEligibility(test *testing.T) {
 		{[]string{"--no-fix", "--lint"}, false},
 		// The land gate's run, its own record since the key holds every argument (#72n9mq0).
 		{[]string{"--no-fix", "--other-builds", "--json"}, true},
+		// A measurement, never replayed and never recorded: a replay would print the last run's CPU as this run's.
+		{[]string{"--no-fix", "--timing"}, false},
 		{[]string{"source/a.ts"}, false},
 	} {
 		os.Args = append([]string{"cohere"}, testCase.arguments...)

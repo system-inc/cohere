@@ -71,11 +71,12 @@ func TestGoEngineArgumentsForwardWhatTheGoEngineReads(test *testing.T) {
 
 // TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement: every flag the Go engine has no meaning for is
 // refused by name, naming Go, rather than dropped into a run that looks like it honored it. `--no-cache` left this
-// list when the run cache came to Go (see TestGoEngineArgumentsForwardNoCache).
+// list when the run cache came to Go (see TestGoEngineArgumentsForwardNoCache), and `--timing` when the engine came to
+// write its timing record (see TestTimingReachesTheGoEngine).
 func TestGoEngineArgumentsRefuseWhatTheGoEngineDoesNotImplement(test *testing.T) {
 	test.Parallel()
 	for _, refused := range []string{
-		"unused", "unused-all", "unused-deep", "timing", "explain", "fix-passes", "print-config",
+		"unused", "unused-all", "unused-deep", "explain", "fix-passes", "print-config",
 	} {
 		test.Run(refused, func(test *testing.T) {
 			test.Parallel()
@@ -103,6 +104,31 @@ func TestGoEngineArgumentsForwardNoCache(test *testing.T) {
 	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
 		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
 			engineModeCheck)
+	}
+}
+
+// TestTimingReachesTheGoEngine: `--timing` is taken, not refused, and forwarded to the Go engine, which answers it with
+// its timing record (#3apgjer). Swift's run forwards it as it always did, for its engine to refuse with exit 2, which
+// the front door reports as nothing checked (TestRunEngineBinaryEndings' exit 2 case).
+func TestTimingReachesTheGoEngine(test *testing.T) {
+	test.Parallel()
+	root := test.TempDir()
+	given := map[string]bool{"no-fix": true, "timing": true}
+	arguments, mode, argumentsError := engineArguments(goLanguage("module"), goFlags, goTestLocation(root), given,
+		typedTrue, nil)
+	if argumentsError != nil {
+		test.Fatalf("--timing was refused for Go: %v", argumentsError)
+	}
+	expected := []string{"--contract", "3", "--root", root, "--no-fix", "--timing"}
+	if !slices.Equal(arguments, expected) || mode != engineModeCheck {
+		test.Errorf("arguments are\n  %q in mode %s\nexpected\n  %q in mode %s", arguments, mode, expected,
+			engineModeCheck)
+	}
+
+	swiftArguments, _, swiftError := engineArguments(swiftLanguage, swiftFlags, goTestLocation(root), given, typedTrue,
+		nil)
+	if swiftError != nil || !slices.Contains(swiftArguments, "--timing") {
+		test.Errorf("Swift's run did not forward --timing for its engine to refuse: %q, %v", swiftArguments, swiftError)
 	}
 }
 
