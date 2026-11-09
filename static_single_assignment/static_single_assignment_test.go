@@ -500,30 +500,7 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 	const graphs = 4000
 	behind := 0
 	for graph := 0; graph < graphs; graph++ {
-		function := newTestFunction()
-		count := 1 + random.Intn(12)
-		blocks := make([]*testBlock, 0, count)
-		for index := 0; index < count; index++ {
-			blocks = append(blocks, function.block())
-		}
-		function.entry = blocks[0].id
-		target := func() ssa.BlockId {
-			if random.Intn(25) == 0 {
-				return ssa.BlockId(int(function.next) + 3)
-			}
-			return blocks[random.Intn(len(blocks))].id
-		}
-		for _, block := range blocks {
-			if random.Intn(4) == 0 {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Fallthrough})
-			}
-			for edges := random.Intn(3); edges > 0; edges-- {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Real})
-			}
-			if random.Intn(10) == 0 {
-				block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
-			}
-		}
+		function := generatedFunction(random)
 		finalize(function)
 
 		want := setIntersectionDominators(function)
@@ -544,6 +521,36 @@ func TestDominanceAgreesWithSetIntersection(test *testing.T) {
 		test.Fatalf("none of the %d graphs puts a reached block ahead of all its real predecessors", graphs)
 	}
 	test.Logf("%d graphs, %d of them with a reached block ahead of all its real predecessors", graphs, behind)
+}
+
+// generatedFunction is a random function of one to twelve blocks, with fallthroughs, exceptional edges,
+// self loops and edges to blocks that aren't there, not yet finalized.
+func generatedFunction(random *rand.Rand) *testFunction {
+	function := newTestFunction()
+	count := 1 + random.Intn(12)
+	blocks := make([]*testBlock, 0, count)
+	for index := 0; index < count; index++ {
+		blocks = append(blocks, function.block())
+	}
+	function.entry = blocks[0].id
+	target := func() ssa.BlockId {
+		if random.Intn(25) == 0 {
+			return ssa.BlockId(int(function.next) + 3)
+		}
+		return blocks[random.Intn(len(blocks))].id
+	}
+	for _, block := range blocks {
+		if random.Intn(4) == 0 {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Fallthrough})
+		}
+		for edges := random.Intn(3); edges > 0; edges-- {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Real})
+		}
+		if random.Intn(10) == 0 {
+			block.edges = append(block.edges, testEdge{to: target(), kind: ssa.Exceptional})
+		}
+	}
+	return function
 }
 
 // reachedBlocks is the blocks the entry reaches by real edges.
@@ -693,4 +700,226 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	); !strings.Contains(refusal, want) {
 		test.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
 	}
+}
+
+// blockIds is the blocks' ids, in order, for comparing with what Dominance answers.
+func blockIds(blocks ...*testBlock) []ssa.BlockId {
+	var ids []ssa.BlockId
+	for _, block := range blocks {
+		ids = append(ids, block.id)
+	}
+	return ids
+}
+
+// expectTree checks the tree ComputeDominance makes: each listed parent's children, every block's
+// immediate dominator against those lists, and the preorder walk. A block no list names as a child has
+// no immediate dominator.
+func expectTree(
+	test *testing.T,
+	function *testFunction,
+	children map[*testBlock][]*testBlock,
+	preorder []*testBlock,
+) *ssa.Dominance {
+	test.Helper()
+	dominance := ssa.ComputeDominance(testGraph{}, function)
+	parent := map[ssa.BlockId]ssa.BlockId{}
+	for block, want := range children {
+		if got := dominance.Children(block.id); !slices.Equal(got, blockIds(want...)) {
+			test.Errorf("bb%d's children are %v, want %v", block.id, got, blockIds(want...))
+		}
+		for _, child := range want {
+			parent[child.id] = block.id
+		}
+	}
+	for _, block := range function.blocks {
+		if _, listed := children[block]; !listed && len(dominance.Children(block.id)) != 0 {
+			test.Errorf("bb%d has children %v, want none", block.id, dominance.Children(block.id))
+		}
+		want, hasParent := parent[block.id]
+		if got, ok := dominance.ImmediateDominator(block.id); ok != hasParent || got != want {
+			test.Errorf("bb%d's immediate dominator is bb%d (%t), want bb%d (%t)", block.id, got, ok, want, hasParent)
+		}
+	}
+	if got := dominance.Preorder(); !slices.Equal(got, blockIds(preorder...)) {
+		test.Errorf("the preorder is %v, want %v", got, blockIds(preorder...))
+	}
+	return dominance
+}
+
+// TestTreeOfADiamondOrdersTheJoinBeforeTheSecondArm: the entry dominates both arms and the join, and
+// its children are in the order go/ir's search first reaches them: the left arm, the join through it,
+// then the right arm. Neither creation order (left, right, join) nor reverse postorder (right, left,
+// join) is that order.
+func TestTreeOfADiamondOrdersTheJoinBeforeTheSecondArm(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, left, right, join := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, left, right)
+	goTo(left, join)
+	goTo(right, join)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {left, join, right}},
+		[]*testBlock{entry, left, join, right})
+}
+
+// TestTreeOfALoopHangsTheBodyAndExitFromTheHeader: the back edge from the body changes no immediate
+// dominator, so the header is the entry's one child, and the body and exit are the header's, in the
+// order its terminal names them.
+func TestTreeOfALoopHangsTheBodyAndExitFromTheHeader(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, header, body, exit := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, header)
+	goTo(header, body, exit)
+	goTo(body, header)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {header}, header: {body, exit}},
+		[]*testBlock{entry, header, body, exit})
+}
+
+// TestTreeOfANestedLoopFollowsTheOuterHeadersEdges: the outer header names its exit before the inner
+// loop, so go/ir's search reaches the exit first and it is the outer header's first child, ahead of the
+// inner header made before it. The inner loop's body and latch hang from the inner header.
+func TestTreeOfANestedLoopFollowsTheOuterHeadersEdges(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, outer, inner := function.block(), function.block(), function.block()
+	body, latch, exit := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, outer)
+	goTo(outer, exit, inner)
+	goTo(inner, body, latch)
+	goTo(body, inner)
+	goTo(latch, outer)
+	finalize(function)
+
+	expectTree(test, function,
+		map[*testBlock][]*testBlock{entry: {outer}, outer: {exit, inner}, inner: {body, latch}},
+		[]*testBlock{entry, outer, exit, inner, body, latch})
+}
+
+// TestTreeLeavesOutABlockTheRealEdgesDontReach: a fallthrough's placeholder stays in the slice with no
+// real edge into it, so it has no immediate dominator, no children, and no place in the walk, and the
+// entry's one child is the body. A block the function doesn't hold answers the same.
+func TestTreeLeavesOutABlockTheRealEdgesDontReach(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, body, continuation := function.block(), function.block(), function.block()
+	function.entry = entry.id
+	entry.edges = []testEdge{{to: continuation.id, kind: ssa.Fallthrough}, {to: body.id, kind: ssa.Real}}
+	body.returns = true
+	finalize(function)
+	if !slices.Contains(blockIds(function.blocks...), continuation.id) {
+		test.Fatalf("the block order is %v; the test needs the placeholder in it", blockIds(function.blocks...))
+	}
+
+	dominance := expectTree(test, function, map[*testBlock][]*testBlock{entry: {body}}, []*testBlock{entry, body})
+	missing := ssa.BlockId(function.next + 7)
+	if _, ok := dominance.ImmediateDominator(missing); ok || dominance.Children(missing) != nil {
+		test.Errorf("a block the function doesn't hold has a place in the tree")
+	}
+}
+
+// TestTreePreorderIsNotTheSearchsPreorder: blocks are made in an order go/ir's isn't, and the walk of
+// the tree differs from the search's own preorder. The entry reaches blockB first, then blockX through
+// it, so the entry's children are blockB then blockX (creation made blockX first). blockX has the
+// entry's edge too, so it hangs from the entry, and the walk visits blockB's child blockY before it,
+// where the search visited blockX before blockY.
+func TestTreePreorderIsNotTheSearchsPreorder(test *testing.T) {
+	test.Parallel()
+	function := newTestFunction()
+	entry, blockX, blockY, blockB := function.block(), function.block(), function.block(), function.block()
+	function.entry = entry.id
+	goTo(entry, blockB, blockX)
+	goTo(blockB, blockX, blockY)
+	finalize(function)
+
+	expectTree(test, function, map[*testBlock][]*testBlock{entry: {blockB, blockX}, blockB: {blockY}},
+		[]*testBlock{entry, blockB, blockY, blockX})
+}
+
+// TestTreeAgreesWithGoIrsConstruction: over thousands of generated graphs, the tree is the one go/ir's
+// buildDomTree makes, built here the plain way: immediate dominators from set intersection, each block
+// appended to its parent's children in the recursive depth-first preorder of the real edges, and the
+// walk a recursive one over those children.
+func TestTreeAgreesWithGoIrsConstruction(test *testing.T) {
+	test.Parallel()
+	random := rand.New(rand.NewSource(20261108))
+	const graphs = 4000
+	branching := 0
+	for graph := 0; graph < graphs; graph++ {
+		function := generatedFunction(random)
+		finalize(function)
+
+		dominators := setIntersectionDominators(function)
+		var searchPreorder []ssa.BlockId
+		searched := map[ssa.BlockId]bool{}
+		var search func(id ssa.BlockId)
+		search = func(id ssa.BlockId) {
+			block, ok := function.table[id]
+			if !ok || searched[id] {
+				return
+			}
+			searched[id] = true
+			searchPreorder = append(searchPreorder, id)
+			for _, edge := range block.edges {
+				if edge.kind != ssa.Fallthrough {
+					search(edge.to)
+				}
+			}
+		}
+		search(function.entry)
+
+		// A block's immediate dominator is the strict dominator every other strict one dominates, so the one
+		// with the most dominators of its own.
+		wantParent := map[ssa.BlockId]ssa.BlockId{}
+		wantChildren := map[ssa.BlockId][]ssa.BlockId{}
+		for _, id := range searchPreorder[1:] {
+			best, bestCount := ssa.BlockId(0), -1
+			for dominator := range dominators[id] {
+				if dominator != id && len(dominators[dominator]) > bestCount {
+					best, bestCount = dominator, len(dominators[dominator])
+				}
+			}
+			wantParent[id] = best
+			wantChildren[best] = append(wantChildren[best], id)
+		}
+		var wantPreorder []ssa.BlockId
+		var walk func(id ssa.BlockId)
+		walk = func(id ssa.BlockId) {
+			wantPreorder = append(wantPreorder, id)
+			for _, child := range wantChildren[id] {
+				walk(child)
+			}
+		}
+		walk(function.entry)
+
+		dominance := ssa.ComputeDominance(testGraph{}, function)
+		for _, block := range function.blocks {
+			if got := dominance.Children(block.id); !slices.Equal(got, wantChildren[block.id]) {
+				test.Fatalf("graph %d: bb%d's children are %v, go/ir's are %v\n%s",
+					graph, block.id, got, wantChildren[block.id], describeTestGraph(function))
+			}
+			if len(wantChildren[block.id]) > 1 {
+				branching++
+			}
+			want, hasParent := wantParent[block.id]
+			if got, ok := dominance.ImmediateDominator(block.id); ok != hasParent || got != want {
+				test.Fatalf("graph %d: bb%d's immediate dominator is bb%d (%t), want bb%d (%t)\n%s",
+					graph, block.id, got, ok, want, hasParent, describeTestGraph(function))
+			}
+		}
+		if got := dominance.Preorder(); !slices.Equal(got, wantPreorder) {
+			test.Fatalf("graph %d: the preorder is %v, go/ir's is %v\n%s",
+				graph, got, wantPreorder, describeTestGraph(function))
+		}
+	}
+	if branching == 0 {
+		test.Fatalf("none of the %d graphs has a block with two children, so the order was never tested", graphs)
+	}
+	test.Logf("%d graphs, %d blocks with two children or more", graphs, branching)
 }
