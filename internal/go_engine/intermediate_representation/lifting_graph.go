@@ -23,17 +23,21 @@ type liftingPlace struct {
 	identifier static_single_assignment.IdentifierId
 }
 
-// liftingSlot is the one place a lifted Allocation, Store or Load has.
+// liftingSlot is the one place a lifted Allocation, Store, Load or debug reference has, kept by the instruction's
+// index in its block. isPlace says whether the instruction has one: the zero slot has none, kept apart from role,
+// since the core's Use is its Role's zero value.
 type liftingSlot struct {
-	place liftingPlace
-	role  static_single_assignment.Role
+	place   liftingPlace
+	role    static_single_assignment.Role
+	isPlace bool
 }
 
-// liftingBlock is one block as the core sees it: the block, and the phis the core places in it until lifting
-// turns them into *Phi instructions.
+// liftingBlock is one block as the core sees it: the block, the phis the core places in it until lifting turns
+// them into *Phi instructions, and its instructions' places by index, nil when none of them has one.
 type liftingBlock struct {
 	block *BasicBlock
 	phis  []*static_single_assignment.Phi[liftingPlace]
+	slots []liftingSlot
 }
 
 // liftingFunction is one function as the core sees it for one round of lifting.
@@ -46,9 +50,6 @@ type liftingFunction struct {
 	// order is the blocks in reverse postorder from the entry over Successors, then those the entry doesn't
 	// reach (the Recover block), in index order. Braun's construction walks it.
 	order []*liftingBlock
-
-	// slots are the places of the lifted instructions.
-	slots map[Instruction]*liftingSlot
 
 	// declarations are each identifier's declaration, by identifier: the first len(allocations) are the
 	// declarations' own, and Mint appends.
@@ -140,8 +141,8 @@ func (liftingGraph) InstructionCount(_ *liftingFunction, block *liftingBlock) in
 
 func (liftingGraph) EachInstructionPlace(lifting *liftingFunction, block *liftingBlock, index int,
 	visit func(*liftingPlace, static_single_assignment.Role)) {
-	if slot, isLifted := lifting.slots[block.block.Instructions[index]]; isLifted {
-		visit(&slot.place, slot.role)
+	if index < len(block.slots) && block.slots[index].isPlace {
+		visit(&block.slots[index].place, block.slots[index].role)
 	}
 }
 

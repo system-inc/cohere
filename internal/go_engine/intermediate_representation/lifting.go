@@ -219,7 +219,6 @@ func liftingApplyWork(function *Function, work []liftingWork) {
 func liftingPrepare(function *Function, allocations []*Allocation, options liftingOptions) *liftingFunction {
 	lifting := &liftingFunction{
 		function:     function,
-		slots:        map[Instruction]*liftingSlot{},
 		declarations: make([]static_single_assignment.DeclarationId, len(allocations)),
 		allocations:  allocations,
 	}
@@ -228,19 +227,15 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 		lifting.declarations[index] = static_single_assignment.DeclarationId(index)
 		declarationOf[allocation] = static_single_assignment.DeclarationId(index)
 	}
-	place := func(declaration static_single_assignment.DeclarationId) liftingPlace {
-		// A declaration's own identifier is its number, so the first identifiers are the declarations'.
-		return liftingPlace{identifier: static_single_assignment.IdentifierId(declaration)}
-	}
 	storeSkipped := !options.skipStoreDefinition
 	for _, block := range function.Blocks {
-		lifting.blocks = append(lifting.blocks, &liftingBlock{block: block})
-		for _, instruction := range block.Instructions {
+		lifted := &liftingBlock{block: block}
+		lifting.blocks = append(lifting.blocks, lifted)
+		for index, instruction := range block.Instructions {
 			switch instruction := instruction.(type) {
 			case *Allocation:
 				if declaration, isLifted := declarationOf[instruction]; isLifted {
-					lifting.slots[instruction] = &liftingSlot{place: place(declaration),
-						role: static_single_assignment.Define}
+					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Define)
 				}
 			case *Store:
 				declaration, isLifted := declarationOf[liftingAllocationOf(instruction.Address)]
@@ -251,26 +246,37 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 					storeSkipped = true
 					continue
 				}
-				lifting.slots[instruction] = &liftingSlot{place: place(declaration),
-					role: static_single_assignment.Define}
+				liftingPlaceAt(lifted, index, declaration, static_single_assignment.Define)
 			case *Load:
 				if declaration, isLifted := declarationOf[liftingAllocationOf(instruction.X)]; isLifted {
-					lifting.slots[instruction] = &liftingSlot{place: place(declaration),
-						role: static_single_assignment.Use}
+					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Use)
 				}
 			case *debugReference:
 				// A reference to the variable's address reads the value there once lifted, as a Load does; one
 				// to the cell's address itself goes with the cell (resolve).
 				declaration, isLifted := declarationOf[liftingAllocationOf(instruction.X)]
 				if isLifted && instruction.IsAddress {
-					lifting.slots[instruction] = &liftingSlot{place: place(declaration),
-						role: static_single_assignment.Use}
+					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Use)
 				}
 			}
 		}
 	}
 	lifting.order = liftingReversePostorder(lifting)
 	return lifting
+}
+
+// liftingPlaceAt gives block's instruction at index a place of declaration in role, making the block's slots on
+// its first.
+//
+// Mutates: block its slots are where the core finds each instruction's place
+func liftingPlaceAt(block *liftingBlock, index int, declaration static_single_assignment.DeclarationId,
+	role static_single_assignment.Role) {
+	if block.slots == nil {
+		block.slots = make([]liftingSlot, len(block.block.Instructions))
+	}
+	// A declaration's own identifier is its number, so the first identifiers are the declarations'.
+	identifier := static_single_assignment.IdentifierId(declaration)
+	block.slots[index] = liftingSlot{place: liftingPlace{identifier: identifier}, role: role, isPlace: true}
 }
 
 // liftingAllocationOf is value as an Allocation, or nil.
@@ -313,14 +319,19 @@ func liftingResolve(lifting *liftingFunction, deleted map[Instruction]bool) map[
 	zeroDefinitions := map[static_single_assignment.IdentifierId]*Allocation{}
 	storeDefinitions := map[static_single_assignment.IdentifierId]*Store{}
 	loads := map[*Load]static_single_assignment.IdentifierId{}
-	for instruction, slot := range lifting.slots {
-		switch instruction := instruction.(type) {
-		case *Allocation:
-			zeroDefinitions[slot.place.identifier] = instruction
-		case *Store:
-			storeDefinitions[slot.place.identifier] = instruction
-		case *Load:
-			loads[instruction] = slot.place.identifier
+	for _, block := range lifting.blocks {
+		for index, slot := range block.slots {
+			if !slot.isPlace {
+				continue
+			}
+			switch instruction := block.block.Instructions[index].(type) {
+			case *Allocation:
+				zeroDefinitions[slot.place.identifier] = instruction
+			case *Store:
+				storeDefinitions[slot.place.identifier] = instruction
+			case *Load:
+				loads[instruction] = slot.place.identifier
+			}
 		}
 	}
 
@@ -408,37 +419,41 @@ func liftingResolve(lifting *liftingFunction, deleted map[Instruction]bool) map[
 	for _, allocation := range lifting.allocations {
 		lifted[allocation] = true
 	}
-	for _, block := range lifting.function.Blocks {
-		for _, instruction := range block.Instructions {
+	for _, block := range lifting.blocks {
+		for index, instruction := range block.block.Instructions {
 			reference, isReference := instruction.(*debugReference)
 			if !isReference || !lifted[reference.X] {
 				continue
 			}
-			slot, isUse := lifting.slots[reference]
-			if !isUse {
+			if index >= len(block.slots) || !block.slots[index].isPlace {
 				reference.X = nil
 				deleted[reference] = true
 				continue
 			}
-			reference.X = valueOf(slot.place.identifier)
+			reference.X = valueOf(block.slots[index].place.identifier)
 			reference.IsAddress = false
 			if referrers := reference.X.Referrers(); referrers != nil {
 				*referrers = append(*referrers, reference)
 			}
 		}
 	}
-	for instruction := range lifting.slots {
-		switch instruction := instruction.(type) {
-		case *Store:
-			if referrers := instruction.Address.Referrers(); referrers != nil {
-				*referrers = liftingRemoveReferrer(*referrers, instruction)
+	for _, block := range lifting.blocks {
+		for index, slot := range block.slots {
+			if !slot.isPlace {
+				continue
 			}
-			if referrers := instruction.Value.Referrers(); referrers != nil {
-				*referrers = liftingRemoveReferrer(*referrers, instruction)
+			switch instruction := block.block.Instructions[index].(type) {
+			case *Store:
+				if referrers := instruction.Address.Referrers(); referrers != nil {
+					*referrers = liftingRemoveReferrer(*referrers, instruction)
+				}
+				if referrers := instruction.Value.Referrers(); referrers != nil {
+					*referrers = liftingRemoveReferrer(*referrers, instruction)
+				}
+				deleted[instruction] = true
+			case *Allocation:
+				deleted[instruction] = true
 			}
-			deleted[instruction] = true
-		case *Allocation:
-			deleted[instruction] = true
 		}
 	}
 
