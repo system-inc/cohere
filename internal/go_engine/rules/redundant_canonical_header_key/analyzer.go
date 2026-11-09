@@ -20,6 +20,7 @@ import (
 
 	"honnef.co/go/tools/analysis/edit"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
@@ -80,6 +81,11 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 			edit.ReplaceWithNode(context.Fset, canonical, canonical.Args[0]))))
 }
 
+// headerMethodNames are the four methods the pattern's Or names, by the full names the finding reports.
+var headerMethodNames = []string{
+	"(net/http.Header).Add", "(net/http.Header).Del", "(net/http.Header).Get", "(net/http.Header).Set",
+}
+
 // headerMethodName is the full name of the method function calls, `(net/http.Header).Add` and so on, as the pattern's
 // `(Symbol callName@(Or ...))` binds it, and empty for any other callee. Symbol matches an identifier or a selector,
 // parenthesized or not and instantiated or not, whose object is a function whose full name is one of the four, so the
@@ -95,14 +101,13 @@ func headerMethodName(context *rule.Context, function ast.Expr) string {
 	if method.Pkg() == context.Package {
 		return ""
 	}
-	// FullName spells a method with its receiver's package path and type, which is net/http.Header for the standard
-	// library's Header alone.
-	switch method.FullName() {
-	case "(net/http.Header).Add", "(net/http.Header).Del", "(net/http.Header).Get", "(net/http.Header).Set":
-		return method.FullName()
-	default:
+	// The full name Matches compares spells a method with its receiver's package path and type, which is
+	// net/http.Header for the standard library's Header alone.
+	index := function_name.Index(method, headerMethodNames...)
+	if index < 0 {
 		return ""
 	}
+	return headerMethodNames[index]
 }
 
 // isCanonicalHeaderKey is whether function names http.CanonicalHeaderKey, as the pattern's `(Symbol
@@ -113,7 +118,7 @@ func headerMethodName(context *rule.Context, function ast.Expr) string {
 // net/http's own package is the outer method's, whose package is the same.
 func isCanonicalHeaderKey(context *rule.Context, function ast.Expr) bool {
 	canonical := functionNamed(context, function)
-	return canonical != nil && canonical.FullName() == "net/http.CanonicalHeaderKey"
+	return canonical != nil && function_name.Matches(canonical, "net/http.CanonicalHeaderKey")
 }
 
 // functionNamed is the function function names, as the pattern's Symbol finds its object: the expression without its
