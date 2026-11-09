@@ -31,16 +31,10 @@ type Collector struct {
 	calls atomic.Int64
 
 	mutex     sync.Mutex
-	analyzers map[string]*cost
-	listeners map[string]*cost
+	analyzers costs
+	listeners costs
 	nested    map[string]time.Duration
 	load      loadCost
-}
-
-// cost is one row's CPU and how many times it was added to.
-type cost struct {
-	cpu   time.Duration
-	count int64
 }
 
 // loadCost is the load's phases as they are added.
@@ -52,8 +46,8 @@ type loadCost struct {
 // New is a collector for one run, which learns what a measurement costs before it measures anything.
 func New() *Collector {
 	collector := &Collector{
-		analyzers: map[string]*cost{},
-		listeners: map[string]*cost{},
+		analyzers: costs{},
+		listeners: costs{},
 		nested:    map[string]time.Duration{},
 	}
 	runtime.LockOSThread()
@@ -91,18 +85,19 @@ func (collector *Collector) Measure(work func()) time.Duration {
 
 // Analyzer adds one action's CPU, an analyzer run on one package, under the analyzer's name.
 func (collector *Collector) Analyzer(name string, cpu time.Duration) {
-	collector.add(func() { addTo(collector.analyzers, name, cpu, 1) })
+	collector.add(func() { collector.analyzers.add(name, cpu, 1) })
 }
 
 // Listener adds the CPU of calls into a dispatched rule's listener over one package, under the rule's name.
 func (collector *Collector) Listener(rule string, cpu time.Duration, calls int64) {
-	collector.add(func() { addTo(collector.listeners, rule, cpu, calls) })
+	collector.add(func() { collector.listeners.add(rule, cpu, calls) })
 }
 
-// Nested takes cpu out of the analyzer named name's row, for the work a measurement inside its action billed
-// elsewhere: a dispatcher's calls into its listeners, which are their rules' rows.
-func (collector *Collector) Nested(name string, cpu time.Duration) {
-	collector.add(func() { collector.nested[name] += cpu })
+// Nested takes cpu out of the analyzer named name's row, for the work calls measurements inside its action billed
+// elsewhere: a dispatcher's calls into its listeners, which are their rules' rows. The clock reads of those calls are
+// taken out too, since the action's own measurement holds them and no row is to be inflated by the measuring.
+func (collector *Collector) Nested(name string, cpu time.Duration, calls int64) {
+	collector.add(func() { collector.nested[name] += cpu + time.Duration(calls)*collector.perCall })
 }
 
 // List adds the listing's CPU: this process's own, and its go commands' (children).
@@ -145,16 +140,6 @@ func (collector *Collector) add(change func()) {
 	collector.mutex.Lock()
 	defer collector.mutex.Unlock()
 	change()
-}
-
-func addTo(costs map[string]*cost, name string, cpu time.Duration, count int64) {
-	row, known := costs[name]
-	if !known {
-		row = &cost{}
-		costs[name] = row
-	}
-	row.cpu += cpu
-	row.count += count
 }
 
 // Kinds says, for an analyzer name, which rule it is the analyzer of, or else what kind of shared row it is. The

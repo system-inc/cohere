@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"runtime"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // panicFramesShown is how many of a panic's frames a crash names, as many as the engine's own recover names for an
@@ -31,12 +33,24 @@ type listenerRun struct {
 	context     *rule.Context
 	diagnostics []analysis.Diagnostic
 	crash       error
+
+	// timing is the run's collector under `--timing`, nil otherwise, when each call is the listener's call alone, at
+	// the cost of reading this field. cpu and calls are what the measured calls cost over the package, which finish
+	// bills to the rule and takes out of the dispatcher's own row.
+	timing *timing.Collector
+	cpu    time.Duration
+	calls  int64
 }
 
 // newListenerRun is registered's listener ready to hear pass's package, with a context of its own whose findings
-// collect on the run, judging generated files by isGenerated.
-func newListenerRun(registered *registeredRule, pass *analysis.Pass, isGenerated func(string) bool) *listenerRun {
-	run := &listenerRun{registered: registered, pass: pass}
+// collect on the run, judging generated files by isGenerated, and each call measured into collector when it is set.
+func newListenerRun(
+	registered *registeredRule,
+	pass *analysis.Pass,
+	isGenerated func(string) bool,
+	collector *timing.Collector,
+) *listenerRun {
+	run := &listenerRun{registered: registered, pass: pass, timing: collector}
 	run.context = rule.NewContext(registered.name, pass, registered.listener.Requires, &registered.analyzer.Flags,
 		isGenerated, func(_ string, diagnostic analysis.Diagnostic) {
 			run.diagnostics = append(run.diagnostics, diagnostic)
@@ -50,6 +64,10 @@ func (run *listenerRun) function(function *ir.Function) {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.Function(run.context, function) })
+		return
+	}
 	run.registered.listener.Function(run.context, function)
 }
 
@@ -59,6 +77,10 @@ func (run *listenerRun) instruction(instruction ir.Instruction) {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.Instruction(run.context, instruction) })
+		return
+	}
 	run.registered.listener.Instruction(run.context, instruction)
 }
 
@@ -68,6 +90,10 @@ func (run *listenerRun) functionExit(function *ir.Function) {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.FunctionExit(run.context, function) })
+		return
+	}
 	run.registered.listener.FunctionExit(run.context, function)
 }
 
@@ -78,6 +104,10 @@ func (run *listenerRun) ownFunction(function *intermediate_representation.Functi
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.IntermediateRepresentation.Function(run.context, function) })
+		return
+	}
 	run.registered.listener.IntermediateRepresentation.Function(run.context, function)
 }
 
@@ -88,6 +118,12 @@ func (run *listenerRun) ownInstruction(instruction intermediate_representation.I
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() {
+			run.registered.listener.IntermediateRepresentation.Instruction(run.context, instruction)
+		})
+		return
+	}
 	run.registered.listener.IntermediateRepresentation.Instruction(run.context, instruction)
 }
 
@@ -98,6 +134,10 @@ func (run *listenerRun) ownFunctionExit(function *intermediate_representation.Fu
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.IntermediateRepresentation.FunctionExit(run.context, function) })
+		return
+	}
 	run.registered.listener.IntermediateRepresentation.FunctionExit(run.context, function)
 }
 
@@ -107,6 +147,10 @@ func (run *listenerRun) fileEnter(file *ast.File) {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.FileEnter(run.context, file) })
+		return
+	}
 	run.registered.listener.FileEnter(run.context, file)
 }
 
@@ -119,7 +163,11 @@ func (run *listenerRun) node(cursor inspector.Cursor, node ast.Node, stack []ast
 	}
 	defer run.recoverCrash()
 	run.context.EnterNode(cursor)
-	run.registered.listener.Node(run.context, node, stack)
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.Node(run.context, node, stack) })
+	} else {
+		run.registered.listener.Node(run.context, node, stack)
+	}
 	run.context.LeaveNode()
 }
 
@@ -129,6 +177,10 @@ func (run *listenerRun) fileExit(file *ast.File) {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.FileExit(run.context, file) })
+		return
+	}
 	run.registered.listener.FileExit(run.context, file)
 }
 
@@ -138,7 +190,18 @@ func (run *listenerRun) packageExit() {
 		return
 	}
 	defer run.recoverCrash()
+	if run.timing != nil {
+		run.measured(func() { run.registered.listener.PackageExit(run.context) })
+		return
+	}
 	run.registered.listener.PackageExit(run.context)
+}
+
+// measured calls listen, one call into the listener, on a thread held for it, and adds what it cost to the run's. A
+// call that panics adds nothing: the run has crashed, and its rule's crash is what the run reports.
+func (run *listenerRun) measured(listen func()) {
+	run.cpu += run.timing.Measure(listen)
+	run.calls++
 }
 
 // recoverCrash, deferred around each call, records a panic in the listener as the rule's crash on the package,

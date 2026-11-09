@@ -5,11 +5,13 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/facts/generated"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
+	"github.com/system-inc/cohere/internal/go_engine/timing"
 )
 
 // listeners is what every dispatcher keeps of the rules registered on it, whichever walk it makes: the dispatcher's
@@ -222,6 +224,11 @@ type startedRuns struct {
 	// notStarted is the outcome of each rule of the run whose listener was not started because something it
 	// requires failed on the package.
 	notStarted Result
+	// timing is the run's collector under `--timing`, which the checker hands the pass under rule.Timed, nil
+	// otherwise, and dispatcher is the name of the dispatcher's own analyzer, whose row finish takes the listeners'
+	// calls out of.
+	timing     *timing.Collector
+	dispatcher string
 }
 
 // start is the listeners to call over pass's package, each ready with a context of its own, all judging the package's
@@ -258,7 +265,10 @@ func (listeners *listeners) start(pass *analysis.Pass) (*startedRuns, error) {
 		return found
 	}
 	dependents, knowsDependents := pass.ResultOf[rule.Dependents].(map[*analysis.Analyzer]bool)
-	started := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}}
+	// Absent on a run that did not ask for --timing, where the nil collector measures nothing.
+	collector, _ := pass.ResultOf[rule.Timed].(*timing.Collector)
+	started := &startedRuns{byKind: map[reflect.Type][]*listenerRun{}, notStarted: Result{}, timing: collector,
+		dispatcher: listeners.analyzer.Name}
 	for index := range listeners.registered {
 		registered := &listeners.registered[index]
 		if knowsDependents && !dependents[registered.analyzer] {
@@ -268,7 +278,7 @@ func (listeners *listeners) start(pass *analysis.Pass) (*startedRuns, error) {
 			started.notStarted[registered.name] = Outcome{Crash: crash}
 			continue
 		}
-		run := newListenerRun(registered, pass, isGenerated)
+		run := newListenerRun(registered, pass, isGenerated, collector)
 		started.runs = append(started.runs, run)
 		for _, kind := range registered.kinds {
 			started.byKind[kind] = append(started.byKind[kind], run)
@@ -314,10 +324,22 @@ func failedAmong(required []*analysis.Analyzer, failed map[*analysis.Analyzer]er
 }
 
 // finish calls every started PackageExit once the walk is over and returns each started rule's outcome, with the
-// outcome of each rule whose listener was not started, which is every outcome a rule analyzer of the run reads.
+// outcome of each rule whose listener was not started, which is every outcome a rule analyzer of the run reads. Under
+// `--timing` it bills each listener's calls over the package to its rule, and takes them out of the dispatcher's own
+// row, so that row is the walk alone.
 func finish(started *startedRuns) Result {
 	for _, run := range started.runs {
 		run.packageExit()
+	}
+	if started.timing != nil {
+		var listened time.Duration
+		var calls int64
+		for _, run := range started.runs {
+			started.timing.Listener(run.registered.name, run.cpu, run.calls)
+			listened += run.cpu
+			calls += run.calls
+		}
+		started.timing.Nested(started.dispatcher, listened, calls)
 	}
 	result := Result{}
 	for name, outcome := range started.notStarted {
