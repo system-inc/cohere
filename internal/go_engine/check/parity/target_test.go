@@ -116,15 +116,25 @@ func TestTargetRefusesAVariableTheLoadSets(test *testing.T) {
 }
 
 // judging is an analyzer that reports, at each package's clause, the target go/build's default context names while it
-// runs, as asmdecl and framepointer read the target they judge there. Each call makes a new one, since the checker
-// tells the two sides of a pair apart by their analyzers.
-func judging() *analysis.Analyzer {
+// runs, as asmdecl and framepointer read the target they judge there, and, where its call does not hold the default
+// context as it must, that too: a call that sets it, isSetting, must hold it to write, so no read hold can be taken
+// beside it, and any other to read, so no write hold can. A hold it takes to try is let go at once. Each call makes a
+// new one, since the checker tells the two sides of a pair apart by their analyzers.
+func judging(isSetting bool) *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "judging",
 		Doc:  "judging reports the target go/build's default context names.",
 		Run: func(pass *analysis.Pass) (any, error) {
 			for _, file := range pass.Files {
 				pass.Reportf(file.Name.Pos(), "judged for %s/%s", build.Default.GOOS, build.Default.GOARCH)
+				if isSetting && defaultContext.TryRLock() {
+					defaultContext.RUnlock()
+					pass.Reportf(file.Name.Pos(), "the call sets the default context and does not hold it to write")
+				}
+				if !isSetting && defaultContext.TryLock() {
+					defaultContext.Unlock()
+					pass.Reportf(file.Name.Pos(), "the call does not hold the default context to read")
+				}
 			}
 			return nil, nil
 		},
@@ -147,8 +157,9 @@ func TestTargetSetsTheDefaultContextForItsRun(test *testing.T) {
 			if architecture == "" {
 				target, judged = Target{}, machineTarget
 			}
-			originalFindings, portFindings := target.Findings(subtest, judging(), judging(), analysistest.TestData(),
-				"same")
+			isSetting := architecture != ""
+			originalFindings, portFindings := target.Findings(subtest, judging(isSetting), judging(isSetting),
+				analysistest.TestData(), "same")
 			wanted := []Finding{{File: "same/same.go", Line: 2, Column: 9, Message: "judged for " + judged}}
 			if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
 				subtest.Errorf("the original found %v and the port %v, want %v from each", originalFindings,
@@ -163,13 +174,38 @@ func TestTargetSetsTheDefaultContextForItsRun(test *testing.T) {
 // Not parallel: it reads go/build's default context outside a harness call, which no other test may set meanwhile.
 func TestTargetPutsTheDefaultContextBack(test *testing.T) {
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
-		on386.Findings(recording, judging(), judging(), analysistest.TestData(), "same")
+		on386.Findings(recording, judging(true), judging(true), analysistest.TestData(), "same")
 	}))
 	requireFailures(test, failuresOf(test, func(recording testing.TB) {
-		on386.Findings(recording, judging(), judging(), analysistest.TestData(), "absent")
+		on386.Findings(recording, judging(true), judging(true), analysistest.TestData(), "absent")
 	}), "fixture package absent does not load clean")
 	if judged := build.Default.GOOS + "/" + build.Default.GOARCH; judged != machineTarget {
 		test.Errorf("after the calls go/build's default context names %s, want %s", judged, machineTarget)
+	}
+}
+
+// A call on a Target that sets go/build's default context holds it to write while it runs, and a call on the zero
+// Target holds it to read, each proven inside the run, where judging tries the hold the call must keep out: a read
+// hold beside the first and a write hold beside the second.
+//
+// Not parallel: a try fails whenever another test's call holds the default context, so only run alone does each
+// try that succeeds say the call itself does not hold it.
+func TestEveryCallHoldsTheDefaultContext(test *testing.T) {
+	for _, call := range []struct {
+		target    Target
+		isSetting bool
+		judged    string
+	}{
+		{on386, true, "linux/386"},
+		{Target{}, false, machineTarget},
+	} {
+		originalFindings, portFindings := call.target.Findings(test, judging(call.isSetting),
+			judging(call.isSetting), analysistest.TestData(), "same")
+		wanted := []Finding{{File: "same/same.go", Line: 2, Column: 9, Message: "judged for " + call.judged}}
+		if !reflect.DeepEqual(originalFindings, wanted) || !reflect.DeepEqual(portFindings, wanted) {
+			test.Errorf("the original found %v and the port %v, want %v from each", originalFindings, portFindings,
+				wanted)
+		}
 	}
 }
 
