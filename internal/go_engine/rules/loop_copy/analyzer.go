@@ -249,7 +249,7 @@ func countedCopy(context *rule.Context, loop *ast.ForStmt) (copiedLoop, bool) {
 // The body is a list of one statement, which the pattern looks through labels and blocks of one statement to reach,
 // as match.go does for any statement it compares.
 func storeAtKey(body *ast.BlockStmt, key *ast.Ident) (*ast.AssignStmt, ast.Expr, bool) {
-	assignment, isAssignment := soleAssignment(body.List)
+	assignment, isAssignment := staticcheck_code.SoleAssignment(body.List)
 	if !isAssignment || assignment.Tok != token.ASSIGN || len(assignment.Lhs) != 1 || len(assignment.Rhs) != 1 {
 		return nil, nil, false
 	}
@@ -266,31 +266,6 @@ func storeAtKey(body *ast.BlockStmt, key *ast.Ident) (*ast.AssignStmt, ast.Expr,
 func readsAtKey(expression ast.Expr, source ast.Expr, key *ast.Ident) bool {
 	read, isIndex := ast.Unparen(expression).(*ast.IndexExpr)
 	return isIndex && staticcheck_code.SameSyntax(source, read.X) && staticcheck_code.SameSyntax(key, read.Index)
-}
-
-// soleAssignment is the assignment a list of one statement holds, looking through labels and blocks of one
-// statement on the way, as match.go looks through them before comparing a statement with the pattern's AssignStmt.
-// A list of any other length, an empty block among them, holds none.
-func soleAssignment(statements []ast.Stmt) (*ast.AssignStmt, bool) {
-	if len(statements) != 1 {
-		return nil, false
-	}
-	statement := statements[0]
-	for {
-		switch wrapped := statement.(type) {
-		case *ast.AssignStmt:
-			return wrapped, true
-		case *ast.LabeledStmt:
-			statement = wrapped.Stmt
-		case *ast.BlockStmt:
-			if len(wrapped.List) != 1 {
-				return nil, false
-			}
-			statement = wrapped.List[0]
-		default:
-			return nil, false
-		}
-	}
 }
 
 // isInvariant is whether expression is the same value on every iteration: it has no side effects, judged with no
