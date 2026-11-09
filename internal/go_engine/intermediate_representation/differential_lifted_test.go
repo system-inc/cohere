@@ -30,6 +30,16 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
+// differentialLiftedMutant is the mutant a lifted comparison plants in ours: none, the first lifted Store of each
+// round defining nothing (SkippedStore), or each block's placed view leaving out its Stores (DroppedStores).
+type differentialLiftedMutant string
+
+// The causes the core's verifier and the placed-view guard report under, apart from the comparator's own.
+const (
+	differentialVerifierCause   = "the core's verifier"
+	differentialPlacedViewCause = "the placed view"
+)
+
 // differentialLiftedTally adds phi counts to a differential tally.
 type differentialLiftedTally struct {
 	differentialTally
@@ -40,8 +50,10 @@ type differentialLiftedTally struct {
 	theirPhisWithoutReferrers int
 	ourPhis                   int
 
-	// verifiedRounds are the rounds of our lifting the core's verifier checked.
+	// verifiedRounds are the rounds of our lifting the core's verifier checked, and placesChecked the
+	// instructions with a place the placed-view guard found in them.
 	verifiedRounds int
+	placesChecked  int
 
 	// phiDeltas counts the compared functions by go/ir's phis with referrers less ours, and phiDeltaExamples
 	// names up to three functions for each delta but zero.
@@ -69,6 +81,7 @@ func differentialMergeLifted(tally differentialLiftedTally, other differentialLi
 		theirPhisWithoutReferrers: tally.theirPhisWithoutReferrers + other.theirPhisWithoutReferrers,
 		ourPhis:                   tally.ourPhis + other.ourPhis,
 		verifiedRounds:            tally.verifiedRounds + other.verifiedRounds,
+		placesChecked:             tally.placesChecked + other.placesChecked,
 		phiDeltas:                 deltas,
 		phiDeltaExamples:          examples,
 	}
@@ -83,7 +96,7 @@ func TestLiftedDifferential(test *testing.T) {
 	var tally differentialLiftedTally
 	if corpus == "" {
 		for _, unit := range differentialTestdataUnits(test) {
-			tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, false))
+			tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, "None"))
 		}
 		tally = differentialMergeLifted(tally, differentialCompareLiftedLoaded(test, differentialStandardPackages))
 	} else {
@@ -106,8 +119,9 @@ func TestLiftedDifferential(test *testing.T) {
 		rendered = append(rendered, entry)
 	}
 	test.Logf("phis: go/ir %d (%d of them replaced and left without referrers), ours %d; functions by go/ir's "+
-		"phis with referrers less ours: %s; %d rounds of our lifting verified", tally.theirPhis,
-		tally.theirPhisWithoutReferrers, tally.ourPhis, strings.Join(rendered, ", "), tally.verifiedRounds)
+		"phis with referrers less ours: %s; %d rounds of our lifting verified, %d instructions with a place "+
+		"found in their placed views", tally.theirPhis, tally.theirPhisWithoutReferrers, tally.ourPhis,
+		strings.Join(rendered, ", "), tally.verifiedRounds, tally.placesChecked)
 	differentialReport(test, "lifted "+differentialCorpusName(corpus), tally.differentialTally, time.Since(started))
 }
 
@@ -123,7 +137,7 @@ func Overwritten(first int, second int) int {
 	return value
 }
 `)
-	tally := differentialCompareLiftedUnit(test, unit, true)
+	tally := differentialCompareLiftedUnit(test, unit, "SkippedStore")
 	if len(tally.differences) == 0 {
 		test.Fatal("the comparator found nothing in the mutant")
 	}
@@ -132,6 +146,35 @@ func Overwritten(first int, second int) int {
 		if difference.function != "mutant.Overwritten" {
 			test.Errorf("the comparator found a difference outside the mutant, in %s", difference.function)
 		}
+	}
+}
+
+// TestLiftedDifferentialFailsOnDroppedStores plants the mutant the placed-view guard is for: each block's placed
+// view leaves out its Stores, so the core never sees one define. The placed-view guard goes red on it
+// (TestPlacedViewGuardFailsOnDroppedStores), and the comparator, apart from the guard, finds the function too.
+func TestLiftedDifferentialFailsOnDroppedStores(test *testing.T) {
+	test.Parallel()
+	unit := differentialCheck(test, "mutant", `package mutant
+
+func Overwritten(first int, second int) int {
+	value := first
+	value = second
+	return value
+}
+`)
+	tally := differentialCompareLiftedUnit(test, unit, "DroppedStores")
+	compared := 0
+	for _, difference := range tally.differences {
+		test.Logf("the differential reports the mutant: %s", differentialDescribe(difference))
+		if difference.function != "mutant.Overwritten" {
+			test.Errorf("the differential found a difference outside the mutant, in %s", difference.function)
+		}
+		if difference.cause != differentialPlacedViewCause && difference.cause != differentialVerifierCause {
+			compared++
+		}
+	}
+	if compared == 0 {
+		test.Fatal("the comparator, apart from the guard and the verifier, found nothing in the mutant")
 	}
 }
 
@@ -167,17 +210,17 @@ func differentialCompareLiftedLoaded(test *testing.T, patterns []string) differe
 		}
 		unit := differentialUnit{path: each.PkgPath, fileSet: each.Fset, types: each.Types, files: each.Syntax,
 			typeInfo: each.TypesInfo}
-		tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, false))
+		tally = differentialMergeLifted(tally, differentialCompareLiftedUnit(test, unit, "None"))
 		// Let the package's syntax and types go once both IRs are compared.
 		each.Syntax, each.TypesInfo = nil, nil
 	}
 	return tally
 }
 
-// differentialCompareLiftedUnit builds unit both ways, lifted, and compares every source function. mutant plants
-// the skipped-store mutant in ours.
+// differentialCompareLiftedUnit builds unit both ways, lifted, and compares every source function, with mutant
+// planted in ours. Every round but a SkippedStore one is verified, and its placed view held to the guard.
 func differentialCompareLiftedUnit(test *testing.T, unit differentialUnit,
-	mutant bool) (tally differentialLiftedTally) {
+	mutant differentialLiftedMutant) (tally differentialLiftedTally) {
 	tally.packages = 1
 	tally.phiDeltas = map[int]int{}
 	var theirPackage *ir.Package
@@ -195,22 +238,30 @@ func differentialCompareLiftedUnit(test *testing.T, unit differentialUnit,
 	var verifying sync.Mutex
 	ourPanic := differentialBuild(func() {
 		ourProgram := intermediate_representation.NewProgram(unit.fileSet)
-		if mutant {
+		verify := func(function *intermediate_representation.Function,
+			violations []static_single_assignment.StaticSingleAssignmentViolation, incomplete []string, places int) {
+			verifying.Lock()
+			defer verifying.Unlock()
+			tally.verifiedRounds++
+			tally.placesChecked += places
+			for _, violation := range violations {
+				tally.differences = append(tally.differences, differentialDifference{
+					cause: differentialVerifierCause, function: function.RelativeString(nil),
+					where: "a round of lifting", theirs: "", ours: violation.Detail})
+			}
+			for _, problem := range incomplete {
+				tally.differences = append(tally.differences, differentialDifference{
+					cause: differentialPlacedViewCause, function: function.RelativeString(nil),
+					where: "a round of lifting", theirs: "", ours: problem})
+			}
+		}
+		switch mutant {
+		case "SkippedStore":
 			intermediate_representation.SkipStoreDefinitionForTest(test, ourProgram)
-		} else {
-			intermediate_representation.VerifyLiftingForTest(test, ourProgram, func(
-				function *intermediate_representation.Function,
-				violations []static_single_assignment.StaticSingleAssignmentViolation,
-			) {
-				verifying.Lock()
-				defer verifying.Unlock()
-				tally.verifiedRounds++
-				for _, violation := range violations {
-					tally.differences = append(tally.differences, differentialDifference{
-						cause: "the core's verifier", function: function.RelativeString(nil),
-						where: "a round of lifting", theirs: "", ours: violation.Detail})
-				}
-			})
+		case "DroppedStores":
+			intermediate_representation.DropStoresFromPlacedViewForTest(test, ourProgram, verify)
+		default:
+			intermediate_representation.VerifyLiftingForTest(test, ourProgram, verify)
 		}
 		ourProgram.SetNoReturn(differentialNoReturn)
 		for _, imported := range unit.types.Imports() {
