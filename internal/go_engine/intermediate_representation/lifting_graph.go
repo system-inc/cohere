@@ -33,6 +33,9 @@ type liftingSlot struct {
 
 	// deleted is whether the round drops the instruction once lifted.
 	deleted bool
+
+	// isCell is whether the instruction is a lifted Allocation, the cell a declaration names.
+	isCell bool
 }
 
 // liftingBlock is one block as the core sees it: the block, the phis the core places in it until lifting turns
@@ -61,9 +64,8 @@ type liftingFunction struct {
 	// declarations' own, and Mint appends.
 	declarations []static_single_assignment.DeclarationId
 
-	// allocations are the lifted Allocations, by declaration, and declarationOf each one's declaration.
-	allocations   []*Allocation
-	declarationOf map[*Allocation]static_single_assignment.DeclarationId
+	// allocations are the lifted Allocations, by declaration.
+	allocations []*Allocation
 }
 
 var _ static_single_assignment.Graph[*liftingFunction, *liftingBlock, liftingPlace] = liftingGraph{}

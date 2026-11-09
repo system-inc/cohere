@@ -132,6 +132,12 @@ func liftingRound(function *Function, options liftingOptions) bool {
 			options.verify(function, static_single_assignment.VerifyStaticSingleAssignment(liftingGraph{}, lifting))
 		}
 		liftingResolve(lifting)
+		// A lifted Allocation leaves Locals with the ones no block holds.
+		for _, allocation := range allocations {
+			if _, isLocal := localsInBlocks[allocation]; isLocal {
+				localsInBlocks[allocation] = false
+			}
+		}
 	}
 	// The ssa:deferstack call goes once lifting has removed what read it.
 	var deletedCall Instruction
@@ -173,11 +179,6 @@ func liftingRound(function *Function, options liftingOptions) bool {
 	// its lift keeps a local whose index the round set to -1, the mark of an unliftable Allocation, and an
 	// Allocation in no block keeps its zero index, the mark of a lifted one.
 	function.Locals = slices.DeleteFunc(function.Locals, func(local *Allocation) bool {
-		if lifting != nil {
-			if _, isLifted := lifting.declarationOf[local]; isLifted {
-				return true
-			}
-		}
 		return !localsInBlocks[local]
 	})
 	return len(allocations) > 0
@@ -244,48 +245,87 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 		declarations: make([]static_single_assignment.DeclarationId, len(allocations)),
 		allocations:  allocations,
 	}
-	declarationOf := make(map[*Allocation]static_single_assignment.DeclarationId, len(allocations))
+	// Each instruction's id is its index in its block for the round, so a lifted cell, Load or debug reference is
+	// found by its block and id rather than through a map (#beapx0q). finishBody numbers them again after lifting.
+	for _, block := range function.Blocks {
+		lifting.blocks = append(lifting.blocks, &liftingBlock{block: block})
+		for index, instruction := range block.Instructions {
+			instruction.setId(Id(index))
+		}
+	}
 	for index, allocation := range allocations {
 		lifting.declarations[index] = static_single_assignment.DeclarationId(index)
-		declarationOf[allocation] = static_single_assignment.DeclarationId(index)
+		block := lifting.blocks[allocation.block.Index]
+		liftingPlaceAt(block, int(allocation.id), static_single_assignment.DeclarationId(index),
+			static_single_assignment.Define)
+		block.slots[allocation.id].isCell = true
 	}
-	lifting.declarationOf = declarationOf
 	storeSkipped := !options.skipStoreDefinition
-	for _, block := range function.Blocks {
-		lifted := &liftingBlock{block: block}
-		lifting.blocks = append(lifting.blocks, lifted)
-		for index, instruction := range block.Instructions {
+	for _, lifted := range lifting.blocks {
+		for index, instruction := range lifted.block.Instructions {
 			switch instruction := instruction.(type) {
-			case *Allocation:
-				if declaration, isLifted := declarationOf[instruction]; isLifted {
-					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Define)
-				}
 			case *Store:
-				declaration, isLifted := declarationOf[liftingAllocationOf(instruction.Address)]
-				if !isLifted {
+				cell := liftingCellSlot(lifting, instruction.Address)
+				if cell == nil {
 					continue
 				}
 				if !storeSkipped {
 					storeSkipped = true
 					continue
 				}
-				liftingPlaceAt(lifted, index, declaration, static_single_assignment.Define)
+				liftingPlaceAt(lifted, index, liftingDeclarationOf(cell), static_single_assignment.Define)
 			case *Load:
-				if declaration, isLifted := declarationOf[liftingAllocationOf(instruction.X)]; isLifted {
-					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Use)
+				if cell := liftingCellSlot(lifting, instruction.X); cell != nil {
+					liftingPlaceAt(lifted, index, liftingDeclarationOf(cell), static_single_assignment.Use)
 				}
 			case *debugReference:
 				// A reference to the variable's address reads the value there once lifted, as a Load does; one
-				// to the cell's address itself goes with the cell (resolve).
-				declaration, isLifted := declarationOf[liftingAllocationOf(instruction.X)]
-				if isLifted && instruction.IsAddress {
-					liftingPlaceAt(lifted, index, declaration, static_single_assignment.Use)
+				// to the cell's own address names what lifting removes, and goes, as go/ir's renaming has it.
+				cell := liftingCellSlot(lifting, instruction.X)
+				switch {
+				case cell == nil:
+				case instruction.IsAddress:
+					liftingPlaceAt(lifted, index, liftingDeclarationOf(cell), static_single_assignment.Use)
+				default:
+					instruction.X = nil
+					liftingDeleteAt(lifted, index)
 				}
 			}
 		}
 	}
 	lifting.order = liftingReversePostorder(lifting)
 	return lifting
+}
+
+// liftingCellSlot is the slot of the lifted Allocation value is, or nil when value is no lifted Allocation of the
+// function.
+func liftingCellSlot(lifting *liftingFunction, value Value) *liftingSlot {
+	allocation, isAllocation := value.(*Allocation)
+	if !isAllocation || allocation.block == nil {
+		return nil
+	}
+	return liftingSlotOf(lifting, allocation, allocation.block, func(slot liftingSlot) bool { return slot.isCell })
+}
+
+// liftingSlotOf is the slot of instruction, which sits in block, when keep accepts it, or nil.
+func liftingSlotOf(lifting *liftingFunction, instruction Instruction, block *BasicBlock,
+	keep func(slot liftingSlot) bool) *liftingSlot {
+	if block.Index >= len(lifting.blocks) || lifting.blocks[block.Index].block != block {
+		return nil
+	}
+	lifted := lifting.blocks[block.Index]
+	position := int(instruction.Id())
+	if position >= len(lifted.slots) || lifted.block.Instructions[position] != instruction ||
+		!keep(lifted.slots[position]) {
+		return nil
+	}
+	return &lifted.slots[position]
+}
+
+// liftingDeclarationOf is the declaration a lifted cell's slot defines. Before construction a declaration's own
+// identifier is its number.
+func liftingDeclarationOf(cell *liftingSlot) static_single_assignment.DeclarationId {
+	return static_single_assignment.DeclarationId(cell.place.identifier)
 }
 
 // liftingPlaceAt gives block's instruction at index a place of declaration in role, making the block's slots on
@@ -300,12 +340,6 @@ func liftingPlaceAt(block *liftingBlock, index int, declaration static_single_as
 	// A declaration's own identifier is its number, so the first identifiers are the declarations'.
 	identifier := static_single_assignment.IdentifierId(declaration)
 	block.slots[index] = liftingSlot{place: liftingPlace{identifier: identifier}, role: role, isPlace: true}
-}
-
-// liftingAllocationOf is value as an Allocation, or nil.
-func liftingAllocationOf(value Value) *Allocation {
-	allocation, _ := value.(*Allocation)
-	return allocation
 }
 
 // liftingReversePostorder is the blocks in reverse postorder from the entry over Successors, then the blocks the
@@ -353,7 +387,6 @@ type liftingDefinition struct {
 // Mutates: lifting its blocks' slots are marked deleted, and their newPhis set
 func liftingResolve(lifting *liftingFunction) {
 	definitions := make([]liftingDefinition, len(lifting.declarations))
-	loads := make(map[*Load]static_single_assignment.IdentifierId, len(lifting.allocations))
 	for _, block := range lifting.blocks {
 		for index, slot := range block.slots {
 			if !slot.isPlace {
@@ -364,8 +397,6 @@ func liftingResolve(lifting *liftingFunction) {
 				definitions[slot.place.identifier].zero = instruction
 			case *Store:
 				definitions[slot.place.identifier].store = instruction
-			case *Load:
-				loads[instruction] = slot.place.identifier
 			}
 		}
 	}
@@ -392,9 +423,10 @@ func liftingResolve(lifting *liftingFunction) {
 
 	var valueOf func(identifier static_single_assignment.IdentifierId) Value
 	through := func(value Value) Value {
-		if load, isLoad := value.(*Load); isLoad {
-			if identifier, isLifted := loads[load]; isLifted {
-				return valueOf(identifier)
+		if load, isLoad := value.(*Load); isLoad && load.block != nil {
+			slot := liftingSlotOf(lifting, load, load.block, func(slot liftingSlot) bool { return slot.isPlace })
+			if slot != nil {
+				return valueOf(slot.place.identifier)
 			}
 		}
 		return value
@@ -448,21 +480,17 @@ func liftingResolve(lifting *liftingFunction) {
 	}
 	// A debug reference to a lifted variable's address now names the value there, as go/ir's renaming makes it;
 	// one to the address of a lifted cell names what no longer exists, and goes.
+	// (The prepare dropped those to a cell's own address.)
 	for _, block := range lifting.blocks {
-		for index, instruction := range block.block.Instructions {
-			reference, isReference := instruction.(*debugReference)
+		for index, slot := range block.slots {
+			if !slot.isPlace {
+				continue
+			}
+			reference, isReference := block.block.Instructions[index].(*debugReference)
 			if !isReference {
 				continue
 			}
-			if _, isLifted := lifting.declarationOf[liftingAllocationOf(reference.X)]; !isLifted {
-				continue
-			}
-			if index >= len(block.slots) || !block.slots[index].isPlace {
-				reference.X = nil
-				liftingDeleteAt(block, index)
-				continue
-			}
-			reference.X = valueOf(block.slots[index].place.identifier)
+			reference.X = valueOf(slot.place.identifier)
 			reference.IsAddress = false
 			if referrers := reference.X.Referrers(); referrers != nil {
 				*referrers = append(*referrers, reference)
