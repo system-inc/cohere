@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"maps"
+	"slices"
 
 	"honnef.co/go/tools/knowledge"
 
@@ -89,6 +91,10 @@ var guards = map[string]guard{
 	"bytes.Contains": {packageName: "bytes", function: "Contains", unconditional: "bytes.Replace"},
 }
 
+// guardNames are guards' keys, sorted, which staticcheck_code.CallIndex compares a condition's name with in place, so
+// the name is never built for a condition that calls none of them.
+var guardNames = slices.Sorted(maps.Keys(guards))
+
 // Check judges one if statement against seen, which it reads and never writes, and returns its else, for the caller
 // to record in seen, or nil. An if statement with no initializer and no else, that seen does not hold, whose condition
 // is a call of a guard and whose body is one plain assignment to the guard's first argument, is reported when the
@@ -113,11 +119,11 @@ func Check(context *rule.Context, ifStatement *ast.IfStmt, seen *Seen) ast.Stmt 
 	if !isCall {
 		return nil
 	}
-	conditionName := staticcheck_code.CallName(context, condition)
-	asked, isGuard := guards[conditionName]
-	if !isGuard {
+	guardIndex := staticcheck_code.CallIndex(context, condition, guardNames...)
+	if guardIndex < 0 {
 		return nil
 	}
+	asked := guards[guardNames[guardIndex]]
 	// A guard called on another call's two results has one argument, a call, which sameNonDynamic never finds the
 	// same as an assignment's left side, so the original turns it away before it reads a second argument, as this does.
 	if len(condition.Args) != 2 {
@@ -140,8 +146,8 @@ func Check(context *rule.Context, ifStatement *ast.IfStmt, seen *Seen) ast.Stmt 
 }
 
 // checkUnconditionalCall reports ifStatement when call, its body's right side, is the call asked does its work with,
-// on the condition's two arguments as its first two, at the whole statement. The message names the call by its
-// CallName, the import path's spelling.
+// on the condition's two arguments as its first two, at the whole statement. The message names the call by the
+// CallName it matched, asked's unconditional, the import path's spelling.
 func checkUnconditionalCall(
 	context *rule.Context, ifStatement *ast.IfStmt, condition *ast.CallExpr, asked guard, call *ast.CallExpr,
 ) {
@@ -149,12 +155,11 @@ func checkUnconditionalCall(
 		!sameNonDynamic(context, condition.Args[1], call.Args[1]) {
 		return
 	}
-	callName := staticcheck_code.CallName(context, call)
-	if callName != asked.unconditional {
+	if staticcheck_code.CallIndex(context, call, asked.unconditional) < 0 {
 		return
 	}
 	staticcheck_report.Report(context, ifStatement,
-		fmt.Sprintf("should replace this if statement with an unconditional %s", callName),
+		fmt.Sprintf("should replace this if statement with an unconditional %s", asked.unconditional),
 		staticcheck_report.FilterGenerated())
 }
 

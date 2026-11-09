@@ -17,6 +17,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -96,7 +97,8 @@ func isExecCommand(context *rule.Context, function ast.Expr) bool {
 	default:
 		return false
 	}
-	// FullName spells a method with its receiver, `(T).Command`, and a function by its package's path.
+	// The full name Matches compares spells a method with its receiver, `(T).Command`, and a function by its package's
+	// path.
 	command, isFunction := object.(*types.Func)
-	return isFunction && command.FullName() == "os/exec.Command"
+	return isFunction && function_name.Matches(command, "os/exec.Command")
 }

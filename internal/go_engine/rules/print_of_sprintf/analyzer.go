@@ -6,11 +6,11 @@
 // whose messages it reports word for word, over the same range, the whole outer call. The original runs three pattern
 // queries on every call of every package that could hold one, and each query allocates its matcher's state before it
 // can fail; the port fails first on a gate that allocates nothing, the call's last argument resolving by types to
-// fmt.Sprintf, and only past it asks what the three forms ask. It asks staticcheck_code.CallName where the original
-// asks code.CallName, and reports through staticcheck_report.Report where the original reports through
-// report.Report, each the port of the one the original calls. The registry runs the port in the original's place, under
-// its name, and the original stays only as the oracle: the parity tests beside this file run both over the same
-// packages, and the two differ nowhere they hold.
+// fmt.Sprintf, and only past it asks what the three forms ask. It asks staticcheck_code.CallIndex where the original
+// looks code.CallName up, which compares the name in place, and reports through staticcheck_report.Report where the
+// original reports through report.Report, each the port of the one the original calls. The registry runs the port in
+// the original's place, under its name, and the original stays only as the oracle: the parity tests beside this file
+// run both over the same packages, and the two differ nowhere they hold.
 package print_of_sprintf
 
 import (
@@ -19,6 +19,8 @@ import (
 	"go/ast"
 	"go/format"
 	"go/types"
+	"maps"
+	"slices"
 
 	"honnef.co/go/tools/go/types/typeutil"
 
@@ -87,6 +89,10 @@ var alternatives = map[string]alternative{
 	"log.Print":               {"", "log.Printf"},
 	"log.Println":             {"", "log.Printf"},
 }
+
+// alternativeNames are alternatives' keys, sorted, which staticcheck_code.CallIndex compares a call's name with in
+// place, so the name is never built for a call that is none of them.
+var alternativeNames = slices.Sorted(maps.Keys(alternatives))
 
 // Check judges one call: a print given the result of fmt.Sprintf as its one argument, or as its second after a
 // writer, is reported with the formatting form that would do the work itself.
@@ -178,10 +184,11 @@ func checkMethodPrint(context *rule.Context, call *ast.CallExpr) {
 	default:
 		return
 	}
-	mapped, isMapped := alternatives[staticcheck_code.CallName(context, call)]
-	if !isMapped {
+	index := staticcheck_code.CallIndex(context, call, alternativeNames...)
+	if index < 0 {
 		return
 	}
+	mapped := alternatives[alternativeNames[index]]
 	// The original binds the receiver without its parentheses, so `(t).Error(...)` looks Errorf up on t's type, and
 	// its message names t.Errorf beside (t).Error.
 	receiver := ast.Unparen(selector.X)
@@ -214,13 +221,12 @@ func checkLogPrint(context *rule.Context, call *ast.CallExpr) {
 	default:
 		return
 	}
-	callName := staticcheck_code.CallName(context, call)
-	mapped, isMapped := alternatives[callName]
-	if !isMapped {
+	index := staticcheck_code.CallIndex(context, call, alternativeNames...)
+	if index < 0 {
 		return
 	}
-	staticcheck_report.Report(context, call,
-		fmt.Sprintf("should use %s(...) instead of %s(fmt.Sprintf(...))", mapped.name, callName))
+	staticcheck_report.Report(context, call, fmt.Sprintf("should use %s(...) instead of %s(fmt.Sprintf(...))",
+		alternatives[alternativeNames[index]].name, alternativeNames[index]))
 }
 
 // render is node as the original's messages write it, printed by go/format over the package's positions as

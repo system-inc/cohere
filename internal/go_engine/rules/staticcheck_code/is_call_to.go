@@ -2,7 +2,6 @@ package staticcheck_code
 
 import (
 	"go/ast"
-	"slices"
 
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
@@ -17,7 +16,7 @@ func IsCallTo(context *rule.Context, node ast.Node, name string) bool {
 	if !isCall {
 		return false
 	}
-	return CallName(context, call) == name
+	return CallIndex(context, call, name) == 0
 }
 
 // IsCallToAny is whether node is a call of a function CallName names one of names. It is staticcheck's
@@ -27,5 +26,5 @@ func IsCallToAny(context *rule.Context, node ast.Node, names ...string) bool {
 	if !isCall {
 		return false
 	}
-	return slices.Contains(names, CallName(context, call))
+	return CallIndex(context, call, names...) >= 0
 }

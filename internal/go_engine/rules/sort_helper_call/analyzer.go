@@ -92,7 +92,7 @@ func Check(context *rule.Context, node ast.Node) []Finding {
 		call, isCall := inspected.(*ast.CallExpr)
 		// code.IsCallTo's "sort.Sort", the callee named through its object, so a renamed or dot import, or
 		// parentheses around it, still call sort.Sort, and a variable holding it does not.
-		if !isCall || staticcheck_code.CallName(context, call) != "sort.Sort" {
+		if !isCall || staticcheck_code.CallIndex(context, call, "sort.Sort") < 0 {
 			return true
 		}
 		message, isHelper := helperConversion(context, call.Args[knowledge.Arg("sort.Sort.data")])

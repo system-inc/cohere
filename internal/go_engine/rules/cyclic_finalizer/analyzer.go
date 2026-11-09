@@ -17,6 +17,7 @@ package cyclic_finalizer
 
 import (
 	"fmt"
+	"strings"
 
 	"honnef.co/go/tools/knowledge"
 
@@ -55,7 +56,11 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 				continue
 			}
 			callee := site.Common().StaticCallee()
-			if callee == nil || callee.RelativeString(nil) != "runtime.SetFinalizer" {
+			// RelativeString ends in the function's own name in every case but an anonymous function's, which
+			// ends in "$" and its number, so one whose name doesn't end in SetFinalizer can't be it, and the
+			// string is built only for the few that do (#p92j24d).
+			if callee == nil || !strings.HasSuffix(callee.Name(), "SetFinalizer") ||
+				callee.RelativeString(nil) != "runtime.SetFinalizer" {
 				continue
 			}
 			object := withoutInterface(site.Common().Arguments[knowledge.Arg("runtime.SetFinalizer.obj")])

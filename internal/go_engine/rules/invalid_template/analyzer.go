@@ -28,6 +28,7 @@ import (
 
 	"honnef.co/go/tools/knowledge"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
@@ -97,21 +98,27 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	}
 }
 
+// parseMethods are the two methods the query's Or names, in the order parseOf picks between them: text/template's
+// Template's Parse, then html/template's.
+var parseMethods = []string{"(*text/template.Template).Parse", "(*html/template.Template).Parse"}
+
 // parseOf is the parse of the template package whose Template's Parse method names, as the query's Symbol and its
-// Or of the two methods match it, or nil when method names neither. A method's object spells its receiver in
-// FullName, so a function, a variable or another type's Parse is neither.
+// Or of the two methods match it, or nil when method names neither. A method's full name spells its receiver, so a
+// function, a variable or another type's Parse is neither.
 func parseOf(context *rule.Context, method *ast.SelectorExpr) func(text string) error {
 	function, isFunction := context.TypesInfo.ObjectOf(method.Sel).(*types.Func)
 	if !isFunction {
 		return nil
 	}
-	switch function.FullName() {
-	case "(*text/template.Template).Parse":
+	switch function_name.Index(function, parseMethods...) {
+	case 0:
+		// (*text/template.Template).Parse
 		return func(text string) error {
 			_, parseError := texttemplate.New("").Parse(text)
 			return parseError
 		}
-	case "(*html/template.Template).Parse":
+	case 1:
+		// (*html/template.Template).Parse
 		return func(text string) error {
 			_, parseError := htmltemplate.New("").Parse(text)
 			return parseError

@@ -41,21 +41,33 @@ var Analyzer = dispatch.RuleAnalyzer(
 	&Listener,
 )
 
-// lockMethod is one locking method the check knows, by the two names its message reads.
+// lockMethod is one locking method the check knows, by the full name CallName, irutil's translated, gives a static
+// call to it, and the two names its message reads.
 type lockMethod struct {
+	// fullName is the method's full name, "(*sync.Mutex).Lock".
+	fullName string
 	// name is the method's own name.
 	name string
 	// release is the name of the method that releases what it takes.
 	release string
 }
 
-// lockMethods is the locking methods the check knows, by the full name CallName, irutil's translated, gives a static
-// call to each. The original's list is these two alone, so a write lock of a sync.RWMutex deferred after taking it is
-// not found.
-var lockMethods = map[string]lockMethod{
-	"(*sync.Mutex).Lock":    {name: "Lock", release: "Unlock"},
-	"(*sync.RWMutex).RLock": {name: "RLock", release: "RUnlock"},
+// lockMethods is the locking methods the check knows. The original's list is these two alone, so a write lock of a
+// sync.RWMutex deferred after taking it is not found.
+var lockMethods = []lockMethod{
+	{fullName: "(*sync.Mutex).Lock", name: "Lock", release: "Unlock"},
+	{fullName: "(*sync.RWMutex).RLock", name: "RLock", release: "RUnlock"},
 }
+
+// lockFullNames are lockMethods' full names, in their order, what CallIndex compares a call's callee with in place
+// rather than building its name for a lookup (#p92j24d).
+var lockFullNames = func() []string {
+	names := make([]string, 0, len(lockMethods))
+	for _, method := range lockMethods {
+		names = append(names, method.fullName)
+	}
+	return names
+}()
 
 // Check judges one function: each static call to a locking method followed, as the next instruction of its block, by
 // a defer of a locking method on the very same receiver, the one value both calls read, reported at the defer.
@@ -67,15 +79,16 @@ func Check(context *rule.Context, function *intermediate_representation.Function
 			if !isCall {
 				continue
 			}
-			locked, isLock := lockMethods[intermediate_representation.CallName(call.Common())]
-			if !isLock {
+			lockIndex := intermediate_representation.CallIndex(call.Common(), lockFullNames...)
+			if lockIndex < 0 {
 				continue
 			}
+			locked := lockMethods[lockIndex]
 			deferred, isDefer := block.Instructions[index+1].(*intermediate_representation.Defer)
 			if !isDefer {
 				continue
 			}
-			if _, isDeferredLock := lockMethods[intermediate_representation.CallName(&deferred.Call)]; !isDeferredLock {
+			if !intermediate_representation.IsCallToAny(&deferred.Call, lockFullNames...) {
 				continue
 			}
 			// A static call to a method takes its receiver first. The same value is the same mutex: a global, a local

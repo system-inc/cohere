@@ -6,6 +6,7 @@ import (
 	"go/types"
 	"strings"
 
+	"github.com/system-inc/cohere/internal/go_engine/function_name"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 )
 
@@ -70,25 +71,10 @@ func isObjectSymbol(object types.Object, name string) bool {
 	return false
 }
 
-// isFunctionSymbol is whether function's full name is name, as types.Func's FullName spells it: its name alone when it
-// has no type yet, a method's receiver in parentheses, a dot and its name, and any other function's package path, a
-// dot and its name, or its name alone when it has no package or its package no path. Only a method's receiver needs
-// FullName's printing, and only once name has a method's shape and ends in the method's own name.
+// isFunctionSymbol is whether function's full name is name, compared in place by function_name, which answers
+// what types.Func's FullName would.
 func isFunctionSymbol(function *types.Func, name string) bool {
-	if function.Type() == nil {
-		return name == function.Name()
-	}
-	if function.Signature().Recv() != nil {
-		receiver, isMethodName := strings.CutSuffix(name, function.Name())
-		if !isMethodName || !strings.HasPrefix(receiver, "(") || !strings.HasSuffix(receiver, ").") {
-			return false
-		}
-		return function.FullName() == name
-	}
-	if function.Pkg() == nil || function.Pkg().Path() == "" {
-		return name == function.Name()
-	}
-	return isJoined(name, function.Pkg().Path(), function.Name())
+	return function_name.Matches(function, name)
 }
 
 // isJoined is whether name is qualifier and local joined by a dot, compared in place.
