@@ -25,8 +25,8 @@ type fixtureEntry struct {
 	executable   bool
 }
 
-// fixtureEntries is the fixture cache, one entry a letter, oldest first: C is an executable entry, and the
-// rest are files. 100 KiB in all.
+// fixtureEntries is the fixture cache, one entry a letter, oldest first, each named as Go names it by its
+// subdirectory: C is an executable entry, and the rest are files. 100 KiB in all.
 var fixtureEntries = map[string]fixtureEntry{
 	"A": {subdirectory: "00", suffix: "-a", kibibytes: 10, age: 7 * 24 * time.Hour},
 	"B": {subdirectory: "01", suffix: "-d", kibibytes: 20, age: 3 * 24 * time.Hour},
@@ -51,10 +51,7 @@ func newFixture(test *testing.T) fixture {
 	test.Helper()
 	written := fixture{directory: newCache(test), entries: map[string]string{}}
 	for letter, entry := range fixtureEntries {
-		path := filepath.Join(written.directory, entry.subdirectory, entry.subdirectory+strings.Repeat(
-			strings.ToLower(letter),
-			62,
-		)+entry.suffix)
+		path := entryPath(written.directory, entry.subdirectory, entry.subdirectory[1:], entry.suffix)
 		used := fixtureNow.Add(-entry.age)
 		if entry.executable {
 			put(test, path, "tool", entry.kibibytes*kibibyte, used)
@@ -66,7 +63,7 @@ func newFixture(test *testing.T) fixture {
 	}
 	old := fixtureNow.Add(-10 * 24 * time.Hour)
 	outside := put(test, test.TempDir(), "target", 10*kibibyte, old)
-	link := filepath.Join(written.directory, "09", "09"+strings.Repeat("f", 62)+"-d")
+	link := entryPath(written.directory, "09", "f", "-d")
 	if createDirectoryError := os.MkdirAll(filepath.Dir(link), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
@@ -82,6 +79,12 @@ func newFixture(test *testing.T) fixture {
 		outside,
 	}
 	return written
+}
+
+// entryPath is the path in the cache at directory of the entry Go would name with suffix in subdirectory,
+// its hash being the subdirectory's digits and then digit repeated.
+func entryPath(directory, subdirectory, digit, suffix string) string {
+	return filepath.Join(directory, subdirectory, subdirectory+strings.Repeat(digit, hashDigits-2)+suffix)
 }
 
 // newCache makes a directory in Go's cache layout, README included.
@@ -387,10 +390,10 @@ func TestAnExecutableEntryIsCountedAndRemoved(test *testing.T) {
 	test.Parallel()
 	directory := newCache(test)
 	old := fixtureNow.Add(-48 * time.Hour)
-	executable := filepath.Join(directory, "00", "00"+strings.Repeat("a", 62)+"-d")
+	executable := entryPath(directory, "00", "a", "-d")
 	put(test, executable, "cohere", 2000, old)
 	setTime(test, executable, old)
-	nested := put(test, filepath.Join(directory, "01", "01"+strings.Repeat("b", 62)+"-d", "inner"), "file", 2000, old)
+	nested := put(test, filepath.Join(entryPath(directory, "01", "b", "-d"), "inner"), "file", 2000, old)
 	setTime(test, filepath.Dir(filepath.Dir(nested)), old)
 
 	trimmed, trimError := Trim(directory, Limit{Cap: 1000, Target: 0, Spare: MinimumSpare}, fixtureNow)
@@ -422,5 +425,240 @@ func TestADirectoryWithoutGosReadmeIsRefused(test *testing.T) {
 	}
 	if !exists(file) {
 		test.Fatal("a refused trim removed a file")
+	}
+}
+
+// putOutputs writes an old action file and an old executable output into directory, named as Go names entries
+// of subdirectory, and returns the paths of the action file and the executable's binary.
+func putOutputs(test *testing.T, directory, subdirectory string, used time.Time) []string {
+	test.Helper()
+	action := put(test, directory, filepath.Base(entryPath(directory, subdirectory, "a", "-a")), 4096, used)
+	executable := filepath.Join(directory, filepath.Base(entryPath(directory, subdirectory, "b", "-d")))
+	binary := put(test, executable, "tool", 4096, used)
+	setTime(test, executable, used)
+	return []string{action, binary}
+}
+
+// link makes path a symbolic link to target.
+func link(test *testing.T, target, path string) {
+	test.Helper()
+	if linkError := os.Symlink(target, path); linkError != nil {
+		test.Fatal(linkError)
+	}
+}
+
+// A subdirectory that is a link is never read, wherever it points: one planted in place of 0a pointing outside
+// the cache, and one in place of 0b pointing to a directory inside it. The old files and the executable output
+// each target holds are never listed and survive a trim to nothing, while the real entry beside them goes
+// (#7jx42ed).
+func TestALinkedSubdirectoryIsNeverListedOrTrimmed(test *testing.T) {
+	test.Parallel()
+	directory := newCache(test)
+	old := fixtureNow.Add(-10 * 24 * time.Hour)
+	genuine := entryPath(directory, "00", "0", "-a")
+	put(test, filepath.Dir(genuine), filepath.Base(genuine), 4096, old)
+	outside := test.TempDir()
+	kept := putOutputs(test, outside, "0a", old)
+	link(test, outside, filepath.Join(directory, "0a"))
+	kept = append(kept, putOutputs(test, filepath.Join(directory, "elsewhere"), "0b", old)...)
+	link(test, "elsewhere", filepath.Join(directory, "0b"))
+
+	entries, listError := List(directory)
+	if listError != nil {
+		test.Fatal(listError)
+	}
+	if len(entries) != 1 || entries[0].Path != genuine {
+		test.Errorf("listed %+v, want only %s", entries, genuine)
+	}
+	trimmed, trimError := Trim(directory, Limit{Spare: MinimumSpare}, fixtureNow)
+	if trimError != nil {
+		test.Fatal(trimError)
+	}
+	if trimmed.Removed != 1 || exists(genuine) {
+		test.Errorf("trimmed %+v, want the one real entry removed", trimmed)
+	}
+	for _, path := range kept {
+		if !exists(path) {
+			test.Errorf("%s, behind a linked subdirectory, was removed", path)
+		}
+	}
+}
+
+// A link swapped in for a real subdirectory between the listing and the removal leaves the entries listed
+// through it where they are, with no error, and removes nothing it points to: 00 becomes a link outside the
+// cache and 02 one to a directory inside it, each target holding A's and C's names, with their times, so the
+// recheck before a remove would pass. The rest of the trim goes on.
+func TestALinkSwappedInAfterTheListingRemovesNothingOutside(test *testing.T) {
+	test.Parallel()
+	written := newFixture(test)
+	outside := test.TempDir()
+	inside := filepath.Join(written.directory, "elsewhere")
+	moved := test.TempDir()
+	targets := []string{}
+	swap := func() {
+		for _, swapped := range []struct {
+			letter string
+			target string
+			link   string
+		}{
+			{letter: "A", target: outside, link: outside},
+			{letter: "C", target: inside, link: "elsewhere"},
+		} {
+			original := written.entries[swapped.letter]
+			used := fixtureNow.Add(-fixtureEntries[swapped.letter].age)
+			if fixtureEntries[swapped.letter].executable {
+				executable := filepath.Join(swapped.target, filepath.Base(original))
+				targets = append(targets, put(test, executable, "tool", 4096, used))
+				setTime(test, executable, used)
+			} else {
+				targets = append(targets, put(test, swapped.target, filepath.Base(original), 4096, used))
+			}
+			subdirectory := filepath.Dir(original)
+			if renameError := os.Rename(
+				subdirectory,
+				filepath.Join(moved, filepath.Base(subdirectory)),
+			); renameError != nil {
+				test.Fatal(renameError)
+			}
+			link(test, swapped.link, subdirectory)
+		}
+	}
+	trimmed, trimError := trim(written.directory, Limit{Spare: MinimumSpare}, fixtureNow, swap)
+	if trimError != nil {
+		test.Fatalf("a trim that met a swapped link failed: %v", trimError)
+	}
+	if len(targets) != 2 {
+		test.Fatalf("the swap planted %d targets, want 2", len(targets))
+	}
+	for _, path := range targets {
+		if !exists(path) {
+			test.Errorf("%s, reached through a link swapped in after the listing, was removed", path)
+		}
+	}
+	if trimmed.Removed != 3 || written.gone() != "BDE" {
+		test.Errorf(
+			"trimmed %+v and removed %q, want B, D and E, with A and C behind their links",
+			trimmed,
+			written.gone(),
+		)
+	}
+	written.checkKept(test)
+}
+
+// Only a name Go gives an entry is listed or removed: its subdirectory's digits leading 64 lowercase hex, then
+// -a or -d. A name that is not hex, one a digit short, one in uppercase, one under the wrong subdirectory and
+// one with another suffix all survive a trim to nothing beside the one Go would write, and Remove refuses an
+// entry named so.
+func TestOnlyNamesGoGivesAnEntryAreListed(test *testing.T) {
+	test.Parallel()
+	directory := newCache(test)
+	old := fixtureNow.Add(-10 * 24 * time.Hour)
+	subdirectory := filepath.Join(directory, "0c")
+	genuine := put(test, subdirectory, filepath.Base(entryPath(directory, "0c", "0", "-a")), 4096, old)
+	kept := []string{
+		put(test, subdirectory, "x-a", 4096, old),
+		put(test, subdirectory, "0c"+strings.Repeat("c", hashDigits-3)+"-a", 4096, old),
+		put(test, subdirectory, "0c"+strings.Repeat("C", hashDigits-2)+"-a", 4096, old),
+		put(test, subdirectory, "0d"+strings.Repeat("d", hashDigits-2)+"-a", 4096, old),
+		put(test, subdirectory, "0c"+strings.Repeat("e", hashDigits-2)+"-x", 4096, old),
+	}
+
+	entries, listError := List(directory)
+	if listError != nil {
+		test.Fatal(listError)
+	}
+	if len(entries) != 1 || entries[0].Path != genuine {
+		test.Errorf("listed %+v, want only %s", entries, genuine)
+	}
+	if _, trimError := Trim(directory, Limit{Spare: MinimumSpare}, fixtureNow); trimError != nil {
+		test.Fatal(trimError)
+	}
+	if exists(genuine) {
+		test.Error("the entry Go would write survived a trim to nothing")
+	}
+	for _, path := range kept {
+		if !exists(path) {
+			test.Errorf("%s, no name Go gives an entry, was removed", filepath.Base(path))
+		}
+		removed, removeError := Remove(Entry{Path: path, Bytes: 4096, Used: old})
+		if removed || removeError == nil || !strings.Contains(removeError.Error(), "refusing to remove") {
+			test.Errorf("Remove of %s was not refused: %t, %v", filepath.Base(path), removed, removeError)
+		}
+		if !exists(path) {
+			test.Errorf("%s, no name Go gives an entry, was removed by Remove", filepath.Base(path))
+		}
+	}
+}
+
+// A link swapped in for a real subdirectory after its Lstat and before its open is caught by the identity
+// check alone, since the open follows a link that stays inside the cache: 00 becomes a link to elsewhere, a
+// directory in the cache holding A's name with A's time and size. Swapped during the listing, nothing in
+// elsewhere is listed. Swapped during the removal, after a listing of the real 00, nothing in elsewhere is
+// removed. Neither stops the trim, and B, C, D and E go.
+// Not parallel: afterLstatForTest is one hook for the package, and a top-level test that is not parallel runs
+// while no parallel one does.
+func TestALinkSwappedInBetweenTheCheckAndTheOpenIsRefused(test *testing.T) {
+	for _, phase := range []struct {
+		name   string
+		listed bool
+		before int64
+	}{
+		{name: "during the listing", before: 90 * kibibyte},
+		{name: "during the removal", listed: true, before: 100 * kibibyte},
+	} {
+		// Not parallel: each phase sets afterLstatForTest, the one hook for the package.
+		test.Run(phase.name, func(test *testing.T) {
+			written := newFixture(test)
+			original := written.entries["A"]
+			target := put(
+				test,
+				filepath.Join(written.directory, "elsewhere"),
+				filepath.Base(original),
+				fixtureEntries["A"].kibibytes*kibibyte,
+				fixtureNow.Add(-fixtureEntries["A"].age),
+			)
+			armed, swapped := !phase.listed, false
+			afterLstatForTest = func(name string) {
+				if !armed || swapped || name != "00" {
+					return
+				}
+				swapped = true
+				if renameError := os.Rename(
+					filepath.Dir(original),
+					filepath.Join(test.TempDir(), "00"),
+				); renameError != nil {
+					test.Fatal(renameError)
+				}
+				link(test, "elsewhere", filepath.Dir(original))
+			}
+			defer func() { afterLstatForTest = nil }()
+
+			trimmed, trimError := trim(
+				written.directory,
+				Limit{Spare: MinimumSpare},
+				fixtureNow,
+				func() { armed = true },
+			)
+			if trimError != nil {
+				test.Fatalf("a trim that met a link swapped in after its check failed: %v", trimError)
+			}
+			if !swapped {
+				test.Fatal("the link was never swapped in, so the test shows nothing")
+			}
+			if trimmed.Before != phase.before {
+				test.Errorf(
+					"the trim listed %d bytes, want %d, with nothing in elsewhere",
+					trimmed.Before,
+					phase.before,
+				)
+			}
+			if !exists(target) {
+				test.Errorf("%s, reached through a link swapped in after its check, was removed", target)
+			}
+			if gone := written.gone(); gone != "BCDE" || trimmed.Removed != 4 {
+				test.Errorf("trimmed %+v and removed %q, want B, C, D and E, with A behind its link", trimmed, gone)
+			}
+			written.checkKept(test)
+		})
 	}
 }

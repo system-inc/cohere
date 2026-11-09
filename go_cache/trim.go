@@ -1,6 +1,7 @@
 package go_cache
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,9 +102,41 @@ func Choose(candidates []Entry, remove int64) []Entry {
 // Remove removes one entry, an executable entry's files by name and then its emptied directory, and
 // reports whether it did. It looks at the entry again first and leaves it when its time has moved since
 // it was listed, since that is Go marking it used again, or when it is no longer the kind it was listed
-// as. An entry already gone is not removed and is no error.
+// as. An entry already gone is not removed and is no error. Like List, it reaches the entry only through
+// its cache and a subdirectory that is a real directory, never a link, so a link swapped in since the
+// listing leaves the entry where it is, with no error, since one planted link must not stop a trim. A
+// path that is no name Go gives an entry is refused.
 func Remove(entry Entry) (bool, error) {
-	information, statError := os.Lstat(entry.Path)
+	name := filepath.Base(entry.Path)
+	subdirectoryPath := filepath.Dir(entry.Path)
+	subdirectoryName := filepath.Base(subdirectoryPath)
+	if !namesASubdirectory(subdirectoryName) || !namesAnEntry(subdirectoryName, name) {
+		return false, fmt.Errorf("refusing to remove %s: it is no name Go gives a cache entry", entry.Path)
+	}
+	cache, openError := os.OpenRoot(filepath.Dir(subdirectoryPath))
+	if gone(openError) {
+		return false, nil
+	}
+	if openError != nil {
+		return false, fmt.Errorf("trimming the Go build cache: %w", openError)
+	}
+	defer cache.Close() // Ignored: a close fails nothing already removed.
+	subdirectoryInformation, subdirectoryStatError := cache.Lstat(subdirectoryName)
+	if gone(subdirectoryStatError) {
+		return false, nil
+	}
+	if subdirectoryStatError != nil {
+		return false, fmt.Errorf("trimming the Go build cache: %w", subdirectoryStatError)
+	}
+	subdirectory, openSubdirectoryError := openDirectory(cache, subdirectoryName, subdirectoryInformation)
+	if gone(openSubdirectoryError) || errors.Is(openSubdirectoryError, errorNotTheDirectory) {
+		return false, nil
+	}
+	if openSubdirectoryError != nil {
+		return false, fmt.Errorf("trimming the Go build cache: %w", openSubdirectoryError)
+	}
+	defer subdirectory.Close() // Ignored: a close fails nothing already removed.
+	information, statError := subdirectory.Lstat(name)
 	if gone(statError) {
 		return false, nil
 	}
@@ -116,12 +149,13 @@ func Remove(entry Entry) (bool, error) {
 	if entry.Executable != information.IsDir() || (!entry.Executable && !information.Mode().IsRegular()) {
 		return false, nil
 	}
-	for _, name := range entry.Files {
-		if removeError := os.Remove(filepath.Join(entry.Path, name)); removeError != nil && !gone(removeError) {
-			return false, fmt.Errorf("trimming the Go build cache: %w", removeError)
+	if entry.Executable {
+		left, removeFilesError := removeFiles(subdirectory, name, information, entry.Files)
+		if left || removeFilesError != nil {
+			return false, removeFilesError
 		}
 	}
-	removeError := os.Remove(entry.Path)
+	removeError := subdirectory.Remove(name)
 	if gone(removeError) {
 		return false, nil
 	}
@@ -129,6 +163,26 @@ func Remove(entry Entry) (bool, error) {
 		return false, fmt.Errorf("trimming the Go build cache: %w", removeError)
 	}
 	return true, nil
+}
+
+// removeFiles removes an executable entry's files by name, through the entry named name in subdirectory
+// opened as a root once information, its Lstat, says it is still a real directory, and reports the entry
+// left, not removed, when it is a link or gone.
+func removeFiles(subdirectory *os.Root, name string, information os.FileInfo, files []string) (bool, error) {
+	executable, openError := openDirectory(subdirectory, name, information)
+	if gone(openError) || errors.Is(openError, errorNotTheDirectory) {
+		return true, nil
+	}
+	if openError != nil {
+		return false, fmt.Errorf("trimming the Go build cache: %w", openError)
+	}
+	defer executable.Close() // Ignored: a close fails nothing already removed.
+	for _, file := range files {
+		if removeError := executable.Remove(file); removeError != nil && !gone(removeError) {
+			return false, fmt.Errorf("trimming the Go build cache: %w", removeError)
+		}
+	}
+	return false, nil
 }
 
 // RemoveOldest removes candidates in order until remove bytes are gone, and returns how many entries and

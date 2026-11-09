@@ -113,7 +113,11 @@ func newQuietTrimCase(test *testing.T) quietTrimCase {
 		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
-		path := filepath.Join(cache, fmt.Sprintf("%02x", index), fmt.Sprintf("%02xaa-d", index))
+		path := filepath.Join(
+			cache,
+			fmt.Sprintf("%02x", index),
+			fmt.Sprintf("%02x%s-d", index, strings.Repeat("a", 62)),
+		)
 		if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
