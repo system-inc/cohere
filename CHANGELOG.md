@@ -103,6 +103,13 @@ changed in cohere outside the sets is written under the same heading.
   valid declaration merging, as lib.es5.d.ts's own `interface Array<T>` plus `declare var Array`. A project
   that wants it turns it on in its own settings. A `no-redeclare` disable comment is now unused, and so an
   error: delete it.
+- The abbreviation rule no longer guesses what `res`, `ch`, `dir`, `var` and `vars` mean. An audit of the Go
+  engine's renames found `res` made `response` where it meant a result or a map's reserve size, `ch` a channel
+  where it was a rune, and `dir` a directory where it was a channel's direction. Their messages now name every
+  meaning, as `Use "result", "response", "resource" or "reserve", whichever it means`, and the Go engine's fix
+  no longer renames them. `Var` and `Vars` can mean JavaScript's var keyword, so they say what to write for a
+  variable and ask for a name saying it means the keyword otherwise. The same names are found as before. A
+  local error from a call whose name holds one of the words, as `os.ReadDir`'s, is no longer named for it.
 
 ## 0.1.1 (2026-11-03)
 

@@ -239,7 +239,7 @@ func TestAbbreviationVocabularyOrderIsObservableWhereItMatters(test *testing.T) 
 		wantId      string
 		wantMessage string
 	}{
-		{"themeVarsVar", "abbreviatedWordSegment", `Use "themeVariablesVar".`},
+		{"themeVarsVar", "abbreviatedWordSegment", `abbreviates "Vars".`},
 		{"timeoutMsRef", "millisecondSuffix", `Use "timeoutInMillisecondsRef"`},
 		{"dbVal", "abbreviatedIdentifier", `Use "databaseVal".`},
 	}

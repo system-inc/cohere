@@ -1,6 +1,7 @@
 package consistency_no_abbreviated_identifier_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -60,6 +61,36 @@ func TestAnalyzer(test *testing.T) {
 		"contextcalls",
 		"namesake",
 	)
+}
+
+// A word the vocabulary gives more than one meaning, or advice in place of one, is found and never renamed. An audit
+// of the fix's renames found single expansions that guessed: `res` became `response` where it meant a result or
+// MakeMap's reserve, `ch` and `dir` meant a rune and a ChanDir, and `Var` meant JavaScript's var keyword. So
+// ambiguous.go declares each in every sense the audit found, and its golden keeps every one of those names.
+//
+// analysistest compares a golden only for a file some fix edits, so a rule that offered no rename at all would pass
+// the golden by skipping it. The test reads the renames themselves instead: exactly one, `strValue`'s, the word with
+// one meaning the file declares beside them, so it fails as much on a fix that never runs as on one that guesses.
+func TestAWordWithSeveralMeaningsIsNeverRenamed(test *testing.T) {
+	test.Parallel()
+	results := analysistest.RunWithSuggestedFixes(
+		errorsOnly{test},
+		analysistest.TestData(),
+		consistency_no_abbreviated_identifier.Analyzer,
+		"ambiguous",
+	)
+	var renames []string
+	for _, result := range results {
+		for _, diagnostic := range result.Diagnostics {
+			for _, fix := range diagnostic.SuggestedFixes {
+				renames = append(renames, fix.Message)
+			}
+		}
+	}
+	want := []string{`Rename "strValue" to "stringValue" at its declaration and at every reference.`}
+	if !slices.Equal(renames, want) {
+		test.Errorf("renames %q, want %q", renames, want)
+	}
 }
 
 // renameExports is the engine's to read, so turning it on changes no finding and no rename the rule offers: the

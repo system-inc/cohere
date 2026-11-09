@@ -6,7 +6,7 @@ enum PolicyAbbreviations {
     /* policy/Abbreviations.json, byte for byte. */
     static let file = ##"""
         {
-            "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansions` are the words it stands in for, the most common meaning first, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. A word with more than one common meaning lists every one, and its messages name them all and ask for whichever it means, never one guess; a word whose meanings are too many to list has no `expansions` and gives its `advice` instead. No engine fixes a name from this file, and a word with more than one expansion must never be fixed, since only its author knows which it means. Order is observable: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
+            "about": "The abbreviation vocabulary for nexus/consistency-no-abbreviated-identifier, read by the Go rule through go:embed and by the Swift engine directly. Each entry is one abbreviated word: `expansions` are the words it stands in for, the most common meaning first, and each form says where in a name the word is judged. A suffix or segment form matches the word capitalized, and suggests the expansion capitalized. A word with more than one common meaning lists every one, and its messages name them all and ask for whichever it means, never one guess; a word whose meanings are too many to list, or one of whose meanings has no full word to expand to, has no `expansions` and gives its `advice` instead. Only the Go engine fixes a name from this file, and only where a finding names one spelling, so a single expansion promises the rename is right wherever the word appears: a word with more than one expansion must never be fixed, since only its author knows which it means. Order is observable: within each form the rule reports the first entry that matches, so `ms` sits between `params` and `ref`, the early prefixes run `ctx` through `prev` in this order, and `vars` precedes `var`. Framework exemptions (`params` in route files, `ref` in React property positions, `config` in middleware, TanStack's `queryFn`) are policy rather than vocabulary and stay in the Go rule.",
             "abbreviations": [
                 {
                     "abbreviation": "prop",
@@ -141,7 +141,8 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "res",
-                    "expansions": ["response"],
+                    "expansions": ["result", "response", "resource", "reserve"],
+                    "reason": "It has four common meanings, so every message names them all. A census of the Go fix's renames found it meaning a result, MakeMap's reserve and result types, never a response.",
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "suffix": {}
@@ -195,8 +196,8 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "dir",
-                    "expansions": ["directory"],
-                    "reason": "A segment ends at the end of the name or the start of the next word, which is what keeps `Direction` from reading as `Dir`.",
+                    "expansions": ["directory", "direction"],
+                    "reason": "A segment ends at the end of the name or the start of the next word, which is what keeps `Direction` from reading as `Dir`. It has two common meanings: a census of the Go fix's renames found it naming a ChanDir's direction as well as a directory, so every message names both.",
                     "segment": {}
                 },
                 {
@@ -259,14 +260,15 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "vars",
-                    "expansions": ["variables"],
-                    "reason": "Before `var`, so the longer word wins.",
-                    "segment": {}
+                    "advice": "Use \"Variables\" for variables, or a name saying it means JavaScript's var keyword.",
+                    "reason": "Before `var`, so the longer word wins. It asks rather than offering `Variables` for the reason `var` does: a census of the Go fix's renames found `Var` and `Vars` in names meaning JavaScript's var keyword, which is no variable.",
+                    "segment": { "style": "advice" }
                 },
                 {
                     "abbreviation": "var",
-                    "expansions": ["variable"],
-                    "segment": {}
+                    "advice": "Use \"Variable\" for a variable, or a name saying it means JavaScript's var keyword.",
+                    "reason": "A census of the Go fix's renames found names like `NoVar` meaning JavaScript's var keyword, which is no variable, and the keyword has no full word to expand to, so it asks rather than offering `Variable`.",
+                    "segment": { "style": "advice" }
                 },
                 {
                     "abbreviation": "buf",
@@ -349,8 +351,8 @@ enum PolicyAbbreviations {
                 },
                 {
                     "abbreviation": "ch",
-                    "expansions": ["channel"],
-                    "reason": "Every form needs a word boundary after it, so `Check` and `Change` never read as `Ch`.",
+                    "expansions": ["channel", "character"],
+                    "reason": "Every form needs a word boundary after it, so `Check` and `Change` never read as `Ch`. It has two common meanings: a census of the Go fix's renames found it naming a rune as well as a channel, so every message names both.",
                     "whole": { "style": "orDescriptive" },
                     "prefix": { "phase": "late" },
                     "segment": {}

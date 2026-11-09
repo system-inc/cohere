@@ -1,0 +1,58 @@
+// Package ambiguous declares words whose letters the vocabulary cannot read one meaning from, each in the senses a
+// census of the fix's renames found, beside a word with one meaning that the fix still renames.
+package ambiguous
+
+import (
+	"os"
+	"reflect"
+)
+
+// response stands in for an HTTP response, so the fixture loads no network package.
+type response struct{ body string }
+
+// `res` as a call's result, as an HTTP response, as a resource and as MakeMap's reserve size.
+func sum(left int, right int) (res int) { // want `Identifier "res" should not be abbreviated\. Use "result", "response", "resource" or "reserve", whichever it means, or a more descriptive name\.`
+	return left + right
+}
+
+func read(resBody *response) string { // want `Identifier "resBody" should not be abbreviated\. Use "resultBody", "responseBody", "resourceBody" or "reserveBody", whichever it means\.`
+	return resBody.body
+}
+
+func openRes(name string) (*os.File, error) { // want `Identifier "openRes" should not end with "Res"\. Use "openResult", "openResponse", "openResource" or "openReserve", whichever it means\.`
+	return os.Open(name)
+}
+
+func makeTable(res int) map[string]int { // want `Identifier "res" should not be abbreviated\. Use "result", "response", "resource" or "reserve", whichever it means, or a more descriptive name\.`
+	return make(map[string]int, res)
+}
+
+// `ch` as a channel and as a character, and `dir` as a directory and as a channel's direction.
+func walk(text string, outputDir string, chanDir reflect.ChanDir) int { // want `Identifier "outputDir" abbreviates "Dir"\. Use "outputDirectory" or "outputDirection", whichever it means\.` `Identifier "chanDir" abbreviates "Dir"\. Use "chanDirectory" or "chanDirection", whichever it means\.`
+	ch := make(chan rune, len(text)) // want `Identifier "ch" should not be abbreviated\. Use "channel" or "character", whichever it means, or a more descriptive name\.`
+	doneCh := make(chan bool, 1)     // want `Identifier "doneCh" abbreviates "Ch"\. Use "doneChannel" or "doneCharacter", whichever it means\.`
+	for _, ch := range text {        // want `Identifier "ch" should not be abbreviated\. Use "channel" or "character", whichever it means, or a more descriptive name\.`
+		_ = ch
+	}
+	doneCh <- true
+	return len(ch) + len(outputDir) + int(chanDir)
+}
+
+// `Var` and `Vars` as JavaScript's var keyword, as a rule against it is named, and as variables. A bare lowercase
+// `vars` is no camelCase word, so it is not judged.
+type NoVar struct{} // want `Identifier "NoVar" abbreviates "Var"\. Use "Variable" for a variable, or a name saying it means JavaScript's var keyword\.`
+
+func NoUnusedVars() {} // want `Identifier "NoUnusedVars" abbreviates "Vars"\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
+
+func theme() int {
+	themeVars := map[string]string{} // want `Identifier "themeVars" abbreviates "Vars"\. Use "Variables" for variables, or a name saying it means JavaScript's var keyword\.`
+	themeVarName := ""               // want `Identifier "themeVarName" abbreviates "Var"\. Use "Variable" for a variable, or a name saying it means JavaScript's var keyword\.`
+	vars := 0
+	return len(themeVars) + len(themeVarName) + vars
+}
+
+// A word with one meaning, beside them: its rename runs, so a golden that kept every name above still compares.
+func label() string {
+	strValue := "label" // want `Identifier "strValue" should not be abbreviated\. Use "stringValue"\.`
+	return strValue
+}

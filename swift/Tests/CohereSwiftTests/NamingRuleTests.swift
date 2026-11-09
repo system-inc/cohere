@@ -91,7 +91,7 @@ struct NamingRuleTests {
     }
 
     @Test(arguments: [
-        ("themeVarsVar", "abbreviatedWordSegment", #"Use "themeVariablesVar"."#),
+        ("themeVarsVar", "abbreviatedWordSegment", #"abbreviates "Vars"."#),
         ("timeoutMsRef", "millisecondSuffix", #"Use "timeoutInMillisecondsRef""#),
         ("dbVal", "abbreviatedIdentifier", #"Use "databaseVal"."#),
     ])
@@ -111,8 +111,7 @@ struct NamingRuleTests {
         ("db", #"Identifier "db" should not be abbreviated. Use "database"."#),
         ("idxStart", #"Identifier "idxStart" should not be abbreviated. Use "indexStart"."#),
         ("rowProps", #"Identifier "rowProps" should not end with "Props". Use "rowProperties"."#),
-        ("outputDirPath", #"Identifier "outputDirPath" abbreviates "Dir". Use "outputDirectoryPath"."#),
-        ("themeVarsVar", #"Identifier "themeVarsVar" abbreviates "Vars". Use "themeVariablesVar"."#),
+        ("buildEnvName", #"Identifier "buildEnvName" abbreviates "Env". Use "buildEnvironmentName"."#),
     ])
     func aWordWithOneExpansionRendersAsBefore(name: String, want: String) throws {
         let finding = try #require(try Self.vocabulary().find(name))
@@ -121,7 +120,8 @@ struct NamingRuleTests {
 
     /*
      A word with more than one meaning names them all and asks for whichever it is, never one guess: Go's
-     `TestFindNamesEveryMeaningOfAWordWithMore`, `resultPos` beside `resultNeg` among them, where it means positive.
+     `TestFindNamesEveryMeaningOfAWordWithMore`, `resultPos` beside `resultNeg` among them, where it means positive,
+     and `res`, `ch` and `dir`, which an audit of the Go fix's renames found guessed.
      */
     @Test(arguments: [
         (
@@ -137,6 +137,30 @@ struct NamingRuleTests {
             #"Identifier "resultPos" abbreviates "Pos". Use "resultPosition" or "resultPositive", whichever it means."#,
         ),
         (
+            "policy", "res",
+            #"Identifier "res" should not be abbreviated. Use "result", "response", "resource" or "reserve", whichever it means, or a more descriptive name."#,
+        ),
+        (
+            "policy", "resBody",
+            #"Identifier "resBody" should not be abbreviated. Use "resultBody", "responseBody", "resourceBody" or "reserveBody", whichever it means."#,
+        ),
+        (
+            "policy", "fetchRes",
+            #"Identifier "fetchRes" should not end with "Res". Use "fetchResult", "fetchResponse", "fetchResource" or "fetchReserve", whichever it means."#,
+        ),
+        (
+            "policy", "ch",
+            #"Identifier "ch" should not be abbreviated. Use "channel" or "character", whichever it means, or a more descriptive name."#,
+        ),
+        (
+            "policy", "doneCh",
+            #"Identifier "doneCh" abbreviates "Ch". Use "doneChannel" or "doneCharacter", whichever it means."#,
+        ),
+        (
+            "policy", "outputDirPath",
+            #"Identifier "outputDirPath" abbreviates "Dir". Use "outputDirectoryPath" or "outputDirectionPath", whichever it means."#,
+        ),
+        (
             "listed", "neg",
             #"Identifier "neg" should not be abbreviated. Use "negative" or "negation", whichever it means."#,
         ),
@@ -150,7 +174,7 @@ struct NamingRuleTests {
         ),
     ])
     func aWordWithMoreThanOneMeaningNamesThemAll(vocabularyName: String, name: String, want: String) throws {
-        /* The plain whole form, the suffix form and three meanings, which no word in policy's file has yet. */
+        /* The plain whole form, which no word in policy's file has two meanings in yet, and a segment with three. */
         let listed = try AbbreviationVocabulary.load(
             data: Data(
                 #"""
@@ -163,6 +187,34 @@ struct NamingRuleTests {
         )
         let vocabulary = vocabularyName == "policy" ? try Self.vocabulary() : listed
         let finding = try #require(vocabulary.find(name))
+        #expect(finding.message == want + " " + Self.reasoning)
+    }
+
+    /*
+     `Var` and `Vars` can mean JavaScript's var keyword, as a rule against it is named `NoVar`, which no word spells
+     out, so they offer no name: Go's `TestFindAsksWhetherAWordMeansTheKeyword`.
+     */
+    @Test(arguments: [
+        (
+            "NoVar",
+            #"Identifier "NoVar" abbreviates "Var". Use "Variable" for a variable, or a name saying it means JavaScript's var keyword."#,
+        ),
+        (
+            "themeVarName",
+            #"Identifier "themeVarName" abbreviates "Var". Use "Variable" for a variable, or a name saying it means JavaScript's var keyword."#,
+        ),
+        (
+            "themeVars",
+            #"Identifier "themeVars" abbreviates "Vars". Use "Variables" for variables, or a name saying it means JavaScript's var keyword."#,
+        ),
+        (
+            "themeVarsVar",
+            #"Identifier "themeVarsVar" abbreviates "Vars". Use "Variables" for variables, or a name saying it means JavaScript's var keyword."#,
+        ),
+    ])
+    func aWordThatMayMeanTheKeywordAsksWhichItIs(name: String, want: String) throws {
+        let finding = try #require(try Self.vocabulary().find(name))
+        #expect(finding.form == "segment")
         #expect(finding.message == want + " " + Self.reasoning)
     }
 
