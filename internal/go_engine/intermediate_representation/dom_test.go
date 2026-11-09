@@ -11,6 +11,7 @@ import (
 
 // TestDominatorOrder is go/ir's, building the package in memory where go/ir's loads it with go/packages.
 func TestDominatorOrder(test *testing.T) {
+	test.Parallel()
 	const source = `package p
 
 func f(cond bool) {

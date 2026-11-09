@@ -19,8 +19,13 @@ import (
 //
 // Acquires prog.objectMethodsMu.
 func (prog *Program) objectMethod(object *types.Func, targs []types.Type, builder *builder) *Function {
-	sig := object.Type().(*types.Signature)
+	sig, isSignature := object.Type().(*types.Signature)
+	if !isSignature {
+		// Invariant: go/types gives every *types.Func a *types.Signature type.
+		panic("not a function: " + object.String())
+	}
 	if sig.Recv() == nil {
+		// Invariant: callers pass the object of a method selection or of a method wrapper, each with a receiver.
 		panic("not a method: " + object.String())
 	}
 

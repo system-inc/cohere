@@ -18,8 +18,9 @@ type Phi struct {
 }
 
 func (phi *Phi) Operands(rands []*Value) []*Value {
+	operands := rands
 	for index := range phi.Edges {
-		rands = append(rands, &phi.Edges[index])
+		operands = append(operands, &phi.Edges[index])
 	}
-	return rands
+	return operands
 }

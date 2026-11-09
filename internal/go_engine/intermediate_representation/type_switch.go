@@ -9,6 +9,5 @@ type TypeSwitch struct {
 }
 
 func (typeSwitch *TypeSwitch) Operands(rands []*Value) []*Value {
-	rands = append(rands, &typeSwitch.Tag)
-	return rands
+	return append(rands, &typeSwitch.Tag)
 }

@@ -15,21 +15,24 @@ import (
 // initializer) and "init#%d", the nth declared init function,
 // and unspecified other things too.
 type Package struct {
-	Program   *Program                // the owning program
-	Types     *types.Package          // the corresponding go/types.Package
-	Members   map[string]Member       // all package members keyed by name (incl. init and init#%d)
-	Functions []*Function             // all functions, excluding anonymous ones
-	values    map[types.Object]Member // mapping of package objects to members (incl. methods). Contains *NamedConstant, *Global, *Function (values but not types)
-	init      *Function               // Function("init"); the package's init function
-	syntax    bool                    // package was loaded from syntax
+	Program   *Program          // the owning program
+	Types     *types.Package    // the corresponding go/types.Package
+	Members   map[string]Member // all package members keyed by name (incl. init and init#%d)
+	Functions []*Function       // all functions, excluding anonymous ones
+	// mapping of package objects to members (incl. methods). Contains *NamedConstant, *Global, *Function (values
+	// but not types)
+	values map[types.Object]Member
+	init   *Function // Function("init"); the package's init function
+	syntax bool      // package was loaded from syntax
 
 	// The following fields are set transiently, then cleared
 	// after building.
-	buildOnce   sync.Once           // ensures package building occurs once
-	ninit       int32               // number of init functions
-	info        *types.Info         // package type information
-	files       []*ast.File         // package ASTs
-	created     []*Function         // members created as a result of building this package (includes declared functions, wrappers)
+	buildOnce sync.Once   // ensures package building occurs once
+	ninit     int32       // number of init functions
+	info      *types.Info // package type information
+	files     []*ast.File // package ASTs
+	// members created as a result of building this package (includes declared functions, wrappers)
+	created     []*Function
 	initVersion map[ast.Expr]string // goversion to use for each global var init expr
 }
 

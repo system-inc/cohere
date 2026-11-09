@@ -60,32 +60,37 @@ func isPointerCore(resolvedType types.Type) bool {
 	return is[*types.Pointer](typeutil.CoreType(resolvedType))
 }
 
-func is[T any](x any) bool {
+// is reports whether x holds a T.
+func is[T any](x types.Type) bool {
 	_, ok := x.(T)
 	return ok
 }
 
 // deref returns a pointer's element type; otherwise it returns typ.
 func deref(typ types.Type) types.Type {
-	orig := typ
-	typ = types.Unalias(typ)
+	resolvedType := types.Unalias(typ)
 
-	if parameter, ok := typ.(*types.TypeParam); ok {
+	if parameter, ok := resolvedType.(*types.TypeParam); ok {
 		if ctyp := typeutil.CoreType(parameter); ctyp != nil {
 			// This can happen, for example, with len(T) where T is a
 			// type parameter whose core type is a pointer to array.
-			typ = ctyp
+			resolvedType = ctyp
 		}
 	}
-	if pointer, ok := typ.Underlying().(*types.Pointer); ok {
+	if pointer, ok := resolvedType.Underlying().(*types.Pointer); ok {
 		return pointer.Elem()
 	}
-	return orig
+	return typ
 }
 
 // recvType returns the receiver type of method obj.
 func recvType(object *types.Func) types.Type {
-	return object.Type().(*types.Signature).Recv().Type()
+	sig, isSignature := object.Type().(*types.Signature)
+	if !isSignature {
+		// Invariant: go/types gives every *types.Func a *types.Signature type.
+		panic("not a function: " + object.String())
+	}
+	return sig.Recv().Type()
 }
 
 // fieldOf returns the index'th field of the (core type of) a struct type;
@@ -147,8 +152,11 @@ func makeLength(operandType types.Type) *Builtin {
 	}
 }
 
+// assert panics with message when x is false.
 func assert(x bool, message string) {
 	if !x {
+		// Invariant: callers assert only what holds by construction: buildFunction and done run only on
+		// top-level functions, and the type of a ~x term is its own underlying type.
 		panic(message)
 	}
 }

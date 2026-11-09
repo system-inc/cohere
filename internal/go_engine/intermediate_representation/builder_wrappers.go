@@ -104,6 +104,8 @@ func (packageBuilder *builder) buildBound(function *Function) {
 // buildInstantiationWrapper builds the body of an instantiation
 // wrapper fn. The body calls the original generic function,
 // bracketed by ChangeType conversions on its arguments and results.
+//
+// Mutates: function gains its body, which ends in the return of the call's results
 func (packageBuilder *builder) buildInstantiationWrapper(function *Function) {
 	orig := function.topLevelOrigin
 	sig := function.Signature
