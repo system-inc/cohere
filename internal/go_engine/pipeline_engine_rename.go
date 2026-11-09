@@ -2,6 +2,7 @@ package go_engine
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"go/token"
 	"go/types"
@@ -41,6 +42,7 @@ const renameRounds = 3
 // note on stderr names the rename and the whole reason.
 const (
 	refusedUnwritable    = "a reference in a file this run can't write"
+	refusedOutsideRoot   = "a reference in a file reached through a link outside the root"
 	refusedExported      = "an exported name in an importable package, which renameExports allows"
 	refusedPlatform      = "a package it reaches doesn't load or type-check under another platform"
 	refusedUnproven      = "not proven by a load of the rewrite"
@@ -265,17 +267,25 @@ func (engine *pipeline) rename(firstAsked []nameRename) *load.Loaded {
 // lines on disk. When the set is written it adds the files to the fix record: once each, merged with the entry the fix
 // phase made for a file gofmt or the wrap wrote, the identifiers renamed counted under the rule that asked for them
 // and the lines the wrap cured under the long-line rule. When it is not, nothing was written, every rename applied is
-// refused as unwritable and its finding stands, and it returns false. A set it could not put back is a gap, named.
+// refused as unwritable and its finding stands, and it returns false. A set it could not put back is a gap, named. A
+// set holding a file outside the root, which renameOnce's writable keeps out of every plan, is refused as such and the
+// file withheld, should one reach here.
 func (engine *pipeline) writeRenamed(
 	overlay map[string][]byte, fixedBy map[string]map[string]int, wrapped map[string]int, applied []askedProposal,
 ) bool {
-	partlyWritten, writeError := format.WriteAllAtomically(overlay)
+	partlyWritten, writeError := format.WriteAllAtomically(engine.writeRoot, overlay)
 	for _, file := range slices.Sorted(maps.Keys(overlay)) {
 		engine.reread(file)
 	}
 	if writeError != nil {
+		reason := refusedUnwritable
+		var outside *format.OutsideRootError
+		if errors.As(writeError, &outside) {
+			reason = refusedOutsideRoot
+			engine.withhold(outside.File, outside.RealPath)
+		}
 		for _, renamed := range applied {
-			engine.refuseRename(renamed.rename, renamed.oldName, refusedUnwritable, "the files it rewrites could not "+
+			engine.refuseRename(renamed.rename, renamed.oldName, reason, "the files it rewrites could not "+
 				"all be written, so none was: "+oneLine(writeError))
 		}
 		if len(partlyWritten) > 0 {
@@ -324,9 +334,14 @@ func (engine *pipeline) writeRenamed(
 // the proven rewrite, or refused with its reason. Its proof is nil when nothing was proven.
 func (engine *pipeline) renameOnce(current *load.Loaded, overlay map[string][]byte, asked []nameRename) renameRound {
 	// A file in scope, or one the build constraints leave out here inside the scope's paths, which a rename proven
-	// under the platform that builds it may write.
+	// under the platform that builds it may write, and only when its real path is inside the root: a plan never
+	// reaches a file through a link to somewhere else, and refuseRejected names the file it would have edited.
 	writable := func(filename string) bool {
-		return engine.described.inScopeSet[filename] || engine.described.constrainedInScope[filename]
+		if !engine.described.inScopeSet[filename] && !engine.described.constrainedInScope[filename] {
+			return false
+		}
+		_, inside, resolveError := engine.writeRoot.Inside(filename)
+		return resolveError == nil && inside
 	}
 	space := workspace.FromLoaded(engine.described.workspace.Root, current.Roots, current.Packages, writable)
 	proposals, askedBy := engine.proposals(current, asked)
@@ -738,7 +753,8 @@ func acceptedAsked(result *global_rename.Result, askedBy []askedProposal) []aske
 }
 
 // refuseRejected refuses each rename asked for that the plan rejected, matched by where its declaration stands, with
-// the plan's reason, under the reason the fix record counts it by.
+// the plan's reason, under the reason the fix record counts it by. A file the plan may not edit because its real path
+// is outside the root is refused as such, and withheld, so writeFix names it.
 func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []askedProposal) {
 	for _, rejection := range result.Rejections {
 		for _, asked := range askedBy {
@@ -749,12 +765,26 @@ func (engine *pipeline) refuseRejected(result *global_rename.Result, askedBy []a
 			switch rejection.Class {
 			case "file":
 				reason = refusedUnwritable
+				if realPath, outside := engine.outsideRoot(rejection.File); outside {
+					reason = refusedOutsideRoot
+					engine.withhold(rejection.File, realPath)
+				}
 			case "platform":
 				reason = refusedPlatform
 			}
 			engine.refuseRename(asked.rename, asked.oldName, reason, rejection.Reason)
 		}
 	}
+}
+
+// outsideRoot is file's real path, and whether it is outside the root: false for no file, and for one that cannot be
+// resolved, which is refused as unwritable and never named as reached through a link.
+func (engine *pipeline) outsideRoot(file string) (string, bool) {
+	if file == "" {
+		return "", false
+	}
+	realPath, inside, resolveError := engine.writeRoot.Inside(file)
+	return realPath, resolveError == nil && !inside
 }
 
 // refuseRename counts one rename as refused in the fix record, under reason, and says on stderr which and why. oldName

@@ -108,6 +108,13 @@ type ChangedFile struct {
 	Formatted bool           `json:"formatted"`
 }
 
+// NotWrittenFile is one file the fix phase would have written and did not: the file as the run reached it, and its
+// real path, outside the run's root, every symbolic link resolved.
+type NotWrittenFile struct {
+	File     string `json:"file"`
+	RealPath string `json:"realPath"`
+}
+
 // Crash is a rule that failed on a file, which makes the run incomplete.
 type Crash struct {
 	File  string `json:"file"`

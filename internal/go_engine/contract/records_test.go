@@ -38,6 +38,7 @@ var fieldsNotWritten = map[Kind][]string{
 // additiveFields are fields this engine writes beyond the contract, by kind: additive within contract 3, so the
 // front door ignores them until it reads them. Each must be written, and none is compared with the contract.
 var additiveFields = map[Kind][]string{
+	KindFix:   {"notWritten"},
 	KindLint:  {"withheldBySuppression", "withheldAsGenerated", "withheldAsCopied", "cache", "builds"},
 	KindTypes: {"withheldInDependencyCgo", "withheldDependencyCgoDeclarations", "cgoTranslation"},
 }
@@ -299,6 +300,7 @@ func populatedRecords() []Record {
 			ChangedFiles: []ChangedFile{
 				{File: "/project/a.go", FixedBy: map[string]int{"cohere-go/printf": 1}, Formatted: true},
 			},
+			NotWritten: []NotWrittenFile{{File: "/project/shared/b.go", RealPath: "/elsewhere/shared/b.go"}},
 		},
 		TypesRecord{
 			Diagnostics:         1,

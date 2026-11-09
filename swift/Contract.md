@@ -370,6 +370,13 @@ count or a verdict. The counts stay what the verdict reads, and the list never c
 engine from before the field writes no `changedFiles` at all. The front door reads that as _not listed_,
 never as _no files changed_, and renders the counts alone. `Clean.jsonl` is such a stream.
 
+The Go engine's fix record carries `notWritten`, additive within contract 3 as `changedFiles` is: every file the
+phase would have written and did not, since it is reached through a symbolic link to a real path outside the root
+(#hwz114g), as `{"file":"<root>/shared/sum.go","realPath":"<elsewhere>/shared/sum.go"}`, sorted by file, and `[]`
+when there were none. A fix never writes such a file: it is checked, its findings stand, and the run is incomplete.
+The front door names each file with its real path and counts them in the footer, and reads a stream without the
+field, from an engine before it, as naming none.
+
 ### `types`
 
 ```json
