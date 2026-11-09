@@ -1062,6 +1062,60 @@ func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
 	forbidLines(test, output, "cohered")
 }
 
+// A Swift run whose fix phase left a file unwritten, since it is reached through a link to outside the root (#723rzxm),
+// names it with its real path in the account `--verbose` prints, counts it in the footer every view ends with, lists it
+// in `--json`'s gaps, and exits 1, incomplete. The same stream calling itself complete is refused: its own fix record
+// shows a gap.
+// Not parallel: it swaps the package-level activeOutput and activeSummary, which the record acceptors set
+func TestSwiftRunNamesTheFilesItDidNotWrite(test *testing.T) {
+	saved, savedSummary := activeOutput, activeSummary
+	defer func() { activeOutput, activeSummary = saved, savedSummary }()
+	lines := contractFixture(test, "NotWritten.jsonl")
+	render := func(mode outputMode) string {
+		test.Helper()
+		activeOutput, activeSummary = outputSettings{Mode: mode}, runSummary{}
+		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, lines, 1)
+		if renderRecordsError != nil || exitCode != 1 {
+			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
+		}
+		return output
+	}
+
+	verbose := render(outputVerbose)
+	requireLines(test, verbose,
+		"  not written: /project/Sources/Example/Linked/Outside.swift → /elsewhere/Outside.swift\n",
+		"⚠ not written: 1 file reached through a link outside the root",
+	)
+	want := []notWrittenFile{
+		{File: "/project/Sources/Example/Linked/Outside.swift", RealPath: "/elsewhere/Outside.swift"},
+	}
+	if !reflect.DeepEqual(activeSummary.Gaps.NotWritten, want) {
+		test.Errorf("the summary's gap is %+v, want %+v", activeSummary.Gaps.NotWritten, want)
+	}
+	requireLines(test, render(outputHuman), "⚠ not written: 1 file reached through a link outside the root")
+
+	summaryLine := summaryJsonOf(test, render(outputJson))
+	var decoded struct {
+		Gaps struct {
+			NotWritten []notWrittenFile `json:"notWritten"`
+		} `json:"gaps"`
+	}
+	if decodeError := json.Unmarshal([]byte(summaryLine), &decoded); decodeError != nil {
+		test.Fatalf("the summary line does not decode: %v\n%s", decodeError, summaryLine)
+	}
+	if !reflect.DeepEqual(decoded.Gaps.NotWritten, want) {
+		test.Errorf("under --json the gap is %+v:\n%s", decoded.Gaps.NotWritten, summaryLine)
+	}
+
+	claimed := slices.Clone(lines)
+	claimed[len(claimed)-1] = `{"kind":"summary","findings":2,"complete":true,"exitCode":1}`
+	activeOutput, activeSummary = outputSettings{Mode: outputHuman}, runSummary{}
+	if _, _, renderRecordsError := renderRecords(test, engineModeCheck, claimed, 1); renderRecordsError == nil ||
+		!strings.Contains(renderRecordsError.Error(), "calls the run complete") {
+		test.Errorf("a stream calling itself complete over a file not written was not refused: %v", renderRecordsError)
+	}
+}
+
 // TestEngineRunRendersAGoStreamInGoWords renders a clean Go engine's stream through the renderer Swift
 // uses, and holds that every sentence names the Go engine's world: a Swift word in a Go run's output would
 // tell a reader the wrong engine checked their code.

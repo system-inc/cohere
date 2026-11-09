@@ -25,6 +25,7 @@ encoder's tests both read them, so neither side can drift without the other's te
 | `LintOnly.jsonl`            | `--lint`, a real run: fix and types skipped as `not requested`, lint ran and found two, and the summary calls the run complete, which it is. Exit 1, for the findings.                                                                                                                                         |
 | `FormatOnly.jsonl`          | `--no-fix --format-only`, a real run: the fix phase ran with no fix proposed and found one file the formatter would change, which is the one finding; types, lint and unused skipped as `not requested`, and the summary calls the run complete. Exit 1, for the finding.                                      |
 | `GoClean.jsonl`             | A clean run as the Go engine writes it: its provenance names a go toolchain and no swift-syntax or swift-format, and the front door renders it in Go's words, with nothing in the output saying Swift. Exit 0.                                                                                                 |
+| `NotWritten.jsonl`          | A bare run whose fix phase reached one file through a link to outside the root: `notWritten` names it with its real path, its formatting is a `format` finding and the fix it was not given a `rule` finding, the file inside beside it is written, and the run is incomplete. Exit 1.                         |
 | `Unused.jsonl`              | `--unused`: after lint, each rule's `unused` records then its `unusedCoverage`, `unused-import` first and `unused-declaration` second (the declaration section is from a real run on ahraos-presence), the unused phase ran, and the summary counts no findings and exits 0, because the report is not a gate. |
 
 **Version 2** (2026-10-02) added the `unreadable` record. Before it, a file the engine could not read was a
@@ -369,6 +370,21 @@ document does not list is ignored by the front door, so an older front door lose
 count or a verdict. The counts stay what the verdict reads, and the list never changes an exit code. An
 engine from before the field writes no `changedFiles` at all. The front door reads that as _not listed_,
 never as _no files changed_, and renders the counts alone. `Clean.jsonl` is such a stream.
+
+`notWritten` names every file the phase would have written and did not, since its real path, every link resolved,
+lies outside the run's root (#723rzxm, the rule #hwz114g gives all three engines), sorted by file:
+`"notWritten":[{"file":"/…/Linked/Outside.swift","realPath":"/elsewhere/Outside.swift"}]`, `file` as the run reached
+it and `realPath` where it is. Such a file is checked, read only, as `--no-fix` checks it: none of its fixes lands, lint
+walks the text on disk, so what they would have fixed is reported, and when the formatter would change that text it
+is one `notFormatted` `format` finding at the first line that moves. It is never in `changedFiles`, and its fixes and
+reformat are not counted in `fixesApplied` or `filesReformatted`. Each is a gap: the run is incomplete, exit 1, and a
+summary calling it complete is refused. The front door names each in the account as
+`  not written: <file> → <realPath>` and counts them on the footer, `⚠ not written: 1 file reached through a link
+outside the root`, and `--json` lists them in the summary's `gaps.notWritten`. A link inside the root is written
+through: a temporary file in the target's own directory, given the target's permissions, then renamed onto the target,
+so the rename never crosses a filesystem and the link stays a link. The field is additive within contract 3, in the Go
+engine's shape: this engine always writes it, `[]` when there were none, and a stream from an engine before it has
+none, which the front door reads as nothing withheld.
 
 ### `types`
 
