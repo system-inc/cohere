@@ -12,8 +12,8 @@ import (
 //
 // It reads the name the file was parsed from, never one a line directive gives a position, so a test file whose
 // directives name another file is still a test file. A node at no position, or at one in no file of the file set, is
-// in none: the package initializer staticcheck's IR synthesizes is at none, so the initializers of a test file's
-// package-level variables, built into it, are in no test file, as the original's own comment admits, kept.
+// in none: the package initializer the intermediate representation synthesizes is at none, so the initializers of a
+// test file's package-level variables, built into it, are in no test file, as the original's own comment admits, kept.
 func IsInTest(context *rule.Context, node staticcheck_report.Positioner) bool {
 	file := context.Fset.File(node.Pos())
 	return file != nil && strings.HasSuffix(file.Name(), "_test.go")

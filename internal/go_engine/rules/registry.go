@@ -249,10 +249,9 @@ import (
 // syntaxOnly names the passes that read no type information, decided by reading each pass's source at
 // x/tools v0.49.0 and staticcheck v0.8.1, and still true at v0.50.0, which go.mod requires: the four vet passes
 // below are byte-identical between the two. Every other pass in vet's suite reads pass.TypesInfo, the ports of
-// nilness and unusedwrite read staticcheck's intermediate form built from it, and staticcheck's checks read it
-// through the helpers they share (analysis/code, pattern, buildir). A pass missing from this table counts as
-// type aware, so a pass a newer release adds is never described as running without types before someone has
-// read it.
+// nilness and unusedwrite read the engine's own intermediate representation built from it, and staticcheck's checks
+// read it through the helpers they share (analysis/code, pattern, buildir). A pass missing from this table counts as
+// type aware, so a pass a newer release adds is never described as running without types before someone has read it.
 var syntaxOnly = map[string]bool{
 	// buildtag reads build constraint lines from the files' comments and text.
 	"buildtag": true,
@@ -303,8 +302,8 @@ var stylecheckRuledOn = map[string]bool{
 // never weaker than `go vet`, and a newer x/tools that adds a pass adds its rule here with no edit. Then
 // two of x/tools' own passes that vet leaves out, which find real bugs: a nil dereference or a comparison
 // with nil whose answer is already known, and a write to a struct or array nothing reads again. Each runs as
-// our port onto staticcheck's intermediate form, under the original's name, so the run builds one program form
-// where x/tools' would build a second for these two alone (#pn1xvnd). Then
+// our port onto the engine's own intermediate representation, under the original's name, so the run builds one
+// program form where x/tools' would build a second for these two alone (#pn1xvnd). Then
 // staticcheck's SA and S checks under their own codes, the ST checks ruled on, and U1000 as our port,
 // which reports what it finds where the original returns its verdict for staticcheck's runner to report
 // (#7hdcn3w). staticcheck's QF checks are quick fixes an editor offers, not findings.

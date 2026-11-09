@@ -16,7 +16,7 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/load"
 )
 
-// heavyResult stands in for a large intermediate Result such as staticcheck's IR of a package.
+// heavyResult stands in for a large intermediate Result such as the intermediate representation of a package.
 type heavyResult struct {
 	contents []byte
 }

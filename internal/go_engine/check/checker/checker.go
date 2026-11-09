@@ -17,15 +17,15 @@
 // Result until the whole graph finishes, under its own "TODO(adonovan):
 // opt: clear them earlier, so we can release large data structures like
 // SSA sooner" (checker.go:210-219 at v0.50.0, :213 at v0.49.0). On
-// cohere's own tree that holds staticcheck's IR of every package in the
-// graph at once. Here an action's Result is released when the last
+// cohere's own tree that holds the intermediate representation of every
+// package in the graph at once. Here an action's Result is released when the last
 // action that reads it has finished (releaseInputs).
 //
 // The second is bounded scheduling, which lets the release free
 // anything in time (schedule, in scheduler.go beside this file).
 // Upstream's execAll(roots) starts every action at once, about 950 on
-// cohere's own root, so every package's syntax, types and staticcheck IR
-// are live together, the collector marks all of it on every cycle, and
+// cohere's own root, so every package's syntax, types and intermediate
+// representation are live together, the collector marks all of it on every cycle, and
 // the largest packages finish last. Here the actions on one package are
 // a group, which waits until every action on another package that it
 // inherits facts from has finished, then for one of a bounded number of
@@ -802,8 +802,8 @@ func (act *Action) execOnce() {
 
 // cohere: releaseInputs lets go of what act read from its prerequisites
 // once it has finished, so that a large intermediate Result, such as
-// staticcheck's IR of a package, is collected as soon as nothing will
-// read it again, rather than when the whole graph finishes.
+// the intermediate representation of a package, is collected as soon as
+// nothing will read it again, rather than when the whole graph finishes.
 //
 // The pass's ResultOf map is cleared rather than the pass dropped, so
 // the guards against fact exports after Run keep working; the map is
@@ -834,8 +834,9 @@ func (act *Action) releaseInputs() {
 //
 // The actions' passes are cleared with the package, since each holds its
 // files and type information. A Result that holds syntax, such as
-// ctrlflow's or buildir's, is released by releaseInputs when its last
-// reader, an action on the same package, has finished, so by now.
+// ctrlflow's or build_intermediate_representation's, is released by
+// releaseInputs when its last reader, an action on the same package, has
+// finished, so by now.
 func (act *Action) releaseSyntax() {
 	if act.syntax.unfinished.Add(-1) != 0 {
 		return

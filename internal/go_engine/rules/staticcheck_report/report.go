@@ -41,8 +41,8 @@ type fullPositioner interface {
 	End() token.Pos
 }
 
-// sourcer is a Positioner built from syntax, as an instruction of staticcheck's intermediate representation is, whose
-// finding spans that syntax.
+// sourcer is a Positioner built from syntax, as an instruction of the engine's intermediate representation is, and of
+// staticcheck's, whose finding spans that syntax.
 type sourcer interface {
 	Source() ast.Node
 }
@@ -106,7 +106,7 @@ func Report(context *rule.Context, node Positioner, message string, options ...O
 }
 
 // HasRange is whether a finding or related information can be reported at node: false for an instruction or value of
-// staticcheck's intermediate representation that has no source, and true for anything else, as staticcheck's
+// the intermediate representation that has no source, and true for anything else, as staticcheck's
 // report.HasRange answers. A check asks it before Report or Related at a value that may have been built with no
 // syntax, Report panicking there and Related adding nothing. Like staticcheck's, it asks for both the full and the
 // short range, since it cannot know which the report will want, though the two agree on whether there is one.

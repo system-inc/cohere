@@ -37,8 +37,8 @@ var Listener = rule.Listener{
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA5005",
 	"SA5005",
-	"Flags a finalizer that closes over the object it finalizes: staticcheck's SA5005, ported onto its intermediate "+
-		"representation.",
+	"Flags a finalizer that closes over the object it finalizes: staticcheck's SA5005, ported onto the engine's own "+
+		"intermediate representation.",
 	&Listener,
 )
 
