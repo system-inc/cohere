@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"unsafe"
 )
 
 type record struct {
@@ -30,6 +31,12 @@ type twice = alias
 type slice = []int
 
 type List[T any] struct{ items []T }
+
+// genericAlias is an alias with type parameters of its own, and integers one of its instances, so a type name's
+// brackets are met on an alias as on a named type.
+type genericAlias[T any] = List[T]
+
+type integers = genericAlias[int]
 
 type pair[K comparable, V any] struct {
 	key   K
@@ -98,7 +105,13 @@ func typesAndAliases(parameter int) {
 	_ = waitGroup{}
 	_ = slice{}
 	_ = int(parameter)
+	_ = unsafe.Pointer(&parameter)
+	_ = string(rune(parameter))
 	_ = List[int]{}
+	_ = genericAlias[int]{}
+	_ = (genericAlias[string])(List[string]{})
+	var counted integers
+	_ = counted
 	_ = (*List[int])(nil)
 	_ = pair[int, string]{}
 	_ = inner{}

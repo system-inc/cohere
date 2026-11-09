@@ -6,12 +6,12 @@
 // it reports word for word, at the argument, with no range option, and withholds in a generated file as the
 // original's FilterGenerated does. The original finds its calls with staticcheck's pattern package, `(CallExpr (Symbol
 // name@(Or "net/http.Error" ...)) args)`, which it looks up in x/tools' type index, every call whose callee is one of
-// the four functions. The port hears every call on the dispatcher's walk instead and asks staticcheck_code.IsSymbol,
-// the kit's translation of the pattern's Symbol, of the call's function, so it requires neither the type index nor the
-// inspector of its own the original's pattern matching asks for. The type index finds a call through parentheses and
-// a qualifying package, as IsSymbol does, and neither function is generic, so the two find the same calls. Like the
-// original, it reads the codes left alone from staticcheck's config pass, whose http_status_code_whitelist a
-// staticcheck.conf can set, by default 200, 400, 404 and 500.
+// the four functions. The port hears every call on the dispatcher's walk instead and asks staticcheck_code.SymbolIndex,
+// the kit's translation of the pattern's Symbol of an Or, of the call's function, so it requires neither the type index
+// nor the inspector of its own the original's pattern matching asks for. The type index finds a call through
+// parentheses and a qualifying package, as SymbolIndex does, and neither function is generic, so the two find the
+// same calls. Like the original, it reads the codes left alone from staticcheck's config pass, whose
+// http_status_code_whitelist a staticcheck.conf can set, by default 200, 400, 404 and 500.
 //
 // The original's MergeIf, MergeIfAny, tells staticcheck's runner to keep a finding any one build configuration makes,
 // and the engine runs one configuration, so there is nothing for the port to merge.
@@ -53,6 +53,15 @@ var statusArguments = []statusArgument{
 	{function: "net/http.StatusText", index: 0},
 	{function: "net/http.RedirectHandler", index: 1},
 }
+
+// statusFunctions are the full names of statusArguments' functions, in their order, the names of the pattern's Or.
+var statusFunctions = func() []string {
+	functions := make([]string, 0, len(statusArguments))
+	for _, argument := range statusArguments {
+		functions = append(functions, argument.function)
+	}
+	return functions
+}()
 
 // statusConstants are the codes net/http names, each with its constant's name, the original's table as it stands,
 // which lacks three net/http has since named, 103, 421 and 425, so neither reports them.
@@ -180,12 +189,12 @@ func checkCall(context *rule.Context, node ast.Node, _ []ast.Node) {
 }
 
 // statusIndex is which argument of call is the status code, when call is to one of the functions the original reads,
-// and -1 when it is to none of them.
+// and -1 when it is to none of them. It asks staticcheck_code.SymbolIndex, the pattern's Symbol of an Or, which
+// resolves the call's function once for all four names.
 func statusIndex(context *rule.Context, call *ast.CallExpr) int {
-	for _, argument := range statusArguments {
-		if staticcheck_code.IsSymbol(context, call.Fun, argument.function) {
-			return argument.index
-		}
+	function := staticcheck_code.SymbolIndex(context, call.Fun, statusFunctions...)
+	if function < 0 {
+		return -1
 	}
-	return -1
+	return statusArguments[function].index
 }

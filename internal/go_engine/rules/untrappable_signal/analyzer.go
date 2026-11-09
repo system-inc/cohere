@@ -7,7 +7,7 @@
 // to os.Signal when it is converted. The original finds the calls with the pattern `(CallExpr (Symbol (Or
 // "os/signal.Ignore" "os/signal.Notify" "os/signal.Reset")) _)` of staticcheck's pattern package, which, rooted at a
 // call of named symbols, walks the type index's calls of those functions rather than every node; the port walks
-// every call and asks staticcheck_code.IsSymbol of its function, which accepts exactly the calls the index lists, a
+// every call and asks staticcheck_code.SymbolIndex of its function, which accepts exactly the calls the index lists, a
 // function named directly, through parentheses, a selector or a dot import, and refuses one held in a variable,
 // which the index does not list either. The original first asks whether the package depends on os/signal at all,
 // code.CouldMatchAny; any call it would judge calls into it, so the question changes no finding, and the port asks
@@ -102,14 +102,10 @@ func Check(context *rule.Context, call *ast.CallExpr) {
 	}
 }
 
-// callsSignalFunction is whether call calls one of signalFunctions, as the pattern's Symbol of their Or judges it.
+// callsSignalFunction is whether call calls one of signalFunctions, as the pattern's Symbol of their Or judges it,
+// which staticcheck_code.SymbolIndex answers resolving the call's function once for all three names.
 func callsSignalFunction(context *rule.Context, call *ast.CallExpr) bool {
-	for _, name := range signalFunctions {
-		if staticcheck_code.IsSymbol(context, call.Fun, name) {
-			return true
-		}
-	}
-	return false
+	return staticcheck_code.SymbolIndex(context, call.Fun, signalFunctions...) >= 0
 }
 
 // signalOf is the signal argument names: the operand of its conversion to os.Signal when it is one, and argument

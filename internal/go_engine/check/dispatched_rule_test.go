@@ -210,7 +210,9 @@ var failsOnBase = &analysis.Analyzer{
 // dispatcher requires that requirement for it: the rule's crash reads exactly as check.Run writes it for the same
 // rule as a plain analyzer requiring the failing one, cause and all, and is the only crash, while the rule beside it
 // on the same dispatcher reports every function, base's included, and the failing rule still reports on user, where
-// its requirement held, reading the result it was handed.
+// its requirement held, reading the result it was handed. The failing listener is never called on base, where its
+// requirement failed: the rule's crash would read the same if it were, since the checker fails the rule's own action
+// there, so only its calls show that a listener walking on a missing input was never started.
 func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	test.Parallel()
 
@@ -218,20 +220,24 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
 		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
 	}
-	// readsItsRequirement panics, which the dispatcher makes the rule's crash, unless the listener was handed the
-	// result it requires.
-	readsItsRequirement := func(context *rule.Context) {
+	// readsItsRequirement counts a call on base into callsOnBase and panics, which the dispatcher makes the rule's
+	// crash, unless the listener was handed the result it requires.
+	readsItsRequirement := func(context *rule.Context, callsOnBase *atomic.Int64) {
+		if context.Package.Path() == "example.com/fixture/base" {
+			callsOnBase.Add(1)
+		}
 		if result, isResult := context.ResultOf(failsOnBase).(string); !isResult || result == "" {
 			panic(fmt.Sprintf("the listener was handed %v for %s", result, failsOnBase.Name))
 		}
 	}
 	cases := []struct {
 		name string
-		// register registers a listener that requires failsOnBase and one that does not, each reporting every
-		// function it is called for, on a fresh dispatcher of the walk the case is for, and returns their rules.
-		register func(failingName string, besideName string) (rule.Rule, rule.Rule)
+		// register registers a listener that requires failsOnBase, counting its calls on base into callsOnBase, and
+		// one that does not, each reporting every function it is called for, on a fresh dispatcher of the walk the
+		// case is for, and returns their rules.
+		register func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule)
 	}{
-		{"syntax", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+		{"syntax", func(failingName string, besideName string, callsOnBase *atomic.Int64) (rule.Rule, rule.Rule) {
 			dispatcher := dispatch.NewSyntax()
 			listener := func(requires []*analysis.Analyzer) *rule.Listener {
 				return &rule.Listener{
@@ -243,7 +249,7 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 							return
 						}
 						if len(requires) > 0 {
-							readsItsRequirement(context)
+							readsItsRequirement(context, callsOnBase)
 						}
 						reportDeclared(context, declaration.Name.Pos(), declaration.Name.Name)
 					},
@@ -257,7 +263,9 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_syntax", "requires nothing",
 						besideListener)}
 		}},
-		{"intermediate representation", func(failingName string, besideName string) (rule.Rule, rule.Rule) {
+		{"intermediate representation", func(
+			failingName string, besideName string, callsOnBase *atomic.Int64,
+		) (rule.Rule, rule.Rule) {
 			dispatcher := dispatch.NewIr()
 			listener := func(requires []*analysis.Analyzer) *rule.Listener {
 				return &rule.Listener{
@@ -268,7 +276,7 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 							return
 						}
 						if len(requires) > 0 {
-							readsItsRequirement(context)
+							readsItsRequirement(context, callsOnBase)
 						}
 						reportDeclared(context, function.Pos(), function.Name())
 					},
@@ -285,9 +293,14 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(subtest *testing.T) {
 			subtest.Parallel()
+			callsOnBase := &atomic.Int64{}
 			failing, beside := testCase.register(rule.Namespace+"test-failing-requirement",
-				rule.Namespace+"test-beside-the-failing")
+				rule.Namespace+"test-beside-the-failing", callsOnBase)
 			dispatched := runRules(subtest, Options{}, failing, beside)
+			if calls := callsOnBase.Load(); calls != 0 {
+				subtest.Errorf("the failing rule's listener was called %d times on base, where its requirement "+
+					"failed and it is never started", calls)
+			}
 			// The same rule walking by itself: an analyzer of its own that requires the failing one.
 			alone := runRules(subtest, Options{}, rule.Rule{Name: failing.Name, Origin: rule.OriginHouse,
 				Analyzer: &analysis.Analyzer{
@@ -320,6 +333,63 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 				subtest.Errorf("the run found %q, where exactly %q was expected", messages, expected)
 			}
 		})
+	}
+}
+
+// A dispatcher that runs past a listener's failed requirement on a package and then fails there on its own, as a real
+// one does when what its walk reads fails or its run panics outside every listener, is the cause each rule on it
+// names: the rule beside names the dispatcher's failure alone, and the rule whose listener required what failed names
+// that failure beside the dispatcher's. A crash sentence that traced the dispatcher's failure on past it would name the
+// requirement as the cause of every rule on the dispatcher, though only one of them reads it. The stand-in fails only
+// where it ran past a failure, so its failure on base also shows that it ran there.
+func TestADispatcherFailingAfterRunningPastAFailureIsTheCauseItsRulesName(test *testing.T) {
+	test.Parallel()
+
+	// standIn is a dispatcher to check.Run, which knows one by its analyzer's result type (see dispatch.IsDispatcher),
+	// so the checker runs it past failsOnBase on base, where it then fails.
+	standIn := &analysis.Analyzer{
+		Name:             "stand_in_dispatcher",
+		Doc:              "runs past fails_on_base and then fails wherever it ran past a failure",
+		Requires:         []*analysis.Analyzer{failsOnBase},
+		RunDespiteErrors: true,
+		ResultType:       reflect.TypeFor[dispatch.Result](),
+		Run: func(pass *analysis.Pass) (any, error) {
+			if failed, _ := pass.ResultOf[rule.Failed].(map[*analysis.Analyzer]error); len(failed) > 0 {
+				return nil, fmt.Errorf("planted failure of the dispatcher itself on %s", pass.Pkg.Path())
+			}
+			return dispatch.Result{}, nil
+		},
+	}
+	if !dispatch.IsDispatcher(standIn) {
+		test.Fatalf("%s is no dispatcher to dispatch.IsDispatcher, so the checker would never run it past a failure",
+			standIn.Name)
+	}
+	// onTheStandIn is a rule requiring the stand-in and also requires, as a rule analyzer requires its listener's
+	// Requires, reporting nothing.
+	onTheStandIn := func(name string, requires ...*analysis.Analyzer) rule.Rule {
+		return houseRule(&analysis.Analyzer{
+			Name:     name,
+			Doc:      "requires the stand-in dispatcher and reports nothing",
+			Requires: append([]*analysis.Analyzer{standIn}, requires...),
+			Run:      func(*analysis.Pass) (any, error) { return nil, nil },
+		})
+	}
+	requiring := onTheStandIn("requires_the_failing", failsOnBase)
+	beside := onTheStandIn("beside_the_failing")
+
+	root := loadedFixtures(test)
+	result := runRules(test, Options{}, requiring, beside)
+	const base = "example.com/fixture/base"
+	dispatcherFailure := "stand_in_dispatcher@" + base + ": planted failure of the dispatcher itself on " + base
+	requirementFailure := "fails_on_base@" + base + ": planted failure on " + base
+	want := []Crash{
+		{File: fixturePath(root, "base/base.go"), Error: beside.Name + ": failed prerequisites: stand_in_dispatcher@" +
+			base + ", because " + dispatcherFailure},
+		{File: fixturePath(root, "base/base.go"), Error: requiring.Name + ": failed prerequisites: fails_on_base@" +
+			base + ", stand_in_dispatcher@" + base + ", because " + requirementFailure + "; " + dispatcherFailure},
+	}
+	if !reflect.DeepEqual(result.Crashes, want) {
+		test.Errorf("the run crashed\n%+v\nwhere exactly\n%+v\nwas expected", result.Crashes, want)
 	}
 }
 
