@@ -12,16 +12,24 @@ import (
 // is read.
 var sharedIr = NewIr()
 
+// sharedIntermediateRepresentation is the process's one dispatcher over the engine's own intermediate
+// representation, shared for sharedIr's reasons.
+var sharedIntermediateRepresentation = NewIntermediateRepresentation()
+
 // sharedSyntax is the process's one dispatcher over the syntax, shared for sharedIr's reasons.
 var sharedSyntax = NewSyntax()
 
-// RuleAnalyzer registers listener on the shared dispatcher of the walk it hears, Syntax for a syntax listener and Ir
-// for any other, as the rule named ruleName, and returns the rule's own analyzer, named analyzerName and documented by
-// doc, which requires that dispatcher. A house rule's name and its analyzer's differ, `cohere-go/consistency-no-label`
-// and `consistency_no_label`, so both are given.
+// RuleAnalyzer registers listener on the shared dispatcher of the walk it hears, Syntax for a syntax listener,
+// IntermediateRepresentation for one declaring the engine's own intermediate representation's walk, and Ir for any
+// other, as the rule named ruleName, and returns the rule's own analyzer, named analyzerName and documented by doc,
+// which requires that dispatcher. A house rule's name and its analyzer's differ, `cohere-go/consistency-no-label` and
+// `consistency_no_label`, so both are given.
 func RuleAnalyzer(ruleName string, analyzerName string, doc string, listener *rule.Listener) *analysis.Analyzer {
 	if listener.IsSyntax() {
 		return sharedSyntax.RuleAnalyzer(ruleName, analyzerName, doc, listener)
+	}
+	if listener.IsIntermediateRepresentation() {
+		return sharedIntermediateRepresentation.RuleAnalyzer(ruleName, analyzerName, doc, listener)
 	}
 	return sharedIr.RuleAnalyzer(ruleName, analyzerName, doc, listener)
 }
@@ -38,5 +46,22 @@ func Shared(listener *rule.Listener) (*analysis.Analyzer, bool) {
 	if listener.IsSyntax() {
 		return sharedSyntax.Analyzer(), sharedSyntax.Holds(listener)
 	}
+	if listener.IsIntermediateRepresentation() {
+		return sharedIntermediateRepresentation.Analyzer(), sharedIntermediateRepresentation.Holds(listener)
+	}
 	return sharedIr.Analyzer(), sharedIr.Holds(listener)
+}
+
+// HeldBy is the analyzer of each shared dispatcher that holds listener, in the order Ir, IntermediateRepresentation,
+// Syntax, for the registry's test that every dispatched rule is held by exactly one: a listener registered on two
+// dispatchers would be walked twice, by two representations, and only one outcome would be read.
+func HeldBy(listener *rule.Listener) []*analysis.Analyzer {
+	holders := []*analysis.Analyzer{}
+	for _, dispatcher := range []*listeners{sharedIr.listeners, sharedIntermediateRepresentation.listeners,
+		sharedSyntax.listeners} {
+		if dispatcher.Holds(listener) {
+			holders = append(holders, dispatcher.Analyzer())
+		}
+	}
+	return holders
 }

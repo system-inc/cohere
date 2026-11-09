@@ -16,6 +16,7 @@ import (
 	"honnef.co/go/tools/analysis/facts/deprecated"
 	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/load"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
@@ -98,7 +99,7 @@ func TestADisabledDispatchedRuleNeverReachesTheResult(test *testing.T) {
 	}
 }
 
-// A listener whose rule the run leaves out is never called, on either dispatcher, though it registered on the very
+// A listener whose rule the run leaves out is never called, on every dispatcher, though it registered on the very
 // dispatcher the run's enabled rule requires, as every rule a process imports registers: no context, no FileEnter, no
 // Node, no Function, no Instruction, no exit, while the enabled rule beside it reports a finding for every function
 // the fixtures declare. The left-out listener hears kinds the enabled one does not, so a dispatcher that walked for
@@ -164,6 +165,39 @@ func TestADispatchedRuleTheRunLeavesOutIsNeverCalled(test *testing.T) {
 				Analyzer: dispatcher.RuleAnalyzer(enabledName, "enabled_ir", "reports every source function",
 					enabledListener)}
 		}},
+		{"own intermediate representation", func(enabledName string, leftOutCalls *atomic.Int64) rule.Rule {
+			dispatcher := dispatch.NewIntermediateRepresentation()
+			enabledListener := &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+				Function: func(context *rule.Context, function *intermediate_representation.Function) {
+					// The package initializer is synthetic and declared by no one.
+					if function.Synthetic != "" {
+						return
+					}
+					context.Report(analysis.Diagnostic{Pos: function.Pos(), Message: "declares " + function.Name()})
+				},
+			}}
+			dispatcher.RuleAnalyzer(rule.Namespace+"test-left-out-own", "left_out_own", "counts its calls",
+				&rule.Listener{
+					IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+						Function: func(*rule.Context, *intermediate_representation.Function) { leftOutCalls.Add(1) },
+						Instructions: []intermediate_representation.Instruction{
+							(*intermediate_representation.Call)(nil), (*intermediate_representation.Return)(nil),
+						},
+						Instruction: func(*rule.Context, intermediate_representation.Instruction) {
+							leftOutCalls.Add(1)
+						},
+						FunctionExit: func(*rule.Context, *intermediate_representation.Function) {
+							leftOutCalls.Add(1)
+						},
+					},
+					PackageExit: func(*rule.Context) {
+						leftOutCalls.Add(1)
+					},
+				})
+			return rule.Rule{Name: enabledName, Origin: rule.OriginHouse, Listener: enabledListener,
+				Analyzer: dispatcher.RuleAnalyzer(enabledName, "enabled_own", "reports every source function",
+					enabledListener)}
+		}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(subtest *testing.T) {
@@ -206,7 +240,7 @@ var failsOnBase = &analysis.Analyzer{
 	},
 }
 
-// A listener whose requirement fails on a package fails only its own rule there, on either dispatcher, though the
+// A listener whose requirement fails on a package fails only its own rule there, on every dispatcher, though the
 // dispatcher requires that requirement for it: the rule's crash reads exactly as check.Run writes it for the same
 // rule as a plain analyzer requiring the failing one, cause and all, and is the only crash, while the rule beside it
 // on the same dispatcher reports every function, base's included, and the failing rule still reports on user, where
@@ -216,7 +250,7 @@ var failsOnBase = &analysis.Analyzer{
 func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 	test.Parallel()
 
-	// reportDeclared reports every function as declaring its name, for a listener of either walk.
+	// reportDeclared reports every function as declaring its name, for a listener of any walk.
 	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
 		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
 	}
@@ -288,6 +322,34 @@ func TestAListenersFailedRequirementFailsOnlyItsOwnRule(test *testing.T) {
 						failingListener)},
 				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
 					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_ir", "requires nothing", besideListener)}
+		}},
+		{"own intermediate representation", func(
+			failingName string, besideName string, callsOnBase *atomic.Int64,
+		) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewIntermediateRepresentation()
+			listener := func(requires []*analysis.Analyzer) *rule.Listener {
+				return &rule.Listener{
+					Requires: requires,
+					IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+						Function: func(context *rule.Context, function *intermediate_representation.Function) {
+							// The package initializer is synthetic and declared by no one.
+							if function.Synthetic != "" {
+								return
+							}
+							if len(requires) > 0 {
+								readsItsRequirement(context, callsOnBase)
+							}
+							reportDeclared(context, function.Pos(), function.Name())
+						},
+					},
+				}
+			}
+			failingListener, besideListener := listener([]*analysis.Analyzer{failsOnBase}), listener(nil)
+			return rule.Rule{Name: failingName, Origin: rule.OriginHouse, Listener: failingListener,
+					Analyzer: dispatcher.RuleAnalyzer(failingName, "failing_own", "requires fails_on_base",
+						failingListener)},
+				rule.Rule{Name: besideName, Origin: rule.OriginHouse, Listener: besideListener,
+					Analyzer: dispatcher.RuleAnalyzer(besideName, "beside_own", "requires nothing", besideListener)}
 		}},
 	}
 	for _, testCase := range cases {
@@ -420,7 +482,7 @@ func newPlantedRuns(name string) *plantedRuns {
 	return planted
 }
 
-// An analyzer that only the listener of a rule the run leaves out requires never runs, on either dispatcher, on any
+// An analyzer that only the listener of a rule the run leaves out requires never runs, on every dispatcher, on any
 // package, though that listener registered on the very dispatcher the run's enabled rule requires and the dispatcher
 // requires what each of its listeners does: the run's rule beside it still reports every function. The same analyzer,
 // required also by an enabled rule's listener, runs once on every package, and that listener reads its result there,
@@ -428,7 +490,7 @@ func newPlantedRuns(name string) *plantedRuns {
 func TestAnAnalyzerOnlyALeftOutListenerRequiresNeverRuns(test *testing.T) {
 	test.Parallel()
 
-	// reportDeclared reports every function as declaring its name, for a listener of either walk.
+	// reportDeclared reports every function as declaring its name, for a listener of any walk.
 	reportDeclared := func(context *rule.Context, position token.Pos, name string) {
 		context.Report(analysis.Diagnostic{Pos: position, Message: "declares " + name})
 	}
@@ -502,6 +564,41 @@ func TestAnAnalyzerOnlyALeftOutListenerRequiresNeverRuns(test *testing.T) {
 						"reports every source function", declaring)},
 				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
 					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_ir",
+						"reports reading the planted analyzer", reading)}
+		}},
+		{"own intermediate representation", func(planted *analysis.Analyzer) (rule.Rule, rule.Rule) {
+			dispatcher := dispatch.NewIntermediateRepresentation()
+			dispatcher.RuleAnalyzer(rule.Namespace+"test-planted-left-out", "planted_left_out_own",
+				"requires the planted analyzer", &rule.Listener{
+					Requires: []*analysis.Analyzer{planted},
+					IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+						Function: func(context *rule.Context, _ *intermediate_representation.Function) {
+							reportRead(context, planted)
+						},
+					},
+				})
+			declaring := &rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+				Function: func(context *rule.Context, function *intermediate_representation.Function) {
+					// The package initializer is synthetic and declared by no one.
+					if function.Synthetic == "" {
+						reportDeclared(context, function.Pos(), function.Name())
+					}
+				},
+			}}
+			reading := &rule.Listener{
+				Requires: []*analysis.Analyzer{planted},
+				IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+					Function: func(context *rule.Context, _ *intermediate_representation.Function) {
+						reportRead(context, planted)
+					},
+				},
+			}
+			declaringName, readingName := rule.Namespace+"test-planted-declaring", rule.Namespace+"test-planted-reading"
+			return rule.Rule{Name: declaringName, Origin: rule.OriginHouse, Listener: declaring,
+					Analyzer: dispatcher.RuleAnalyzer(declaringName, "planted_declaring_own",
+						"reports every source function", declaring)},
+				rule.Rule{Name: readingName, Origin: rule.OriginHouse, Listener: reading,
+					Analyzer: dispatcher.RuleAnalyzer(readingName, "planted_reading_own",
 						"reports reading the planted analyzer", reading)}
 		}},
 	}

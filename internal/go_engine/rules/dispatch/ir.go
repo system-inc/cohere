@@ -4,9 +4,10 @@
 // handling of a rule, its settings, suppression, crash accounting, findings cache and rulesRun, reads a dispatched
 // rule as any other.
 //
-// There are two dispatchers, one per walk: Ir over staticcheck's intermediate representation, and Syntax over the
-// syntax tree. A listener hears one of them, never both, and the process shares one of each, so every rule's analyzer
-// requires the one dispatcher that holds its listener.
+// There are three dispatchers, one per walk: Ir over staticcheck's intermediate representation,
+// IntermediateRepresentation over the engine's own, and Syntax over the syntax tree. A listener hears one of them,
+// never two, and the process shares one of each, so every rule's analyzer requires the one dispatcher that holds its
+// listener.
 package dispatch
 
 import (
@@ -50,11 +51,12 @@ func (dispatcher *Ir) RuleAnalyzer(
 	doc string,
 	listener *rule.Listener,
 ) *analysis.Analyzer {
-	if listener.IsSyntax() {
-		// Invariant: RuleAnalyzer hands a syntax listener to Syntax, and Validate refuses one that declares both
-		// walks, so a syntax listener here is a mistake in building the registry, never in a package.
-		panic("rule " + ruleName + " registers a syntax listener on the dispatcher over the intermediate " +
-			"representation, which would never call it")
+	if listener.IsSyntax() || listener.IsIntermediateRepresentation() {
+		// Invariant: RuleAnalyzer hands a syntax listener to Syntax and one of the engine's own intermediate
+		// representation to IntermediateRepresentation, and Validate refuses one that declares two walks, so either
+		// here is a mistake in building the registry, never in a package.
+		panic("rule " + ruleName + " registers a listener of another walk on the dispatcher over staticcheck's " +
+			"intermediate representation, which would never call it")
 	}
 	kinds := []reflect.Type{}
 	for _, kind := range listener.Instructions {

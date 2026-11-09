@@ -13,6 +13,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
 	"golang.org/x/tools/go/ast/inspector"
+	"golang.org/x/tools/go/packages"
 	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/check/analysistest"
@@ -294,19 +295,24 @@ func functionProbe() (*analysis.Analyzer, *[]*ir.Function) {
 // analyzeFixture runs analyzers over the fixture package named fixture in one checker.
 func analyzeFixture(test *testing.T, fixture string, analyzers ...*analysis.Analyzer) *checker.Graph {
 	test.Helper()
+	graph, analyzeError := checker.Analyze(analyzers, loadFixture(test, fixture), &checker.Options{})
+	if analyzeError != nil {
+		test.Fatalf("analyzing the fixture: %v", analyzeError)
+	}
+	return graph
+}
+
+// loadFixture loads the fixture package named fixture, a tree laid out by import path, as analysistest loads one.
+func loadFixture(test *testing.T, fixture string) []*packages.Package {
+	test.Helper()
 	directory := analysistest.TestData()
-	// The fixture is a tree laid out by import path, loaded as analysistest loads one.
 	loaded, loadError := load.Packages(directory, []string{fixture}, []string{
 		"GOPATH=" + directory, "GO111MODULE=off", "GOWORK=off",
 	}, nil)
 	if loadError != nil {
 		test.Fatalf("loading the fixture: %v", loadError)
 	}
-	graph, analyzeError := checker.Analyze(analyzers, loaded.Roots, &checker.Options{})
-	if analyzeError != nil {
-		test.Fatalf("analyzing the fixture: %v", analyzeError)
-	}
-	return graph
+	return loaded.Roots
 }
 
 // errorsOnly hands analysistest.Run a reporter that isn't a testing.TB. Given a testing.TB, Run first proves the go

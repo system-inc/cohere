@@ -7,6 +7,8 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/go/ir"
+
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
 
 // plantedAnalyzer is an analyzer that finds nothing, for rules that need one to be valid.
@@ -37,6 +39,14 @@ func plantedFunction(*Context, *ir.Function) {
 }
 
 func plantedInstruction(*Context, ir.Instruction) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedOwnFunction(*Context, *intermediate_representation.Function) {
+	// Never called: Validate reads only whether a callback is set.
+}
+
+func plantedOwnInstruction(*Context, intermediate_representation.Instruction) {
 	// Never called: Validate reads only whether a callback is set.
 }
 
@@ -112,6 +122,21 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 				Instructions: []ir.Instruction{(*ir.Store)(nil), (*ir.Call)(nil)},
 				Instruction:  plantedInstruction,
 				PackageExit:  plantedPackageExit,
+			},
+		},
+		{
+			Name:         "cohere-go/SA5000",
+			Origin:       OriginStaticcheck,
+			UpstreamName: "SA5000",
+			Analyzer:     plantedAnalyzer,
+			Listener: &Listener{
+				IntermediateRepresentation: &IntermediateRepresentationListener{
+					Instructions: []intermediate_representation.Instruction{
+						(*intermediate_representation.MapUpdate)(nil),
+					},
+					Instruction: plantedOwnInstruction,
+				},
+				PackageExit: plantedPackageExit,
 			},
 		},
 		{
@@ -216,7 +241,43 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 		{
 			name:   "a listener that declares both walks",
 			rule:   listening(Listener{Function: plantedFunction, FileEnter: plantedFile}),
-			saying: "declares both the intermediate representation's walk and the syntax walk",
+			saying: "declares both staticcheck's intermediate representation's walk and the syntax walk",
+		},
+		{
+			name: "a listener that declares both intermediate representations' walks",
+			rule: listening(Listener{Function: plantedFunction,
+				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedOwnFunction}}),
+			saying: "declares both staticcheck's intermediate representation's walk and the engine's own",
+		},
+		{
+			name: "a listener that declares the engine's own walk and the syntax walk",
+			rule: listening(Listener{FileEnter: plantedFile,
+				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedOwnFunction}}),
+			saying: "declares both the engine's own intermediate representation's walk and the syntax walk",
+		},
+		{
+			name: "the engine's own walk with none of its callbacks",
+			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{},
+				PackageExit: plantedPackageExit}),
+			saying: "with none of its callbacks",
+		},
+		{
+			name: "the engine's own instruction kinds with no callback",
+			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
+				Function:     plantedOwnFunction,
+				Instructions: []intermediate_representation.Instruction{(*intermediate_representation.Call)(nil)},
+			}}),
+			saying: "has no IntermediateRepresentation.Instruction to call for them",
+		},
+		{
+			name: "the engine's own instruction kind listed twice",
+			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
+				Instruction: plantedOwnInstruction,
+				Instructions: []intermediate_representation.Instruction{
+					(*intermediate_representation.Call)(nil), (*intermediate_representation.Call)(nil),
+				},
+			}}),
+			saying: "twice in IntermediateRepresentation.Instructions",
 		},
 		{
 			name:   "a listener with PackageExit alone",
