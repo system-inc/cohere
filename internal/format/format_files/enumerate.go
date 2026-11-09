@@ -62,8 +62,9 @@ type Enumeration struct {
 	Directories []string
 
 	// IgnoreFiles is every git ignore file the walk read or looked for, absolute paths, present or not:
-	// the `.gitignore` of the root and of each directory it entered, and `.git/info/exclude` when `.git`
-	// is a directory. An edit to one changes what the walk skips without moving any directory's
+	// the `.gitignore` of the root and of each directory it entered, `.git/info/exclude` when `.git`
+	// is a directory, and the repository's index when the root holds a `.git`, since a path the index
+	// tracks is never ignored. An edit to one changes what the walk skips without moving any directory's
 	// modification time, so a cache replaying the walk reads them too. A pruned directory's file is not
 	// read, and not listed.
 	IgnoreFiles []string
@@ -162,6 +163,9 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 			enumeration.IgnoreFiles,
 			filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)),
 		)
+	}
+	if matcher.IndexFile() != "" {
+		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, matcher.IndexFile())
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer

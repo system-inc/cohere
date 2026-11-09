@@ -43,7 +43,8 @@ type Exclusion struct {
 // go.mod of its own (an owned one is walked as itself, and an unowned one is another project), or a
 // repository of its own, a submodule's checkout included, and never counting a file whose name starts with
 // `.` or `_`, which go does not read either. A file git ignores is excluded, by the ignore
-// files of the nearest repository at or above the root; a root in no repository ignores nothing. Generated
+// files of the nearest repository at or above the root, and a file its index tracks never is, as git never
+// ignores a tracked file; a root in no repository ignores nothing. Generated
 // files are counted as ours here: the format and lint phases decide about those.
 func TakeCensus(workspace Workspace) (Census, error) {
 	var census Census
