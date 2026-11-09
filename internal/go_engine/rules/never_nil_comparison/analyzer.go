@@ -1,6 +1,6 @@
 // Package never_nil_comparison is staticcheck's SA4031, an if statement that compares with nil a value the function
-// itself made and that can never be nil, an allocation, a make, a function or a closure, ported onto staticcheck's
-// intermediate representation as a rule.FunctionCheck.
+// itself made and that can never be nil, an allocation, a make, a function or a closure, ported onto the engine's own
+// intermediate representation.
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 staticcheck/sa4031/sa4031.go, whose logic it keeps and
 // whose messages it reports word for word, from the start to the end of the comparison, with the related places
@@ -27,14 +27,20 @@ import (
 	"slices"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
+	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
 )
 
-// Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
-var Listener = rule.Listener{Function: Check}
+// Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
+// representation: every function, each judged on its own. It reads the function's expression map.
+var Listener = rule.Listener{
+	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
+		Function:                Check,
+		ReadsValueForExpression: true,
+	},
+}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener under the original's
 // name, so the rule, its settings and every `//cohere:ignore` naming it read the same once the port takes the
@@ -42,8 +48,8 @@ var Listener = rule.Listener{Function: Check}
 var Analyzer = dispatch.RuleAnalyzer(
 	rule.Namespace+"SA4031",
 	"SA4031",
-	"Flags a comparison with nil of a value that is never nil: staticcheck's SA4031, ported onto its intermediate "+
-		"representation.",
+	"Flags a comparison with nil of a value that is never nil: staticcheck's SA4031, ported onto the engine's "+
+		"own intermediate representation.",
 	&Listener,
 )
 
@@ -60,7 +66,7 @@ type sourced interface {
 
 // Check judges one function: each if statement in its own syntax whose condition compares with nil a value the
 // function made and that is never nil.
-func Check(context *rule.Context, function *ir.Function) {
+func Check(context *rule.Context, function *intermediate_representation.Function) {
 	outermost := function
 	for outermost.Parent() != nil {
 		outermost = outermost.Parent()
@@ -95,7 +101,7 @@ func Check(context *rule.Context, function *ir.Function) {
 }
 
 // checkIf reports statement's condition when it compares with nil a value of function that is never nil.
-func checkIf(context *rule.Context, function *ir.Function, statement *ast.IfStmt) {
+func checkIf(context *rule.Context, function *intermediate_representation.Function, statement *ast.IfStmt) {
 	comparison, isComparison := ast.Unparen(statement.Cond).(*ast.BinaryExpr)
 	if !isComparison || comparison.Op != token.EQL && comparison.Op != token.NEQ ||
 		!isUniverseNil(context.TypesInfo, comparison.Y) {
@@ -106,7 +112,7 @@ func checkIf(context *rule.Context, function *ir.Function, statement *ast.IfStmt
 		// Don't duplicate diagnostics reported by SA4022, the address of a variable compared with nil.
 		return
 	}
-	value, isAddress := function.ValueForExpr(compared)
+	value, isAddress := function.ValueForExpression(compared)
 	if isAddress {
 		return
 	}
@@ -123,7 +129,7 @@ func checkIf(context *rule.Context, function *ir.Function, statement *ast.IfStmt
 		End:     comparison.End(),
 		Message: fmt.Sprintf("this nil check is %s true", qualifier),
 	}
-	_, isFunction := value.(*ir.Function)
+	_, isFunction := value.(*intermediate_representation.Function)
 	identifier, isIdentifier := compared.(*ast.Ident)
 	isVariable := false
 	if isIdentifier {
@@ -133,7 +139,7 @@ func checkIf(context *rule.Context, function *ir.Function, statement *ast.IfStmt
 		if value.Parent() == function {
 			diagnostic.Related = related(values, identifier.Name)
 		}
-		if _, isClosure := value.(*ir.MakeClosure); isClosure || isFunction {
+		if _, isClosure := value.(*intermediate_representation.MakeClosure); isClosure || isFunction {
 			diagnostic.Message = functionMessage
 		}
 	} else if isFunction {
@@ -152,32 +158,34 @@ func isUniverseNil(typesInfo *types.Info, expression ast.Expr) bool {
 // neverNilValues is whether value is never nil, because the function made it as an allocation, a make, a function
 // or a closure, or as a slicing or a field's address of one, through phis, and the values it was made from, sorted by
 // position: each of them where value is no phi, and each edge where it is, for the related places of a finding.
-func neverNilValues(value ir.Value) ([]ir.Value, bool) {
-	seen := map[ir.Value]bool{}
-	values := []ir.Value{}
-	var neverNil func(value ir.Value, isTracked bool) bool
-	neverNil = func(value ir.Value, isTracked bool) bool {
+func neverNilValues(value intermediate_representation.Value) ([]intermediate_representation.Value, bool) {
+	seen := map[intermediate_representation.Value]bool{}
+	values := []intermediate_representation.Value{}
+	var neverNil func(value intermediate_representation.Value, isTracked bool) bool
+	neverNil = func(value intermediate_representation.Value, isTracked bool) bool {
 		if seen[value] {
 			return true
 		}
 		seen[value] = true
 		switch value := value.(type) {
-		case *ir.MakeClosure, *ir.Function, *ir.MakeChan, *ir.MakeMap, *ir.MakeSlice, *ir.Alloc:
+		case *intermediate_representation.MakeClosure, *intermediate_representation.Function,
+			*intermediate_representation.MakeChannel, *intermediate_representation.MakeMap,
+			*intermediate_representation.MakeSlice, *intermediate_representation.Allocation:
 			if isTracked {
 				values = append(values, value)
 			}
 			return true
-		case *ir.Slice:
+		case *intermediate_representation.Slice:
 			if isTracked {
 				values = append(values, value)
 			}
 			return neverNil(value.X, false)
-		case *ir.FieldAddr:
+		case *intermediate_representation.FieldAddress:
 			if isTracked {
 				values = append(values, value)
 			}
 			return neverNil(value.X, false)
-		case *ir.Phi:
+		case *intermediate_representation.Phi:
 			for _, edge := range value.Edges {
 				if !neverNil(edge, true) {
 					return false
@@ -191,15 +199,18 @@ func neverNilValues(value ir.Value) ([]ir.Value, bool) {
 		// A value of nil is an expression the function holds no value for, which the original's walk rejects too.
 		return nil, false
 	}
-	slices.SortStableFunc(values, func(first ir.Value, second ir.Value) int {
-		return cmp.Compare(first.Pos(), second.Pos())
-	})
+	slices.SortStableFunc(
+		values,
+		func(first intermediate_representation.Value, second intermediate_representation.Value) int {
+			return cmp.Compare(first.Pos(), second.Pos())
+		},
+	)
 	return values, true
 }
 
 // related is a related place for each of values that has syntax, naming the variable name holds, as
 // staticcheck's report.Related gives them: a value without syntax has no place, and is left out.
-func related(values []ir.Value, name string) []analysis.RelatedInformation {
+func related(values []intermediate_representation.Value, name string) []analysis.RelatedInformation {
 	message := fmt.Sprintf("this is the value of %s", name)
 	if len(values) != 1 {
 		message = fmt.Sprintf("this is one of the value of %s", name)
