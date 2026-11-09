@@ -375,10 +375,10 @@ func differentialCompareLiftedFunction(
 	return differentialDifference{}, false
 }
 
-// differentialLiftedTheirPlaces names each value go/ir's lifted function uses by the set of non-phi values it
-// reaches: a non-phi value is the set of itself, a phi the union of its edges', recursively. A non-phi instruction
-// is named by its block and its index among the block's non-phi instructions.
-func differentialLiftedTheirPlaces(function *ir.Function) differentialTheirPlaces {
+// differentialLiftedTheirPlaces names each value go/ir's lifted function uses, and each of extra, by the set of
+// non-phi values it reaches: a non-phi value is the set of itself, a phi the union of its edges', recursively. A
+// non-phi instruction is named by its block and its index among the block's non-phi instructions.
+func differentialLiftedTheirPlaces(function *ir.Function, extra ...ir.Value) differentialTheirPlaces {
 	names := map[ir.Value]string{}
 	for index, parameter := range function.Params {
 		names[parameter] = fmt.Sprintf("parameter %d", index)
@@ -386,7 +386,7 @@ func differentialLiftedTheirPlaces(function *ir.Function) differentialTheirPlace
 	for index, free := range function.FreeVars {
 		names[free] = fmt.Sprintf("free variable %d", index)
 	}
-	var values []ir.Value
+	values := slices.Clone(extra)
 	for _, block := range function.Blocks {
 		phis := len(block.Phis())
 		for index, instruction := range block.Instrs {
@@ -436,7 +436,8 @@ func differentialTheirReach(value ir.Value, name func(ir.Value) string, reached 
 }
 
 // differentialLiftedOurPlaces is differentialLiftedTheirPlaces for ours.
-func differentialLiftedOurPlaces(function *intermediate_representation.Function) differentialOurPlaces {
+func differentialLiftedOurPlaces(function *intermediate_representation.Function,
+	extra ...intermediate_representation.Value) differentialOurPlaces {
 	names := map[intermediate_representation.Value]string{}
 	for index, parameter := range function.Parameters {
 		names[parameter] = fmt.Sprintf("parameter %d", index)
@@ -444,7 +445,7 @@ func differentialLiftedOurPlaces(function *intermediate_representation.Function)
 	for index, free := range function.FreeVariables {
 		names[free] = fmt.Sprintf("free variable %d", index)
 	}
-	var values []intermediate_representation.Value
+	values := slices.Clone(extra)
 	for _, block := range function.Blocks {
 		phis := len(block.Phis())
 		for index, instruction := range block.Instructions {

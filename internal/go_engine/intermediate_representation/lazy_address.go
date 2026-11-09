@@ -13,6 +13,10 @@ import (
 type lazyAddress struct {
 	addr         func(function *Function) Value // emit to fn the computation of the address
 	locationType types.Type                     // type of the location
+
+	// expression is the syntax of the value (not the address), for the debug references a package built with
+	// SetDebugMode records; nil where there is none.
+	expression ast.Expr
 }
 
 func (address *lazyAddress) load(function *Function, source ast.Node) Value {
@@ -21,11 +25,19 @@ func (address *lazyAddress) load(function *Function, source ast.Node) Value {
 }
 
 func (address *lazyAddress) store(function *Function, value Value, source ast.Node) {
-	emitStore(function, address.addr(function), value, source)
+	store := emitStore(function, address.addr(function), value, source)
+	if address.expression != nil {
+		// store.Value is value, converted for assignability.
+		emitDebugReference(function, address.expression, store.Value, false)
+	}
 }
 
 func (address *lazyAddress) address(function *Function) Value {
-	return address.addr(function)
+	computed := address.addr(function)
+	if address.expression != nil {
+		emitDebugReference(function, address.expression, computed, true)
+	}
+	return computed
 }
 
 func (address *lazyAddress) typ() types.Type { return address.locationType }

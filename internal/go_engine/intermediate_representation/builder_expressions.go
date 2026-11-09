@@ -314,7 +314,7 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		} else {
 			value = function.lookup(object, escaping)
 		}
-		return &address{addr: value}
+		return &address{addr: value, expression: typed}
 
 	case *ast.CompositeLit:
 		resolvedType := deref(function.typeOf(typed))
@@ -327,7 +327,7 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		var stores storebuf
 		packageBuilder.compLit(function, allocation, typed, true, &stores)
 		stores.emit(function)
-		return &address{addr: allocation}
+		return &address{addr: allocation, expression: typed}
 
 	case *ast.ParenExpr:
 		return packageBuilder.addr(function, typed.X, escaping)
@@ -354,7 +354,7 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		emit := func(function *Function) Value {
 			return emitFieldSelection(function, value, index, true, typed.Sel)
 		}
-		return &lazyAddress{addr: emit, locationType: fld.Type()}
+		return &lazyAddress{addr: emit, locationType: fld.Type(), expression: typed.Sel}
 
 	case *ast.IndexExpr:
 		xt := function.typeOf(typed.X)
@@ -401,10 +401,10 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 			address.setType(et)
 			return function.emit(address, typed)
 		}
-		return &lazyAddress{addr: emit, locationType: deref(et)}
+		return &lazyAddress{addr: emit, locationType: deref(et), expression: typed}
 
 	case *ast.StarExpr:
-		return &address{addr: packageBuilder.expr(function, typed.X)}
+		return &address{addr: packageBuilder.expr(function, typed.X), expression: typed}
 	}
 
 	// Invariant: go/types makes addressable, or lets a statement assign to, only identifiers, field selectors, index
@@ -416,6 +416,10 @@ type store struct {
 	lhs    lvalue
 	rhs    Value
 	source ast.Node
+
+	// debugReference, when set, is the store: a debug reference to emit in its place, and no other field is
+	// set.
+	debugReference *debugReference
 }
 
 // assign emits to fn code to initialize the lvalue loc with the value
@@ -480,6 +484,20 @@ func (packageBuilder *builder) assign(
 					stores.emit(function)
 				}
 
+				// Subtle: emit debug ref for aggregate types only;
+				// slice and map are handled by store ops in compLit.
+				switch typeutil.CoreType(loc.typ()).(type) {
+				case *types.Struct, *types.Array:
+					if deferredStores != nil {
+						// Make sure we don't emit DebugRefs before the store has actually occurred
+						if reference := makeDebugReference(function, lit, addr, true); reference != nil {
+							deferredStores.storeDebugReference(reference)
+						}
+					} else {
+						emitDebugReference(function, lit, addr, true)
+					}
+				}
+
 				return
 			}
 		}
@@ -514,6 +532,9 @@ func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
 		value = packageBuilder.addr(function, unparenthesized, false).load(function, unparenthesized)
 	} else {
 		value = packageBuilder.expr0(function, unparenthesized, tv)
+	}
+	if function.debugInformation() {
+		emitDebugReference(function, unparenthesized, value, false)
 	}
 	return value
 }
@@ -1187,7 +1208,7 @@ func (packageBuilder *builder) compLit(
 	typ := deref(function.typeOf(lit)) // retain the named/alias/param type, if any
 	switch typed := typeutil.CoreType(typ).(type) {
 	case *types.Struct:
-		lvalue := &address{addr: addr}
+		lvalue := &address{addr: addr, expression: lit}
 		if len(lit.Elts) == 0 {
 			if !isZero {
 				deferredStores.store(lvalue, zeroConstant(deref(addr.Type()), lit), lit)
@@ -1267,6 +1288,7 @@ func (packageBuilder *builder) compLit(
 						cv:          chain.cv,
 						index:       index[len(index)-1],
 						elementType: chainCoreType.Field(index[len(index)-1]).Type(),
+						expression:  kv.Value,
 					}
 					// We use b.assign for its handling of implicit & (which,
 					// albeit not needed for structs now, may be needed in the
@@ -1281,6 +1303,7 @@ func (packageBuilder *builder) compLit(
 						cv:          value,
 						index:       eltIndex,
 						elementType: typed.Field(eltIndex).Type(),
+						expression:  elt,
 					}
 					packageBuilder.assign(function, ce, elt, isZero, nil, elt)
 					value.Bitmap.SetBit(&value.Bitmap, eltIndex, 1)
@@ -1355,6 +1378,7 @@ func (packageBuilder *builder) compLit(
 					cv:          value,
 					index:       int(index.Int64()),
 					elementType: at.Elem(),
+					expression:  elt,
 				}
 
 				// We use b.assign for its handling of implicit &, but no
@@ -1372,7 +1396,7 @@ func (packageBuilder *builder) compLit(
 			// like []int{1<<62: 1}.
 			if !isZero {
 				// memclear
-				deferredStores.store(&address{array}, zeroConstant(deref(array.Type()), lit), lit)
+				deferredStores.store(&address{addr: array}, zeroConstant(deref(array.Type()), lit), lit)
 			}
 
 			var index *Constant
@@ -1401,9 +1425,10 @@ func (packageBuilder *builder) compLit(
 				function.emit(iaddr, elt)
 				if typed != at { // slice
 					// backing array is unaliased => storebuf not needed.
-					packageBuilder.assign(function, &address{addr: iaddr}, elt, true, nil, elt)
+					packageBuilder.assign(function, &address{addr: iaddr, expression: elt}, elt, true, nil, elt)
 				} else {
-					packageBuilder.assign(function, &address{addr: iaddr}, elt, true, deferredStores, elt)
+					location := &address{addr: iaddr, expression: elt}
+					packageBuilder.assign(function, location, elt, true, deferredStores, elt)
 				}
 			}
 		}
@@ -1413,9 +1438,9 @@ func (packageBuilder *builder) compLit(
 			}
 			slice := &Slice{X: array}
 			slice.setType(typ)
-			deferredStores.store(&address{addr: addr}, function.emit(slice, lit), lit)
+			deferredStores.store(&address{addr: addr, expression: lit}, function.emit(slice, lit), lit)
 		} else if final != nil {
-			deferredStores.store(&address{addr: array}, final, lit)
+			deferredStores.store(&address{addr: array, expression: lit}, final, lit)
 		}
 
 	case *types.Map:
@@ -1464,7 +1489,7 @@ func (packageBuilder *builder) compLit(
 			// and no storebuf is needed.
 			packageBuilder.assign(function, &loc, expr.Value, true, nil, expr)
 		}
-		deferredStores.store(&address{addr: addr}, makeMap, lit)
+		deferredStores.store(&address{addr: addr, expression: lit}, makeMap, lit)
 
 	default:
 		// Invariant: go/types accepts composite literals only of struct, array, slice and map core types.

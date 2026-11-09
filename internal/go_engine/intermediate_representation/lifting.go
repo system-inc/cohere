@@ -42,6 +42,10 @@ type liftingOptions struct {
 
 	// skipStoreDefinition plants a mutant: the first Store a round would lift defines nothing.
 	skipStoreDefinition bool
+
+	// dropDebugReference plants a mutant: each function's first debug reference goes unrecorded in its
+	// expression map.
+	dropDebugReference bool
 }
 
 // liftingOptionsByProgram holds the options a test set on a Program, *Program to liftingOptions. A Program
@@ -253,6 +257,14 @@ func liftingPrepare(function *Function, allocations []*Allocation, options lifti
 					lifting.slots[instruction] = &liftingSlot{place: place(declaration),
 						role: static_single_assignment.Use}
 				}
+			case *debugReference:
+				// A reference to the variable's address reads the value there once lifted, as a Load does; one
+				// to the cell's address itself goes with the cell (resolve).
+				declaration, isLifted := declarationOf[liftingAllocationOf(instruction.X)]
+				if isLifted && instruction.IsAddress {
+					lifting.slots[instruction] = &liftingSlot{place: place(declaration),
+						role: static_single_assignment.Use}
+				}
 			}
 		}
 	}
@@ -386,6 +398,31 @@ func liftingResolve(lifting *liftingFunction, deleted map[Instruction]bool) map[
 					liftingReplaceAll(load, valueOf(identifier))
 					deleted[load] = true
 				}
+			}
+		}
+	}
+	// A debug reference to a lifted variable's address now names the value there, as go/ir's renaming makes it;
+	// one to the address of a lifted cell names what no longer exists, and goes.
+	lifted := map[Value]bool{}
+	for _, allocation := range lifting.allocations {
+		lifted[allocation] = true
+	}
+	for _, block := range lifting.function.Blocks {
+		for _, instruction := range block.Instructions {
+			reference, isReference := instruction.(*debugReference)
+			if !isReference || !lifted[reference.X] {
+				continue
+			}
+			slot, isUse := lifting.slots[reference]
+			if !isUse {
+				reference.X = nil
+				deleted[reference] = true
+				continue
+			}
+			reference.X = valueOf(slot.place.identifier)
+			reference.IsAddress = false
+			if referrers := reference.X.Referrers(); referrers != nil {
+				*referrers = append(*referrers, reference)
 			}
 		}
 	}

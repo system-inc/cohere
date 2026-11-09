@@ -28,6 +28,12 @@ func SkipStoreDefinitionForTest(test testing.TB, program *Program) {
 	liftingStoreForTest(test, program, liftingOptions{skipStoreDefinition: true})
 }
 
+// DropDebugReferenceForTest plants a mutant in program's expression maps until test ends: each function's first
+// debug reference goes unrecorded.
+func DropDebugReferenceForTest(test testing.TB, program *Program) {
+	liftingStoreForTest(test, program, liftingOptions{dropDebugReference: true})
+}
+
 // HasLiftingOptionsForTest reports whether program has options stored, for the test that the default path has
 // none.
 func HasLiftingOptionsForTest(program *Program) bool {

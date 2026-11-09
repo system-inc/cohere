@@ -9,6 +9,10 @@ type compositeElement struct {
 	cv          *CompositeValue
 	index       int
 	elementType types.Type
+
+	// expression is the element's syntax, for the debug references a package built with SetDebugMode records;
+	// nil where there is none.
+	expression ast.Expr
 }
 
 func (element *compositeElement) load(function *Function, source ast.Node) Value {
@@ -20,6 +24,10 @@ func (element *compositeElement) load(function *Function, source ast.Node) Value
 func (element *compositeElement) store(function *Function, value Value, source ast.Node) {
 	converted := emitConv(function, value, element.elementType, source)
 	element.cv.Values[element.index] = converted
+	if element.expression != nil {
+		// converted is value, converted for assignability.
+		emitDebugReference(function, element.expression, converted, false)
+	}
 }
 
 func (element *compositeElement) address(function *Function) Value {

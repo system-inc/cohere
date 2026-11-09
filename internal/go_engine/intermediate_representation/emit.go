@@ -606,6 +606,7 @@ func emitFieldSelection(function *Function, value Value, index int, wantAddr boo
 		instr.setType(fld.Type())
 		selected = function.emit(instr, id)
 	}
+	emitDebugReference(function, id, selected, wantAddr)
 	return selected
 }
 
