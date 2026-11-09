@@ -171,7 +171,13 @@
 // dependency's functions only when a reader asks of one, where a pushed fact
 // is learned on every function of every dependency. Options.Resolved keys
 // the resolver in every pass's ResultOf, as Options.Timed keys the
-// collector. Unset, nothing is told and every pass is upstream's.
+// collector. Unset, nothing is told and every pass is upstream's. Two
+// accessors serve it: Action.PackageActions, every action on an action's
+// package, and Action.Dependents, the set a pass holds under
+// Options.Dependents. From them the resolver reads, when ctrlflow finishes
+// on a package, whether build_intermediate_representation runs there and
+// whether its readers ask for the expression map, so it shares that
+// package with them and builds a root once (#wt5vaft).
 //
 // What else differs, because this module cannot import x/tools'
 // internal packages:
