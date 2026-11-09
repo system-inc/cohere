@@ -107,10 +107,10 @@ func (session *CacheSession) packageOf(packageTypes *types.Package) *packages.Pa
 }
 
 // Answers is what the run can read of the answers of the package whose types are packageTypes, for the resolver: its
-// entry's, for a package restored from the binary's table, complete in every kind its release computed, or restored
-// from the store by its own first key, or loaded from source to answer a question, whose entry under that key the run
-// did not restore. An entry an alias or the second key led to holds the answers of other inputs than the package's
-// own, which the early cutoff does not compare (#w7zmvat wave 3b), so it gives none. It is nil when there are none.
+// entry's, for a package the run trusts the entry of (see trusted), restored from the binary's table, complete in every
+// kind its release computed, or from the store by its own first key, or by an alias or its second key once its reads
+// held; or, for a package loaded from source to answer a question, its entry's under its own first key, which the run
+// did not restore. It is nil when there are none.
 func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver.Answers {
 	asked := session.packageOf(packageTypes)
 	if asked == nil {
@@ -118,11 +118,11 @@ func (session *CacheSession) Answers(packageTypes *types.Package) *fact_resolver
 	}
 	var held []kindAnswers
 	if restored := session.hits[asked]; restored != nil {
-		if key, keyed := session.keys[asked]; session.fromBinary[asked] || keyed && session.stored[asked] == key {
+		if session.trusted[asked] {
 			held = restored.answers
 		}
 	} else {
-		held = session.previous[asked]
+		held = session.previous[asked].answers
 	}
 	if len(held) == 0 {
 		return nil
@@ -189,10 +189,10 @@ func (session *CacheSession) reloadsOf(resolver *fact_resolver.Resolver) []strin
 }
 
 // readPrevious reads, for each package among reachable the run loads from source to answer a question, the answers
-// its entry under its own first key holds, which the run did not restore, so they answer without a build and stay in
-// the entry the run writes for it.
+// and reads its entry under its own first key holds, which the run did not restore, so the answers answer without a
+// build, and both stay in the entry the run writes for it.
 func (session *CacheSession) readPrevious(reachable []*packages.Package) {
-	session.previous = map[*packages.Package][]kindAnswers{}
+	session.previous = map[*packages.Package]entryDemand{}
 	if session.caching.Store == nil {
 		return
 	}
@@ -210,49 +210,67 @@ func (session *CacheSession) readPrevious(reachable []*packages.Package) {
 			entry.Version != CacheFormatVersion {
 			continue
 		}
-		session.previous[reloaded] = entry.Answers
+		session.previous[reloaded] = entryDemand{answers: entry.Answers, reads: entry.Reads,
+			readsIncomplete: entry.ReadsIncomplete}
 	}
 }
 
-// answersOf is the answers the entry of saved holds: those the resolver computed whole, for a standard-library package
-// the run collects for the binary's table, and otherwise those its entry held before, for a package loaded from source
-// to answer a question, with every answer the run computed in it.
-func (session *CacheSession) answersOf(saved *packages.Package) []kindAnswers {
+// entryDemand is what an entry holds of the fact kinds computed on demand: the package's answers, and the answers
+// its analysis read of other packages, with whether those could all be named.
+type entryDemand struct {
+	answers         []kindAnswers
+	reads           []storedRead
+	readsIncomplete bool
+}
+
+// demandOf is what the entry of saved holds of the fact kinds computed on demand. Its answers are those the resolver
+// computed whole, for a standard-library package the run collects for the binary's table, and otherwise those held
+// before, the entry's before a reload or the first wave's (held), with every answer the run computed in it. Its reads
+// are those held before with every read the run's analysis of it made.
+func (session *CacheSession) demandOf(saved *packages.Package, held entryDemand) entryDemand {
 	if session.resolver == nil || saved.Types == nil {
-		return nil
+		return held
 	}
+	demanded := entryDemand{}
 	if session.collects(saved) {
 		if home := session.resolver.Package(saved.Types); home != nil {
-			return sortedAnswers(session.resolver.Whole(home), true)
+			demanded.answers = sortedAnswers(session.resolver.Whole(home), true)
 		}
 	}
-	merged := session.resolver.Recorded(saved.Types)
-	complete := map[string]bool{}
-	for _, kind := range session.previous[saved] {
-		if merged[kind.Kind] == nil {
-			merged[kind.Kind] = map[objectpath.Path][]byte{}
+	if demanded.answers == nil {
+		merged := session.resolver.Recorded(saved.Types)
+		complete := map[string]bool{}
+		for _, kind := range held.answers {
+			if merged[kind.Kind] == nil {
+				merged[kind.Kind] = map[objectpath.Path][]byte{}
+			}
+			for _, answer := range kind.Answers {
+				merged[kind.Kind][answer.Path] = answer.Value
+			}
+			complete[kind.Kind] = complete[kind.Kind] || kind.Complete
 		}
-		for _, answer := range kind.Answers {
-			merged[kind.Kind][answer.Path] = answer.Value
+		demanded.answers = sortedAnswers(merged, false)
+		for index := range demanded.answers {
+			demanded.answers[index].Complete = complete[demanded.answers[index].Kind]
 		}
-		complete[kind.Kind] = complete[kind.Kind] || kind.Complete
 	}
-	sorted := sortedAnswers(merged, false)
-	for index := range sorted {
-		sorted[index].Complete = complete[sorted[index].Kind]
-	}
-	return sorted
+	demanded.reads, demanded.readsIncomplete = session.readsOf(saved, held)
+	return demanded
 }
 
-// rewriteEarlier writes again the entry of each package the first wave saved whose answers grew since, as the second
-// wave asked of it, with every answer it now holds, as many at once as there are cores. A failed write is a problem,
-// never a finding: the next run loads from source what the entry would have answered.
+// rewriteEarlier writes again the entry of each package the first wave saved whose answers or reads grew since, as
+// the second wave, or a decision by second key between the waves, asked of it, with every answer and read it now
+// holds, as many at once as there are cores. A failed write is a problem, never a finding: the next run loads from
+// source what the entry would have answered, and misses what its reads would have held.
 func (session *CacheSession) rewriteEarlier() {
 	var group sync.WaitGroup
 	slots := make(chan struct{}, runtime.GOMAXPROCS(0))
 	for saved, restored := range session.earlier {
-		answers := session.answersOf(saved)
-		if answerCount(answers) == answerCount(restored.answers) {
+		held := entryDemand{answers: restored.answers, reads: restored.reads,
+			readsIncomplete: restored.readsIncomplete}
+		demanded := session.demandOf(saved, held)
+		if answerCount(demanded.answers) == answerCount(restored.answers) &&
+			len(demanded.reads) == len(restored.reads) && demanded.readsIncomplete == restored.readsIncomplete {
 			continue
 		}
 		key, keyed := session.keys[saved]
@@ -271,7 +289,8 @@ func (session *CacheSession) rewriteEarlier() {
 				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, decodeError))
 				return
 			}
-			entry.Answers = answers
+			entry.Answers, entry.Reads, entry.ReadsIncomplete = demanded.answers, demanded.reads,
+				demanded.readsIncomplete
 			var encoded bytes.Buffer
 			if encodeError := gob.NewEncoder(&encoded).Encode(entry); encodeError != nil {
 				session.problem(fmt.Sprintf("rewriting the entry of %s with its answers: %v", saved.ID, encodeError))

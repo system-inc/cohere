@@ -174,7 +174,12 @@ type CacheSession struct {
 	// source to answer a question, from its entry under its own key, which the run did not restore.
 	answering answering
 	resolver  *fact_resolver.Resolver
-	previous  map[*packages.Package][]kindAnswers
+	previous  map[*packages.Package]entryDemand
+
+	// trusted are the hits whose entry's findings and answers hold for the package as the run finds it (see
+	// cache_session_reads.go), and byIdentifier every package the load reached, by ID, which a read names its owner by.
+	trusted      map[*packages.Package]bool
+	byIdentifier map[string]*packages.Package
 }
 
 // NewCacheSession is a session for the rules a run will run, and the report analyzers it will run beside them (see
@@ -264,6 +269,7 @@ func (session *CacheSession) Restore(
 	session.restoreFromBinary(loader, reachable, hashed)
 	session.readHits(reachable)
 	session.readPrevious(reachable)
+	session.holdAliasHits(reachable)
 	// Each pass makes a hit that falls short a miss, which can only ask more of the rest.
 	dropping := true
 	for dropping {
@@ -633,9 +639,9 @@ func (session *CacheSession) saveMisses(
 		go func() {
 			defer group.Done()
 			defer func() { <-slots }()
-			answers := session.answersOf(saved)
+			demanded := session.demandOf(saved, session.previous[saved])
 			entry, encodeError := encodeEntry(session.known, session.ruleOf, saved, actionsOf[saved],
-				withheld[saved], answers, files[saved], knownFiles)
+				withheld[saved], demanded, files[saved], knownFiles)
 			var putError error
 			// The export data goes first, so an entry is never in the store before what it needs to be read.
 			if encodeError == nil && entry.exportData != nil {

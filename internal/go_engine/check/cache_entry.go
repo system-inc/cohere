@@ -27,7 +27,8 @@ import (
 // facts by value rather than of their bytes (#z14ch7c), so an entry written at 4 holds a digest no second key of 5
 // can match, and would only be a miss read the long way. At 6, an analysis holds its report analyzer's result
 // (#jfvhbj7). At 7, an entry holds the answers a standard-library package was computed whole in (#w7zmvat wave 3).
-const CacheFormatVersion = "go-engine-cache-7"
+// At 8, it holds the answers its package's analysis read of other packages (#w7zmvat wave 3b).
+const CacheFormatVersion = "go-engine-cache-8"
 
 // errorUnstorable is a package an entry cannot hold, a fact gob refuses or factValueDigest cannot read, or types export
 // data cannot carry, so it gets no entry, and is counted.
@@ -61,6 +62,24 @@ type cacheEntry struct {
 	// standard-library package a run collects for the binary's table, every answer, computed whole (see answersOf).
 	// They depend only on the package's key, as everything else here does.
 	Answers []kindAnswers
+
+	// Reads are the answers of the fact kinds computed on demand that the package's analysis took from other packages,
+	// in the runs that wrote its findings and answers, each with its owner's first key then (#w7zmvat wave 3b). A run
+	// that restores the package by anything but its own first key holds the entry only while every read still holds
+	// (see readsHold). ReadsIncomplete is set when a read could not be named, an object with no objectpath or an owner
+	// the run did not key, and then the entry is held by its own first key alone.
+	Reads           []storedRead
+	ReadsIncomplete bool
+}
+
+// storedRead is one read (see fact_resolver.Read): the kind, the owner's ID and its first key when the read was
+// made, the object's objectpath in the owner, and the answer, as JSON.
+type storedRead struct {
+	Kind     string
+	Owner    string
+	OwnerKey []byte
+	Path     objectpath.Path
+	Value    []byte
 }
 
 // storedFile is one file of a package Analyze was given: its name as the syntax names it, the nodes of one
@@ -107,8 +126,10 @@ type restoredPackage struct {
 	output    cache.Key
 	hasOutput bool
 
-	// answers are the entry's Answers.
-	answers []kindAnswers
+	// answers are the entry's Answers, and reads and readsIncomplete its Reads and ReadsIncomplete.
+	answers         []kindAnswers
+	reads           []storedRead
+	readsIncomplete bool
 }
 
 // encodedEntry is one package's entry as encodeEntry makes it, with what the session needs of it beside the bytes.
@@ -155,8 +176,8 @@ func factTypeName(factType reflect.Type) string {
 }
 
 // encodeEntry is the entry of one package that missed, from every action on it, each of which finished without an
-// error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it, and, for a
-// package Analyze was given, its files' walk, with its
+// error, its types, what the load withheld of it, the answers of the fact kinds computed on demand in it and those its
+// analysis read of other packages (demanded), and, for a package Analyze was given, its files' walk, with its
 // export data beside it, its output digest, and whether a finding of it names a file outside it, among knownFiles,
 // every file the load holds. It returns errorUnstorable, wrapped, when gob refuses a fact the package exported, or
 // factValueDigest cannot read one, or its types cannot be written as export data.
@@ -166,16 +187,18 @@ func encodeEntry(
 	saved *packages.Package,
 	actions []*checker.Action,
 	withheld load.PackageWithheld,
-	answers []kindAnswers,
+	demanded entryDemand,
 	files []storedFile,
 	knownFiles map[string]bool,
 ) (encodedEntry, error) {
 	entry := cacheEntry{
-		Version:   CacheFormatVersion,
-		Analyzers: map[string]storedAnalysis{},
-		Withheld:  withheld,
-		Files:     files,
-		Answers:   answers,
+		Version:         CacheFormatVersion,
+		Analyzers:       map[string]storedAnalysis{},
+		Withheld:        withheld,
+		Files:           files,
+		Answers:         demanded.answers,
+		Reads:           demanded.reads,
+		ReadsIncomplete: demanded.readsIncomplete,
 	}
 	encoded := encodedEntry{}
 	digested := map[string]analysisFacts{}
@@ -378,8 +401,10 @@ func restoredOf(
 			Imports:        entry.Imports,
 			Withheld:       entry.Withheld,
 		},
-		files:   entry.Files,
-		answers: entry.Answers,
+		files:           entry.Files,
+		answers:         entry.Answers,
+		reads:           entry.Reads,
+		readsIncomplete: entry.ReadsIncomplete,
 	}
 	if len(entry.Output) == len(restored.output) {
 		copy(restored.output[:], entry.Output)
