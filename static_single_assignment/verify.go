@@ -294,11 +294,23 @@ func CollectStaticSingleAssignmentStatistics[G Graph[F, B, P], F any, B comparab
 //
 // Blocks the real edges don't reach (a fallthrough's placeholder) follow the reverse postorder, in the
 // slice's order, with no dominator but themselves.
+//
+// # The tree's children are in go/ir's order
+//
+// Once the fixed point settles, each block reached is appended to its immediate dominator's children
+// in the depth-first preorder of the real edges from the entry, each block's edges in the order
+// EachEdge names them. That is how go/ir's buildDomTree makes BasicBlock.Dominees: its step 4 walks
+// the preorder of its Lengauer-Tarjan search over Succs and appends each block to its idom's children.
+// Immediate dominators are unique, so the two algorithms agree on them, and the same search over the
+// same edges gives the same order. A reader ported from go/ir that walks children in order and stops
+// at the first thing it finds then stops at the same block.
 func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) *Dominance {
-	blocks, reached := realReversePostorder(graph, function)
-	tree := &Dominance{position: make(map[BlockId]int, len(blocks))}
+	blocks, preorder := realReversePostorder(graph, function)
+	reached := len(preorder)
+	tree := &Dominance{position: make(map[BlockId]int, len(blocks)), blocks: make([]BlockId, len(blocks))}
 	for index, block := range blocks {
 		tree.position[graph.Id(block)] = index
+		tree.blocks[index] = graph.Id(block)
 	}
 	tree.immediate = make([]int, len(blocks))
 	for index := range tree.immediate {
@@ -344,16 +356,19 @@ func ComputeDominance[G Graph[F, B, P], F any, B comparable, P any](graph G, fun
 			}
 		}
 	}
+	tree.collectChildren(preorder)
 	return tree
 }
 
 // realReversePostorder is the function's blocks in a reverse postorder of the real edges from its entry,
-// then the blocks those edges don't reach, in the block slice's order; and how many the edges reach.
+// then the blocks those edges don't reach, in the block slice's order; and the ids of the blocks the
+// edges reach, in the preorder of the same search, which is the order go/ir's search numbers them in.
 // Fallthroughs are not edges. Exceptional edges are real ones, as everywhere in this module.
-func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) ([]B, int) {
+func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G, function F) ([]B, []BlockId) {
 	slice := graph.Blocks(function)
 	visited := make(map[BlockId]bool, len(slice))
 	postorder := make([]B, 0, len(slice))
+	preorder := make([]BlockId, 0, len(slice))
 	type frame struct {
 		block      B
 		successors []BlockId
@@ -368,6 +383,7 @@ func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G,
 			return
 		}
 		visited[id] = true
+		preorder = append(preorder, id)
 		var successors []BlockId
 		for _, edge := range edgesOf(graph, block, scratch) {
 			if edge.edge != Fallthrough {
@@ -399,7 +415,7 @@ func realReversePostorder[G Graph[F, B, P], F any, B comparable, P any](graph G,
 			order = append(order, block)
 		}
 	}
-	return order, len(postorder)
+	return order, preorder
 }
 
 // entryPredecessors reports the entry block and its predecessors when it has any, which Graph.Entry
