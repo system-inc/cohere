@@ -29,7 +29,8 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 }
 
 // The differences fixture holds the cases where the port and the original could plausibly disagree. It records no
-// difference, since the two read the same form and differ nowhere, so they must agree there finding for finding.
+// difference, since our form is built as buildir builds its own and the two differ nowhere, so they must agree there
+// finding for finding.
 func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	test.Parallel()
 	parity.RequireIdentical(test, sa1023.Analyzer, Analyzer, analysistest.TestData(), "differences")
