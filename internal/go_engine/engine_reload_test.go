@@ -9,11 +9,13 @@ import (
 
 // A question of a fact computed on demand that reaches a package the cache restored, with no answer stored, is never
 // answered no fact: the run loads that package again from source and runs again, and writes what a run without the
-// cache writes (#w7zmvat wave 3). Cold, nothing asks the purity of bottom.Double, so bottom's entry holds no answer of
-// it. The edit adds Drop to top, which discards bottom.Double's result: top misses, bottom hits, and SA4017 asks
-// whether bottom.Double is pure, which only bottom's source can say. The run reloads bottom once and reports the call,
-// as `--no-cache` does. The answer is then in bottom's entry, so the next edit to top asks it again and reloads
-// nothing.
+// cache writes (#w7zmvat wave 3). Cold, nothing asks the purity of bottom.Double or os.Getpagesize, so no entry holds
+// an answer of either. The edit adds Drop to top, which discards both results: top misses, and SA4017 asks whether
+// each is pure, which only its package's source can say. A pass that asks ends at its first unanswered question, so
+// the run reloads bottom, then os, then syscall, whose Getpagesize os's source asks of, a pass for each, and keeps os
+// from source though its second key holds an entry by then. The last pass reports the call to Double, and holds
+// os.Getpagesize not pure, as `--no-cache` does. Every answer is then in its package's entry, so the next edit to top
+// asks them again and reloads nothing.
 func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *testing.T) {
 	test.Parallel()
 
@@ -28,20 +30,21 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	if readError != nil {
 		test.Fatalf("reading %s: %v", file, readError)
 	}
-	drop := "\n// Drop calls bottom.Double and drops what it returns.\nfunc Drop() {\n\tbottom.Double(2)\n}\n"
+	drop := "\n// Drop calls bottom.Double and os.Getpagesize and drops what they return.\nfunc Drop() {\n\tbottom.Double(2)\n\tos.Getpagesize()\n}\n"
 	if writeError := os.WriteFile(file, append(contents, []byte(drop)...), 0o644); writeError != nil {
 		test.Fatalf("editing %s: %v", file, writeError)
 	}
 	edited := runCachedEngine(test, root)
-	if !strings.Contains(edited.stream, `"rule":"cohere-go/SA4017"`) {
-		test.Fatalf("want SA4017's finding on the dropped call to bottom.Double, got\n%s", edited.stream)
+	if strings.Count(edited.stream, `"rule":"cohere-go/SA4017"`) != 1 {
+		test.Fatalf("want SA4017's one finding, on the dropped call to bottom.Double, got\n%s", edited.stream)
 	}
 	uncached := runCachedEngine(test, root, "--no-cache")
 	if edited.withoutCounts != uncached.withoutCounts {
 		test.Fatalf("after the reload\n%s\nunder --no-cache\n%s", edited.withoutCounts, uncached.withoutCounts)
 	}
-	if edited.counts.Reloads != 1 {
-		test.Fatalf("want bottom reloaded once to answer the purity of bottom.Double, got %+v", edited.counts)
+	if edited.counts.Reloads != 3 {
+		test.Fatalf("want bottom, os and syscall reloaded to answer the purity of bottom.Double and os.Getpagesize, "+
+			"got %+v", edited.counts)
 	}
 
 	again := append(contents, []byte(drop+"\n// Edited again, so top misses and asks again.\n")...)
@@ -50,10 +53,10 @@ func TestARestoredPackageWithNoAnswerIsReloadedAndAnswersAsTheColdPath(test *tes
 	}
 	stored := runCachedEngine(test, root)
 	if stored.counts.Reloads != 0 || stored.counts.Missed != edited.counts.Missed-edited.counts.Reloads {
-		test.Fatalf("want bottom's stored answer read with no reload and only top missed, edited %+v, again %+v",
+		test.Fatalf("want the stored answers read with no reload and only top missed, edited %+v, again %+v",
 			edited.counts, stored.counts)
 	}
-	if !strings.Contains(stored.stream, `"rule":"cohere-go/SA4017"`) {
-		test.Fatalf("want SA4017's finding from bottom's stored answer, got\n%s", stored.stream)
+	if strings.Count(stored.stream, `"rule":"cohere-go/SA4017"`) != 1 {
+		test.Fatalf("want SA4017's finding from the stored answers, got\n%s", stored.stream)
 	}
 }

@@ -141,7 +141,9 @@ func (session *CacheSession) decideBySecondKey() {
 		for _, imported := range current.Imports {
 			decide(imported)
 		}
-		if session.restoredInWave(current) || len(current.Errors) > 0 {
+		// A package the run reloads to answer a question is checked from source whatever its second key holds, or
+		// the run would restore it again with no answer, as it did before the reload (see Reload).
+		if session.restoredInWave(current) || len(current.Errors) > 0 || session.reloading(current) {
 			return
 		}
 		second, known := session.secondKey(current)
