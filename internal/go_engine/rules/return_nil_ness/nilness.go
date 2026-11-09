@@ -1,4 +1,4 @@
-package return_nilness
+package return_nil_ness
 
 // Nilness is what is known of whether a value is nil. Its zero value is no knowledge at all, the lattice's identity.
 type Nilness uint8

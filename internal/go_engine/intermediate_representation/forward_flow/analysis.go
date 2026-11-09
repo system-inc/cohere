@@ -4,12 +4,13 @@
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/dfa/dense (forward.go and flow.go) and the
 // parts of internal/xtools-internal/graph those call, compaction and the reverse postorder, keeping only what
-// return_nilness reads: Forward and the fact on entry to each block. It keeps the original's order step for step, since
-// a transfer function need not be monotone and the order blocks are visited in can then change the answer: blocks are
-// swept in reverse postorder, a block reached again by an edge back to one already passed in a sweep waits for the
-// next sweep, and a block whose incoming fact has not changed since its last visit is not visited again. A function's
-// blocks are numbered from zero in order, which the original's compaction maps to themselves, so each node here is its
-// block's index. The lattice is the original's own dfa.Semilattice, imported as is, since it reads no representation.
+// return_nil_ness reads: Forward and the fact on entry to each block. It keeps the original's order step for step,
+// since a transfer function need not be monotone and the order blocks are visited in can then change the answer:
+// blocks are swept in reverse postorder, a block reached again by an edge back to one already passed in a sweep waits
+// for the next sweep, and a block whose incoming fact has not changed since its last visit is not visited again. A
+// function's blocks are numbered from zero in order, which the original's compaction maps to themselves, so each node
+// here is its block's index. The lattice is the original's own dfa.Semilattice, imported as is, since it reads no
+// representation.
 package forward_flow
 
 import (

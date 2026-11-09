@@ -7,8 +7,8 @@
 // whose messages and related places it reports word for word, through staticcheck_report.Report and Related at the
 // comparison's syntax, asking staticcheck_report.HasRange and Ordinal and staticcheck_code.IsInTest where the original
 // asks report.HasRange, report.Ordinal and code.IsInTest, each the port of the one the original calls, proven against
-// it beside it. It reads what each function returns from return_nilness, the port of staticcheck's nilness facts,
-// which cross from every dependency, through the context, its listener requiring return_nilness, asks Flatten and
+// it beside it. It reads what each function returns from return_nil_ness, the port of staticcheck's nilness facts,
+// which cross from every dependency, through the context, its listener requiring return_nil_ness, asks Flatten and
 // IsTrivial of the engine's intermediate representation where the original asks irutil's, and asks
 // golang.org/x/exp/typeparams and honnef.co/go/tools/go/types/typeutil what the original asks them, public packages and
 // not framework.
@@ -39,23 +39,23 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
 	"github.com/system-inc/cohere/internal/go_engine/rules/dispatch"
-	"github.com/system-inc/cohere/internal/go_engine/rules/return_nilness"
+	"github.com/system-inc/cohere/internal/go_engine/rules/return_nil_ness"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_code"
 	"github.com/system-inc/cohere/internal/go_engine/rules/staticcheck_report"
 )
 
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
 // representation: every function, each judged on its own with the nilness facts of the package. It requires
-// return_nilness, whose result it reads.
+// return_nil_ness, whose result it reads.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{return_nilness.Analyzer},
+	Requires: []*analysis.Analyzer{return_nil_ness.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
-			nilnesses, isNilnesses := context.ResultOf(return_nilness.Analyzer).(*return_nilness.Result)
+			nilnesses, isNilnesses := context.ResultOf(return_nil_ness.Analyzer).(*return_nil_ness.Result)
 			if !isNilnesses {
-				// Invariant: the listener requires return_nilness, and the dispatcher hands over its result, of
+				// Invariant: the listener requires return_nil_ness, and the dispatcher hands over its result, of
 				// the type it declares.
-				panic("typed_nil_interface_comparison: return_nilness's result is missing")
+				panic("typed_nil_interface_comparison: return_nil_ness's result is missing")
 			}
 			Check(context, nilnesses, function)
 		},
@@ -78,7 +78,7 @@ var Analyzer = dispatch.RuleAnalyzer(
 // return one holding a typed nil, is reported.
 func Check(
 	context *rule.Context,
-	nilnesses *return_nilness.Result,
+	nilnesses *return_nil_ness.Result,
 	function *intermediate_representation.Function,
 ) {
 	for _, block := range function.Blocks {
@@ -95,7 +95,7 @@ func Check(
 // checkComparison reports comparison when its left side is an interface value that can never be nil, as Check says.
 func checkComparison(
 	context *rule.Context,
-	nilnesses *return_nilness.Result,
+	nilnesses *return_nil_ness.Result,
 	comparison *intermediate_representation.BinaryOperation,
 ) {
 	// A type parameter's core may be an interface, but a value of it is no interface value.
@@ -152,8 +152,8 @@ func checkComparison(
 	// Flagged: an interface value never nil itself that may hold, or always holds, a typed nil, which points to a bug
 	// in the function returning it. A value never nil that holds no nil either, as errors.New returns, is left alone:
 	// comparing it is more likely defensive, guarding against a future untyped nil.
-	if returned.Outer != return_nilness.NeverNil || returned.Inner != return_nilness.MaybeNil &&
-		returned.Inner != return_nilness.AlwaysNil {
+	if returned.Outer != return_nil_ness.NeverNil || returned.Inner != return_nil_ness.MaybeNil &&
+		returned.Inner != return_nil_ness.AlwaysNil {
 		return
 	}
 	// A test may be enforcing on purpose that a value is not nil.

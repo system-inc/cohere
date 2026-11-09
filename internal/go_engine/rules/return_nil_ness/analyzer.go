@@ -1,8 +1,6 @@
-//cohere:file-ignore consistency-require-separated-folder-words staticcheck's nilness, a project's own spelling
-
-// Package return_nilness judges whether each function's results may be nil, staticcheck's nilness facts ported onto the
-// engine's own intermediate representation, so the readers asking what a function returns read them without buildir
-// (#w7zmvat).
+// Package return_nil_ness judges whether each function's results may be nil, staticcheck's nilness facts ported onto
+// the engine's own intermediate representation, so the readers asking what a function returns read them without
+// buildir (#w7zmvat).
 //
 // It is translated, not copied, from honnef.co/go/tools@v0.8.1 analysis/facts/nilness/nilness.go, whose algorithm it
 // keeps step for step: the package's source functions judged in the order buildir lists them, with one set of the
@@ -22,7 +20,7 @@
 // recorded in TestPortDiffersFromOriginalOnlyWhereItIsRight, and holds the port to the same fact in either order. Over
 // the four trees the fact differential runs on, the two export the same facts: root 8387, the standard library 14089,
 // loom 2133 and deeafbf4 7537.
-package return_nilness
+package return_nil_ness
 
 import (
 	"fmt"
@@ -39,7 +37,7 @@ import (
 // more than that each may be nil, and returns every function's results the facts hold, the imported packages' among
 // them.
 var Analyzer = &analysis.Analyzer{
-	Name:       "return_nilness",
+	Name:       "return_nil_ness",
 	Doc:        "annotates return values with their nilness, staticcheck's nilness facts on the engine's own representation",
 	Run:        run,
 	Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
@@ -68,7 +66,7 @@ func run(pass *analysis.Pass) (any, error) {
 		function, isFunction := fact.Object.(*types.Func)
 		returned, isReturned := fact.Fact.(*ReturnedNilness)
 		if !isFunction || !isReturned {
-			return nil, fmt.Errorf("reading return_nilness's facts: %s holds a %T, where only a function's "+
+			return nil, fmt.Errorf("reading return_nil_ness's facts: %s holds a %T, where only a function's "+
 				"ReturnedNilness was expected", fact.Object, fact.Fact)
 		}
 		result.functions[function] = returned.Results

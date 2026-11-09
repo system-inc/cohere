@@ -1,4 +1,4 @@
-package return_nilness
+package return_nil_ness
 
 import (
 	"fmt"
@@ -145,7 +145,7 @@ func (judging *judgment) judge(function *intermediate_representation.Function, o
 		control, isReturn := block.Control().(*intermediate_representation.Return)
 		if !isReturn {
 			// Invariant: Returns yields only the blocks whose control instruction is a return.
-			panic(fmt.Sprintf("return_nilness: %s's block %d, yielded by Returns, ends in no return", function,
+			panic(fmt.Sprintf("return_nil_ness: %s's block %d, yielded by Returns, ends in no return", function,
 				block.Index))
 		}
 		current := state{numbering: values, values: analysis.In(block.Index)}

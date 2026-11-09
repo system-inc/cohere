@@ -1,4 +1,4 @@
-package return_nilness
+package return_nil_ness
 
 import "github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 

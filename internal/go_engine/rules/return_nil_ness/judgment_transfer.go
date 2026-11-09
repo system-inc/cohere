@@ -1,4 +1,4 @@
-package return_nilness
+package return_nil_ness
 
 import (
 	"fmt"
@@ -38,13 +38,13 @@ func (judging *judgment) transfer(
 				if !isPointer {
 					// Invariant: a slice converts only to a pointer to an array, or to a type parameter whose every
 					// term is one, which the type checker proves.
-					panic(fmt.Sprintf("return_nilness: a slice converted to %s, which is no pointer", term.Type()))
+					panic(fmt.Sprintf("return_nil_ness: a slice converted to %s, which is no pointer", term.Type()))
 				}
 				return typeutil.All(pointer.Elem(), func(innerTerm *types.Term) bool {
 					array, isArray := innerTerm.Type().Underlying().(*types.Array)
 					if !isArray {
 						// Invariant: as above, the pointer's element is an array.
-						panic(fmt.Sprintf("return_nilness: a slice converted to a pointer to %s, which is no array",
+						panic(fmt.Sprintf("return_nil_ness: a slice converted to a pointer to %s, which is no array",
 							innerTerm.Type()))
 					}
 					return array.Len() != 0
@@ -65,7 +65,7 @@ func (judging *judgment) transfer(
 				array, isArray := term.Type().Underlying().(*types.Array)
 				if !isArray {
 					// Invariant: a slice converts only to an array, or to a type parameter whose every term is one.
-					panic(fmt.Sprintf("return_nilness: a slice converted to %s, which is no array", term.Type()))
+					panic(fmt.Sprintf("return_nil_ness: a slice converted to %s, which is no array", term.Type()))
 				}
 				return array.Len() != 0
 			})
@@ -114,7 +114,7 @@ func (judging *judgment) transfer(
 					operator = token.EQL
 				default:
 					// Invariant: a comparison with nil is == or !=, the only operators the type checker allows on it.
-					panic(fmt.Sprintf("return_nilness: internal error: unhandled token %v", operator))
+					panic(fmt.Sprintf("return_nil_ness: internal error: unhandled token %v", operator))
 				}
 			}
 			switch operator {
@@ -124,7 +124,7 @@ func (judging *judgment) transfer(
 				current.setOuter(target, NeverNil)
 			default:
 				// Invariant: as above, a comparison with nil is == or !=, and negating one gives the other.
-				panic(fmt.Sprintf("return_nilness: internal error: unhandled token %v", operator))
+				panic(fmt.Sprintf("return_nil_ness: internal error: unhandled token %v", operator))
 			}
 
 			// Staticcheck leaves for later the comparison of two values that are not nil: the true branch of
@@ -237,7 +237,7 @@ func (judging *judgment) transfer(
 			position := judging.pass.Fset.PositionFor(instruction.Pos(), false)
 			// Invariant: every kind of instruction the representation builds has a case above, so a kind it builds
 			// that is new to this pass is found here, as staticcheck's pass finds one, rather than judged by chance.
-			panic(fmt.Sprintf("return_nilness: internal error: unhandled type %T at %s", instruction, position))
+			panic(fmt.Sprintf("return_nil_ness: internal error: unhandled type %T at %s", instruction, position))
 		}
 	}
 }
@@ -342,7 +342,7 @@ func (judging *judgment) transferReturnValue(
 		default:
 			// Invariant: these are every builtin whose result may be nil; new, make and the rest are built as
 			// instructions of their own, or give values that cannot be nil, which returned above.
-			panic(fmt.Sprintf("return_nilness: internal error: unhandled builtin %s", builtin.Name()))
+			panic(fmt.Sprintf("return_nil_ness: internal error: unhandled builtin %s", builtin.Name()))
 		}
 		return
 	}

@@ -1,4 +1,4 @@
-package return_nilness
+package return_nil_ness
 
 import "honnef.co/go/tools/analysis/dfa"
 
