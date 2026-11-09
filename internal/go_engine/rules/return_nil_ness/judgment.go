@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
 	"honnef.co/go/tools/analysis/dfa"
 	"honnef.co/go/tools/go/types/typeutil"
 
@@ -14,56 +13,16 @@ import (
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation/forward_flow"
 )
 
-// judgment is one package's judging: its pass, its package in our representation, and every function of the package
-// whose judging has begun, so a call back into one already begun answers the defaults of its signature.
-type judgment struct {
-	pass      *analysis.Pass
-	irPackage *intermediate_representation.Package
-	seen      map[*intermediate_representation.Function]bool
+// callees is what judging a function's body asks of each function it calls statically: the nilness of its results.
+// The push walk answers from the facts and judges a function of its own package as it is met; the resolver's walk
+// answers from what it computed, on demand.
+type callees interface {
+	returns(function *intermediate_representation.Function) []ValueNilness
 }
 
-// returns is the nilness of each of function's results: nil for a function with none, what a ReturnedNilness fact
-// holds, or, for a function of this package judged here once, what judge finds, and otherwise the defaults of its
-// signature. A function with no object, an anonymous one, is never judged, nor one of another package, one with no
-// blocks, one already begun, or one with no result that may be nil.
-func (judging *judgment) returns(function *intermediate_representation.Function) []ValueNilness {
-	if function.Signature.Results().Len() == 0 {
-		return nil
-	}
-	object := function.Object()
-	if object == nil {
-		// Closures are not judged, as staticcheck leaves them for later.
-		return defaultNilnessForSignature(function.Signature)
-	}
-	if fact := new(ReturnedNilness); judging.pass.ImportObjectFact(object, fact) {
-		return fact.Results
-	}
-	if function.Package != judging.irPackage {
-		return defaultNilnessForSignature(function.Signature)
-	}
-	if function.Blocks == nil {
-		return defaultNilnessForSignature(function.Signature)
-	}
-	if judging.seen[function] {
-		// A function already begun breaks the recursion.
-		return defaultNilnessForSignature(function.Signature)
-	}
-
-	judging.seen[function] = true
-
-	anyPointers := false
-	for result := range function.Signature.Results().Variables() {
-		if typeutil.MaybePointerLike(result.Type()) {
-			anyPointers = true
-			break
-		}
-	}
-
-	if !anyPointers {
-		return defaultNilnessForSignature(function.Signature)
-	}
-
-	return judging.judge(function, object)
+// judgment judges one function's body, asking callees of each function it calls.
+type judgment struct {
+	callees callees
 }
 
 // defaultNilnessForSignature is the nilness of each result of signature when nothing is known of them.
@@ -88,10 +47,10 @@ func defaultNilness(valueType types.Type) ValueNilness {
 	return ValueNilness{NeverNil, NeverNil}
 }
 
-// judge is the nilness of each of function's results, declared as object, from a forward analysis over its blocks,
-// merged over every block that returns, and exported as a ReturnedNilness fact when any says more than that it may be
-// nil.
-func (judging *judgment) judge(function *intermediate_representation.Function, object types.Object) []ValueNilness {
+// judge is the nilness of each of function's results from a forward analysis over its blocks, merged over every block
+// that returns, each normalized, so a result that is no pointer is never nil and one the analysis knows nothing of may
+// be nil.
+func (judging *judgment) judge(function *intermediate_representation.Function) []ValueNilness {
 	values := numbering{}
 
 	// The default state of the values that are no instruction is set on entry, since state.get cannot supply it
@@ -155,7 +114,6 @@ func (judging *judgment) judge(function *intermediate_representation.Function, o
 		}
 	}
 
-	interesting := false
 	for index := range returned {
 		resultType := function.Signature.Results().At(index).Type()
 		if !typeutil.MaybePointerLike(resultType) {
@@ -163,16 +121,20 @@ func (judging *judgment) judge(function *intermediate_representation.Function, o
 			continue
 		}
 		returned[index] = normalize(returned[index], resultType)
-		if returned[index] != (ValueNilness{MaybeNil, MaybeNil}) {
-			interesting = true
+	}
+	return returned
+}
+
+// interesting is whether returned, the results judge found for a function of signature, says more than that each may
+// be nil, which is when the push marks the function with a fact. Returned that is not is the defaults of signature.
+func interesting(signature *types.Signature, returned []ValueNilness) bool {
+	for index, value := range returned {
+		if typeutil.MaybePointerLike(signature.Results().At(index).Type()) &&
+			value != (ValueNilness{MaybeNil, MaybeNil}) {
+			return true
 		}
 	}
-
-	if interesting {
-		judging.pass.ExportObjectFact(object, &ReturnedNilness{Results: returned})
-	}
-
-	return returned
+	return false
 }
 
 // transferPhis sets each phi at the head of block to the nilness of its edge from the predecessor at index

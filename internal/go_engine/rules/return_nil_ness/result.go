@@ -4,26 +4,68 @@ import (
 	"go/types"
 
 	"honnef.co/go/tools/go/types/typeutil"
+
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// Result is the nilness of every function's results the facts hold, this package's and its imports', keyed as
-// staticcheck's nilness.Result keys them.
+// Kind keys nilness's verdicts in each package the resolver holds, and its counts.
+var Kind = &fact_resolver.Kind{Name: "return_nil_ness"}
+
+// Result is one package's nilness of results, as its readers ask it.
 type Result struct {
-	functions map[*types.Func][]ValueNilness
+	resolver *fact_resolver.Resolver
+	reader   *fact_resolver.Package
 }
 
 // Nilness is the nilness of the result at index result of function: {_ NeverNil} for a result that cannot be nil,
-// {MaybeNil MaybeNil} for a function the facts hold nothing of, and otherwise what they hold, normalized.
+// {MaybeNil MaybeNil} for a function the push held no fact of here, and otherwise what the fact holds, normalized, as
+// staticcheck's nilness.Result answers it.
 func (judged *Result) Nilness(function *types.Func, result int) ValueNilness {
 	resultType := function.Signature().Results().At(result).Type()
 	if !typeutil.MaybePointerLike(resultType) {
 		return ValueNilness{Outer: NeverNil}
 	}
-	if len(judged.functions[function]) == 0 {
+	results, holds := ask(judged.resolver, judged.reader, function)
+	if !holds {
 		return ValueNilness{Inner: MaybeNil, Outer: MaybeNil}
 	}
+	return normalize(results[result], resultType)
+}
 
-	return normalize(judged.functions[function][result], resultType)
+// ask is the nilness of function's results and whether a reader in reader holds them as the push did, as a fact: the
+// fact crossed here (fact_resolver.Visible) and says more than the defaults. The function is judged in its own
+// package, under that package's lock, once, and each answer after is the verdict kept.
+func ask(resolver *fact_resolver.Resolver, reader *fact_resolver.Package, function *types.Func) ([]ValueNilness, bool) {
+	if !fact_resolver.Visible(reader, function) {
+		return nil, false
+	}
+	home := resolver.Owner(function)
+	if home == nil {
+		// A function of no package, an interface's of the universe, which the push never judged.
+		return nil, false
+	}
+	home.Lock()
+	defer home.Unlock()
+	state := fact_resolver.StateOf[verdicts](home, Kind)
+	if state.results == nil {
+		state.results = map[*types.Func][]ValueNilness{}
+	}
+	if results, judged := state.results[function]; judged {
+		return results, interesting(function.Signature(), results)
+	}
+	declared := home.Function(function)
+	if declared == nil {
+		// No declared function of the package, as an instantiated method's object is not, which the push never
+		// judged and so never held a fact of.
+		return nil, false
+	}
+	walk := &demandWalk{resolver: resolver, home: home, irPackage: home.IntermediateRepresentation(), state: state}
+	results := walk.verdict(declared)
+	if walk.orderDependent {
+		state.fallBack(resolver, home)
+		results = state.results[function]
+	}
+	return results, interesting(function.Signature(), results)
 }
 
 // normalize fills what value leaves unknown with MaybeNil, and Inner too for a value of valueType that is no interface,

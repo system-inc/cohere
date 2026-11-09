@@ -31,7 +31,7 @@ var adjudicatedDifferences = map[string]adjudicatedDifference{
 // it reads every edge into a block before it sets any of the block's phis.
 func TestPortReadsPhisTheSameInEitherOrder(test *testing.T) {
 	test.Parallel()
-	analysistest.Run(test, analysistest.TestData(), Analyzer, "differences")
+	analysistest.Run(test, analysistest.TestData(), pushAnalyzer, "differences")
 }
 
 // Over the differences fixture the two part only where adjudicatedDifferences records it, each side giving the answer
@@ -46,12 +46,12 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 	if loadError != nil {
 		test.Fatalf("loading the fixture: %v", loadError)
 	}
-	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{nilness.Analysis, Analyzer}, loaded.Roots,
+	graph, analyzeError := checker.Analyze([]*analysis.Analyzer{nilness.Analysis, pushAnalyzer}, loaded.Roots,
 		&checker.Options{})
 	if analyzeError != nil {
 		test.Fatalf("analyzing the fixture: %v", analyzeError)
 	}
-	exported := map[*analysis.Analyzer]map[string]string{nilness.Analysis: {}, Analyzer: {}}
+	exported := map[*analysis.Analyzer]map[string]string{nilness.Analysis: {}, pushAnalyzer: {}}
 	for _, action := range graph.Roots {
 		if action.Err != nil {
 			test.Fatalf("running %s: %v", action, action.Err)
@@ -63,7 +63,7 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 		}
 	}
 	names := slices.Sorted(maps.Keys(exported[nilness.Analysis]))
-	names = append(names, slices.Sorted(maps.Keys(exported[Analyzer]))...)
+	names = append(names, slices.Sorted(maps.Keys(exported[pushAnalyzer]))...)
 	names = append(names, slices.Sorted(maps.Keys(adjudicatedDifferences))...)
 	slices.Sort(names)
 	for _, name := range slices.Compact(names) {
@@ -72,9 +72,9 @@ func TestPortDiffersFromOriginalOnlyWhereItIsRight(test *testing.T) {
 			expected = adjudicatedDifference{original: exported[nilness.Analysis][name],
 				port: exported[nilness.Analysis][name]}
 		}
-		if exported[nilness.Analysis][name] != expected.original || exported[Analyzer][name] != expected.port {
+		if exported[nilness.Analysis][name] != expected.original || exported[pushAnalyzer][name] != expected.port {
 			test.Errorf("on %s the original exported %q and the port %q, where %q and %q were expected", name,
-				exported[nilness.Analysis][name], exported[Analyzer][name], expected.original, expected.port)
+				exported[nilness.Analysis][name], exported[pushAnalyzer][name], expected.original, expected.port)
 		}
 	}
 }

@@ -7,9 +7,11 @@
 // functions whose judging has begun shared by them all, a callee of the same package judged as it is met, a callee
 // already begun, as in a cycle of calls, answering the defaults of its signature, and each function's results judged
 // by a forward data flow analysis over its blocks, forward_flow's port of staticcheck's dense.Forward, on staticcheck's
-// own dfa lattices. A function whose results say more than that each may be nil is marked with a ReturnedNilness fact
-// on its object, which the packages importing it read. Its Result answers the nilness of any function's result from
-// the facts, this package's and its imports', as staticcheck's does.
+// own dfa lattices. The original pushes its facts: it judges every function of every package, dependencies included,
+// and marks each whose results say more than that each may be nil with a fact its importers read. Here a reader asks
+// instead (#w7zmvat unit 2): Result.Nilness judges a function only when asked, through the run's fact resolver,
+// building only what that judgment reaches, and gives every answer the push gives. demand_walk.go says how; the push
+// walk stays in push_walk.go, for the resolver's fallback and the tests.
 //
 // It differs in one place, adjudicated: how a block's phis are set. Staticcheck's processPhis sets them one after
 // another, so a phi whose edge is a sibling phi of the block reads the sibling's new value when the sibling stands
@@ -24,55 +26,35 @@ package return_nil_ness
 
 import (
 	"fmt"
-	"go/types"
 	"reflect"
-	"slices"
 
 	"golang.org/x/tools/go/analysis"
+	"golang.org/x/tools/go/analysis/passes/ctrlflow"
 
-	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
-	"github.com/system-inc/cohere/internal/go_engine/rules/build_intermediate_representation"
+	"github.com/system-inc/cohere/internal/go_engine/fact_resolver"
 )
 
-// Analyzer judges the results of each function of the package, exporting ReturnedNilness on those whose results say
-// more than that each may be nil, and returns every function's results the facts hold, the imported packages' among
-// them.
+// Analyzer hands the package's readers the nilness of results, which they ask of one function at a time. It requires
+// ctrlflow, as the build of every package it judges does, so ctrlflow has run on the package and on every package
+// below it, and the resolver holds each of them, before a reader asks.
 var Analyzer = &analysis.Analyzer{
 	Name:       "return_nil_ness",
-	Doc:        "annotates return values with their nilness, staticcheck's nilness facts on the engine's own representation",
+	Doc:        "annotates return values with their nilness when a reader asks, staticcheck's nilness on the engine's own representation",
 	Run:        run,
-	Requires:   []*analysis.Analyzer{build_intermediate_representation.Analyzer},
-	FactTypes:  []analysis.Fact{new(ReturnedNilness)},
+	Requires:   []*analysis.Analyzer{ctrlflow.Analyzer},
 	ResultType: reflect.TypeFor[*Result](),
 }
 
-// run judges every source function of the package, in buildir's order, and returns every function's results the facts
-// hold.
+// run is the package's nilness of results, asked of the run's resolver as the package's readers ask.
 func run(pass *analysis.Pass) (any, error) {
-	built, readError := build_intermediate_representation.ResultOf(pass)
-	if readError != nil {
-		return nil, readError
+	resolver, resolverError := fact_resolver.Of(pass)
+	if resolverError != nil {
+		return nil, resolverError
 	}
-	// Read first, so under `--timing` the package's build is billed to the representation's row, not to this pass.
-	functions := slices.Collect(built.SourceFunctionsReadBy(pass))
-	judging := &judgment{
-		pass:      pass,
-		irPackage: built.Package(),
-		seen:      map[*intermediate_representation.Function]bool{},
+	reader := resolver.Package(pass.Pkg)
+	if reader == nil {
+		return nil, fmt.Errorf("reading the nilness of %s: the fact resolver never learned it, though ctrlflow, "+
+			"which it learns a package from, ran on it first", pass.Pkg.Path())
 	}
-	for _, function := range functions {
-		judging.returns(function)
-	}
-
-	result := &Result{functions: map[*types.Func][]ValueNilness{}}
-	for _, fact := range pass.AllObjectFacts() {
-		function, isFunction := fact.Object.(*types.Func)
-		returned, isReturned := fact.Fact.(*ReturnedNilness)
-		if !isFunction || !isReturned {
-			return nil, fmt.Errorf("reading return_nil_ness's facts: %s holds a %T, where only a function's "+
-				"ReturnedNilness was expected", fact.Object, fact.Fact)
-		}
-		result.functions[function] = returned.Results
-	}
-	return result, nil
+	return &Result{resolver: resolver, reader: reader}, nil
 }
