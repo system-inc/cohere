@@ -1,7 +1,6 @@
 package asm_decl
 
 import (
-	"cmp"
 	"go/ast"
 	"go/build"
 	"go/parser"
@@ -9,7 +8,6 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 
@@ -72,7 +70,7 @@ func TestPortMatchesUpstreamWants(test *testing.T) {
 	for _, target := range upstreamTargets {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
-			onTarget(subtest, target, "")
+			onTarget(subtest, target)
 			parity.RequireUpstreamWants(subtest, Analyzer, analysistest.TestData(), "a")
 		})
 	}
@@ -87,39 +85,34 @@ func TestPortMatchesOriginalFindingForFinding(test *testing.T) {
 	for _, target := range architectureTargets {
 		// Not parallel: onTarget sets the target in go/build's default context and the environment, the process's own.
 		test.Run(target, func(subtest *testing.T) {
-			onTarget(subtest, target, "")
+			onTarget(subtest, target)
 			parity.RequireIdentical(subtest, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
 		})
 	}
 }
 
+// unknownArchitectureFiles are the fixture files whose architecture the pass cannot tell when the default context
+// names one it does not know: each names none of its own, in its name or in a build line the pass reads, and each holds
+// findings on every target that judges it.
+var unknownArchitectureFiles = []string{
+	"parity/parity.s",
+	"parity/parity_terms.s",
+	"parity/parity_go_build.s",
+	"parity/nested/nested.s",
+}
+
 // When go/build's default context names an architecture the pass does not know, a file whose name and build lines
 // name none cannot be judged, and both leave it whole, the original after logging that it cannot tell the file's
-// architecture, while both still judge the files that name theirs. The load is for linux/amd64, and the default
-// context says sparc64, which no Go release builds for. It reads the findings through the harness's Findings rather
-// than RequireIdentical, since it judges the port's findings further, and compares them as RequireIdentical does.
+// architecture, while both still judge the files that name theirs, each finding the same in every field. The load is
+// for linux/amd64 and the default context says sparc64, which no Go release builds for, so the load hands over
+// parity_go_build.s, built for amd64 by a `//go:build` line the pass does not read, beside the files that name no
+// architecture at all (see unknownArchitectureFiles).
 //
-// Not parallel: the target is set in go/build's default context and the environment, which are the process's own.
+// Not parallel: the differences and shape tiers run asmdecl by hand, outside the harness, where it reads go/build's
+// default context, which this call sets.
 func TestNeitherJudgesAFileOfAnUnknownArchitecture(test *testing.T) {
-	onTarget(test, "linux/amd64", "sparc64")
-	original, port := parity.Findings(test, asmdecl.Analyzer, Analyzer, analysistest.TestData(), fixturePackages...)
-	test.Logf("with an unknown default architecture, the original found %d, the port %d", len(original), len(port))
-	if len(original) == 0 {
-		test.Fatal("the original found nothing in the fixtures, so the comparison proves nothing")
-	}
-	for _, missing := range parity.Difference(original, port) {
-		test.Errorf("the original found %s, and the port did not", missing)
-	}
-	for _, extra := range parity.Difference(port, original) {
-		test.Errorf("the port found %s, and the original did not", extra)
-	}
-	// These files name no architecture of their own, and each holds findings on every target that judges it.
-	unjudged := []string{"parity.s", "parity_terms.s", "parity_go_build.s"}
-	for _, found := range port {
-		if slices.Contains(unjudged, found.File) {
-			test.Errorf("the port judged %s, whose architecture it cannot tell: %s", found.File, found)
-		}
-	}
+	parity.On("GOOS=linux", "GOARCH=amd64", "CGO_ENABLED=0").JudgingBy("GOARCH=sparc64").RequireIdenticalLeavingAlone(
+		test, asmdecl.Analyzer, Analyzer, analysistest.TestData(), unknownArchitectureFiles, fixturePackages...)
 }
 
 // differencesDirectory is the differences fixture, whose declarations crash the original. Its records sit on the
@@ -318,16 +311,15 @@ func portFindsRecords(test *testing.T, filename string) []parity.Finding {
 
 // onTarget makes test run as on a machine building for target, `GOOS/GOARCH`: go/build's default context, which
 // the original and the port read the architecture from, and the environment, which the load runs go list under, so
-// a package holds the files it holds there. A defaultArchitecture other than empty is put in the default context in
-// place of target's. Both are put back when test ends. Setenv also refuses a parallel test, and none may run beside
-// this one, since the default context is the process's own.
-func onTarget(test *testing.T, target string, defaultArchitecture string) {
+// a package holds the files it holds there. Both are put back when test ends. Setenv also refuses a parallel test, and
+// none may run beside this one, since the default context is the process's own.
+func onTarget(test *testing.T, target string) {
 	test.Helper()
 	operatingSystem, architectureName, _ := strings.Cut(target, "/")
 	test.Setenv("GOOS", operatingSystem)
 	test.Setenv("GOARCH", architectureName)
 	savedOperatingSystem, savedArchitecture := build.Default.GOOS, build.Default.GOARCH
-	build.Default.GOOS, build.Default.GOARCH = operatingSystem, cmp.Or(defaultArchitecture, architectureName)
+	build.Default.GOOS, build.Default.GOARCH = operatingSystem, architectureName
 	test.Cleanup(func() {
 		build.Default.GOOS, build.Default.GOARCH = savedOperatingSystem, savedArchitecture
 	})
