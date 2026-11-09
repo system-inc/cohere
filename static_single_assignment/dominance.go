@@ -106,8 +106,6 @@ func (dominance *Dominance) Preorder() []BlockId {
 // real edges reach to its parent's children in preorder: the ids of those blocks in the depth-first
 // preorder of the real edges, the entry first. ComputeDominance calls it only when the edges reach the
 // entry, so preorder holds one block at least.
-//
-// Mutates: dominance its children and childrenStart are built here, once, after the fixed point settles
 func (dominance *Dominance) collectChildren(preorder []BlockId) {
 	dominance.childrenStart = make([]int, len(dominance.blocks)+1)
 	parents := make([]int, len(preorder))
