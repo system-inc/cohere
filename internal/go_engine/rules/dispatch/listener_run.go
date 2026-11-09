@@ -9,7 +9,6 @@ import (
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/ast/inspector"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 	"github.com/system-inc/cohere/internal/go_engine/rule"
@@ -58,48 +57,8 @@ func newListenerRun(
 	return run
 }
 
-// function calls the listener's Function on function.
-func (run *listenerRun) function(function *ir.Function) {
-	if run.crash != nil || run.registered.listener.Function == nil {
-		return
-	}
-	defer run.recoverCrash()
-	if run.timing != nil {
-		run.measured(func() { run.registered.listener.Function(run.context, function) })
-		return
-	}
-	run.registered.listener.Function(run.context, function)
-}
-
-// instruction calls the listener's Instruction on instruction, a kind the listener lists.
-func (run *listenerRun) instruction(instruction ir.Instruction) {
-	if run.crash != nil {
-		return
-	}
-	defer run.recoverCrash()
-	if run.timing != nil {
-		run.measured(func() { run.registered.listener.Instruction(run.context, instruction) })
-		return
-	}
-	run.registered.listener.Instruction(run.context, instruction)
-}
-
-// functionExit calls the listener's FunctionExit on function, once its instructions have been heard.
-func (run *listenerRun) functionExit(function *ir.Function) {
-	if run.crash != nil || run.registered.listener.FunctionExit == nil {
-		return
-	}
-	defer run.recoverCrash()
-	if run.timing != nil {
-		run.measured(func() { run.registered.listener.FunctionExit(run.context, function) })
-		return
-	}
-	run.registered.listener.FunctionExit(run.context, function)
-}
-
-// ownFunction calls the Function of the listener's walk over the engine's own intermediate representation on
-// function.
-func (run *listenerRun) ownFunction(function *intermediate_representation.Function) {
+// function calls the Function of the listener's walk over the engine's own intermediate representation on function.
+func (run *listenerRun) function(function *intermediate_representation.Function) {
 	if run.crash != nil || run.registered.listener.IntermediateRepresentation.Function == nil {
 		return
 	}
@@ -111,9 +70,9 @@ func (run *listenerRun) ownFunction(function *intermediate_representation.Functi
 	run.registered.listener.IntermediateRepresentation.Function(run.context, function)
 }
 
-// ownInstruction calls the Instruction of the listener's walk over the engine's own intermediate representation on
+// instruction calls the Instruction of the listener's walk over the engine's own intermediate representation on
 // instruction, a kind the walk lists.
-func (run *listenerRun) ownInstruction(instruction intermediate_representation.Instruction) {
+func (run *listenerRun) instruction(instruction intermediate_representation.Instruction) {
 	if run.crash != nil {
 		return
 	}
@@ -127,9 +86,9 @@ func (run *listenerRun) ownInstruction(instruction intermediate_representation.I
 	run.registered.listener.IntermediateRepresentation.Instruction(run.context, instruction)
 }
 
-// ownFunctionExit calls the FunctionExit of the listener's walk over the engine's own intermediate representation on
+// functionExit calls the FunctionExit of the listener's walk over the engine's own intermediate representation on
 // function, once its instructions have been heard.
-func (run *listenerRun) ownFunctionExit(function *intermediate_representation.Function) {
+func (run *listenerRun) functionExit(function *intermediate_representation.Function) {
 	if run.crash != nil || run.registered.listener.IntermediateRepresentation.FunctionExit == nil {
 		return
 	}

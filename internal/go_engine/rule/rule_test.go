@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"golang.org/x/tools/go/analysis"
-	"honnef.co/go/tools/go/ir"
 
 	"github.com/system-inc/cohere/internal/go_engine/intermediate_representation"
 )
@@ -34,19 +33,11 @@ var optionedAnalyzer = func() *analysis.Analyzer {
 }()
 
 // The planted callbacks exist so a listener under test declares something, and are never called.
-func plantedFunction(*Context, *ir.Function) {
+func plantedFunction(*Context, *intermediate_representation.Function) {
 	// Never called: Validate reads only whether a callback is set.
 }
 
-func plantedInstruction(*Context, ir.Instruction) {
-	// Never called: Validate reads only whether a callback is set.
-}
-
-func plantedOwnFunction(*Context, *intermediate_representation.Function) {
-	// Never called: Validate reads only whether a callback is set.
-}
-
-func plantedOwnInstruction(*Context, intermediate_representation.Instruction) {
+func plantedInstruction(*Context, intermediate_representation.Instruction) {
 	// Never called: Validate reads only whether a callback is set.
 }
 
@@ -111,7 +102,9 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			Origin:       OriginTools,
 			UpstreamName: "nilness",
 			Analyzer:     plantedAnalyzer,
-			Listener:     &Listener{Function: plantedFunction},
+			Listener: &Listener{
+				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedFunction},
+			},
 		},
 		{
 			Name:         "cohere-go/unusedwrite",
@@ -119,9 +112,13 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 			UpstreamName: "unusedwrite",
 			Analyzer:     plantedAnalyzer,
 			Listener: &Listener{
-				Instructions: []ir.Instruction{(*ir.Store)(nil), (*ir.Call)(nil)},
-				Instruction:  plantedInstruction,
-				PackageExit:  plantedPackageExit,
+				IntermediateRepresentation: &IntermediateRepresentationListener{
+					Instructions: []intermediate_representation.Instruction{
+						(*intermediate_representation.Store)(nil), (*intermediate_representation.Call)(nil),
+					},
+					Instruction: plantedInstruction,
+				},
+				PackageExit: plantedPackageExit,
 			},
 		},
 		{
@@ -134,7 +131,7 @@ func TestValidateAcceptsAWellFormedRule(test *testing.T) {
 					Instructions: []intermediate_representation.Instruction{
 						(*intermediate_representation.MapUpdate)(nil),
 					},
-					Instruction: plantedOwnInstruction,
+					Instruction: plantedInstruction,
 				},
 				PackageExit: plantedPackageExit,
 			},
@@ -239,20 +236,9 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "declares no callback",
 		},
 		{
-			name:   "a listener that declares both walks",
-			rule:   listening(Listener{Function: plantedFunction, FileEnter: plantedFile}),
-			saying: "declares both staticcheck's intermediate representation's walk and the syntax walk",
-		},
-		{
-			name: "a listener that declares both intermediate representations' walks",
-			rule: listening(Listener{Function: plantedFunction,
-				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedOwnFunction}}),
-			saying: "declares both staticcheck's intermediate representation's walk and the engine's own",
-		},
-		{
 			name: "a listener that declares the engine's own walk and the syntax walk",
 			rule: listening(Listener{FileEnter: plantedFile,
-				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedOwnFunction}}),
+				IntermediateRepresentation: &IntermediateRepresentationListener{Function: plantedFunction}}),
 			saying: "declares both the engine's own intermediate representation's walk and the syntax walk",
 		},
 		{
@@ -264,7 +250,7 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 		{
 			name: "the engine's own instruction kinds with no callback",
 			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
-				Function:     plantedOwnFunction,
+				Function:     plantedFunction,
 				Instructions: []intermediate_representation.Instruction{(*intermediate_representation.Call)(nil)},
 			}}),
 			saying: "has no IntermediateRepresentation.Instruction to call for them",
@@ -272,7 +258,7 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 		{
 			name: "the engine's own instruction kind listed twice",
 			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
-				Instruction: plantedOwnInstruction,
+				Instruction: plantedInstruction,
 				Instructions: []intermediate_representation.Instruction{
 					(*intermediate_representation.Call)(nil), (*intermediate_representation.Call)(nil),
 				},
@@ -285,14 +271,11 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "declares PackageExit alone",
 		},
 		{
-			name:   "instruction kinds with no callback",
-			rule:   listening(Listener{Function: plantedFunction, Instructions: []ir.Instruction{(*ir.Call)(nil)}}),
-			saying: "has no Instruction to call for them",
-		},
-		{
-			name:   "an instruction callback with no kinds",
-			rule:   listening(Listener{Instruction: plantedInstruction}),
-			saying: "sets Instruction and lists no instruction kinds",
+			name: "an instruction callback with no kinds",
+			rule: listening(Listener{
+				IntermediateRepresentation: &IntermediateRepresentationListener{Instruction: plantedInstruction},
+			}),
+			saying: "sets IntermediateRepresentation.Instruction and lists no instruction kinds",
 		},
 		{
 			name:   "node kinds with no callback",
@@ -305,17 +288,18 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "sets Node and lists no node kinds",
 		},
 		{
-			name:   "a bare nil kind",
-			rule:   listening(Listener{Instruction: plantedInstruction, Instructions: []ir.Instruction{nil}}),
-			saying: "lists a bare nil in Instructions",
+			name: "a bare nil kind",
+			rule: listening(Listener{IntermediateRepresentation: &IntermediateRepresentationListener{
+				Instruction: plantedInstruction, Instructions: []intermediate_representation.Instruction{nil},
+			}}),
+			saying: "lists a bare nil in IntermediateRepresentation.Instructions",
 		},
 		{
-			name: "a kind listed twice",
-			rule: listening(Listener{
-				Instruction:  plantedInstruction,
-				Instructions: []ir.Instruction{(*ir.Call)(nil), (*ir.Call)(nil)},
-			}),
-			saying: "twice in Instructions",
+			name: "a node kind listed twice",
+			rule: listening(
+				Listener{Node: plantedNode, Nodes: []ast.Node{(*ast.CallExpr)(nil), (*ast.CallExpr)(nil)}},
+			),
+			saying: "twice in Nodes",
 		},
 		{
 			name: "an option its analyzer has no flag for",

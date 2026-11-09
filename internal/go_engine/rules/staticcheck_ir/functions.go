@@ -1,8 +1,8 @@
 //cohere:file-ignore consistency-require-separated-folder-words staticcheck's name, a project's own spelling
 
 // Package staticcheck_ir reads the functions of staticcheck's intermediate representation, the very ones staticcheck's
-// own checks read, built once per package by staticcheck's buildir pass. The engine's IR dispatcher, package
-// dispatch, reads them here and calls every dispatched rule's listener over them.
+// own checks read, built once per package by staticcheck's buildir pass. No rule reads them any more (#kk4864m); the
+// duplicates report's hash, canonical_function_hash, reads them here until it moves onto the engine's own.
 package staticcheck_ir
 
 import (

@@ -15,9 +15,9 @@ import (
 )
 
 // listeners is what every dispatcher keeps of the rules registered on it, whichever walk it makes: the dispatcher's
-// analyzer, and each rule with its listener and the kinds it hears. Ir and Syntax each hold one and walk over what it
-// starts on a package, so registration, which rules a pass calls, a rule's analyzer, its context and its outcome are
-// built one way for both.
+// analyzer, and each rule with its listener and the kinds it hears. IntermediateRepresentation and Syntax each hold one
+// and walk over what it starts on a package, so registration, which rules a pass calls, a rule's analyzer, its context
+// and its outcome are built one way for both.
 //
 // Every rule is registered before the first run, since the checker reads the analyzer's requirements as a run starts,
 // and a run reads the registered rules without a lock.

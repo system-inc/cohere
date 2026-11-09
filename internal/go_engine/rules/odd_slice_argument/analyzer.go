@@ -8,7 +8,7 @@
 // before panicking, then each slice parameter a function passes on every path to a parameter so marked, and then
 // reports each call passing a slice of known odd length to a marked parameter. A mark is an object fact, of a type
 // of the port's own that prints as the original's does, "needs even elements", so a function of another package is
-// marked when that package was analyzed. A check on rule.FunctionCheck reads no facts, so this is a plain analyzer
+// marked when that package was analyzed. A dispatched listener exports no facts, so this is a plain analyzer
 // on build_intermediate_representation.Analyzer, whose source functions it walks in the order buildir's SrcFuncs
 // lists them, and generated, whose judgment the context reads though this check filters nothing. Where the original
 // asks staticcheck's internal iterutil.All whether every return block is dominated, the port loops over them itself,
