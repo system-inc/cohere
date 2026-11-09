@@ -70,9 +70,6 @@ import (
 )
 
 var (
-	varOk    = newVariable("ok", tBool)
-	varIndex = newVariable("index", tInt)
-
 	// Type constants.
 	tBool       = types.Typ[types.Bool]
 	tByte       = types.Typ[types.Byte]
@@ -84,13 +81,16 @@ var (
 	tEface      = types.NewInterfaceType(nil, nil).Complete()
 	tDeferStack = types.NewPointer(typeutil.NewDeferStack())
 
+	varOk    = newVariable("ok", tBool)
+	varIndex = newVariable("index", tInt)
+
 	vOne      = intConstant(1, nil)
 	vTrue     = NewConstant(constant.MakeBool(true), tBool, nil)
 	vNoReturn = NewConstant(constant.MakeString("noreturn"), tString, nil)
 
-	jReady        = intConstant(0, nil)  // range-over-func jump is READY
-	jBusy         = intConstant(-1, nil) // range-over-func jump is BUSY
-	jDone         = intConstant(-2, nil) // range-over-func jump is DONE
+	jReady        = intConstant(0, nil)  // range-over-func jump is ready
+	jBusy         = intConstant(-1, nil) // range-over-func jump is busy
+	jDone         = intConstant(-2, nil) // range-over-func jump is done
 	jDroppedPanic = stringConstant("iterator call did not preserve panic", nil)
 	jLateYield    = stringConstant("yield function called after range loop exit", nil)
 
@@ -107,7 +107,7 @@ var (
 //
 // builders are not thread-safe.
 type builder struct {
-	fns []*Function // Functions that have finished their CREATE phases.
+	fns []*Function // Functions that have finished their create phases.
 
 	finished int // finished is the length of the prefix of fns containing built functions.
 
@@ -150,6 +150,8 @@ func (packageBuilder *builder) waitForSharedFunction(function *Function) {
 // to t or f depending on its value, performing various simplifications.
 //
 // Postcondition: fn.currentBlock is nil.
+//
+// Mutates: function gains the blocks of the condition, and its current block moves into them
 func (packageBuilder *builder) cond(function *Function, expr ast.Expr, trueBlock, falseBlock *BasicBlock) *If {
 	switch typed := expr.(type) {
 	case *ast.ParenExpr:
@@ -188,13 +190,15 @@ func (packageBuilder *builder) cond(function *Function, expr ast.Expr, trueBlock
 // logicalBinop emits code to fn to evaluate `expr`, a &&- or
 // ||-expression whose reified boolean value is wanted.
 // The value is returned.
+//
+// Mutates: function gains the blocks of both operands, and its current block moves on to the done block
 func (packageBuilder *builder) logicalBinop(function *Function, expr *ast.BinaryExpr) Value {
 	rhs := function.newBasicBlock("binop.rhs")
 	done := function.newBasicBlock("binop.done")
 
 	// T(e) = T(e.X) = T(e.Y) after untyped constants have been
 	// eliminated.
-	// TODO(adonovan): not true; MyBool==MyBool yields UntypedBool.
+	// That does not hold in every case: MyBool==MyBool yields UntypedBool.
 	resolvedType := function.typeOf(expr)
 
 	var short Value // value of the short-circuit path
@@ -248,7 +252,12 @@ func (packageBuilder *builder) logicalBinop(function *Function, expr *ast.Binary
 // assignment or return statement, and "value,ok" uses of
 // TypeAssertExpr, IndexExpr (when X is a map), and Receive.
 func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
-	typ := function.typeOf(expr).(*types.Tuple)
+	typ, isTuple := function.typeOf(expr).(*types.Tuple)
+	if !isTuple {
+		// Invariant: callers pass only multi-result expressions, a call in a multi-value assignment or return or a
+		// comma-ok form, and go/types gives each of those a tuple type.
+		panic(fmt.Sprintf("exprN(%T) in %s: type %s is not a tuple", expr, function, function.typeOf(expr)))
+	}
 	switch typed := expr.(type) {
 	case *ast.ParenExpr:
 		return packageBuilder.exprN(function, typed.X)
@@ -263,7 +272,11 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 		return emitCall(function, &call, typed)
 
 	case *ast.IndexExpr:
-		mapt := typeutil.CoreType(function.typeOf(typed.X)).(*types.Map) // ,ok must be a map.
+		mapt, isMap := typeutil.CoreType(function.typeOf(typed.X)).(*types.Map) // ,ok must be a map.
+		if !isMap {
+			// Invariant: go/types gives a comma-ok form to an index expression only when it looks up a map.
+			panic(fmt.Sprintf("exprN: comma-ok index of %s, not a map", function.typeOf(typed.X)))
+		}
 		lookup := &MapLookup{
 			X:       packageBuilder.expr(function, typed.X),
 			Index:   emitConv(function, packageBuilder.expr(function, typed.Index), mapt.Key(), typed),
@@ -278,6 +291,8 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 	case *ast.UnaryExpr: // must be receive <-
 		return emitReceive(function, packageBuilder.expr(function, typed.X), true, typ, typed)
 	}
+	// Invariant: the multi-result expressions are calls, comma-ok map indexes, type assertions and receives, each
+	// handled above, with parentheses unwrapped.
 	panic(fmt.Sprintf("exprN(%T) in %s", expr, function))
 }
 
@@ -288,6 +303,8 @@ func (packageBuilder *builder) exprN(function *Function, expr ast.Expr) Value {
 // The result is nil if no special handling was required; in this case
 // the caller should treat this like an ordinary library function
 // call.
+//
+// Mutates: function moves on to an unreachable block after a panic
 func (packageBuilder *builder) builtin(
 	function *Function,
 	object *types.Builtin,
@@ -295,10 +312,10 @@ func (packageBuilder *builder) builtin(
 	typ types.Type,
 	source ast.Node,
 ) Value {
-	typ = function.typ(typ)
+	resultType := function.typ(typ)
 	switch object.Name() {
 	case "make":
-		switch ct := typeutil.CoreType(typ).(type) {
+		switch ct := typeutil.CoreType(resultType).(type) {
 		case *types.Slice:
 			length := packageBuilder.expr(function, arguments[1])
 			capacity := length
@@ -313,14 +330,14 @@ func (packageBuilder *builder) builtin(
 					X:    emitNew(function, at, source, "makeslice"),
 					High: length,
 				}
-				slice.setType(typ)
+				slice.setType(resultType)
 				return function.emit(slice, source)
 			}
 			slice := &MakeSlice{
 				Length:   length,
 				Capacity: capacity,
 			}
-			slice.setType(typ)
+			slice.setType(resultType)
 			return function.emit(slice, source)
 
 		case *types.Map:
@@ -329,7 +346,7 @@ func (packageBuilder *builder) builtin(
 				reserve = packageBuilder.expr(function, arguments[1])
 			}
 			makeMap := &MakeMap{Reserve: reserve}
-			makeMap.setType(typ)
+			makeMap.setType(resultType)
 			return function.emit(makeMap, source)
 
 		case *types.Chan:
@@ -338,15 +355,15 @@ func (packageBuilder *builder) builtin(
 				sz = packageBuilder.expr(function, arguments[1])
 			}
 			channel := &MakeChannel{Size: sz}
-			channel.setType(typ)
+			channel.setType(resultType)
 			return function.emit(channel, source)
 
 		default:
-			lint.ExhaustiveTypeSwitch(typ.Underlying())
+			lint.ExhaustiveTypeSwitch(resultType.Underlying())
 		}
 
 	case "new":
-		alloc := emitNew(function, deref(typ), source, "new")
+		alloc := emitNew(function, deref(resultType), source, "new")
 		if !function.info.Types[arguments[0]].IsType() {
 			// new(expr), requires go1.26
 			value := packageBuilder.expr(function, arguments[0])
@@ -409,10 +426,20 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		if isBlankIdent(typed) {
 			return blank{}
 		}
-		object := function.objectOf(typed).(*types.Var)
+		object, isVariable := function.objectOf(typed).(*types.Var)
+		if !isVariable {
+			// Invariant: an addressable identifier, or one assigned to, names a variable, and the blank
+			// identifier returned above.
+			panic(fmt.Sprintf("addr: identifier %s is %T, not a variable", typed.Name, function.objectOf(typed)))
+		}
 		var value Value
 		if member := function.Program.packageLevelMember(object); member != nil {
-			value = member.(*Global) // var (address)
+			global, isGlobal := member.(*Global)
+			if !isGlobal {
+				// Invariant: CreatePackage records every package-level variable as a Global.
+				panic(fmt.Sprintf("addr: package-level variable %s is %T, not a Global", object.Name(), member))
+			}
+			value = global // var (address)
 		} else {
 			value = function.lookup(object, escaping)
 		}
@@ -441,6 +468,8 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 			return packageBuilder.addr(function, typed.Sel, escaping)
 		}
 		if sel.kind != types.FieldVal {
+			// Invariant: an addressable selector selects a field, since method values and method expressions are
+			// not addressable and cannot be assigned to.
 			panic(sel)
 		}
 		wantAddr := true
@@ -469,13 +498,20 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 			x = packageBuilder.expr(function, typed.X)
 			et = types.NewPointer(elem)
 		case ixMap:
-			mt := typeutil.CoreType(xt).(*types.Map)
+			mt, isMap := typeutil.CoreType(xt).(*types.Map)
+			if !isMap {
+				// Invariant: indexType gives ixMap only when every type in the operand's type set is a map with the
+				// same key and element types, so its core type is that map.
+				panic("addr: map index of " + xt.String() + ", which has no map core type")
+			}
 			return &element{
 				mapValue:    packageBuilder.expr(function, typed.X),
 				key:         emitConv(function, packageBuilder.expr(function, typed.Index), mt.Key(), typed.Index),
 				elementType: mt.Elem(),
 			}
 		default:
+			// Invariant: addr is reached only for an addressable index expression or a map element assigned to, and
+			// indexing a string or an array value is neither.
 			panic("unexpected container type in IndexExpr: " + xt.String())
 		}
 		index := packageBuilder.expr(function, typed.Index)
@@ -500,6 +536,8 @@ func (packageBuilder *builder) addr(function *Function, expr ast.Expr, escaping 
 		return &address{addr: packageBuilder.expr(function, typed.X)}
 	}
 
+	// Invariant: go/types makes addressable, or lets a statement assign to, only identifiers, field selectors, index
+	// expressions and pointer indirections, and & applies also to composite literals; each is handled above.
 	panic(fmt.Sprintf("unexpected address expression: %T", expr))
 }
 
@@ -522,7 +560,14 @@ type store struct {
 // storebuf sb so that they can be executed later.  This allows correct
 // in-place update of existing variables when the RHS is a composite
 // literal that may reference parts of the LHS.
-func (packageBuilder *builder) assign(function *Function, loc lvalue, expr ast.Expr, isZero bool, deferredStores *storebuf, source ast.Node) {
+func (packageBuilder *builder) assign(
+	function *Function,
+	loc lvalue,
+	expr ast.Expr,
+	isZero bool,
+	deferredStores *storebuf,
+	source ast.Node,
+) {
 	// Can we initialize it in place?
 	if lit, ok := ast.Unparen(expr).(*ast.CompositeLit); ok {
 		// A CompositeLit never evaluates to a pointer,
@@ -581,13 +626,13 @@ func (packageBuilder *builder) assign(function *Function, loc lvalue, expr ast.E
 // expr lowers a single-result expression `expr` to IR form, emitting code
 // to fn and returning the Value defined by the expression.
 func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
-	expr = ast.Unparen(expr)
+	unparenthesized := ast.Unparen(expr)
 
-	tv := function.info.Types[expr]
+	tv := function.info.Types[unparenthesized]
 
 	// Is expression a constant?
 	if tv.Value != nil {
-		return NewConstant(tv.Value, function.typ(tv.Type), expr)
+		return NewConstant(tv.Value, function.typ(tv.Type), unparenthesized)
 	}
 
 	var value Value
@@ -595,23 +640,37 @@ func (packageBuilder *builder) expr(function *Function, expr ast.Expr) Value {
 		// Prefer pointer arithmetic ({Index,Field}Address) followed
 		// by Load over subelement extraction (e.g. Index, Field),
 		// to avoid large copies.
-		value = packageBuilder.addr(function, expr, false).load(function, expr)
+		value = packageBuilder.addr(function, unparenthesized, false).load(function, unparenthesized)
 	} else {
-		value = packageBuilder.expr0(function, expr, tv)
+		value = packageBuilder.expr0(function, unparenthesized, tv)
 	}
 	return value
 }
 
+// expr0 lowers a single-result expression `expr` that is neither a constant nor addressable to IR form,
+// emitting code to fn and returning the Value defined by the expression.
+//
+// Mutates: function gains a function literal as an anonymous function and resumes its unique values after it's built
 func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types.TypeAndValue) Value {
 	switch typed := expr.(type) {
 	case *ast.BasicLit:
+		// Invariant: a basic literal is always constant, so expr returned it as a constant before calling expr0.
 		panic("non-constant BasicLit") // unreachable
 
 	case *ast.FuncLit:
 		/* function literal */
+		signature, isSignature := function.typeOf(typed.Type).(*types.Signature)
+		if !isSignature {
+			// Invariant: go/types gives a function literal's type expression a signature type.
+			panic(fmt.Sprintf(
+				"function literal in %s has type %s, not a signature",
+				function,
+				function.typeOf(typed.Type),
+			))
+		}
 		fn2 := &Function{
 			name:           fmt.Sprintf("%s$%d", function.Name(), 1+len(function.AnonymousFunctions)),
-			Signature:      function.typeOf(typed.Type).(*types.Signature),
+			Signature:      signature,
 			position:       typed.Type.Func,
 			parent:         function,
 			anonIndex:      int32(len(function.AnonymousFunctions)),
@@ -655,7 +714,13 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		// Call to "intrinsic" built-ins, e.g. new, make, panic.
 		if id, ok := ast.Unparen(typed.Fun).(*ast.Ident); ok {
 			if object, ok := function.info.Uses[id].(*types.Builtin); ok {
-				if value := packageBuilder.builtin(function, object, typed.Args, function.typ(tv.Type), typed); value != nil {
+				if value := packageBuilder.builtin(
+					function,
+					object,
+					typed.Args,
+					function.typ(tv.Type),
+					typed,
+				); value != nil {
 					return value
 				}
 			}
@@ -674,7 +739,7 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 				// &*p must panic if p is nil (https://golang.org/s/go12nil).
 				// For simplicity, we'll just (suboptimally) rely
 				// on the side effects of a load.
-				// TODO(adonovan): emit dedicated nilcheck.
+				// No dedicated nil check is emitted.
 				addr.load(function, typed)
 			}
 			return addr.address(function)
@@ -690,6 +755,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		case token.ARROW:
 			return emitReceive(function, packageBuilder.expr(function, typed.X), false, function.typ(tv.Type), typed)
 		default:
+			// Invariant: go/types accepts only the unary operators &, +, !, -, ^ and <-, each handled above, as
+			// *p is a StarExpr.
 			panic(typed.Op)
 		}
 
@@ -700,18 +767,34 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		case token.SHL, token.SHR:
 			fallthrough
 		case token.ADD, token.SUB, token.MUL, token.QUO, token.REM, token.AND, token.OR, token.XOR, token.AND_NOT:
-			return emitArith(function, typed.Op, packageBuilder.expr(function, typed.X), packageBuilder.expr(function, typed.Y), function.typ(tv.Type), typed)
+			return emitArith(
+				function,
+				typed.Op,
+				packageBuilder.expr(function, typed.X),
+				packageBuilder.expr(function, typed.Y),
+				function.typ(tv.Type),
+				typed,
+			)
 
 		case token.EQL, token.NEQ, token.GTR, token.LSS, token.LEQ, token.GEQ:
-			cmp := emitCompare(function, typed.Op, packageBuilder.expr(function, typed.X), packageBuilder.expr(function, typed.Y), typed)
+			cmp := emitCompare(
+				function,
+				typed.Op,
+				packageBuilder.expr(function, typed.X),
+				packageBuilder.expr(function, typed.Y),
+				typed,
+			)
 			// The type of x==y may be UntypedBool.
 			return emitConv(function, cmp, types.Default(function.typ(tv.Type)), typed)
 		default:
+			// Invariant: the cases above cover every binary operator Go has.
 			panic("illegal op in BinaryExpr: " + typed.Op.String())
 		}
 
 	case *ast.SliceExpr:
-		var low, high, maximum Value
+		var low Value
+		var high Value
+		var maximum Value
 		var x Value
 		xtyp := function.typeOf(typed.X)
 		switch typeutil.CoreType(xtyp).(type) {
@@ -725,6 +808,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			if isBytestring(xtyp) {
 				x = packageBuilder.expr(function, typed.X) // bytestring is handled as string and []byte.
 			} else {
+				// Invariant: go/types slices only strings, arrays, pointers to arrays, slices and type sets of
+				// byte strings, each handled above.
 				panic("unexpected sequence type in SliceExpr")
 			}
 		}
@@ -751,7 +836,17 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		// Universal built-in or nil?
 		switch typedObject := object.(type) {
 		case *types.Builtin:
-			return &Builtin{name: typedObject.Name(), sig: function.instanceType(typed).(*types.Signature)}
+			signature, isSignature := function.instanceType(typed).(*types.Signature)
+			if !isSignature {
+				// Invariant: a built-in reaches expr only as the callee of a call the builtin method left as a
+				// regular call, and go/types records that call's signature as its type.
+				panic(fmt.Sprintf(
+					"built-in %s has type %s, not a signature",
+					typedObject.Name(),
+					function.instanceType(typed),
+				))
+			}
+			return &Builtin{name: typedObject.Name(), sig: signature}
 		case *types.Nil:
 			return zeroConstant(function.instanceType(typed), typed)
 		}
@@ -762,7 +857,12 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			if global, ok := member.(*Global); ok {
 				return emitLoad(function, global, typed) // var (address)
 			}
-			callee := member.(*Function) // (func)
+			callee, isFunction := member.(*Function) // (func)
+			if !isFunction {
+				// Invariant: a package's values are its constants, Globals and Functions; expr returns a constant
+				// before calling expr0, and a Global returns above as a load.
+				panic(fmt.Sprintf("package-level member %s is %T, not a function", typed.Name, member))
+			}
 			if callee.typeparams.Len() > 0 {
 				targs := function.subtargs(typed)
 				callee = callee.instance(nil, targs, packageBuilder)
@@ -770,14 +870,26 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return callee
 		}
 		// Local var.
-		return emitLoad(function, function.lookup(object.(*types.Var), false), typed) // var (address)
+		variable, isVariable := object.(*types.Var)
+		if !isVariable {
+			// Invariant: an identifier that is not a built-in, nil, a constant or a package-level member names a
+			// local variable, as functions are declared only at package level.
+			panic(fmt.Sprintf("identifier %s is %T, not a variable", typed.Name, object))
+		}
+		return emitLoad(function, function.lookup(variable, false), typed) // var (address)
 
 	case *ast.SelectorExpr:
 		sel := function.selection(typed)
 		if sel == nil {
 			// builtin unsafe.{Add,Slice}
 			if object, ok := function.info.Uses[typed.Sel].(*types.Builtin); ok {
-				return &Builtin{name: "Unsafe" + object.Name(), sig: function.typ(tv.Type).(*types.Signature)}
+				signature, isSignature := function.typ(tv.Type).(*types.Signature)
+				if !isSignature {
+					// Invariant: unsafe.Add and unsafe.Slice reach expr only as the callee of a call, and go/types
+					// records that call's signature as their type.
+					panic(fmt.Sprintf("unsafe.%s has type %s, not a signature", object.Name(), tv.Type))
+				}
+				return &Builtin{name: "Unsafe" + object.Name(), sig: signature}
 			}
 			// qualified identifier
 			return packageBuilder.expr(function, typed.Sel)
@@ -794,7 +906,11 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		case types.MethodVal:
 			// e.f where e is an expression and f is a method.
 			// The result is a "bound".
-			method := sel.object.(*types.Func)
+			method, isFunc := sel.object.(*types.Func)
+			if !isFunc {
+				// Invariant: go/types makes the object of every method selection a *types.Func.
+				panic(fmt.Sprintf("method value %s selects %T, not a method", typed.Sel.Name, sel.object))
+			}
 			rt := function.typ(recvType(method))
 			wantAddr := isPointer(rt)
 			escaping := true
@@ -856,18 +972,22 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return value
 		}
 
+		// Invariant: the cases above cover every selection kind go/types has.
 		panic("unexpected expression-relative selector")
 
 	case *ast.IndexListExpr:
 		// f[X, Y] must be a generic function
 		if !instance(function.info, typed.X) {
+			// Invariant: go/types accepts an index list expression only as an instantiation, and in a value
+			// position only of a generic function.
 			panic("unexpected expression-could not match index list to instantiation")
 		}
 		return packageBuilder.expr(function, typed.X) // Handle instantiation within the *Ident or *SelectorExpr cases.
 
 	case *ast.IndexExpr:
 		if instance(function.info, typed.X) {
-			return packageBuilder.expr(function, typed.X) // Handle instantiation within the *Ident or *SelectorExpr cases.
+			// Handle instantiation within the *Ident or *SelectorExpr cases.
+			return packageBuilder.expr(function, typed.X)
 		}
 		// not a generic instantiation.
 		xt := function.typeOf(typed.X)
@@ -893,7 +1013,12 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			return function.emit(elementValue, typed)
 
 		case ixMap:
-			ct := typeutil.CoreType(xt).(*types.Map)
+			ct, isMap := typeutil.CoreType(xt).(*types.Map)
+			if !isMap {
+				// Invariant: indexType gives ixMap only when every type in the operand's type set is a map with the
+				// same key and element types, so its core type is that map.
+				panic("map index of " + xt.String() + ", which has no map core type")
+			}
 			lookup := &MapLookup{
 				X:     packageBuilder.expr(function, typed.X),
 				Index: emitConv(function, packageBuilder.expr(function, typed.Index), ct.Key(), typed.Index),
@@ -901,6 +1026,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 			lookup.setType(ct.Elem())
 			return function.emit(lookup, typed)
 		default:
+			// Invariant: go/types indexes only arrays, pointers to arrays, slices, strings, maps and type sets of
+			// those with one element type, and indexType gives each of them one of the modes above.
 			panic("unexpected container type in IndexExpr: " + xt.String())
 		}
 
@@ -909,6 +1036,8 @@ func (packageBuilder *builder) expr0(function *Function, expr ast.Expr, tv types
 		return packageBuilder.addr(function, typed, false).load(function, typed)
 	}
 
+	// Invariant: expr unwraps parentheses and returns constants, and every other expression that has a value is
+	// handled above.
 	panic(fmt.Sprintf("unexpected expr: %T", expr))
 }
 
@@ -957,6 +1086,8 @@ func (packageBuilder *builder) receiver(
 // setCallFunc populates the function parts of a CallCommon structure
 // (Function, Method, receiver, Arguments[0]) based on the kind of invocation
 // occurring in `callExpr`.
+//
+// Mutates: common takes the callee, and for a method its receiver or method
 func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.CallExpr, common *CallCommon) {
 	// Is this a (possibly generic) method call?
 	calleeExpression := ast.Unparen(callExpr.Fun)
@@ -969,7 +1100,11 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 	if selector, ok := calleeExpression.(*ast.SelectorExpr); ok {
 		sel := function.selection(selector)
 		if sel != nil && sel.kind == types.MethodVal {
-			object := sel.object.(*types.Func)
+			object, isFunc := sel.object.(*types.Func)
+			if !isFunc {
+				// Invariant: go/types makes the object of every method selection a *types.Func.
+				panic(fmt.Sprintf("method call %s selects %T, not a method", selector.Sel.Name, sel.object))
+			}
 			recv := recvType(object)
 
 			wantAddr := isPointer(recv)
@@ -995,11 +1130,9 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 		// e.Fun would evaluate to a concrete method, interface
 		// wrapper function, or promotion wrapper.
 		//
-		// For now, we evaluate it in the usual way.
-		//
-		// TODO(adonovan): opt: inline expr() here, to make the
-		// call static and to avoid generation of wrappers.
-		// It's somewhat tricky as it may consume the first
+		// It is evaluated in the usual way. Inlining expr() here
+		// would make the call static and avoid generating wrappers,
+		// but it's somewhat tricky as it may consume the first
 		// actual parameter if the call is "invoke" mode.
 		//
 		// Examples:
@@ -1012,7 +1145,7 @@ func (packageBuilder *builder) setCallFunc(function *Function, callExpr *ast.Cal
 		//  S.f(s)
 		//  (*S).f(&s)
 		//
-		// Suggested approach:
+		// An approach to inlining it:
 		// - consume the first actual parameter expression
 		//   and build it with b.expr().
 		// - apply implicit field selections.
@@ -1032,13 +1165,20 @@ func (packageBuilder *builder) emitCallArguments(
 	expr *ast.CallExpr,
 	arguments []Value,
 ) []Value {
+	callArguments := arguments
+
 	// f(x, y, z...): pass slice z straight through.
 	if expr.Ellipsis != 0 {
 		for index, argument := range expr.Args {
-			value := emitConv(function, packageBuilder.expr(function, argument), sig.Params().At(index).Type(), argument)
-			arguments = append(arguments, value)
+			value := emitConv(
+				function,
+				packageBuilder.expr(function, argument),
+				sig.Params().At(index).Type(),
+				argument,
+			)
+			callArguments = append(callArguments, value)
 		}
-		return arguments
+		return callArguments
 	}
 
 	offset := len(arguments) // 1 if call has receiver, 0 otherwise
@@ -1052,10 +1192,10 @@ func (packageBuilder *builder) emitCallArguments(
 		value := packageBuilder.expr(function, argument)
 		if ttuple, ok := value.Type().(*types.Tuple); ok { // MRV chain
 			for index, length := 0, ttuple.Len(); index < length; index++ {
-				arguments = append(arguments, emitExtract(function, value, index, argument))
+				callArguments = append(callArguments, emitExtract(function, value, index, argument))
 			}
 		} else {
-			arguments = append(arguments, value)
+			callArguments = append(callArguments, value)
 		}
 	}
 
@@ -1065,22 +1205,27 @@ func (packageBuilder *builder) emitCallArguments(
 		np--
 	}
 	for index := 0; index < np; index++ {
-		arguments[offset+index] = emitConv(
+		callArguments[offset+index] = emitConv(
 			function,
-			arguments[offset+index],
+			callArguments[offset+index],
 			sig.Params().At(index).Type(),
-			arguments[offset+index].Source(),
+			callArguments[offset+index].Source(),
 		)
 	}
 
 	// Actual->formal assignability conversions for variadic parameter,
 	// and construction of slice.
 	if sig.Variadic() {
-		varargs := arguments[offset+np:]
-		st := sig.Params().At(np).Type().(*types.Slice)
+		varargs := callArguments[offset+np:]
+		st, isSlice := sig.Params().At(np).Type().(*types.Slice)
+		if !isSlice {
+			// Invariant: a variadic parameter has a slice type unless the call spreads a string into append with
+			// ..., and the ... form returned above.
+			panic(fmt.Sprintf("variadic parameter of %s has type %s, not a slice", sig, sig.Params().At(np).Type()))
+		}
 		vt := st.Elem()
 		if len(varargs) == 0 {
-			arguments = append(arguments, zeroConstant(st, nil))
+			callArguments = append(callArguments, zeroConstant(st, nil))
 		} else {
 			// Replace a suffix of args with a slice containing it.
 			at := types.NewArray(vt, int64(len(varargs)))
@@ -1096,15 +1241,17 @@ func (packageBuilder *builder) emitCallArguments(
 			}
 			slice := &Slice{X: allocation}
 			slice.setType(st)
-			arguments[offset+np] = function.emit(slice, arguments[offset+np].Source())
-			arguments = arguments[:offset+np+1]
+			callArguments[offset+np] = function.emit(slice, callArguments[offset+np].Source())
+			callArguments = callArguments[:offset+np+1]
 		}
 	}
-	return arguments
+	return callArguments
 }
 
 // setCall emits to fn code to evaluate all the parameters of a function
 // call `expr`, and populates *`common` with those values.
+//
+// Mutates: common takes the callee and the call's arguments
 func (packageBuilder *builder) setCall(function *Function, expr *ast.CallExpr, common *CallCommon) {
 	// First deal with the f(...) part and optional receiver.
 	packageBuilder.setCallFunc(function, expr, common)
@@ -1112,6 +1259,8 @@ func (packageBuilder *builder) setCall(function *Function, expr *ast.CallExpr, c
 	// Then append the other actual parameters.
 	sig, _ := typeutil.CoreType(function.typeOf(expr.Fun)).(*types.Signature)
 	if sig == nil {
+		// Invariant: setCall is reached only for calls of functions, conversions having returned in expr0, and
+		// go/types records a signature as the core type of every callee, built-ins included.
 		panic(fmt.Sprintf("no signature for call of %s", expr.Fun))
 	}
 	common.Arguments = packageBuilder.emitCallArguments(function, sig, expr, common.Arguments)
@@ -1171,7 +1320,12 @@ func (packageBuilder *builder) assignStmt(function *Function, lhss, rhss []ast.E
 		var lval lvalue = blank{}
 		if !isBlankIdent(lhs) {
 			if isDef {
-				if object, ok := function.info.Defs[lhs.(*ast.Ident)].(*types.Var); ok {
+				id, isIdent := lhs.(*ast.Ident)
+				if !isIdent {
+					// Invariant: go/types accepts only identifiers on the left of :=.
+					panic(fmt.Sprintf("short variable declaration of %T, not an identifier", lhs))
+				}
+				if object, ok := function.info.Defs[id].(*types.Var); ok {
 					emitLocalVariable(function, object, lhs)
 					isZero[index] = true
 				}
@@ -1207,7 +1361,12 @@ func (packageBuilder *builder) arrayLength(function *Function, elts []ast.Expr) 
 	var index int64 = -1
 	for _, elt := range elts {
 		if kv, ok := elt.(*ast.KeyValueExpr); ok {
-			index = packageBuilder.expr(function, kv.Key).(*Constant).Int64()
+			key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+			if !isConstant {
+				// Invariant: go/types requires every index key of an array or slice literal to be a constant.
+				panic(fmt.Sprintf("array literal key %T is not a constant", kv.Key))
+			}
+			index = key.Int64()
 		} else {
 			index++
 		}
@@ -1238,7 +1397,13 @@ func (packageBuilder *builder) arrayLength(function *Function, elts []ast.Expr) 
 // case when the type name is implicit.  e.g. in []*T{{}}, the inner
 // literal has type *T behaves like &T{}.
 // In that case, addr must hold a T, not a *T.
-func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.CompositeLit, isZero bool, deferredStores *storebuf) {
+func (packageBuilder *builder) compLit(
+	function *Function,
+	addr Value,
+	lit *ast.CompositeLit,
+	isZero bool,
+	deferredStores *storebuf,
+) {
 	typ := deref(function.typeOf(lit)) // retain the named/alias/param type, if any
 	switch typed := typeutil.CoreType(typ).(type) {
 	case *types.Struct:
@@ -1267,7 +1432,12 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 
 			for eltIndex, elt := range lit.Elts {
 				if kv, ok := elt.(*ast.KeyValueExpr); ok {
-					fname := kv.Key.(*ast.Ident).Name
+					key, isIdent := kv.Key.(*ast.Ident)
+					if !isIdent {
+						// Invariant: go/types requires every key of a struct literal to be a field name.
+						panic(fmt.Sprintf("struct literal key %T is not a field name", kv.Key))
+					}
+					fname := key.Name
 					_, index, _ := types.LookupFieldOrMethod(typed, true, function.declaredPackage().Types, fname)
 
 					var parent *chainElement
@@ -1286,7 +1456,13 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 						parent = chain
 						chain = &chain.children[embeddedFieldIndex]
 						treeType := chainCoreType.Field(embeddedFieldIndex).Type()
-						chainCoreType = typeutil.CoreType(treeType).(*types.Struct)
+						embeddedStruct, isStruct := typeutil.CoreType(treeType).(*types.Struct)
+						if !isStruct {
+							// Invariant: go/types accepts only a struct's own fields as keys of its literal, never
+							// promoted ones, so the path to a key has no embedded step and this loop does not run.
+							panic(fmt.Sprintf("embedded field of type %s is not a struct", treeType))
+						}
+						chainCoreType = embeddedStruct
 						if chain.cv == nil {
 							ncv := &CompositeValue{
 								Values: make([]Value, chainCoreType.NumFields()),
@@ -1338,7 +1514,7 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 					dfs(tt)
 				}
 
-				// XXX better e
+				// Each element's composite value is emitted after those of its children.
 				if element.cv != nil {
 					function.emit(element.cv, lit)
 				}
@@ -1365,79 +1541,89 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 				zc := zeroConstant(at, lit)
 				final = zc
 			}
+		} else if at.Len() == int64(len(lit.Elts)) {
+			// The literal specifies all elements, so we can use a composite value
+			value := &CompositeValue{
+				Values: make([]Value, at.Len()),
+			}
+			zc := zeroConstant(at.Elem(), lit)
+			for index := range value.Values {
+				value.Values[index] = zc
+			}
+			value.setType(at)
+
+			var index *Constant
+			for _, elt := range lit.Elts {
+				if kv, ok := elt.(*ast.KeyValueExpr); ok {
+					key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+					if !isConstant {
+						// Invariant: go/types requires every index key of an array or slice literal to be a
+						// constant.
+						panic(fmt.Sprintf("array literal key %T is not a constant", kv.Key))
+					}
+					index = key
+					elt = kv.Value
+				} else {
+					var idxval int64
+					if index != nil {
+						idxval = index.Int64() + 1
+					}
+					index = intConstant(idxval, elt)
+				}
+
+				iaddr := &compositeElement{
+					cv:          value,
+					index:       int(index.Int64()),
+					elementType: at.Elem(),
+				}
+
+				// We use b.assign for its handling of implicit &, but no
+				// store buffer because 1) it's not needed 2) implicit
+				// conversions have to be emitted before we emit the
+				// CompositeValue.
+				packageBuilder.assign(function, iaddr, elt, true, nil, elt)
+				value.Bitmap.SetBit(&value.Bitmap, int(index.Int64()), 1)
+				value.ExplicitCount++
+			}
+			final = value
+			function.emit(value, lit)
 		} else {
-			if at.Len() == int64(len(lit.Elts)) {
-				// The literal specifies all elements, so we can use a composite value
-				value := &CompositeValue{
-					Values: make([]Value, at.Len()),
-				}
-				zc := zeroConstant(at.Elem(), lit)
-				for index := range value.Values {
-					value.Values[index] = zc
-				}
-				value.setType(at)
+			// Not all elements are specified. Populate the array with a series of stores, to guard against literals
+			// like []int{1<<62: 1}.
+			if !isZero {
+				// memclear
+				deferredStores.store(&address{array}, zeroConstant(deref(array.Type()), lit), lit)
+			}
 
-				var index *Constant
-				for _, elt := range lit.Elts {
-					if kv, ok := elt.(*ast.KeyValueExpr); ok {
-						index = packageBuilder.expr(function, kv.Key).(*Constant)
-						elt = kv.Value
-					} else {
-						var idxval int64
-						if index != nil {
-							idxval = index.Int64() + 1
-						}
-						index = intConstant(idxval, elt)
+			var index *Constant
+			for _, elt := range lit.Elts {
+				if kv, ok := elt.(*ast.KeyValueExpr); ok {
+					key, isConstant := packageBuilder.expr(function, kv.Key).(*Constant)
+					if !isConstant {
+						// Invariant: go/types requires every index key of an array or slice literal to be a
+						// constant.
+						panic(fmt.Sprintf("array literal key %T is not a constant", kv.Key))
 					}
-
-					iaddr := &compositeElement{
-						cv:          value,
-						index:       int(index.Int64()),
-						elementType: at.Elem(),
+					index = key
+					elt = kv.Value
+				} else {
+					var idxval int64
+					if index != nil {
+						idxval = index.Int64() + 1
 					}
-
-					// We use b.assign for its handling of implicit &, but no
-					// store buffer because 1) it's not needed 2) implicit
-					// conversions have to be emitted before we emit the
-					// CompositeValue.
-					packageBuilder.assign(function, iaddr, elt, true, nil, elt)
-					value.Bitmap.SetBit(&value.Bitmap, int(index.Int64()), 1)
-					value.ExplicitCount++
+					index = intConstant(idxval, elt)
 				}
-				final = value
-				function.emit(value, lit)
-			} else {
-				// Not all elements are specified. Populate the array with a series of stores, to guard against literals
-				// like []int{1<<62: 1}.
-				if !isZero {
-					// memclear
-					deferredStores.store(&address{array}, zeroConstant(deref(array.Type()), lit), lit)
+				iaddr := &IndexAddress{
+					X:     array,
+					Index: index,
 				}
-
-				var index *Constant
-				for _, elt := range lit.Elts {
-					if kv, ok := elt.(*ast.KeyValueExpr); ok {
-						index = packageBuilder.expr(function, kv.Key).(*Constant)
-						elt = kv.Value
-					} else {
-						var idxval int64
-						if index != nil {
-							idxval = index.Int64() + 1
-						}
-						index = intConstant(idxval, elt)
-					}
-					iaddr := &IndexAddress{
-						X:     array,
-						Index: index,
-					}
-					iaddr.setType(types.NewPointer(at.Elem()))
-					function.emit(iaddr, elt)
-					if typed != at { // slice
-						// backing array is unaliased => storebuf not needed.
-						packageBuilder.assign(function, &address{addr: iaddr}, elt, true, nil, elt)
-					} else {
-						packageBuilder.assign(function, &address{addr: iaddr}, elt, true, deferredStores, elt)
-					}
+				iaddr.setType(types.NewPointer(at.Elem()))
+				function.emit(iaddr, elt)
+				if typed != at { // slice
+					// backing array is unaliased => storebuf not needed.
+					packageBuilder.assign(function, &address{addr: iaddr}, elt, true, nil, elt)
+				} else {
+					packageBuilder.assign(function, &address{addr: iaddr}, elt, true, deferredStores, elt)
 				}
 			}
 		}
@@ -1457,7 +1643,11 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 		makeMap.setType(typ)
 		function.emit(makeMap, lit)
 		for _, elt := range lit.Elts {
-			expr := elt.(*ast.KeyValueExpr)
+			expr, isKeyValue := elt.(*ast.KeyValueExpr)
+			if !isKeyValue {
+				// Invariant: go/types requires every element of a map literal to be a key-value pair.
+				panic(fmt.Sprintf("map literal element %T is not a key-value pair", elt))
+			}
 
 			// If a key expression in a map literal is  itself a
 			// composite literal, the type may be omitted.
@@ -1497,10 +1687,16 @@ func (packageBuilder *builder) compLit(function *Function, addr Value, lit *ast.
 		deferredStores.store(&address{addr: addr}, makeMap, lit)
 
 	default:
+		// Invariant: go/types accepts composite literals only of struct, array, slice and map core types.
 		panic("unexpected CompositeLit type: " + typ.String())
 	}
 }
 
+// switchStmt emits to fn code for the switch statement `switchStmt`, optionally
+// labelled by label. A switch whose cases are all constant becomes a ConstantSwitch.
+//
+// Mutates: function gains the blocks of the switch, and its targets and current block follow them
+// Mutates: label takes the switch's done block as its break target
 func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.SwitchStmt, label *lblock) {
 	if switchStmt.Tag == nil {
 		packageBuilder.switchStmtDynamic(function, switchStmt, label)
@@ -1508,7 +1704,11 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	}
 	dynamic := false
 	for _, iclause := range switchStmt.Body.List {
-		clause := iclause.(*ast.CaseClause)
+		clause, isCaseClause := iclause.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", iclause))
+		}
 		for _, cond := range clause.List {
 			if function.info.Types[ast.Unparen(cond)].Value == nil {
 				dynamic = true
@@ -1541,7 +1741,11 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	for caseIndex, stmt := range switchStmt.Body.List {
 		body := function.newBasicBlock(fmt.Sprintf("switch.body.%d", caseIndex))
 		bodies[caseIndex] = body
-		cas := stmt.(*ast.CaseClause)
+		cas, isCaseClause := stmt.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", stmt))
+		}
 		if cas.List == nil {
 			// default branch
 			hasDefault = true
@@ -1551,7 +1755,7 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 			function.currentBlock = head
 			emitJump(function, body, cas)
 		}
-		for conditionIndex, cond := range stmt.(*ast.CaseClause).List {
+		for conditionIndex, cond := range cas.List {
 			function.currentBlock = entry
 			head := function.newBasicBlock(fmt.Sprintf("switch.head.%d.%d", caseIndex, conditionIndex))
 			conds = append(conds, packageBuilder.expr(function, cond))
@@ -1562,7 +1766,11 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	}
 
 	for index, stmt := range switchStmt.Body.List {
-		clause := stmt.(*ast.CaseClause)
+		clause, isCaseClause := stmt.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", stmt))
+		}
 		body := bodies[index]
 		function.currentBlock = body
 		fallthru := done
@@ -1591,6 +1799,7 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 	}
 
 	if len(heads) != len(conds) {
+		// Invariant: every head appended above comes with exactly one condition.
 		panic(fmt.Sprintf("internal error: %d heads for %d conds", len(heads), len(conds)))
 	}
 	for _, head := range heads {
@@ -1606,6 +1815,9 @@ func (packageBuilder *builder) switchStmt(function *Function, switchStmt *ast.Sw
 
 // switchStmt emits to fn code for the switch statement `stmt`, optionally
 // labelled by label.
+//
+// Mutates: function gains the blocks of the switch, and its targets and current block follow them
+// Mutates: label takes the switch's done block as its break target
 func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.SwitchStmt, label *lblock) {
 	// We treat SwitchStmt like a sequential if-else chain.
 	// Multiway dispatch can be recovered later by irutil.Switches()
@@ -1630,7 +1842,8 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 	// Unfortunately this makes for a confusing block order.
 	var dfltBody *[]ast.Stmt
 	var dfltFallthrough *BasicBlock
-	var fallthru, dfltBlock *BasicBlock
+	var fallthru *BasicBlock
+	var dfltBlock *BasicBlock
 	ncases := len(stmt.Body.List)
 	for index, clause := range stmt.Body.List {
 		body := fallthru
@@ -1644,7 +1857,11 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 			fallthru = function.newBasicBlock("switch.body")
 		}
 
-		cc := clause.(*ast.CaseClause)
+		cc, isCaseClause := clause.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("switch body holds %T, not a case clause", clause))
+		}
 		if cc.List == nil {
 			// Default case.
 			dfltBody = &cc.Body
@@ -1698,6 +1915,9 @@ func (packageBuilder *builder) switchStmtDynamic(function *Function, stmt *ast.S
 
 // typeSwitchStmt emits to fn code for the type switch statement `stmt`, optionally
 // labelled by label.
+//
+// Mutates: function gains the blocks of the type switch, and its targets and current block follow them
+// Mutates: label takes the type switch's done block as its break target
 func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.TypeSwitchStmt, label *lblock) {
 	if stmt.Init != nil {
 		packageBuilder.stmt(function, stmt.Init)
@@ -1706,10 +1926,21 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 	var tag Value
 	switch typed := stmt.Assign.(type) {
 	case *ast.ExprStmt: // x.(type)
-		tag = packageBuilder.expr(function, ast.Unparen(typed.X).(*ast.TypeAssertExpr).X)
+		guard, isTypeAssert := ast.Unparen(typed.X).(*ast.TypeAssertExpr)
+		if !isTypeAssert {
+			// Invariant: the parser accepts only x.(type) as a type switch's guard.
+			panic(fmt.Sprintf("type switch guard %T is not a type assertion", typed.X))
+		}
+		tag = packageBuilder.expr(function, guard.X)
 	case *ast.AssignStmt: // y := x.(type)
-		tag = packageBuilder.expr(function, ast.Unparen(typed.Rhs[0]).(*ast.TypeAssertExpr).X)
+		guard, isTypeAssert := ast.Unparen(typed.Rhs[0]).(*ast.TypeAssertExpr)
+		if !isTypeAssert {
+			// Invariant: the parser accepts only y := x.(type) as a type switch's assigning guard.
+			panic(fmt.Sprintf("type switch guard %T is not a type assertion", typed.Rhs[0]))
+		}
+		tag = packageBuilder.expr(function, guard.X)
 	default:
+		// Invariant: go/ast documents a type switch's Assign as x.(type) or y := x.(type), each handled above.
 		panic("unreachable")
 	}
 
@@ -1735,7 +1966,11 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 	index := 0
 	var default_ *ast.CaseClause
 	for _, clause := range stmt.Body.List {
-		cc := clause.(*ast.CaseClause)
+		cc, isCaseClause := clause.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("type switch body holds %T, not a case clause", clause))
+		}
 		if object, ok := function.info.Implicits[cc].(*types.Var); ok {
 			emitLocalVariable(function, object, cc)
 		}
@@ -1777,7 +2012,11 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 	// build heads and bodies
 	index = 0
 	for _, clause := range stmt.Body.List {
-		cc := clause.(*ast.CaseClause)
+		cc, isCaseClause := clause.(*ast.CaseClause)
+		if !isCaseClause {
+			// Invariant: go/ast holds only case clauses in the body of an expression or type switch.
+			panic(fmt.Sprintf("type switch body holds %T, not a case clause", clause))
+		}
 		if cc.List == nil {
 			continue
 		}
@@ -1847,6 +2086,9 @@ func (packageBuilder *builder) typeSwitchStmt(function *Function, stmt *ast.Type
 
 // selectStmt emits to fn code for the select statement `stmt`, optionally
 // labelled by label.
+//
+// Mutates: function gains the blocks of the select, and its targets and current block follow them
+// Mutates: label takes the select's done block as its break target
 func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectStmt, label *lblock) (noreturn bool) {
 	if len(stmt.Body.List) == 0 {
 		instr := &Select{Blocking: true}
@@ -1858,9 +2100,13 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 
 	// A blocking select of a single case degenerates to a
 	// simple send or receive.
-	// TODO(adonovan): opt: is this optimization worth its weight?
+	// Whether this optimization is worth its weight has not been measured.
 	if len(stmt.Body.List) == 1 {
-		clause := stmt.Body.List[0].(*ast.CommClause)
+		clause, isCommClause := stmt.Body.List[0].(*ast.CommClause)
+		if !isCommClause {
+			// Invariant: go/ast holds only comm clauses in the body of a select.
+			panic(fmt.Sprintf("select body holds %T, not a comm clause", stmt.Body.List[0]))
+		}
 		if clause.Comm != nil {
 			packageBuilder.stmt(function, clause.Comm)
 			done := function.newBasicBlock("select.done")
@@ -1885,23 +2131,37 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	blocking := true
 	for _, clause := range stmt.Body.List {
 		var st *SelectState
-		switch comm := clause.(*ast.CommClause).Comm.(type) {
+		commClause, isCommClause := clause.(*ast.CommClause)
+		if !isCommClause {
+			// Invariant: go/ast holds only comm clauses in the body of a select.
+			panic(fmt.Sprintf("select body holds %T, not a comm clause", clause))
+		}
+		switch comm := commClause.Comm.(type) {
 		case nil: // default case
 			blocking = false
 			continue
 
 		case *ast.SendStmt: // ch<- i
 			channel := packageBuilder.expr(function, comm.Chan)
+			channelType, isChannel := typeutil.CoreType(function.typ(channel.Type())).(*types.Chan)
+			if !isChannel {
+				// Invariant: go/types accepts a send only on an operand whose core type is a channel.
+				panic(fmt.Sprintf("send on %s, which has no channel core type", channel.Type()))
+			}
 			st = &SelectState{
 				Direction: types.SendOnly,
 				Channel:   channel,
 				Send: emitConv(function, packageBuilder.expr(function, comm.Value),
-					typeutil.CoreType(function.typ(channel.Type())).(*types.Chan).Elem(), comm),
+					channelType.Elem(), comm),
 				Position: comm.Arrow,
 			}
 
 		case *ast.AssignStmt: // x := <-ch
-			recv := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
+			recv, isUnary := ast.Unparen(comm.Rhs[0]).(*ast.UnaryExpr)
+			if !isUnary {
+				// Invariant: the parser accepts an assignment as a select case only when it receives, <-ch.
+				panic(fmt.Sprintf("select case assigns %T, not a receive", comm.Rhs[0]))
+			}
 			st = &SelectState{
 				Direction: types.RecvOnly,
 				Channel:   packageBuilder.expr(function, recv.X),
@@ -1909,7 +2169,11 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 			}
 
 		case *ast.ExprStmt: // <-ch
-			recv := ast.Unparen(comm.X).(*ast.UnaryExpr)
+			recv, isUnary := ast.Unparen(comm.X).(*ast.UnaryExpr)
+			if !isUnary {
+				// Invariant: the parser accepts an expression as a select case only when it receives, <-ch.
+				panic(fmt.Sprintf("select case evaluates %T, not a receive", comm.X))
+			}
 			st = &SelectState{
 				Direction: types.RecvOnly,
 				Channel:   packageBuilder.expr(function, recv.X),
@@ -1930,7 +2194,12 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	vars = append(vars, varIndex, varOk)
 	for _, st := range states {
 		if st.Direction == types.RecvOnly {
-			tElem := typeutil.CoreType(function.typ(st.Channel.Type())).(*types.Chan).Elem()
+			channelType, isChannel := typeutil.CoreType(function.typ(st.Channel.Type())).(*types.Chan)
+			if !isChannel {
+				// Invariant: go/types accepts a receive only from an operand whose core type is a channel.
+				panic(fmt.Sprintf("receive from %s, which has no channel core type", st.Channel.Type()))
+			}
+			tElem := channelType.Elem()
 			vars = append(vars, anonVariable(tElem))
 		}
 	}
@@ -1953,9 +2222,13 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 	var bodies []*BasicBlock
 
 	state := 0
-	receivedValueIndex := 2 // index in 'sel' tuple of value; increments if st.Direction==RECV
+	receivedValueIndex := 2 // index in 'sel' tuple of value; increments if st.Direction==types.RecvOnly
 	for _, cc := range stmt.Body.List {
-		clause := cc.(*ast.CommClause)
+		clause, isCommClause := cc.(*ast.CommClause)
+		if !isCommClause {
+			// Invariant: go/ast holds only comm clauses in the body of a select.
+			panic(fmt.Sprintf("select body holds %T, not a comm clause", cc))
+		}
 		if clause.Comm == nil {
 			body := function.newBasicBlock("select.default")
 			function.currentBlock = body
@@ -1984,7 +2257,11 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 
 		case *ast.AssignStmt: // x := <-states[state].Channel
 			if comm.Tok == token.DEFINE {
-				id := comm.Lhs[0].(*ast.Ident)
+				id, isIdent := comm.Lhs[0].(*ast.Ident)
+				if !isIdent {
+					// Invariant: go/types accepts only identifiers on the left of :=.
+					panic(fmt.Sprintf("short variable declaration of %T, not an identifier", comm.Lhs[0]))
+				}
 				emitLocalVariable(function, identVariable(function, id), id)
 			}
 			x := packageBuilder.addr(function, comm.Lhs[0], false) // non-escaping
@@ -1993,7 +2270,11 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 
 			if len(comm.Lhs) == 2 { // x, ok := ...
 				if comm.Tok == token.DEFINE {
-					id := comm.Lhs[1].(*ast.Ident)
+					id, isIdent := comm.Lhs[1].(*ast.Ident)
+					if !isIdent {
+						// Invariant: go/types accepts only identifiers on the left of :=.
+						panic(fmt.Sprintf("short variable declaration of %T, not an identifier", comm.Lhs[1]))
+					}
 					emitLocalVariable(function, identVariable(function, id), id)
 				}
 				ok := packageBuilder.addr(function, comm.Lhs[1], false) // non-escaping
@@ -2017,6 +2298,9 @@ func (packageBuilder *builder) selectStmt(function *Function, stmt *ast.SelectSt
 
 // forStmt emits to fn code for the for statement `stmt`, optionally
 // labelled by label.
+//
+// Mutates: function gains the blocks of the loop, and its targets and current block follow them
+// Mutates: label takes the loop's done and continue blocks as its break and continue targets
 func (packageBuilder *builder) forStmt(function *Function, stmt *ast.ForStmt, label *lblock) {
 	// Use forStmtGo122 instead if it applies.
 	if stmt.Init != nil {
@@ -2084,6 +2368,9 @@ func (packageBuilder *builder) forStmt(function *Function, stmt *ast.ForStmt, la
 //
 // This allocates once per loop iteration. This is only correct in
 // GoVersions >= go1.22.
+//
+// Mutates: function gains the blocks of the loop, and its variables, targets and current block follow them
+// Mutates: label takes the loop's done and post blocks as its break and continue targets
 func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStmt, label *lblock) {
 	//     i_outer = alloc[T]
 	//     *i_outer = ...init...        // under objects[i] = i_outer
@@ -2103,7 +2390,11 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 	//     goto loop
 	// done:
 
-	init := stmt.Init.(*ast.AssignStmt)
+	init, isAssign := stmt.Init.(*ast.AssignStmt)
+	if !isAssign {
+		// Invariant: forStmt calls forStmtGo122 only when the loop's init is a := assignment.
+		panic(fmt.Sprintf("for loop init %T is not an assignment", stmt.Init))
+	}
 	startingBlocks := len(function.Blocks)
 
 	pre := function.currentBlock               // current block before starting
@@ -2125,7 +2416,12 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 	}
 	vars := make([]loopVariable, len(init.Lhs))
 	for index, lhs := range init.Lhs {
-		variable := identVariable(function, lhs.(*ast.Ident))
+		id, isIdent := lhs.(*ast.Ident)
+		if !isIdent {
+			// Invariant: go/types accepts only identifiers on the left of :=.
+			panic(fmt.Sprintf("short variable declaration of %T, not an identifier", lhs))
+		}
+		variable := identVariable(function, id)
 		typ := function.typ(variable.Type())
 
 		function.currentBlock = pre
@@ -2215,7 +2511,8 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 			if !variable.next.Heap {
 				replace[variable.next] = variable.outer
 				replace[variable.phi] = variable.outer
-				dead[variable.phi], dead[variable.next], dead[variable.load], dead[variable.store] = true, true, true, true
+				dead[variable.phi], dead[variable.next], dead[variable.load], dead[variable.store] =
+					true, true, true, true
 			}
 		}
 
@@ -2247,6 +2544,8 @@ func (packageBuilder *builder) forStmtGo122(function *Function, stmt *ast.ForStm
 // over array, *array or slice value x.
 // The v result is defined only if tv is non-nil.
 // forPos is the position of the "for" token.
+//
+// Mutates: function gains the loop header's blocks, and its current block moves into the body
 func (packageBuilder *builder) rangeIndexed(
 	function *Function,
 	x Value,
@@ -2323,7 +2622,12 @@ func (packageBuilder *builder) rangeIndexed(
 				X:     x,
 				Index: key,
 			}
-			instr.setType(types.NewPointer(typed.Elem().Underlying().(*types.Array).Elem()))
+			array, isArray := typed.Elem().Underlying().(*types.Array)
+			if !isArray {
+				// Invariant: go/types accepts ranging over a pointer only when it points to an array.
+				panic("rangeIndexed over a pointer to " + typed.Elem().String() + ", not to an array")
+			}
+			instr.setType(types.NewPointer(array.Elem()))
 			value = emitLoad(function, function.emit(instr, source), source)
 
 		case *types.Slice:
@@ -2335,6 +2639,7 @@ func (packageBuilder *builder) rangeIndexed(
 			value = emitLoad(function, function.emit(instr, source), source)
 
 		default:
+			// Invariant: rangeStmt calls rangeIndexed only for slice, array and pointer core types.
 			panic("rangeIndexed x:" + typed.String())
 		}
 	}
@@ -2345,6 +2650,8 @@ func (packageBuilder *builder) rangeIndexed(
 // Range/Next/Extract to iterate over map or string value x.
 // tk and tv are the types of the key/value results k and v, or nil
 // if the respective component is not wanted.
+//
+// Mutates: function gains the loop header's blocks, and its current block moves into the body
 func (packageBuilder *builder) rangeIter(
 	function *Function,
 	x Value,
@@ -2365,7 +2672,8 @@ func (packageBuilder *builder) rangeIter(
 	// done:                                   (target of break)
 	//
 
-	var ak, av types.Type
+	var ak types.Type
+	var av types.Type
 	isString := false
 	if mapping, ok := typeutil.CoreType(x.Type()).(*types.Map); ok {
 		ak, av = mapping.Key(), mapping.Elem()
@@ -2396,7 +2704,12 @@ func (packageBuilder *builder) rangeIter(
 		Iterator: it,
 		IsString: isString,
 	}
-	okv.setType(rng.typ.(*typeutil.Iterator).Elem())
+	iterator, isIterator := rng.typ.(*typeutil.Iterator)
+	if !isIterator {
+		// Invariant: rng's type was set to an Iterator above.
+		panic(fmt.Sprintf("range has type %s, not an iterator", rng.typ))
+	}
+	okv.setType(iterator.Elem())
 	function.emit(okv, source)
 
 	body := function.newBasicBlock("rangeiter.body")
@@ -2421,6 +2734,8 @@ func (packageBuilder *builder) rangeIter(
 // tk is the channel's element type, or nil if the `value` result is
 // not wanted
 // pos is the position of the '=' or ':=' token.
+//
+// Mutates: function gains the loop header's blocks, and its current block moves into the body
 func (packageBuilder *builder) rangeChannel(
 	function *Function,
 	x Value,
@@ -2442,11 +2757,16 @@ func (packageBuilder *builder) rangeChannel(
 	emitJump(function, loop, source)
 	function.currentBlock = loop
 
+	channelType, isChannel := typeutil.CoreType(x.Type()).(*types.Chan)
+	if !isChannel {
+		// Invariant: rangeStmt calls rangeChannel only for a channel core type.
+		panic(fmt.Sprintf("rangeChannel over %s, which has no channel core type", x.Type()))
+	}
 	retv := emitReceive(
 		function,
 		x,
 		true,
-		types.NewTuple(newVariable("k", typeutil.CoreType(x.Type()).(*types.Chan).Elem()), varOk),
+		types.NewTuple(newVariable("k", channelType.Elem()), varOk),
 		source,
 	)
 
@@ -2463,6 +2783,8 @@ func (packageBuilder *builder) rangeChannel(
 // rangeInt emits to fn the header for a range loop with an integer operand.
 // tk is the key value's type, or nil if the `value` result is not wanted.
 // pos is the position of the "for" token.
+//
+// Mutates: function gains the loop header's blocks, and its current block moves into the body
 func (packageBuilder *builder) rangeInt(
 	function *Function,
 	x Value,
@@ -2481,17 +2803,24 @@ func (packageBuilder *builder) rangeInt(
 	//     jump loop
 	// done:                                   (target of break)
 
+	limit := x
 	if basic, ok := x.Type().(*types.Basic); ok && basic.Info()&types.IsUntyped != 0 {
-		x = emitConv(function, x, tInt, source)
+		limit = emitConv(function, x, tInt, source)
 	}
 
-	counterType := x.Type()
+	counterType := limit.Type()
 	iter := emitLocal(function, counterType, source, "rangeint.iter")
 	// x may be unsigned. Avoid initializing x to -1.
 
 	body := function.newBasicBlock("rangeint.body")
 	done = function.newBasicBlock("rangeint.done")
-	emitIf(function, emitCompare(function, token.LSS, zeroConstant(counterType, source), x, source), body, done, source)
+	emitIf(
+		function,
+		emitCompare(function, token.LSS, zeroConstant(counterType, source), limit, source),
+		body,
+		done,
+		source,
+	)
 
 	loop = function.newBasicBlock("rangeint.loop")
 	function.currentBlock = loop
@@ -2503,7 +2832,7 @@ func (packageBuilder *builder) rangeInt(
 	}
 	incr.setType(counterType)
 	emitStore(function, iter, function.emit(incr, source), source)
-	emitIf(function, emitCompare(function, token.LSS, incr, x, source), body, done, source)
+	emitIf(function, emitCompare(function, token.LSS, incr, limit, source), body, done, source)
 	function.currentBlock = body
 
 	if tk != nil {
@@ -2518,8 +2847,12 @@ func (packageBuilder *builder) rangeInt(
 
 // rangeStmt emits to fn code for the range statement `stmt`, optionally
 // labelled by label.
+//
+// Mutates: function gains the blocks of the loop, and its targets and current block follow them
+// Mutates: label takes the loop's done and loop blocks as its break and continue targets
 func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt, label *lblock, source ast.Node) {
-	var tk, tv types.Type
+	var tk types.Type
+	var tv types.Type
 	if stmt.Key != nil && !isBlankIdent(stmt.Key) {
 		tk = function.typeOf(stmt.Key)
 	}
@@ -2533,11 +2866,21 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		// using := never redeclares an existing variable; it
 		// always creates a new one.
 		if tk != nil {
-			id := stmt.Key.(*ast.Ident)
+			id, isIdent := stmt.Key.(*ast.Ident)
+			if !isIdent {
+				// Invariant: createVariables runs only for a range clause with :=, and go/types accepts only
+				// identifiers on its left.
+				panic(fmt.Sprintf("range key %T is not an identifier", stmt.Key))
+			}
 			emitLocalVariable(function, identVariable(function, id), id)
 		}
 		if tv != nil {
-			id := stmt.Value.(*ast.Ident)
+			id, isIdent := stmt.Value.(*ast.Ident)
+			if !isIdent {
+				// Invariant: createVariables runs only for a range clause with :=, and go/types accepts only
+				// identifiers on its left.
+				panic(fmt.Sprintf("range value %T is not an identifier", stmt.Value))
+			}
 			emitLocalVariable(function, identVariable(function, id), id)
 		}
 	}
@@ -2551,8 +2894,10 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 
 	x := packageBuilder.expr(function, stmt.X)
 
-	var key, value Value
-	var loop, done *BasicBlock
+	var key Value
+	var value Value
+	var loop *BasicBlock
+	var done *BasicBlock
 	switch rt := typeutil.CoreType(x.Type()).(type) {
 	case *types.Slice, *types.Array, *types.Pointer: // *array
 		key, value, loop, done = packageBuilder.rangeIndexed(function, x, tv, source)
@@ -2572,6 +2917,7 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 			key, loop, done = packageBuilder.rangeInt(function, x, tk, source)
 
 		default:
+			// Invariant: go/types accepts ranging over a basic type only for strings and integers.
 			panic("Cannot range over basic type: " + rt.String())
 		}
 
@@ -2584,6 +2930,8 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 		return
 
 	default:
+		// Invariant: go/types accepts ranging only over slices, arrays, pointers to arrays, channels, maps, strings,
+		// integers and functions, each handled above.
 		panic("Cannot range over: " + rt.String())
 	}
 
@@ -2593,7 +2941,8 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 	}
 
 	// Evaluate both LHS expressions before we update either.
-	var kl, vl lvalue
+	var kl lvalue
+	var vl lvalue
 	if tk != nil {
 		kl = packageBuilder.addr(function, stmt.Key, false) // non-escaping
 	}
@@ -2626,6 +2975,10 @@ func (packageBuilder *builder) rangeStmt(function *Function, stmt *ast.RangeStmt
 // rangeFunc emits to fn code for the range-over-func rng.Body of the iterator
 // function x, optionally labelled by label. It creates a new anonymous function
 // yield for rng and builds the function.
+//
+// Mutates: function gains the loop's blocks and its yield function, and its targets, unique values and current
+// block follow them
+// Mutates: label takes the loop's done block as its break target
 func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.RangeStmt, label *lblock) {
 	// Consider the SSA code for the outermost range-over-func in fn:
 	//
@@ -2640,7 +2993,7 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	// The code emitted into fn will look something like this.
 	//
 	// loop:
-	//     jump := READY
+	//     jump := jReady
 	//     y := make closure yield [ret, deferstack, jump, k, v]
 	//     x(y)
 	//     switch jump {
@@ -2656,16 +3009,16 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	//   free variables: [ret, stack, jump, k, v]
 	// {
 	//    entry:
-	//      if jump != READY then goto invalid else valid
+	//      if jump != jReady then goto invalid else valid
 	//    invalid:
 	//      panic("iterator called when it is not in a ready state")
 	//    valid:
-	//      jump = BUSY
+	//      jump = jBusy
 	//      k = _k
 	//      v = _v
 	//    ...
 	//    cont:
-	//      jump = READY
+	//      jump = jReady
 	//      return true
 	// }
 	//
@@ -2673,22 +3026,22 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	//
 	// Each range loop has an associated jump variable that records
 	// the state of the iterator. A yield function is initially
-	// in a READY (0) and callable state.  If the yield function is called
-	// and is not in READY state, it panics. When it is called in a callable
-	// state, it becomes BUSY. When execution reaches the end of the body
+	// in the ready (0) and callable state.  If the yield function is called
+	// and is not in the ready state, it panics. When it is called in a callable
+	// state, it becomes busy. When execution reaches the end of the body
 	// of the loop (or a continue statement targeting the loop is executed),
-	// the yield function returns true and resumes being in a READY state.
+	// the yield function returns true and resumes being in the ready state.
 	// After the iterator function x(y) returns, then if the yield function
-	// is in a READY state, the yield enters the DONE state.
+	// is in the ready state, the yield enters the done state.
 	//
 	// Each lowered control statement (break X, continue X, goto Z, or return)
-	// that exits the loop sets the variable to a unique positive EXIT value,
+	// that exits the loop sets the variable to a unique positive exit value,
 	// before returning false from the yield function.
 	//
 	// If the yield function returns abruptly due to a panic or GoExit,
-	// it remains in a BUSY state. The generated code asserts that, after
+	// it remains in the busy state. The generated code asserts that, after
 	// the iterator call x(y) returns normally, the jump variable state
-	// is DONE.
+	// is done.
 	//
 	// Resuming execution:
 	//
@@ -2696,11 +3049,11 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	// variable to determine how to resume execution.
 	//
 	//    switch jump {
-	//    case BUSY:  panic("...")
-	//    case DONE:  goto done
-	//    case READY: state = DONE; goto done
-	//    case 123:   ... // action for exit 123.
-	//    case 456:   ... // action for exit 456.
+	//    case jBusy:  panic("...")
+	//    case jDone:  goto done
+	//    case jReady: state = jDone; goto done
+	//    case 123:    ... // action for exit 123.
+	//    case 456:    ... // action for exit 456.
 	//    ...
 	//    }
 	//
@@ -2737,15 +3090,23 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 	function.currentBlock = loop
 
 	// loop:
-	//     jump := READY
+	//     jump := jReady
 
 	anonIndex := len(function.AnonymousFunctions)
 
 	jump := newVariable(fmt.Sprintf("jump$%d", anonIndex+1), tInt)
-	emitLocalVariable(function, jump, nil) // zero value is READY
+	emitLocalVariable(function, jump, nil) // zero value is jReady
 
-	xsig := typeutil.CoreType(x.Type()).(*types.Signature)
-	ysig := typeutil.CoreType(xsig.Params().At(0).Type()).(*types.Signature)
+	xsig, isSignature := typeutil.CoreType(x.Type()).(*types.Signature)
+	if !isSignature {
+		// Invariant: rangeStmt calls rangeFunc only for a signature core type.
+		panic(fmt.Sprintf("rangeFunc over %s, which has no signature core type", x.Type()))
+	}
+	ysig, isYieldSignature := typeutil.CoreType(xsig.Params().At(0).Type()).(*types.Signature)
+	if !isYieldSignature {
+		// Invariant: go/types accepts ranging over a function only when its one parameter is a yield function.
+		panic(fmt.Sprintf("rangeFunc iterator %s takes %s, not a yield function", x.Type(), xsig.Params().At(0).Type()))
+	}
 
 	/* synthetic yield function for body of range-over-func loop */
 	y := &Function{
@@ -2814,14 +3175,16 @@ func (packageBuilder *builder) rangeFunc(function *Function, x Value, rng *ast.R
 
 // buildYieldResume emits to fn code for how to resume execution once a call to
 // the iterator function over the yield function returns x(y). It does this by building
-// a switch over the value of jump for when it is READY, BUSY, or EXIT(id).
+// a switch over the value of jump for when it is ready, busy, or an exit id.
+//
+// Mutates: function gains the resume switch and its bodies, and its current block returns to the entry
 func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.Var, exits []*exit, done *BasicBlock) {
 	//    v := *jump
 	//    switch v {
-	//    case BUSY:    panic("...")
-	//    case READY:   jump = DONE; goto done
-	//    case EXIT(a): ...
-	//    case EXIT(b): ...
+	//    case jBusy:   panic("...")
+	//    case jReady:  jump = jDone; goto done
+	//    case exit(a): ...
+	//    case exit(b): ...
 	//    ...
 	//    }
 	load := emitLoad(function, function.lookup(jump, false), nil)
@@ -2856,7 +3219,7 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 		function.currentBlock = body
 		switch {
 		case exit.label != nil: // forward goto?
-			// case EXIT(id): goto lb // label
+			// case exit(id): goto lb // label
 			lb := function.lblockOf(exit.label)
 			// Do not mark lb as resolved.
 			// If fn does not contain label, lb remains unresolved and
@@ -2867,7 +3230,7 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 			emitJump(function, lb._goto, exit.source)
 
 		case exit.to != function: // e jumps to an ancestor of fn?
-			// case EXIT(id): { fn.jump = id; return false }
+			// case exit(id): { fn.jump = id; return false }
 			// fn is a range-over-func function.
 
 			storeVariable(function, function.jump, id, exit.source)
@@ -2875,7 +3238,7 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 			function.emit(&Return{Results: []Value{vFalse}}, exit.source)
 
 		case exit.block == nil && exit.label == nil: // return from fn?
-			// case EXIT(id): { return ... }
+			// case exit(id): { return ... }
 			function.emit(new(RunDefers), exit.source)
 			results := make([]Value, len(function.results))
 			for index, result := range function.results {
@@ -2884,10 +3247,12 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 			function.emit(&Return{Results: results}, exit.source)
 
 		case exit.block != nil:
-			// case EXIT(id): goto block
+			// case exit(id): goto block
 			emitJump(function, exit.block, exit.source)
 
 		default:
+			// Invariant: the cases above cover every exit, one with a label, one to an ancestor, one returning,
+			// which has neither label nor block, and one with a block.
 			panic("unreachable")
 		}
 
@@ -2908,19 +3273,28 @@ func (packageBuilder *builder) buildYieldResume(function *Function, jump *types.
 }
 
 // stmt lowers statement s to IR form, emitting code to fn.
+//
+// Mutates: function gains the blocks and instructions for the statement
 func (packageBuilder *builder) stmt(function *Function, statement ast.Stmt) {
 	// The label of the current statement.  If non-nil, its _goto
 	// target is always set; its _break and _continue are set only
 	// within the body of switch/typeswitch/select/for/range.
 	// It is effectively an additional default-nil parameter of stmt().
 	var label *lblock
+	// current is the statement being lowered, which moves on to the statement a label marks.
+	current := statement
 start:
-	switch typed := statement.(type) {
+	switch typed := current.(type) {
 	case *ast.EmptyStmt:
 		// ignore.  (Usually removed by gofmt.)
 
 	case *ast.DeclStmt: // Con, Var or Typ
-		decl := typed.Decl.(*ast.GenDecl)
+		decl, isGenDecl := typed.Decl.(*ast.GenDecl)
+		if !isGenDecl {
+			// Invariant: go/ast documents a DeclStmt's Decl as a GenDecl, since functions are declared only at
+			// package level.
+			panic(fmt.Sprintf("declaration statement holds %T, not a GenDecl", typed.Decl))
+		}
 		if decl.Tok == token.VAR {
 			for _, spec := range decl.Specs {
 				if vs, ok := spec.(*ast.ValueSpec); ok {
@@ -2933,24 +3307,29 @@ start:
 		if typed.Label.Name == "_" {
 			// Blank labels can't be the target of a goto, break,
 			// or continue statement, so we don't need a new block.
-			statement = typed.Stmt
+			current = typed.Stmt
 			goto start
 		}
 		label = function.lblockOf(function.label(typed.Label))
 		label.resolved = true
 		emitJump(function, label._goto, typed)
 		function.currentBlock = label._goto
-		statement = typed.Stmt
+		current = typed.Stmt
 		goto start // effectively: tailcall stmt(fn, s.Stmt, label)
 
 	case *ast.ExprStmt:
 		packageBuilder.expr(function, typed.X)
 
 	case *ast.SendStmt:
+		channelType, isChannel := typeutil.CoreType(function.typeOf(typed.Chan)).(*types.Chan)
+		if !isChannel {
+			// Invariant: go/types accepts a send only on an operand whose core type is a channel.
+			panic(fmt.Sprintf("send on %s, which has no channel core type", function.typeOf(typed.Chan)))
+		}
 		instr := &Send{
 			Channel: packageBuilder.expr(function, typed.Chan),
 			X: emitConv(function, packageBuilder.expr(function, typed.Value),
-				typeutil.CoreType(function.typeOf(typed.Chan)).(*types.Chan).Elem(), typed),
+				channelType.Elem(), typed),
 		}
 		function.emit(instr, typed)
 
@@ -2965,11 +3344,17 @@ start:
 	case *ast.AssignStmt:
 		switch typed.Tok {
 		case token.ASSIGN, token.DEFINE:
-			packageBuilder.assignStmt(function, typed.Lhs, typed.Rhs, typed.Tok == token.DEFINE, statement)
+			packageBuilder.assignStmt(function, typed.Lhs, typed.Rhs, typed.Tok == token.DEFINE, current)
 
 		default: // +=, etc.
 			op := typed.Tok + token.ADD - token.ADD_ASSIGN
-			packageBuilder.assignOp(function, packageBuilder.addr(function, typed.Lhs[0], false), packageBuilder.expr(function, typed.Rhs[0]), op, typed)
+			packageBuilder.assignOp(
+				function,
+				packageBuilder.addr(function, typed.Lhs[0], false),
+				packageBuilder.expr(function, typed.Rhs[0]),
+				op,
+				typed,
+			)
 		}
 
 	case *ast.GoStmt:
@@ -3043,10 +3428,15 @@ start:
 		packageBuilder.rangeStmt(function, typed, label, typed)
 
 	default:
+		// Invariant: the cases above cover every statement go/ast has but BadStmt, which go/types rejects, and the
+		// case and comm clauses, which their switch or select builds.
 		panic(fmt.Sprintf("unexpected statement kind: %T", typed))
 	}
 }
 
+// branchStmt emits to fn the jump for the break, continue, goto or fallthrough statement `stmt`.
+//
+// Mutates: function moves on to an unreachable block after the jump
 func (packageBuilder *builder) branchStmt(function *Function, stmt *ast.BranchStmt) {
 	var block *BasicBlock
 	if stmt.Label == nil {
@@ -3080,9 +3470,12 @@ func (packageBuilder *builder) branchStmt(function *Function, stmt *ast.BranchSt
 	function.currentBlock = function.newBasicBlock("unreachable")
 }
 
+// returnStmt emits to fn code for the return statement `stmt`.
+//
+// Mutates: function moves on to an unreachable block after the return
 func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnStmt) {
-	// TODO(dh): we could emit tighter position information by
-	// using the ith returned expression
+	// Each stored result takes the position of the whole return
+	// statement, not that of its own returned expression.
 
 	var results []Value
 
@@ -3092,7 +3485,11 @@ func (packageBuilder *builder) returnStmt(function *Function, stmt *ast.ReturnSt
 	if len(stmt.Results) == 1 && sig.Results().Len() > 1 {
 		// Return of one expression in a multi-valued function.
 		tuple := packageBuilder.exprN(function, stmt.Results[0])
-		ttuple := tuple.Type().(*types.Tuple)
+		ttuple, isTuple := tuple.Type().(*types.Tuple)
+		if !isTuple {
+			// Invariant: exprN returns a value whose type is a tuple.
+			panic(fmt.Sprintf("returned %s has type %s, not a tuple", tuple, tuple.Type()))
+		}
 		for index, length := 0, ttuple.Len(); index < length; index++ {
 			results = append(results,
 				emitConv(function, emitExtract(function, tuple, index, stmt),
@@ -3177,23 +3574,23 @@ func (packageBuilder *builder) buildParamsOnly(function *Function) {
 	// export data, we must set fn.Parameters even though there is no
 	// body code to reference them.
 	if recv := function.Signature.Recv(); recv != nil {
-		// TODO(dh): should we synthesize a node so we have position info?
+		// The parameter has no syntax node, so it carries no position.
 		function.addParamVariable(recv, nil)
 	}
 	parameters := function.Signature.Params()
 	for index, length := 0, parameters.Len(); index < length; index++ {
-		// TODO(dh): should we synthesize a node so we have position info?
+		// The parameter has no syntax node, so it carries no position.
 		function.addParamVariable(parameters.At(index), nil)
 	}
 }
 
 // buildFromSyntax builds fn.Body from fn.syntax, which must be non-nil.
+//
+// Mutates: function gains its body, built from its syntax
 func (packageBuilder *builder) buildFromSyntax(function *Function) {
-	var (
-		recvField *ast.FieldList
-		body      *ast.BlockStmt
-		functype  *ast.FuncType
-	)
+	var recvField *ast.FieldList
+	var body *ast.BlockStmt
+	var functype *ast.FuncType
 	switch syntax := function.syntax.(type) {
 	case *ast.FuncDecl:
 		functype = syntax.Type
@@ -3207,8 +3604,12 @@ func (packageBuilder *builder) buildFromSyntax(function *Function) {
 		functype = syntax.Type
 		body = syntax.Body
 	case nil:
+		// Invariant: buildFromSyntax is the build strategy only of functions created with syntax, as createFunction
+		// gives one without syntax buildParamsOnly.
 		panic("no syntax")
 	default:
+		// Invariant: the syntax of a function built from syntax is the FuncDecl createFunction was given or the
+		// FuncLit expr0 found.
 		panic(syntax) // unexpected syntax
 	}
 	function.source = function
@@ -3233,20 +3634,27 @@ func (packageBuilder *builder) buildFromSyntax(function *Function) {
 
 // buildYieldFunc builds the body of the yield function created
 // from a range-over-func *ast.RangeStmt.
+//
+// Mutates: function gains its body, built from the range statement, and its source and targets
 func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	// See builder.rangeFunc for detailed documentation on how fn is set up.
 	//
 	// In pseudo-Go this roughly builds:
 	// func yield(_k tk, _v tv) bool {
-	// 	   if jump != READY { panic("yield function called after range loop exit") }
-	//     jump = BUSY
+	// 	   if jump != jReady { panic("yield function called after range loop exit") }
+	//     jump = jBusy
 	//     k, v = _k, _v // assign the iterator variable (if needed)
 	//     ... // rng.Body
 	//   continue:
-	//     jump = READY
+	//     jump = jReady
 	//     return true
 	// }
-	stmt := function.syntax.(*ast.RangeStmt)
+	stmt, isRange := function.syntax.(*ast.RangeStmt)
+	if !isRange {
+		// Invariant: buildYieldFunc is the build strategy only of yield functions, which rangeFunc creates with
+		// their range statement as syntax.
+		panic(fmt.Sprintf("yield function %s has syntax %T, not a range statement", function, function.syntax))
+	}
 	function.source = function.parent.source
 	function.startBody()
 	parameters := function.Signature.Params()
@@ -3273,7 +3681,7 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	}
 
 	// continue:
-	//   jump = READY
+	//   jump = jReady
 	//   return true
 	saved := function.currentBlock
 	function.currentBlock = ycont
@@ -3283,8 +3691,8 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 
 	// Emit header:
 	//
-	//   if jump != READY { panic("yield iterator accessed after exit") }
-	//   jump = BUSY
+	//   if jump != jReady { panic("yield iterator accessed after exit") }
+	//   jump = jBusy
 	//   k, v = _k, _v
 	function.currentBlock = saved
 	yloop := function.newBasicBlock("yield-loop")
@@ -3304,7 +3712,8 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	storeVariable(function, function.jump, jBusy, stmt.Body)
 
 	// Initialize k and v from params.
-	var tk, tv types.Type
+	var tk types.Type
+	var tv types.Type
 	if stmt.Key != nil && !isBlankIdent(stmt.Key) {
 		tk = function.typeOf(stmt.Key) // fn.parent.typeOf is identical
 	}
@@ -3313,20 +3722,32 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 	}
 	if stmt.Tok == token.DEFINE {
 		if tk != nil {
-			emitLocalVariable(function, identVariable(function, stmt.Key.(*ast.Ident)), stmt.Key)
+			id, isIdent := stmt.Key.(*ast.Ident)
+			if !isIdent {
+				// Invariant: go/types accepts only identifiers on the left of a range clause's :=.
+				panic(fmt.Sprintf("range key %T is not an identifier", stmt.Key))
+			}
+			emitLocalVariable(function, identVariable(function, id), stmt.Key)
 		}
 		if tv != nil {
-			emitLocalVariable(function, identVariable(function, stmt.Value.(*ast.Ident)), stmt.Value)
+			id, isIdent := stmt.Value.(*ast.Ident)
+			if !isIdent {
+				// Invariant: go/types accepts only identifiers on the left of a range clause's :=.
+				panic(fmt.Sprintf("range value %T is not an identifier", stmt.Value))
+			}
+			emitLocalVariable(function, identVariable(function, id), stmt.Value)
 		}
 	}
-	var key, value Value
+	var key Value
+	var value Value
 	if len(function.Parameters) > 0 {
 		key = function.Parameters[0]
 	}
 	if len(function.Parameters) > 1 {
 		value = function.Parameters[1]
 	}
-	var kl, vl lvalue
+	var kl lvalue
+	var vl lvalue
 	if tk != nil {
 		kl = packageBuilder.addr(function, stmt.Key, false) // non-escaping
 	}
@@ -3385,6 +3806,8 @@ func (packageBuilder *builder) buildYieldFunc(function *Function) {
 var cpuLimit = make(chan unit, runtime.GOMAXPROCS(0))
 
 // buildPackageInit builds fn.Body for the synthetic package initializer.
+//
+// Mutates: init gains its body, and its version and info are set for each initializer and then cleared
 func (packageBuilder *builder) buildPackageInit(init *Function) {
 	irPackage := init.Package
 	init.startBody()
@@ -3401,6 +3824,8 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 	for _, importsPackage := range irPackage.Types.Imports() {
 		prereq := irPackage.Program.packages[importsPackage]
 		if prereq == nil {
+			// Invariant: Package.Build requires, as its doc says, that CreatePackage was called for every direct
+			// import, so each has a package here.
 			panic(fmt.Sprintf(
 				"Package(%q).Build(): unsatisfied import: Program.CreatePackage(%q) was not called",
 				irPackage.Types.Path(),
@@ -3415,6 +3840,8 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 
 	// Initialize package-level vars in correct order.
 	if len(irPackage.info.InitOrder) > 0 && len(irPackage.files) == 0 {
+		// Invariant: CreatePackage takes info from type-checking the package's files, so it orders variable
+		// initializers only when there are files.
 		panic("no source files provided for package. cannot initialize globals")
 	}
 
@@ -3429,11 +3856,20 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 			// 1:1 initialization: var x, y = a(), b()
 			var lval lvalue
 			if variable := varinit.Lhs[0]; variable.Name() != "_" {
-				lval = &address{addr: irPackage.values[variable].(*Global)}
+				global, isGlobal := irPackage.values[variable].(*Global)
+				if !isGlobal {
+					// Invariant: CreatePackage records every package-level variable as a Global.
+					panic(fmt.Sprintf(
+						"package-level variable %s is %T, not a Global",
+						variable.Name(),
+						irPackage.values[variable],
+					))
+				}
+				lval = &address{addr: global}
 			} else {
 				lval = blank{}
 			}
-			// TODO(dh): do emit position information
+			// The assignment carries no position information.
 			packageBuilder.assign(init, lval, varinit.Rhs, true, nil, nil)
 		} else {
 			// n:1 initialization: var x, y :=  f()
@@ -3442,7 +3878,16 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 				if variable.Name() == "_" {
 					continue
 				}
-				emitStore(init, irPackage.values[variable].(*Global), emitExtract(init, tuple, index, nil), nil)
+				global, isGlobal := irPackage.values[variable].(*Global)
+				if !isGlobal {
+					// Invariant: CreatePackage records every package-level variable as a Global.
+					panic(fmt.Sprintf(
+						"package-level variable %s is %T, not a Global",
+						variable.Name(),
+						irPackage.values[variable],
+					))
+				}
+				emitStore(init, global, emitExtract(init, tuple, index, nil), nil)
 			}
 		}
 	}
@@ -3458,7 +3903,14 @@ func (packageBuilder *builder) buildPackageInit(init *Function) {
 			if decl, ok := decl.(*ast.FuncDecl); ok {
 				id := decl.Name
 				if !isBlankIdent(id) && id.Name == "init" && decl.Recv == nil {
-					declaredInit := irPackage.values[irPackage.info.Defs[id]].(*Function)
+					declaredInit, isFunction := irPackage.values[irPackage.info.Defs[id]].(*Function)
+					if !isFunction {
+						// Invariant: CreatePackage records every package-level function as a Function.
+						panic(fmt.Sprintf(
+							"init function is %T, not a Function",
+							irPackage.values[irPackage.info.Defs[id]],
+						))
+					}
 					var call Call
 					call.Call.Value = declaredInit
 					call.setType(types.NewTuple())
