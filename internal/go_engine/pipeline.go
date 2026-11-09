@@ -68,6 +68,12 @@ type pipeline struct {
 	// buildRuns are the runs mergeBuildRuns was handed, the host's first, nil unless `--other-builds` found a build
 	// beside the host's to check.
 	buildRuns []buildRun
+
+	// overlaps is whether a run whose findings cache has no store may start the lint phase's rules beside the load,
+	// which only a test turns off, to hold a run that does to one that does not; speculation is that pass once started
+	// (see pipeline_speculative_lint.go).
+	overlaps    bool
+	speculation *speculativeLint
 }
 
 func newPipeline(
@@ -87,6 +93,7 @@ func newPipeline(
 		writer:        contract.NewWriter(standardOutput),
 		standardError: standardError,
 		memory:        memory,
+		overlaps:      true,
 	}
 }
 
@@ -380,7 +387,8 @@ func (engine *pipeline) reread(file string) {
 // and rereads it, and there the rename's loads read the disk and its rules read the rewrite from the overlay first.
 // described.contents is written only on the main goroutine, between phases, and the goroutines of gofmt, the load and
 // the rules read it only while that goroutine waits for them, so it is never read while it is written and takes no
-// lock.
+// lock. The rules beside the load (speculativeLint) read it while the main goroutine runs the long-line wrap, which
+// stops them before its first reread.
 func (engine *pipeline) held(file string) ([]byte, bool) {
 	contents, isHeld := engine.described.contents[file]
 	return contents, isHeld

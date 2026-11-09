@@ -109,6 +109,10 @@ type Loaded struct {
 
 	// Inputs are what the load read to decide what it returned, for the inputs record (see inputs.go).
 	Inputs Inputs
+
+	// testFunctions is each analyzed test variant's refused test functions, judged as it was checked, for the
+	// diagnostics.
+	testFunctions map[*packages.Package][]Diagnostic
 }
 
 // Packages loads the packages the patterns name from directory, with the current environment plus
@@ -149,6 +153,12 @@ type Caching struct {
 	// parse, and the build constraints of the files no package holds. go list, when the in-process lister doubts, and
 	// the cgo tool still read the disk, which the held bytes are. Nil reads every file from disk.
 	Held Held
+
+	// Begin, when set, is called once the graph is built and the Restorer has decided, before any package is
+	// type-checked, on the load's goroutine, so the caller can start analyzing beside the load (see Overlap). Only a
+	// Restorer whose decisions are all made before the first type check may be given with it, as one without a store
+	// is, restoring the standard library from the binary.
+	Begin func(*Overlap)
 }
 
 // PackagesCached is Packages with the findings cache.
@@ -162,9 +172,10 @@ func PackagesCached(
 	return loadWorkspace(directory, patterns, environment, census, true, caching, nil)
 }
 
-// loadWorkspace is PackagesCached, and PackagesWithOverlay when overlay is set. With translateOwnCgo unset it
-// translates nothing even for a project with cgo files of its own, which only the tests ask for, to judge the load
-// with package "C" faked on such a package.
+// loadWorkspace is PackagesCached, PackagesWithOverlay when overlay is set, and PackagesOverlapping when caching's
+// Begin is.
+// With translateOwnCgo unset it translates nothing even for a project with cgo files of its own, which only the tests
+// ask for, to judge the load with package "C" faked on such a package.
 func loadWorkspace(
 	directory string,
 	patterns []string,
@@ -175,6 +186,10 @@ func loadWorkspace(
 	overlay map[string][]byte,
 ) (*Loaded, error) {
 	started := time.Now()
+	// Closed on every return, a failed load's included, so an analysis waiting on a package that is final only at the
+	// load's end never waits forever.
+	ended := make(chan struct{})
+	defer close(ended)
 	workspace, absoluteError := filepath.Abs(directory)
 	if absoluteError != nil {
 		return nil, fmt.Errorf("resolving %s: %w", directory, absoluteError)
@@ -217,7 +232,7 @@ func loadWorkspace(
 		}
 		translationElapsed = time.Since(translationStarted)
 	}
-	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching, overlay, compiled)
+	roots, loaded, loadError := fromSource(workspace, listed, buildContext, caching, overlay, compiled, ended)
 	if loadError != nil {
 		return nil, loadError
 	}
@@ -236,7 +251,7 @@ func loadWorkspace(
 	loaded.GoListReason = listed.goListReason
 	loaded.Roots = roots
 	loaded.PackagesInWorkspace = len(loaded.Packages)
-	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages)
+	loaded.Diagnostics = diagnostics(workspace, roots, loaded.Packages, loaded.testFunctions)
 	packages.Visit(roots, nil, func(*packages.Package) { loaded.PackagesLoaded++ })
 	loaded.FilesTypeChecked = filesTypeChecked(workspace, loaded.Packages)
 	excluded, unseen, excludedError := excludedAndUnseen(workspace, buildContext, roots, census)
@@ -265,7 +280,8 @@ func hasOwnCgo(listed *listing, workspace string) bool {
 // outputs, and returns its roots and what the load knows of them before the diagnostics and the counts. The
 // declarations of dependencies that reach their cgo files lose what reaches it only once every package is
 // type-checked. caching's Restorer is told which loader ran, since a translated package has other files than one
-// checked with package "C" faked.
+// checked with package "C" faked. caching's Begin, when set, is given the graph once the Restorer has decided and
+// before the first type check, with ended, closed when the load returns, for what is final only then.
 func fromSource(
 	workspace string,
 	listed *listing,
@@ -273,6 +289,7 @@ func fromSource(
 	caching Caching,
 	overlay map[string][]byte,
 	compiled map[string]*compiledPackage,
+	ended <-chan struct{},
 ) ([]*packages.Package, *Loaded, error) {
 	sizes := types.SizesFor("gc", buildContext.GOARCH)
 	if sizes == nil {
@@ -290,6 +307,16 @@ func fromSource(
 			loaderName = LoaderCgoTranslated
 		}
 		typeChecker.restored = caching.Restorer.Restore(loaderName, loadedOf(reachable), analyzedPackages)
+	}
+	for _, analyzedPackage := range analyzedPackages {
+		typeChecker.analyzed[analyzedPackage] = true
+	}
+	if caching.Begin != nil {
+		nodes := make(map[*packages.Package]*node, len(reachable))
+		for _, current := range reachable {
+			nodes[current.loaded] = current
+		}
+		caching.Begin(&Overlap{Packages: analyzedPackages, nodes: nodes, ended: ended})
 	}
 	typeChecker.load(reachable)
 
@@ -319,6 +346,7 @@ func fromSource(
 		Withheld:                          byPackage,
 		FilesParsed:                       int(typeChecker.filesParsed.Load()),
 		PackagesFromExportData:            int(typeChecker.fromExportData.Load()),
+		testFunctions:                     typeChecker.testFunctions,
 	}, nil
 }
 

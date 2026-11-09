@@ -110,7 +110,8 @@ func (engine *pipeline) renamesNames() bool {
 }
 
 // runRename is the part of the fix phase that needs types: the renames the naming rules ask for. The lint phase's rules
-// run over the load first, through the findings cache, and the run keeps what they found for the lint phase, so a
+// run over the load first, through the findings cache or as the pass beside the load when one ran (speculativeLint),
+// and the run keeps what they found for the lint phase, so a
 // tree whose findings ask for no rename pays nothing past its one load. Otherwise it renames (see rename) and returns
 // the load that proved what it wrote, which the types and lint phases read in place of the first, with no lint pass,
 // and marks the run renamed, so the lint phase runs without the findings cache: the first pass's findings and the
@@ -120,7 +121,15 @@ func (engine *pipeline) runRename(loaded *load.Loaded, loadError error) (*load.L
 		return loaded, nil
 	}
 	started := time.Now()
-	first := engine.lint(loaded)
+	var first lintPass
+	if engine.speculation != nil {
+		// The pass beside the load is the lint over this load. Its own time ran beside the types; what the run waits
+		// for it here is the lint phase's, as runLint counts it.
+		first = engine.speculativePass()
+		first.elapsed = time.Since(started)
+	} else {
+		first = engine.lint(loaded)
+	}
 	if first.checkError != nil {
 		return loaded, &first
 	}
