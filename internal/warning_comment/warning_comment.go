@@ -69,8 +69,9 @@ func WordsIn(texts []string) []Word {
 		spans = append(spans, commentSpan{start: start, end: joined.Len(), cut: len(text) - len(body)})
 	}
 	text := joined.String()
-	// Most comments hold none of the words, so they skip the masking.
-	if !warningWord.MatchString(text) {
+	// Most comments hold none of the words, so they skip the masking, and the substring searches turn them away
+	// before the regexp is asked.
+	if !holdsWarningWord(text) || !warningWord.MatchString(text) {
 		return nil
 	}
 	// Code blocks are masked before backticks, in the order the shouting rule masks them, so a backtick inside a code
@@ -96,6 +97,14 @@ func WordsIn(texts []string) []Word {
 		}
 	}
 	return words
+}
+
+// holdsWarningWord is whether text holds one of the words anywhere, as warningWord would say, read as three plain
+// substring searches, which cost a fraction of the regexp's backtracker over a comment that holds none of them. It is
+// exactly warningWord.MatchString while that pattern is these three literal words, in capitals and unbounded, so it
+// turns no comment away the regexp would read: a word added to warningWord is added here too.
+func holdsWarningWord(text string) bool {
+	return strings.Contains(text, "TODO") || strings.Contains(text, "FIXME") || strings.Contains(text, "XXX")
 }
 
 // isWholeWord is whether text[start:end] stands alone: no letter, digit or underscore of any script touches it on

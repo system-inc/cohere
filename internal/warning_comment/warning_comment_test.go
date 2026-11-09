@@ -47,3 +47,52 @@ func TestWordsInFindsNothingInAGroupWithoutTheWords(test *testing.T) {
 		}
 	}
 }
+
+// The cheap test before the masks must never turn a comment away that holds a word. Each word is found at the start,
+// in the middle and at the end of a line comment and of a block comment, alone in its group and as the last comment
+// of a group whose first comment holds none, so a test that reads only the start, only one comment or only some of
+// the words fails here.
+func TestWordsInFindsEachWordWhereverItStands(test *testing.T) {
+	test.Parallel()
+
+	for _, word := range []string{"TODO", "FIXME", "XXX"} {
+		for _, text := range []string{
+			"// " + word + " at the start",
+			"// in the " + word + " middle",
+			"// at the end " + word,
+			"/* " + word + " at the start */",
+			"/* in the " + word + " middle */",
+			"/* at the end\n   " + word + " */",
+		} {
+			for _, texts := range [][]string{{text}, {"// nothing here", text}} {
+				words := WordsIn(texts)
+				if len(words) != 1 {
+					test.Errorf("WordsIn(%q) = %v, want one word", texts, words)
+					continue
+				}
+				got := texts[words[0].Comment][words[0].Start:words[0].End]
+				if words[0].Comment != len(texts)-1 || got != word {
+					test.Errorf("WordsIn(%q) found %q in comment %d, want %q in comment %d",
+						texts, got, words[0].Comment, word, len(texts)-1)
+				}
+			}
+		}
+	}
+}
+
+// holdsWarningWord says yes wherever the regexp would match and no wherever it would not, so it turns away exactly the
+// texts the regexp would and no other: lowercase and mixed case, a word cut short, and an empty text are turned away,
+// and a word inside a longer one passes on to the whole-word test.
+func TestHoldsWarningWordAgreesWithTheRegexp(test *testing.T) {
+	test.Parallel()
+
+	for _, text := range []string{
+		"", "todo", "Todo", "fixme", "Fixme", "xxx", "XxX", "TOD", "FIXM", "XX", "TO DO", "FIX ME", "X X X",
+		"TODO", "FIXME", "XXX", "TODOS", "TODO_LIST", "XXXX", "0xXXX", "ÜTODO", "a\nFIXME", "ends in XXX",
+	} {
+		want := warningWord.MatchString(text)
+		if got := holdsWarningWord(text); got != want {
+			test.Errorf("holdsWarningWord(%q) = %t, want %t as the regexp says", text, got, want)
+		}
+	}
+}
