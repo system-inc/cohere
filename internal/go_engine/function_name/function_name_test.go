@@ -64,11 +64,15 @@ func TestMatchesAgreesWithFullName(test *testing.T) {
 	add(types.NewFunc(token.NoPos, nil, "orphan", unsigned))
 	add(types.NewFunc(token.NoPos, types.NewPackage("", "pathless"), "pathless", unsigned))
 	// Each function is asked about its own full name, names a step from it (a letter short, a letter long, the
-	// package's path cut, the receiver without its parentheses or its pointer), and every full name that ends in
-	// its own short name, the names it could be mistaken for.
+	// package's path cut, the receiver without its parentheses or its pointer, a letter put in before its own
+	// name), every full name that ends in its own short name, and every full name of its own package, among them
+	// one that ends in its name with more before it, strings.LastIndex for strings.Index, and one that begins
+	// with it, bytes.EqualFold for bytes.Equal: the names it could be mistaken for.
 	bySuffix := map[string][]string{}
+	byPackage := map[*types.Package][]string{}
 	for _, function := range functions {
 		bySuffix[function.Name()] = append(bySuffix[function.Name()], function.FullName())
+		byPackage[function.Pkg()] = append(byPackage[function.Pkg()], function.FullName())
 	}
 	met := map[string]int{}
 	questions := 0
@@ -81,6 +85,10 @@ func TestMatchesAgreesWithFullName(test *testing.T) {
 		asked := append([]string{full, full[:len(full)-1], full + "s", function.Name(),
 			strings.TrimPrefix(strings.Replace(full, ").", ".", 1), "("), strings.Replace(full, "(*", "(", 1)},
 			bySuffix[function.Name()]...)
+		asked = append(asked, byPackage[function.Pkg()]...)
+		if index := strings.LastIndex(full, "."); index > 0 {
+			asked = append(asked, full[:index+1]+"X"+full[index+1:])
+		}
 		if index := strings.LastIndex(full, "."); index > 0 {
 			asked = append(asked, full[:index]+"/"+full[index+1:])
 		}
@@ -101,6 +109,21 @@ func TestMatchesAgreesWithFullName(test *testing.T) {
 		}
 	}
 	test.Logf("%d functions, %d questions, %v", len(functions), questions, met)
+	// The shapes a loosened length check would take for the function, asked of the pairs that have them.
+	longerBefore := 0
+	for _, function := range functions {
+		for _, other := range byPackage[function.Pkg()] {
+			if other != function.FullName() && strings.HasSuffix(other, function.Name()) &&
+				strings.HasPrefix(other, function.Pkg().Path()+".") {
+				longerBefore++
+			}
+		}
+	}
+	test.Logf("%d questions name a function of the same package ending in the asked one's name", longerBefore)
+	if longerBefore == 0 {
+		test.Error("no question names a longer function ending in the asked one's name, so the length check " +
+			"is unpinned")
+	}
 	for _, label := range []string{"function matching", "function not", "method matching", "method not"} {
 		if met[label] == 0 {
 			test.Errorf("the fixture never met %s, so the comparison proves nothing of it", label)
