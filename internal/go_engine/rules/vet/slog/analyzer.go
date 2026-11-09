@@ -62,8 +62,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/slog"
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder, as the original's
 // Preorder visits them, of which it judges those of log/slog's functions taking key-value pairs.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
-	Node:  checkCall,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      checkCall,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

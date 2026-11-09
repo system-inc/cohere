@@ -67,8 +67,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/timefo
 // even one that does not import "time": a value of time.Time, returned by a function of another package, has its
 // Format method called without the import.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CallExpr)(nil)},
-	Node:  checkCall,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil)},
+	Node:      checkCall,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

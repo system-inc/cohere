@@ -34,7 +34,8 @@ const Name = "cohere-go/consistency-no-undefined-initializer"
 
 // listener hears every general declaration of the syntax dispatcher's walk, the var declarations among them. A var's
 // initializer can hold a function literal with var declarations of its own, which the walk reaches too.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.GenDecl)(nil)}, Node: judgeDeclaration}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.GenDecl)(nil)}, Node: judgeDeclaration}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_undefined_initializer", "Flags a var with a type whose "+

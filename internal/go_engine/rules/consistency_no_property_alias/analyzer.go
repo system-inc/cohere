@@ -57,7 +57,8 @@ import (
 const Name = "cohere-go/consistency-no-property-alias"
 
 // listener hears every assignment and declaration statement of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.AssignStmt)(nil), (*ast.DeclStmt)(nil)}, Node: judgeStatement}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.AssignStmt)(nil), (*ast.DeclStmt)(nil)}, Node: judgeStatement}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_property_alias", "Flags a local inside a function that "+

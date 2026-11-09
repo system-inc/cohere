@@ -34,7 +34,8 @@ const Name = "cohere-go/correctness-require-invariant-reason"
 // the whole file before any panic, a panic's recovered variables are its own function's and none of the literals
 // inside it, and a Must call is judged by whether it runs while the package initializes, which the walk carries down
 // from the declaration holding it and through each function literal, never entering a var's names or type.
-var listener = rule.Listener{Requires: []*analysis.Analyzer{marker.Analyzer}, FileEnter: judgeFile}
+var listener = rule.Listener{
+	FileLocal: true, Requires: []*analysis.Analyzer{marker.Analyzer}, FileEnter: judgeFile}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_invariant_reason", "Flags a call to the builtin "+

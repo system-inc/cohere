@@ -22,7 +22,8 @@ const Name = "cohere-go/correctness-require-checked-assertion"
 
 // listener hears every type assertion of the syntax dispatcher's walk, with the ancestors a type switch around it is
 // found among.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.TypeAssertExpr)(nil)}, Node: judgeAssertion}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.TypeAssertExpr)(nil)}, Node: judgeAssertion}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "correctness_require_checked_assertion", "Flags a single-value type "+

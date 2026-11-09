@@ -35,8 +35,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/nilfun
 // Listener is what the port hears of each package from the dispatcher: every binary expression, in preorder, as the
 // original's Preorder visits them, of which it judges the comparisons with nil.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BinaryExpr)(nil)},
-	Node:  checkComparison,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BinaryExpr)(nil)},
+	Node:      checkComparison,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

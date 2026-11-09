@@ -36,8 +36,9 @@ const Doc = "A function's error value should be its last return value"
 // Listener is what the port hears of each package from the dispatcher: every function declaration and every function
 // literal, with the literal's ancestors, which say whether the original's builder ever builds it.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
-	Node:  checkFunction,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.FuncDecl)(nil), (*ast.FuncLit)(nil)},
+	Node:      checkFunction,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

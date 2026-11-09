@@ -27,7 +27,8 @@ import (
 const Name = "cohere-go/consistency-no-else-return"
 
 // listener hears every if of the syntax dispatcher's walk, with its parent, which says whether it heads a chain.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.IfStmt)(nil)}, Node: judgeIf}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.IfStmt)(nil)}, Node: judgeIf}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_else_return", "Flags the final else of an if or else-if "+

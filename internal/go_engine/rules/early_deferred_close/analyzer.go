@@ -25,7 +25,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every block, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BlockStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BlockStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		block, isBlock := node.(*ast.BlockStmt)
 		if !isBlock {

@@ -28,6 +28,7 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every call, in preorder.
 var Listener = rule.Listener{
+	FileLocal: true,
 	// The original's root is a call of a Symbol, so code.Matches walks the type index's calls of fmt.Sprint and of
 	// fmt.Sprintf instead of the syntax. Those are the calls whose callee, through parentheses and a selector,
 	// resolves to either function, which are the calls the gate in Check lets through, so the port hears every call

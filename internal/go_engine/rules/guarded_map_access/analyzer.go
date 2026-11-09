@@ -46,7 +46,8 @@ import (
 // names no symbol, so code.Matches walks the if statements of every package, as this does, and its root is an Or of
 // if statements alone, so no other kind of node is asked.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.IfStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		ifStatement, isIf := node.(*ast.IfStmt)
 		if !isIf {

@@ -266,6 +266,15 @@ func TestValidateRefusesEachMalformedRule(test *testing.T) {
 			saying: "twice in IntermediateRepresentation.Instructions",
 		},
 		{
+			name: "a file-local listener with PackageExit",
+			rule: listening(Listener{
+				FileLocal:   true,
+				FileEnter:   plantedFile,
+				PackageExit: plantedPackageExit,
+			}),
+			saying: "is marked FileLocal and declares PackageExit",
+		},
+		{
 			name:   "a listener with PackageExit alone",
 			rule:   listening(Listener{PackageExit: plantedPackageExit}),
 			saying: "declares PackageExit alone",

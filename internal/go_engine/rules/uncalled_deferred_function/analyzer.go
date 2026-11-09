@@ -22,7 +22,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every defer statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.DeferStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.DeferStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		deferred, isDefer := node.(*ast.DeferStmt)
 		if !isDefer {

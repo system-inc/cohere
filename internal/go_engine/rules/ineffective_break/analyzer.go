@@ -24,7 +24,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every for and range loop, in preorder, whose
 // body it judges.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.ForStmt)(nil), (*ast.RangeStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch loop := node.(type) {
 		case *ast.ForStmt:

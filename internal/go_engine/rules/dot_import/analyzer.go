@@ -40,6 +40,7 @@ const message = "should not use dot imports"
 // are all the port reads of the syntax. It requires staticcheck's config analyzer, as the original does, for the
 // paths dot_import_whitelist allows.
 var Listener = rule.Listener{
+	FileLocal: true,
 	Requires:  []*analysis.Analyzer{config.Analyzer},
 	FileEnter: checkFile,
 }

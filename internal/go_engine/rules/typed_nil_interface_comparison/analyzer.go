@@ -48,7 +48,8 @@ import (
 // representation: every function, each judged on its own with the nilness facts of the package. It requires
 // return_nil_ness, whose result it reads.
 var Listener = rule.Listener{
-	Requires: []*analysis.Analyzer{return_nil_ness.Analyzer},
+	FileLocal: true,
+	Requires:  []*analysis.Analyzer{return_nil_ness.Analyzer},
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function: func(context *rule.Context, function *intermediate_representation.Function) {
 			nilnesses, isNilnesses := context.ResultOf(return_nil_ness.Analyzer).(*return_nil_ness.Result)

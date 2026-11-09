@@ -55,6 +55,14 @@ type Context struct {
 	// cursor is the inspector's cursor of the node the syntax dispatcher is calling Node on, and the zero cursor, which
 	// is not valid, between those calls.
 	cursor inspector.Cursor
+	// fileLocal is set on the context of a file-local run, which hears only some of the package's files, so State,
+	// which gathers across them, panics there (see Listener.FileLocal).
+	fileLocal bool
+	// file is the file the syntax walk is calling the check on, from FileEnter through FileExit, and nil outside one,
+	// and fileStates is each file's FileState, by file.
+	file *token.File
+	//cohere:ignore consistency-no-any each check chooses its own state type, read back through FileState's type
+	fileStates map[*token.File]any
 }
 
 // NewContext is the context a check registered as ruleName reads over the package pass analyzes, its findings handed
@@ -83,6 +91,22 @@ func NewContext(
 		requires:    requires,
 		options:     options,
 	}
+}
+
+// NewFileLocalContext is NewContext's context for a file-local run of a listener marked FileLocal, which hears only
+// some of the package's files, where State panics, so a listener marked wrongly crashes on its rule rather than
+// judging some of the files as though they were all of them.
+func NewFileLocalContext(
+	ruleName string,
+	pass *analysis.Pass,
+	requires []*analysis.Analyzer,
+	options *flag.FlagSet,
+	isGenerated func(filename string) bool,
+	sink func(ruleName string, diagnostic analysis.Diagnostic),
+) *Context {
+	context := NewContext(ruleName, pass, requires, options, isGenerated, sink)
+	context.fileLocal = true
+	return context
 }
 
 // Report hands diagnostic to the sink under the rule name the check was registered under. The check never names its
@@ -157,18 +181,63 @@ func (context *Context) EnterNode(cursor inspector.Cursor) {
 	context.cursor = cursor
 }
 
+// EnterFile is called by the syntax dispatcher as it enters file, before FileEnter, and with nil once FileExit has
+// returned, so FileState reads the slot of the file the call is on and panics outside one. Only the dispatcher calls
+// it.
+func (context *Context) EnterFile(file *token.File) {
+	context.file = file
+}
+
 // LeaveNode makes Cursor panic again, as Node returns. See EnterNode.
 func (context *Context) LeaveNode() {
 	context.cursor = inspector.Cursor{}
 }
 
+// FileState is the check's own state over the file the syntax walk is calling it on, a new Kind made on the first call
+// on that file and the same one on every call after on it, so a check gathers across one file's calls and judges in a
+// later one, FileExit at the latest. It is keyed by the file, not cleared as a file is entered, so it holds however a
+// package's files are split among runs (see Listener.FileLocal), and a check can never read another file's. A
+// listener marked FileLocal may read it. It panics outside the syntax walk's calls on a file: in PackageExit, and on
+// the walk over the intermediate representation, where no check needs one.
+//
+// Mutates: context gains the file's state on the first call on that file, handed back on every call after
+func FileState[Kind any](context *Context) *Kind {
+	if context.file == nil {
+		// Invariant: the syntax dispatcher sets the file for every call from FileEnter through FileExit, so a call
+		// outside one is a check reading it where no file is being walked, which the dispatcher's recover makes this
+		// rule's crash on the package.
+		panic(fmt.Sprintf("rule %s reads FileState outside the syntax walk's calls on a file", context.ruleName))
+	}
+	if context.fileStates == nil {
+		context.fileStates = map[*token.File]any{}
+	}
+	if context.fileStates[context.file] == nil {
+		context.fileStates[context.file] = new(Kind)
+	}
+	state, isKind := context.fileStates[context.file].(*Kind)
+	if !isKind {
+		// Invariant: a check asks for its file state as one type, so a second type is a mistake in the check, and the
+		// dispatcher's recover makes it this rule's crash on the package.
+		panic(fmt.Sprintf("rule %s reads its file state as %T, where it was made as %T", context.ruleName, state,
+			context.fileStates[context.file]))
+	}
+	return state
+}
+
 // State is the check's own state over the package context covers, a new Kind made on the first call and the same one
 // on every call after, so a check gathers across its calls and judges in a later one, FileExit or PackageExit, without
 // a variable of its own. Each rule has its own context on each package, so the state is dropped with the package and
-// two packages walked at once never share one. A context holds one state, of one type.
+// two packages walked at once never share one. A context holds one state, of one type. A file-local run's context has
+// none: State panics there (see Listener.FileLocal).
 //
 // Mutates: context gains its state on the first call, handed back on every call after, which is the point of it
 func State[Kind any](context *Context) *Kind {
+	if context.fileLocal {
+		// Invariant: a listener marked FileLocal keeps nothing across files, which the mark promises, so a State here
+		// is a wrong mark, and the dispatcher's recover makes it this rule's crash on the package.
+		panic(fmt.Sprintf("rule %s reads State in a file-local run, where it hears only some of the package's "+
+			"files; a listener that gathers across files is not FileLocal", context.ruleName))
+	}
 	if context.state == nil {
 		context.state = new(Kind)
 	}

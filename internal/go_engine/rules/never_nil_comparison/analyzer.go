@@ -36,6 +36,7 @@ import (
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
 // representation: every function, each judged on its own. It reads the function's expression map.
 var Listener = rule.Listener{
+	FileLocal: true,
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{
 		Function:                Check,
 		ReadsValueForExpression: true,

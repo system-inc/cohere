@@ -25,7 +25,8 @@ import (
 const Name = "cohere-go/consistency-no-grouped-var"
 
 // listener hears every declaration statement of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.DeclStmt)(nil)}, Node: judgeStatement}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.DeclStmt)(nil)}, Node: judgeStatement}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_grouped_var", "Flags, inside a function body, a "+

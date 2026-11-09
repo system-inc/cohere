@@ -31,7 +31,8 @@ const exemptPackage = "sync_test"
 // Listener is what the port hears of each package from the dispatcher: every block, in preorder, but none of the
 // exempt package's.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BlockStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BlockStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		if context.Package.Path() == exemptPackage {
 			return

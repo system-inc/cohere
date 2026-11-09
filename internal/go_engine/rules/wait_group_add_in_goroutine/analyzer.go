@@ -30,7 +30,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every go statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.GoStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.GoStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		statement, isGo := node.(*ast.GoStmt)
 		if !isGo {

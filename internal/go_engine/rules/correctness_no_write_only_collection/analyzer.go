@@ -26,6 +26,7 @@ const Name = "cohere-go/correctness-no-write-only-collection"
 // walk goes through the file, and judges them as it leaves the file. A local's scope opens after the statement that
 // declares it, so the walk meets that statement before any reference to the local.
 var listener = rule.Listener{
+	FileLocal: true,
 	FileEnter: enterFile,
 	Nodes:     []ast.Node{(*ast.AssignStmt)(nil), (*ast.DeclStmt)(nil), (*ast.Ident)(nil)},
 	Node:      hearNode,
@@ -66,8 +67,8 @@ type collection struct {
 	isRead bool
 }
 
-// fileState is what the rule gathers over the file being walked, held in its context's state. A local is referenced
-// only in the file that declares it, so one file is the whole of its uses.
+// fileState is what the rule gathers over the file being walked, held in its file state (rule.FileState). A local
+// is referenced only in the file that declares it, so one file is the whole of its uses.
 type fileState struct {
 	// collections is every fresh collection declared in the file so far, in source order.
 	collections []*collection
@@ -77,14 +78,14 @@ type fileState struct {
 
 // enterFile starts a file with no collection gathered.
 func enterFile(context *rule.Context, _ *ast.File) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	state.collections = nil
 	state.byVariable = map[*types.Var]*collection{}
 }
 
 // hearNode gathers the fresh collections a declaration makes, and records what a reference does to one gathered.
 func hearNode(context *rule.Context, node ast.Node, stack []ast.Node) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	switch heard := node.(type) {
 	case *ast.Ident:
 		judgeReference(context, heard, stack, state.byVariable)
@@ -101,7 +102,7 @@ func hearNode(context *rule.Context, node ast.Node, stack []ast.Node) {
 
 // judgeFile reports every collection the file declares whose every reference writes it, as the walk leaves the file.
 func judgeFile(context *rule.Context, _ *ast.File) {
-	for _, found := range rule.State[fileState](context).collections {
+	for _, found := range rule.FileState[fileState](context).collections {
 		// A write by append alone is SA4010's to report, and a collection never referenced is the compiler's.
 		if found.isRead || found.writes == 0 {
 			continue

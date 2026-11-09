@@ -38,6 +38,15 @@ type Listener struct {
 	// PackageExit is called once the listener's walk has covered the package, for a check that judges what it
 	// gathered.
 	PackageExit func(context *Context)
+
+	// FileLocal marks a listener that judges each file on its own: it keeps nothing across a package's files, so it
+	// reads no State, though it may read FileState, and declares no PackageExit. A dispatcher may then hand a large
+	// package's files to several runs of it at once, each over some of the files, so the package that ends a cold run
+	// walks on several cores (#0jnq91n).
+	// Unmarked, a listener hears every file of the package in one run, as it always has. A wrong mark fails loud,
+	// never quietly: Validate refuses it beside PackageExit, and State panics in a file-local run, which the dispatcher
+	// makes the rule's crash.
+	FileLocal bool
 }
 
 // IsSyntax is whether the listener hears the syntax walk, declaring Nodes, Node, FileEnter or FileExit.
@@ -54,8 +63,8 @@ func (listener *Listener) IsIntermediateRepresentation() bool {
 // Validate refuses a listener that would listen for what it does not declare, or declare what nothing calls: one
 // with no callback at all, one that declares two walks, one with PackageExit alone, which no walk gathers for, one
 // that declares the engine's own intermediate representation's walk with none of its callbacks, kinds listed with no
-// callback to call for them, a kind callback with no kinds, a kind that is a bare nil and so names no type, or a kind
-// listed twice.
+// callback to call for them, a kind callback with no kinds, a kind that is a bare nil and so names no type, a kind
+// listed twice, or a listener marked FileLocal that declares PackageExit.
 func (listener *Listener) Validate() error {
 	declared := []string{}
 	if listener.IsIntermediateRepresentation() {
@@ -73,6 +82,10 @@ func (listener *Listener) Validate() error {
 	if len(declared) > 1 {
 		return fmt.Errorf("declares both %s and %s, where a listener hears one; register a listener for each",
 			declared[0], declared[1])
+	}
+	if listener.FileLocal && listener.PackageExit != nil {
+		return errors.New("is marked FileLocal and declares PackageExit, which judges what it gathered across the " +
+			"package's files; a file-local run hears only some of them")
 	}
 	if listener.IsIntermediateRepresentation() {
 		return listener.IntermediateRepresentation.validate()

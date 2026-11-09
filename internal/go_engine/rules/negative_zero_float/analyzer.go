@@ -40,7 +40,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every unary expression and call, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.UnaryExpr)(nil), (*ast.CallExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.UnaryExpr)(nil), (*ast.CallExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch expression := node.(type) {
 		case *ast.UnaryExpr:

@@ -32,6 +32,7 @@ const Name = "cohere-go/testing-no-machine-path"
 // listener reads the file's comments as the syntax dispatcher's walk enters each _test.go file, and hears every
 // literal in it.
 var listener = rule.Listener{
+	FileLocal: true,
 	Requires:  []*analysis.Analyzer{marker.Analyzer, positions.Analyzer},
 	FileEnter: enterFile,
 	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
@@ -56,7 +57,7 @@ var machinePathWithoutReasonMessage = policy.MessageOf(Name, "machinePathWithout
 // so /Users/ alone and /AllUsers/x/ are not home directories.
 var homeDirectory = regexp.MustCompile(`(^|[^A-Za-z0-9_])/(Users|home)/[^/\s"']+/`)
 
-// fileState is what the rule reads once for its package and once for each file, held in its context's state.
+// fileState is what the rule reads once for each file, held in its file state (rule.FileState).
 type fileState struct {
 	// table is the package's line table, read as the walk enters its first file.
 	table *positions.Table
@@ -73,7 +74,7 @@ type fileState struct {
 
 // enterFile reads the package's comment indexes and line table the first time, and whether file holds tests.
 func enterFile(context *rule.Context, file *ast.File) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	if state.table == nil {
 		indexes, isIndexes := context.ResultOf(marker.Analyzer).(*marker.Indexes)
 		if !isIndexes {
@@ -101,7 +102,7 @@ func enterFile(context *rule.Context, file *ast.File) {
 // judgeLiteral reports node when it is a string literal in a _test.go file naming a home directory that no marker
 // excuses with a reason.
 func judgeLiteral(context *rule.Context, node ast.Node, stack []ast.Node) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	literal, isLiteral := node.(*ast.BasicLit)
 	if !state.isTest || !isLiteral || literal.Kind != token.STRING || len(stack) == 0 {
 		return

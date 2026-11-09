@@ -33,6 +33,7 @@ const Name = "cohere-go/consistency-no-dash-punctuation"
 
 // listener reads each file's comments as the syntax dispatcher's walk enters the file, and hears every literal in it.
 var listener = rule.Listener{
+	FileLocal: true,
 	Requires:  []*analysis.Analyzer{positions.Analyzer},
 	FileEnter: enterFile,
 	Nodes:     []ast.Node{(*ast.BasicLit)(nil)},
@@ -80,7 +81,7 @@ const (
 	rawStringText
 )
 
-// fileState is what the rule holds of the file the walk is in, in its context's state.
+// fileState is what the rule holds of the file the walk is in, in its file state (rule.FileState).
 type fileState struct {
 	// table is the package's line table, which reads a comment's or a literal's line without the FileSet's lock.
 	table *positions.Table
@@ -92,7 +93,7 @@ type fileState struct {
 // enterFile reads the line table the first time, looks up the file's own line table, and reports the dashes in
 // file's comments.
 func enterFile(context *rule.Context, file *ast.File) {
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	if state.table == nil {
 		table, isTable := context.ResultOf(positions.Analyzer).(*positions.Table)
 		if !isTable {
@@ -118,7 +119,7 @@ func judgeLiteral(context *rule.Context, node ast.Node, _ []ast.Node) {
 	if !isLiteral || literal.Kind != token.STRING {
 		return
 	}
-	state := rule.State[fileState](context)
+	state := rule.FileState[fileState](context)
 	// literal.Value is the literal's source, quotes included, so it starts at literal.Pos(). Only a dash written as
 	// itself is in the source as a dash, so an escaped one is never seen here.
 	if strings.HasPrefix(literal.Value, "`") {

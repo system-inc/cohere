@@ -23,6 +23,7 @@ var Check = staticcheck_call.FunctionCheck(map[string]staticcheck_call.Rule{
 
 // Listener is what the port hears of each package from the dispatcher: every function, each judged on its own.
 var Listener = rule.Listener{
+	FileLocal:                  true,
 	IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check},
 }
 

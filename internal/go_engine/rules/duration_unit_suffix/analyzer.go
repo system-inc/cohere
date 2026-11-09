@@ -44,8 +44,9 @@ var unitSuffixes = []string{
 // Listener is what the port hears of each package from the dispatcher: every declaration of a variable, every list
 // of fields or parameters, and every assignment, the three places the original reads a name being declared.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.ValueSpec)(nil), (*ast.FieldList)(nil), (*ast.AssignStmt)(nil)},
-	Node:  checkNode,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.ValueSpec)(nil), (*ast.FieldList)(nil), (*ast.AssignStmt)(nil)},
+	Node:      checkNode,
 }
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.

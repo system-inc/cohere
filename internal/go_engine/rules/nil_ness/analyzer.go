@@ -43,7 +43,8 @@ const Doc = "Flags a nil dereference, a panic with nil, and a comparison with ni
 
 // Listener is what the port hears of each package from the dispatcher over the engine's own intermediate
 // representation: every function, each judged on its own.
-var Listener = rule.Listener{IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
+var Listener = rule.Listener{
+	FileLocal: true, IntermediateRepresentation: &rule.IntermediateRepresentationListener{Function: Check}}
 
 // Analyzer is the rule's own analyzer, reporting what the dispatcher's walk found for Listener.
 var Analyzer = dispatch.RuleAnalyzer(rule.Namespace+Name, Name, Doc, &Listener)

@@ -24,7 +24,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every slice expression, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.SliceExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.SliceExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		slice, isSlice := node.(*ast.SliceExpr)
 		if !isSlice {

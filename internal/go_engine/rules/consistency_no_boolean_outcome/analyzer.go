@@ -56,7 +56,8 @@ import (
 const Name = "cohere-go/consistency-no-boolean-outcome"
 
 // listener hears every type spec of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.TypeSpec)(nil)}, Node: judgeTypeSpec}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.TypeSpec)(nil)}, Node: judgeTypeSpec}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_no_boolean_outcome", "Flags a declared struct type with a "+

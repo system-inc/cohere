@@ -33,7 +33,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every range statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.RangeStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.RangeStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		loop, isLoop := node.(*ast.RangeStmt)
 		if !isLoop {

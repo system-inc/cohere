@@ -29,7 +29,8 @@ import (
 const Name = "cohere-go/consistency-require-error-clause"
 
 // listener hears every call of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.CallExpr)(nil)}, Node: judgeCall}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_error_clause", "Flags the literal text given to "+

@@ -26,7 +26,8 @@ import (
 
 // Listener is what the port hears of each package from the dispatcher: every type assertion, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.TypeAssertExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.TypeAssertExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		assertion, isAssertion := node.(*ast.TypeAssertExpr)
 		if !isAssertion {

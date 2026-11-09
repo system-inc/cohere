@@ -56,8 +56,9 @@ const passUrl = "https://pkg.go.dev/golang.org/x/tools/go/analysis/passes/unsafe
 // Listener is what the port hears of each package from the dispatcher: every call, dereference and unary expression,
 // in one preorder, as the original's Preorder over the same three kinds visits them.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.CallExpr)(nil), (*ast.StarExpr)(nil), (*ast.UnaryExpr)(nil)},
-	Node:  checkNode,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.CallExpr)(nil), (*ast.StarExpr)(nil), (*ast.UnaryExpr)(nil)},
+	Node:      checkNode,
 }
 
 // Analyzer runs the port under the original's name, documentation and address, reporting what the shared syntax

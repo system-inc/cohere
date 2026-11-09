@@ -28,7 +28,8 @@ import (
 // Listener is what the port hears of each package from the dispatcher: every block, case clause and select clause, in
 // preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.BlockStmt)(nil), (*ast.CaseClause)(nil), (*ast.CommClause)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		Check(context, node)
 	},

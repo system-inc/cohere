@@ -29,8 +29,9 @@ const Name = "cohere-go/consistency-no-ambiguous-identifier"
 // listener hears every identifier and type switch of the syntax dispatcher's walk, with their ancestors, which an `e`
 // finding reads its suggestion from.
 var listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.Ident)(nil), (*ast.TypeSwitchStmt)(nil)},
-	Node:  judgeNode,
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.Ident)(nil), (*ast.TypeSwitchStmt)(nil)},
+	Node:      judgeNode,
 }
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.

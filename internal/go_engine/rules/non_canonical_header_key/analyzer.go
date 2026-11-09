@@ -40,7 +40,8 @@ const headerType = "net/http.Header"
 // inside one, its right side included, is never judged; the dispatcher walks every node, so the port leaves alone an
 // index with such an assignment among its ancestors, the same indexes.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.IndexExpr)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.IndexExpr)(nil)},
 	Node: func(context *rule.Context, node ast.Node, stack []ast.Node) {
 		index, isIndex := node.(*ast.IndexExpr)
 		if !isIndex {

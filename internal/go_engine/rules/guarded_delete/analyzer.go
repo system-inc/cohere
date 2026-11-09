@@ -40,7 +40,8 @@ var (
 
 // Listener is what the port hears of each package from the dispatcher: every if statement, in preorder.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.IfStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.IfStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		statement, isIf := node.(*ast.IfStmt)
 		if !isIf {

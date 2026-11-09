@@ -38,7 +38,8 @@ import (
 const Name = "cohere-go/consistency-require-operator-assignment"
 
 // listener hears every assignment of the syntax dispatcher's walk.
-var listener = rule.Listener{Nodes: []ast.Node{(*ast.AssignStmt)(nil)}, Node: judgeAssignment}
+var listener = rule.Listener{
+	FileLocal: true, Nodes: []ast.Node{(*ast.AssignStmt)(nil)}, Node: judgeAssignment}
 
 // Analyzer runs the rule over one package, reporting what the syntax dispatcher's walk found for it.
 var Analyzer = dispatch.RuleAnalyzer(Name, "consistency_require_operator_assignment", "Flags x = x op y, where both "+

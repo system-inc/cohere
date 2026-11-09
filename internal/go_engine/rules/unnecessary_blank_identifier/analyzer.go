@@ -31,7 +31,8 @@ import (
 // in preorder. The original judges every assignment of the package and then every range statement, and the walk
 // hands the two over as they stand, which changes the order the findings are reported in and none of them.
 var Listener = rule.Listener{
-	Nodes: []ast.Node{(*ast.AssignStmt)(nil), (*ast.RangeStmt)(nil)},
+	FileLocal: true,
+	Nodes:     []ast.Node{(*ast.AssignStmt)(nil), (*ast.RangeStmt)(nil)},
 	Node: func(context *rule.Context, node ast.Node, _ []ast.Node) {
 		switch statement := node.(type) {
 		case *ast.AssignStmt:
